@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import usePopup from './common/use-popup'
+import { sanitizeHtml } from '../../services/sanitize.js';
 import './char-inventory.css'
 
 function CharInventory({ playerStats }) {
@@ -131,7 +132,7 @@ function CharInventory({ playerStats }) {
                             </i>
                             :&nbsp;
                         </b>
-                        <span dangerouslySetInnerHTML={{ __html: magicItem.description }}></span>
+                        <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(magicItem.description) }}></span>
                     </div>}
                 )}
             </div>}

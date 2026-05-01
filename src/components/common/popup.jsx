@@ -1,4 +1,5 @@
 /* eslint-disable react/prop-types */
+import { sanitizeHtml } from '../../services/sanitize.js';
 import './popup.css'
 
 function Popup({ html, onClickOrKeyDown }) {
@@ -9,7 +10,7 @@ function Popup({ html, onClickOrKeyDown }) {
     document.addEventListener("keydown", handleOnClickOrKeyDown); // Close 
     return (
         <div className="popup-overlay" onClick={handleOnClickOrKeyDown}>
-            <div className="popup-modal" dangerouslySetInnerHTML={{ __html: html }}></div>
+            <div className="popup-modal" dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}></div>
         </div>
     )
 }

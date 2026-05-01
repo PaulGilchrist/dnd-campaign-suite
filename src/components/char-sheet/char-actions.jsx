@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 import React, { useState, useEffect } from 'react'
 import usePopup from './common/use-popup'
+import { sanitizeHtml } from '../../services/sanitize.js';
 import './char-actions.css'
 
 function CharActions({ playerStats }) {
@@ -67,10 +68,10 @@ function CharActions({ playerStats }) {
                 </div>
                 <br />
                 {playerStats.actions.map((action) => {
-                    return <div key={action.name}>
-                         {PopupElement}
-                         <b className={action.details ? "clickable" : ""} onClick={() => showPopup(action)}>{action.name}:</b> <span dangerouslySetInnerHTML={{ __html: action.description }}></span>
-                    </div>
+                                        return <div key={action.name}>
+                          {PopupElement}
+                          <b className={action.details ? "clickable" : ""} onClick={() => showPopup(action)}>{action.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }}></span>
+                     </div>
                 })}
                 <div><b>Base Actions:</b> {actions.join(', ')}</div>
             </div>
@@ -107,10 +108,10 @@ function CharActions({ playerStats }) {
                     <br />
                     {(playerStats.bonusActions.length > 0) && <div>
                         {playerStats.bonusActions.map((bonusAction) => {
-                            return <div key={bonusAction.name}>
-                                 {PopupElement}
-                                 <b className={bonusAction.details ? "clickable" : ""} onClick={() => showPopup(bonusAction)}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: bonusAction.description }}></span>
-                            </div>
+                                                        return <div key={bonusAction.name}>
+                                  {PopupElement}
+                                  <b className={bonusAction.details ? "clickable" : ""} onClick={() => showPopup(bonusAction)}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(bonusAction.description) }}></span>
+                             </div>
                         })}
                     </div>}
                 </div>}

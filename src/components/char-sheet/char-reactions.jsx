@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import usePopup from './common/use-popup'
+import { sanitizeHtml } from '../../services/sanitize.js';
 
 function CharReactions({ playerStats }) {
     const { showPopup, PopupElement } = usePopup((specialAction) => {
@@ -33,8 +34,8 @@ function CharReactions({ playerStats }) {
             <div className='sectionHeader'>Reactions</div>
             {PopupElement}
               {reactions.map((reaction) => {
-                return <div key={reaction.name}>
-                    <b className={reaction.details ? "clickable" : ""} onClick={() => showPopup(reaction)}>{reaction.name}:</b> <span dangerouslySetInnerHTML={{ __html: reaction.description }}></span>
+               return <div key={reaction.name}>
+                    <b className={reaction.details ? "clickable" : ""} onClick={() => showPopup(reaction)}>{reaction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(reaction.description) }}></span>
                 </div>
             })}
         </div>

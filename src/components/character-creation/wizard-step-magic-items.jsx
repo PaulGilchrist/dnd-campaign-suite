@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import SelectableList from './selectable-list';
+import { sanitizeHtml } from '../../services/sanitize.js';
 import './wizard-step-magic-items.css';
 function WizardStepMagicItems({ formData, allMagicItems, ruleset, onArrayFieldChange }) {
   const [warnings, setWarnings] = useState([]);
@@ -51,15 +52,15 @@ function WizardStepMagicItems({ formData, allMagicItems, ruleset, onArrayFieldCh
                                 <div
                                     className="magic-item-description"
                                     dangerouslySetInnerHTML={{
-                                        __html: Array.isArray(item.description) ? item.description[0] : item.description
+                                        __html: sanitizeHtml(Array.isArray(item.description) ? item.description[0] : item.description)
                                     }}
                                 />
                             )}
                             {item.description && Array.isArray(item.description) && item.description.length > 1 && (
                                 <div
-                                    className="magic-item-more-description"
-                                    dangerouslySetInnerHTML={{
-                                        __html: item.description.slice(1).join('\n')
+                                   className="magic-item-more-description"
+                                   dangerouslySetInnerHTML={{
+                                        __html: sanitizeHtml(item.description.slice(1).join('\n'))
                                     }}
                                 />
                             )}

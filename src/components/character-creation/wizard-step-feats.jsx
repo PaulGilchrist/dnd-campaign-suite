@@ -1,6 +1,7 @@
 import React from 'react';
 import SelectableList from './selectable-list';
 import { validateFeats, getFeatLimits } from '../../services/feat-validation.js';
+import { sanitizeHtml } from '../../services/sanitize.js';
 
 function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFeats }) {
   const [warnings, setWarnings] = React.useState([]);
@@ -122,7 +123,7 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
                             {descData.text && (
                                 <div className="feat-description">
                                     {descData.isHtml ? (
-                                        <div dangerouslySetInnerHTML={{ __html: descData.text }} />
+                                        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(descData.text) }} />
                                     ) : (
                                         descData.text
                                     )}

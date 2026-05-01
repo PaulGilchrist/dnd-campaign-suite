@@ -15,7 +15,6 @@
         ]
     },
     "description": "Dungeons and Dragons Character Sheet",
-    
     "license": "MIT",
     "name": "dnd-char-sheet",
     "private": true,
@@ -25,13 +24,11 @@
     },
     "scripts": {
         "api": "node server.js",
-        
         "dev": "concurrently \"npm run api\" \"npm run dev:react\"",
         "dev:react": "vite --host",
         "prod": "node server.js",
         "build": "vite build",
         "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
-        
         "preview": "vite preview --host",
         "start": "npm install && npm run build && node server.js"
     },
@@ -40,6 +37,7 @@
     "dependencies": {
         "@fortawesome/fontawesome-free": "^7.2.0",
         "concurrently": "^9.2.1",
+        "dompurify": "^3.4.2",
         "express": "^5.2.1",
         "file-saver": "^2.0.5",
         "guid": "^0.0.12",
