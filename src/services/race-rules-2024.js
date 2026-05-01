@@ -1,16 +1,6 @@
 import { cloneDeep, uniqBy } from 'lodash';
 import { featuresToIgnore, actions, bonusActions, reactions, characterAdvancement } from './feature-categories-2024'
-
-const getAbilityLongName = (shortName) => {
-    switch (shortName) {
-        case 'STR': return 'Strength';
-        case 'DEX': return 'Dexterity';
-        case 'CON': return 'Constitution';
-        case 'INT': return 'Intelligence';
-        case 'WIS': return 'Wisdom';
-        case 'CHA': return 'Charisma';
-        }
-};
+import utils from './utils.js';
 
 const raceRules = {
     getImmunities: (playerSummary) => {
@@ -67,8 +57,8 @@ const raceRules = {
 
             // Convert ability names if present
         if (race.ability_bonuses) {
-            race.ability_bonuses = race.ability_bonuses.map((ability_bonus) => {
-                ability_bonus.ability_score = getAbilityLongName(ability_bonus.ability_score);
+                        race.ability_bonuses = race.ability_bonuses.map((ability_bonus) => {
+                ability_bonus.ability_score = utils.getAbilityLongName(ability_bonus.ability_score);
                 return ability_bonus;
                });
             }

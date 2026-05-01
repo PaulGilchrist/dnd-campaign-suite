@@ -1,16 +1,6 @@
 import { cloneDeep, uniqBy } from 'lodash';
 import { featuresToIgnore, actions, bonusActions, reactions, characterAdvancement } from './feature-categories-2024'
-
-const getAbilityLongName = (shortName) => {
-    switch (shortName) {
-        case 'STR': return 'Strength';
-        case 'DEX': return 'Dexterity';
-        case 'CON': return 'Constitution';
-        case 'INT': return 'Intelligence';
-        case 'WIS': return 'Wisdom';
-        case 'CHA': return 'Charisma';
-       }
-};
+import utils from './utils.js';
 
 const classRules = {
     getClass: (allClasses, playerSummary) => {
@@ -46,8 +36,8 @@ const classRules = {
            // Convert ability names (2024: saving_throw_proficiencies is now an array)
            // 2024 data may already have long names, so only convert if short names are found
         if (characterClass.saving_throw_proficiencies) {
-            characterClass.saving_throw_proficiencies = characterClass.saving_throw_proficiencies.map((savingThrow) => {
-                const longName = getAbilityLongName(savingThrow);
+                        characterClass.saving_throw_proficiencies = characterClass.saving_throw_proficiencies.map((savingThrow) => {
+                const longName = utils.getAbilityLongName(savingThrow);
                 return longName || savingThrow; // Keep original if not a short name
                });
            }

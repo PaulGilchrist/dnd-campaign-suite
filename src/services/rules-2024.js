@@ -1,6 +1,7 @@
 import { cloneDeep, uniqBy } from 'lodash';
 import classRules from './class-rules-2024.js';
 import raceRules from './race-rules-2024.js';
+import utils from './utils.js';
 
 // Load passive skills from public/data/passive-skills.json
 const loadPassiveSkills = async () => {
@@ -77,16 +78,7 @@ const getSkills = async () => {
 };
 
 const rules = {
-    getAbilityLongName: (shortName) => {
-        switch (shortName) {
-            case 'STR': return 'Strength';
-            case 'DEX': return 'Dexterity';
-            case 'CON': return 'Constitution';
-            case 'INT': return 'Intelligence';
-            case 'WIS': return 'Wisdom';
-            case 'CHA': return 'Charisma';
-        }
-    },
+    getAbilityLongName: utils.getAbilityLongName,
     getAbilities: async (playerStats) => {
         // 2024 Rules: Simpler ability calculation, no racial bonuses
         const skills = await getSkills();

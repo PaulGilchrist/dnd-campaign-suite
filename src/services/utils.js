@@ -1,4 +1,14 @@
 const utils = {
+    getAbilityLongName: (shortName) => {
+        switch (shortName) {
+            case 'STR': return 'Strength';
+            case 'DEX': return 'Dexterity';
+            case 'CON': return 'Constitution';
+            case 'INT': return 'Intelligence';
+            case 'WIS': return 'Wisdom';
+            case 'CHA': return 'Charisma';
+        }
+    },
     getFirstName: (fullName) => {
         if (!fullName || typeof fullName !== 'string') {
             return 'Unknown';
