@@ -24,15 +24,16 @@ const classRules = {
         return characterClass;
     },
     getDruidMaxWildShapeChallengeRating: (playerStats) => {
-        let maxWildShapeChallengeRating = playerStats.class.class_levels[playerStats.level - 1].class_specific.wild_shape_max_cr;
-        if (playerStats.class.subclass && playerStats.class.subclass.name === 'Moon' && playerStats.level > 1) {
-            maxWildShapeChallengeRating = 1;
-            if (playerStats.level > 5) {
-                maxWildShapeChallengeRating = Math.floor(playerStats.level / 3);
-         }
-          }
-        return maxWildShapeChallengeRating
-    },
+            const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+            let maxWildShapeChallengeRating = classLevel?.class_specific?.wild_shape_max_cr || 0;
+            if (playerStats.class.subclass && playerStats.class.subclass.name === 'Moon' && playerStats.level > 1) {
+                maxWildShapeChallengeRating = 1;
+                if (playerStats.level > 5) {
+                    maxWildShapeChallengeRating = Math.floor(playerStats.level / 3);
+              }
+               }
+            return maxWildShapeChallengeRating
+         },
     getDruidWildShapeUses: (playerStats) => {
         // 5e Rules: Always 2 uses per day
         return 2;
@@ -41,10 +42,11 @@ const classRules = {
         // 5e Rules: No limit on known forms (returns null or 0)
         return 0;
     },
-    getDruidBeastFlySpeed: (playerStats) => {
-        // 5e Rules: Use class_specific.wild_shape_fly
-        return playerStats.class.class_levels[playerStats.level - 1].class_specific.wild_shape_fly === true;
-    },
+        getDruidBeastFlySpeed: (playerStats) => {
+         // 5e Rules: Use class_specific.wild_shape_fly
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+        return classLevel?.class_specific?.wild_shape_fly === true;
+      },
     addFeatures: (levels) => {
         const categorizedFeatures = {
                     actions: [],
@@ -110,9 +112,9 @@ const classRules = {
              }
             return subClassLevel
          },
-        getRogueSneakAttack: (playerStats) => {
-             // 5e Rules: Get sneak attack from class_specific
-            const classLevel = playerStats.class.class_levels[playerStats.level - 1];
+                getRogueSneakAttack: (playerStats) => {
+              // 5e Rules: Get sneak attack from class_specific
+            const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
             if (!classLevel || !classLevel.class_specific || !classLevel.class_specific.sneak_attack) {
                 return { dice_count: 0, dice_value: 6 };
              }

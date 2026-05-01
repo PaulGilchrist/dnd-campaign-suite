@@ -593,7 +593,8 @@ const rules = {
     getSpellAbilities: (allSpells, playerStats) => {
         // 2024 Rules: Simplified spellcasting
         let spellAbilities = null;
-        let spellcasting = playerStats.class.class_levels[playerStats.level - 1].spellcasting;
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+        let spellcasting = classLevel?.spellcasting;
 
         if (!spellcasting) {
             spellcasting = classRules.getHighestMajorLevel(playerStats)?.spellcasting;

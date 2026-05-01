@@ -2,7 +2,7 @@
 import React from 'react'
 
 function CharClassRogue({ playerStats }) {
-    const classLevel = playerStats.class.class_levels[playerStats.level - 1];
+    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     // Support both 5e format (class_specific.sneak_attack) and 2024 format (sneak_attack_num_d6)
     let sneakAttack;
     if (classLevel.sneak_attack_num_d6 !== undefined) {

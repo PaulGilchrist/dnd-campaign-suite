@@ -76,7 +76,7 @@ const classRules = {
            }
 
            // Parse tool proficiencies
-           // If it starts with \"Choose\", the player has already selected their tools in character JSON
+             // If it starts with "Choose", the player has already selected their tools in character JSON
            // Otherwise, it's an automatic tool proficiency
         if (characterClass.tool_proficiencies) {
             if (!characterClass.tool_proficiencies.startsWith('Choose')) {
@@ -85,12 +85,12 @@ const classRules = {
            }
 
            // Parse skill proficiencies
-           // If it starts with \"Choose\", the player has already selected their skills in character JSON
-           // Otherwise, parse the skill list into \"Skill: Name\" format
+             // If it starts with "Choose", the player has already selected their skills in character JSON
+             // Otherwise, parse the skill list into "Skill: Name" format
         if (characterClass.skill_proficiencies || characterClass.skill_proficiencies_choices) {
             const skillString = characterClass.skill_proficiencies || characterClass.skill_proficiencies_choices;
             if (!skillString.startsWith('Choose')) {
-                   // Parse skills like \"History, Insight, Medicine, Persuasion, or Religion\"
+                     // Parse skills like "History, Insight, Medicine, Persuasion, or Religion"
                 const skills = skillString.split(',').map(skill => skill.trim().replace(' or ', ''));
                 characterClass.proficiencies = [...characterClass.proficiencies, ...skills.map(skill => `Skill: ${skill}`)];
                }
@@ -98,30 +98,34 @@ const classRules = {
 
         return characterClass;
        },
-    getDruidMaxWildShapeChallengeRating: (playerStats) => {
-           // 2024 Rules: Use beast_max_cr from class_levels
-        let maxWildShapeChallengeRating = playerStats.class.class_levels[playerStats.level - 1].beast_max_cr;
+        getDruidMaxWildShapeChallengeRating: (playerStats) => {
+            // 2024 Rules: Use beast_max_cr from class_levels
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+        let maxWildShapeChallengeRating = classLevel?.beast_max_cr || 0;
 
         if (playerStats.class.major && playerStats.class.major.name === 'Moon' && playerStats.level > 1) {
             maxWildShapeChallengeRating = 1;
             if (playerStats.level > 5) {
                 maxWildShapeChallengeRating = Math.floor(playerStats.level / 3);
-               }
            }
+            }
 
         return maxWildShapeChallengeRating;
        },
-    getDruidWildShapeUses: (playerStats) => {
-           // 2024 Rules: Use wild_shape from class_levels
-        return playerStats.class.class_levels[playerStats.level - 1].wild_shape;
-       },
-    getDruidBeastKnownForms: (playerStats) => {
-           // 2024 Rules: Use beast_known_forms from class_levels
-        return playerStats.class.class_levels[playerStats.level - 1].beast_known_forms;
-       },
+        getDruidWildShapeUses: (playerStats) => {
+             // 2024 Rules: Use wild_shape from class_levels
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+        return classLevel?.wild_shape || 0;
+        },
+        getDruidBeastKnownForms: (playerStats) => {
+              // 2024 Rules: Use beast_known_forms from class_levels
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+        return classLevel?.beast_known_forms || 0;
+        },
     getDruidBeastFlySpeed: (playerStats) => {
-           // 2024 Rules: Use beast_fly_speed from class_levels (\"Yes\" or \"No\")
-        return playerStats.class.class_levels[playerStats.level - 1].beast_fly_speed === 'Yes';
+              // 2024 Rules: Use beast_fly_speed from class_levels ("Yes" or "No")
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+        return classLevel?.beast_fly_speed === 'Yes';
        },
     addFeatures: (levels) => {
         const categorizedFeatures = {
@@ -163,7 +167,7 @@ const classRules = {
        },
     getFeatures: (playerStats) => {
                  // 2024 Rules: Process class and major features
-            const classLevels = playerStats.class.class_levels.filter(classLevel => classLevel.level <= playerStats.level);
+            const classLevels = playerStats.class?.class_levels?.filter(classLevel => classLevel.level <= playerStats.level) || [];
             let features = classRules.addFeatures(classLevels);
 
             if (playerStats.class.major) {
@@ -201,7 +205,7 @@ const classRules = {
        },
     getEnergy: (playerStats) => {
            // 2024 Rules: Get energy properties for Psi Warrior and other classes with energy dice
-        const classLevel = playerStats.class.class_levels[playerStats.level - 1];
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
         if (!classLevel || !classLevel.energy) {
             return null;
            }
@@ -215,7 +219,7 @@ const classRules = {
        },
     getSecondWind: (playerStats) => {
            // 2024 Rules: Get second wind uses for Fighter
-        const classLevel = playerStats.class.class_levels[playerStats.level - 1];
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
         if (!classLevel) {
             return 0;
            }
@@ -223,7 +227,7 @@ const classRules = {
        },
     getWeaponMastery: (playerStats) => {
             // 2024 Rules: Get weapon mastery count for Fighter and Barbarian
-            const classLevel = playerStats.class.class_levels[playerStats.level - 1];
+            const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
             if (!classLevel) {
                 return 0;
             }
@@ -231,7 +235,7 @@ const classRules = {
         },
         getMartialArtsDie: (playerStats) => {
             // 2024 Rules: Get martial arts die for Monk
-            const classLevel = playerStats.class.class_levels[playerStats.level - 1];
+            const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
             if (!classLevel) {
                 return 4; // Default d4 if no level found
             }
@@ -239,7 +243,7 @@ const classRules = {
         },
         getFocusPoints: (playerStats) => {
             // 2024 Rules: Get focus points (formerly ki points) for Monk
-            const classLevel = playerStats.class.class_levels[playerStats.level - 1];
+            const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
             if (!classLevel) {
                 return 0;
             }
@@ -247,7 +251,7 @@ const classRules = {
         },
         getUnarmoredMovementIncrease: (playerStats) => {
                      // 2024 Rules: Get unarmored movement increase for Monk
-                    const classLevel = playerStats.class.class_levels[playerStats.level - 1];
+                    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
                     if (!classLevel) {
                         return 0;
                      }
@@ -255,7 +259,7 @@ const classRules = {
                  },
                 getFavoredEnemy: (playerStats) => {
                                       // 2024 Rules: Get favored enemy count for Ranger
-                                    const classLevel = playerStats.class.class_levels[playerStats.level - 1];
+                                    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
                                     if (!classLevel) {
                                         return 0;
                                       }
@@ -263,7 +267,7 @@ const classRules = {
                                   },
                                 getRogueSneakAttack: (playerStats) => {
                                                                        // 2024 Rules: Get sneak attack dice count for Rogue
-                                                                    const classLevel = playerStats.class.class_levels[playerStats.level - 1];
+                                                                    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
                                                                     if (!classLevel) {
                                                                         return { dice_count: 0, dice_value: 6 };
                                                                        }
@@ -271,7 +275,7 @@ const classRules = {
                                                                    },
                                                                 getEldritchInvocations: (playerStats) => {
                                                                        // 2024 Rules: Get eldritch invocations count for Warlock
-                                                                    const classLevel = playerStats.class.class_levels[playerStats.level - 1];
+                                                                    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
                                                                     if (!classLevel) {
                                                                         return 0;
                                                                        }

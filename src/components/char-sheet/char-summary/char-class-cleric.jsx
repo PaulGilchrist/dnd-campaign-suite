@@ -4,15 +4,15 @@ import storage from '../../../services/storage'
 import HiddenInput from '../../common/hidden-input'
 
 function CharClassCleric({ playerStats }) {
-    const classLevel = playerStats.class.class_levels[playerStats.level - 1];
-    // 2024 uses top-level channel_divinity, 5e uses class_specific.channel_divinity_charges
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+     // 2024 uses top-level channel_divinity, 5e uses class_specific.channel_divinity_charges
     const maxChannelDivinity = playerStats.rules === '2024'
-        ? classLevel.channel_divinity
-        : classLevel.class_specific?.channel_divinity_charges;
-    // Destroy Undead was removed in 2024 rules, so only show for 5e
+          ? classLevel?.channel_divinity || 0
+          : classLevel?.class_specific?.channel_divinity_charges || 0;
+     // Destroy Undead was removed in 2024 rules, so only show for 5e
         const destroyUndeadCR = playerStats.rules === '2024'
-             ? null
-             : classLevel.class_specific?.destroy_undead_cr;
+              ? null
+              : classLevel?.class_specific?.destroy_undead_cr;
     const [channelDivinityCharges, setChannelDivinityCharges] = React.useState(0);
     const [showInput, setShowInput] = React.useState(false);
     React.useEffect(() => {

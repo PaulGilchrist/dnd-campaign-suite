@@ -8,15 +8,22 @@ function CharClassWarlock({ playerStats }) {
 
     if (is2024) {
         invocationsKnown = classRules2024.getEldritchInvocations(playerStats);
-    } else {
-        const classSpecific = playerStats.class.class_levels[playerStats.level-1].class_specific;
+     } else {
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level-1];
+        const classSpecific = classLevel?.class_specific;
         invocationsKnown = classSpecific?.invocations_known || 0;
     }
 
     return (<React.Fragment>
          {playerStats.class.name === 'Warlock' && <div>
              {playerStats.level > 10 && !is2024 && <React.Fragment>
-                 <div><b>Arcanums Known (levels 6-9): </b>{playerStats.class.class_levels[playerStats.level-1].class_specific.mystic_arcanum_level_6}, {playerStats.class.class_levels[playerStats.level-1].class_specific.mystic_arcanum_level_7}, {playerStats.class.class_levels[playerStats.level-1].class_specific.mystic_arcanum_level_8}, {playerStats.class.class_levels[playerStats.level-1].class_specific.mystic_arcanum_level_9}</div>
+                 {(() => {
+                     const classLevel = playerStats.class?.class_levels?.[playerStats.level-1];
+                     const classSpecific = classLevel?.class_specific;
+                     return (
+                         <div><b>Arcanums Known (levels 6-9): </b>{classSpecific?.mystic_arcanum_level_6 || 0}, {classSpecific?.mystic_arcanum_level_7 || 0}, {classSpecific?.mystic_arcanum_level_8 || 0}, {classSpecific?.mystic_arcanum_level_9 || 0}</div>
+                     );
+                 })()}
                  {playerStats.class.arcanums && <div>
                      <b>Arcanums: </b>{playerStats.class.arcanums.sort().join(', ')}
                  </div>}

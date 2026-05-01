@@ -22,17 +22,17 @@ function CharClassBard({ playerStats }) {
         storage.setProperty(playerStats.name, 'bardicInspirationUses', bardicInspirationUses);
         setBardicInspirationUses(bardicInspirationUses);
     };
-    const classLevel = playerStats.class.class_levels[playerStats.level-1];
+    const classLevel = playerStats.class?.class_levels?.[playerStats.level-1];
     	const is2024 = playerStats.rules === '2024';
 	
     	// 2024 uses top-level bardic_die, 5e uses class_specific.bardic_inspiration_die
     	const bardicDie = is2024
-    		? classLevel.bardic_die
-    		: classLevel.class_specific?.bardic_inspiration_die;
+    			? classLevel?.bardic_die || 0
+    			: classLevel?.class_specific?.bardic_inspiration_die || 0;
 	
     	// 5e-only features
-    	const songOfRestDie = is2024 ? null : classLevel.class_specific?.song_of_rest_die;
-    	const magicalSecrets = is2024 ? null : classLevel.class_specific?.magical_secrets_max_5 || 0;
+    	const songOfRestDie = is2024 ? null : classLevel?.class_specific?.song_of_rest_die;
+    	const magicalSecrets = is2024 ? null : classLevel?.class_specific?.magical_secrets_max_5 || 0;
 	
     	// 5e-only subclass magical secrets (Lore)
     	let subclassMagicalSecrets = 0;
@@ -61,3 +61,4 @@ function CharClassBard({ playerStats }) {
 }
 
 export default CharClassBard
+

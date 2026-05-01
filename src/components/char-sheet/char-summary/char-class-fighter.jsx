@@ -4,7 +4,7 @@ import storage from '../../../services/storage'
 import HiddenInput from '../../common/hidden-input'
 
 function CharClassFighter({ playerStats }) {
-    const classLevel = playerStats.class.class_levels[playerStats.level - 1];
+    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const [secondWindUses, setSecondWindUses] = React.useState(0);
     const [showSecondWindInput, setShowSecondWindInput] = React.useState(false);
     const [psionicEnergy, setPsionicEnergy] = React.useState(0);

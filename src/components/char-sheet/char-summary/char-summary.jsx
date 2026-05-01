@@ -50,8 +50,8 @@ function CharSummary({ playerStats, onDeleteCharacter }) {
         const unarmoredMovementIncrease = classRules.getUnarmoredMovementIncrease(playerStats);
         speed += unarmoredMovementIncrease;
     }
-    if (playerStats.class.name === 'Barbarian') {
-        const classLevel = playerStats.class.class_levels[playerStats.level - 1];
+        if (playerStats.class.name === 'Barbarian') {
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
         const unarmoredMovement = classLevel?.class_specific?.unarmored_movement || 0;
         speed += unarmoredMovement;
     }

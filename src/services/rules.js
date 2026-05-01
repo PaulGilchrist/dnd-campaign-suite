@@ -360,28 +360,31 @@ const rules = {
         }
         // If we have a Monk, then their hands are a weapon
         if (playerStats.class.name === 'Monk') {
-            const martialArts = playerStats.class.class_levels[playerStats.level - 1].class_specific.martial_arts;
-            attacks.push({
-                "name": 'Unarmed Strike',
-                "damage": `${martialArts.dice_count}d${martialArts.dice_value}+${dexterity.bonus}`,
-                "damageType": 'Bludgeoning',
-                "damageFormula": `Damage Formula = Monk Open Hand (${martialArts.dice_count}d${martialArts.dice_value}) + Dexterity Bonus (${dexterity.bonus})`,
-                "hitBonus": dexterity.bonus + proficiency,
-                "hitBonusFormula": `To Hit Bonus Formula = Dexterity Bonus (${dexterity.bonus}) + Proficiency (${proficiency})`,
-                "range": 5,
-                "type": "Action"
-            });
-            attacks.push({
-                "name": 'Unarmed Strike',
-                "damage": `${martialArts.dice_count}d${martialArts.dice_value}+${dexterity.bonus}`,
-                "damageType": 'Bludgeoning',
-                "damageFormula": `Damage Formula = Monk Open Hand (${martialArts.dice_count}d${martialArts.dice_value}) + Dexterity Bonus (${dexterity.bonus})`,
-                "hitBonus": dexterity.bonus + proficiency,
-                "hitBonusFormula": `To Hit Bonus Formula = Dexterity Bonus (${dexterity.bonus}) + Proficiency (${proficiency})`,
-                "range": 5,
-                "type": "Bonus Action"
-            });
-        }
+                    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+                    const martialArts = classLevel?.class_specific?.martial_arts;
+                    if (martialArts) {
+                        attacks.push({
+                             "name": 'Unarmed Strike',
+                             "damage": `${martialArts.dice_count}d${martialArts.dice_value}+${dexterity.bonus}`,
+                             "damageType": 'Bludgeoning',
+                             "damageFormula": `Damage Formula = Monk Open Hand (${martialArts.dice_count}d${martialArts.dice_value}) + Dexterity Bonus (${dexterity.bonus})`,
+                             "hitBonus": dexterity.bonus + proficiency,
+                             "hitBonusFormula": `To Hit Bonus Formula = Dexterity Bonus (${dexterity.bonus}) + Proficiency (${proficiency})`,
+                             "range": 5,
+                             "type": "Action"
+                         });
+                        attacks.push({
+                             "name": 'Unarmed Strike',
+                             "damage": `${martialArts.dice_count}d${martialArts.dice_value}+${dexterity.bonus}`,
+                             "damageType": 'Bludgeoning',
+                             "damageFormula": `Damage Formula = Monk Open Hand (${martialArts.dice_count}d${martialArts.dice_value}) + Dexterity Bonus (${dexterity.bonus})`,
+                             "hitBonus": dexterity.bonus + proficiency,
+                             "hitBonusFormula": `To Hit Bonus Formula = Dexterity Bonus (${dexterity.bonus}) + Proficiency (${proficiency})`,
+                             "range": 5,
+                             "type": "Bonus Action"
+                         });
+                     }
+                 }
         // Add spell details
         if (playerStats.spellAbilities) {
             let spells = playerStats.spellAbilities.spells.map(spell => {
@@ -559,13 +562,14 @@ const rules = {
          }
         return [proficienciesAllowed, proficiencies.sort()];
     },
-        getSpellAbilities: (allSpells, playerStats) => {
-          // Dependencies: Abilities, Class 
+                getSpellAbilities: (allSpells, playerStats) => {
+            // Dependencies: Abilities, Class 
         let spellAbilities = null;
-        let spellcasting = playerStats.class.class_levels[playerStats.level - 1].spellcasting;
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+        let spellcasting = classLevel?.spellcasting;
         if(!spellcasting) {
-            spellcasting = classRules.getHighestSubclassLevel(playerStats).spellcasting;
-        }
+            spellcasting = classRules.getHighestSubclassLevel(playerStats)?.spellcasting;
+          }
         if(spellcasting) {
              // Check if spellcasting requires a specific major/subclass
             if (spellcasting.required_major && spellcasting.required_major !== playerStats.class.major?.name && spellcasting.required_major !== playerStats.class.subclass?.name) {

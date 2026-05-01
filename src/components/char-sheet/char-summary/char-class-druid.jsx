@@ -26,7 +26,7 @@ function CharClassDruid({ playerStats }) {
         setWildShapeUses(wildShapeUses);
      };
     
-    const classLevel = playerStats.class.class_levels[playerStats.level-1];
+    const classLevel = playerStats.class?.class_levels?.[playerStats.level-1];
     
     let maxWildShapeChallengeRating;
         let maxWildShapeUses;
