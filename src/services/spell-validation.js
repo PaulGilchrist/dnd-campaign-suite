@@ -33,9 +33,9 @@ async function loadClassData(version = '5e') {
   try {
     const path = version === '2024' ? 'data/2024/classes.json' : 'data/classes.json';
     const response = await fetch(path);
-    if (!response.ok) {
-      throw new Error(`Failed to load ${version} classes.json from ${fullPath}`);
-    }
+        if (!response.ok) {
+      throw new Error(`Failed to load ${version} classes.json from ${path}`);
+      }
     const data = await response.json();
     dataCache[version].classes = data;
     return data;
@@ -58,9 +58,9 @@ async function loadRaceData(version = '5e') {
   try {
     const path = version === '2024' ? 'data/2024/races.json' : 'data/races.json';
         const response = await fetch(path);
-    if (!response.ok) {
-      throw new Error(`Failed to load ${version} races.json from ${fullPath}`);
-    }
+        if (!response.ok) {
+      throw new Error(`Failed to load ${version} races.json from ${path}`);
+       }
     const data = await response.json();
     dataCache[version].races = data;
     return data;
@@ -112,9 +112,9 @@ async function loadFeatData(version = '5e') {
     const path = version === '2024' ? 'data/2024/feats.json' : 'data/feats.json';
     
     const response = await fetch(path);
-    if (!response.ok) {
-      throw new Error(`Failed to load ${version} feats.json from ${fullPath}`);
-    }
+        if (!response.ok) {
+      throw new Error(`Failed to load ${version} feats.json from ${path}`);
+       }
     const data = await response.json();
     dataCache[version].feats = data;
     return data;

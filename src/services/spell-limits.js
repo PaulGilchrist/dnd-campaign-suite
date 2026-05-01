@@ -19,8 +19,8 @@ async function loadClassData(version = '5e') {
     console.log(`Loading ${version} classes from:`, path);
     const response = await fetch(path);
     if (!response.ok) {
-      throw new Error(`Failed to load ${version} classes.json from ${fullPath}`);
-    }
+          throw new Error(`Failed to load ${version} classes.json from ${path}`);
+         }
     const data = await response.json();
     classDataCache[version] = data;
     return data;
