@@ -4,19 +4,7 @@ import { validateStep, validateFinalFormData, getPointBuyCosts } from './utils';
 import WizardHeader from './wizard-header';
 import WizardProgressBar from './wizard-progress-bar';
 import WizardFooter from './wizard-footer';
-import WizardStepRules from './wizard-step-rules';
-import WizardStepBasic from './wizard-step-basic';
-import WizardStepRaceClass from './wizard-step-race-class';
-import WizardStepAbilities from './wizard-step-abilities';
-import WizardStepSkills from './wizard-step-skills';
-import WizardStepLanguages from './wizard-step-languages';
-import WizardStepInventory from './wizard-step-inventory';
-import WizardStepSpells from './wizard-step-spells';
-import WizardStepFeats from './wizard-step-feats';
-import WizardStepSpecial from './wizard-step-special';
-import WizardStepResistances from './wizard-step-resistances';
-import WizardStepMagicItems from './wizard-step-magic-items';
-
+import { WIZARD_STEPS, getTotalSteps } from './steps-config';
 import useWizardForm from './use-wizard-form';
 import useWizardData from './use-wizard-data';
 import useWizardNavigation from './use-wizard-navigation';
@@ -277,129 +265,56 @@ function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, a
      }, [currentStep, formData, racesData, classSubtypes, ruleset, onComplete, setErrors]);
 
   const renderStep = useCallback(() => {
-    switch (currentStep) {
-      case 1:
-        return (
-             <WizardStepRules
-            ruleset={ruleset}
-            errors={errors}
-            onRulesetChange={handleRulesetChange}
-            />
-           );
-      case 2:
-        return (
-             <WizardStepBasic
-            formData={formData}
-            errors={errors}
-            backgrounds={backgrounds}
-            ruleset={ruleset}
-            onInputChange={updateField}
-            />
-           );
-      case 3:
-        return (
-             <WizardStepRaceClass
-            formData={formData}
-            errors={errors}
-            racesData={racesData}
-            classSubtypes={classSubtypes}
-            ruleset={ruleset}
-            onInputChange={updateField}
-            />
-           );
-      case 4:
-        return (
-             <WizardStepFeats
-            formData={formData}
-            allFeats={feats}
-            onArrayFieldChange={updateArrayField}
-            preSelectedFeats={preSelectedFeats}
-            />
-           );
-      case 5:
-        return (
-             <WizardStepAbilities
-            formData={formData}
-            errors={errors}
-            onAbilityBaseScoreChange={handleAbilityBaseScoreChange}
-            onAbilityImprovementChange={handleAbilityImprovementChange}
-            onAbilityMiscBonusChange={handleAbilityMiscBonusChange}
-            />
-           );
-      case 6:
-        return (
-             <WizardStepSkills
-            formData={formData}
-            errors={errors}
-            onSkillToggle={handleSkillToggle}
-            onSkillExpertiseToggle={handleSkillExpertiseToggle}
-            skillLimits={skillLimits}
-            expertiseLimits={expertiseLimits}
-            warnings={skillWarnings}
-            preSelectedSkills={preSelectedSkills}
-            />
-           );
-      case 7:
-        return (
-             <WizardStepLanguages
-            formData={formData}
-            errors={errors}
-            onLanguageToggle={handleLanguageToggle}
-            onFightingStyleToggle={handleFightingStyleToggle}
-            languageLimits={languageLimits}
-            fightingStyleLimits={fightingStyleLimits}
-            warnings={languageWarnings}
-            preSelectedLanguages={preSelectedLanguages}
-            preSelectedFightingStyles={preSelectedFightingStyles}
-            />
-           );
-      case 8:
-        return (
-             <WizardStepResistances
-            formData={formData}
-            onResistanceToggle={handleResistanceToggle}
-            onImmunityToggle={handleImmunityToggle}
-            warnings={resistanceWarnings}
-            preSelectedResistances={preSelectedResistancesList.resistances}
-            preSelectedImmunities={preSelectedResistancesList.immunities}
-            />
-           );
-      case 9:
-        return (
-             <WizardStepSpells
-            formData={formData}
-            allSpells={allSpells || []}
-            onArrayFieldChange={updateArrayField}
-            />
-           );
-      case 10:
-        return (
-             <WizardStepMagicItems
-            formData={formData}
-            allMagicItems={magicItems}
-            ruleset={ruleset}
-            onArrayFieldChange={updateArrayField}
-            />
-           );
-      case 11:
-        return (
-             <WizardStepInventory
-            formData={formData}
-            tempInventory={tempInventory}
-            onInventoryChange={updateInventory}
-            onTempInventoryChange={updateTempInventory}
-            />
-           );
-      case 12:
-        return (
-             <WizardStepSpecial
-            formData={formData}
-            onArrayFieldChange={updateArrayField}
-            />
-           );
-      default:
+    const stepConfig = WIZARD_STEPS.find((step) => step.step === currentStep);
+    if (!stepConfig) {
         return null;
       }
+
+    const StepComponent = stepConfig.component;
+    const props = stepConfig.getProps({
+      ruleset,
+      errors,
+      formData,
+      backgrounds,
+      racesData,
+      classSubtypes,
+      feats,
+      magicItems,
+      allSpells,
+      preSelectedFeats,
+      preSelectedSkills,
+      preSelectedLanguages,
+      preSelectedFightingStyles,
+      preSelectedResistances: preSelectedResistancesList.resistances,
+      preSelectedImmunities: preSelectedResistancesList.immunities,
+      skillLimits,
+      expertiseLimits,
+      skillWarnings,
+      languageLimits,
+      fightingStyleLimits,
+      languageWarnings,
+      resistanceWarnings,
+      tempInventory,
+      onRulesetChange: handleRulesetChange,
+      onInputChange: updateField,
+      onArrayFieldChange: updateArrayField,
+      onInventoryChange: updateInventory,
+      onTempInventoryChange: updateTempInventory,
+      onAbilityBaseScoreChange: handleAbilityBaseScoreChange,
+      onAbilityImprovementChange: handleAbilityImprovementChange,
+      onAbilityMiscBonusChange: handleAbilityMiscBonusChange,
+      onSkillToggle: handleSkillToggle,
+      onSkillExpertiseToggle: handleSkillExpertiseToggle,
+      onLanguageToggle: handleLanguageToggle,
+      onFightingStyleToggle: handleFightingStyleToggle,
+      onResistanceToggle: handleResistanceToggle,
+      onImmunityToggle: handleImmunityToggle,
+      warnings: skillWarnings,
+      allFeats: feats,
+      allMagicItems: magicItems,
+      });
+
+    return <StepComponent {...props} />;
      }, [currentStep, ruleset, errors, formData, backgrounds, racesData, classSubtypes, feats, magicItems,
     preSelectedFeats, preSelectedSkills, preSelectedLanguages, preSelectedFightingStyles,
     preSelectedResistancesList, skillLimits, expertiseLimits, skillWarnings,
@@ -410,6 +325,8 @@ function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, a
     handleSkillToggle, handleSkillExpertiseToggle, handleLanguageToggle, handleFightingStyleToggle,
     handleResistanceToggle, handleImmunityToggle]);
 
+  const totalSteps = getTotalSteps();
+
   return (
       <div className="character-creation-wizard-overlay">
         <div className="character-creation-wizard">
@@ -419,7 +336,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, a
           />
           <WizardProgressBar
           currentStep={currentStep}
-          totalSteps={12}
+          totalSteps={totalSteps}
           isEditing={isEditing}
           />
           <div className="wizard-content">
@@ -428,7 +345,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, a
           <WizardFooter
           currentStep={currentStep}
           isFirstStep={isEditing ? currentStep === 2 : currentStep === 1}
-          isLastStep={currentStep === 12}
+          isLastStep={currentStep === totalSteps}
           onCancel={onCancel}
           onPrevious={navigatePrevious}
           onNext={handleNext}
