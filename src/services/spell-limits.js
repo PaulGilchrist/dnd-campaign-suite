@@ -16,7 +16,6 @@ async function loadClassData(version = '5e') {
   try {
     const path = version === '2024' ? 'data/2024/classes.json' : 'data/classes.json';
     
-    console.log(`Loading ${version} classes from:`, path);
     const response = await fetch(path);
     if (!response.ok) {
           throw new Error(`Failed to load ${version} classes.json from ${path}`);

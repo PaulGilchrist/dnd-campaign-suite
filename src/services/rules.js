@@ -485,7 +485,6 @@ const rules = {
                     }
                     return {...magicItem, quantity: playerMagicItem.quantity, rarity: playerMagicItem.rarity ? playerMagicItem.rarity : magicItem.rarity };
                 }
-                console.log(playerMagicItem);
                 return{...playerMagicItem};
             });
             return playerMagicItems;

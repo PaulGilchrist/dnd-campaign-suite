@@ -21,7 +21,6 @@ export const getCharacterFiles = async (campaign) => {
     }
     
     const data = await response.json();
-    console.log(`getCharacterFiles for '${campaign}':`, data);
     return data.files || [];
   } catch (error) {
     console.error('Error fetching character files:', error);
@@ -30,10 +29,8 @@ export const getCharacterFiles = async (campaign) => {
 };
 
 export const loadCharacters = async (campaign, characterFiles) => {
-  console.log(`loadCharacters called with campaign: '${campaign}', files:`, characterFiles);
   const encodedCampaign = encodeURIComponent(campaign);
   const urls = characterFiles.map(file => `/api/characters/${encodedCampaign}/${encodeURIComponent(file)}`);
-  console.log(`Generated URLs:`, urls);
   const promises = urls.map(url => fetch(url).then(response => {
     if (!response.ok) {
       throw new Error(`Failed to load character: ${response.statusText}`);
@@ -43,7 +40,6 @@ export const loadCharacters = async (campaign, characterFiles) => {
   
   try {
     const data = await Promise.all(promises);
-    console.log(`loadCharacters result for '${campaign}':`, data);
     return data;
   } catch (error) {
     console.error('Error loading characters:', error);

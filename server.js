@@ -134,9 +134,7 @@ app.get('/api/characters/:campaign/:file', (req, res) => {
 const readFile = () => {
     fs.readFile('characterChangeData.json', 'utf-8', (err, data) => {
         if (err) {
-            console.log('Character change data file not found');
         } else {
-            console.log('Character change data retrieved');
             characterChangeData = JSON.parse(data.toString());
         }
     });
@@ -147,7 +145,6 @@ const saveFile = () => {
         if (err) {
             console.error('Failed to save character change data');
         }
-        console.log('Character change data saved');
     });
 }
 // API endpoint to create a new campaign folder (must be BEFORE wildcard routes)
@@ -292,9 +289,6 @@ app.put('/api/campaigns/:campaign', (req, res) => {
 app.post('/api/characters', (req, res) => {
     const { campaignName, character } = req.body;
     
-    console.log('=== POST /api/characters ===');
-    console.log('Received campaignName:', campaignName);
-    console.log('Received character:', character);
     
     if (!campaignName || !character) {
         console.error('Missing campaignName or character');
@@ -304,7 +298,6 @@ app.post('/api/characters', (req, res) => {
     const campaignsDir = path.join(process.cwd(), 'public', 'characters');
     const campaignDir = path.join(campaignsDir, campaignName.trim());
     
-    console.log('Campaign directory path:', campaignDir);
     
     try {
         if (!fs.existsSync(campaignDir)) {
@@ -317,7 +310,6 @@ app.post('/api/characters', (req, res) => {
         const fileName = `${charName.toLowerCase().replace(/\s+/g, '-')}.json`;
         const filePath = path.join(campaignDir, fileName);
         
-        console.log('Character file path:', filePath);
         
         // Check if file already exists
         if (fs.existsSync(filePath)) {
@@ -327,7 +319,6 @@ app.post('/api/characters', (req, res) => {
         
         // Write character data to file
         fs.writeFileSync(filePath, JSON.stringify(character, null, 2));
-        console.log('Character file written successfully:', filePath);
         res.status(201).json({ 
             message: 'Character created successfully', 
             character: character,
@@ -377,7 +368,6 @@ const publish = (key, data) => {
 const keepAlive = () => {
     fetch(`http://localhost:${PORT}/health`)
         .then((response) => {
-            console.log(`Response: ${response.status}`);
          })
          .catch((error) => {
             console.error(`Error: ${error.message}`);

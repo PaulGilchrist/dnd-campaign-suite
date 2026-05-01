@@ -13,7 +13,6 @@ function CharFeats({ playerStats, showPopup }) {
         // Use the deployment path from Vite config base
         const featsUrl = `/data/${featsFile}`;
         
-        console.log(`[CharFeats] Fetching feats from: ${featsUrl}`);
         
         fetch(featsUrl)
             .then(response => {
@@ -23,7 +22,6 @@ function CharFeats({ playerStats, showPopup }) {
                 return response.json();
              })
              .then(featsData => {
-                console.log(`[CharFeats] Loaded ${featsData.length} feats`);
                  // For 2024, feat names are uppercase (e.g., "ACTOR", "ATHLETE")
                  // For 5e, feat names use lowercase with hyphens (e.g., "actor", "athlete")
                  // Character feat names are typically title case with spaces (e.g., "Actor", "Athlete")
@@ -34,7 +32,6 @@ function CharFeats({ playerStats, showPopup }) {
                     return normalizedName === normalizedInput || normalizedIndex === normalizedInput;
                 });
                 if (feat) {
-                    console.log(`[CharFeats] Found feat: ${feat.name}`);
                     showPopup(feat);
                 } else {
                     console.warn(`[CharFeats] Feat not found: ${featName} (normalized: ${normalizedInput})`);

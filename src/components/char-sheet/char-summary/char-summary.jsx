@@ -107,7 +107,6 @@ function CharSummary({ playerStats, onDeleteCharacter }) {
                 <div>
                     <CharFeats playerStats={playerStats} showPopup={(feat) => {
                         if (feat.desc || feat.description) {
-                            console.log(`[CharSummary] Feat clicked: ${feat.name}`, {
                                 featData: feat,
                                 rules: playerStats.rules || '5e (default)'
                             });

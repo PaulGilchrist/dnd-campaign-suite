@@ -28,22 +28,14 @@ function CampaignSelection({ onCampaignSelect }) {
 
   const handleCampaignSelect = async (campaign) => {
         try {
-          setLoading(true);
-          console.log(`handleCampaignSelect called for: '${campaign}'`);
-          const characterFiles = await getCharacterFiles(campaign);
-          console.log(`Character files for '${campaign}':`, characterFiles);
-          const characters = await loadCharacters(campaign, characterFiles);
-          console.log(`Loaded characters for '${campaign}':`, characters);
+                  setLoading(true);
+                  const characterFiles = await getCharacterFiles(campaign);
+                  const characters = await loadCharacters(campaign, characterFiles);
         
-          // Store campaign and characters in sessionStorage
-          // Even if empty, allow navigation to char sheet
-          sessionStorage.setItem('currentCampaign', campaign);
-          sessionStorage.setItem('characters', JSON.stringify(characters));
-          console.log(`Stored campaign '${campaign}' in sessionStorage`);
-          console.log(`Current sessionStorage values:`, {
-            currentCampaign: sessionStorage.getItem('currentCampaign'),
-            characters: sessionStorage.getItem('characters')
-            });
+                   // Store campaign and characters in sessionStorage
+                   // Even if empty, allow navigation to char sheet
+                  sessionStorage.setItem('currentCampaign', campaign);
+                  sessionStorage.setItem('characters', JSON.stringify(characters));
           
           // Notify parent to switch views
           if (onCampaignSelect) {

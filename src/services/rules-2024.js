@@ -510,11 +510,9 @@ const rules = {
             // Handle both string names and objects
             let itemName = typeof itemNameOrObj === 'string' ? itemNameOrObj : itemNameOrObj.name;
 
-            console.log('[Rules2024 getMagicItems] Processing item:', itemName);
             const magicItem = allMagicItems.find(m => m.name === itemName);
 
             if (!magicItem) {
-                console.warn(`[Rules2024 getMagicItems] Item not found in database: ${itemName}`);
                 return null;
             }
 
@@ -677,30 +675,19 @@ const rules = {
         return spellMaxLevel;
     },
     getPlayerStats: async (allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary) => {
-        console.log('[Rules2024 getPlayerStats] START');
-        const playerStats = cloneDeep(playerSummary);
-        playerStats.proficiency = Math.floor((playerSummary.level - 1) / 4 + 2);
+            const playerStats = cloneDeep(playerSummary);
+            playerStats.proficiency = Math.floor((playerSummary.level - 1) / 4 + 2);
 
-        // Initialize senses array early to prevent undefined errors
-        playerStats.senses = [];
+             // Initialize senses array early to prevent undefined errors
+            playerStats.senses = [];
 
-        // Store equipment reference for mastery lookup
-        playerStats.equipment = allEquipment;
+             // Store equipment reference for mastery lookup
+            playerStats.equipment = allEquipment;
 
-        console.log('[Rules2024 getPlayerStats] Before getMagicItems:', {
-            hasInventory: !!playerSummary.inventory,
-            hasMagicItemsInInventory: !!playerSummary.inventory?.magicItems,
-            magicItemsData: JSON.stringify(playerSummary.inventory?.magicItems)
-        });
-        playerStats.class = classRules.getClass(allClasses, playerSummary);
-        playerStats.race = raceRules.getRace(allRaces, playerSummary);
-        const resultMagicItems = rules.getMagicItems(allMagicItems, playerSummary);
-        console.log('[Rules2024 getPlayerStats] getMagicItems returned:', {
-            hasResult: !!resultMagicItems,
-            length: resultMagicItems?.length || 0,
-            data: JSON.stringify(resultMagicItems)
-        });
-        playerStats.inventory.magicItems = resultMagicItems;
+            playerStats.class = classRules.getClass(allClasses, playerSummary);
+            playerStats.race = raceRules.getRace(allRaces, playerSummary);
+            const resultMagicItems = rules.getMagicItems(allMagicItems, playerSummary);
+            playerStats.inventory.magicItems = resultMagicItems;
 
         // Dependency on class and race begin here 
         [playerStats.actions, playerStats.bonusActions, playerStats.reactions, playerStats.specialActions, playerStats.characterAdvancement] = rules.getActions(playerStats);

@@ -8,7 +8,6 @@ import './char-spells.css'
 function CharSpells({ playerStats, handleTogglePreparedSpells }) {
     const { showPopup, PopupElement } = usePopup((spell) => {
         if (spell.desc) {
-            console.log(`[CharSpells] Spell clicked: ${spell.name}`, {
                 spellData: spell,
                 rules: playerStats.rules || '5e (default)'
               });

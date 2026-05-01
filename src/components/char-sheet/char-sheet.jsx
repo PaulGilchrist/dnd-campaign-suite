@@ -37,17 +37,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             const effectiveClasses = playerSummary.rules === '2024' ? allClasses2024 : allClasses;
             const effectiveRaces = playerSummary.rules === '2024' ? allRaces2024 : allRaces;
             const effectiveMagicItems = playerSummary.rules === '2024' ? allMagicItems2024 : allMagicItems;
-            console.log('[CharSheet] Processing:', {
-                rules: playerSummary.rules,
-                hasAllMagicItems2024: !!allMagicItems2024,
-                allMagicItems2024Length: allMagicItems2024?.length || 0,
-                inventoryExists: !!playerSummary.inventory,
-                hasInventoryMagicItems: !!playerSummary.inventory?.magicItems,
-                magicItemsCount: playerSummary.inventory?.magicItems?.length || 0
-            });
-            console.log('[CharSheet] Using magic items:', { source: playerSummary.rules === '2024' ? 'allMagicItems2024' : 'allMagicItems', count: effectiveMagicItems?.length || 0 });
-            const stats = await rulesFactory.getPlayerStats(effectiveClasses, allEquipment, effectiveMagicItems, effectiveRaces, spellData, playerSummary);
-            console.log('[CharSheet] After getPlayerStats - magic items:', stats.inventory?.magicItems?.length || 0);
+                        const stats = await rulesFactory.getPlayerStats(effectiveClasses, allEquipment, effectiveMagicItems, effectiveRaces, spellData, playerSummary);
 
             if (preparedSpells) {
                 stats.spellAbilities?.spells.forEach(spell => {

@@ -9,7 +9,6 @@ function CharInventory({ playerStats }) {
     const handleItemClick = (itemName) => {
         const equipmentUrl = '/data/equipment.json';
         
-        console.log(`[CharInventory] Fetching equipment from: ${equipmentUrl}`);
         
         // Extract name if item has quantity info in parentheses (e.g., "Arrows (10)" -> "Arrows")
         let lookupName = itemName;
@@ -26,7 +25,6 @@ function CharInventory({ playerStats }) {
                 return response.json();
             })
             .then(equipmentData => {
-                console.log(`[CharInventory] Loaded ${equipmentData.length} items`);
                 
                 // Try to find item, handling plural/singular variations
                 const findItem = (itemNameToSearch) => {
@@ -46,7 +44,6 @@ function CharInventory({ playerStats }) {
                     const singularName = lookupName.slice(0, -1);
                     item = findItem(singularName);
                     if (item) {
-                        console.log(`[CharInventory] Found item via singular conversion: ${item.name} from ${lookupName}`);
                     }
                 }
                 
@@ -55,12 +52,10 @@ function CharInventory({ playerStats }) {
                     const pluralName = lookupName + 's';
                     item = findItem(pluralName);
                     if (item) {
-                        console.log(`[CharInventory] Found item via plural conversion: ${item.name} from ${lookupName}`);
                     }
                 }
                 
                 if (item) {
-                    console.log(`[CharInventory] Found item: ${item.name}`);
                     let descriptionHtml = '';
                     if (Array.isArray(item.desc)) {
                         descriptionHtml = item.desc.map(desc => desc || '').join('<br/><br/>');
