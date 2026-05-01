@@ -14,7 +14,9 @@ const classRules = {
             characterClass.subclass = null;
         }
         delete characterClass.subclasses; // We don't need these anymore
-        characterClass.saving_throws = characterClass.saving_throws.map((savingThrow) => rules.getAbilityLongName(savingThrow));
+        if (characterClass.saving_throws) {
+            characterClass.saving_throws = characterClass.saving_throws.map((savingThrow) => rules.getAbilityLongName(savingThrow));
+        }
         return characterClass;
     },
     getDruidMaxWildShapeChallengeRating: (playerStats) => {

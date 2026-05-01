@@ -116,18 +116,18 @@ const raceRules = {
                         details: trait.details
                        };
                     if(featuresToIgnore.includes(trait.name)) {
-                           // Do nothing - this trait is ignored entirely
-                       } else if(characterAdvancement.includes(trait.name) && !categorizedTraits.characterAdvancement.some(f => f.name == f.name)) {
-                        categorizedTraits.characterAdvancement.push(traitSummary);
-                       } else if(actions.includes(trait.name) && !categorizedTraits.actions.some(action => action.name == action.name)) {
-                        categorizedTraits.actions.push(traitSummary);
-                       } else if(bonusActions.includes(trait.name) && !categorizedTraits.bonusActions.some(bonusAction => bonusAction.name == bonusAction.name)) {
-                        categorizedTraits.bonusActions.push(traitSummary);
-                       } else if(reactions.includes(trait.name) && !categorizedTraits.reactions.some(reaction => reaction.name == reaction.name)) {
-                        categorizedTraits.reactions.push(traitSummary);
-                       } else if(!categorizedTraits.specialActions.some(specialAction => specialAction.name == specialAction.name)) {
-                        categorizedTraits.specialActions.push(traitSummary);
-                       }
+                                                // Do nothing - this trait is ignored entirely
+                                            } else if(characterAdvancement.includes(trait.name) && !categorizedTraits.characterAdvancement.some(f => f.name == traitSummary.name)) {
+                                            categorizedTraits.characterAdvancement.push(traitSummary);
+                                            } else if(actions.includes(trait.name) && !categorizedTraits.actions.some(action => action.name == traitSummary.name)) {
+                                            categorizedTraits.actions.push(traitSummary);
+                                            } else if(bonusActions.includes(trait.name) && !categorizedTraits.bonusActions.some(bonusAction => bonusAction.name == traitSummary.name)) {
+                                            categorizedTraits.bonusActions.push(traitSummary);
+                                            } else if(reactions.includes(trait.name) && !categorizedTraits.reactions.some(reaction => reaction.name == traitSummary.name)) {
+                                            categorizedTraits.reactions.push(traitSummary);
+                                            } else if(!categorizedTraits.specialActions.some(specialAction => specialAction.name == traitSummary.name)) {
+                                            categorizedTraits.specialActions.push(traitSummary);
+                                            }
                    });
                }
             return categorizedTraits;
