@@ -101,37 +101,37 @@ const raceRules = {
         return senses.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         },
     addTraits: (traits) => {
-        const categorizedTraits = {
-            actions: [],
-            bonusActions: [],
-            reactions: [],
-            specialActions: [],
-            characterAdvancement: []
-          }
-        if(traits) {
-            traits.forEach(trait => {
-                const traitSummary = {
-                    name: trait.name,
-                    description: trait.desc,
-                    details: trait.details
-                  };
-                if(featuresToIgnore.includes(trait.name)) {
-                      // Do nothing - this trait is ignored entirely
-                  } else if(characterAdvancement.includes(trait.name) && !categorizedTraits.characterAdvancement.some(f => f.name == f.name)) {
-                    categorizedTraits.characterAdvancement.push(traitSummary);
-                  } else if(actions.includes(trait.name) && !categorizedTraits.actions.some(action => action.name == action.name)) {
-                    categorizedTraits.actions.push(traitSummary);
-                  } else if(bonusActions.includes(trait.name) && !categorizedTraits.bonusActions.some(bonusAction => bonusAction.name == bonusAction.name)) {
-                    categorizedTraits.bonusActions.push(traitSummary);
-                  } else if(reactions.includes(trait.name) && !categorizedTraits.reactions.some(reaction => reaction.name == reaction.name)) {
-                    categorizedTraits.reactions.push(traitSummary);
-                  } else if(!categorizedTraits.specialActions.some(specialAction => specialAction.name == specialAction.name)) {
-                    categorizedTraits.specialActions.push(traitSummary);
-                  }
-              });
-          }
-        return categorizedTraits;
-        },
+            const categorizedTraits = {
+                actions: [],
+                bonusActions: [],
+                reactions: [],
+                specialActions: [],
+                characterAdvancement: []
+               }
+            if(traits) {
+                traits.forEach(trait => {
+                    const traitSummary = {
+                        name: trait.name,
+                        description: trait.description,
+                        details: trait.details
+                       };
+                    if(featuresToIgnore.includes(trait.name)) {
+                           // Do nothing - this trait is ignored entirely
+                       } else if(characterAdvancement.includes(trait.name) && !categorizedTraits.characterAdvancement.some(f => f.name == f.name)) {
+                        categorizedTraits.characterAdvancement.push(traitSummary);
+                       } else if(actions.includes(trait.name) && !categorizedTraits.actions.some(action => action.name == action.name)) {
+                        categorizedTraits.actions.push(traitSummary);
+                       } else if(bonusActions.includes(trait.name) && !categorizedTraits.bonusActions.some(bonusAction => bonusAction.name == bonusAction.name)) {
+                        categorizedTraits.bonusActions.push(traitSummary);
+                       } else if(reactions.includes(trait.name) && !categorizedTraits.reactions.some(reaction => reaction.name == reaction.name)) {
+                        categorizedTraits.reactions.push(traitSummary);
+                       } else if(!categorizedTraits.specialActions.some(specialAction => specialAction.name == specialAction.name)) {
+                        categorizedTraits.specialActions.push(traitSummary);
+                       }
+                   });
+               }
+            return categorizedTraits;
+             },
     getTraits: (playerStats) => {
            // Dependencies: Race
         let traits = raceRules.addTraits(playerStats.race.traits);

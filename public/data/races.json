@@ -27,81 +27,76 @@
             {
                 "index": "draconic-ancestry",
                 "name": "Draconic Ancestry",
-                "desc": "You have draconic ancestry. Choose one type of dragon from the Draconic Ancestry table. Your breath weapon and damage resistance are determined by the dragon type, as shown in the table.",
-                "details": "<table class='table table-condensed table-striped table-hover' style='width:400px;text-align:center;line-height:10px;'><thead><tr><th>Dragon</th><th>Damage Type</th><th>Breath Weapon</th></tr></thead><tbody><tr><td>Black</td><td>Acid</td><td>5 by 30 ft. line (Dex. save)</td></tr><tr><td>Blue</td><td>Lightning</td><td>5 by 30 ft. line (Dex. save)</td></tr><tr><td>Brass</td><td>Fire</td><td>5 by 30 ft. line (Dex. save)</td></tr><tr><td>Bronze</td><td>Ligntning</td><td>5 by 30 ft. line (Dex. save)</td></tr><tr><td>Copper</td><td>Acid</td><td>5 by 30 ft. line (Dex. save)</td></tr><tr><td>Gold</td><td>Fire</td><td>15 ft. cone (Dex. save)</td></tr><tr><td>Green</td><td>Poison</td><td>15 ft. cone (Dex. save)</td></tr><tr><td>Red</td><td>Fire</td><td>15 ft. cone (Dex. save)</td></tr><tr><td>Silver</td><td>Cold</td><td>15 ft. cone (Dex. save)</td></tr><tr><td>White</td><td>Cold</td><td>15 ft. cone (Dex. save)</td></tr></tbody></table>",
+                "description": "You have draconic ancestry. Choose one type of dragon from the Draconic Ancestry table. Your breath weapon and damage resistance are determined by the dragon type, as shown in the table. <table class='table table-condensed table-striped table-hover' style='width:400px;text-align:center;line-height:10px;'><thead><tr><th>Dragon</th><th>Damage Type</th><th>Breath Weapon</th></tr></thead><tbody><tr><td>Black</td><td>Acid</td><td>5 by 30 ft. line (Dex. save)</td></tr><tr><td>Blue</td><td>Lightning</td><td>5 by 30 ft. line (Dex. save)</td></tr><tr><td>Brass</td><td>Fire</td><td>5 by 30 ft. line (Dex. save)</td></tr><tr><td>Bronze</td><td>Ligntning</td><td>5 by 30 ft. line (Dex. save)</td></tr><tr><td>Copper</td><td>Acid</td><td>5 by 30 ft. line (Dex. save)</td></tr><tr><td>Gold</td><td>Fire</td><td>15 ft. cone (Dex. save)</td></tr><tr><td>Green</td><td>Poison</td><td>15 ft. cone (Dex. save)</td></tr><tr><td>Red</td><td>Fire</td><td>15 ft. cone (Dex. save)</td></tr><tr><td>Silver</td><td>Cold</td><td>15 ft. cone (Dex. save)</td></tr><tr><td>White</td><td>Cold</td><td>15 ft. cone (Dex. save)</td></tr></tbody></table>",
                 "proficiencies": []
             },
             {
                 "index": "breath-weapon",
                 "name": "Breath Weapon",
-                "desc": [
-                    "You can use your action to exhale destructive energy. Your draconic ancestry determines the size, shape, and damage type of the exhalation. When you use your breath weapon, each creature in the area of the exhalation must make a saving throw, the type of which is determined by your draconic ancestry. The DC for this saving throw equals 8 + your Constitution modifier + your proficiency bonus. A creature takes 2d6 damage on a failed save, and half as much damage on a successful one. The damage increases to 3d6 at 6th level, 4d6 at 11th level, and 5d6 at 16th level. After you use your breath weapon, you cannot use it again until you complete a short or long rest."
-                ],
+                "description": "You can use your action to exhale destructive energy. Your draconic ancestry determines the size, shape, and damage type of the exhalation. When you use your breath weapon, each creature in the area of the exhalation must make a saving throw, the type of which is determined by your draconic ancestry. The DC for this saving throw equals 8 + your Constitution modifier + your proficiency bonus. A creature takes 2d6 damage on a failed save, and half as much damage on a successful one. The damage increases to 3d6 at 6th level, 4d6 at 11th level, and 5d6 at 16th level. After you use your breath weapon, you cannot use it again until you complete a short or long rest.",
                 "proficiencies": []
             },
             {
                 "index": "damage-resistance",
                 "name": "Damage Resistance",
-                "desc": [
-                    "You have resistance to the damage type associated with your draconic ancestry."
-                ],
+                "description": "You have resistance to the damage type associated with your draconic ancestry.",
                 "proficiencies": []
             }
         ],
         "subraces": [
             {
                 "name": "Black",
-                "desc": "Black Dragonborn inherit the corrosive power of their chromatic ancestors, marked by acid breath and a harsh resilience shaped by swamps and desolate marshlands.",
+                "description": "Black Dragonborn inherit the corrosive power of their chromatic ancestors, marked by acid breath and a harsh resilience shaped by swamps and desolate marshlands.",
                 "damage_resistance": "Acid"
             },
             {
                 "name": "Blue",
-                "desc": "Blue Dragonborn channel crackling lightning, often displaying disciplined focus and a commanding presence reminiscent of the desert-dwelling blue dragons.",
+                "description": "Blue Dragonborn channel crackling lightning, often displaying disciplined focus and a commanding presence reminiscent of the desert-dwelling blue dragons.",
                 "damage_resistance": "Lightning"
             },
             {
                 "name": "Brass",
-                "desc": "Brass Dragonborn are talkative and warm-spirited, breathing fire and carrying the social, curious nature of brass dragons who thrive in sun-baked deserts.",
+                "description": "Brass Dragonborn are talkative and warm-spirited, breathing fire and carrying the social, curious nature of brass dragons who thrive in sun-baked deserts.",
                 "damage_resistance": "Fire"
             },
             {
                 "name": "Bronze",
-                "desc": "Bronze Dragonborn wield lightning and possess a strong sense of duty, echoing the coastal guardianship and martial instincts of bronze dragons.",
+                "description": "Bronze Dragonborn wield lightning and possess a strong sense of duty, echoing the coastal guardianship and martial instincts of bronze dragons.",
                 "damage_resistance": "Lightning"
             },
             {
                 "name": "Copper",
-                "desc": "Copper Dragonborn are clever and quick-witted, breathing acid and often showing the playful, prank-loving tendencies of their copper dragon lineage.",
+                "description": "Copper Dragonborn are clever and quick-witted, breathing acid and often showing the playful, prank-loving tendencies of their copper dragon lineage.",
                 "damage_resistance": "Acid"
             },
             {
                 "name": "Gold",
-                "desc": "Gold Dragonborn embody nobility and inner fire, inheriting a powerful flame breath and the disciplined, honorable nature of gold dragons.",
+                "description": "Gold Dragonborn embody nobility and inner fire, inheriting a powerful flame breath and the disciplined, honorable nature of gold dragons.",
                 "damage_resistance": "Fire"
             },
             {
                 "name": "Green",
-                "desc": "Green Dragonborn exude a sharp, cunning presence, breathing toxic gas and reflecting the forest-dwelling, manipulative instincts of green dragons.",
+                "description": "Green Dragonborn exude a sharp, cunning presence, breathing toxic gas and reflecting the forest-dwelling, manipulative instincts of green dragons.",
                 "damage_resistance": "Poison"
             },
             {
                 "name": "Red",
-                "desc": "Red Dragonborn carry the fierce pride and fiery wrath of their volcanic ancestors, unleashing devastating fire breath and a bold, intense temperament.",
+                "description": "Red Dragonborn carry the fierce pride and fiery wrath of their volcanic ancestors, unleashing devastating fire breath and a bold, intense temperament.",
                 "damage_resistance": "Fire"
             },
             {
                 "name": "Silver",
-                "desc": "Silver Dragonborn are compassionate and steadfast, breathing frost and mirroring the protective, community-oriented nature of silver dragons.",
+                "description": "Silver Dragonborn are compassionate and steadfast, breathing frost and mirroring the protective, community-oriented nature of silver dragons.",
                 "damage_resistance": "Cold"
             },
             {
                 "name": "White",
-                "desc": "White Dragonborn channel bitter cold through their frost breath, often displaying a rugged, survival-driven mindset shaped by their arctic heritage.",
+                "description": "White Dragonborn channel bitter cold through their frost breath, often displaying a rugged, survival-driven mindset shaped by their arctic heritage.",
                 "damage_resistance": "Cold"
             }
         ],
         "book": "Player's Handbook",
-        "desc": "Dragonborn look very much like dragons standing erect in humanoid form, though they lack wings or a tail.",
+        "description": "Dragonborn look very much like dragons standing erect in humanoid form, though they lack wings or a tail.",
         "page": 32
     },
     {
@@ -141,33 +136,25 @@
             {
                 "index": "darkvision",
                 "name": "Darkvision",
-                "desc": [
-                    "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray."
-                ],
+                "description": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
                 "proficiencies": []
             },
             {
                 "index": "dwarven-resilience",
                 "name": "Dwarven Resilience",
-                "desc": [
-                    "You have advantage on saving throws against poison, and you have resistance against poison damage."
-                ],
+                "description": "You have advantage on saving throws against poison, and you have resistance against poison damage.",
                 "proficiencies": []
             },
             {
                 "index": "stonecunning",
                 "name": "Stonecunning",
-                "desc": [
-                    "Whenever you make an Intelligence (History) check related to the origin of stonework, you are considered proficient in the History skill and add double your proficiency bonus to the check, instead of your normal proficiency bonus."
-                ],
+                "description": "Whenever you make an Intelligence (History) check related to the origin of stonework, you are considered proficient in the History skill and add double your proficiency bonus to the check, instead of your normal proficiency bonus.",
                 "proficiencies": []
             },
             {
                 "index": "tool-proficiency",
                 "name": "Tool Proficiency",
-                "desc": [
-                    "You gain proficiency with the artisan's tools of your choice: smith's tools, brewer's supplies, or mason's tools."
-                ],
+                "description": "You gain proficiency with the artisan's tools of your choice: smith's tools, brewer's supplies, or mason's tools.",
                 "proficiencies": [],
                 "proficiency_choices": {
                     "choose": 1,
@@ -183,7 +170,7 @@
             {
                 "index": "hill-dwarf",
                 "name": "Hill Dwarf",
-                "desc": "As a hill dwarf, you have keen senses, deep intuition, and remarkable resilience.",
+                "description": "As a hill dwarf, you have keen senses, deep intuition, and remarkable resilience.",
                 "ability_bonuses": [
                     {
                         "ability_score": "WIS",
@@ -196,9 +183,7 @@
                     {
                         "index": "dwarven-toughness",
                         "name": "Dwarven Toughness",
-                        "desc": [
-                            "Your hit point maximum increases by 1, and it increases by 1 every time you gain a level."
-                        ],
+                        "description": "Your hit point maximum increases by 1, and it increases by 1 every time you gain a level.",
                         "proficiencies": []
                     }
                 ],
@@ -207,7 +192,7 @@
             {
                 "index": "mountain-dwarf",
                 "name": "Mountain Dwarf",
-                "desc": "As a mountain dwarf, you're strong and hardy, accustomed to a difficult life in rugged terrain. You're probably on the tall side (for a dwarf), and tend toward lighter coloration.",
+                "description": "As a mountain dwarf, you're strong and hardy, accustomed to a difficult life in rugged terrain. You're probably on the tall side (for a dwarf), and tend toward lighter coloration.",
                 "race": {},
                 "ability_bonuses": [
                     {
@@ -224,7 +209,7 @@
             }
         ],
         "book": "Player's Handbook",
-        "desc": "Bold and hardy, dwarves are known as skilled warriors, miners, and workers of stone and metal.",
+        "description": "Bold and hardy, dwarves are known as skilled warriors, miners, and workers of stone and metal.",
         "page": 18,
         "damage_resistance": "Poison"
     },
@@ -254,25 +239,19 @@
             {
                 "index": "darkvision",
                 "name": "Darkvision",
-                "desc": [
-                    "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray."
-                ],
+                "description": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
                 "proficiencies": []
             },
             {
                 "index": "fey-ancestry",
                 "name": "Fey Ancestry",
-                "desc": [
-                    "You have advantage on saving throws against being charmed, and magic cannot put you to sleep."
-                ],
+                "description": "You have advantage on saving throws against being charmed, and magic cannot put you to sleep.",
                 "proficiencies": []
             },
             {
                 "index": "trance",
                 "name": "Trance",
-                "desc": [
-                    "Elves do not need to sleep. Instead, they meditate deeply, remaining semiconscious, for 4 hours a day. (The Common word for such meditation is \"trance.\") While meditating, you can dream after a fashion; such dreams are actually mental exercises that have become reflexive through years of practice. After resting this way, you gain the same benefit that a human does from 8 hours of sleep."
-                ],
+                "description": "Elves do not need to sleep. Instead, they meditate deeply, remaining semiconscious, for 4 hours a day. (The Common word for such meditation is \"trance.\") While meditating, you can dream after a fashion; such dreams are actually mental exercises that have become reflexive through years of practice. After resting this way, you gain the same benefit that a human does from 8 hours of sleep.",
                 "proficiencies": []
             }
         ],
@@ -280,7 +259,7 @@
             {
                 "index": "high-elf",
                 "name": "High Elf",
-                "desc": "As a high elf, you have a keen mind and a mastery of at least the basics of magic. In many fantasy gaming worlds, there are two kinds of high elves. One type is haughty and reclusive, believing themselves to be superior to non-elves and even other elves. The other type is more common and more friendly, and often encountered among humans and other races.",
+                "description": "As a high elf, you have a keen mind and a mastery of at least the basics of magic. In many fantasy gaming worlds, there are two kinds of high elves. One type is haughty and reclusive, believing themselves to be superior to non-elves and even other elves. The other type is more common and more friendly, and often encountered among humans and other races.",
                 "ability_bonuses": [
                     {
                         "ability_score": "INT",
@@ -317,9 +296,7 @@
                     {
                         "index": "high-elf-cantrip",
                         "name": "High Elf Cantrip",
-                        "desc": [
-                            "You know one cantrip of your choice form the wizard spell list. Intelligence is your spellcasting ability for it."
-                        ],
+                        "description": "You know one cantrip of your choice form the wizard spell list. Intelligence is your spellcasting ability for it.",
                         "proficiencies": [],
                         "trait_specific": {
                             "spell_options": {
@@ -346,7 +323,7 @@
             {
                 "index": "wood-elf",
                 "name": "Wood Elf",
-                "desc": "As a wood elf, you have keen senses and intuition, and your fleet feet carry you quickly and stealthily through your native forests.",
+                "description": "As a wood elf, you have keen senses and intuition, and your fleet feet carry you quickly and stealthily through your native forests.",
                 "race": {},
                 "ability_bonuses": [
                     {
@@ -366,17 +343,13 @@
                     {
                         "index": "fleet-of-foot",
                         "name": "Fleet of Foot",
-                        "desc": [
-                            "Your base walking speed increases to 35 feet."
-                        ],
+                        "description": "Your base walking speed increases to 35 feet.",
                         "proficiencies": []
                     },
                     {
                         "index": "mask-of-the-wild",
                         "name": "Mask of the Wild",
-                        "desc": [
-                            "You can attempt to hide even when you are only lightly obscured by foliage, heavy rain, falling snow, mist, and other natural phenomena."
-                        ],
+                        "description": "You can attempt to hide even when you are only lightly obscured by foliage, heavy rain, falling snow, mist, and other natural phenomena.",
                         "proficiencies": []
                     }
                 ]
@@ -384,7 +357,7 @@
             {
                 "index": "dark-elf",
                 "name": "Dark Elf",
-                "desc": "Descended from an earlier subrace of elves, the drow were banished from the surface world for following the goddess Lolth down the path of evil. Now they have built their own civilization in the depths of the Underdark, patterned after the Way of Lolth.",
+                "description": "Descended from an earlier subrace of elves, the drow were banished from the surface world for following the goddess Lolth down the path of evil. Now they have built their own civilization in the depths of the Underdark, patterned after the Way of Lolth.",
                 "race": {},
                 "ability_bonuses": [
                     {
@@ -402,32 +375,26 @@
                     {
                         "index": "superior-darkvision",
                         "name": "Superior Darkvision",
-                        "desc": [
-                            "Your darkvision has a radius of 120 feet."
-                        ],
+                        "description": "Your darkvision has a radius of 120 feet.",
                         "proficiencies": []
                     },
                     {
                         "index": "sunlight-sensitivity",
                         "name": "Sunlight Sensitivity",
-                        "desc": [
-                            "You have disadvantage on attack rolls and on Wisdom (Perception) checks that rely on sight when you, the target of your attack, or whatever you are trying to perceive is in direct sunlight."
-                        ],
+                        "description": "You have disadvantage on attack rolls and on Wisdom (Perception) checks that rely on sight when you, the target of your attack, or whatever you are trying to perceive is in direct sunlight.",
                         "proficiencies": []
                     },
                     {
                         "index": "drow-magic",
                         "name": "Drow Magic",
-                        "desc": [
-                            "You know the dancing lights cantrip. When you reach 3rd level, you can cast the faerie fire spell once with this trait and regain the ability to do so when you finish a long rest. When you reach 5th level, you can cast the darkness spell once with this trait and regain the ability to do so when you finish a long rest. Charisma is your spellcasting ability for these spells."
-                        ],
+                        "description": "You know the dancing lights cantrip. When you reach 3rd level, you can cast the faerie fire spell once with this trait and regain the ability to do so when you finish a long rest. When you reach 5th level, you can cast the darkness spell once with this trait and regain the ability to do so when you finish a long rest. Charisma is your spellcasting ability for these spells.",
                         "proficiencies": []
                     }
                 ]
             }
         ],
         "book": "Player's Handbook",
-        "desc": "Elves are a magical people with otherworldly grace, living in the world but not entirely part of it.",
+        "description": "Elves are a magical people with otherworldly grace, living in the world but not entirely part of it.",
         "page": 21
     },
     {
@@ -440,7 +407,10 @@
                 "bonus": 2
             }
         ],
+        "alignment": "Genasi follow the temperaments of their elemental heritage more than any moral code, tending toward impulsive or independent behavior rather than strict notions of good, evil, law, or chaos.",
+        "age": "Genasi mature at roughly the same rate as humans, but their elemental nature often shows early. They live about as long as humans, though some with stronger elemental ties may age more slowly or display unusual vitality.",
         "size": "Medium",
+        "size_description": "Genasi are about the same size as humans, ranging from roughly 5 to 6 feet tall, with builds shaped subtly by their elemental heritage.",
         "starting_proficiencies": [],
         "languages": [
             "Common",
@@ -451,7 +421,7 @@
             {
                 "index": "earth-genasi",
                 "name": "Earth Genasi",
-                "desc": "As an earth genasi, you are descended from the cruel and greedy dao, though you aren\u2019t necessarily evil. You have inherited some measure of control over earth, reveling in superior strength and solid power. You tend to avoid rash decisions, pausing long enough to consider your options before taking action. Elemental earth manifests differently from one individual to the next. Some earth genasi always have bits of dust falling from their bodies and mud clinging to their clothes, never getting clean no matter how often they bathe. Others are as shiny and polished as gemstones, with skin tones of deep brown or black, eyes sparkling like agates. Earth genasi can also have smooth metallic flesh, dull iron skin spotted with rust, a pebbled and rough hide, or even a coating of tiny embedded crystals. The most arresting have fissures in their flesh, from which faint light shines.",
+                "description": "As an earth genasi, you are descended from the cruel and greedy dao, though you aren\u2019t necessarily evil. You have inherited some measure of control over earth, reveling in superior strength and solid power. You tend to avoid rash decisions, pausing long enough to consider your options before taking action. Elemental earth manifests differently from one individual to the next. Some earth genasi always have bits of dust falling from their bodies and mud clinging to their clothes, never getting clean no matter how often they bathe. Others are as shiny and polished as gemstones, with skin tones of deep brown or black, eyes sparkling like agates. Earth genasi can also have smooth metallic flesh, dull iron skin spotted with rust, a pebbled and rough hide, or even a coating of tiny embedded crystals. The most arresting have fissures in their flesh, from which faint light shines.",
                 "ability_bonuses": [
                     {
                         "ability_score": "STR",
@@ -466,17 +436,13 @@
                     {
                         "index": "earth-walk",
                         "name": "Earth Walk",
-                        "desc": [
-                            "You can move across difficult terrain made of earth or stone without expending extra movement."
-                        ],
+                        "description": "You can move across difficult terrain made of earth or stone without expending extra movement.",
                         "proficiencies": []
                     },
                     {
                         "index": "merge-with-stone",
                         "name": "Merge With Stone",
-                        "desc": [
-                            "You can cast the pass without trace spell once with this trait, requiring no material components, and you regain the ability to cast it this way when you finish a long rest. Constitution is your spellcasting ability for this spell."
-                        ],
+                        "description": "You can cast the pass without trace spell once with this trait, requiring no material components, and you regain the ability to cast it this way when you finish a long rest. Constitution is your spellcasting ability for this spell.",
                         "proficiencies": []
                     }
                 ],
@@ -489,7 +455,7 @@
             {
                 "index": "fire-genasi",
                 "name": "Fire Genasi",
-                "desc": "As a fire genasi, you are descended from the passionate and destructive efreeti, though you aren't necessarily evil. You have inherited some measure of control over fire, reveling in superior strength and solid power. Elemental fire manifests differently from one individual to the next. Some fire genasi have skin that is warm to the touch, with hair that resembles flames. Others have skin that is red or orange, with eyes that glow like embers.",
+                "description": "As a fire genasi, you are descended from the passionate and destructive efreeti, though you aren't necessarily evil. You have inherited some measure of control over fire, reveling in superior strength and solid power. Elemental fire manifests differently from one individual to the next. Some fire genasi have skin that is warm to the touch, with hair that resembles flames. Others have skin that is red or orange, with eyes that glow like embers.",
                 "ability_bonuses": [
                     {
                         "ability_score": "STR",
@@ -502,9 +468,7 @@
                     {
                         "index": "fire-walk",
                         "name": "Fire Walk",
-                        "desc": [
-                            "You can create or extinguish a flame no larger than 10 feet in any dimension as a bonus action. Additionally, you have resistance to fire damage."
-                        ],
+                        "description": "You can create or extinguish a flame no larger than 10 feet in any dimension as a bonus action. Additionally, you have resistance to fire damage.",
                         "proficiencies": []
                     }
                 ],
@@ -513,7 +477,7 @@
             {
                 "index": "air-genasi",
                 "name": "Air Genasi",
-                "desc": "As an air genasi, you are descended from the cunning and aloof djinn, though you aren't necessarily good. You have inherited some measure of control over air, reveling in superior agility and speed. Elemental air manifests differently from one individual to the next. Some air genasi have skin that is cool to the touch, with hair that resembles clouds. Others have skin that is blue or gray, with eyes that glow like lightning.",
+                "description": "As an air genasi, you are descended from the cunning and aloof djinn, though you aren't necessarily good. You have inherited some measure of control over air, reveling in superior agility and speed. Elemental air manifests differently from one individual to the next. Some air genasi have skin that is cool to the touch, with hair that resembles clouds. Others have skin that is blue or gray, with eyes that glow like lightning.",
                 "ability_bonuses": [
                     {
                         "ability_score": "DEX",
@@ -526,9 +490,7 @@
                     {
                         "index": "air-walk",
                         "name": "Air Walk",
-                        "desc": [
-                            "You can create a gentle breeze as a bonus action. Additionally, you have resistance to lightning damage."
-                        ],
+                        "description": "You can create a gentle breeze as a bonus action. Additionally, you have resistance to lightning damage.",
                         "proficiencies": []
                     }
                 ],
@@ -537,7 +499,7 @@
             {
                 "index": "water-genasi",
                 "name": "Water Genasi",
-                "desc": "As a water genasi, you are descended from the calm and patient marids, though you aren't necessarily good. You have inherited some measure of control over water, reveling in superior endurance and adaptability. Elemental water manifests differently from one individual to the next. Some water genasi have skin that is cool and damp to the touch, with hair that resembles seaweed. Others have skin that is blue or green, with eyes that glow like the ocean.",
+                "description": "As a water genasi, you are descended from the calm and patient marids, though you aren't necessarily good. You have inherited some measure of control over water, reveling in superior endurance and adaptability. Elemental water manifests differently from one individual to the next. Some water genasi have skin that is cool and damp to the touch, with hair that resembles seaweed. Others have skin that is blue or green, with eyes that glow like the ocean.",
                 "ability_bonuses": [
                     {
                         "ability_score": "CON",
@@ -552,9 +514,7 @@
                     {
                         "index": "water-walk",
                         "name": "Water Walk",
-                        "desc": [
-                            "You can swim at the end of your movement to enter water without the first 5 feet of it counting as difficult terrain. Additionally, you have resistance to acid and cold damage."
-                        ],
+                        "description": "You can swim at the end of your movement to enter water without the first 5 feet of it counting as difficult terrain. Additionally, you have resistance to acid and cold damage.",
                         "proficiencies": []
                     }
                 ],
@@ -565,7 +525,7 @@
             }
         ],
         "book": "Player's Handbook",
-        "desc": "Genasi carry the power of the elemental planes of air, earth, fire, and water in their blood.",
+        "description": "Genasi carry the power of the elemental planes of air, earth, fire, and water in their blood.",
         "page": 0
     },
     {
@@ -592,17 +552,13 @@
             {
                 "index": "darkvision",
                 "name": "Darkvision",
-                "desc": [
-                    "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray."
-                ],
+                "description": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
                 "proficiencies": []
             },
             {
                 "index": "gnome-cunning",
                 "name": "Gnome Cunning",
-                "desc": [
-                    "You have advantage on all Intelligence, Wisdom, and Charisma saving throws against magic."
-                ],
+                "description": "You have advantage on all Intelligence, Wisdom, and Charisma saving throws against magic.",
                 "proficiencies": []
             }
         ],
@@ -610,7 +566,7 @@
             {
                 "index": "rock-gnome",
                 "name": "Rock Gnome",
-                "desc": "As a rock gnome, you have a natural inventiveness and hardiness beyond that of other gnomes.",
+                "description": "As a rock gnome, you have a natural inventiveness and hardiness beyond that of other gnomes.",
                 "ability_bonuses": [
                     {
                         "ability_score": "CON",
@@ -625,21 +581,13 @@
                     {
                         "index": "artificers-lore",
                         "name": "Artificer's Lore",
-                        "desc": [
-                            "Whenever you make an Intelligence (History) check related to magic items, alchemical objects, or technological devices, you can add twice your proficiency bonus, instead of any proficiency bonus you normally apply."
-                        ],
+                        "description": "Whenever you make an Intelligence (History) check related to magic items, alchemical objects, or technological devices, you can add twice your proficiency bonus, instead of any proficiency bonus you normally apply.",
                         "proficiencies": []
                     },
                     {
                         "index": "tinker",
                         "name": "Tinker",
-                        "desc": [
-                            "You have proficiency with artisan's tools (tinker's tools). Using those tools, you can spend 1 hour and 10 gp worth of materials to construct a Tiny clockwork device (AC 5, 1 hp). The device ceases to function after 24 hours (unless you spend 1 hour repairing it to keep the device functioning), or when you use your action to dismantle it; at that time, you can reclaim the materials used to create it. You can have up to three such devices active at a time.",
-                            "When you create a device, choose one of the following options:",
-                            "Clockwork Toy: This toy is a clockwork animal, monster, or person, such as a frog, mouse, bird, dragon, or soldier. When placed on the ground, the toy moves 5 feet across the ground on each of your turns in a random direction. It makes noises as appropriate to the creature it represents.",
-                            "Fire Starter: The device produces a miniature flame, which you can use to light a candle, torch, or campfire. Using the device requires your action.",
-                            "Music Box: When opened, this music box plays a single song at a moderate volume. The box stops playing when it reaches the song's end or when it is closed."
-                        ],
+                        "description": "You have proficiency with artisan's tools (tinker's tools). Using those tools, you can spend 1 hour and 10 gp worth of materials to construct a Tiny clockwork device (AC 5, 1 hp). The device ceases to function after 24 hours (unless you spend 1 hour repairing it to keep the device functioning), or when you use your action to dismantle it; at that time, you can reclaim the materials used to create it. You can have up to three such devices active at a time.<br/>When you create a device, choose one of the following options:<br/><ul><li>Clockwork Toy: This toy is a clockwork animal, monster, or person, such as a frog, mouse, bird, dragon, or soldier. When placed on the ground, the toy moves 5 feet across the ground on each of your turns in a random direction. It makes noises as appropriate to the creature it represents.</li><li>Fire Starter: The device produces a miniature flame, which you can use to light a candle, torch, or campfire. Using the device requires your action.</li><li>Music Box: When opened, this music box plays a single song at a moderate volume. The box stops playing when it reaches the song's end or when it is closed.</li></ul>",
                         "proficiencies": [
                             "Tinker's Tools"
                         ]
@@ -649,7 +597,7 @@
             {
                 "index": "forest-gnome",
                 "name": "Forest Gnome",
-                "desc": "As a forest gnome, you have a natural knack for illusion and inherent quickness and stealth.",
+                "description": "As a forest gnome, you have a natural knack for illusion and inherent quickness and stealth.",
                 "race": {},
                 "ability_bonuses": [
                     {
@@ -663,7 +611,7 @@
                     {
                         "index": "natural-illusionist",
                         "name": "Natural Illusionist",
-                        "desc": [
+                        "description": [
                             "You know the minor illusion cantrip. Intelligence is your spellcasting ability for it."
                         ],
                         "proficiencies": []
@@ -671,16 +619,14 @@
                     {
                         "index": "speak-with-small-beasts",
                         "name": "Speak with Small Beasts",
-                        "desc": [
-                            "Through sounds and gestures, you can communicate simple ideas with Small or smaller beasts. Forest gnomes love animals and often keep squirrels, badgers, rabbits, moles, woodpeckers, and other creatures as beloved pets."
-                        ],
+                        "description": "Through sounds and gestures, you can communicate simple ideas with Small or smaller beasts. Forest gnomes love animals and often keep squirrels, badgers, rabbits, moles, woodpeckers, and other creatures as beloved pets.",
                         "proficiencies": []
                     }
                 ]
             }
         ],
         "book": "Player's Handbook",
-        "desc": "A gonme's energy and enthusiasm for living shines through every inch of his or her body.",
+        "description": "A gonme's energy and enthusiasm for living shines through every inch of his or her body.",
         "page": 35
     },
     {
@@ -774,25 +720,19 @@
             {
                 "index": "darkvision",
                 "name": "Darkvision",
-                "desc": [
-                    "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray."
-                ],
+                "description": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
                 "proficiencies": []
             },
             {
                 "index": "fey-ancestry",
                 "name": "Fey Ancestry",
-                "desc": [
-                    "You have advantage on saving throws against being charmed, and magic cannot put you to sleep."
-                ],
+                "description": "You have advantage on saving throws against being charmed, and magic cannot put you to sleep.",
                 "proficiencies": []
             },
             {
                 "index": "skill-versatility",
                 "name": "Skill Versatility",
-                "desc": [
-                    "You gain proficiency in two skills of your choice."
-                ],
+                "description": "You gain proficiency in two skills of your choice.",
                 "proficiencies": [],
                 "proficiency_choices": {
                     "choose": 2,
@@ -821,7 +761,7 @@
         ],
         "subraces": [],
         "book": "Player's Handbook",
-        "desc": "Half-elves combine what some say are the best qualities of their elf and human parents.",
+        "description": "Half-elves combine what some say are the best qualities of their elf and human parents.",
         "page": 38
     },
     {
@@ -854,31 +794,25 @@
             {
                 "index": "darkvision",
                 "name": "Darkvision",
-                "desc": [
-                    "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray."
-                ],
+                "description": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
                 "proficiencies": []
             },
             {
                 "index": "savage-attacks",
                 "name": "Savage Attacks",
-                "desc": [
-                    "When you score a critical hit with a melee weapon attack, you can roll one of the weapon's damage dice one additional time and add it to the extra damage of the critical hit."
-                ],
+                "description": "When you score a critical hit with a melee weapon attack, you can roll one of the weapon's damage dice one additional time and add it to the extra damage of the critical hit.",
                 "proficiencies": []
             },
             {
                 "index": "relentless-endurance",
                 "name": "Relentless Endurance",
-                "desc": [
-                    "When you are reduced to 0 hit points but not killed outright, you can drop to 1 hit point instead. you cannot use this feature again until you finish a long rest."
-                ],
+                "description": "When you are reduced to 0 hit points but not killed outright, you can drop to 1 hit point instead. you cannot use this feature again until you finish a long rest.",
                 "proficiencies": []
             }
         ],
         "subraces": [],
         "book": "Player's Handbook",
-        "desc": "Half-orcs' grayish pigmentation, sloping foreheads, jutting jaws, prominent teeth, and towering builds make their orcish heritage plain for all to see.",
+        "description": "Half-orcs' grayish pigmentation, sloping foreheads, jutting jaws, prominent teeth, and towering builds make their orcish heritage plain for all to see.",
         "page": 40
     },
     {
@@ -905,25 +839,19 @@
             {
                 "index": "brave",
                 "name": "Brave",
-                "desc": [
-                    "You have advantage on saving throw against being frightened."
-                ],
+                "description": "You have advantage on saving throw against being frightened.",
                 "proficiencies": []
             },
             {
                 "index": "halfling-nimbleness",
                 "name": "Halfling Nimbleness",
-                "desc": [
-                    "You can move through the space of any creature that is of a size larger than yours."
-                ],
+                "description": "You can move through the space of any creature that is of a size larger than yours.",
                 "proficiencies": []
             },
             {
                 "index": "lucky",
                 "name": "Lucky",
-                "desc": [
-                    "When you roll a 1 on the d20 for an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll."
-                ],
+                "description": "When you roll a 1 on the d20 for an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll.",
                 "proficiencies": []
             }
         ],
@@ -931,7 +859,7 @@
             {
                 "index": "lightfoot-halfling",
                 "name": "Lightfoot Halfling",
-                "desc": "As a lightfoot halfling, you can easily hide from notice, even using other people as cover. You're inclined to be affable and get along well with others. Lightfoots are more prone to wanderlust than other halflings, and often dwell alongside other races or take up a nomadic life.",
+                "description": "As a lightfoot halfling, you can easily hide from notice, even using other people as cover. You're inclined to be affable and get along well with others. Lightfoots are more prone to wanderlust than other halflings, and often dwell alongside other races or take up a nomadic life.",
                 "ability_bonuses": [
                     {
                         "ability_score": "CHA",
@@ -944,9 +872,7 @@
                     {
                         "index": "naturally-stealthy",
                         "name": "Naturally Stealthy",
-                        "desc": [
-                            "You can attempt to hide even when you are obscured only by a creature that is at least one size larger than you."
-                        ],
+                        "description": "You can attempt to hide even when you are obscured only by a creature that is at least one size larger than you.",
                         "proficiencies": []
                     }
                 ]
@@ -954,7 +880,7 @@
             {
                 "index": "stout-halfling",
                 "name": "Stout Halfling",
-                "desc": "As a stout halfling, you're hardier than average and have some resistance to poison.",
+                "description": "As a stout halfling, you're hardier than average and have some resistance to poison.",
                 "race": {},
                 "ability_bonuses": [
                     {
@@ -968,16 +894,14 @@
                     {
                         "index": "scout-resilience",
                         "name": "Scout Resilience",
-                        "desc": [
-                            "You have advantage on saving throws against poison, and you have resistance against poison damage."
-                        ],
+                        "description": "You have advantage on saving throws against poison, and you have resistance against poison damage.",
                         "proficiencies": []
                     }
                 ]
             }
         ],
         "book": "Player's Handbook",
-        "desc": "The diminutive halflings survive in a world full of larger creatures by avoiding notice or, barring that, avoiding offense.",
+        "description": "The diminutive halflings survive in a world full of larger creatures by avoiding notice or, barring that, avoiding offense.",
         "page": 26
     },
     {
@@ -1043,14 +967,12 @@
             {
                 "index": "naturally-stealthy",
                 "name": "Naturally Stealthy",
-                "desc": [
-                    "You can attempt to hide even when you are obscured only by a creature that is at least one size larger than you."
-                ],
+                "description": "You can attempt to hide even when you are obscured only by a creature that is at least one size larger than you.",
                 "proficiencies": []
             }
         ],
         "book": "Player's Handbook",
-        "desc": "Humans are the most adaptable and ambitious people among the common races. Whatever drives them, humans are the innovators, the achievers, and the pioneers of the worlds.",
+        "description": "Humans are the most adaptable and ambitious people among the common races. Whatever drives them, humans are the innovators, the achievers, and the pioneers of the worlds.",
         "page": 29
     },
     {
@@ -1081,31 +1003,25 @@
             {
                 "index": "darkvision",
                 "name": "Darkvision",
-                "desc": [
-                    "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray."
-                ],
+                "description": "You have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You cannot discern color in darkness, only shades of gray.",
                 "proficiencies": []
             },
             {
                 "index": "hellish-resistance",
                 "name": "Hellish Resistance",
-                "desc": [
-                    "You have resistance to fire damage."
-                ],
+                "description": "You have resistance to fire damage.",
                 "proficiencies": []
             },
             {
                 "index": "infernal-legacy",
                 "name": "Infernal Legacy",
-                "desc": [
-                    "You know the thaumaturgy cantrip. When you reach 3rd level, you can cast the hellish rebuke spell as a 2nd-level spell once with this trait and regain the ability to do so when you finish a long rest. When you reach 5th level, you can cast the darkness spell once with this trait and regain the ability to do so when you finish a long rest. Charisma is your spellcasting ability for these spells."
-                ],
+                "description": "You know the thaumaturgy cantrip. When you reach 3rd level, you can cast the hellish rebuke spell as a 2nd-level spell once with this trait and regain the ability to do so when you finish a long rest. When you reach 5th level, you can cast the darkness spell once with this trait and regain the ability to do so when you finish a long rest. Charisma is your spellcasting ability for these spells.",
                 "proficiencies": []
             }
         ],
         "subraces": [],
         "book": "Player's Handbook",
-        "desc": "To be greeted with stares and whispers, to suffer violence and insult on the street, to see mistrust and fear in every eye: this is the life of the tiefling",
+        "description": "To be greeted with stares and whispers, to suffer violence and insult on the street, to see mistrust and fear in every eye: this is the life of the tiefling",
         "page": 42,
         "damage_resistance": "Fire"
     }
