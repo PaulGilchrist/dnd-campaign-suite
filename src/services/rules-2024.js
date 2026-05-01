@@ -85,31 +85,24 @@ const rules = {
         const passiveSkills = await getPassiveSkills();
         return playerStats.abilities.map((ability) => {
             const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
-            ability.totalScore = ability.baseScore + ability.abilityImprovements + ability.miscBonus;
+            const newAbility = { ...ability };
+            newAbility.totalScore = ability.baseScore + ability.abilityImprovements + ability.miscBonus;
             // No racial bonuses in 2024
-            ability.bonus = Math.floor((ability.totalScore - 10) / 2);
-            ability.proficient = playerStats.class.saving_throw_proficiencies ? playerStats.class.saving_throw_proficiencies.includes(ability.name) : false;
-            ability.save = ability.proficient ? ability.bonus + proficiency : ability.bonus;
-            ability.skills = skills.filter(skill => skill.ability === ability.name);
-            ability.skills = ability.skills.map((skill) => {
+            newAbility.bonus = Math.floor((newAbility.totalScore - 10) / 2);
+            newAbility.proficient = playerStats.class.saving_throw_proficiencies ? playerStats.class.saving_throw_proficiencies.includes(newAbility.name) : false;
+            newAbility.save = newAbility.proficient ? newAbility.bonus + proficiency : newAbility.bonus;
+            newAbility.skills = skills.filter(skill => skill.ability === newAbility.name);
+            newAbility.skills = newAbility.skills.map((skill) => {
                 const proficient = playerStats.skillProficiencies.includes(skill.name);
-                skill.bonus = proficient ? ability.bonus + proficiency : ability.bonus;
+                const newSkill = { ...skill };
+                newSkill.bonus = proficient ? newAbility.bonus + proficiency : newAbility.bonus;
                 if (playerStats.expertise && playerStats.expertise.includes(skill.name)) {
-                    skill.bonus += proficiency;
+                    newSkill.bonus += proficiency;
                 }
-                if (passiveSkills.includes(skill.name)) {
-                    const newSense = {
-                        name: `Passive ${skill.name}`,
-                        value: 10 + skill.bonus
-                    }
-                    if (playerStats.senses && !playerStats.senses.some((sense) => sense.name === newSense.name)) {
-                        playerStats.senses.push(newSense);
-                    }
-                }
-                return skill;
-            });
-            return ability;
-        });
+                return newSkill;
+             });
+            return newAbility;
+         });
     },
     getActions: (playerStats) => {
         // 2024 Rules: Includes Magic, Utilize, and Craft actions
@@ -612,7 +605,6 @@ const rules = {
         if (spellAbilities) {
             if (playerStats.spells) {
                 spellAbilities.spells = playerStats.spells.map(spell => { return { name: spell, prepared: '' } });
-                delete playerStats.spells;
             } else {
                 spellAbilities.spells = [];
             }

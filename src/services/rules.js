@@ -86,34 +86,26 @@ const rules = {
     const passiveSkills = await getPassiveSkills();
     return playerStats.abilities.map((ability) => {
 		const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
-		ability.totalScore = ability.baseScore + ability.abilityImprovements + ability.miscBonus + raceRules.getRacialBonus(playerStats, ability.name);
-		if((ability.name === 'Strength' || ability.name === 'Constitution') && playerStats.class.name === 'Barbarian' && playerStats.level > 19) {
-			ability.totalScore += 4; // Primal Champion
+		const newAbility = { ...ability };
+		newAbility.totalScore = ability.baseScore + ability.abilityImprovements + ability.miscBonus + raceRules.getRacialBonus(playerStats, ability.name);
+		if((newAbility.name === 'Strength' || newAbility.name === 'Constitution') && playerStats.class.name === 'Barbarian' && playerStats.level > 19) {
+			newAbility.totalScore += 4; // Primal Champion
 		 }
-		ability.bonus = Math.floor((ability.totalScore - 10) / 2);
-		ability.proficient = playerStats.class.saving_throws.includes(ability.name);
-		ability.save = ability.proficient ? ability.bonus + proficiency : ability.bonus;
-		ability.skills = skills.filter(skill => skill.ability === ability.name);
-		ability.skills = ability.skills.map((skill) => {
+		newAbility.bonus = Math.floor((newAbility.totalScore - 10) / 2);
+		newAbility.proficient = playerStats.class.saving_throws.includes(newAbility.name);
+		newAbility.save = newAbility.proficient ? newAbility.bonus + proficiency : newAbility.bonus;
+		newAbility.skills = skills.filter(skill => skill.ability === newAbility.name);
+		newAbility.skills = newAbility.skills.map((skill) => {
 			const proficient = playerStats.skillProficiencies.includes(skill.name);
-			skill.bonus = proficient ? ability.bonus + proficiency : ability.bonus;
+			const newSkill = { ...skill };
+			newSkill.bonus = proficient ? newAbility.bonus + proficiency : newAbility.bonus;
 			if (playerStats.expertise && playerStats.expertise.includes(skill.name)) {
-				skill.bonus += proficiency; // Rogues can double their proficiency for two selected areas of expertise
+				newSkill.bonus += proficiency; // Rogues can double their proficiency for two selected areas of expertise
 			 }
-			if (passiveSkills.includes(skill.name)) {
-			 // Add skill based senses
-				const newSense = {
-					name: `Passive ${skill.name}`,
-					value: 10 + skill.bonus
-				}
-				if (!playerStats.senses.some((sense) => sense.name === newSense.name)) {
-					playerStats.senses.push(newSense);
-				 }
-			 }
-			return skill;
-		 });
-		return ability;
-	 });
+			return newSkill;
+		   });
+		return newAbility;
+	   });
 	},
     getActions: (playerStats) => {
         // Dependencies: Class, Race
@@ -580,8 +572,7 @@ const rules = {
          }
         if (spellAbilities) {
             if (playerStats.spells) {
-                spellAbilities.spells = playerStats.spells.map(spell => {return { name: spell, prepared: ''};})               
-                delete playerStats.spells;
+                spellAbilities.spells = playerStats.spells.map(spell => {return { name: spell, prepared: ''};})
                 if(playerStats.class.subclass && playerStats.class.subclass.name === 'Arcane Trickster') { // Mage Hand Legerdemain
                     spellAbilities.spells = [...new Set([...spellAbilities.spells, ...['Mage Hand']])];
                     spellAbilities.cantrips_known += 3;                    
@@ -790,3 +781,4 @@ const rules = {
 }
 
 export default rules
+
