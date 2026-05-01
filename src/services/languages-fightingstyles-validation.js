@@ -4,112 +4,9 @@
  * Supports both 5e and 2024 rulesets
  */
 
-let classDataCache = {
-      '5e': null,
-      '2024': null
-     };
-let raceDataCache = {
-      '5e': null,
-      '2024': null
-     };
-let backgroundDataCache = {
-      '2024': null
-     };
+import { loadClassData, loadRaceData, loadBackgroundData, loadFeatData, fetchClassData, fetchRaceData, fetchBackgroundData, fetchSubraceData } from './data-loader.js';
 
-/**
- * Fetches class data from JSON files (with caching)
- * @param {string} version - '5e' or '2024'
- * @returns {Promise<object[]>} - Array of class data
- */
-async function loadClassData(version = '5e') {
-    if (classDataCache[version]) {
-        return classDataCache[version];
-       }
-    
-    try {
-        const path = version === '2024' ? '/data/2024/classes.json' : '/data/classes.json';
-        const response = await fetch(path);
-        if (!response.ok) {
-            throw new Error(`Failed to load ${version} classes.json from ${path}`);
-            }
-        const data = await response.json();
-        classDataCache[version] = data;
-        return data;
-       } catch (error) {
-        console.error(`Error loading ${version} classes.json:`, error);
-        return [];
-    }
-     }
-
-/**
- * Fetches race data from JSON files (with caching)
- * @param {string} version - '5e' or '2024'
- * @returns {Promise<object[]>} - Array of race data
- */
-async function loadRaceData(version = '5e') {
-    if (raceDataCache[version]) {
-        return raceDataCache[version];
-       }
-    
-    try {
-        const path = version === '2024' ? '/data/2024/races.json' : '/data/races.json';
-        const response = await fetch(path);
-        if (!response.ok) {
-            throw new Error(`Failed to load ${version} races.json from ${path}`);
-            }
-        const data = await response.json();
-        raceDataCache[version] = data;
-        return data;
-       } catch (error) {
-        console.error(`Error loading ${version} races.json:`, error);
-        return [];
-    }
-     }
-
-/**
- * Fetches background data from JSON files (with caching) - 2024 only
- * @returns {Promise<object[]>} - Array of background data
- */
-async function loadBackgroundData() {
-    if (backgroundDataCache['2024']) {
-        return backgroundDataCache['2024'];
-       }
-    
-    try {
-        const path = '/data/2024/backgrounds.json';
-        const response = await fetch(path);
-        if (!response.ok) {
-            throw new Error(`Failed to load 2024 backgrounds.json from ${path}`);
-            }
-        const data = await response.json();
-        backgroundDataCache['2024'] = data;
-        return data;
-       } catch (error) {
-        console.error('Error loading 2024 backgrounds.json:', error);
-        return [];
-    }
-     }
-
-/**
- * Fetches feat data from JSON files (with caching) - for fighting style feats
- * @param {string} version - '5e' or '2024'
- * @returns {Promise<object[]>} - Array of feat data
- */
-async function loadFeatData(version = '5e') {
-    try {
-        const path = version === '2024' ? '/data/2024/feats.json' : '/data/feats.json';
-      
-        const response = await fetch(path);
-        if (!response.ok) {
-            throw new Error(`Failed to load ${version} feats.json from ${path}`);
-            }
-        return await response.json();
-       } catch (error) {
-        console.error(`Error loading ${version} feats.json:`, error);
-        return [];
-    }
-     }
-
+export { fetchClassData, fetchRaceData, fetchBackgroundData, fetchSubraceData };
 /**
  * Gets the class data for a specific class name
  * @param {string} className - The name of the class
@@ -118,9 +15,8 @@ async function loadFeatData(version = '5e') {
  */
 async function getClassByName(className, version = '5e') {
     if (!className) return null;
-    const classes = await loadClassData(version);
-    return classes.find(c => c.name === className || c.index === className.toLowerCase()) || null;
-   }
+    return fetchClassData(className, version);
+    }
 
 /**
  * Gets the race data for a specific race name
@@ -130,29 +26,13 @@ async function getClassByName(className, version = '5e') {
  */
 async function getRaceByName(raceName, version = '5e') {
     if (!raceName) return null;
-    const races = await loadRaceData(version);
-    return races.find(r => r.name === raceName || r.index === raceName.toLowerCase()) || null;
-   }
+    return fetchRaceData(raceName, version);
+    }
 
 async function getSubraceByName(subraceName, version = '5e') {
     if (!subraceName) return null;
-    const races = await loadRaceData(version);
-      
-    // For 2024, subraces are nested under the parent race
-    if (version === '2024') {
-        for (const race of races) {
-            if (race.subraces) {
-                const subrace = race.subraces.find(s => s.name === subraceName);
-                if (subrace) return subrace;
-             }
-              }
-        return null;
-        }
-      
-    // For 5e, subraces are top-level entries
-    return races.find(r => r.name === subraceName || r.index === subraceName.toLowerCase()) || null;
+    return fetchSubraceData(subraceName, version);
     }
-
 /**
  * Gets the background data for a specific background name (2024 only)
  * @param {string} backgroundName - The name of the background
@@ -160,9 +40,8 @@ async function getSubraceByName(subraceName, version = '5e') {
  */
 async function getBackgroundByName(backgroundName) {
     if (!backgroundName) return null;
-    const backgrounds = await loadBackgroundData();
-    return backgrounds.find(b => b.name === backgroundName || b.index === backgroundName.toLowerCase()) || null;
-   }
+    return fetchBackgroundData(backgroundName, '2024');
+    }
 
 /**
  * Determines fighting styles allowed based on class features from JSON
@@ -475,3 +354,4 @@ export async function validateLanguagesAndFightingStyles(formData) {
     
         return warnings;
     }
+

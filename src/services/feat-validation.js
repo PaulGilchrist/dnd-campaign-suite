@@ -4,81 +4,7 @@
  * Supports both 5e and 2024 rulesets
  */
 
-let backgroundDataCache = {
-      '2024': null
-     };
-
-let validationRulesCache = {
-      '5e': null,
-      '2024': null
-     };
-
-/**
- * Fetches validation rules from JSON files (with caching)
- * @param {string} version - '5e' or '2024'
- * @returns {Promise<object>} - Validation rules object
- */
-async function loadValidationRules(version = '5e') {
-    if (validationRulesCache[version]) {
-        return validationRulesCache[version];
-         }
-     
-    try {
-        const path = version === '2024' ? '/data/2024/rules-validation.json' : '/data/rules-validation.json';
-        const response = await fetch(path);
-        if (!response.ok) {
-            throw new Error(`Failed to load ${version} rules-validation.json from ${path}`);
-             }
-        const data = await response.json();
-        validationRulesCache[version] = data[version] || data;
-        return validationRulesCache[version];
-         } catch (error) {
-        console.error(`Error loading ${version} rules-validation.json:`, error);
-         // Fallback to defaults
-        return {
-            feats: {
-                available_levels: version === '2024' ? [1, 4, 8, 12, 16, 19] : [4, 8, 12, 16, 19],
-                origin_feat_required: version === '2024',
-                origin_feat_level: 1
-                 }
-             };
-         }
-     }
-
-/**
- * Fetches background data from JSON files (with caching) - 2024 only
- * @returns {Promise<object[]>} - Array of background data
- */
-async function loadBackgroundData() {
-    if (backgroundDataCache['2024']) {
-        return backgroundDataCache['2024'];
-    }
-
-    try {
-        const path = '/data/2024/backgrounds.json';
-        const response = await fetch(path);
-        if (!response.ok) {
-            throw new Error(`Failed to load 2024 backgrounds.json from ${path}`);
-             }
-        const data = await response.json();
-        backgroundDataCache['2024'] = data;
-        return data;
-    } catch (error) {
-        console.error(`Error loading 2024 backgrounds.json:`, error);
-        return [];
-}
-     }
-
-/**
- * Fetches a specific background by name from the JSON data (2024 only)
- * @param {string} backgroundName - The name of the background
- * @returns {object|null} - The background data or null if not found
- */
-async function fetchBackgroundData(backgroundName) {
-    const backgrounds = await loadBackgroundData();
-    return backgrounds.find(b => b.name === backgroundName || b.index === backgroundName.toLowerCase()) || null;
-}
-
+import { loadValidationRules, fetchBackgroundData } from './data-loader.js';
 /**
  * Gets the number of feats allowed based on ruleset, level, and class from JSON
  * @param {object} formData - The character form data
@@ -99,8 +25,8 @@ export async function getFeatLimits(formData) {
     for (const featLevel of availableLevels) {
         if (level >= featLevel) {
             allowed += 1;
-             }
          }
+          }
      
     let details = '';
     if (ruleset === '2024') {
@@ -262,3 +188,4 @@ export async function getPreSelectedFeats(formData) {
 
     return Array.from(preSelected);
      }
+

@@ -4,126 +4,9 @@
  * Supports both 5e and 2024 rulesets
  */
 
-let classDataCache = {
-   '5e': null,
-   '2024': null
-};
+import { fetchClassData, fetchRaceData, fetchBackgroundData } from './data-loader.js';
 
-let raceDataCache = {
-   '5e': null,
-   '2024': null
-};
-
-let backgroundDataCache = {
-  '2024': null
-};
-
-/**
- * Fetches class data from JSON files (with caching)
- * @param {string} version - '5e' or '2024'
- * @returns {Promise<object[]>} - Array of class data
- */
-async function loadClassData(version = '5e') {
-  if (classDataCache[version]) {
-    return classDataCache[version];
-  }
-  
-  try {
-    const path = version === '2024' ? '/data/2024/classes.json' : '/data/classes.json';
-    const response = await fetch(path);
-    if (!response.ok) {
-      throw new Error(`Failed to load ${version} classes.json from ${path}`);
-     }
-    const data = await response.json();
-    classDataCache[version] = data;
-    return data;
-  } catch (error) {
-    console.error(`Error loading ${version} classes.json:`, error);
-    return [];
-  }
-}
-
-/**
- * Fetches race data from JSON files (with caching)
- * @param {string} version - '5e' or '2024'
- * @returns {Promise<object[]>} - Array of race data
- */
-async function loadRaceData(version = '5e') {
-  if (raceDataCache[version]) {
-    return raceDataCache[version];
-  }
-  
-  try {
-    const path = version === '2024' ? '/data/2024/races.json' : '/data/races.json';
-    const response = await fetch(path);
-    if (!response.ok) {
-      throw new Error(`Failed to load ${version} races.json from ${path}`);
-     }
-    const data = await response.json();
-    raceDataCache[version] = data;
-    return data;
-  } catch (error) {
-    console.error(`Error loading ${version} races.json:`, error);
-    return [];
-  }
-}
-
-/**
- * Fetches background data from JSON files (with caching) - 2024 only
- * @returns {Promise<object[]>} - Array of background data
- */
-async function loadBackgroundData() {
-  if (backgroundDataCache['2024']) {
-    return backgroundDataCache['2024'];
-  }
-  
-  try {
-    const path = '/data/2024/backgrounds.json';
-    const response = await fetch(path);
-    if (!response.ok) {
-      throw new Error(`Failed to load 2024 backgrounds.json from ${path}`);
-     }
-    const data = await response.json();
-    backgroundDataCache['2024'] = data;
-    return data;
-  } catch (error) {
-    console.error(`Error loading 2024 backgrounds.json:`, error);
-    return [];
-  }
-}
-
-/**
- * Fetches a specific class by name from the JSON data
- * @param {string} className - The name of the class (e.g., 'Wizard', 'Bard')
- * @param {string} version - '5e' or '2024'
- * @returns {object|null} - The class data or null if not found
- */
-export async function fetchClassData(className, version = '5e') {
-  const classes = await loadClassData(version);
-  return classes.find(c => c.name === className || c.index === className.toLowerCase()) || null;
-}
-
-/**
- * Fetches a specific race by name from the JSON data
- * @param {string} raceName - The name of the race (e.g., 'Human', 'Elf')
- * @param {string} version - '5e' or '2024'
- * @returns {object|null} - The race data or null if not found
- */
-export async function fetchRaceData(raceName, version = '5e') {
-  const races = await loadRaceData(version);
-  return races.find(r => r.name === raceName || r.index === raceName.toLowerCase()) || null;
-}
-
-/**
- * Fetches a specific background by name from the JSON data (2024 only)
- * @param {string} backgroundName - The name of the background
- * @returns {object|null} - The background data or null if not found
- */
-export async function fetchBackgroundData(backgroundName) {
-  const backgrounds = await loadBackgroundData();
-  return backgrounds.find(b => b.name === backgroundName || b.index === backgroundName.toLowerCase()) || null;
-}
-
+export { fetchClassData, fetchRaceData, fetchBackgroundData };
 /**
  * Parses skill proficiencies from a class/race/background data object
  * Handles both "Choose X from..." format and direct skill lists
@@ -513,3 +396,4 @@ export async function getSkillInfo(skillName, formData) {
     isPreSelected
    };
 }
+

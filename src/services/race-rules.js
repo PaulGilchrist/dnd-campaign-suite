@@ -23,10 +23,12 @@ const raceRules = {
         },
     getRace: (allRaces, playerSummary) => {
         const race = merge(cloneDeep(allRaces.find((race) => race.name === playerSummary.race.name)), cloneDeep(playerSummary.race));
+        if (race.ability_bonuses) {
         race.ability_bonuses = race.ability_bonuses.map((ability_bonus) => {
             ability_bonus.ability_score = rules.getAbilityLongName(ability_bonus.ability_score);
             return ability_bonus;
            });
+              }
         const subrace = playerSummary.race.subrace
                         ? race.subraces?.find((subrace) => subrace.name === playerSummary.race.subrace.name)
                         : null;
@@ -44,19 +46,21 @@ const raceRules = {
                     }
         return race;
         },
-    getRacialBonus: (playerStats, abilityName) => {
-           // Dependencies: Race
+        getRacialBonus: (playerStats, abilityName) => {
+             // Dependencies: Race
         let racialBonus = 0;
-        let ability_bonus = playerStats.race.ability_bonuses.find((ability_bonus) => ability_bonus.ability_score == abilityName);
-        if (ability_bonus) {
-            racialBonus += ability_bonus.bonus;
-           }
-        if (playerStats.race.subrace && playerStats.race.subrace.ability_bonuses) {
-                    ability_bonus = playerStats.race.subrace.ability_bonuses.find((ability_bonus) => ability_bonus.ability_score == abilityName);
-                    if (ability_bonus) {
-                        racialBonus += ability_bonus.bonus;
-                        }
-                    }
+        if (playerStats.race.ability_bonuses) {
+            let ability_bonus = playerStats.race.ability_bonuses.find((ability_bonus) => ability_bonus.ability_score == abilityName);
+            if (ability_bonus) {
+                racialBonus += ability_bonus.bonus;
+                  }
+              }
+                if (playerStats.race.subrace && playerStats.race.subrace.ability_bonuses) {
+                    let subrace_ability_bonus = playerStats.race.subrace.ability_bonuses.find((ab) => ab.ability_score == abilityName);
+                    if (subrace_ability_bonus) {
+                        racialBonus += subrace_ability_bonus.bonus;
+                     }
+                       }
         return racialBonus;
         },
     getResistances: (playerSummary) => {

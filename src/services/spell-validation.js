@@ -4,125 +4,7 @@
  * Supports both 5e and 2024 rulesets
  */
 
-// Cache for loaded data
-const dataCache = {
-  '5e': {
-    classes: null,
-    races: null,
-    backgrounds: null,
-    feats: null
-  },
-  '2024': {
-    classes: null,
-    races: null,
-    backgrounds: null,
-    feats: null
-  }
-};
-
-/**
- * Fetches class data from JSON files (with caching)
- * @param {string} version - '5e' or '2024'
- * @returns {Promise<object[]>} - Array of class data
- */
-async function loadClassData(version = '5e') {
-  if (dataCache[version].classes) {
-    return dataCache[version].classes;
-  }
-  
-  try {
-    const path = version === '2024' ? 'data/2024/classes.json' : 'data/classes.json';
-    const response = await fetch(path);
-        if (!response.ok) {
-      throw new Error(`Failed to load ${version} classes.json from ${path}`);
-      }
-    const data = await response.json();
-    dataCache[version].classes = data;
-    return data;
-  } catch (error) {
-    console.error(`Error loading ${version} classes.json:`, error);
-    return [];
-  }
-}
-
-/**
- * Fetches race data from JSON files (with caching)
- * @param {string} version - '5e' or '2024'
- * @returns {Promise<object[]>} - Array of race data
- */
-async function loadRaceData(version = '5e') {
-  if (dataCache[version].races) {
-    return dataCache[version].races;
-  }
-  
-  try {
-    const path = version === '2024' ? 'data/2024/races.json' : 'data/races.json';
-        const response = await fetch(path);
-        if (!response.ok) {
-      throw new Error(`Failed to load ${version} races.json from ${path}`);
-       }
-    const data = await response.json();
-    dataCache[version].races = data;
-    return data;
-  } catch (error) {
-    console.error(`Error loading ${version} races.json:`, error);
-    return [];
-  }
-}
-
-/**
- * Fetches background data from JSON files (with caching)
- * @param {string} version - '5e' or '2024'
- * @returns {Promise<object[]>} - Array of background data
- */
-async function loadBackgroundData(version = '5e') {
-  if (dataCache[version].backgrounds) {
-    return dataCache[version].backgrounds;
-  }
-  
-  try {
-    // 5e backgrounds may not exist as a separate file
-    const path = version === '2024' ? 'data/2024/backgrounds.json' : 'data/backgrounds.json';
-      const response = await fetch(path);
-    if (!response.ok) {
-      // Backgrounds file may not exist for 5e, that's okay
-      dataCache[version].backgrounds = [];
-      return [];
-    }
-    const data = await response.json();
-    dataCache[version].backgrounds = data;
-    return data;
-  } catch (error) {
-    console.error(`Error loading ${version} backgrounds.json:`, error);
-    return [];
-  }
-}
-
-/**
- * Fetches feat data from JSON files (with caching)
- * @param {string} version - '5e' or '2024'
- * @returns {Promise<object[]>} - Array of feat data
- */
-async function loadFeatData(version = '5e') {
-  if (dataCache[version].feats) {
-    return dataCache[version].feats;
-  }
-  
-  try {
-    const path = version === '2024' ? 'data/2024/feats.json' : 'data/feats.json';
-    
-    const response = await fetch(path);
-        if (!response.ok) {
-      throw new Error(`Failed to load ${version} feats.json from ${path}`);
-       }
-    const data = await response.json();
-    dataCache[version].feats = data;
-    return data;
-  } catch (error) {
-    console.error(`Error loading ${version} feats.json:`, error);
-    return [];
-  }
-}
+import { loadClassData, loadRaceData, loadBackgroundData, loadFeatData } from './data-loader.js';
 
 /**
  * Gets the spell list for a given class
@@ -131,16 +13,16 @@ async function loadFeatData(version = '5e') {
  * @returns {Promise<string[]>} - Array of class names that have this spell list
  */
 export async function getClassSpellList(className, version = '5e') {
-  const classes = await loadClassData(version);
-  const classData = classes.find(c => c.name === className || c.index === className.toLowerCase());
+  const classData = await loadClassData(version);
+  const found = classData.find(c => c.name === className || c.index === className.toLowerCase());
   
-  if (!classData) {
+  if (!found) {
     return [];
   }
   
-  // For full casters, the spell list is the class name itself
-  // For half casters and third casters, we need to check the subclass
-  // The spell list is typically the class name for most purposes
+   // For full casters, the spell list is the class name itself
+   // For half casters and third casters, we need to check the subclass
+   // The spell list is typically the class name for most purposes
   return [className];
 }
 
