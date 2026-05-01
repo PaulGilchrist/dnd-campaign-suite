@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from 'react';
 import './character-creation-wizard.css';
-import './character-creation-wizard-dark.css';
 import { validateStep, validateFinalFormData, getPointBuyCosts } from './utils';
 import WizardHeader from './wizard-header';
 import WizardProgressBar from './wizard-progress-bar';

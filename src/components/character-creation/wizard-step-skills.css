@@ -5,13 +5,13 @@
 /* Skill Expert Styling */
 .skill-expert-label {
   font-weight: 600;
-  color: #2e7d32;
+  color: var(--color-success);
 }
 
 .expertise-indicator {
   margin-left: 4px;
   font-size: 0.85rem;
-  color: #2e7d32;
+  color: var(--color-success);
   font-weight: 500;
 }
 
@@ -19,10 +19,10 @@
 .expertise-toggle-btn {
   padding: 4px 10px;
   margin-left: 8px;
-  border: 1px solid #4CAF50;
+  border: 1px solid var(--color-primary);
   border-radius: 4px;
-  background-color: white;
-  color: #4CAF50;
+  background-color: var(--background-color-card);
+  color: var(--color-primary);
   font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -30,21 +30,20 @@
 }
 
 .expertise-toggle-btn:hover:not(:disabled) {
-  background-color: #4CAF50;
-  color: white;
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
 }
 
 .expertise-toggle-btn.active {
-  background-color: #2e7d32;
-  border-color: #2e7d32;
-  color: white;
-  cursor: default;
+  background-color: var(--background-color-selected);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .expertise-toggle-btn:disabled {
-  border-color: #ccc;
-  background-color: #f5f5f5;
-  color: #999;
+  border-color: var(--border-color);
+  background-color: var(--background-color-disabled);
+  color: var(--color-text-muted);
   cursor: not-allowed;
 }
 
@@ -59,15 +58,15 @@
 }
 
 .expertise-feedback.error {
-  background-color: #ffebee;
-  color: #c62828;
-  border: 1px solid #ef9a9a;
+  background-color: var(--background-color-error);
+  color: var(--color-error-light);
+  border: 1px solid var(--border-color-error);
 }
 
 .expertise-feedback.success {
-  background-color: #e8f5e9;
-  color: #2e7d32;
-  border: 1px solid #a5d6a7;
+  background-color: var(--background-color-success);
+  color: var(--color-success);
+  border: 1px solid var(--border-color-success);
 }
 
 @keyframes slideIn {

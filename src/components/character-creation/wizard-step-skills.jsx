@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import './wizard-step-skills.css';
-// Dark mode styles loaded via media query
-import './wizard-step-skills-dark.css';
 import { validateSkills, getSkillLimits, getExpertiseLimits } from '../../services/skill-validation.js';
 
 // Load skills from public/data/ability-scores.json

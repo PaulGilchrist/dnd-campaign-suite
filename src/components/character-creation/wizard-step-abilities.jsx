@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import './wizard-step-abilities.css';
-// Dark mode styles loaded via media query
-import './wizard-step-abilities-dark.css';
 import { getPointBuyCosts } from './utils';
 
 // Load ability names from public/data/ability-scores.json

@@ -7,7 +7,7 @@
 }
 .level > .slots {
     border-radius: 2px;
-    border: 1px solid #555;
+    border: 1px solid var(--border-color-light);
     width: 100%;
 }
 .level > .slots > .row {

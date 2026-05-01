@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import SelectableList from './selectable-list';
 import './wizard-step-magic-items.css';
-import './wizard-step-magic-items-dark.css';
-
 function WizardStepMagicItems({ formData, allMagicItems, ruleset, onArrayFieldChange }) {
   const [warnings, setWarnings] = useState([]);
     // Check for attunement limit warnings

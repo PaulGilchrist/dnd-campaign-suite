@@ -3,8 +3,6 @@ import SelectableList from './selectable-list';
 import { getSpellLimits, validateSpellSelection } from '../../services/spell-limits.js';
 import { getSpellValidationInfo } from '../../services/spell-validation.js';
 import './wizard-step-spells.css';
-import './wizard-step-spells-dark.css';
-
 function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
   const [spellCounts, setSpellCounts] = useState({ cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 });
   const [spellLimits, setSpellLimits] = useState({ cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 });

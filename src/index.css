@@ -3,21 +3,98 @@ html {
 }
 
 :root {
+    /* ===== Base Theme Colors (Dark Mode Default) ===== */
+
+    /* Backgrounds */
     --background-color-main: #000;
-    --color-main: #ddd;
-
     --background-color-body: #111;
-    --color-body: #eee;
-
     --background-color-header: #232;
-    --color-header: #48A948;
-
     --background-color-header-inner: #202320;
-    --color-header-inner: #fff;
+    --background-color-card: #222;
+    --background-color-card-hover: #2a2a2a;
+    --background-color-input: #222;
+    --background-color-input-error: #3a1a1a;
+    --background-color-surface: #1a1a1a;
+    --background-color-overlay: rgba(0, 0, 0, 0.9);
+    --background-color-modal: #111;
+    --background-color-tag: #333;
+    --background-color-badge: #444;
+    --background-color-selected: #1a4a1a;
+    --background-color-selected-hover: #1a3a1a;
+    --background-color-error: #4a1a1a;
+    --background-color-error-hover: #6a1a1a;
+    --background-color-success: #1a4a1a;
+    --background-color-success-hover: #1a6a1a;
+    --background-color-warning: #4a3a1a;
+    --background-color-warning-hover: #6a5a1a;
+    --background-color-disabled: #222;
+    --background-color-button-secondary: #333;
+    --background-color-button-secondary-hover: #444;
+    --background-color-button-cancel: #555;
+    --background-color-button-cancel-hover: #666;
+    --background-color-button-disabled: #555;
+    --background-color-point-cost: #333;
+    --background-color-level-count: #1a4a1a;
+    --background-color-level-count-exceeded: #4a1a1a;
+    --background-color-item-tag-more: #665500;
+    --background-color-checkbox: #333;
 
+    /* Text */
+    --color-main: #ddd;
+    --color-body: #eee;
+    --color-header: #48A948;
+    --color-header-inner: #fff;
+    --color-text: #eee;
+    --color-text-secondary: #aaa;
+    --color-text-muted: #666;
+    --color-text-inverse: #fff;
+    --color-link: #48A948;
+    --color-link-hover: #747bff;
+
+    /* Borders */
+    --border-color: #444;
+    --border-color-light: #555;
+    --border-color-input: #444;
+    --border-color-error: #6a1a1a;
+    --border-color-success: #1a6a1a;
+    --border-color-warning: #6a5a1a;
+    --border-color-focus: #4CAF50;
+
+    /* Accent Colors */
+    --color-primary: #4CAF50;
+    --color-primary-hover: #45a049;
+    --color-primary-dark: #2e7d32;
+    --color-primary-light: rgba(76, 175, 80, 0.3);
+    --color-primary-lighter: rgba(76, 175, 80, 0.2);
+    --color-primary-glow: rgba(76, 175, 80, 0.5);
     --color-error: red;
-    --color-hover: #646cff;
+    --color-error-light: #ff6b6b;
+    --color-error-border: #f44336;
     --color-warning: orange;
+    --color-success: #4CAF50;
+    --color-success-light: #2e7d32;
+    --color-hover: #646cff;
+    --color-info: #007bff;
+    --color-info-hover: #0056b3;
+
+    /* Component-specific backgrounds */
+    --background-color-spell-level-cantrip: #6c757d;
+    --background-color-spell-level-low: #28a745;
+    --background-color-spell-level-mid: #ffc107;
+    --background-color-spell-level-high: #dc3545;
+    --background-color-feat-type: #6c757d;
+    --background-color-magic-item-type: #8b9bb4;
+    --background-color-magic-item-rarity: #a67c52;
+    --background-color-item-tag: #e9ecef;
+    --background-color-item-tag-more: #ffc107;
+    --background-color-category-filter: #333;
+    --background-color-category-filter-hover: #444;
+    --background-color-category-filter-active: #4CAF50;
+
+    /* Shadows */
+    --shadow-color: rgba(0, 0, 0, 0.3);
+    --shadow-focus: rgba(76, 175, 80, 0.5);
+    --shadow-selected: rgba(76, 175, 80, 0.4);
 
     color-scheme: light dark;
     font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -26,8 +103,8 @@ html {
     font-weight: 400;
     line-height: 1.5;
     text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+     -webkit-font-smoothing: antialiased;
+     -moz-osx-font-smoothing: grayscale;
 }
 
 b {
@@ -170,23 +247,102 @@ th {
 }
 
 @media (prefers-color-scheme: light) {
-    :root {
-        --background-color-main: #fff;
-        --color-main: #333;
-        --background-color-header: #bbb;
-        --color-header: #070;
-        --background-color-body: #eee;
-        --color-body: #000;
-        --background-color-header-inner: #ddd;
-        --color-header-inner: #070;
-        --color-error: red;
-        --color-hover: #646cff;
-        --color-warning: orange;
-    }
+     :root {
+         /* Backgrounds */
+         --background-color-main: #fff;
+         --background-color-body: #eee;
+         --background-color-header: #bbb;
+         --background-color-header-inner: #ddd;
+         --background-color-card: #f9f9f9;
+         --background-color-card-hover: #f0f7f0;
+         --background-color-input: #fff;
+         --background-color-input-error: #fff5f5;
+         --background-color-surface: #fff;
+         --background-color-overlay: rgba(0, 0, 0, 0.7);
+         --background-color-modal: #fff;
+         --background-color-tag: #e9ecef;
+         --background-color-badge: #f0f0f0;
+         --background-color-selected: #e8f5e9;
+         --background-color-selected-hover: #f0fff0;
+         --background-color-error: #ffebee;
+         --background-color-error-hover: #ef9a9a;
+         --background-color-success: #e8f5e9;
+         --background-color-success-hover: #a5d6a7;
+         --background-color-warning: #fff3e0;
+         --background-color-warning-hover: #ffe0b2;
+         --background-color-disabled: #f5f5f5;
+         --background-color-button-secondary: #f0f0f0;
+         --background-color-button-secondary-hover: #e0e0e0;
+         --background-color-button-cancel: #6c757d;
+         --background-color-button-cancel-hover: #5a6268;
+         --background-color-button-disabled: #ccc;
+         --background-color-point-cost: #f0f0f0;
+         --background-color-level-count: #e8f5e9;
+         --background-color-level-count-exceeded: #ffebee;
+         --background-color-item-tag-more: #ffc107;
+         --background-color-checkbox: #f5f5f5;
+
+         /* Text */
+         --color-main: #333;
+         --color-body: #000;
+         --color-header: #070;
+         --color-header-inner: #070;
+         --color-text: #333;
+         --color-text-secondary: #555;
+         --color-text-muted: #666;
+         --color-text-inverse: #fff;
+         --color-link: #070;
+         --color-link-hover: #747bff;
+
+         /* Borders */
+         --border-color: #e0e0e0;
+         --border-color-light: #ddd;
+         --border-color-input: #ddd;
+         --border-color-error: #ef9a9a;
+         --border-color-success: #a5d6a7;
+         --border-color-warning: #ffe0b2;
+         --border-color-focus: #4CAF50;
+
+         /* Accent Colors */
+         --color-primary: #4CAF50;
+         --color-primary-hover: #45a049;
+         --color-primary-dark: #2e7d32;
+         --color-primary-light: rgba(76, 175, 80, 0.3);
+         --color-primary-lighter: rgba(76, 175, 80, 0.2);
+         --color-primary-glow: rgba(76, 175, 80, 0.3);
+         --color-error: red;
+         --color-error-light: #c62828;
+         --color-error-border: #f44336;
+         --color-warning: orange;
+         --color-success: #2e7d32;
+         --color-success-light: #2e7d32;
+         --color-hover: #646cff;
+         --color-info: #007bff;
+         --color-info-hover: #0056b3;
+
+         /* Component-specific backgrounds */
+         --background-color-spell-level-cantrip: #6c757d;
+         --background-color-spell-level-low: #28a745;
+         --background-color-spell-level-mid: #ffc107;
+         --background-color-spell-level-high: #dc3545;
+         --background-color-feat-type: #6c757d;
+         --background-color-magic-item-type: #8b758d;
+         --background-color-magic-item-rarity: #8b5a2b;
+         --background-color-item-tag: #e9ecef;
+         --background-color-item-tag-more: #ffc107;
+         --background-color-category-filter: #e9ecef;
+         --background-color-category-filter-hover: #dee2e6;
+         --background-color-category-filter-active: #007bff;
+
+         /* Shadows */
+         --shadow-color: rgba(0, 0, 0, 0.3);
+         --shadow-focus: rgba(76, 175, 80, 0.3);
+         --shadow-selected: rgba(76, 175, 80, 0.4);
+     }
 
     a:hover {
-        color: #747bff;
-    }
+        color: var(--color-link-hover);
+     }
 
     button {
         background-color: #f9f9f9;
