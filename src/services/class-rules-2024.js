@@ -6,7 +6,12 @@ const classRules = {
     getClass: (allClasses, playerSummary) => {
         let characterClass = cloneDeep(allClasses.find((characterClass) => characterClass.name === playerSummary.class.name));
 
-           // Preserve class_levels before merging
+        if (!characterClass) {
+            console.warn(`Could not find class: ${playerSummary.class.name}`);
+            return { class_levels: [] };
+        }
+
+            // Preserve class_levels before merging
         const classLevels = characterClass.class_levels || [];
 
            // Merge with player summary data

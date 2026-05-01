@@ -5,13 +5,23 @@ import { validateFeats, getFeatLimits } from '../../services/feat-validation.js'
 function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFeats }) {
   const [warnings, setWarnings] = React.useState([]);
     // Validate feats when selection changes
-  React.useEffect(() => {
-        const validationWarnings = validateFeats(formData, allFeats);
-        setWarnings(validationWarnings);
-    }, [formData.feats, formData.level, formData.rules, allFeats]);
+      React.useEffect(() => {
+            const fetchWarnings = async () => {
+              const validationWarnings = await validateFeats(formData, allFeats);
+              setWarnings(validationWarnings);
+            };
+            fetchWarnings();
+         }, [formData.feats, formData.level, formData.rules, allFeats]);
 
     // Get feat limits for display
-    const featLimits = getFeatLimits(formData);
+    const [featLimits, setFeatLimits] = React.useState({ allowed: 0, originRequired: false, details: '' });
+  React.useEffect(() => {
+        const fetchLimits = async () => {
+          const limits = await getFeatLimits(formData);
+          setFeatLimits(limits);
+          };
+        fetchLimits();
+      }, [formData.level, formData.rules]);
 
     // Complex description extraction logic
   const getDescriptionData = (feat) => {

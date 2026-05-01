@@ -56,17 +56,27 @@ async function loadData(dataType, version = '5e', optional = false) {
     const response = await fetch(path);
 
     if (!response.ok) {
-      if (optional && response.status === 404) {
-        // Optional data not found - cache empty array to avoid re-fetching
-        versionCache[cacheKey] = [];
-        return [];
-      }
-      throw new Error(`Failed to load ${version} ${dataType}.json from ${path}`);
-    }
+          if (optional && response.status === 404) {
+              // Optional data not found - cache empty array to avoid re-fetching
+            versionCache[cacheKey] = [];
+            return [];
+            }
+          throw new Error(`Failed to load ${version} ${dataType}.json from ${path}`);
+          }
 
-    const data = await response.json();
-    versionCache[cacheKey] = data;
-    return data;
+        // Check if response is actually JSON (Vite dev server may return HTML for missing files)
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          if (optional) {
+            versionCache[cacheKey] = [];
+            return [];
+            }
+          throw new Error(`Expected JSON but got ${contentType} for ${version} ${dataType}.json`);
+          }
+
+        const data = await response.json();
+        versionCache[cacheKey] = data;
+        return data;
   } catch (error) {
     console.error(`Error loading ${version} ${dataType}.json:`, error);
     return [];

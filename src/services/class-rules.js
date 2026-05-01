@@ -4,8 +4,12 @@ import { featuresToIgnore, actions, bonusActions, reactions, characterAdvancemen
 
 const classRules = {
     getClass: (allClasses, playerSummary) => {
-        // Dependencies: None
-        let characterClass = allClasses.find((characterClass) => characterClass.name === playerSummary.class.name)
+         // Dependencies: None
+        let characterClass = allClasses.find((characterClass) => characterClass.name === playerSummary.class.name);
+        if (!characterClass) {
+            console.warn(`Could not find class: ${playerSummary.class.name}`);
+            return { class_levels: [] };
+         }
         characterClass = merge(cloneDeep(characterClass), cloneDeep(playerSummary.class));
         let subclass = playerSummary.class.subclass ? characterClass.subclasses?.find((subclass) => subclass.name === playerSummary.class.subclass.name) : undefined;
         if (subclass) {
