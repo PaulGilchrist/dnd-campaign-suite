@@ -43,11 +43,14 @@ const classRules = {
         // 5e Rules: No limit on known forms (returns null or 0)
         return 0;
     },
-        getDruidBeastFlySpeed: (playerStats) => {
-         // 5e Rules: Use class_specific.wild_shape_fly
+                getDruidBeastFlySpeed: (playerStats) => {
+          // 5e Rules: Use class_specific.wild_shape_fly
         const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-        return classLevel?.class_specific?.wild_shape_fly === true;
-      },
+        const wildShapeFly = classLevel?.class_specific?.wild_shape_fly;
+        if (wildShapeFly === true) return true;
+        if (wildShapeFly === false) return false;
+        return undefined;
+       },
         addFeatures: (levels) => {
         // Flatten all features from all levels, maintaining reverse order (highest level first)
         const allFeatures = [];

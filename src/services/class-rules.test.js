@@ -4,26 +4,26 @@ import classRules from './class-rules';
 describe('classRules', () => {
   describe('getClass', () => {
     const mockClasses = [
-         {
-          name: 'Wizard',
-          index: 'wizard',
-          saving_throws: ['INT'],
-          class_levels: [],
-          subclasses: [
-               {
-                name: 'Abjuration',
-                class_levels: []
-                 }
-               ]
-           },
-         {
-          name: 'Fighter',
-          index: 'fighter',
-          saving_throws: ['STR', 'CON'],
-          class_levels: [],
-          subclasses: []
+       {
+        name: 'Wizard',
+        index: 'wizard',
+        saving_throws: ['INT'],
+        class_levels: [],
+        subclasses: [
+           {
+            name: 'Abjuration',
+            class_levels: []
            }
-       ];
+         ]
+       },
+       {
+        name: 'Fighter',
+        index: 'fighter',
+        saving_throws: ['STR', 'CON'],
+        class_levels: [],
+        subclasses: []
+       }
+     ];
 
     it('should return class data for valid class', () => {
       const playerSummary = {
@@ -33,8 +33,8 @@ describe('classRules', () => {
       const result = classRules.getClass(mockClasses, playerSummary);
 
       expect(result.name).toBe('Wizard');
-      expect(result.saving_throkes).toContain('Intelligence');
-        });
+      expect(result.saving_throws).toContain('Intelligence');
+     });
 
     it('should convert saving_throws abbreviations to full names', () => {
       const playerSummary = {
@@ -52,8 +52,8 @@ describe('classRules', () => {
         class: {
           name: 'Wizard',
           subclass: { name: 'Abjuration' }
-           }
-          };
+         }
+       };
 
       const result = classRules.getClass(mockClasses, playerSummary);
 
@@ -85,8 +85,8 @@ describe('classRules', () => {
         class: {
           name: 'Wizard',
           customProperty: 'custom value'
-           }
-          };
+         }
+       };
 
       const result = classRules.getClass(mockClasses, playerSummary);
 
@@ -106,8 +106,8 @@ describe('classRules', () => {
 
     it('should handle class without saving_throws', () => {
       const classes = [
-           { name: 'Wizard', class_levels: [] }
-         ];
+         { name: 'Wizard', class_levels: [] }
+       ];
       const playerSummary = {
         class: { name: 'Wizard' }
           };
@@ -120,8 +120,8 @@ describe('classRules', () => {
 
     it('should handle class without subclasses', () => {
       const classes = [
-           { name: 'Fighter', saving_throws: ['STR'], class_levels: [] }
-         ];
+         { name: 'Fighter', saving_throws: ['STR'], class_levels: [] }
+       ];
       const playerSummary = {
         class: { name: 'Fighter' }
           };
@@ -130,8 +130,8 @@ describe('classRules', () => {
 
       expect(result.subclass).toBeNull();
       expect(result.subclasses).toBeUndefined();
-        });
       });
+   });
 
   describe('getDruidMaxWildShapeChallengeRating', () => {
     it('should return 0 for non-Druid class', () => {
@@ -150,11 +150,11 @@ describe('classRules', () => {
         class: {
           name: 'Druid',
           class_levels: [
-               { level: 1, class_specific: { wild_shape_max_cr: 0 } },
-               { level: 2, class_specific: { wild_shape_max_cr: 0 } },
-               { level: 3, class_specific: { wild_shape_max_cr: 1/2 } }
-               ]
-           },
+             { level: 1, class_specific: { wild_shape_max_cr: 0 } },
+             { level: 2, class_specific: { wild_shape_max_cr: 0 } },
+             { level: 3, class_specific: { wild_shape_max_cr: 1/2 } }
+           ]
+         },
         level: 3
           };
 
@@ -169,10 +169,10 @@ describe('classRules', () => {
           name: 'Druid',
           subclass: { name: 'Moon' },
           class_levels: [
-               { level: 1, class_specific: {} },
-               { level: 2, class_specific: {} }
-               ]
-           },
+             { level: 1, class_specific: {} },
+             { level: 2, class_specific: {} }
+           ]
+         },
         level: 2
           };
 
@@ -249,8 +249,8 @@ describe('classRules', () => {
       const result = classRules.getDruidMaxWildShapeChallengeRating(playerStats);
 
       expect(result).toBe(0);
-        });
       });
+   });
 
   describe('getDruidWildShapeUses', () => {
     it('should always return 2 uses', () => {
@@ -266,17 +266,17 @@ describe('classRules', () => {
 
     it('should return 2 for any level', () => {
       for (let level = 1; level <= 20; level++) {
-          const playerStats = {
-            class: { name: 'Druid' },
-            level: level
-              };
+        const playerStats = {
+          class: { name: 'Druid' },
+          level: level
+         };
 
           const result = classRules.getDruidWildShapeUses(playerStats);
 
-          expect(result).toBe(2);
-          }
-        });
-      });
+        expect(result).toBe(2);
+       }
+     });
+   });
 
   describe('getDruidBeastKnownForms', () => {
     it('should always return 0 (no limit)', () => {
@@ -288,8 +288,8 @@ describe('classRules', () => {
       const result = classRules.getDruidBeastKnownForms(playerStats);
 
       expect(result).toBe(0);
-        });
       });
+   });
 
   describe('getDruidBeastFlySpeed', () => {
     it('should return true when wild_shape_fly is true', () => {
@@ -297,10 +297,12 @@ describe('classRules', () => {
         class: {
           name: 'Druid',
           class_levels: [
-               { level: 1, class_specific: {} },
-               { level: 4, class_specific: { wild_shape_fly: true } }
-               ]
-           },
+              { level: 1, class_specific: {} },
+              { level: 2, class_specific: {} },
+              { level: 3, class_specific: {} },
+              { level: 4, class_specific: { wild_shape_fly: true } }
+            ]
+          },
         level: 4
           };
 
@@ -314,9 +316,9 @@ describe('classRules', () => {
         class: {
           name: 'Druid',
           class_levels: [
-               { level: 1, class_specific: { wild_shape_fly: false } }
-               ]
-           },
+             { level: 1, class_specific: { wild_shape_fly: false } }
+           ]
+         },
         level: 1
           };
 
@@ -330,9 +332,9 @@ describe('classRules', () => {
         class: {
           name: 'Druid',
           class_levels: [
-               { level: 1, class_specific: {} }
-               ]
-           },
+             { level: 1, class_specific: {} }
+           ]
+         },
         level: 1
           };
 
@@ -346,9 +348,9 @@ describe('classRules', () => {
         class: {
           name: 'Druid',
           class_levels: [
-               { level: 1 }
-               ]
-           },
+             { level: 1 }
+           ]
+         },
         level: 1
           };
 
@@ -366,8 +368,8 @@ describe('classRules', () => {
       const result = classRules.getDruidBeastFlySpeed(playerStats);
 
       expect(result).toBeUndefined();
-        });
       });
+   });
 
   describe('getRogueSneakAttack', () => {
     it('should return sneak attack from class_specific', () => {
@@ -375,10 +377,10 @@ describe('classRules', () => {
         class: {
           name: 'Rogue',
           class_levels: [
-               { level: 1, class_specific: { sneak_attack: { dice_count: 1, dice_value: 6 } } },
-               { level: 2, class_specific: { sneak_attack: { dice_count: 2, dice_value: 6 } } }
-               ]
-           },
+             { level: 1, class_specific: { sneak_attack: { dice_count: 1, dice_value: 6 } } },
+             { level: 2, class_specific: { sneak_attack: { dice_count: 2, dice_value: 6 } } }
+           ]
+         },
         level: 2
           };
 
@@ -392,9 +394,9 @@ describe('classRules', () => {
         class: {
           name: 'Rogue',
           class_levels: [
-               { level: 1, class_specific: {} }
-               ]
-           },
+             { level: 1, class_specific: {} }
+           ]
+         },
         level: 1
           };
 
@@ -408,9 +410,9 @@ describe('classRules', () => {
         class: {
           name: 'Rogue',
           class_levels: [
-               { level: 1 }
-               ]
-           },
+             { level: 1 }
+           ]
+         },
         level: 1
           };
 
@@ -435,9 +437,9 @@ describe('classRules', () => {
         class: {
           name: 'Rogue',
           class_levels: [
-               { level: 1, class_specific: { sneak_attack: { dice_count: 1, dice_value: 6 } } }
-               ]
-           },
+             { level: 1, class_specific: { sneak_attack: { dice_count: 1, dice_value: 6 } } }
+           ]
+         },
         level: 1
           };
 
@@ -452,13 +454,13 @@ describe('classRules', () => {
         class: {
           name: 'Rogue',
           class_levels: [
-               { level: 1, class_specific: { sneak_attack: { dice_count: 1, dice_value: 6 } } },
-               { level: 2, class_specific: { sneak_attack: { dice_count: 2, dice_value: 6 } } },
-               { level: 3, class_specific: { sneak_attack: { dice_count: 3, dice_value: 6 } } },
-               { level: 4, class_specific: { sneak_attack: { dice_count: 4, dice_value: 6 } } },
-               { level: 5, class_specific: { sneak_attack: { dice_count: 5, dice_value: 6 } } }
-               ]
-           },
+             { level: 1, class_specific: { sneak_attack: { dice_count: 1, dice_value: 6 } } },
+             { level: 2, class_specific: { sneak_attack: { dice_count: 2, dice_value: 6 } } },
+             { level: 3, class_specific: { sneak_attack: { dice_count: 3, dice_value: 6 } } },
+             { level: 4, class_specific: { sneak_attack: { dice_count: 4, dice_value: 6 } } },
+             { level: 5, class_specific: { sneak_attack: { dice_count: 5, dice_value: 6 } } }
+           ]
+         },
         level: 5
           };
 
@@ -466,8 +468,8 @@ describe('classRules', () => {
 
       expect(result.dice_count).toBe(5);
       expect(result.dice_value).toBe(6);
-        });
       });
+   });
 
   describe('getHighestSubclassLevel', () => {
     it('should return 0 when no subclass', () => {
@@ -491,14 +493,15 @@ describe('classRules', () => {
           subclass: {
             name: 'Abjuration',
             class_levels: [
-                 { level: 2 },
-                 { level: 3 },
-                 { level: 4 },
-                 { level: 5 }
-                 ]
-             },
+               { level: 2 },
+               { level: 3 },
+               { level: 4 },
+               { level: 5 }
+             ]
+           }
+         },
         level: 4
-          };
+       };
 
       const result = classRules.getHighestSubclassLevel(playerStats);
 
@@ -512,10 +515,11 @@ describe('classRules', () => {
           subclass: {
             name: 'Abjuration',
             class_levels: [
-                 { level: 2 },
-                 { level: 3 }
-                 ]
-             },
+               { level: 2 },
+               { level: 3 }
+             ]
+           }
+         },
         level: 1
           };
 
@@ -531,11 +535,12 @@ describe('classRules', () => {
           subclass: {
             name: 'Abjuration',
             class_levels: [
-                 { level: 2 },
-                 { level: 3 },
-                 { level: 4 }
-                 ]
-             },
+               { level: 2 },
+               { level: 3 },
+               { level: 4 }
+             ]
+           }
+         },
         level: 10
           };
 
@@ -550,15 +555,16 @@ describe('classRules', () => {
           name: 'Wizard',
           subclass: {
             name: 'Abjuration'
-             },
+           }
+         },
         level: 5
           };
 
       const result = classRules.getHighestSubclassLevel(playerStats);
 
       expect(result).toBe(0);
-        });
       });
+   });
 
   describe('getFeatures', () => {
     it('should return categorized features from class levels', () => {
@@ -566,10 +572,10 @@ describe('classRules', () => {
         class: {
           name: 'Fighter',
           class_levels: [
-               { level: 1, features: ['Weapon Training'] },
-               { level: 2, features: ['Second Wind', 'Action Surge'] }
-               ]
-           },
+             { level: 1, features: ['Weapon Training'] },
+             { level: 2, features: ['Second Wind', 'Action Surge'] }
+           ]
+         },
         level: 2,
         subclass: null
           };
@@ -585,15 +591,15 @@ describe('classRules', () => {
         class: {
           name: 'Fighter',
           class_levels: [
-               { level: 1, features: ['Weapon Training'] }
-               ],
+             { level: 1, features: ['Weapon Training'] }
+           ],
           subclass: {
             name: 'Battle Master',
             class_levels: [
-                 { level: 3, features: ['Combat Maneuvers'] }
-                 ]
-             }
-           },
+               { level: 3, features: ['Combat Maneuvers'] }
+             ]
+           }
+         },
         level: 3
           };
 
@@ -607,11 +613,11 @@ describe('classRules', () => {
         class: {
           name: 'Fighter',
           class_levels: [
-               { level: 1, features: ['Weapon Training'] },
-               { level: 2, features: ['Second Wind'] },
-               { level: 3, features: ['Action Surge'] }
-               ]
-           },
+             { level: 1, features: ['Weapon Training'] },
+             { level: 2, features: ['Second Wind'] },
+             { level: 3, features: ['Action Surge'] }
+           ]
+         },
         level: 2,
         subclass: null
           };
@@ -626,9 +632,9 @@ describe('classRules', () => {
         class: {
           name: 'Fighter',
           class_levels: [
-               { level: 1 }
-               ]
-           },
+             { level: 1 }
+           ]
+         },
         level: 1,
         subclass: null
           };
@@ -643,30 +649,30 @@ describe('classRules', () => {
         class: {
           name: 'Fighter',
           class_levels: [
-               { level: 1, features: ['Weapon Training'] }
-               ],
+             { level: 1, features: ['Weapon Training'] }
+           ],
           subclass: {
             name: 'Battle Master',
             class_levels: [
-                 { level: 3 }
-                 ]
-             }
-           },
+               { level: 3 }
+             ]
+           }
+         },
         level: 3
           };
 
       const result = classRules.getFeatures(playerStats);
 
       expect(result).toBeDefined();
-        });
       });
+   });
 
   describe('addFeatures', () => {
     it('should categorize features from all levels', () => {
       const levels = [
-           { level: 1, features: ['Weapon Training'] },
-           { level: 2, features: ['Second Wind', 'Action Surge'] }
-           ];
+         { level: 1, features: ['Weapon Training'] },
+         { level: 2, features: ['Second Wind', 'Action Surge'] }
+       ];
 
       const result = classRules.addFeatures(levels);
 
@@ -682,9 +688,9 @@ describe('classRules', () => {
 
     it('should handle levels without features', () => {
       const levels = [
-           { level: 1 },
-           { level: 2 }
-           ];
+         { level: 1 },
+         { level: 2 }
+       ];
 
       const result = classRules.addFeatures(levels);
 
@@ -693,13 +699,13 @@ describe('classRules', () => {
 
     it('should handle levels with empty features array', () => {
       const levels = [
-           { level: 1, features: [] },
-           { level: 2, features: [] }
-           ];
+         { level: 1, features: [] },
+         { level: 2, features: [] }
+       ];
 
       const result = classRules.addFeatures(levels);
 
       expect(result).toBeDefined();
-        });
       });
+   });
 });

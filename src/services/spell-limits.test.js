@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { 
   getSpellLimits, 
   validateSpellSelection, 
-  getAllSpellLimits 
+  getAllSpellLimits,
+  resetClassDataCache
 } from './spell-limits';
 
 // Mock fetch for all tests
@@ -12,8 +13,8 @@ global.fetch = mockFetch;
 describe('spell-limits', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetClassDataCache();
    });
-
   describe('getSpellLimits', () => {
     it('should return default limits for non-spellcasting class', async () => {
       mockFetch.mockResolvedValue({
@@ -23,9 +24,9 @@ describe('spell-limits', () => {
             name: 'Barbarian',
             index: 'barbarian',
             class_levels: [{ level: 1, spellcasting: null }]
-           }
-         ])
-       });
+            }
+          ])
+        });
 
       const limits = await getSpellLimits('Barbarian', 1, '5e');
       
@@ -59,12 +60,12 @@ describe('spell-limits', () => {
                 spellcasting: {
                   cantrips_known: 3,
                   spell_slots_level_1: 2
-                 }
-               }
-             ]
-           }
-         ])
-       });
+                  }
+                }
+              ]
+            }
+          ])
+        });
 
       const limits = await getSpellLimits('Wizard', 1, '5e');
       
@@ -86,12 +87,12 @@ describe('spell-limits', () => {
                 spellcasting: {
                   cantrips_known: 3,
                   spell_slots_level_1: 2
-                 }
-               }
-             ]
-           }
-         ])
-       });
+                  }
+                }
+              ]
+            }
+          ])
+        });
 
       const limits = await getSpellLimits('wizard', 1, '5e');
       
@@ -616,3 +617,4 @@ describe('spell-limits', () => {
      });
    });
 });
+

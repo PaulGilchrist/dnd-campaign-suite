@@ -28,14 +28,14 @@ vi.mock('./feature-categorization-utils', () => ({
     reactions: features.filter(f => f.type === 'reaction'),
     passive: features.filter(f => f.type === 'passive'),
     maintained: features.filter(f => f.type === 'maintained')
-      }),
+  })),
   mergeCategorizedFeatures: vi.fn((a, b) => ({
     actions: [...(a.actions || []), ...(b.actions || [])],
     bonusActions: [...(a.bonusActions || []), ...(b.bonusActions || [])],
     reactions: [...(a.reactions || []), ...(b.reactions || [])],
     passive: [...(a.passive || []), ...(b.passive || [])],
     maintained: [...(a.maintained || []), ...(b.maintained || [])]
-      })
+  }))
 }));
 
 describe('raceRules 2024', () => {

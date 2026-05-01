@@ -20,10 +20,14 @@ const raceRules = {
         if(playerSummary.immunities) {
             immunities = [...new Set([...immunities, ...playerSummary.immunities])];
            }
-        return immunities.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        return immunities.sort();
         },
     getRace: (allRaces, playerSummary) => {
-        const race = merge(cloneDeep(allRaces.find((race) => race.name === playerSummary.race.name)), cloneDeep(playerSummary.race));
+        const foundRace = allRaces.find((race) => race.name === playerSummary.race.name);
+        if (!foundRace) {
+            return undefined;
+         }
+        const race = merge(cloneDeep(foundRace), cloneDeep(playerSummary.race));
         if (race.ability_bonuses) {
         race.ability_bonuses = race.ability_bonuses.map((ability_bonus) => {
             ability_bonus.ability_score = rules.getAbilityLongName(ability_bonus.ability_score);
@@ -93,7 +97,7 @@ const raceRules = {
         if(playerSummary.resistances) {
             resistances = [...new Set([...resistances, ...playerSummary.resistances])];
            }
-        return resistances.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        return resistances.sort();
         },
     getSenses: (playerStats) => {
            // Dependencies: Race

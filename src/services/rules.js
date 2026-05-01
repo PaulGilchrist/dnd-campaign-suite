@@ -409,18 +409,19 @@ const rules = {
         }
         return attacks;
     },
-    getHitPoints: (playerStats) => {
-             // Dependencies: Abilities, Class
-            const constitution = playerStats.abilities.find((ability) => ability.name === 'Constitution');
-            let hitPoints = playerStats.class.hit_die + ((playerStats.class.hit_die / 2 + 1) * (playerStats.level - 1)) + (constitution.bonus * playerStats.level);
+        getHitPoints: (playerStats) => {
+              // Dependencies: Abilities, Class
+            const constitution = playerStats.abilities?.find((ability) => ability.name === 'Constitution');
+            const conBonus = constitution?.bonus || 0;
+            let hitPoints = playerStats.class.hit_die + ((playerStats.class.hit_die / 2 + 1) * (playerStats.level - 1)) + (conBonus * playerStats.level);
         
-            // Check for racial hit point bonus (e.g., Hill Dwarf Dwarven Toughness)
-            if(playerStats.race.subrace && playerStats.race.subrace.hit_point_bonus_per_level) {
+             // Check for racial hit point bonus (e.g., Hill Dwarf Dwarven Toughness)
+            if(playerStats.race?.subrace?.hit_point_bonus_per_level) {
                 hitPoints += playerStats.race.subrace.hit_point_bonus_per_level * playerStats.level;
              }
         
-            // Check for subclass hit point bonus (e.g., Draconic Sorcerer Draconic Resilience)
-            if(playerStats.class.subclass && playerStats.class.subclass.hit_point_bonus_per_level) {
+             // Check for subclass hit point bonus (e.g., Draconic Sorcerer Draconic Resilience)
+            if(playerStats.class.subclass?.hit_point_bonus_per_level) {
                 hitPoints += playerStats.class.subclass.hit_point_bonus_per_level * playerStats.level;
              }
             return hitPoints
@@ -483,14 +484,14 @@ const rules = {
         }
         return null;
     },
-    getProficiencyChoiceCount: (playerStats, skills = true) => {
-        // Dependencies: Class, Race
+        getProficiencyChoiceCount: (playerStats, skills = true) => {
+         // Dependencies: Class, Race
         let proficiencyChoiceCount = 0;
-        playerStats.class.proficiency_choices.forEach((proficiency) => {
+        (playerStats.class.proficiency_choices || []).forEach((proficiency) => {
             if((skills && proficiency.from[0].startsWith('Skill: ') || (!skills && !proficiency.from[0].startsWith('Skill: ')))) {
                 proficiencyChoiceCount += proficiency.choose;
-            }
-        })
+             }
+         })
         if(playerStats.race.starting_proficiency_options && ((skills && playerStats.race.starting_proficiency_options.from[0].startsWith('Skill: ')) || (!skills && !playerStats.race.starting_proficiency_options.from[0].startsWith('Skill: ')))) {
             proficiencyChoiceCount += playerStats.race.starting_proficiency_options.choose;
         }

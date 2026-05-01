@@ -4,6 +4,16 @@ let classDataCache = {
 };
 
 /**
+ * Resets the class data cache (for testing purposes)
+ */
+export function resetClassDataCache() {
+  classDataCache = {
+     '5e': null,
+     '2024': null
+    };
+}
+
+/**
  * Fetches class data from JSON files (with caching)
  * @param {string} version - '5e' or '2024'
  * @returns {Promise<object[]>} - Array of class data
@@ -11,15 +21,15 @@ let classDataCache = {
 async function loadClassData(version = '5e') {
   if (classDataCache[version]) {
     return classDataCache[version];
-  }
-  
+}
+
   try {
     const path = version === '2024' ? 'data/2024/classes.json' : 'data/classes.json';
     
     const response = await fetch(path);
     if (!response.ok) {
-          throw new Error(`Failed to load ${version} classes.json from ${path}`);
-         }
+      throw new Error(`Failed to load ${version} classes.json from ${path}`);
+     }
     const data = await response.json();
     classDataCache[version] = data;
     return data;
@@ -39,7 +49,6 @@ export async function fetchClassData(className, version = '5e') {
   const classes = await loadClassData(version);
   return classes.find(c => c.name === className || c.index === className.toLowerCase()) || null;
 }
-
 /**
  * Fetches spell limits for a given class and level from the appropriate JSON file
  * @param {string} className - The name of the class (e.g., 'Wizard', 'Bard')
@@ -53,10 +62,10 @@ export async function getSpellLimits(className, level, version = '5e', majorName
     
     if (!classData || !classData.class_levels) {
       console.warn(`Could not find class data for ${className} (${version})`);
-      return getDefaultSpellLimits(className);
-    }
-    
-    // Find the class level entry
+    return getDefaultSpellLimits(className);
+  }
+  
+     // Find the class level entry
     const levelEntry = classData.class_levels.find(entry => entry.level === level);
     
     if (!levelEntry || !levelEntry.spellcasting) {
@@ -66,22 +75,21 @@ export async function getSpellLimits(className, level, version = '5e', majorName
         return convertSpellcastingToLimits(spellcasting);
       }
       return getDefaultSpellLimits(className);
-    }
-    
-    // For 2024 classes, check if spellcasting requires a specific major
+     }
+
+     // For 2024 classes, check if spellcasting requires a specific major
     if (version === '2024' && levelEntry.spellcasting.required_major) {
       if (levelEntry.spellcasting.required_major !== majorName) {
         return getDefaultSpellLimits(className);
-      }
-    }
-    
+       }
+     }
+
     return convertSpellcastingToLimits(levelEntry.spellcasting, className);
   } catch (error) {
     console.error(`Error fetching spell limits for ${className} level ${level}:`, error);
     return getDefaultSpellLimits(className);
   }
 }
-
 /**
  * Finds spellcasting information in class levels or subclass features
  */
@@ -94,13 +102,13 @@ function findSpellcastingInClass(classData, level, version, majorName = null) {
       if (version === '2024' && levelEntry.spellcasting.required_major) {
         if (levelEntry.spellcasting.required_major !== majorName) {
           continue; // Skip this level's spellcasting if major doesn't match
-         }
        }
+        }
       return levelEntry.spellcasting;
-     }
-   }
-   
-   // If not found, check subclass features (for 2024)
+      }
+    }
+
+    // If not found, check subclass features (for 2024)
   if (version === '2024' && classData.subclass) {
     const subclass = classData.subclass;
     if (subclass.features) {
@@ -111,22 +119,21 @@ function findSpellcastingInClass(classData, level, version, majorName = null) {
             continue; // Skip this feature's spellcasting if major doesn't match
            }
           return feature.spellcasting;
-         }
-       }
-     }
-   }
-   
+          }
+        }
+      }
+    }
+
   return null;
 }
-
 /**
  * Converts spellcasting object to spell limits format
  */
 function convertSpellcastingToLimits(spellcasting, className = null) {
   if (!spellcasting) {
     return getDefaultSpellLimits(className);
-  }
-  
+   }
+
   const limits = {
     cantrip: spellcasting.cantrips_known || 0,
     level1: spellcasting.spell_slots_level_1 || 0,
@@ -139,7 +146,6 @@ function convertSpellcastingToLimits(spellcasting, className = null) {
     level8: spellcasting.spell_slots_level_8 || 0,
     level9: spellcasting.spell_slots_level_9 || 0
   };
-  
   return limits;
 }
 
@@ -158,9 +164,9 @@ function getDefaultSpellLimits(className) {
     level7: 0,
     level8: 0,
     level9: 0
-  };
-  
-  // Classes that have cantrips but no spell slots at level 1
+   };
+
+   // Classes that have cantrips but no spell slots at level 1
   const cantripOnlyClasses = ['Barbarian', 'Monk', 'Rogue', 'Fighter', 'Paladin'];
   
   if (cantripOnlyClasses.includes(className)) {
@@ -175,9 +181,9 @@ function getDefaultSpellLimits(className) {
       level7: 0,
       level8: 0,
       level9: 0
-    };
-  }
-  
+     };
+   }
+
   return defaultLimits;
 }
 
@@ -219,8 +225,8 @@ export async function validateSpellSelection(selectedSpells, allSpells, classNam
   }
   if (counts.level9 > limits.level9) {
     violations.push(`9th level: ${counts.level9}/${limits.level9}`);
-  }
-  
+   }
+
   return {
     valid: violations.length === 0,
     violations,
@@ -244,12 +250,12 @@ function countSpellsByLevel(selectedSpells, allSpells) {
     level7: 0,
     level8: 0,
     level9: 0
-  };
-  
+   };
+
   if (!selectedSpells || selectedSpells.length === 0) {
     return counts;
-  }
-  
+   }
+
   selectedSpells.forEach(spellName => {
     const spell = allSpells.find(s => s.name === spellName || s.index === spellName);
     if (spell) {
@@ -257,10 +263,10 @@ function countSpellsByLevel(selectedSpells, allSpells) {
       const levelKey = level === 0 ? 'cantrip' : `level${level}`;
       if (counts[levelKey] !== undefined) {
         counts[levelKey]++;
-      }
-    }
-  });
-  
+       }
+     }
+   });
+
   return counts;
 }
 
@@ -272,7 +278,7 @@ export async function getAllSpellLimits(className, version = '5e', majorName = n
   
   for (let level = 1; level <= 20; level++) {
     limits[level] = await getSpellLimits(className, level, version, majorName);
-   }
-  
+    }
+
   return limits;
 }

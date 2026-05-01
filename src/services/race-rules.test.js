@@ -579,9 +579,9 @@ describe('raceRules', () => {
 
       const result = raceRules.getTraits(playerStats);
 
-      expect(result).toBeDefined();
-      expect(Object.keys(result)).toContain('passive');
-       });
+            expect(result).toBeDefined();
+      expect(Object.keys(result)).toContain('specialActions');
+        });
 
     it('should merge traits from race and subrace', () => {
       const playerStats = {

@@ -1,30 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import rules from './rules';
+import classRules from './class-rules';
+import raceRules from './race-rules';
 
 // Mock dependencies
 vi.mock('./utils', () => ({
   default: {
     getAbilityLongName: (abbr) => {
       const map = {
-        'STR': 'Strength',
-        'DEX': 'Dexterity',
-        'CON': 'Constitution',
-        'INT': 'Intelligence',
-        'WIS': 'Wisdom',
-        'CHA': 'Charisma'
-        };
+         'STR': 'Strength',
+         'DEX': 'Dexterity',
+         'CON': 'Constitution',
+         'INT': 'Intelligence',
+         'WIS': 'Wisdom',
+         'CHA': 'Charisma'
+         };
       return map[abbr];
-      }
-      }
-    }));
+       }
+       }
+     }));
 
 vi.mock('./class-rules', () => ({
   default: {
     getClass: vi.fn(),
     getFeatures: vi.fn(),
     getHighestSubclassLevel: vi.fn()
-      }
-    }));
+       }
+     }));
 
 vi.mock('./race-rules', () => ({
   default: {
@@ -34,16 +36,16 @@ vi.mock('./race-rules', () => ({
     getResistances: vi.fn(),
     getSenses: vi.fn(),
     getTraits: vi.fn()
-      }
-    }));
+       }
+     }));
 
 describe('rules', () => {
   describe('getAbilityLongName', () => {
     it('should delegate to utils.getAbilityLongName', () => {
       const result = rules.getAbilityLongName('STR');
       expect(result).toBe('Strength');
-       });
      });
+      });
 
   describe('getHitPoints', () => {
     it('should calculate hit points based on hit die, level, and constitution bonus', () => {
@@ -53,14 +55,14 @@ describe('rules', () => {
             },
         level: 5,
         abilities: [
-            { name: 'Constitution', bonus: 2 }
-            ]
-           };
+             { name: 'Constitution', bonus: 2 }
+             ]
+            };
 
       const result = rules.getHitPoints(playerStats);
 
-       // hit_die + (hit_die/2 + 1) * (level - 1) + constitution.bonus * level
-       // 10 + (5 + 1) * 4 + 2 * 5 = 10 + 24 + 10 = 44
+        // hit_die + (hit_die/2 + 1) * (level - 1) + constitution.bonus * level
+        // 10 + (5 + 1) * 4 + 2 * 5 = 10 + 24 + 10 = 44
       expect(result).toBe(44);
          });
 
@@ -71,14 +73,14 @@ describe('rules', () => {
             },
         level: 5,
         abilities: [
-            { name: 'Constitution', bonus: 1 }
-            ],
+             { name: 'Constitution', bonus: 1 }
+             ],
         race: {
           subrace: {
             hit_point_bonus_per_level: 1
-              }
-           }
-           };
+               }
+            }
+            };
 
       const result = rules.getHitPoints(playerStats);
 
@@ -92,13 +94,13 @@ describe('rules', () => {
           hit_die: 6,
           subclass: {
             hit_point_bonus_per_level: 1
-              }
-            },
+               }
+             },
         level: 5,
         abilities: [
-            { name: 'Constitution', bonus: 0 }
-            ]
-           };
+             { name: 'Constitution', bonus: 0 }
+             ]
+            };
 
       const result = rules.getHitPoints(playerStats);
 
@@ -113,9 +115,9 @@ describe('rules', () => {
             },
         level: 1,
         abilities: [
-            { name: 'Constitution', bonus: 2 }
-            ]
-           };
+             { name: 'Constitution', bonus: 2 }
+             ]
+            };
 
       const result = rules.getHitPoints(playerStats);
 
@@ -136,8 +138,8 @@ describe('rules', () => {
 
        // Should handle undefined bonus gracefully
       expect(result).toBeDefined();
-         });
        });
+        });
 
   describe('getSpellMaxLevel', () => {
     it('should return null when no spell slots', () => {
@@ -206,21 +208,21 @@ describe('rules', () => {
       const result = rules.getSpellMaxLevel(spellAbilities);
 
       expect(result).toBe(2);
-         });
        });
+        });
 
   describe('getProficiencyChoiceCount', () => {
     it('should count skill proficiency choices from class', () => {
       const playerStats = {
         class: {
           proficiency_choices: [
-               { choose: 2, from: ['Skill: Arcana', 'Skill: History'] }
-               ]
-            },
+                { choose: 2, from: ['Skill: Arcana', 'Skill: History'] }
+                ]
+             },
         race: {
           starting_proficiency_options: null
-           }
-           };
+            }
+            };
 
       const result = rules.getProficiencyChoiceCount(playerStats, true);
 
@@ -231,13 +233,13 @@ describe('rules', () => {
       const playerStats = {
         class: {
           proficiency_choices: [
-               { choose: 1, from: ['Tool: Carpenter Tools'] }
-               ]
-            },
+                { choose: 1, from: ['Tool: Carpenter Tools'] }
+                ]
+             },
         race: {
           starting_proficiency_options: null
-           }
-           };
+            }
+            };
 
       const result = rules.getProficiencyChoiceCount(playerStats, false);
 
@@ -253,9 +255,9 @@ describe('rules', () => {
           starting_proficiency_options: {
             choose: 1,
             from: ['Skill: Stealth']
-              }
-           }
-           };
+               }
+            }
+            };
 
       const result = rules.getProficiencyChoiceCount(playerStats, true);
 
@@ -271,11 +273,11 @@ describe('rules', () => {
           starting_proficiency_options: null,
           subrace: {
             racial_traits: [
-                  { proficiency_choices: { choose: 1, from: ['Skill: Nature'] } }
-                  ]
-              }
-           }
-           };
+                   { proficiency_choices: { choose: 1, from: ['Skill: Nature'] } }
+                   ]
+               }
+            }
+            };
 
       const result = rules.getProficiencyChoiceCount(playerStats, true);
 
@@ -286,9 +288,9 @@ describe('rules', () => {
       const playerStats = {
         class: {
           proficiency_choices: [
-               { choose: 2, from: ['Skill: Arcana', 'Skill: History'] }
-               ]
-            },
+                { choose: 2, from: ['Skill: Arcana', 'Skill: History'] }
+                ]
+             },
         race: {
           starting_proficiency_options: {
             choose: 1,
@@ -296,11 +298,11 @@ describe('rules', () => {
               },
           subrace: {
             racial_traits: [
-                  { proficiency_choices: { choose: 1, from: ['Skill: Nature'] } }
-                  ]
-              }
-           }
-           };
+                   { proficiency_choices: { choose: 1, from: ['Skill: Nature'] } }
+                   ]
+               }
+            }
+            };
 
       const result = rules.getProficiencyChoiceCount(playerStats, true);
 
@@ -316,8 +318,8 @@ describe('rules', () => {
       const result = rules.getProficiencyChoiceCount(playerStats, true);
 
       expect(result).toBe(0);
-         });
        });
+        });
 
   describe('getLanguages', () => {
     it('should include race languages', () => {
@@ -428,8 +430,8 @@ describe('rules', () => {
           language_choices: {
             choose: 2,
             options: ['Dwarvish', 'Elvish', 'Gnomish']
-              }
-           },
+               }
+            },
         class: {
           languages: []
             },
@@ -451,8 +453,8 @@ describe('rules', () => {
           languages: ['Druidic'],
           language_choices: {
             choose: 1
-              }
-            },
+               }
+             },
         level: 6
            };
 
@@ -472,8 +474,8 @@ describe('rules', () => {
           languages: ['Druidic'],
           language_choices: {
             choose: 1
-              }
-            },
+               }
+             },
         level: 14
            };
 
@@ -481,8 +483,8 @@ describe('rules', () => {
 
        // Should include both bonus languages
       expect(languagesAllowed).toBeGreaterThan(5);
-         });
        });
+        });
 
   describe('getMagicItems', () => {
     it('should return null when no magic items', () => {
@@ -498,15 +500,15 @@ describe('rules', () => {
 
     it('should return magic items with details', () => {
       const allMagicItems = [
-            { name: 'Ring of Protection', description: 'Grants +1 AC', rarity: 'Rare' }
-            ];
+             { name: 'Ring of Protection', description: 'Grants +1 AC', rarity: 'Rare' }
+             ];
       const playerSummary = {
         inventory: {
           magicItems: [
-               { name: 'Ring of Protection', quantity: 1 }
-               ]
-           }
-          };
+                { name: 'Ring of Protection', quantity: 1 }
+                ]
+            }
+           };
 
       const result = rules.getMagicItems(allMagicItems, playerSummary);
 
@@ -521,15 +523,15 @@ describe('rules', () => {
             name: 'Ring of Spell Storing', 
             description: 'Can store spells', 
             rarity: 'Rare'
-              }
-            ];
+               }
+             ];
       const playerSummary = {
         inventory: {
           magicItems: [
-               { name: 'Ring of Spell Storing', quantity: 1, spell: 'Fireball' }
-               ]
-           }
-          };
+                { name: 'Ring of Spell Storing', quantity: 1, spell: 'Fireball' }
+                ]
+            }
+           };
 
       const result = rules.getMagicItems(allMagicItems, playerSummary);
 
@@ -542,10 +544,10 @@ describe('rules', () => {
       const playerSummary = {
         inventory: {
           magicItems: [
-               { name: 'Custom Item', quantity: 1 }
-               ]
-           }
-          };
+                { name: 'Custom Item', quantity: 1 }
+                ]
+            }
+           };
 
       const result = rules.getMagicItems(allMagicItems, playerSummary);
 
@@ -555,29 +557,26 @@ describe('rules', () => {
 
     it('should use player magic item rarity if available', () => {
       const allMagicItems = [
-            { name: 'Potion of Healing', rarity: 'Common' }
-            ];
+             { name: 'Potion of Healing', rarity: 'Common' }
+             ];
       const playerSummary = {
         inventory: {
           magicItems: [
-               { name: 'Potion of Healing', quantity: 3, rarity: 'Uncommon' }
-               ]
-           }
-          };
+                { name: 'Potion of Healing', quantity: 3, rarity: 'Uncommon' }
+                ]
+            }
+           };
 
       const result = rules.getMagicItems(allMagicItems, playerSummary);
 
       expect(result[0].rarity).toBe('Uncommon');
-         });
        });
+        });
 
   describe('getActions', () => {
     beforeEach(() => {
-       // Mock classRules.getFeatures and raceRules.getTraits
-      const classRulesModule = vi.getMockedModule('./class-rules');
-      const raceRulesModule = vi.getMockedModule('./race-rules');
-
-      classRulesModule.default.getFeatures.mockReturnValue({
+        // Mock classRules.getFeatures and raceRules.getTraits
+      classRules.getFeatures.mockReturnValue({
         actions: [{ name: 'Action Surge' }],
         bonusActions: [{ name: 'Second Wind' }],
         reactions: [],
@@ -585,14 +584,14 @@ describe('rules', () => {
         characterAdvancement: []
           });
 
-      raceRulesModule.default.getTraits.mockReturnValue({
+      raceRules.getTraits.mockReturnValue({
         actions: [{ name: 'Brave' }],
         bonusActions: [],
         reactions: [],
         specialActions: [],
         characterAdvancement: []
-          });
        });
+        });
 
     it('should combine actions from playerStats, features, and traits', () => {
       const playerStats = {
@@ -610,8 +609,7 @@ describe('rules', () => {
          });
 
     it('should deduplicate actions by name', () => {
-      const classRulesModule = vi.getMockedModule('./class-rules');
-      classRulesModule.default.getFeatures.mockReturnValue({
+      classRules.getFeatures.mockReturnValue({
         actions: [{ name: 'Attack' }],
         bonusActions: [],
         reactions: [],
@@ -655,8 +653,8 @@ describe('rules', () => {
       expect(reactions).toBeDefined();
       expect(specialActions).toBeDefined();
       expect(characterAdvancement).toBeDefined();
-         });
        });
+        });
 
   describe('getProficiencies', () => {
     it('should return skill proficiencies when skill=true', () => {
@@ -669,7 +667,7 @@ describe('rules', () => {
           traits: [],
           subrace: null
            },
-        skillProficiencies: ['Skill: Religion']
+        skillProficiencies: ['Religion']
            };
 
       const [allowed, proficiencies] = rules.getProficiencies(playerStats, true);
@@ -746,8 +744,8 @@ describe('rules', () => {
           subclass: {
             name: 'Lore',
             bonus_skill_proficiencies: 2
-              }
-            },
+               }
+             },
         race: {
           starting_proficiencies: [],
           traits: [],
@@ -768,8 +766,8 @@ describe('rules', () => {
           subclass: {
             name: 'Valor',
             bonus_proficiencies: ['Armor: Medium Armor']
-              }
-            },
+               }
+             },
         race: {
           starting_proficiencies: [],
           traits: [],
@@ -781,6 +779,6 @@ describe('rules', () => {
       const [allowed, proficiencies] = rules.getProficiencies(playerStats, false);
 
       expect(proficiencies).toContain('Armor: Medium Armor');
-         });
        });
+        });
 });
