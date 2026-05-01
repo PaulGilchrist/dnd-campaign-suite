@@ -17,6 +17,8 @@ const storage = {
             mode: 'cors',
             headers: { 'Content-Type': 'application/json' },
             body: json
+        }).catch(() => {
+            // Silently ignore — fire-and-forget sync
         });
     },
     getProperty: (name, propertyName) => {
