@@ -117,8 +117,8 @@ describe('raceRules', () => {
       const result = raceRules.getImmunities(playerSummary);
 
       expect(result[0]).toBe('Apple');
-       });
      });
+      });
 
   describe('getRace', () => {
     const mockRaces = [
@@ -127,8 +127,8 @@ describe('raceRules', () => {
           ability_bonuses: [{ ability_score: 'STR', bonus: 1 }],
           traits: [],
           subraces: []
-          },
-        {
+            },
+          {
           name: 'Elf',
           ability_bonuses: [{ ability_score: 'DEX', bonus: 2 }],
           traits: [{ name: 'Darkvision' }],
@@ -137,10 +137,10 @@ describe('raceRules', () => {
                 name: 'High Elf',
                 ability_bonuses: [{ ability_score: 'INT', bonus: 1 }],
                 traits: []
-                }
-              ]
-          }
-      ];
+                  }
+                ]
+            }
+        ];
 
     it('should return race data for valid race', () => {
       const playerSummary = {
@@ -168,8 +168,8 @@ describe('raceRules', () => {
         race: {
           name: 'Elf',
           subrace: { name: 'High Elf' }
-          }
-         };
+           }
+          };
 
       const result = raceRules.getRace(mockRaces, playerSummary);
 
@@ -202,8 +202,8 @@ describe('raceRules', () => {
         race: {
           name: 'Human',
           customProperty: 'custom value'
-          }
-         };
+           }
+          };
 
       const result = raceRules.getRace(mockRaces, playerSummary);
 
@@ -218,8 +218,8 @@ describe('raceRules', () => {
 
       const result = raceRules.getRace(mockRaces, playerSummary);
 
-      expect(result.name).toBeUndefined();
-       });
+      expect(result).toBeUndefined();
+          });
 
     it('should handle race without ability_bonuses', () => {
       const races = [
@@ -661,3 +661,4 @@ describe('raceRules', () => {
        });
      });
 });
+

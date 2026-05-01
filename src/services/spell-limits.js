@@ -1,6 +1,6 @@
 let classDataCache = {
-  '5e': null,
-  '2024': null
+     '5e': null,
+     '2024': null
 };
 
 /**
@@ -49,6 +49,7 @@ export async function fetchClassData(className, version = '5e') {
   const classes = await loadClassData(version);
   return classes.find(c => c.name === className || c.index === className.toLowerCase()) || null;
 }
+
 /**
  * Fetches spell limits for a given class and level from the appropriate JSON file
  * @param {string} className - The name of the class (e.g., 'Wizard', 'Bard')
@@ -62,10 +63,10 @@ export async function getSpellLimits(className, level, version = '5e', majorName
     
     if (!classData || !classData.class_levels) {
       console.warn(`Could not find class data for ${className} (${version})`);
-    return getDefaultSpellLimits(className);
-  }
-  
-     // Find the class level entry
+      return getDefaultSpellLimits(className);
+    }
+
+    // Find the class level entry
     const levelEntry = classData.class_levels.find(entry => entry.level === level);
     
     if (!levelEntry || !levelEntry.spellcasting) {
@@ -81,8 +82,8 @@ export async function getSpellLimits(className, level, version = '5e', majorName
     if (version === '2024' && levelEntry.spellcasting.required_major) {
       if (levelEntry.spellcasting.required_major !== majorName) {
         return getDefaultSpellLimits(className);
-       }
      }
+    }
 
     return convertSpellcastingToLimits(levelEntry.spellcasting, className);
   } catch (error) {
@@ -90,6 +91,7 @@ export async function getSpellLimits(className, level, version = '5e', majorName
     return getDefaultSpellLimits(className);
   }
 }
+
 /**
  * Finds spellcasting information in class levels or subclass features
  */
@@ -102,11 +104,11 @@ function findSpellcastingInClass(classData, level, version, majorName = null) {
       if (version === '2024' && levelEntry.spellcasting.required_major) {
         if (levelEntry.spellcasting.required_major !== majorName) {
           continue; // Skip this level's spellcasting if major doesn't match
-       }
         }
-      return levelEntry.spellcasting;
       }
+      return levelEntry.spellcasting;
     }
+  }
 
     // If not found, check subclass features (for 2024)
   if (version === '2024' && classData.subclass) {
@@ -117,15 +119,16 @@ function findSpellcastingInClass(classData, level, version, majorName = null) {
            // For 2024 classes, check if spellcasting requires a specific major
           if (feature.spellcasting.required_major && feature.spellcasting.required_major !== majorName) {
             continue; // Skip this feature's spellcasting if major doesn't match
-           }
-          return feature.spellcasting;
           }
+          return feature.spellcasting;
         }
       }
     }
+  }
 
   return null;
 }
+
 /**
  * Converts spellcasting object to spell limits format
  */
@@ -146,6 +149,7 @@ function convertSpellcastingToLimits(spellcasting, className = null) {
     level8: spellcasting.spell_slots_level_8 || 0,
     level9: spellcasting.spell_slots_level_9 || 0
   };
+
   return limits;
 }
 
@@ -181,8 +185,8 @@ function getDefaultSpellLimits(className) {
       level7: 0,
       level8: 0,
       level9: 0
-     };
-   }
+    };
+  }
 
   return defaultLimits;
 }
@@ -263,9 +267,9 @@ function countSpellsByLevel(selectedSpells, allSpells) {
       const levelKey = level === 0 ? 'cantrip' : `level${level}`;
       if (counts[levelKey] !== undefined) {
         counts[levelKey]++;
-       }
-     }
-   });
+      }
+    }
+  });
 
   return counts;
 }
