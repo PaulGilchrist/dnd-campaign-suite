@@ -1,13 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import './character-creation-wizard.css';
-// Import dark mode styles - will be loaded via media query
 import './character-creation-wizard-dark.css';
-import merge from 'lodash/merge';
-import {
-  REQUIRED_FIELDS,
-  DEFAULT_FORM_DATA
-} from './constants';
-import { validateStep, validateFinalFormData, getPointBuyCosts, getFeatRules } from './utils';
+import { validateStep, validateFinalFormData, getPointBuyCosts } from './utils';
 import WizardHeader from './wizard-header';
 import WizardProgressBar from './wizard-progress-bar';
 import WizardFooter from './wizard-footer';
@@ -18,581 +12,324 @@ import WizardStepAbilities from './wizard-step-abilities';
 import WizardStepSkills from './wizard-step-skills';
 import WizardStepLanguages from './wizard-step-languages';
 import WizardStepInventory from './wizard-step-inventory';
-import { validateSkills, getSkillLimits, getExpertiseLimits, getPreSelectedSkills } from '../../services/skill-validation.js';
-import { getLanguageLimits, getFightingStyleLimits, validateLanguagesAndFightingStyles } from '../../services/languages-fightingstyles-validation.js';
-import { getPreSelectedFeats } from '../../services/feat-validation.js';
-import { getPreSelectedResistances, validateResistances } from '../../services/resistances-validation.js';
 import WizardStepSpells from './wizard-step-spells';
 import WizardStepFeats from './wizard-step-feats';
 import WizardStepSpecial from './wizard-step-special';
 import WizardStepResistances from './wizard-step-resistances';
 import WizardStepMagicItems from './wizard-step-magic-items';
 
+import useWizardForm from './use-wizard-form';
+import useWizardData from './use-wizard-data';
+import useWizardNavigation from './use-wizard-navigation';
+import useWizardSkills from './use-wizard-skills';
+import useWizardLanguages from './use-wizard-languages';
+import useWizardResistances from './use-wizard-resistances';
+import useWizardFeats from './use-wizard-feats';
+import useWizardInventory from './use-wizard-inventory';
+import useWizardAbilities from './use-wizard-abilities';
+
 function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, allSpells, allSpells2024, characterData, isEditing = false }) {
-  const [currentStep, setCurrentStep] = useState(isEditing ? 2 : 1);
+  // Core form state
+  const {
+    formData,
+    errors,
+    setFormData,
+    setErrors,
+    updateField,
+    updateArrayField,
+    updateAbility,
+    updateInventory,
+    updateClass,
+    resetErrors,
+   } = useWizardForm(characterData, isEditing);
+
+  // Ruleset state (needed by data hook)
   const [ruleset, setRuleset] = useState(characterData?.rules ?? null);
-  const [backgrounds, setBackgrounds] = useState([]);
-  const [racesData, setRacesData] = useState([]);
-  const [classSubtypes, setClassSubtypes] = useState([]);
-  const [feats, setFeats] = useState([]);
-  const [magicItems, setMagicItems] = useState([]);
-  const [formData, setFormData] = useState(() => {
-    if (isEditing && characterData) {
-      return merge({}, DEFAULT_FORM_DATA, characterData);
-    }
-    return DEFAULT_FORM_DATA;
-  });
-  const [errors, setErrors] = useState({});
-  const [tempInventory, setTempInventory] = useState({ backpack: [], equipped: [] });
-  const [skillLimits, setSkillLimits] = useState(null);
-  const [expertiseLimits, setExpertiseLimits] = useState(null);
-  const [skillWarnings, setSkillWarnings] = useState([]);
-  const [preSelectedSkills, setPreSelectedSkills] = useState([]);
-  const [languageLimits, setLanguageLimits] = useState(null);
-  const [fightingStyleLimits, setFightingStyleLimits] = useState(null);
-  const [languageWarnings, setLanguageWarnings] = useState([]);
-  const [preSelectedLanguages, setPreSelectedLanguages] = useState([]);
-  const [preSelectedFightingStyles, setPreSelectedFightingStyles] = useState([]);
-  const [preSelectedFeats, setPreSelectedFeats] = useState([]);
-  const [resistanceWarnings, setResistanceWarnings] = useState([]);
-  const [preSelectedResistancesList, setPreSelectedResistancesList] = useState({ resistances: [], immunities: [] });
-
-   // Validate resistances and immunities when selections change
-  useEffect(() => {
-    const validate = async () => {
-      try {
-        const warnings = await validateResistances(formData);
-        setResistanceWarnings(warnings);
-       } catch (error) {
-        console.error('Error validating resistances:', error);
-       }
-     };
-
-    validate();
-   }, [formData.resistances, formData.immunities, formData.class?.name, formData.race?.name, formData.race?.subrace?.name, formData.background, formData.rules, formData.level]);
-
-   // Pre-select resistances and immunities when race/class changes
-  useEffect(() => {
-    const preSelect = async () => {
-      try {
-        const preSelected = await getPreSelectedResistances(formData);
-        setPreSelectedResistancesList(preSelected);
-
-         // Only update if there are pre-selected items and the current selection doesn't include them
-        if (preSelected.resistances.length > 0 || preSelected.immunities.length > 0) {
-          setFormData(prev => {
-            const currentResistances = prev.resistances || [];
-      const currentImmunities = prev.immunities || [];
-
-            const missingResistances = preSelected.resistances.filter(r => !currentResistances.includes(r));
-            const missingImmunities = preSelected.immunities.filter(i => !currentImmunities.includes(i));
-
-            if (missingResistances.length > 0 || missingImmunities.length > 0) {
-              return {
-      ...prev,
-                resistances: [...currentResistances, ...missingResistances],
-                immunities: [...currentImmunities, ...missingImmunities]
-    };
-             }
-            return prev;
-           });
-         }
-       } catch (error) {
-        console.error('Error pre-selecting resistances:', error);
-       }
-  };
-
-    preSelect();
-   }, [formData.race?.name, formData.race?.subrace?.name, formData.class?.name, formData.rules]);
-
-     // Validate skills when selection changes
-  useEffect(() => {
-    const validate = async () => {
-      try {
-        const limits = await getSkillLimits(formData);
-        const expertise = await getExpertiseLimits(formData);
-        const warnings = await validateSkills(formData);
-
-        setSkillLimits(limits);
-        setExpertiseLimits(expertise);
-        setSkillWarnings(warnings);
-       } catch (error) {
-        console.error('Error validating skills:', error);
-         }
-       };
-
-    validate();
-   }, [formData.skillProficiencies, formData.expertSkills, formData.class?.name, formData.race?.name, formData.background, formData.rules, formData.level]);
-
-     // Pre-select skills when background, race, or class changes
-  useEffect(() => {
-    const preSelectSkills = async () => {
-      try {
-        const preSelected = await getPreSelectedSkills(formData);
-        setPreSelectedSkills(preSelected);
-
-         // Only update if there are pre-selected skills and the current selection doesn't include them
-        if (preSelected.length > 0) {
-          setFormData(prev => {
-            const currentSkills = prev.skillProficiencies || [];
-             // Check if any pre-selected skills are not already in the current selection
-            const missingSkills = preSelected.filter(skill => !currentSkills.includes(skill));
-
-            if (missingSkills.length > 0) {
-              return {
-                 ...prev,
-                skillProficiencies: [...currentSkills, ...missingSkills]
-  };
-               }
-            return prev;
-             });
-           }
-         } catch (error) {
-        console.error('Error pre-selecting skills:', error);
-         }
-    };
-
-    preSelectSkills();
-   }, [formData.background, formData.race?.name, formData.class?.name, formData.rules]);
-
-     // Pre-select feats when background changes
-     useEffect(() => {
-    const preSelectFeats = async () => {
-         try {
-        const preSelected = await getPreSelectedFeats(formData);
-        setPreSelectedFeats(preSelected);
-
-           // Only update if there are pre-selected feats and the current selection doesn't include them
-        if (preSelected.length > 0) {
-    setFormData(prev => {
-            const currentFeats = prev.feats || [];
-               // Check if any pre-selected feats are not already in the current selection
-            const missingFeats = preSelected.filter(feat => !currentFeats.includes(feat));
-
-            if (missingFeats.length > 0) {
-              return {
-      ...prev,
-                feats: [...currentFeats, ...missingFeats]
-   };
-               }
-            return prev;
-               });
-             }
-           } catch (error) {
-        console.error('Error pre-selecting feats:', error);
-           }
-    };
-
-    preSelectFeats();
-     }, [formData.background, formData.rules]);
-
-         // Validate languages and fighting styles when selections change
-     useEffect(() => {
-       const validate = async () => {
-         try {
-           const langLimits = await getLanguageLimits(formData);
-           const styleLimits = await getFightingStyleLimits(formData);
-           const warnings = await validateLanguagesAndFightingStyles(formData);
-           setLanguageLimits(langLimits);
-           setFightingStyleLimits(styleLimits);
-           setLanguageWarnings(warnings);
-
-            // Extract and store pre-selected items
-           setPreSelectedLanguages(langLimits?.preSelected || []);
-           setPreSelectedFightingStyles(styleLimits?.preSelected || []);
-          } catch (error) {
-           console.error('Error validating languages and fighting styles:', error);
-              }
-        };
-
-       validate();
-      }, [formData.languages, formData.class?.fightingStyles, formData.class?.name, formData.race?.name, formData.background, formData.rules, formData.level]);
-
-      // Sync tempInventory with formData.inventory when it changes
-  useEffect(() => {
-    setTempInventory({
-      backpack: formData.inventory?.backpack || [],
-      equipped: formData.inventory?.equipped || [],
-        });
-      }, [formData.inventory]);
 
   // Load data based on ruleset
-  useEffect(() => {
-    const loadData = async (url, setData) => {
-      try {
-        const response = await fetch(url);
-        const data = await response.json();
-        setData(data);
-      } catch (error) {
-        console.error(`Failed to load ${url}:`, error);
-        setData([]);
-         }
-    };
+  const {
+    backgrounds,
+    racesData,
+    classSubtypes,
+    feats,
+    magicItems,
+    isDataLoading,
+   } = useWizardData(ruleset);
 
-    if (ruleset === '2024') {
-      loadData('/data/2024/backgrounds.json', setBackgrounds);
-      loadData('/data/2024/races.json', setRacesData);
-      loadData('/data/2024/classes.json', (data) => {
-        setClassSubtypes(data.map(cls => ({
-          className: cls.name,
-          subtypes: cls.subclasses || cls.majors || []
-            })));
-          });
-      loadData('/data/2024/feats.json', setFeats);
-      loadData('/data/2024/magic-items.json', setMagicItems);
-        } else {
-          // 5e does not use the same background system as 2024
-      setBackgrounds([]);
-      loadData('data/races.json', setRacesData);
-      loadData('/data/classes.json', (data) => {
-        setClassSubtypes(data.map(cls => ({
-          className: cls.name,
-          subtypes: cls.subclasses || []
-            })));
-          });
-      loadData('/data/feats.json', setFeats);
-      loadData('/data/magic-items.json', setMagicItems);
-        }
-      }, [ruleset]);
+  // Navigation
+  const {
+    currentStep,
+    isNextDisabled,
+    navigateNext,
+    navigatePrevious,
+    goToStep,
+   } = useWizardNavigation(isEditing ? 2 : 1, formData, racesData, classSubtypes, ruleset);
 
-  // Validate ability scores (async, loads rules from JSON)
-  useEffect(() => {
-   const validateAbilities = async () => {
-     if (currentStep === 5) {  // Abilities step is step 5
-       const abilityErrors = {};
-       const rules = await getPointBuyCosts(formData.rules || '5e');
-       let totalPointsSpent = 0;
-        
-       formData.abilities.forEach((ability, index) => {
-         const baseScore = parseInt(ability.baseScore) || 8;
-         const improvements = parseInt(ability.abilityImprovements) || 0;
-         const misc = parseInt(ability.miscBonus) || 0;
-         const totalScore = baseScore + improvements + misc;
+  // Skills
+  const {
+    skillLimits,
+    expertiseLimits,
+    skillWarnings,
+    preSelectedSkills,
+   } = useWizardSkills(formData, setFormData);
 
-         const cost = rules[baseScore] || 0;
-         totalPointsSpent += cost;
+  // Languages & Fighting Styles
+  const {
+    languageLimits,
+    fightingStyleLimits,
+    languageWarnings,
+    preSelectedLanguages,
+    preSelectedFightingStyles,
+   } = useWizardLanguages(formData);
 
-         if (baseScore < 8) {
-           abilityErrors[`ability_${index}_baseScore`] = 'Base score must be at least 8';
-          }
-         if (baseScore > 15) {
-           abilityErrors[`ability_${index}_baseScore`] = 'Base score cannot exceed 15 (point buy max)';
-          }
-         if (totalScore > 20) {
-           abilityErrors[`ability_${index}_totalScore`] = `Total score (base + improvements + misc) cannot exceed 20`;
-          }
-         if (improvements < 0) {
-           abilityErrors[`ability_${index}_abilityImprovements`] = 'Improvements must be 0 or above';
-          }
-         if (misc < 0) {
-           abilityErrors[`ability_${index}_miscBonus`] = 'Misc bonus must be 0 or above';
-            }
-          });
+  // Resistances
+  const {
+    resistanceWarnings,
+    preSelectedResistancesList,
+   } = useWizardResistances(formData, setFormData);
 
-       if (totalPointsSpent > 27) {
-         abilityErrors.pointsExceeded = `You have spent ${totalPointsSpent} points. You only have 27 points to spend.`;
-        }
+  // Feats
+  const {
+    preSelectedFeats,
+   } = useWizardFeats(formData, setFormData);
 
-      setErrors(prev => ({ ...prev, ...abilityErrors }));
-        }
-      };
+  // Inventory
+  const {
+    tempInventory,
+    updateTempInventory,
+   } = useWizardInventory(formData);
 
-     validateAbilities();
-    }, [formData.abilities, currentStep, formData.rules]);
-  const handleRulesetChange = async (newRuleset) => {
+  // Abilities validation
+  useWizardAbilities(formData, currentStep, setErrors);
+
+  // Handlers
+  const handleRulesetChange = useCallback(async (newRuleset) => {
     setRuleset(newRuleset);
-    
+
     if (newRuleset === '2024') {
-    setFormData(prev => ({
-      ...prev,
+      setFormData(prev => ({
+           ...prev,
         rules: '2024',
         spells: [],
         feats: [],
         background: ''
-       }));
-        } else {
+         }));
+       } else {
       setFormData(prev => ({
-        ...prev,
+           ...prev,
         rules: '5e',
         spells: [],
         feats: [],
         background: ''
-          }));
-        }
+         }));
+       }
 
-    setCurrentStep(2);
-  };
+    goToStep(2);
+    }, [setFormData, goToStep]);
 
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    setErrors(prev => ({ ...prev, [field]: null }));
-  };
-
-  const handleArrayFieldChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    setErrors(prev => ({ ...prev, [field]: null }));
-  };
-
-  const handleAbilityChange = (index, field, value) => {
-    setFormData(prev => {
-      const newAbilities = [...prev.abilities];
-      newAbilities[index] = { ...newAbilities[index], [field]: value };
-      return { ...prev, abilities: newAbilities };
-       });
-     };
-
-    const handleAbilityBaseScoreChange = async (index, value) => {
+  const handleAbilityBaseScoreChange = useCallback(async (index, value) => {
     const newBaseScore = parseInt(value) || 8;
     const oldBaseScore = parseInt(formData.abilities[index].baseScore) || 8;
-    
-    // Load point buy costs from JSON
+
     const rules = await getPointBuyCosts(formData.rules || '5e');
-    const calculateCost = (score) => {
-      return rules[score] || 0;
-   };
+    const calculateCost = (score) => rules[score] || 0;
 
     const newCost = calculateCost(newBaseScore);
     const oldCost = calculateCost(oldBaseScore);
-    
+
     const currentTotalSpent = formData.abilities.reduce((sum, ability, i) => {
       if (i === index) {
         return sum + newCost;
-      }
+         }
       const baseScore = parseInt(ability.baseScore) || 8;
       const cost = calculateCost(baseScore);
       return sum + cost;
-    }, 0);
+       }, 0);
 
     if (currentTotalSpent <= 27) {
-      handleAbilityChange(index, 'baseScore', newBaseScore);
-        }
-      };
+      updateAbility(index, 'baseScore', newBaseScore);
+       }
+     }, [formData.abilities, formData.rules, updateAbility]);
 
-  const handleAbilityImprovementChange = (index, value) => {
-    setFormData(prev => {
-      const newAbilities = [...prev.abilities];
-      newAbilities[index] = { ...newAbilities[index], abilityImprovements: value };
-      return { ...prev, abilities: newAbilities };
-        });
-      };
+  const handleAbilityImprovementChange = useCallback((index, value) => {
+    updateAbility(index, 'abilityImprovements', value);
+    }, [updateAbility]);
 
-  const handleAbilityMiscBonusChange = (index, value) => {
-    setFormData(prev => {
-      const newAbilities = [...prev.abilities];
-      newAbilities[index] = { ...newAbilities[index], miscBonus: value };
-      return { ...prev, abilities: newAbilities };
-        });
-      };
+  const handleAbilityMiscBonusChange = useCallback((index, value) => {
+    updateAbility(index, 'miscBonus', value);
+    }, [updateAbility]);
 
-  const handleSkillToggle = (skill) => {
+  const handleSkillToggle = useCallback((skill) => {
     setFormData(prev => {
       const currentSkills = prev.skillProficiencies || [];
-       // Prevent unselection of pre-selected skills
       const isPreSelected = preSelectedSkills.includes(skill);
       const isCurrentlySelected = currentSkills.includes(skill);
 
-       // Don't allow unselection if the skill is pre-selected
       if (isCurrentlySelected && isPreSelected) {
         return prev;
-       }
+         }
 
       const newSkills = isCurrentlySelected
-            ? currentSkills.filter(s => s !== skill)
-            : [...currentSkills, skill];
+           ? currentSkills.filter(s => s !== skill)
+           : [...currentSkills, skill];
       return { ...prev, skillProficiencies: newSkills };
-    });
+       });
     setErrors(prev => ({ ...prev, skillProficiencies: null }));
-  };
+    }, [preSelectedSkills, setFormData, setErrors]);
 
-  const handleSkillExpertiseToggle = (skill, isExpert) => {
+  const handleSkillExpertiseToggle = useCallback((skill, isExpert) => {
     setFormData(prev => {
       if (isExpert) {
-        // Add to expertSkills
         const currentExpertSkills = prev.expertSkills || [];
         const newExpertSkills = [...currentExpertSkills, skill];
         return { ...prev, expertSkills: newExpertSkills };
-          } else {
-            // Remove from expertSkills
+         } else {
         const currentExpertSkills = prev.expertSkills || [];
         const newExpertSkills = currentExpertSkills.filter(s => s !== skill);
         return { ...prev, expertSkills: newExpertSkills };
-          }
-        });
+         }
+       });
     setErrors(prev => ({ ...prev, expertSkills: null }));
-  };
+    }, [setFormData, setErrors]);
 
-  const handleLanguageToggle = (language) => {
+  const handleLanguageToggle = useCallback((language) => {
     setFormData(prev => {
       const currentLanguages = prev.languages || [];
-       // Prevent unselection of pre-selected languages
       const isPreSelected = preSelectedLanguages.includes(language);
       const isCurrentlySelected = currentLanguages.includes(language);
 
-       // Don't allow unselection if the language is pre-selected
       if (isCurrentlySelected && isPreSelected) {
         return prev;
-       }
+         }
 
       const newLanguages = currentLanguages.includes(language)
-            ? currentLanguages.filter(l => l !== language)
-            : [...currentLanguages, language];
+           ? currentLanguages.filter(l => l !== language)
+           : [...currentLanguages, language];
       return { ...prev, languages: newLanguages };
-    });
+       });
     setErrors(prev => ({ ...prev, languages: null }));
-  };
+    }, [preSelectedLanguages, setFormData, setErrors]);
 
-  const handleFightingStyleToggle = (style) => {
+  const handleFightingStyleToggle = useCallback((style) => {
     setFormData(prev => {
       const currentStyles = prev.class?.fightingStyles || [];
-       // Prevent unselection of pre-selected fighting styles
       const isPreSelected = preSelectedFightingStyles.includes(style);
       const isCurrentlySelected = currentStyles.includes(style);
 
-       // Don't allow unselection if the fighting style is pre-selected
       if (isCurrentlySelected && isPreSelected) {
         return prev;
-       }
+         }
 
       const newStyles = currentStyles.includes(style)
-            ? currentStyles.filter(s => s !== style)
-            : [...currentStyles, style];
+           ? currentStyles.filter(s => s !== style)
+           : [...currentStyles, style];
       return { ...prev, class: { ...prev.class, fightingStyles: newStyles } };
-    });
+       });
     setErrors(prev => ({ ...prev, fightingStyles: null }));
-  };
+    }, [preSelectedFightingStyles, setFormData, setErrors]);
 
-  const handleResistanceToggle = (type, isPreSelected) => {
-     // Prevent unselection of pre-selected resistances
+  const handleResistanceToggle = useCallback((type, isPreSelected) => {
     if (isPreSelected) {
       return;
-     }
+       }
 
     setFormData(prev => {
       const currentResistances = prev.resistances || [];
       const newResistances = currentResistances.includes(type)
-            ? currentResistances.filter(r => r !== type)
-            : [...currentResistances, type];
+           ? currentResistances.filter(r => r !== type)
+           : [...currentResistances, type];
       return { ...prev, resistances: newResistances };
-    });
+       });
     setErrors(prev => ({ ...prev, resistances: null }));
-  };
+    }, [setFormData, setErrors]);
 
-  const handleImmunityToggle = (type, isPreSelected) => {
-     // Prevent unselection of pre-selected immunities
+  const handleImmunityToggle = useCallback((type, isPreSelected) => {
     if (isPreSelected) {
       return;
-     }
+       }
 
     setFormData(prev => {
       const currentImmunities = prev.immunities || [];
       const newImmunities = currentImmunities.includes(type)
-            ? currentImmunities.filter(i => i !== type)
-            : [...currentImmunities, type];
+           ? currentImmunities.filter(i => i !== type)
+           : [...currentImmunities, type];
       return { ...prev, immunities: newImmunities };
-    });
+       });
     setErrors(prev => ({ ...prev, immunities: null }));
-  };
+    }, [setFormData, setErrors]);
 
-  const handleInventoryChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      inventory: { ...prev.inventory, [field]: value }
-        }));
-      };
+  const handleNext = useCallback(async () => {
+    const success = await navigateNext();
+    if (success) {
+      resetErrors();
+       }
+     }, [navigateNext, resetErrors]);
 
-  const handleTempInventoryChange = (field, value) => {
-    setTempInventory(prev => ({ ...prev, [field]: value }));
-  };
-
-   // Check if current step is valid (for disabling Next button)
-  const [isNextDisabled, setIsNextDisabled] = useState(false);
-
-  useEffect(() => {
-     const checkValidation = async () => {
-       const stepErrors = await validateStep(currentStep, formData, {}, racesData, classSubtypes, ruleset);
-       setIsNextDisabled(Object.keys(stepErrors).length > 0);
-       setErrors(prev => ({ ...prev, ...stepErrors }));
-        };
-     checkValidation();
-      }, [currentStep, formData, racesData, classSubtypes, ruleset]);
-
-  const handleNext = async () => {
-     const stepErrors = await validateStep(currentStep, formData, {}, racesData, classSubtypes, ruleset);
-     if (Object.keys(stepErrors).length === 0) {
-       setCurrentStep(prev => prev + 1);
-       setErrors({});
-        }
-      };
-
-  const handlePrevious = () => {
-    setCurrentStep(prev => prev - 1);
-  };
-
-    const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     const stepErrors = await validateStep(currentStep, formData, {}, racesData, classSubtypes, ruleset);
     if (Object.keys(stepErrors).length === 0) {
       const finalErrors = validateFinalFormData(formData);
       if (Object.keys(finalErrors).length > 0) {
         setErrors(finalErrors);
         return;
-        }
+         }
       onComplete(formData);
        }
-     };
+     }, [currentStep, formData, racesData, classSubtypes, ruleset, onComplete, setErrors]);
 
-  const renderStep = () => {
+  const renderStep = useCallback(() => {
     switch (currentStep) {
       case 1:
-  return (
-           <WizardStepRules
+        return (
+             <WizardStepRules
             ruleset={ruleset}
             errors={errors}
             onRulesetChange={handleRulesetChange}
-          />
-    );
+            />
+           );
       case 2:
         return (
-          <WizardStepBasic
+             <WizardStepBasic
             formData={formData}
             errors={errors}
             backgrounds={backgrounds}
             ruleset={ruleset}
-            onInputChange={handleInputChange}
-              />
-            );
+            onInputChange={updateField}
+            />
+           );
       case 3:
         return (
-          <WizardStepRaceClass
+             <WizardStepRaceClass
             formData={formData}
             errors={errors}
             racesData={racesData}
             classSubtypes={classSubtypes}
             ruleset={ruleset}
-            onInputChange={handleInputChange}
-              />
-            );
+            onInputChange={updateField}
+            />
+           );
       case 4:
         return (
-          <WizardStepFeats
+             <WizardStepFeats
             formData={formData}
             allFeats={feats}
-            onArrayFieldChange={handleArrayFieldChange}
+            onArrayFieldChange={updateArrayField}
             preSelectedFeats={preSelectedFeats}
-              />
-            );
+            />
+           );
       case 5:
         return (
-          <WizardStepAbilities
+             <WizardStepAbilities
             formData={formData}
             errors={errors}
             onAbilityBaseScoreChange={handleAbilityBaseScoreChange}
             onAbilityImprovementChange={handleAbilityImprovementChange}
             onAbilityMiscBonusChange={handleAbilityMiscBonusChange}
-              />
-            );
+            />
+           );
       case 6:
         return (
-          <WizardStepSkills
+             <WizardStepSkills
             formData={formData}
             errors={errors}
             onSkillToggle={handleSkillToggle}
@@ -601,101 +338,108 @@ function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, a
             expertiseLimits={expertiseLimits}
             warnings={skillWarnings}
             preSelectedSkills={preSelectedSkills}
-              />
-            );
+            />
+           );
       case 7:
-          return (
+        return (
              <WizardStepLanguages
-              formData={formData}
-              errors={errors}
-              onLanguageToggle={handleLanguageToggle}
-              onFightingStyleToggle={handleFightingStyleToggle}
-              languageLimits={languageLimits}
-              fightingStyleLimits={fightingStyleLimits}
-              warnings={languageWarnings}
-              preSelectedLanguages={preSelectedLanguages}
-              preSelectedFightingStyles={preSelectedFightingStyles}
-                 />
-            );
+            formData={formData}
+            errors={errors}
+            onLanguageToggle={handleLanguageToggle}
+            onFightingStyleToggle={handleFightingStyleToggle}
+            languageLimits={languageLimits}
+            fightingStyleLimits={fightingStyleLimits}
+            warnings={languageWarnings}
+            preSelectedLanguages={preSelectedLanguages}
+            preSelectedFightingStyles={preSelectedFightingStyles}
+            />
+           );
       case 8:
         return (
-          <WizardStepResistances
+             <WizardStepResistances
             formData={formData}
             onResistanceToggle={handleResistanceToggle}
             onImmunityToggle={handleImmunityToggle}
             warnings={resistanceWarnings}
             preSelectedResistances={preSelectedResistancesList.resistances}
             preSelectedImmunities={preSelectedResistancesList.immunities}
-              />
-            );
+            />
+           );
       case 9:
         return (
-          <WizardStepSpells
+             <WizardStepSpells
             formData={formData}
             allSpells={allSpells || []}
-            onArrayFieldChange={handleArrayFieldChange}
-              />
-            );
+            onArrayFieldChange={updateArrayField}
+            />
+           );
       case 10:
         return (
-          <WizardStepMagicItems
+             <WizardStepMagicItems
             formData={formData}
             allMagicItems={magicItems}
             ruleset={ruleset}
-            onArrayFieldChange={handleArrayFieldChange}
-              />
-            );
+            onArrayFieldChange={updateArrayField}
+            />
+           );
       case 11:
         return (
-          <WizardStepInventory
+             <WizardStepInventory
             formData={formData}
             tempInventory={tempInventory}
-            onInventoryChange={handleInventoryChange}
-            onTempInventoryChange={handleTempInventoryChange}
-              />
-            );
+            onInventoryChange={updateInventory}
+            onTempInventoryChange={updateTempInventory}
+            />
+           );
       case 12:
         return (
-          <WizardStepSpecial
+             <WizardStepSpecial
             formData={formData}
-            onArrayFieldChange={handleArrayFieldChange}
-              />
-            );
+            onArrayFieldChange={updateArrayField}
+            />
+           );
       default:
         return null;
-}
-   };
+      }
+     }, [currentStep, ruleset, errors, formData, backgrounds, racesData, classSubtypes, feats, magicItems,
+    preSelectedFeats, preSelectedSkills, preSelectedLanguages, preSelectedFightingStyles,
+    preSelectedResistancesList, skillLimits, expertiseLimits, skillWarnings,
+    languageLimits, fightingStyleLimits, languageWarnings, resistanceWarnings,
+    tempInventory, allSpells,
+    handleRulesetChange, updateField, updateArrayField, updateInventory, updateTempInventory,
+    handleAbilityBaseScoreChange, handleAbilityImprovementChange, handleAbilityMiscBonusChange,
+    handleSkillToggle, handleSkillExpertiseToggle, handleLanguageToggle, handleFightingStyleToggle,
+    handleResistanceToggle, handleImmunityToggle]);
 
   return (
-        <div className="character-creation-wizard-overlay">
-          <div className="character-creation-wizard">
-            <WizardHeader
+      <div className="character-creation-wizard-overlay">
+        <div className="character-creation-wizard">
+          <WizardHeader
           title={isEditing ? "Edit Character" : "Create New Character"}
           onClose={onCancel}
-            />
-            <WizardProgressBar
-                    currentStep={currentStep}
-                    totalSteps={12}
-                    isEditing={isEditing}
-                      />
-            <div className="wizard-content">
-              {renderStep()}
-            </div>
-            <WizardFooter
+          />
+          <WizardProgressBar
+          currentStep={currentStep}
+          totalSteps={12}
+          isEditing={isEditing}
+          />
+          <div className="wizard-content">
+            {renderStep()}
+          </div>
+          <WizardFooter
           currentStep={currentStep}
           isFirstStep={isEditing ? currentStep === 2 : currentStep === 1}
           isLastStep={currentStep === 12}
           onCancel={onCancel}
-          onPrevious={handlePrevious}
+          onPrevious={navigatePrevious}
           onNext={handleNext}
           onSubmit={handleSubmit}
           isEditing={isEditing}
           isNextDisabled={isNextDisabled}
           />
-          </div>
         </div>
-    );
+      </div>
+     );
 }
 
 export default CharacterCreationWizard;
-
