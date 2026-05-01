@@ -28,3 +28,6 @@ dist-ssr
 # Ignore Vite plugin cache files and test files
 **/.vite-plugin-*.json
 **/wizard-test-*.json
+
+# Coverage reports
+coverage
