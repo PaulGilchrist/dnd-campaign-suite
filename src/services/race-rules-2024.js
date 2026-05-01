@@ -1,5 +1,6 @@
 import { cloneDeep, uniqBy } from 'lodash';
-import { featuresToIgnore, actions, bonusActions, reactions, characterAdvancement } from './feature-categories-2024'
+import * as featureCategories from './feature-categories-2024'
+import { categorizeFeatures, mergeCategorizedFeatures } from './feature-categorization-utils'
 import utils from './utils.js';
 
 const raceRules = {
@@ -126,65 +127,34 @@ const raceRules = {
 
         return senses.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
          },
-    addTraits: (traits) => {
-        const categorizedTraits = {
-            actions: [],
-            bonusActions: [],
-            reactions: [],
-            specialActions: [],
-            characterAdvancement: []
-            };
-
-        if(traits) {
-            traits.forEach(trait => {
-                const traitSummary = {
-                    name: trait.name,
-                    description: trait.description,
-                    details: trait.details || null
-                    };
-
-                if(featuresToIgnore.includes(trait.name)) {
-                       // Do nothing - this trait is ignored entirely
-                    } else if(characterAdvancement.includes(trait.name) && !categorizedTraits.characterAdvancement.some(f => f.name === trait.name)) {
-                    categorizedTraits.characterAdvancement.push(traitSummary);
-                    } else if(actions.includes(trait.name) && !categorizedTraits.actions.some(action => action.name === trait.name)) {
-                    categorizedTraits.actions.push(traitSummary);
-                    } else if(bonusActions.includes(trait.name) && !categorizedTraits.bonusActions.some(bonusAction => bonusAction.name === trait.name)) {
-                    categorizedTraits.bonusActions.push(traitSummary);
-                    } else if(reactions.includes(trait.name) && !categorizedTraits.reactions.some(reaction => reaction.name === trait.name)) {
-                    categorizedTraits.reactions.push(traitSummary);
-                    } else if(!categorizedTraits.specialActions.some(specialAction => specialAction.name === trait.name)) {
-                    categorizedTraits.specialActions.push(traitSummary);
-                    }
-               });
-            }
-
-        return categorizedTraits;
-         },
-    getTraits: (playerStats) => {
-            // 2024 Rules: Process racial traits including lineages
+        addTraits: (traits) => {
+        return categorizeFeatures(traits, featureCategories, { descriptionField: 'description' });
+          },
+        getTraits: (playerStats) => {
+             // 2024 Rules: Process racial traits including lineages
         let traits = raceRules.addTraits(playerStats.race?.traits);
 
             // Handle lineage-specific traits
         if (playerStats.race?.lineage && playerStats.race.traits) {
+            const lineageTraits = [];
             playerStats.race.traits.forEach(trait => {
                 if (trait.sub_traits) {
                     const selectedLineage = trait.sub_traits.find(st => st.name === playerStats.race.lineage);
                     if (selectedLineage) {
-                        const lineageTrait = {
+                        lineageTraits.push({
                             name: `${trait.name} (${selectedLineage.name})`,
                             description: selectedLineage.description,
                             details: null
-                            };
+                         });
+                     }
+                 }
+             });
 
-                            // Categorize lineage trait
-                        if (!raceRules.addTraits([lineageTrait]).specialActions.some(action => action.name === lineageTrait.name)) {
-                            traits.specialActions.push(lineageTrait);
-                            }
-                        }
-                    }
-               });
-            }
+            if (lineageTraits.length > 0) {
+                const categorizedLineageTraits = raceRules.addTraits(lineageTraits);
+                traits = mergeCategorizedFeatures(traits, categorizedLineageTraits);
+             }
+        }
 
         return traits;
          }

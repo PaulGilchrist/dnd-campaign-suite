@@ -1,5 +1,6 @@
 import { cloneDeep, uniqBy } from 'lodash';
-import { featuresToIgnore, actions, bonusActions, reactions, characterAdvancement } from './feature-categories-2024'
+import * as featureCategories from './feature-categories-2024'
+import { categorizeFeatures, mergeCategorizedFeatures } from './feature-categorization-utils'
 import utils from './utils.js';
 
 const classRules = {
@@ -127,46 +128,16 @@ const classRules = {
         const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
         return classLevel?.beast_fly_speed === 'Yes';
        },
-    addFeatures: (levels) => {
-        const categorizedFeatures = {
-                    actions: [],
-                    bonusActions: [],
-                    reactions: [],
-                    specialActions: [],
-                    characterAdvancement: []
-                     };
-
-                     // Go through levels highest to lowest
-                for (let i = levels.length - 1; i >= 0; i--) {
-                    levels[i].features.forEach(feature => {
-                        const featureSummary = {
-                            name: feature.name,
-                            description: feature.description,
-                            details: feature.details
-                             };
-
-                             // featuresToIgnore prevents adding to any section
-                             // characterAdvancement, actions, bonusActions, and reactions go to their respective sections
-                        if (featuresToIgnore.includes(feature.name)) {
-                                // Do nothing - this feature is ignored entirely
-                             } else if (characterAdvancement.includes(feature.name) && !categorizedFeatures.characterAdvancement.some(f => f.name === feature.name)) {
-                            categorizedFeatures.characterAdvancement.push(featureSummary);
-                             } else if (actions.includes(feature.name) && !categorizedFeatures.actions.some(action => action.name === feature.name)) {
-                            categorizedFeatures.actions.push(featureSummary);
-                             } else if (bonusActions.includes(feature.name) && !categorizedFeatures.bonusActions.some(bonusAction => bonusAction.name === feature.name)) {
-                            categorizedFeatures.bonusActions.push(featureSummary);
-                             } else if (reactions.includes(feature.name) && !categorizedFeatures.reactions.some(reaction => reaction.name === feature.name)) {
-                            categorizedFeatures.reactions.push(featureSummary);
-                             } else if (!categorizedFeatures.specialActions.some(specialAction => specialAction.name === feature.name)) {
-                            categorizedFeatures.specialActions.push(featureSummary);
-                             }
-                         });
-                     }
-
-        return categorizedFeatures;
-       },
-    getFeatures: (playerStats) => {
-                 // 2024 Rules: Process class and major features
+        addFeatures: (levels) => {
+         // Flatten all features from all levels, maintaining reverse order (highest level first)
+        const allFeatures = [];
+        for (let i = levels.length - 1; i >= 0; i--) {
+            allFeatures.push(...(levels[i].features || []));
+         }
+        return categorizeFeatures(allFeatures, featureCategories, { descriptionField: 'description' });
+        },
+        getFeatures: (playerStats) => {
+                  // 2024 Rules: Process class and major features
             const classLevels = playerStats.class?.class_levels?.filter(classLevel => classLevel.level <= playerStats.level) || [];
             let features = classRules.addFeatures(classLevels);
 
@@ -177,14 +148,8 @@ const classRules = {
                 const majorLevels = [{ features: majorFeaturesList }];
                 const majorFeatures = classRules.addFeatures(majorLevels);
 
-                features = {
-                    actions: uniqBy([...features.actions, ...majorFeatures.actions], 'name'),
-                    bonusActions: uniqBy([...features.bonusActions, ...majorFeatures.bonusActions], 'name'),
-                    reactions: uniqBy([...features.reactions, ...majorFeatures.reactions], 'name'),
-                    specialActions: uniqBy([...features.specialActions, ...majorFeatures.specialActions], 'name'),
-                    characterAdvancement: uniqBy([...features.characterAdvancement, ...majorFeatures.characterAdvancement], 'name')
-                     };
-                 }
+                features = mergeCategorizedFeatures(features, majorFeatures);
+                  }
 
             return features;
             },

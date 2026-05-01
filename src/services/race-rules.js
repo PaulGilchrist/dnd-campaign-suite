@@ -1,6 +1,7 @@
 import { cloneDeep, merge, uniqBy } from 'lodash';
 import rules from './rules'
-import { featuresToIgnore, actions, bonusActions, reactions, characterAdvancement } from './feature-categories-5e'
+import * as featureCategories from './feature-categories-5e'
+import { categorizeFeatures, mergeCategorizedFeatures } from './feature-categorization-utils'
 
 const raceRules = {
     getImmunities: (playerSummary) => {
@@ -104,51 +105,16 @@ const raceRules = {
            }
         return senses.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         },
-    addTraits: (traits) => {
-            const categorizedTraits = {
-                actions: [],
-                bonusActions: [],
-                reactions: [],
-                specialActions: [],
-                characterAdvancement: []
-               }
-            if(traits) {
-                traits.forEach(trait => {
-                    const traitSummary = {
-                        name: trait.name,
-                        description: trait.description,
-                        details: trait.details
-                       };
-                    if(featuresToIgnore.includes(trait.name)) {
-                                                // Do nothing - this trait is ignored entirely
-                                            } else if(characterAdvancement.includes(trait.name) && !categorizedTraits.characterAdvancement.some(f => f.name == traitSummary.name)) {
-                                            categorizedTraits.characterAdvancement.push(traitSummary);
-                                            } else if(actions.includes(trait.name) && !categorizedTraits.actions.some(action => action.name == traitSummary.name)) {
-                                            categorizedTraits.actions.push(traitSummary);
-                                            } else if(bonusActions.includes(trait.name) && !categorizedTraits.bonusActions.some(bonusAction => bonusAction.name == traitSummary.name)) {
-                                            categorizedTraits.bonusActions.push(traitSummary);
-                                            } else if(reactions.includes(trait.name) && !categorizedTraits.reactions.some(reaction => reaction.name == traitSummary.name)) {
-                                            categorizedTraits.reactions.push(traitSummary);
-                                            } else if(!categorizedTraits.specialActions.some(specialAction => specialAction.name == traitSummary.name)) {
-                                            categorizedTraits.specialActions.push(traitSummary);
-                                            }
-                   });
-               }
-            return categorizedTraits;
-             },
-    getTraits: (playerStats) => {
-           // Dependencies: Race
+        addTraits: (traits) => {
+            return categorizeFeatures(traits, featureCategories, { descriptionField: 'description' });
+              },
+        getTraits: (playerStats) => {
+            // Dependencies: Race
         let traits = raceRules.addTraits(playerStats.race.traits);
         if(playerStats.race.subrace && playerStats.race.subrace.racial_traits) {
             const subraceTraits = raceRules.addTraits(playerStats.race.subrace.racial_traits);
-            traits = {
-                actions: uniqBy([...traits.actions, ...subraceTraits.actions], 'name'),
-                bonusActions: uniqBy([...traits.bonusActions, ...subraceTraits.bonusActions], 'name'),
-                reactions: uniqBy([...traits.reactions, ...subraceTraits.reactions], 'name'),
-                specialActions: uniqBy([...traits.specialActions, ...subraceTraits.specialActions], 'name'),
-                characterAdvancement: uniqBy([...traits.characterAdvancement, ...subraceTraits.characterAdvancement], 'name')
-              }
-           }
+            traits = mergeCategorizedFeatures(traits, subraceTraits);
+            }
         return traits;
         }
 };
