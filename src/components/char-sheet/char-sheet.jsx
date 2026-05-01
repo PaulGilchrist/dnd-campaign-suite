@@ -68,13 +68,13 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     }, [allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, forceRefresh, allRaces2024, allMagicItems2024]);
 
     const handleEvent = (event) => {
-        if (!isEqual(storage.get(event.key), event.data)) {
-            localStorage.setItem(event.key, JSON.stringify(event.data));
-            if (event.key === utils.getFirstName(playerStats.name)) {
-                setForceRefresh(utils.guid());
-            }
-        }
-    }
+            if (!isEqual(storage.get(event.key), event.data)) {
+                localStorage.setItem(event.key, JSON.stringify(event.data));
+                if (playerStats && event.key === utils.getFirstName(playerStats.name)) {
+                    setForceRefresh(utils.guid());
+                 }
+             }
+         }
 
     const handleTogglePreparedSpells = (spellName) => {
         const spell = playerStats.spellAbilities.spells.find(spell => spell.name === spellName);

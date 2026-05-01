@@ -1,28 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import './wizard-step-magic-items.css'
-import './wizard-step-magic-items-dark.css'
+import SelectableList from './selectable-list';
+import './wizard-step-magic-items.css';
+import './wizard-step-magic-items-dark.css';
 
 function WizardStepMagicItems({ formData, allMagicItems, ruleset, onArrayFieldChange }) {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedType, setSelectedType] = useState('All');
-    const [showFullDetails, setShowFullDetails] = useState({});
-    const [types, setTypes] = useState([]);
-    const [warnings, setWarnings] = useState([]);
-    const [showOnlySelected, setShowOnlySelected] = useState(false);
-
-    // Load magic item types from the data
-    useEffect(() => {
-        if (allMagicItems && allMagicItems.length > 0) {
-            const typeSet = new Set(['All']);
-            allMagicItems.forEach(item => {
-                if (item.type) {
-                    typeSet.add(item.type);
-                }
-            });
-            setTypes(Array.from(typeSet).sort());
-        }
-    }, [allMagicItems]);
-
+  const [warnings, setWarnings] = useState([]);
     // Check for attunement limit warnings
     useEffect(() => {
         const warnings = [];
@@ -45,60 +27,15 @@ function WizardStepMagicItems({ formData, allMagicItems, ruleset, onArrayFieldCh
         setWarnings(warnings);
     }, [formData.magicItems, allMagicItems]);
 
-    const filteredMagicItems = (() => {
-        if (!allMagicItems || allMagicItems.length === 0) return [];
-
-        let results = [...allMagicItems];
-
-        if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase();
-            results = results.filter(item =>
-                item.name.toLowerCase().includes(query) ||
-                (item.index && item.index.toLowerCase().includes(query))
-            );
-        }
-
-        if (selectedType !== 'All') {
-            results = results.filter(item => item.type === selectedType);
-        }
-
-        if (showOnlySelected) {
-            results = results.filter(item => (formData.magicItems || []).includes(item.name));
-        }
-
-        return results.sort((a, b) => a.name.localeCompare(b.name));
-    })();
-
-    const handleMagicItemToggle = (itemName) => {
-        const currentItems = formData.magicItems || [];
-        const newItems = currentItems.includes(itemName)
-            ? currentItems.filter(i => i !== itemName)
-            : [...currentItems, itemName];
-        onArrayFieldChange('magicItems', newItems);
-    };
-
-    const itemIsSelected = (itemName) => {
-        return (formData.magicItems || []).includes(itemName);
-    };
-
-    const toggleFullDetails = (itemIndex) => {
-        setShowFullDetails(prev => ({
-            ...prev,
-            [itemIndex]: !prev[itemIndex]
-        }));
-    };
-
-    const renderMagicItemDetails = (item, index) => {
-        const isExpanded = showFullDetails[index];
-        const isSelected = itemIsSelected(item.name);
-        // Use index as key since it's now guaranteed to be unique
+      // Render item function
+  const renderItem = (item, index, { isSelected, isExpanded, onToggle, onToggleExpand }) => {
         const uniqueKey = item.index || index;
 
         return (
             <div
                 key={uniqueKey}
                 className={`list-item magic-item ${isSelected ? 'selected' : ''}`}
-                onClick={() => handleMagicItemToggle(item.name)}
+          onClick={onToggle}
             >
                 <div className="list-item-header">
                     <div className="list-item-name">{item.name}</div>
@@ -135,7 +72,7 @@ function WizardStepMagicItems({ formData, allMagicItems, ruleset, onArrayFieldCh
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                toggleFullDetails(index);
+                  onToggleExpand();
                             }}
                             className="toggle-details-btn"
                         >
@@ -147,25 +84,10 @@ function WizardStepMagicItems({ formData, allMagicItems, ruleset, onArrayFieldCh
         );
     };
 
-    const renderSearchModal = () => {
-        if (!allMagicItems || allMagicItems.length === 0) {
+      // Render warnings
+  const renderWarnings = () => {
+    if (warnings.length === 0) return null;
             return (
-                <div className="wizard-step">
-                    <h2>Step 9: Magic Items</h2>
-                    <div className="no-magic-items-found">
-                        Magic item data not yet loaded. Please try again.
-                    </div>
-                </div>
-            );
-        }
-
-        return (
-            <div className="wizard-step-magic-items">
-                <div className="wizard-step">
-                    <h2>Step 10: Magic Items</h2>
-
-                    {/* Display warnings if any */}
-                    {warnings.length > 0 && (
                         <div className="warning-container">
                             {warnings.map((warning, index) => (
                                 <div key={index} className={`warning-message ${warning.type}`}>
@@ -173,75 +95,30 @@ function WizardStepMagicItems({ formData, allMagicItems, ruleset, onArrayFieldCh
                                 </div>
                             ))}
                         </div>
-                    )}
-
-                    <div className="list-filter-container magic-items-filters">
-                        <div className="filter-group">
-                            <label htmlFor="magic-item-search">Search Magic Items</label>
-                            <input
-                                type="text"
-                                id="magic-item-search"
-                                className="magic-item-search-input"
-                                placeholder="Search magic items..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="filter-group">
-                            <label htmlFor="magic-item-type-filter">Item Type</label>
-                            <select
-                                id="magic-item-type-filter"
-                                className="magic-item-type-filter"
-                                value={selectedType}
-                                onChange={(e) => setSelectedType(e.target.value)}
-                            >
-                                {types.map(type => (
-                                    <option key={type} value={type}>{type}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div></div>
-                        <div className="filter-group">
-                            <label className="filter-checkbox-label">
-                                <input
-                                    type="checkbox"
-                                    checked={showOnlySelected}
-                                    onChange={(e) => setShowOnlySelected(e.target.checked)}
-                                />
-                                Show Only Selected&nbsp;(
-                            </label>
-                            <span className="filter-checkbox-count">
-                                {(formData.magicItems || []).length} selected)
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="list-results-container magic-item-results-container">
-                        <div className="magic-item-results-header">
-                            <span className="result-count">
-                                Showing {filteredMagicItems.length} magic item{filteredMagicItems.length !== 1 ? 's' : ''}
-                            </span>
-                        </div>
-
-                        <div className="magic-item-results-list">
-                            {filteredMagicItems.length === 0 ? (
-                                <div className="no-results-found">
-                                    {searchQuery || selectedType !== 'All'
-                                        ? 'No magic items found matching your criteria.'
-                                        : 'No magic items available.'}
-                                </div>
-                            ) : (
-                                filteredMagicItems.map((item, index) => renderMagicItemDetails(item, index))
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
         );
     };
 
-    return renderSearchModal();
+      // Filter configuration
+  const filters = [
+         { label: 'Item Type', field: 'type', className: 'magic-item-type-filter' }
+       ];
+
+  return (
+         <SelectableList
+        items={allMagicItems}
+        fieldName="magicItems"
+        formData={formData}
+        onArrayFieldChange={onArrayFieldChange}
+        title="Step 10: Magic Items"
+        searchPlaceholder="Search magic items..."
+        filters={filters}
+        renderItem={renderItem}
+        renderWarnings={renderWarnings}
+        loadingMessage="Magic item data not yet loaded. Please try again."
+        className="wizard-step-magic-items"
+        resultLabel="magic item"
+        />
+       );
 }
 
 export default WizardStepMagicItems;

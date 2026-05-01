@@ -1,26 +1,16 @@
 import React, { useState, useEffect } from 'react';
-// No component-specific CSS needed - uses shared wizard styles
+import SelectableList from './selectable-list';
 import { getSpellLimits, validateSpellSelection } from '../../services/spell-limits.js';
 import { getSpellValidationInfo } from '../../services/spell-validation.js';
 import './wizard-step-spells.css';
-// Dark mode styles loaded via media query
 import './wizard-step-spells-dark.css';
 
 function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLevel, setSelectedLevel] = useState('All');
-  const [selectedClass, setSelectedClass] = useState('All');
-  const [showFullDetails, setShowFullDetails] = useState({});
   const [spellCounts, setSpellCounts] = useState({ cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 });
   const [spellLimits, setSpellLimits] = useState({ cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 });
   const [validationMessage, setValidationMessage] = useState('');
   const [spellWarnings, setSpellWarnings] = useState([]);
   const [isLoadingLimits, setIsLoadingLimits] = useState(false);
-  const [showOnlySelected, setShowOnlySelected] = useState(false);
-
-  const [levels, setLevels] = useState([]);
-  const [classes, setClasses] = useState([]);
-
   // Fetch spell limits dynamically based on class and level
   useEffect(() => {
     const fetchSpellLimits = async () => {
@@ -54,22 +44,15 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
     
     if (formData.spells && formData.spells.length > 0) {
       formData.spells.forEach(spellName => {
-        console.log('Processing spell:', spellName);
         const spell = allSpells.find(s => s.name === spellName || s.index === spellName);
         if (spell) {
-          console.log('Found spell:', spell.name, 'level:', spell.level);
           const level = spell.level !== undefined ? spell.level : 0;
           const levelKey = level === 0 ? 'cantrip' : `level${level}`;
           counts[levelKey] = (counts[levelKey] || 0) + 1;
-        } else {
-          console.log('Spell not found:', spellName);
         }
       });
-    } else {
-      console.log('No spells selected yet');
     }
     
-    console.log('Final counts:', counts);
     setSpellCounts(counts);
   }, [formData.spells, allSpells]);
 
@@ -135,70 +118,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
     validateSpells();
    }, [formData.class, formData.race, formData.background, formData.feats, formData.spells, formData.level, formData.rules, allSpells]);
 
-  useEffect(() => {
-    if (allSpells && allSpells.length > 0) {
-      const levelSet = new Set(['All']);
-      const classSet = new Set(['All']);
-      allSpells.forEach(spell => {
-        levelSet.add(spell.level !== undefined ? spell.level.toString() : '0');
-        if (spell.classes) {
-          spell.classes.forEach(cls => classSet.add(cls));
-        }
-      });
-      setLevels(Array.from(levelSet).sort((a, b) => {
-        if (a === 'All') return -1;
-        if (b === 'All') return 1;
-        return parseInt(a) - parseInt(b);
-      }));
-      setClasses(Array.from(classSet).sort());
-    }
-  }, [allSpells]);
-
-  const filteredSpells = (() => {
-    if (!allSpells || allSpells.length === 0) return [];
-    
-    let results = [...allSpells];
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      results = results.filter(spell => 
-        spell.name.toLowerCase().includes(query) ||
-        (spell.index && spell.index.toLowerCase().includes(query))
-      );
-    }
-
-    if (selectedLevel !== 'All') {
-      results = results.filter(spell => {
-        const spellLevel = spell.level !== undefined ? spell.level.toString() : '0';
-        return spellLevel === selectedLevel;
-      });
-    }
-
-    if (selectedClass !== 'All') {
-      results = results.filter(spell => 
-        spell.classes && spell.classes.includes(selectedClass)
-      );
-    }
-
-    if (showOnlySelected) {
-      results = results.filter(spell => (formData.spells || []).includes(spell.name));
-      }
-
-    return results.sort((a, b) => a.name.localeCompare(b.name));
-  })();
-
-  const handleSpellToggle = (spellName) => {
-    const currentSpells = formData.spells || [];
-    const newSpells = currentSpells.includes(spellName)
-      ? currentSpells.filter(s => s !== spellName)
-      : [...currentSpells, spellName];
-    onArrayFieldChange('spells', newSpells);
-  };
-
-  const spellIsSelected = (spellName) => {
-    return (formData.spells || []).includes(spellName);
-  };
-
+   // Get level class for styling
   const getLevelClass = (spell) => {
     const level = spell.level !== undefined ? spell.level : 0;
     if (level === 0) return 'cantrip';
@@ -207,28 +127,13 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
     return 'high';
   };
 
-  const toggleFullDetails = (spellIndex) => {
-    setShowFullDetails(prev => ({
-      ...prev,
-      [spellIndex]: !prev[spellIndex]
-    }));
-  };
-
-  const removeSpell = (spellName) => {
-    const currentSpells = formData.spells || [];
-    const newSpells = currentSpells.filter(s => s !== spellName);
-    onArrayFieldChange('spells', newSpells);
-  };
-
-  const renderSpellDetails = (spell, index) => {
-    const isExpanded = showFullDetails[index];
-    const isSelected = spellIsSelected(spell.name);
-
+   // Render item function
+  const renderItem = (spell, index, { isSelected, isExpanded, onToggle, onToggleExpand }) => {
     return (
       <div
         key={spell.index || index}
         className={`list-item spell-item ${isSelected ? 'selected' : ''}`}
-        onClick={() => handleSpellToggle(spell.name)}
+        onClick={onToggle}
       >
         <div className="list-item-header">
           <div className="list-item-name">{spell.name}</div>
@@ -285,7 +190,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                toggleFullDetails(index);
+                onToggleExpand();
               }}
               className="toggle-details-btn"
             >
@@ -297,23 +202,8 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
     );
   };
 
-  const renderSearchModal = () => {
-    
-    if (!allSpells || allSpells.length === 0) {
-      return (
-        <div className="wizard-step">
-          <h2>Step 7: Spells</h2>
-          <div className="no-spells-found">
-            Spell data not yet loaded. Please try again.
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="wizard-step wizard-step-spells">
-        <h2>Step 9: Spells</h2>
-        
+   // Render summary
+  const renderSummary = () => (
         <div className="spells-summary">
           <h4>Spell Selection Summary</h4>
           
@@ -344,87 +234,46 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
                        </div>
                      )}
         </div>
-        
-        <div className="list-filter-container spells-filters">
-          <div className="filter-group">
-            <label htmlFor="spell-search">Search Spells</label>
-            <input
-              type="text"
-              id="spell-search"
-              className="spell-search-input"
-              placeholder="Search spells..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          
-          <div className="filter-group">
-            <label htmlFor="level-filter">Spell Level</label>
-            <select
-              id="level-filter"
-              className="level-filter"
-              value={selectedLevel}
-              onChange={(e) => setSelectedLevel(e.target.value)}
-            >
-              {levels.map(level => (
-                <option key={level} value={level}>{level === '0' ? 'Cantrip' : level}</option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="filter-group">
-            <label htmlFor="class-filter">Class</label>
-            <select
-              id="class-filter"
-              className="class-filter"
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-            >
-              {classes.map(cls => (
-                <option key={cls} value={cls}>{cls}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="filter-group">
-              <label className="filter-checkbox-label">
-                <input
-                type="checkbox"
-                checked={showOnlySelected}
-                onChange={(e) => setShowOnlySelected(e.target.checked)}
-                />
-               Show Only Selected&nbsp;(
-              </label>
-              <span className="filter-checkbox-count">
-                {(formData.spells || []).length} selected)
-              </span>
-          </div>
-              </div>
-
-         <div className="list-results-container spell-results-container">
-           <div className="spell-results-header">
-             <span className="result-count">
-              Showing {filteredSpells.length} spell{filteredSpells.length !== 1 ? 's' : ''}
-             </span>
-           </div>
-
-           <div className="spell-results-list">
-             {filteredSpells.length === 0 ? (
-               <div className="no-results-found">
-                 {searchQuery || selectedLevel !== 'All' || selectedClass !== 'All'
-                   ? 'No spells found matching your criteria.'
-                   : 'No spells available.'}
-          </div>
-             ) : (
-              filteredSpells.map((spell, index) => renderSpellDetails(spell, index))
-             )}
-      </div>
-         </div>
-       </div>
     );
-  };
 
-  return renderSearchModal();
+   // Filter configuration
+  const filters = [
+    {
+      label: 'Spell Level',
+      field: 'level',
+      className: 'level-filter',
+      getValue: (spell) => spell.level !== undefined ? spell.level.toString() : '0',
+      renderOption: (level) => level === '0' ? 'Cantrip' : level,
+      sortFn: (a, b) => {
+        if (a === 'All') return -1;
+        if (b === 'All') return 1;
+        return parseInt(a) - parseInt(b);
+}
+     },
+    {
+      label: 'Class',
+      field: 'class',
+      className: 'class-filter',
+      getValue: (spell) => spell.classes
+     }
+   ];
+
+  return (
+     <SelectableList
+      items={allSpells}
+      fieldName="spells"
+      formData={formData}
+      onArrayFieldChange={onArrayFieldChange}
+      title="Step 9: Spells"
+      searchPlaceholder="Search spells..."
+      filters={filters}
+      renderItem={renderItem}
+      renderSummary={renderSummary}
+      loadingMessage="Spell data not yet loaded. Please try again."
+      className="wizard-step-spells"
+      resultLabel="spell"
+     />
+   );
 }
 
 export default WizardStepSpells;
