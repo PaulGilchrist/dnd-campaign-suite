@@ -20,11 +20,11 @@ import CharClassWarlock from './char-class-warlock'
 import CharClassWizard from './char-class-wizard'
 import CharFeats from '../char-feats/char-feats'
 import HiddenInput from '../../common/hidden-input'
-import Popup from '../../common/popup'
+import usePopup from '../common/use-popup'
 
 function CharSummary({ playerStats, onDeleteCharacter }) {
     const [hasInspiration, setHasInspiration] = React.useState(false);
-    const [popupHtml, setPopupHtml] = React.useState(null);
+    const { PopupElement, setPopupHtml } = usePopup(() => null);
     const [shortRestHitDice, setShortRestHitDice] = React.useState(0);
     const [showInput, setShowInput] = React.useState(false);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -73,7 +73,7 @@ function CharSummary({ playerStats, onDeleteCharacter }) {
 
     return (
         <div>
-            {popupHtml && (<Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)}></Popup>)}
+             {PopupElement}
             <div className='name'>
                 {playerStats.name}
                 {isLocalhost && (
@@ -165,3 +165,4 @@ function CharSummary({ playerStats, onDeleteCharacter }) {
 }
 
 export default CharSummary
+

@@ -1,16 +1,14 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
-import Popup from '../common/popup'
+import usePopup from './common/use-popup'
 
 function CharReactions({ playerStats }) {
-    const [popupHtml, setPopupHtml] = React.useState(null);
-    const showPopup = (specialAction) => {
+    const { showPopup, PopupElement } = usePopup((specialAction) => {
         if (specialAction.details) {
-            let html = `<b>${specialAction.name}</b><br/>${specialAction.description}<br/><br/>${specialAction.details}`;
-            setPopupHtml(html);
-    }
-      }
-
+            return `<b>${specialAction.name}</b><br/>${specialAction.description}<br/><br/>${specialAction.details}`;
+        }
+        return null;
+    });
      // Build reactions list immutably
     let reactions = [...(playerStats.reactions || [])];
 
@@ -33,9 +31,9 @@ function CharReactions({ playerStats }) {
     return (
         <div>
             <div className='sectionHeader'>Reactions</div>
+            {PopupElement}
               {reactions.map((reaction) => {
                 return <div key={reaction.name}>
-                    {popupHtml && (<Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)}></Popup>)}
                     <b className={reaction.details ? "clickable" : ""} onClick={() => showPopup(reaction)}>{reaction.name}:</b> <span dangerouslySetInnerHTML={{ __html: reaction.description }}></span>
                 </div>
             })}

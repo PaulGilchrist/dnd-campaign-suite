@@ -1,22 +1,20 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
-import Popup from '../common/popup'
+import usePopup from './common/use-popup'
 import './char-abilities.css'
 
 function CharAbilities({ allAbilityScores, playerStats }) {
-    const [popupHtml, setPopupHtml] = React.useState(null);
-    let signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
-
-    const showPopup = (name) => {
+    const { showPopup, PopupElement, setPopupHtml } = usePopup((name) => {
         const abilityScore = allAbilityScores.find((abilityScore) => abilityScore.full_name === name);
-        if(abilityScore) {
-            setPopupHtml(`<h3>${name}</h3>${abilityScore.desc}<br/>`);
-        }
-    }
-
+        if (abilityScore) {
+            return `<h3>${name}</h3>${abilityScore.desc}<br/>`;
+           }
+        return null;
+       });
+    let signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
     return (
         <div className='abilities-popup-parent'>
-            {popupHtml && (<Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)}></Popup>)}
+               {PopupElement}
             <div className='abilities'>
                 <div className='left'><b>Ability</b></div>
                 <div><b>Score</b></div>
@@ -31,7 +29,7 @@ function CharAbilities({ allAbilityScores, playerStats }) {
                     <div>{signFormatter.format(ability.bonus)}</div>
                     <div>{signFormatter.format(ability.save)}</div>
                     <div className='left'>{ability.skills.map((skill) => {
-                        return `${skill.name}  ${signFormatter.format(skill.bonus)}`;
+                        return `${skill.name}    ${signFormatter.format(skill.bonus)}`;
                     }).join(', ')}</div>
                 </div>;
             })}
@@ -40,3 +38,4 @@ function CharAbilities({ allAbilityScores, playerStats }) {
 }
 
 export default CharAbilities
+

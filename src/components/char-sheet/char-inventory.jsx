@@ -1,10 +1,10 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
-import Popup from '../common/popup'
+import usePopup from './common/use-popup'
 import './char-inventory.css'
 
 function CharInventory({ playerStats }) {
-    const [popupHtml, setPopupHtml] = React.useState(null);
+    const { PopupElement, setPopupHtml } = usePopup(() => null);
     
     const handleItemClick = (itemName) => {
         const equipmentUrl = '/data/equipment.json';
@@ -34,7 +34,7 @@ function CharInventory({ playerStats }) {
                     return equipmentData.find(f => {
                         const normalizedName = (f.name || '').toLowerCase().replace(/\s+/g, '-');
                         const normalizedIndex = (f.index || '').toLowerCase().replace(/\s+/g, '-');
-                        return normalizedName === normalizedInput || normalizedIndex === normalizedInput;
+                        return normalizedName === normalizedInput || normalizedIndex === normalizedIndex;
                     });
                 };
                 
@@ -121,7 +121,7 @@ function CharInventory({ playerStats }) {
     
     return (
         <div>
-            {popupHtml && (<Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)}></Popup>)}
+             {PopupElement}
             {playerStats.inventory.magicItems && <div>
                 <div className='sectionHeader'>Magic Items</div>
                 {playerStats.inventory.magicItems.map((magicItem, index) => {
@@ -147,3 +147,4 @@ function CharInventory({ playerStats }) {
 }
 
 export default CharInventory
+

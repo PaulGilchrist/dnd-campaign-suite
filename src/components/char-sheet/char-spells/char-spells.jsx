@@ -1,20 +1,33 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import { cloneDeep } from 'lodash';
-import Popup from '../../common/popup'
+import usePopup from '../common/use-popup'
 import CharSpellSlots from './char-spell-slots'
 import './char-spells.css'
 
 function CharSpells({ playerStats, handleTogglePreparedSpells }) {
-    const [popupHtml, setPopupHtml] = React.useState(null);
+    const { showPopup, PopupElement } = usePopup((spell) => {
+        if (spell.desc) {
+            console.log(`[CharSpells] Spell clicked: ${spell.name}`, {
+                spellData: spell,
+                rules: playerStats.rules || '5e (default)'
+              });
+            let html = `<b>${spell.name}</b><br/><br/>${spell.desc}<br/>`;
+            if (typeof spell.higher_level === 'string' && spell.higher_level.trim()) {
+                html += `<br/><b>At higher levels.</b>&nbsp;${spell.higher_level}`;
+              }
+            return html;
+            }
+        return null;
+        });
     const [filterPrepared, setFilterPrepared] = React.useState(false);
     const [spells, setSpells] = React.useState([]);
     React.useEffect(() => {
         if(playerStats.spellAbilities) {
             setFilterPrepared(false);
             setSpells(playerStats.spellAbilities.spells);
-        }
-    }, [playerStats]);
+          }
+      }, [playerStats]);
     const handleTogglePreparedFilter = () => {
         const spells = cloneDeep(playerStats.spellAbilities.spells);
         if(!filterPrepared) {
@@ -32,8 +45,8 @@ function CharSpells({ playerStats, handleTogglePreparedSpells }) {
                 return a.level - b.level;
             } else {
                 return a.name.localeCompare(b.name);
-            }
-        });
+              }
+          });
         setSpells(spells);
     }
     const handleSortSpell = () => {
@@ -41,23 +54,10 @@ function CharSpells({ playerStats, handleTogglePreparedSpells }) {
         spells.sort((a, b) => a.name.localeCompare(b.name));
         setSpells(spells);
     }
-    const showPopup = (spell) => {
-        if(spell.desc) {
-            console.log(`[CharSpells] Spell clicked: ${spell.name}`, {
-                spellData: spell,
-                rules: playerStats.rules || '5e (default)'
-            });
-            let html = `<b>${spell.name}</b><br/><br/>${spell.desc}<br/>`;
-            if(typeof spell.higher_level === 'string' && spell.higher_level.trim()) {
-                html += `<br/><b>At higher levels.</b>&nbsp;${spell.higher_level}`;
-            }
-            setPopupHtml(html);
-        }
-    }
     return (
         <div>
             {(playerStats.spellAbilities && playerStats.spellAbilities.spells.length > 0) && <div className="spell-popup-parent">
-                {popupHtml && (<Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)}></Popup>)}
+                     {PopupElement}
                 <hr />
                 <div className='spell-abilities'>
                     <div className="sectionHeader"><h4>&nbsp;Spells</h4></div>
@@ -120,3 +120,4 @@ function CharSpells({ playerStats, handleTogglePreparedSpells }) {
 }
 
 export default CharSpells
+

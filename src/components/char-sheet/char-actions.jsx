@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
 import React, { useState, useEffect } from 'react'
-import Popup from '../common/popup'
+import usePopup from './common/use-popup'
 import './char-actions.css'
 
 function CharActions({ playerStats }) {
@@ -12,28 +12,27 @@ function CharActions({ playerStats }) {
           .then(data => setActions(data))
           .catch(error => console.error('Error loading actions:', error));
     }, []);
-    const [popupHtml, setPopupHtml] = React.useState(null);
-    const showActionsPopup = (actionOrBonusAction) => {
+    const { showPopup, PopupElement, setPopupHtml } = usePopup((actionOrBonusAction) => {
         if (actionOrBonusAction.details) {
-            let html = `<b>${actionOrBonusAction.name}</b><br/>${actionOrBonusAction.description}<br/><br/>${actionOrBonusAction.details}`;
-            setPopupHtml(html);
+            return `<b>${actionOrBonusAction.name}</b><br/>${actionOrBonusAction.description}<br/><br/>${actionOrBonusAction.details}`;
         }
-    }
+            return null;
+     });
     let signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
     // Helper function to get mastery for a weapon name
     const getWeaponMastery = (weaponName) => {
         if (playerStats.rules !== '2024') {
-            return null;
-        }
-        
-        // Remove magic prefix if present
+        return null;
+         }
+
+         // Remove magic prefix if present
         let nonMagicalName = weaponName;
         if (nonMagicalName.charAt(0) === '+') {
             nonMagicalName = nonMagicalName.substring(3);
-        }
-        
-        // Find the weapon in equipment
+         }
+
+         // Find the weapon in equipment
         const weapon = playerStats.equipment?.find(item => item.name === nonMagicalName);
         if (weapon && weapon.equipment_category === 'Weapon') {
             return weapon.mastery;
@@ -69,8 +68,8 @@ function CharActions({ playerStats }) {
                 <br />
                 {playerStats.actions.map((action) => {
                     return <div key={action.name}>
-                        {popupHtml && (<Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)}></Popup>)}
-                        <b className={action.details ? "clickable" : ""} onClick={() => showActionsPopup(action)}>{action.name}:</b> <span dangerouslySetInnerHTML={{ __html: action.description }}></span>
+                         {PopupElement}
+                         <b className={action.details ? "clickable" : ""} onClick={() => showPopup(action)}>{action.name}:</b> <span dangerouslySetInnerHTML={{ __html: action.description }}></span>
                     </div>
                 })}
                 <div><b>Base Actions:</b> {actions.join(', ')}</div>
@@ -109,8 +108,8 @@ function CharActions({ playerStats }) {
                     {(playerStats.bonusActions.length > 0) && <div>
                         {playerStats.bonusActions.map((bonusAction) => {
                             return <div key={bonusAction.name}>
-                                {popupHtml && (<Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)}></Popup>)}
-                                <b className={bonusAction.details ? "clickable" : ""} onClick={() => showActionsPopup(bonusAction)}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: bonusAction.description }}></span>
+                                 {PopupElement}
+                                 <b className={bonusAction.details ? "clickable" : ""} onClick={() => showPopup(bonusAction)}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: bonusAction.description }}></span>
                             </div>
                         })}
                     </div>}
@@ -121,3 +120,4 @@ function CharActions({ playerStats }) {
 }
 
 export default CharActions
+
