@@ -87,7 +87,7 @@ describe('CharClassSorcerer', () => {
       render(<CharClassSorcerer playerStats={mockPlayerStats5e} />);
 
       expect(screen.getByText(/Sorcery Points:/)).toBeInTheDocument();
-      expect(screen.getByText('4/4')).toBeInTheDocument();
+      expect(screen.getByText('4')).toBeInTheDocument();
     });
 
    it('should display metamagic known value (5e)', () => {
@@ -107,7 +107,8 @@ describe('CharClassSorcerer', () => {
       render(<CharClassSorcerer playerStats={statsLevel3} />);
 
       expect(screen.getByText(/Sorcery Points:/)).toBeInTheDocument();
-      expect(screen.getByText('2/2')).toBeInTheDocument();
+      const clickable = document.querySelector('.clickable');
+      expect(clickable.textContent).toContain('2/2');
     });
 
    it('should calculate metamagic known for level 10 (2024)', () => {

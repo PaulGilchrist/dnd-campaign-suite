@@ -278,4 +278,83 @@ describe('CharActions', () => {
 
     expect(mockShowPopup).toHaveBeenCalled();
     });
+
+  it('should return null for action without details in popup callback', async () => {
+    let capturedCallback;
+    usePopup.mockImplementation((buildHtml) => {
+      capturedCallback = buildHtml;
+      return {
+        showPopup: vi.fn(),
+        PopupElement: null,
+        setPopupHtml: vi.fn(),
+      };
+    });
+
+    render(<CharActions playerStats={mockPlayerStats} />);
+
+    const result = capturedCallback({ name: 'Test', description: 'Test desc' }); // No details
+    expect(result).toBeNull();
+  });
+
+  it('should return html for action with details in popup callback', async () => {
+    let capturedCallback;
+    usePopup.mockImplementation((buildHtml) => {
+      capturedCallback = buildHtml;
+      return {
+        showPopup: vi.fn(),
+        PopupElement: null,
+        setPopupHtml: vi.fn(),
+      };
+    });
+
+    render(<CharActions playerStats={mockPlayerStats} />);
+
+    const result = capturedCallback({ name: 'Test', description: 'Test desc', details: 'Some details' });
+    expect(result).toContain('<b>Test</b>');
+    expect(result).toContain('Some details');
+  });
+
+  it('should not show mastery for weapon not in equipment', async () => {
+    const stats = {
+      ...mockPlayerStats,
+      rules: '2024',
+      equipment: [],
+    };
+
+    render(<CharActions playerStats={stats} />);
+
+    // Mastery column should still show for 2024
+    expect(screen.getByText('Mastery')).toBeInTheDocument();
+  });
+
+  it('should handle 2024 rules with magical weapon name', async () => {
+    const stats2024 = {
+      rules: '2024',
+      attacks: [
+        {
+          name: '+1 Longsword',
+          range: 5,
+          hitBonus: 6,
+          hitBonusFormula: null,
+          damage: '1d8+4',
+          damageFormula: null,
+          damageType: 'Slashing',
+          type: 'Action',
+        },
+      ],
+      actions: [],
+      bonusActions: [],
+      equipment: [
+        {
+          name: 'Longsword',
+          equipment_category: 'Weapon',
+          mastery: 'Piercing',
+        },
+      ],
+    };
+
+    render(<CharActions playerStats={stats2024} />);
+
+    expect(screen.getByText('Piercing')).toBeInTheDocument();
+  });
 });

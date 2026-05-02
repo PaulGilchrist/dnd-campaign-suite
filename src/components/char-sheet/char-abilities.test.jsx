@@ -200,15 +200,60 @@ describe('CharAbilities', () => {
       showPopup: vi.fn(),
       PopupElement: mockPopupElement,
       setPopupHtml: vi.fn(),
-     }));
+    }));
 
     render(
       <CharAbilities
         playerStats={mockPlayerStats}
         allAbilityScores={mockAllAbilityScores}
-       />
-     );
+      />
+    );
 
     expect(screen.getByTestId('popup')).toBeInTheDocument();
-   });
+  });
+
+  it('should return null when ability score not found in popup callback', () => {
+    let capturedCallback;
+    usePopup.mockImplementation((buildHtml) => {
+      capturedCallback = buildHtml;
+      return {
+        showPopup: vi.fn(),
+        PopupElement: null,
+        setPopupHtml: vi.fn(),
+      };
+    });
+
+    render(
+      <CharAbilities
+        playerStats={mockPlayerStats}
+        allAbilityScores={mockAllAbilityScores}
+      />
+    );
+
+    const result = capturedCallback('NonExistentAbility');
+    expect(result).toBeNull();
+  });
+
+  it('should return html when ability score is found in popup callback', () => {
+    let capturedCallback;
+    usePopup.mockImplementation((buildHtml) => {
+      capturedCallback = buildHtml;
+      return {
+        showPopup: vi.fn(),
+        PopupElement: null,
+        setPopupHtml: vi.fn(),
+      };
+    });
+
+    render(
+      <CharAbilities
+        playerStats={mockPlayerStats}
+        allAbilityScores={mockAllAbilityScores}
+      />
+    );
+
+    const result = capturedCallback('Strength');
+    expect(result).toContain('<h3>Strength</h3>');
+    expect(result).toContain('Strength measures physical power');
+  });
 });

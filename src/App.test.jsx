@@ -91,7 +91,9 @@ describe('App', () => {
   });
 
   it('should navigate to main view when campaign is selected', async () => {
+    const preloaded = JSON.stringify([{ name: 'Test Character', level: 1 }]);
     window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
       if (key === 'currentCampaign') return 'test-campaign';
       return null;
     });
@@ -99,7 +101,22 @@ describe('App', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(document.querySelector('.app')).toBeInTheDocument();
+      expect(screen.queryByTestId('campaign-selection')).not.toBeInTheDocument();
+    });
+  });
+
+  it('should show character sheet when campaign has characters', async () => {
+    const preloaded = JSON.stringify([{ name: 'Test Character', level: 1 }]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     });
   });
 
@@ -107,6 +124,19 @@ describe('App', () => {
     const preloaded = JSON.stringify([{ name: 'Preloaded Character', level: 1 }]);
     window.sessionStorage.getItem = vi.fn((key) => {
       if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('campaign-selection')).not.toBeInTheDocument();
+    });
+  });
+
+  it('should show main view when campaign was previously selected', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
       if (key === 'currentCampaign') return 'test-campaign';
       return null;
     });
@@ -264,6 +294,63 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(document.querySelector('.app')).toBeInTheDocument();
+    });
+  });
+
+  it('should handle upload error gracefully', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      if (key === 'characters') return JSON.stringify([{ name: 'Test Character', level: 1 }]);
+      return null;
+    });
+
+    // Mock FileReader to simulate error
+    const mockFileReader = {
+      onload: null,
+      readAsText: vi.fn(function() {
+        // Simulate error
+        if (this.onerror) this.onerror(new Error('Read error'));
+      }),
+      onerror: null,
+    };
+    global.FileReader = vi.fn(() => mockFileReader);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Upload/)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle wizard completion with no campaign', async () => {
+    window.sessionStorage.getItem = vi.fn(() => null);
+
+    render(<App />);
+
+    fireEvent.click(screen.getByText('Select Campaign'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('character-wizard')).toBeInTheDocument();
+    });
+  });
+
+  it('should handle edit wizard completion with no campaign', async () => {
+    window.sessionStorage.getItem = vi.fn(() => null);
+
+    render(<App />);
+
+    // Set up active character first
+    const preloaded = JSON.stringify([{ name: 'Test Character', level: 1 }]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Edit/)).toBeInTheDocument();
     });
   });
 });

@@ -559,8 +559,8 @@ describe('spell-limits', () => {
                 spellcasting: {
                   cantrips_known: 3,
                   spell_slots_level_1: 2
-                 }
-               }
+                  }
+                }
              ]
            }
          ])
@@ -577,7 +577,94 @@ describe('spell-limits', () => {
       expect(result.valid).toBe(true);
       expect(result.counts.cantrip).toBe(0);
      });
-   });
+
+    it('should detect level 6 spell limit violation', async () => {
+      const level6Spells = [
+        { name: 'Disintegrate', level: 6 },
+        { name: 'Globe of Invulnerability', level: 6 }
+      ];
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve([
+           {
+             name: 'Wizard',
+             index: 'wizard',
+             class_levels: [
+                {
+                 level: 11,
+                 spellcasting: {
+                   cantrips_known: 3,
+                   spell_slots_level_1: 3,
+                   spell_slots_level_6: 1
+                  }
+                }
+              ]
+            }
+          ])
+        });
+
+      const result = await validateSpellSelection(
+        ['Disintegrate', 'Globe of Invulnerability'], // 2 level 6 spells but limit is 1
+        level6Spells,
+        'Wizard',
+        11,
+        '5e'
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.violations).toContain('6th level: 2/1');
+    });
+
+    it('should detect multiple level violations including higher levels', async () => {
+      const highLevelSpells = [
+        { name: 'Fire Bolt', level: 0 },
+        { name: 'Magic Missile', level: 1 },
+        { name: 'Fireball', level: 3 },
+        { name: 'Wall of Force', level: 5 },
+        { name: 'True Seeing', level: 6 },
+        { name: 'Teleport', level: 7 },
+        { name: 'Clone', level: 8 },
+        { name: 'Wish', level: 9 }
+      ];
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve([
+           {
+             name: 'Wizard',
+             index: 'wizard',
+             class_levels: Array.from({ length: 20 }, (_, i) => ({
+               level: i + 1,
+               spellcasting: {
+                 cantrips_known: 3,
+                 spell_slots_level_1: 4,
+                 spell_slots_level_2: 3,
+                 spell_slots_level_3: 3,
+                 spell_slots_level_4: 3,
+                 spell_slots_level_5: 2,
+                 spell_slots_level_6: 1,
+                 spell_slots_level_7: 1,
+                 spell_slots_level_8: 0,
+                 spell_slots_level_9: 0
+                }
+              }))
+            }
+          ])
+        });
+
+      const result = await validateSpellSelection(
+        ['True Seeing', 'Teleport', 'Clone', 'Wish'], // 6th, 7th, 8th, 9th level spells
+        highLevelSpells,
+        'Wizard',
+        17,
+        '5e'
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.violations.some(v => v.includes('6th') || v.includes('7th') || v.includes('8th') || v.includes('9th'))).toBe(true);
+    });
+  });
 
   describe('getAllSpellLimits', () => {
     it('should return limits for all 20 levels', async () => {

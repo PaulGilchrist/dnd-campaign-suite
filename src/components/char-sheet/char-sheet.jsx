@@ -89,7 +89,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     }
 
     return (<React.Fragment>
-        {playerStats && <div className='char-sheet'>
+        {playerStats && <div className='char-sheet' data-testid='char-sheet'>
             <CharSummary playerStats={playerStats} onDeleteCharacter={onDeleteCharacter}></CharSummary><hr />
             <CharAbilities allAbilityScores={allAbilityScores} playerStats={playerStats}></CharAbilities><hr />
             <CharSummary2 playerStats={playerStats}></CharSummary2><hr />

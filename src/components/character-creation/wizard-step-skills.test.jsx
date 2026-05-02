@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepSkills from './wizard-step-skills';
 
@@ -99,10 +99,12 @@ describe('WizardStepSkills', () => {
     expect(screen.getByText('Step 6: Skill Proficiencies')).toBeInTheDocument();
      });
 
-  it('should render checkboxes for skills when loaded', () => {
+   it('should render checkboxes for skills when loaded', async () => {
     render(<WizardStepSkills {...mockProps} />);
-    expect(document.querySelectorAll('input[type="checkbox"]').length).toBeGreaterThan(0);
-     });
+    await waitFor(() => {
+      expect(document.querySelectorAll('input[type="checkbox"]').length).toBeGreaterThan(0);
+    });
+    });
 
   it('should not show expertise info when not allowed', () => {
     render(<WizardStepSkills {...mockProps} expertiseLimits={null} />);

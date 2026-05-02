@@ -71,7 +71,7 @@ describe('WizardStepInventory', () => {
 
    it('should render search equipment button', () => {
     render(<WizardStepInventory {...mockProps} />);
-    const buttons = screen.getAllByText(/Search Equipment/);
+    const buttons = screen.getAllByText(/🔍 Search Equipment/);
     expect(buttons.length).toBe(2); // One for backpack, one for equipped
     });
 

@@ -321,17 +321,54 @@ describe('CharSpecialActions', () => {
       specialActions: [],
       class: {
         fightingStyles: [],
-       },
+      },
       actions: [],
       bonusActions: [],
       reactions: [],
       characterAdvancement: [],
-     };
+    };
 
     render(
-       <CharSpecialActions playerStats={playerStats} />
-     );
+        <CharSpecialActions playerStats={playerStats} />
+      );
 
     expect(screen.getByText('Special Actions')).toBeInTheDocument();
-   });
+  });
+
+  it('should return null for special action without details in popup callback', () => {
+    let capturedCallback;
+    usePopup.mockImplementation((buildHtml) => {
+      capturedCallback = buildHtml;
+      return {
+        showPopup: vi.fn(),
+        PopupElement: null,
+      };
+    });
+
+    render(
+      <CharSpecialActions playerStats={mockPlayerStats} />
+    );
+
+    const result = capturedCallback({ name: 'Test', description: 'Test desc' }); // No details
+    expect(result).toBeNull();
+  });
+
+  it('should return html for special action with details in popup callback', () => {
+    let capturedCallback;
+    usePopup.mockImplementation((buildHtml) => {
+      capturedCallback = buildHtml;
+      return {
+        showPopup: vi.fn(),
+        PopupElement: null,
+      };
+    });
+
+    render(
+      <CharSpecialActions playerStats={mockPlayerStats} />
+    );
+
+    const result = capturedCallback({ name: 'Test', description: 'Test desc', details: 'Some details' });
+    expect(result).toContain('<b>Test</b>');
+    expect(result).toContain('Some details');
+  });
 });

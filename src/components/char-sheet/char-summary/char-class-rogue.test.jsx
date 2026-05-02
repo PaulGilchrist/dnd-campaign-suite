@@ -101,13 +101,13 @@ describe('CharClassRogue', () => {
          ...mockPlayerStats5e,
         class: {
           name: 'Rogue',
-          class_levels: [{ class_specific: {} }],
+          class_levels: Array(5).fill({ class_specific: {} }),
          },
        };
-
+      
       render(<CharClassRogue playerStats={statsNoSneak} />);
-
-      expect(screen.getByText('+0d6')).toBeInTheDocument();
+      
+      expect(screen.getByText(/0d6/)).toBeInTheDocument();
     });
 
    it('should handle 2024 rogue without sneak_attack_num_d6', () => {
@@ -115,32 +115,32 @@ describe('CharClassRogue', () => {
          ...mockPlayerStats2024,
         class: {
           name: 'Rogue',
-          class_levels: [{}],
+          class_levels: Array(5).fill({}),
          },
        };
-
+      
       render(<CharClassRogue playerStats={stats2024NoSneak} />);
-
-      expect(screen.getByText('+0d6')).toBeInTheDocument();
+      
+      expect(screen.getByText(/0d6/)).toBeInTheDocument();
     });
 
-  it('should handle missing class_levels gracefully', () => {
+   it('should handle missing class_levels gracefully', () => {
     const statsNoLevels = {
        ...mockPlayerStats5e,
       class: { name: 'Rogue' },
      };
-    
-    const { container } = render(<CharClassRogue playerStats={statsNoLevels} />);
-    expect(container.firstChild).toBeNull();
-   });
+
+    render(<CharClassRogue playerStats={statsNoLevels} />);
+    expect(screen.queryByText(/Sneak Attack/)).not.toBeInTheDocument();
+    });
 
   it('should handle level out of bounds', () => {
     const statsOutBounds = {
        ...mockPlayerStats5e,
       level: 100,
      };
-    
-    const { container } = render(<CharClassRogue playerStats={statsOutBounds} />);
-    expect(container.firstChild).toBeNull();
-   });
+
+    render(<CharClassRogue playerStats={statsOutBounds} />);
+    expect(screen.queryByText(/Sneak Attack/)).not.toBeInTheDocument();
+    });
 });

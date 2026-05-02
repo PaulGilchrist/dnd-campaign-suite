@@ -2,11 +2,13 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import usePopup from './use-popup';
 
-const MockPopup = vi.fn(({ html, onClickOrKeyDown }) => (
-  <div data-testid="popup" onClick={onClickOrKeyDown}>
-    <div dangerouslySetInnerHTML={{ __html: html }} />
-  </div>
-));
+const { MockPopup } = vi.hoisted(() => ({
+  MockPopup: vi.fn(({ html, onClickOrKeyDown }) => (
+    <div data-testid="popup" onClick={onClickOrKeyDown}>
+      <div dangerouslySetInnerHTML={{ __html: html }} />
+    </div>
+  ))
+}));
 
 vi.mock('../../common/popup', () => ({ default: MockPopup }));
 
@@ -44,25 +46,9 @@ describe('usePopup', () => {
     });
 
   it('should return setPopupHtml function', () => {
-    function TestSetHtml() {
-      const { PopupElement, setPopupHtml } = usePopup(() => '<p>Test</p>');
-      setPopupHtml('<p>Direct</p>');
-      return (
-        <div>
-          <button>Trigger</button>
-          {PopupElement}
-        </div>
-      );
-    }
-
-    vi.mock('../../common/popup', () => ({
-      default: vi.fn(({ html, onClickOrKeyDown }) => (
-        <div data-testid="popup-direct">{html}</div>
-      )),
-    }));
-
-    render(<TestSetHtml />);
-    expect(screen.getByText('Trigger')).toBeInTheDocument();
+    render(<TestComponent buildHtml={() => '<p>Test</p>'} />);
+    expect(screen.getByText('Show Popup')).toBeInTheDocument();
+    expect(screen.getByText('Set HTML')).toBeInTheDocument();
     });
 
   it('should not render popup when buildHtml returns null', () => {

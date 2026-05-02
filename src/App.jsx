@@ -102,24 +102,28 @@ function App() {
              });
      }, []);
 
-    useEffect(() => {
-        // Check if characters are pre-loaded from campaign selection or URL
-        const preloadedCharacters = sessionStorage.getItem('characters');
+  useEffect(() => {
+      // Check if characters are pre-loaded from campaign selection or URL
+      const preloadedCharacters = sessionStorage.getItem('characters');
+      const currentCampaign = sessionStorage.getItem('currentCampaign');
 
-        if (preloadedCharacters) {
-            const loadedCharacters = JSON.parse(preloadedCharacters);
-            setCharacters(loadedCharacters);
-            setShowCampaignSelection(false);
+      if (preloadedCharacters) {
+          const loadedCharacters = JSON.parse(preloadedCharacters);
+          setCharacters(loadedCharacters);
+          setShowCampaignSelection(false);
 
-            // Clear session storage after loading
-            sessionStorage.removeItem('characters');
+          // Clear session storage after loading
+          sessionStorage.removeItem('characters');
 
-            if (loadedCharacters.length > 0) {
-                setActiveCharacter(cloneDeep(loadedCharacters[0]));
-             }
-             // Don't auto-open wizard here - let handleCampaignSelected handle it
-         }
-     }, []);
+          if (loadedCharacters.length > 0) {
+              setActiveCharacter(cloneDeep(loadedCharacters[0]));
+            }
+          // Don't auto-open wizard here - let handleCampaignSelected handle it
+        } else if (currentCampaign) {
+          // If campaign was previously selected but no characters preloaded, still hide campaign selection
+          setShowCampaignSelection(false);
+        }
+    }, []);
 
     useEffect(() => {
         // Do not allow uploading character until everything is ready

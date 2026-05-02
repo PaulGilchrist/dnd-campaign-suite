@@ -67,12 +67,11 @@ describe('CharClassWarlock', () => {
   });
 
    it('should display invocations list when defined', () => {
-     render(<CharClassWarlock playerStats={mockPlayerStats5e} />);
- 
-     expect(screen.getByText(/Invocations:/)).toBeInTheDocument();
-     const invDiv = screen.getByText('Agonizing Blast').closest('div');
-     expect(invDiv.textContent).toContain('Agonizing Blast');
-   });
+    render(<CharClassWarlock playerStats={mockPlayerStats5e} />);
+
+    expect(screen.getByText(/Invocations:/)).toBeInTheDocument();
+    expect(screen.getByText(/Agonizing Blast.*Devils Sight/)).toBeInTheDocument();
+  });
 
    it('should display pact boon when defined', () => {
      render(<CharClassWarlock playerStats={mockPlayerStats5e} />);

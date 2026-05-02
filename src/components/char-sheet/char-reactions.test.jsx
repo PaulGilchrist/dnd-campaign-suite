@@ -216,4 +216,41 @@ describe('CharReactions', () => {
 
     expect(screen.getByTestId('popup')).toBeInTheDocument();
   });
+
+  it('should return null for reaction without details when building popup html', () => {
+    let capturedCallback;
+    usePopup.mockImplementation((buildHtml) => {
+      capturedCallback = buildHtml;
+      return {
+        showPopup: vi.fn(),
+        PopupElement: null,
+      };
+    });
+
+    render(
+      <CharReactions playerStats={mockPlayerStats} />
+    );
+
+    const result = capturedCallback({ name: 'Test', description: 'Test desc' }); // No details
+    expect(result).toBeNull();
+  });
+
+  it('should return html for reaction with details when building popup html', () => {
+    let capturedCallback;
+    usePopup.mockImplementation((buildHtml) => {
+      capturedCallback = buildHtml;
+      return {
+        showPopup: vi.fn(),
+        PopupElement: null,
+      };
+    });
+
+    render(
+      <CharReactions playerStats={mockPlayerStats} />
+    );
+
+    const result = capturedCallback({ name: 'Test', description: 'Test desc', details: 'Some details' });
+    expect(result).toContain('<b>Test</b>');
+    expect(result).toContain('Some details');
+  });
 });

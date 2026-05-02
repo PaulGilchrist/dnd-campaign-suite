@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepLanguages from './wizard-step-languages';
 
@@ -77,9 +77,11 @@ describe('WizardStepLanguages', () => {
     expect(screen.getByText('You have exceeded the limit.')).toBeInTheDocument();
      });
 
-   it('should mark pre-selected languages as pre-selected class', () => {
+   it('should mark pre-selected languages as pre-selected class', async () => {
     render(<WizardStepLanguages {...mockProps} />);
-    expect(screen.getByText(/Common/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Common')).toBeInTheDocument();
+    });
     });
 
   it('should handle empty languages list', () => {
@@ -94,11 +96,13 @@ describe('WizardStepLanguages', () => {
     expect(screen.getByText('Step 7: Languages & Fighting Styles')).toBeInTheDocument();
      });
 
-  it('should render language checkboxes when loaded', () => {
+   it('should render language checkboxes when loaded', async () => {
     render(<WizardStepLanguages {...mockProps} />);
-    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
-    expect(checkboxes.length).toBeGreaterThan(0);
-     });
+    await waitFor(() => {
+      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+      expect(checkboxes.length).toBeGreaterThan(0);
+    });
+    });
 
   it('should show language count in rule info', () => {
     render(<WizardStepLanguages {...mockProps} />);

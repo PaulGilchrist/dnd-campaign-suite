@@ -64,7 +64,7 @@ describe('WizardStepFeats', () => {
     render(<WizardStepFeats {...mockProps} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Rules: Level 4 grants one feat/)).toBeInTheDocument();
+      expect(screen.getByText(/Level 4 grants one feat/)).toBeInTheDocument();
     });
   });
 
