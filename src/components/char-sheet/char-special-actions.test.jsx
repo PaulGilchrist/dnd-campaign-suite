@@ -1,0 +1,337 @@
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import CharSpecialActions from './char-special-actions';
+
+// Mock the usePopup hook
+vi.mock('./common/use-popup', () => ({
+  default: vi.fn(),
+}));
+
+// Mock sanitizeHtml
+vi.mock('../../services/sanitize', () => ({
+  sanitizeHtml: vi.fn((html) => html),
+}));
+
+import usePopup from './common/use-popup';
+
+const mockPlayerStats = {
+  specialActions: [
+    {
+      name: 'Second Wind',
+      description: 'You can use a bonus action to regain hit points.',
+     },
+   ],
+  class: {
+    fightingStyles: [],
+   },
+  actions: [
+    {
+      name: 'Attack',
+      description: 'Make a weapon attack.',
+     },
+   ],
+  bonusActions: [],
+  reactions: [],
+  characterAdvancement: [],
+};
+
+const mockPlayerStatsWithFightingStyle = {
+  specialActions: [],
+  class: {
+    fightingStyles: ['Great Weapon Fighting'],
+   },
+  actions: [],
+  bonusActions: [],
+  reactions: [],
+  characterAdvancement: [],
+};
+
+describe('CharSpecialActions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+     // Mock usePopup to return a controlled popup
+    usePopup.mockImplementation((buildHtml) => ({
+      showPopup: vi.fn(),
+      PopupElement: null,
+     }));
+   });
+
+  it('should render special actions header', () => {
+    render(
+       <CharSpecialActions playerStats={mockPlayerStats} />
+     );
+
+    expect(screen.getByText('Special Actions')).toBeInTheDocument();
+   });
+
+  it('should display special action names', () => {
+    render(
+       <CharSpecialActions playerStats={mockPlayerStats} />
+     );
+
+    expect(screen.getByText(/Second Wind/)).toBeInTheDocument();
+   });
+
+  it('should display special action descriptions', () => {
+    render(
+       <CharSpecialActions playerStats={mockPlayerStats} />
+     );
+
+    expect(screen.getByText(/You can use a bonus action to regain hit points/)).toBeInTheDocument();
+   });
+
+  it('should add Great Weapon Fighting when in fightingStyles', () => {
+    render(
+       <CharSpecialActions playerStats={mockPlayerStatsWithFightingStyle} />
+     );
+
+    expect(screen.getByText(/Great Weapon Fighting/)).toBeInTheDocument();
+   });
+
+  it('should add Protection fighting style when in fightingStyles', () => {
+    const playerStatsWithProtection = {
+      specialActions: [],
+      class: {
+        fightingStyles: ['Protection'],
+       },
+      actions: [],
+      bonusActions: [],
+      reactions: [],
+      characterAdvancement: [],
+     };
+
+    render(
+       <CharSpecialActions playerStats={playerStatsWithProtection} />
+     );
+
+    expect(screen.getByText(/Protection/)).toBeInTheDocument();
+   });
+
+  it('should not duplicate fighting style if already in specialActions', () => {
+    const playerStatsWithDuplicate = {
+      specialActions: [
+         {
+          name: 'Great Weapon Fighting',
+          description: 'When you roll a 1 or 2 on a damage die...',
+         },
+       ],
+      class: {
+        fightingStyles: ['Great Weapon Fighting'],
+       },
+      actions: [],
+      bonusActions: [],
+      reactions: [],
+      characterAdvancement: [],
+     };
+
+    render(
+       <CharSpecialActions playerStats={playerStatsWithDuplicate} />
+     );
+
+    const greatWeaponElements = screen.getAllByText(/Great Weapon Fighting/);
+    expect(greatWeaponElements.length).toBe(1);
+   });
+
+  it('should filter out actions that are in actions list', () => {
+    const playerStats = {
+      specialActions: [
+         {
+          name: 'Attack',
+          description: 'Make a weapon attack.',
+         },
+       ],
+      class: {
+        fightingStyles: [],
+       },
+      actions: [
+         {
+          name: 'Attack',
+          description: 'Make a weapon attack.',
+         },
+       ],
+      bonusActions: [],
+      reactions: [],
+      characterAdvancement: [],
+     };
+
+    render(
+       <CharSpecialActions playerStats={playerStats} />
+     );
+
+    expect(screen.queryByText(/Attack/)).not.toBeInTheDocument();
+   });
+
+  it('should filter out actions that are in bonusActions list', () => {
+    const playerStats = {
+      specialActions: [
+         {
+          name: 'Dash',
+          description: 'Take the Dash action.',
+         },
+       ],
+      class: {
+        fightingStyles: [],
+       },
+      actions: [],
+      bonusActions: [
+         {
+          name: 'Dash',
+          description: 'Take the Dash action.',
+         },
+       ],
+      reactions: [],
+      characterAdvancement: [],
+     };
+
+    render(
+       <CharSpecialActions playerStats={playerStats} />
+     );
+
+    expect(screen.queryByText(/Dash/)).not.toBeInTheDocument();
+   });
+
+  it('should filter out actions that are in reactions list', () => {
+    const playerStats = {
+      specialActions: [
+         {
+          name: 'Opportunity Attack',
+          description: 'Can attack creature that moves out of your reach.',
+         },
+       ],
+      class: {
+        fightingStyles: [],
+       },
+      actions: [],
+      bonusActions: [],
+      reactions: [
+         {
+          name: 'Opportunity Attack',
+          description: 'Can attack creature that moves out of your reach.',
+         },
+       ],
+      characterAdvancement: [],
+     };
+
+    render(
+       <CharSpecialActions playerStats={playerStats} />
+     );
+
+    expect(screen.queryByText(/Opportunity Attack/)).not.toBeInTheDocument();
+   });
+
+  it('should filter out actions that are in characterAdvancement list', () => {
+    const playerStats = {
+      specialActions: [
+         {
+          name: 'Extra Attack',
+          description: 'You can attack twice.',
+         },
+       ],
+      class: {
+        fightingStyles: [],
+       },
+      actions: [],
+      bonusActions: [],
+      reactions: [],
+      characterAdvancement: [
+         {
+          name: 'Extra Attack',
+          description: 'You can attack twice.',
+         },
+       ],
+     };
+
+    render(
+       <CharSpecialActions playerStats={playerStats} />
+     );
+
+    expect(screen.queryByText(/Extra Attack/)).not.toBeInTheDocument();
+   });
+
+  it('should call showPopup when special action with details is clicked', () => {
+    const mockShowPopup = vi.fn();
+    usePopup.mockImplementation((buildHtml) => ({
+      showPopup: mockShowPopup,
+      PopupElement: null,
+     }));
+
+    const playerStatsWithDetails = {
+      specialActions: [
+         {
+          name: 'Second Wind',
+          description: 'You can use a bonus action to regain hit points.',
+          details: 'This feature comes from the Fighter class.',
+         },
+       ],
+      class: {
+        fightingStyles: [],
+       },
+      actions: [],
+      bonusActions: [],
+      reactions: [],
+      characterAdvancement: [],
+     };
+
+    render(
+       <CharSpecialActions playerStats={playerStatsWithDetails} />
+     );
+
+    const clickableElement = screen.getByText(/Second Wind/);
+    fireEvent.click(clickableElement);
+
+    expect(mockShowPopup).toHaveBeenCalledWith(playerStatsWithDetails.specialActions[0]);
+   });
+
+  it('should handle empty playerStats gracefully', () => {
+      const emptyPlayerStats = {
+        specialActions: [],
+        class: {
+          fightingStyles: [],
+        },
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        characterAdvancement: [],
+      };
+
+      render(
+          <CharSpecialActions playerStats={emptyPlayerStats} />
+        );
+
+      expect(screen.getByText('Special Actions')).toBeInTheDocument();
+      });
+
+  it('should render popup element container', () => {
+    const mockPopupElement = <div data-testid="popup">Popup Content</div>;
+    usePopup.mockImplementation((buildHtml) => ({
+      showPopup: vi.fn(),
+      PopupElement: mockPopupElement,
+     }));
+
+    render(
+       <CharSpecialActions playerStats={mockPlayerStats} />
+     );
+
+    expect(screen.getByTestId('popup')).toBeInTheDocument();
+   });
+
+  it('should handle empty specialActions array', () => {
+    const playerStats = {
+      specialActions: [],
+      class: {
+        fightingStyles: [],
+       },
+      actions: [],
+      bonusActions: [],
+      reactions: [],
+      characterAdvancement: [],
+     };
+
+    render(
+       <CharSpecialActions playerStats={playerStats} />
+     );
+
+    expect(screen.getByText('Special Actions')).toBeInTheDocument();
+   });
+});
