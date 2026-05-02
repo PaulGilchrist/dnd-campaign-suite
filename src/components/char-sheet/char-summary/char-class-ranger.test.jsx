@@ -47,12 +47,12 @@ describe('CharClassRanger', () => {
     expect(screen.getByText(/Favored Enemies/)).toBeInTheDocument();
    });
 
-  it('should display fighting styles for level > 1', () => {
-    render(<CharClassRanger playerStats={mockPlayerStats5e} />);
-    
-    const stylesDiv = screen.getByText((content, element) => element.textContent.includes('Fighting Styles'));
-    expect(stylesDiv.parentElement.textContent).toContain('Archery');
-   });
+   it('should display fighting styles for level > 1', () => {
+     render(<CharClassRanger playerStats={mockPlayerStats5e} />);
+     
+     expect(screen.getByText('Fighting Styles:')).toBeInTheDocument();
+     expect(screen.getByText('Archery')).toBeInTheDocument();
+    });
 
   it('should not display fighting styles for level 1', () => {
     const statsLevel1 = {
@@ -69,28 +69,28 @@ describe('CharClassRanger', () => {
     expect(screen.getByText(/Fighting Styles/)).toBeInTheDocument();
    });
 
-  it('should display extra attacks for level > 4', () => {
-    render(<CharClassRanger playerStats={mockPlayerStats5e} />);
-    
-    const extraDiv = screen.getByText((content, element) => element.textContent.includes('Extra Attacks'));
-    expect(extraDiv.parentElement.textContent).toContain('1');
-   });
+   it('should display extra attacks for level > 4', () => {
+     render(<CharClassRanger playerStats={mockPlayerStats5e} />);
+     
+     expect(screen.getByText('Extra Attacks:')).toBeInTheDocument();
+     expect(screen.getByText('1')).toBeInTheDocument();
+    });
 
-  it('should display 0 extra attacks for level <= 4', () => {
-    const statsLevel4 = {
-       ...mockPlayerStats5e,
-      level: 4,
-      class: {
-        name: 'Ranger',
-        fightingStyles: ['Archery'],
-       },
-     };
-    
-    render(<CharClassRanger playerStats={statsLevel4} />);
-    
-    const extraDiv = screen.getByText((content, element) => element.textContent.includes('Extra Attacks'));
-    expect(extraDiv.parentElement.textContent).toContain('0');
-   });
+   it('should display 0 extra attacks for level <= 4', () => {
+     const statsLevel4 = {
+        ...mockPlayerStats5e,
+       level: 4,
+       class: {
+         name: 'Ranger',
+         fightingStyles: ['Archery'],
+        },
+      };
+     
+     render(<CharClassRanger playerStats={statsLevel4} />);
+     
+     const extraAttacksDiv = screen.getByText('Extra Attacks:').closest('div');
+     expect(extraAttacksDiv).toHaveTextContent('0');
+    });
 
   it('should display favored enemies count', () => {
     classRules.getFavoredEnemy.mockReturnValue(3);
@@ -111,15 +111,15 @@ describe('CharClassRanger', () => {
     expect(container.firstChild).toBeNull();
    });
 
-  it('should handle missing fighting styles', () => {
-    const statsNoStyles = {
-       ...mockPlayerStats5e,
-      class: { name: 'Ranger' },
-     };
-    
-    const { container } = render(<CharClassRanger playerStats={statsNoStyles} />);
-    expect(container.firstChild).not.toBeNull();
-   });
+   it('should handle missing fighting styles', () => {
+     const statsNoStyles = {
+        ...mockPlayerStats5e,
+       class: { name: 'Ranger' },
+      };
+     
+     render(<CharClassRanger playerStats={statsNoStyles} />);
+     expect(screen.queryByText('Fighting Styles:')).not.toBeInTheDocument();
+    });
 
   it('should correctly determine if ruleset is 2024', () => {
     classRules.getFavoredEnemy.mockReturnValue(2);

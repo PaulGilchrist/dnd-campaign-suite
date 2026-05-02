@@ -2,15 +2,17 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepFeats from './wizard-step-feats';
 
-const MockSelectableList = vi.fn(({ title, resultLabel, items, renderSummary, renderWarnings }) => (
-  <div data-testid="selectable-list">
-    <h2>{title}</h2>
-    <div data-testid="result-label">{resultLabel}</div>
-    <div data-testid="item-count">{items?.length || 0} items</div>
-    {renderSummary && <div data-testid="summary">{renderSummary()}</div>}
-    {renderWarnings && <div data-testid="warnings">{renderWarnings()}</div>}
-  </div>
-));
+const { MockSelectableList } = vi.hoisted(() => ({
+  MockSelectableList: vi.fn(({ title, resultLabel, items, renderSummary, renderWarnings }) => (
+    <div data-testid="selectable-list">
+      <h2>{title}</h2>
+      <div data-testid="result-label">{resultLabel}</div>
+      <div data-testid="item-count">{items?.length || 0} items</div>
+      {renderSummary && <div data-testid="summary">{renderSummary()}</div>}
+      {renderWarnings && <div data-testid="warnings">{renderWarnings()}</div>}
+    </div>
+  ))
+}));
 
 vi.mock('./selectable-list', () => ({ default: MockSelectableList }));
 

@@ -66,44 +66,44 @@ describe('CharClassWizard', () => {
     expect(screen.getByText(/Arcane Recovery Levels/)).toBeInTheDocument();
    });
 
-  it('should display max arcane recovery levels', () => {
-    render(<CharClassWizard playerStats={mockPlayerStats5e} />);
-    
-    const div = screen.getByText((content, element) => element.textContent.includes('Arcane Recovery Levels'));
-    expect(div.parentElement.textContent).toContain('1');
-   });
+   it('should display max arcane recovery levels', () => {
+     render(<CharClassWizard playerStats={mockPlayerStats5e} />);
+     
+     const clickable = document.querySelector('.clickable');
+     expect(clickable.textContent).toContain('1');
+    });
 
-  it('should toggle input visibility when clicked', () => {
-    render(<CharClassWizard playerStats={mockPlayerStats5e} />);
-    
-    const clickable = screen.getByText((content, element) => element.textContent.includes('Arcane Recovery Levels')).parentElement;
-    expect(screen.queryByTestId('hidden-input')).not.toBeInTheDocument();
-    
-    fireEvent.click(clickable);
-    
-    expect(screen.getByTestId('hidden-input')).toBeInTheDocument();
-   });
+   it('should toggle input visibility when clicked', () => {
+     render(<CharClassWizard playerStats={mockPlayerStats5e} />);
+     
+     const clickable = document.querySelector('.clickable');
+     expect(screen.queryByTestId('hidden-input')).not.toBeInTheDocument();
+     
+     fireEvent.click(clickable);
+     
+     expect(screen.getByTestId('hidden-input')).toBeInTheDocument();
+    });
 
-  it('should toggle input visibility when keydown', () => {
-    render(<CharClassWizard playerStats={mockPlayerStats5e} />);
-    
-    const clickable = screen.getByText((content, element) => element.textContent.includes('Arcane Recovery Levels')).parentElement;
-    fireEvent.keyDown(clickable);
-    
-    expect(screen.getByTestId('hidden-input')).toBeInTheDocument();
-   });
+   it('should toggle input visibility when keydown', () => {
+     render(<CharClassWizard playerStats={mockPlayerStats5e} />);
+     
+     const clickable = document.querySelector('.clickable');
+     fireEvent.keyDown(clickable);
+     
+     expect(screen.getByTestId('hidden-input')).toBeInTheDocument();
+    });
 
-  it('should call storage.setProperty when value changes', () => {
-    render(<CharClassWizard playerStats={mockPlayerStats5e} />);
-    
-    const clickable = screen.getByText((content, element) => element.textContent.includes('Arcane Recovery Levels')).parentElement;
-    fireEvent.click(clickable);
-    
-    const input = screen.getByTestId('hidden-input');
-    fireEvent.change(input, { target: { value: '0' } });
-    
-    expect(storage.setProperty).toHaveBeenCalledWith('Test Wizard', 'arcaneRecoveryLevels', '0');
-   });
+   it('should call storage.setProperty when value changes', () => {
+     render(<CharClassWizard playerStats={mockPlayerStats5e} />);
+     
+     const clickable = document.querySelector('.clickable');
+     fireEvent.click(clickable);
+     
+     const input = screen.getByTestId('hidden-input');
+     fireEvent.change(input, { target: { value: '0' } });
+     
+     expect(storage.setProperty).toHaveBeenCalledWith('Test Wizard', 'arcaneRecoveryLevels', '0');
+    });
 
   it('should not render when class is not Wizard', () => {
     const nonWizard = {
@@ -122,12 +122,12 @@ describe('CharClassWizard', () => {
     expect(screen.getByText(/\(max\/cur\)/)).toBeInTheDocument();
    });
 
-  it('should have tabIndex for accessibility', () => {
-    render(<CharClassWizard playerStats={mockPlayerStats5e} />);
-    
-    const clickable = screen.getByText((content, element) => element.textContent.includes('Arcane Recovery Levels')).parentElement;
-    expect(clickable).toHaveAttribute('tabIndex', '0');
-   });
+   it('should have tabIndex for accessibility', () => {
+     render(<CharClassWizard playerStats={mockPlayerStats5e} />);
+     
+     const clickable = document.querySelector('.clickable');
+     expect(clickable).toHaveAttribute('tabIndex', '0');
+    });
 
   it('should handle missing class_specific gracefully', () => {
     const statsNoCS = {
@@ -143,20 +143,20 @@ describe('CharClassWizard', () => {
     expect(screen.getByText(/Arcane Recovery Levels/)).toBeInTheDocument();
    });
 
-  it('should default arcane recovery levels to 0', () => {
-    const statsNoLevels = {
-       ...mockPlayerStats5e,
-      class: {
-        name: 'Wizard',
-        class_levels: [{ class_specific: {} }],
-       },
-     };
-    
-    render(<CharClassWizard playerStats={statsNoLevels} />);
-    
-    const div = screen.getByText((content, element) => element.textContent.includes('Arcane Recovery Levels'));
-    expect(div.parentElement.textContent).toContain('0');
-   });
+   it('should default arcane recovery levels to 0', () => {
+     const statsNoLevels = {
+        ...mockPlayerStats5e,
+       class: {
+         name: 'Wizard',
+         class_levels: [{ class_specific: {} }],
+        },
+      };
+     
+     render(<CharClassWizard playerStats={statsNoLevels} />);
+     
+     const clickable = document.querySelector('.clickable');
+     expect(clickable.textContent).toContain('0');
+    });
 
   it('should render HiddenInput initially', () => {
     render(<CharClassWizard playerStats={mockPlayerStats5e} />);

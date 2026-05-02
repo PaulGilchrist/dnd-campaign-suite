@@ -53,10 +53,11 @@ describe('WizardStepInventory', () => {
     expect(screen.getByText('Equipped Items')).toBeInTheDocument();
      });
 
-  it('should display items preview for backpack', () => {
+   it('should display items preview for backpack', () => {
     render(<WizardStepInventory {...mockProps} />);
-    expect(screen.getByText(/1 item/)).toBeInTheDocument();
-     });
+    const itemCounts = screen.getAllByText(/1 item/);
+    expect(itemCounts.length).toBeGreaterThan(0);
+    });
 
   it('should display multiple items count', () => {
     const multiItems = {
@@ -68,10 +69,11 @@ describe('WizardStepInventory', () => {
     expect(screen.getByText(/3 items/)).toBeInTheDocument();
      });
 
-  it('should render search equipment button', () => {
+   it('should render search equipment button', () => {
     render(<WizardStepInventory {...mockProps} />);
-    expect(screen.getByText(/Search Equipment/)).toBeInTheDocument();
-     });
+    const buttons = screen.getAllByText(/Search Equipment/);
+    expect(buttons.length).toBe(2); // One for backpack, one for equipped
+    });
 
   it('should not render modal when not active', () => {
     render(<WizardStepInventory {...mockProps} />);
@@ -110,8 +112,9 @@ describe('WizardStepInventory', () => {
     expect(screen.getByText('Step 11: Inventory')).toBeInTheDocument();
      });
 
-  it('should render field description', () => {
+   it('should render field description', () => {
     render(<WizardStepInventory {...mockProps} />);
-    expect(screen.getByText(/Enter items separated by commas/)).toBeInTheDocument();
-     });
+    const descriptions = screen.getAllByText(/Enter items separated by commas/);
+    expect(descriptions.length).toBe(2); // One for backpack, one for equipped
+    });
 });

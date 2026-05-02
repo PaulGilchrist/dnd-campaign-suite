@@ -2,34 +2,46 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from './App';
 
+const { MockCharSheet } = vi.hoisted(() => ({
+  MockCharSheet: vi.fn(({ playerSummary }) => <div data-testid="char-sheet">{playerSummary?.name || 'no character'}</div>)
+}));
+
+const { MockCombat } = vi.hoisted(() => ({
+  MockCombat: vi.fn(({ characters }) => <div data-testid="combat-tracking">{characters?.length || 0} chars</div>)
+}));
+
+const { CampaignSelectionFn } = vi.hoisted(() => ({
+  CampaignSelectionFn: vi.fn(({ onCampaignSelect }) => (
+    <div data-testid="campaign-selection">
+      <button onClick={() => onCampaignSelect('test-campaign', [])}>Select Campaign</button>
+    </div>
+  ))
+}));
+
+const { WizardFn } = vi.hoisted(() => ({
+  WizardFn: vi.fn(({ onComplete, onCancel, characterData, isEditing }) => (
+    <div data-testid="character-wizard">
+      <button onClick={() => onComplete({ name: 'New Character', level: 1 })}>Complete</button>
+      <button onClick={onCancel}>Cancel</button>
+      {characterData && <div>Editing: {characterData.name}</div>}
+      {isEditing && <div>Editing Mode</div>}
+    </div>
+  ))
+}));
+
 vi.mock('../services/utils', () => ({
   default: { getFirstName: vi.fn((name) => name ? name.split(' ')[0] : '') }
 }));
 
 vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
 
-const MockCharSheet = vi.fn(({ playerSummary }) => <div data-testid="char-sheet">{playerSummary?.name || 'no character'}</div>);
-vi.mock('../components/char-sheet/char-sheet', () => ({ default: MockCharSheet }));
+vi.mock('./components/char-sheet/char-sheet', () => ({ default: MockCharSheet }));
 
-const MockCombat = vi.fn(({ characters }) => <div data-testid="combat-tracking">{characters?.length || 0} chars</div>);
-vi.mock('../components/combat-tracking/combat-tracking', () => ({ default: MockCombat }));
+vi.mock('./components/combat-tracking/combat-tracking', () => ({ default: MockCombat }));
 
-const CampaignSelectionFn = vi.fn(({ onCampaignSelect }) => (
-  <div data-testid="campaign-selection">
-    <button onClick={() => onCampaignSelect('test-campaign', [])}>Select Campaign</button>
-  </div>
-));
-vi.mock('../components/campaign-selection/campaign-selection', () => ({ default: CampaignSelectionFn }));
+vi.mock('./components/campaign-selection/campaign-selection', () => ({ default: CampaignSelectionFn }));
 
-const WizardFn = vi.fn(({ onComplete, onCancel, characterData, isEditing }) => (
-  <div data-testid="character-wizard">
-    <button onClick={() => onComplete({ name: 'New Character', level: 1 })}>Complete</button>
-    <button onClick={onCancel}>Cancel</button>
-    {characterData && <div>Editing: {characterData.name}</div>}
-    {isEditing && <div>Editing Mode</div>}
-  </div>
-));
-vi.mock('../components/character-creation/character-creation-wizard', () => ({ default: WizardFn }));
+vi.mock('./components/character-creation/character-creation-wizard', () => ({ default: WizardFn }));
 
 const mockFetchData = {
   '/data/ability-scores.json': [{ full_name: 'Strength' }],

@@ -38,13 +38,6 @@ describe('usePopup', () => {
     });
 
   it('should render popup when showPopup is called with valid html', () => {
-    function TestShow({ buildHtml }) {
-      const { showPopup, PopupElement, setPopupHtml } = usePopup(buildHtml);
-      const [shown, setShow] = vi.hoisted(() => false);
-      showPopup({ name: 'Test' });
-      return (<>{PopupElement}<button>Show</button></>);
-    }
-
     render(<TestComponent buildHtml={(entity) => entity ? '<p>Test</p>' : null} />);
 
     expect(screen.getByText('Show Popup')).toBeInTheDocument();

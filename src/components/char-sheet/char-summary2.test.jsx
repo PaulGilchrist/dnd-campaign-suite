@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CharSummary2 from '../char-summary2';
+import CharSummary2 from './char-summary2';
 
 vi.mock('../../services/storage', () => ({
   default: {

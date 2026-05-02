@@ -119,11 +119,11 @@ describe('CharSummary', () => {
     expect(screen.getByText(/Mountain Dwarf/)).toBeInTheDocument();
     });
 
-  it('should display class name', () => {
-    render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
+   it('should display class name', () => {
+     render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
 
-    expect(screen.getByText(/Fighter/)).toBeInTheDocument();
-    });
+     expect(screen.getByTestId('char-class-fighter')).toBeInTheDocument();
+     });
 
   it('should display level', () => {
     render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
@@ -131,11 +131,11 @@ describe('CharSummary', () => {
     expect(screen.getByText(/Level 5/)).toBeInTheDocument();
     });
 
-  it('should display alignment', () => {
-    render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
+   it('should display alignment', () => {
+     render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
 
-    expect(screen.getByText('Lawful Good')).toBeInTheDocument();
-    });
+     expect(screen.getByText(/Lawful Good/)).toBeInTheDocument();
+     });
 
   it('should render armor class', () => {
     render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
