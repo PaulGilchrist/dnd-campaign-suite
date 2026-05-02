@@ -58,7 +58,7 @@ function WizardStepAbilities({
     loadCosts();
        }, [formData.rules]);
 
-  const totalPointsSpent = formData.abilities.reduce((sum, ability) => {
+  const totalPointsSpent = (formData.abilities || []).reduce((sum, ability) => {
     const baseScore = parseInt(ability.baseScore) || 8;
     return sum + (pointBuyCosts[baseScore] || 0);
        }, 0);
@@ -85,50 +85,54 @@ function WizardStepAbilities({
 
        <div className="ability-scores-grid">
          {abilityNames.map((ability, index) => {
-          const baseScore = parseInt(formData.abilities[index].baseScore) || 8;
-          const improvements = parseInt(formData.abilities[index].abilityImprovements) || 0;
-          const misc = parseInt(formData.abilities[index].miscBonus) || 0;
-          const totalScore = baseScore + improvements + misc;
-          const cost = pointBuyCosts[baseScore] || 0;
+         const abilityData = formData.abilities?.[index] || { baseScore: '8', abilityImprovements: '0', miscBonus: '0' };
+         const baseScore = parseInt(abilityData.baseScore) || 8;
+         const improvements = parseInt(abilityData.abilityImprovements) || 0;
+         const misc = parseInt(abilityData.miscBonus) || 0;
+         const totalScore = baseScore + improvements + misc;
+         const cost = pointBuyCosts[baseScore] || 0;
 
           return (
              <div key={ability} className="ability-score-card">
                <h4>{ability}</h4>
                <div className="form-group ability-score-form-group">
-                 <label>Base Score (8-15)</label>
-                 <input
-                 type="number"
-                 min="8"
-                 max="15"
-                  value={formData.abilities[index].baseScore}
-                  onChange={(e) => onAbilityBaseScoreChange(index, e.target.value)}
-                  className={errors[`ability_${index}_baseScore`] ? 'error' : ''}
-                 />
-                 <span className="point-cost">Cost: {cost}</span>
-                 {errors[`ability_${index}_baseScore`] && <span className="error-message">{errors[`ability_${index}_baseScore`]}</span>}
-               </div>
-               <div className="form-group ability-score-form-group">
-                 <label>Improvements</label>
-                 <input
-                  type="number"
-                  min="0"
-                  value={formData.abilities[index].abilityImprovements}
-                  onChange={(e) => onAbilityImprovementChange(index, parseInt(e.target.value))}
-                  className={errors[`ability_${index}_abilityImprovements`] ? 'error' : ''}
-                 />
-                 {errors[`ability_${index}_abilityImprovements`] && <span className="error-message">{errors[`ability_${index}_abilityImprovements`]}</span>}
-               </div>
-               <div className="form-group ability-score-form-group">
-                 <label>Misc Bonus</label>
-                 <input
-                  type="number"
-                  min="0"
-                  value={formData.abilities[index].miscBonus}
-                  onChange={(e) => onAbilityMiscBonusChange(index, parseInt(e.target.value))}
-                  className={errors[`ability_${index}_miscBonus`] ? 'error' : ''}
-                 />
-                 {errors[`ability_${index}_miscBonus`] && <span className="error-message">{errors[`ability_${index}_miscBonus`]}</span>}
-               </div>
+                                 <label htmlFor={`base-score-${index}`}>Base Score (8-15)</label>
+                                 <input
+                               id={`base-score-${index}`}
+                               type="number"
+                               min="8"
+                               max="15"
+                                value={abilityData.baseScore}
+                                onChange={(e) => onAbilityBaseScoreChange(index, e.target.value)}
+                                className={errors[`ability_${index}_baseScore`] ? 'error' : ''}
+                                 />
+                                 <span className="point-cost">Cost: {cost}</span>
+                                 {errors[`ability_${index}_baseScore`] && <span className="error-message">{errors[`ability_${index}_baseScore`]}</span>}
+                               </div>
+                               <div className="form-group ability-score-form-group">
+                                 <label htmlFor={`improvements-${index}`}>Improvements</label>
+                                 <input
+                                id={`improvements-${index}`}
+                                type="number"
+                                min="0"
+                                value={abilityData.abilityImprovements}
+                                onChange={(e) => onAbilityImprovementChange(index, parseInt(e.target.value))}
+                                className={errors[`ability_${index}_abilityImprovements`] ? 'error' : ''}
+                                 />
+                                 {errors[`ability_${index}_abilityImprovements`] && <span className="error-message">{errors[`ability_${index}_abilityImprovements`]}</span>}
+                               </div>
+                               <div className="form-group ability-score-form-group">
+                                 <label htmlFor={`misc-bonus-${index}`}>Misc Bonus</label>
+                                 <input
+                                id={`misc-bonus-${index}`}
+                                type="number"
+                                min="0"
+                                value={abilityData.miscBonus}
+                                onChange={(e) => onAbilityMiscBonusChange(index, parseInt(e.target.value))}
+                                className={errors[`ability_${index}_miscBonus`] ? 'error' : ''}
+                                 />
+                                 {errors[`ability_${index}_miscBonus`] && <span className="error-message">{errors[`ability_${index}_miscBonus`]}</span>}
+                               </div>
                <div className={`total-score ${totalScore > 20 ? 'error' : ''}`}>
                 Total: <strong>{totalScore}</strong>
                  {totalScore > 20 && <span className="error-message"> (max 20)</span>}
