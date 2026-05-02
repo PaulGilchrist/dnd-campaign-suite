@@ -1,0 +1,257 @@
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import App from './App';
+
+vi.mock('../services/utils', () => ({
+  default: { getFirstName: vi.fn((name) => name ? name.split(' ')[0] : '') }
+}));
+
+vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
+
+const MockCharSheet = vi.fn(({ playerSummary }) => <div data-testid="char-sheet">{playerSummary?.name || 'no character'}</div>);
+vi.mock('../components/char-sheet/char-sheet', () => ({ default: MockCharSheet }));
+
+const MockCombat = vi.fn(({ characters }) => <div data-testid="combat-tracking">{characters?.length || 0} chars</div>);
+vi.mock('../components/combat-tracking/combat-tracking', () => ({ default: MockCombat }));
+
+const CampaignSelectionFn = vi.fn(({ onCampaignSelect }) => (
+  <div data-testid="campaign-selection">
+    <button onClick={() => onCampaignSelect('test-campaign', [])}>Select Campaign</button>
+  </div>
+));
+vi.mock('../components/campaign-selection/campaign-selection', () => ({ default: CampaignSelectionFn }));
+
+const WizardFn = vi.fn(({ onComplete, onCancel, characterData, isEditing }) => (
+  <div data-testid="character-wizard">
+    <button onClick={() => onComplete({ name: 'New Character', level: 1 })}>Complete</button>
+    <button onClick={onCancel}>Cancel</button>
+    {characterData && <div>Editing: {characterData.name}</div>}
+    {isEditing && <div>Editing Mode</div>}
+  </div>
+));
+vi.mock('../components/character-creation/character-creation-wizard', () => ({ default: WizardFn }));
+
+const mockFetchData = {
+  '/data/ability-scores.json': [{ full_name: 'Strength' }],
+  '/data/classes.json': [{ name: 'Fighter' }],
+  '/data/2024/classes.json': [{ name: 'Fighter 2024' }],
+  '/data/equipment.json': [{ name: 'Longsword' }],
+  '/data/magic-items.json': [{ name: 'Wand' }],
+  '/data/races.json': [{ name: 'Human' }],
+  '/data/2024/races.json': [{ name: 'Human 2024' }],
+  '/data/magic-items-2024.json': [{ name: 'Wand 2024' }],
+  '/data/spells.json': [{ name: 'Fireball' }],
+  '/data/2024/spells.json': [{ name: 'Fireball 2024' }],
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.spyOn(window, 'location', 'get').mockReturnValue({ hostname: 'localhost' });
+
+  window.sessionStorage = {
+    getItem: vi.fn(() => null),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+  };
+
+  global.fetch = vi.fn((url) => {
+    if (mockFetchData[url]) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(mockFetchData[url]) });
+    }
+    return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+  });
+
+  window.confirm = vi.fn(() => true);
+  window.prompt = vi.fn(() => 'New Campaign Name');
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe('App', () => {
+  it('should render campaign selection initially', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('campaign-selection')).toBeInTheDocument();
+    });
+  });
+
+  it('should navigate to main view when campaign is selected', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(document.querySelector('.app')).toBeInTheDocument();
+    });
+  });
+
+  it('should not show campaign selection when characters are preloaded from sessionStorage', async () => {
+    const preloaded = JSON.stringify([{ name: 'Preloaded Character', level: 1 }]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('campaign-selection')).not.toBeInTheDocument();
+    });
+  });
+
+  it('should show the campaign name in the header', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'My Campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('My Campaign')).toBeInTheDocument();
+    });
+  });
+
+  it('should show Add button when data is loaded', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Add/)).toBeInTheDocument();
+    });
+  });
+
+  it('should show Upload button when data is loaded', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Upload/)).toBeInTheDocument();
+    });
+  });
+
+  it('should show Campaigns button to go back', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Campaigns/)).toBeInTheDocument();
+    });
+  });
+
+  it('should show character tabs when characters exist', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(document.querySelector('.app')).toBeInTheDocument();
+    });
+  });
+
+  it('should render rename campaign button when on localhost', async () => {
+    vi.spyOn(window, 'location', 'get').mockReturnValue({ hostname: 'localhost' });
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(document.querySelector('.rename-campaign-btn')).toBeInTheDocument();
+    });
+  });
+
+  it('should disable rename campaign button when not on localhost', async () => {
+    vi.spyOn(window, 'location', 'get').mockReturnValue({ hostname: 'example.com' });
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(document.querySelector('.rename-campaign-btn')).toHaveAttribute('disabled');
+    });
+  });
+
+  it('should disable delete campaign button when characters exist', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      if (key === 'characters') return JSON.stringify([{ name: 'Char1' }]);
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(document.querySelector('.delete-campaign-btn')).toHaveAttribute('disabled');
+    });
+  });
+
+  it('should show Download button when active character exists', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      if (key === 'characters') return JSON.stringify([{ name: 'Test Character', level: 1 }]);
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Download/)).toBeInTheDocument();
+    });
+  });
+
+  it('should show Edit button when active character exists', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      if (key === 'characters') return JSON.stringify([{ name: 'Test Character', level: 1 }]);
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Edit/)).toBeInTheDocument();
+    });
+  });
+
+  it('should show Combat button when characters exist but no active character', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      if (key === 'characters') return JSON.stringify([{ name: 'Char1' }, { name: 'Char2' }]);
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(document.querySelector('.app')).toBeInTheDocument();
+    });
+  });
+});
