@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "skills": [
+    "architecture-rules",
+    "coding-standards"
+  ],
+  "instructions": [
+    "Never execute GIT commands without explicit user confirmation.",
+    "Always generate a step-by-step plan before making any code changes.",
+    "Follow the project's coding-standards and architecture-rules skills at all times."
+  ],
+  "model": "ollama/qwen3.6:27b-coding-nvfp4"
+}

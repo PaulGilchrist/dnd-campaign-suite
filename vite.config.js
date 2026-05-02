@@ -9,9 +9,9 @@ export default defineConfig({
             '/api': {
                 target: 'http://localhost',
                 changeOrigin: true,
-     },
-          },
-      },
+            },
+        },
+    },
     test: {
         environment: 'jsdom',
         globals: true,
@@ -26,8 +26,25 @@ export default defineConfig({
                 'public/',
                 'vite.config.js',
                 'server.js',
+                '**/*.stories.{js,jsx,ts,tsx}',
                 '**/*.css',
-                '**/*.stories.{js,jsx,ts,tsx}'
+                '**/*.scss',
+                '**/*.sass',
+                '**/*.less',
+                '**/*.jpg',
+                '**/*.jpeg',
+                '**/*.png',
+                '**/*.gif',
+                '**/*.svg',
+                '**/*.webp',
+                '**/*.ico',
+                '**/*.mp3',
+                '**/*.mp4',
+                '**/*.woff',
+                '**/*.woff2',
+                '**/*.ttf',
+                '**/*.eot'
+
             ],
             thresholds: {
                 lines: 0,
