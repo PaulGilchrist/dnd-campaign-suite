@@ -1,5 +1,5 @@
 ---
-name: review-agent
+name: review
 description: Agent for structured code reviews, risk detection, and standards enforcement.
 skills:
   - coding-standards

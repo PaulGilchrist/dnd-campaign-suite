@@ -1,5 +1,5 @@
 ---
-name: test-agent
+name: test
 description: Agent focused on writing, fixing, and improving tests with a structured testing strategy.
 skills:
   - coding-standards

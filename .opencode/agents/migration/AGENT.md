@@ -1,5 +1,5 @@
 ---
-name: migration-agent
+name: migration
 description: Agent for framework upgrades, API migrations, and large-scale structural changes.
 skills:
   - architecture-rules
