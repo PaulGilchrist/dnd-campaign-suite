@@ -14,6 +14,7 @@ import useWizardResistances from './use-wizard-resistances';
 import useWizardFeats from './use-wizard-feats';
 import useWizardInventory from './use-wizard-inventory';
 import useWizardAbilities from './use-wizard-abilities';
+import useWizardArrayToggle from '../../hooks/use-wizard-array-toggle';
 
 function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, allSpells, allSpells2024, characterData, isEditing = false }) {
   // Core form state
@@ -146,104 +147,39 @@ function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, a
     updateAbility(index, 'miscBonus', value);
     }, [updateAbility]);
 
-  const handleSkillToggle = useCallback((skill) => {
-    setFormData(prev => {
-      const currentSkills = prev.skillProficiencies || [];
-      const isPreSelected = preSelectedSkills.includes(skill);
-      const isCurrentlySelected = currentSkills.includes(skill);
+   // Skills - Pattern A: preSelectedItems from closure
+   const { toggleItem: handleSkillToggle } = useWizardArrayToggle(
+     setFormData, setErrors, 'skillProficiencies', preSelectedSkills
+   );
 
-      if (isCurrentlySelected && isPreSelected) {
-        return prev;
-         }
+   // Expert Skills - Pattern B: force add/remove via setItem/removeItem
+   const { setItem: addExpertSkill, removeItem: removeExpertSkill } = useWizardArrayToggle(
+     setFormData, setErrors, 'expertSkills'
+   );
+   const handleSkillExpertiseToggle = useCallback(
+      (skill, isExpert) => isExpert ? addExpertSkill(skill) : removeExpertSkill(skill),
+      [addExpertSkill, removeExpertSkill]
+   );
 
-      const newSkills = isCurrentlySelected
-           ? currentSkills.filter(s => s !== skill)
-           : [...currentSkills, skill];
-      return { ...prev, skillProficiencies: newSkills };
-       });
-    setErrors(prev => ({ ...prev, skillProficiencies: null }));
-    }, [preSelectedSkills, setFormData, setErrors]);
+   // Languages - Pattern A: preSelectedItems from closure
+   const { toggleItem: handleLanguageToggle } = useWizardArrayToggle(
+     setFormData, setErrors, 'languages', preSelectedLanguages
+   );
 
-  const handleSkillExpertiseToggle = useCallback((skill, isExpert) => {
-    setFormData(prev => {
-      if (isExpert) {
-        const currentExpertSkills = prev.expertSkills || [];
-        const newExpertSkills = [...currentExpertSkills, skill];
-        return { ...prev, expertSkills: newExpertSkills };
-         } else {
-        const currentExpertSkills = prev.expertSkills || [];
-        const newExpertSkills = currentExpertSkills.filter(s => s !== skill);
-        return { ...prev, expertSkills: newExpertSkills };
-         }
-       });
-    setErrors(prev => ({ ...prev, expertSkills: null }));
-    }, [setFormData, setErrors]);
+   // Fighting Styles - Pattern A, nested field
+   const { toggleItem: handleFightingStyleToggle } = useWizardArrayToggle(
+     setFormData, setErrors, 'class.fightingStyles', preSelectedFightingStyles
+   );
 
-  const handleLanguageToggle = useCallback((language) => {
-    setFormData(prev => {
-      const currentLanguages = prev.languages || [];
-      const isPreSelected = preSelectedLanguages.includes(language);
-      const isCurrentlySelected = currentLanguages.includes(language);
+   // Resistances - Pattern C: boolean param guard
+   const { toggleItem: handleResistanceToggle } = useWizardArrayToggle(
+     setFormData, setErrors, 'resistances'
+   );
 
-      if (isCurrentlySelected && isPreSelected) {
-        return prev;
-         }
-
-      const newLanguages = currentLanguages.includes(language)
-           ? currentLanguages.filter(l => l !== language)
-           : [...currentLanguages, language];
-      return { ...prev, languages: newLanguages };
-       });
-    setErrors(prev => ({ ...prev, languages: null }));
-    }, [preSelectedLanguages, setFormData, setErrors]);
-
-  const handleFightingStyleToggle = useCallback((style) => {
-    setFormData(prev => {
-      const currentStyles = prev.class?.fightingStyles || [];
-      const isPreSelected = preSelectedFightingStyles.includes(style);
-      const isCurrentlySelected = currentStyles.includes(style);
-
-      if (isCurrentlySelected && isPreSelected) {
-        return prev;
-         }
-
-      const newStyles = currentStyles.includes(style)
-           ? currentStyles.filter(s => s !== style)
-           : [...currentStyles, style];
-      return { ...prev, class: { ...prev.class, fightingStyles: newStyles } };
-       });
-    setErrors(prev => ({ ...prev, fightingStyles: null }));
-    }, [preSelectedFightingStyles, setFormData, setErrors]);
-
-  const handleResistanceToggle = useCallback((type, isPreSelected) => {
-    if (isPreSelected) {
-      return;
-       }
-
-    setFormData(prev => {
-      const currentResistances = prev.resistances || [];
-      const newResistances = currentResistances.includes(type)
-           ? currentResistances.filter(r => r !== type)
-           : [...currentResistances, type];
-      return { ...prev, resistances: newResistances };
-       });
-    setErrors(prev => ({ ...prev, resistances: null }));
-    }, [setFormData, setErrors]);
-
-  const handleImmunityToggle = useCallback((type, isPreSelected) => {
-    if (isPreSelected) {
-      return;
-       }
-
-    setFormData(prev => {
-      const currentImmunities = prev.immunities || [];
-      const newImmunities = currentImmunities.includes(type)
-           ? currentImmunities.filter(i => i !== type)
-           : [...currentImmunities, type];
-      return { ...prev, immunities: newImmunities };
-       });
-    setErrors(prev => ({ ...prev, immunities: null }));
-    }, [setFormData, setErrors]);
+   // Immunities - Pattern C: boolean param guard
+   const { toggleItem: handleImmunityToggle } = useWizardArrayToggle(
+     setFormData, setErrors, 'immunities'
+   );
 
   const handleNext = useCallback(async () => {
     const success = await navigateNext();
