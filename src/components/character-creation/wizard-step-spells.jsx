@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import SelectableList from './selectable-list';
+import WarningList from '../common/warning-list';
 import { getSpellLimits, validateSpellSelection } from '../../services/spell-limits.js';
 import { getSpellValidationInfo } from '../../services/spell-validation.js';
 import './wizard-step-spells.css';
@@ -222,15 +223,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
             ))}
           </div>
           
-          {spellWarnings.length > 0 && (
-                       <div className="warning-container">
-                         {spellWarnings.map((warning, index) => (
-                           <div key={index} className={`warning-message ${warning.type}`}>
-                             {warning.type === 'warning' ? '⚠️' : 'ℹ️'} {warning.message}
-                           </div>
-                         ))}
-                       </div>
-                     )}
+            {spellWarnings.length > 0 && <WarningList warnings={spellWarnings} showIcons />}
         </div>
     );
 

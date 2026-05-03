@@ -1,5 +1,6 @@
 import React from 'react';
 import SelectableList from './selectable-list';
+import WarningList from '../common/warning-list';
 import { validateFeats, getFeatLimits } from '../../services/feat-validation.js';
 import { sanitizeHtml } from '../../services/sanitize.js';
 
@@ -155,43 +156,29 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
                 </div>
         );
 
-    // Render warnings
-  const renderWarnings = () => {
-    if (warnings.length === 0) return null;
+     // Filter configuration
+   const filters = [
+         { label: 'Feat Type', field: 'type', className: 'type-filter' }
+       ];
+
     return (
-         <div className="warning-container">
-           {warnings.map((warning, index) => (
-               <div key={index} className={`warning-message ${warning.type}`}>
-                 {warning.message}
-               </div>
-             ))}
-         </div>
-       );
-     };
-
-    // Filter configuration
-  const filters = [
-       { label: 'Feat Type', field: 'type', className: 'type-filter' }
-     ];
-
-  return (
-       <SelectableList
-        items={allFeats}
-        fieldName="feats"
-        formData={formData}
-        onArrayFieldChange={onArrayFieldChange}
-        title="Step 4: Feats"
-        searchPlaceholder="Search feats..."
-        filters={filters}
-        renderItem={renderItem}
-        renderSummary={renderSummary}
-        renderWarnings={renderWarnings}
-        loadingMessage="Feat data not yet loaded. Please try again."
-        preSelectedItems={preSelectedFeats || []}
-        className="wizard-step-feats"
-        resultLabel="feat"
-       />
-     );
+          <SelectableList
+         items={allFeats}
+         fieldName="feats"
+         formData={formData}
+         onArrayFieldChange={onArrayFieldChange}
+         title="Step 4: Feats"
+         searchPlaceholder="Search feats..."
+         filters={filters}
+         renderItem={renderItem}
+         renderSummary={renderSummary}
+         renderWarnings={() => warnings.length > 0 && <WarningList warnings={warnings} />}
+         loadingMessage="Feat data not yet loaded. Please try again."
+         preSelectedItems={preSelectedFeats || []}
+         className="wizard-step-feats"
+         resultLabel="feat"
+          />
+        );
 }
 
 export default WizardStepFeats;

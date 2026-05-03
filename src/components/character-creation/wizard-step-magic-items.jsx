@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import SelectableList from './selectable-list';
+import WarningList from '../common/warning-list';
 import { sanitizeHtml } from '../../services/sanitize.js';
 import './wizard-step-magic-items.css';
 function WizardStepMagicItems({ formData, allMagicItems, ruleset, onArrayFieldChange }) {
@@ -83,41 +84,27 @@ function WizardStepMagicItems({ formData, allMagicItems, ruleset, onArrayFieldCh
         );
     };
 
-      // Render warnings
-  const renderWarnings = () => {
-    if (warnings.length === 0) return null;
-            return (
-                        <div className="warning-container">
-                            {warnings.map((warning, index) => (
-                                <div key={index} className={`warning-message ${warning.type}`}>
-                                    {warning.message}
-                                </div>
-                            ))}
-                        </div>
-        );
-    };
+     // Filter configuration
+   const filters = [
+           { label: 'Item Type', field: 'type', className: 'magic-item-type-filter' }
+         ];
 
-      // Filter configuration
-  const filters = [
-         { label: 'Item Type', field: 'type', className: 'magic-item-type-filter' }
-       ];
-
-  return (
-         <SelectableList
-        items={allMagicItems}
-        fieldName="magicItems"
-        formData={formData}
-        onArrayFieldChange={onArrayFieldChange}
-        title="Step 10: Magic Items"
-        searchPlaceholder="Search magic items..."
-        filters={filters}
-        renderItem={renderItem}
-        renderWarnings={renderWarnings}
-        loadingMessage="Magic item data not yet loaded. Please try again."
-        className="wizard-step-magic-items"
-        resultLabel="magic item"
-        />
-       );
+    return (
+             <SelectableList
+          items={allMagicItems}
+          fieldName="magicItems"
+          formData={formData}
+          onArrayFieldChange={onArrayFieldChange}
+          title="Step 10: Magic Items"
+          searchPlaceholder="Search magic items..."
+          filters={filters}
+          renderItem={renderItem}
+          renderWarnings={() => warnings.length > 0 && <WarningList warnings={warnings} />}
+          loadingMessage="Magic item data not yet loaded. Please try again."
+          className="wizard-step-magic-items"
+          resultLabel="magic item"
+            />
+         );
 }
 
 export default WizardStepMagicItems;

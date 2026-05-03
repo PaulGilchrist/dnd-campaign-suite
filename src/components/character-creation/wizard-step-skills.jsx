@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import WarningList from '../common/warning-list';
 import './wizard-step-skills.css';
 import { validateSkills, getSkillLimits, getExpertiseLimits } from '../../services/skill-validation.js';
 import { loadSkills } from '../../services/data-loader';
@@ -60,16 +61,8 @@ function WizardStepSkills({ formData, errors, onSkillToggle, onSkillExpertiseTog
 				</div>
 			)}
 
-			{/* Display warnings if any */}
-			{warnings && warnings.length > 0 && (
-				<div className="warning-container">
-					{warnings.map((warning, index) => (
-						<div key={index} className={`warning-message ${warning.type}`}>
-							{warning.message}
-						</div>
-				))}
-				</div>
-			)}
+		{/* Display warnings if any */}
+		{warnings && warnings.length > 0 && <WarningList warnings={warnings} />}
 
 			<div className="form-group">
 				<label>Skill Proficiencies</label>

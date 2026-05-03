@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import WarningList from '../common/warning-list';
 
 function WizardStepResistances({ formData, onResistanceToggle, onImmunityToggle, warnings, preSelectedResistances, preSelectedImmunities }) {
   const [resistancesImmunities, setResistancesImmunities] = useState([]);
@@ -13,16 +14,8 @@ function WizardStepResistances({ formData, onResistanceToggle, onImmunityToggle,
     <div className="wizard-step">
       <h2>Step 8: Resistances & Immunities</h2>
       
-      {/* Display warnings if any */}
-      {warnings && warnings.length > 0 && (
-        <div className="warning-container">
-          {warnings.map((warning, index) => (
-            <div key={index} className={`warning-message ${warning.type}`}>
-              {warning.message}
-            </div>
-          ))}
-        </div>
-      )}
+        {/* Display warnings if any */}
+        {warnings && warnings.length > 0 && <WarningList warnings={warnings} />}
 
       <div className="form-group">
         <label>Resistances</label>

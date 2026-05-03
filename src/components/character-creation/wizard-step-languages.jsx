@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import WarningList from '../common/warning-list';
 
 function WizardStepLanguages({ formData, errors, onLanguageToggle, onFightingStyleToggle, languageLimits, fightingStyleLimits, warnings, preSelectedLanguages, preSelectedFightingStyles }) {
   const [languagesList, setLanguagesList] = useState([]);
@@ -65,16 +66,8 @@ function WizardStepLanguages({ formData, errors, onLanguageToggle, onFightingSty
          </div>
        )}
 
-       {/* Display warnings if any */}
-       {warnings && warnings.length > 0 && (
-         <div className="warning-container">
-           {warnings.map((warning, index) => (
-             <div key={index} className={`warning-message ${warning.type}`}>
-               {warning.message}
-             </div>
-           ))}
-         </div>
-       )}
+        {/* Display warnings if any */}
+        {warnings && warnings.length > 0 && <WarningList warnings={warnings} />}
 
        <div className="form-group">
          <label>Languages</label>
