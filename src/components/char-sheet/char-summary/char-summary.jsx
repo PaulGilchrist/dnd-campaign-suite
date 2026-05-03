@@ -106,13 +106,8 @@ function CharSummary({ playerStats, onDeleteCharacter }) {
                 </div>
                 <div>
                     <CharFeats playerStats={playerStats} showPopup={(feat) => {
-                                            if (feat.desc || feat.description) {
-                                                setPopupHtml(null);
-                                                showPopup({
-                                                    featData: feat,
-                                                    rules: playerStats.rules || '5e (default)'
-                                                 });
-                            // Handle both array (5e) and string (2024) description formats
+                                             if (feat.desc || feat.description) {
+                              // Handle both array (5e) and string (2024) description formats
                             let descriptionHtml = '';
                             if (Array.isArray(feat.desc)) {
                                 descriptionHtml = feat.desc.map(desc => desc || '').join('<br/>');
