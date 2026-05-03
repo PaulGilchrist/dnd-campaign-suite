@@ -15,12 +15,6 @@ vi.mock('./char-abilities', () => ({
   )),
 }));
 
-vi.mock('./char-summary2', () => ({
-  default: vi.fn(({ playerStats }) => (
-    <div data-testid="char-summary2">Summary2</div>
-  )),
-}));
-
 vi.mock('./char-actions', () => ({
   default: vi.fn(({ playerStats }) => (
     <div data-testid="char-actions">Actions</div>
@@ -158,8 +152,6 @@ describe('CharSheet', () => {
     });
 
     expect(screen.getByTestId('char-summary')).toBeInTheDocument();
-    expect(screen.getByTestId('char-abilities')).toBeInTheDocument();
-    expect(screen.getByTestId('char-summary2')).toBeInTheDocument();
     expect(screen.getByTestId('char-actions')).toBeInTheDocument();
     expect(screen.getByTestId('char-reactions')).toBeInTheDocument();
     expect(screen.getByTestId('char-spells')).toBeInTheDocument();

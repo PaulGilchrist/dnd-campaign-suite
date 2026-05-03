@@ -12,7 +12,6 @@ import CharSpecialActions from './char-special-actions'
 import CharCharacterAdvancement from './char-character-advancement'
 import CharSpells from './char-spells/char-spells'
 import CharSummary from './char-summary/char-summary'
-import CharSummary2 from './char-summary2'
 import Subscriber from '../common/subscriber';
 import './char-sheet.css'
 
@@ -92,7 +91,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         {playerStats && <div className='char-sheet' data-testid='char-sheet'>
             <CharSummary playerStats={playerStats} onDeleteCharacter={onDeleteCharacter}></CharSummary><hr />
             <CharAbilities allAbilityScores={allAbilityScores} playerStats={playerStats}></CharAbilities><hr />
-            <CharSummary2 playerStats={playerStats}></CharSummary2><hr />
+            
             <CharActions playerStats={playerStats}></CharActions><hr />
             <CharReactions playerStats={playerStats}></CharReactions>
             <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)}></CharSpells><hr />

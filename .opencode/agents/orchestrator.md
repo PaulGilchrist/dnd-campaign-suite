@@ -36,8 +36,6 @@ Example of good decomposition:
 Example of bad decomposition:
 1. Fix the auth system and add tests
 
-<!-- Present the plan to the user before executing. Wait for confirmation if the task is large or ambiguous. -->
-
 ## Step 2 — Dispatch one step at a time
 
 Dispatch subagents strictly one at a time. Do not dispatch the next step until the previous one has completed and returned its result.
