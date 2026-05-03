@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import './character-creation-wizard.css';
 import { validateStep, validateFinalFormData, getPointBuyCosts } from './utils';
 import WizardHeader from './wizard-header';
@@ -12,7 +12,7 @@ import useWizardSkills from './use-wizard-skills';
 import useWizardLanguages from './use-wizard-languages';
 import useWizardResistances from './use-wizard-resistances';
 import useWizardFeats from './use-wizard-feats';
-import useWizardInventory from './use-wizard-inventory';
+
 import useWizardAbilities from './use-wizard-abilities';
 import useWizardArrayToggle from '../../hooks/use-wizard-array-toggle';
 
@@ -81,11 +81,19 @@ function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, a
     preSelectedFeats,
    } = useWizardFeats(formData, setFormData);
 
-  // Inventory
-  const {
-    tempInventory,
-    updateTempInventory,
-   } = useWizardInventory(formData);
+	// Inventory
+	const [tempInventory, setTempInventory] = useState({ backpack: [], equipped: [] });
+
+	useEffect(() => {
+		setTempInventory({
+			backpack: formData.inventory?.backpack || [],
+			equipped: formData.inventory?.equipped || [],
+		});
+	}, [formData.inventory]);
+
+	const updateTempInventory = useCallback((field, value) => {
+		setTempInventory(prev => ({ ...prev, [field]: value }));
+	}, []);
 
   // Abilities validation
   useWizardAbilities(formData, currentStep, setErrors);
