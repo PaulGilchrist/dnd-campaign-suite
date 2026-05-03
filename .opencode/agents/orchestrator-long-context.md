@@ -1,5 +1,5 @@
 ---
-name: orchestrator
+name: orchestrator-long-context
 description: Orchestrates tasks to subagent to prevent single agent context growth. Thinking is long to generate best possible plan.
 mode: primary
 temperature: 0

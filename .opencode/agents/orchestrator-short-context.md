@@ -1,4 +1,5 @@
 ---
+name: orchestrator-short-context
 description: Orchestrates tasks to subagent to prevent single agent context growth. Thinking is short to keep context short.
 mode: primary
 temperature: 0

@@ -1,5 +1,5 @@
 ---
-name: orchestrator-short-context
+name: orchestrator-medium-context
 description: Orchestrates tasks to subagent to prevent single agent context growth. Thinking is a balance between content used, and qyuality of plan.
 mode: primary
 temperature: 0
