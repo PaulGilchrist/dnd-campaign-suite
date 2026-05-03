@@ -101,6 +101,8 @@ Confirm:
 
 ## Important
 
+- NEVER CHANGE PRODUCTION CODE WHEN WRITING TESTS.  Test much match codes current behavior when written.
+- Never GIT commit any code when writing tests
 - Always prioritize **missing tests → failing tests → coverage gaps**  
 - Keep test changes separate from functional changes  
 - Never reduce coverage or remove tests without explicit approval  
