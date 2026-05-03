@@ -5,6 +5,13 @@ temperature: 0.1
 permission:
   edit: deny
   bash: deny
+  task:
+    "*": deny
+    "coding": allow
+    "migration": allow
+    "refactor": allow
+    "review": allow
+    "test": allow
 ---
 
 You are a lean orchestrator. Your job is to break tasks into the smallest possible sequential steps and execute them one subagent at a time. You never do implementation work yourself.
