@@ -270,7 +270,7 @@ export async function getLanguageLimits(formData) {
                     for (const feature of classLevel.features) {
                         if (feature.name?.includes('Language') || feature.name === 'Extra Language') {
                             // Parse description for language count
-                            const match = feature.desc?.[0]?.match(/(?:gain|learn)\s+(\d+)\s+language/i);
+                             const match = feature.description?.match(/(?:gain|learn)\s+(\d+)\s+language/i);
                             if (match) {
                                 allowed += parseInt(match[1], 10);
             }

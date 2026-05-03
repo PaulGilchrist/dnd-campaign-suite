@@ -145,8 +145,7 @@ function extractBackgroundSpells(backgroundData, version = '5e') {
   // Check features/traits for spell-granting abilities
   const features = backgroundData.features || backgroundData.traits || [];
   features.forEach(feature => {
-    const desc = Array.isArray(feature.desc) ? feature.desc.join(' ') : 
-                (feature.description || feature.desc || '');
+    const desc = Array.isArray(feature.desc) ? feature.desc.join(' ') : (feature.description || feature.desc || '');
     extractSpellsFromDescription(desc, result);
   });
   
@@ -173,8 +172,7 @@ function extractFeatSpells(featData, version = '5e') {
   }
   
   const featName = featData.name || '';
-  const desc = Array.isArray(featData.desc) ? featData.desc.join(' ') : 
-              (featData.description || featData.desc || '');
+  const desc = featData.description || featData.desc || '';
   
   // Magic Initiate feat
   if (featName === 'Magic Initiate') {

@@ -317,14 +317,14 @@ describe('skill-validation', () => {
             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
                 class_levels: [{ level: 1, features: [] }],
                 subclasses: [
-                      {
-                          name: 'Arcane Trickster',
-                          class_levels: [
-                              { level: 3, features: [
-                                    { name: 'Expertise', desc: ['Choose 2 skills'] }
-                              ]}
-                          ]
-                      }
+                        {
+                           name: 'Arcane Trickster',
+                           class_levels: [
+                                { level: 3, features: [
+                                      { name: 'Expertise', description: 'Choose 2 skills' }
+                                ]}
+                            ]
+                        }
                   ]
                   });
 

@@ -198,7 +198,7 @@ function extractClassImmunities(classData, version, level) {
 
     const features = levelData.features || [];
     features.forEach(feature => {
-      const desc = Array.isArray(feature.desc) ? feature.desc.join(' ') : (feature.description || feature.desc || '');
+      const desc = feature.description || '';
       const name = feature.name || '';
 
       // 2024 Barbarian Path of the Berserker: Mindless Rage gives Immunity to Charmed and Frightened
@@ -256,9 +256,9 @@ function extractClassImmunities(classData, version, level) {
           return;
         }
         const features = levelData.features || [];
-        features.forEach(feature => {
-          const desc = Array.isArray(feature.desc) ? feature.desc.join(' ') : (feature.desc || '');
-          if (desc.match(/Immunity to (\w+)/gi)) {
+         features.forEach(feature => {
+           const desc = feature.description || '';
+           if (desc.match(/Immunity to (\w+)/gi)) {
             const matches = desc.match(/Immunity to (\w+)/gi);
             matches.forEach(match => {
               const immunityType = match.replace(/Immunity to /i, '');

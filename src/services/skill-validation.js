@@ -213,7 +213,7 @@ export async function getExpertiseLimits(formData) {
        // Also check if the feature name contains "Expertise"
       else if (feature.name && feature.name.includes('Expertise')) {
          // Parse the description for count
-        const match = feature.desc?.[0]?.match(/choose\s+(\d+)/i) || feature.description?.match(/choose\s+(\d+)/i);
+        const match = feature.description?.match(/choose\s+(\d+)/i);
         if (match) {
           totalCount += parseInt(match[1], 10);
          } else {
@@ -253,7 +253,7 @@ export async function getExpertiseLimits(formData) {
             const features = classLevel.features || [];
             for (const feature of features) {
               if (feature.name?.includes('Expertise')) {
-                const match = feature.desc?.[0]?.match(/choose\s+(\d+)/i);
+                const match = feature.description?.match(/choose\s+(\d+)/i);
                 if (match) {
                   totalCount += parseInt(match[1], 10);
                  }

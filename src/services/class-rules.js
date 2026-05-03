@@ -57,7 +57,7 @@ const classRules = {
         for (let i = levels.length - 1; i >= 0; i--) {
             allFeatures.push(...(levels[i].features || []));
         }
-        return categorizeFeatures(allFeatures, featureCategories, { descriptionField: 'desc' });
+        return categorizeFeatures(allFeatures, featureCategories, { descriptionField: 'description' });
      },
         getFeatures: (playerStats) => {
                // Dependencies: Class

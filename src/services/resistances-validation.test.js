@@ -173,32 +173,32 @@ describe('resistances-validation', () => {
         it('should extract immunities from class features', async () => {
             vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({});
             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: [
-                     { level: 1, features: [] },
-                     { level: 10, features: [
-                         { name: 'Damage Immunity', desc: ['You gain Immunity to Fire damage.'] }
-                     ]}
-                 ]
-              });
+                 class_levels: [
+                       { level: 1, features: [] },
+                       { level: 10, features: [
+                           { name: 'Damage Immunity', description: 'You gain Immunity to Fire damage.' }
+                       ]}
+                   ]
+                });
 
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Fighter' },
-                level: 10
-              });
+             const result = await getResistanceLimits({
+                 rules: '5e',
+                 race: { name: 'Human' },
+                 class: { name: 'Fighter' },
+                 level: 10
+                });
 
-            expect(result.immunities).toContain('Fire');
-          });
+             expect(result.immunities).toContain('Fire');
+            });
 
-        it('should not count immunities above character level', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({});
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: [
-                     { level: 1, features: [] },
-                     { level: 10, features: [
-                         { name: 'Damage Immunity', desc: ['You gain Immunity to Fire damage.'] }
-                     ]}
+         it('should not count immunities above character level', async () => {
+             vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({});
+             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+                 class_levels: [
+                       { level: 1, features: [] },
+                       { level: 10, features: [
+                           { name: 'Damage Immunity', description: 'You gain Immunity to Fire damage.' }
+                       ]}
                  ]
               });
 
@@ -216,11 +216,11 @@ describe('resistances-validation', () => {
             vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({});
             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
                 class_levels: [
-                     { level: 10, features: [
-                         { name: 'Damage Immunity', desc: ['You gain Immunity to Psychic damage.'] }
-                     ]}
-                 ]
-              });
+                      { level: 10, features: [
+                          { name: 'Damage Immunity', description: 'You gain Immunity to Psychic damage.' }
+                      ]}
+                  ]
+                 });
 
             const result = await getResistanceLimits({
                 rules: '5e',
