@@ -1,6 +1,7 @@
 ---
 name: coding
 description: Primary coding agent for implementing features and fixing bugs with deterministic behavior.
+mode: all
 skills:
   - coding-standards
   - architecture-rules

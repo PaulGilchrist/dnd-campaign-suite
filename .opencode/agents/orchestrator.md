@@ -1,7 +1,6 @@
 ---
 description: Orchestrates development tasks by dispatching to specialized subagents based on the nature of the request
 mode: primary
-model: anthropic/claude-sonnet-4-20250514
 temperature: 0.2
 permission:
   edit: deny

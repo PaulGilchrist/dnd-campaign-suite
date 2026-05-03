@@ -1,6 +1,7 @@
 ---
 name: migration
 description: Agent for framework upgrades, API migrations, and large-scale structural changes.
+mode: all
 skills:
   - architecture-rules
   - migration-helper

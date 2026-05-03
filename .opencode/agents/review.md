@@ -1,6 +1,7 @@
 ---
 name: review
 description: Agent for structured code reviews, risk detection, and standards enforcement.
+mode: all
 skills:
   - coding-standards
   - architecture-rules

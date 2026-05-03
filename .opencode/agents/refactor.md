@@ -1,6 +1,7 @@
 ---
 name: refactor
 description: Agent dedicated to safe, incremental refactoring with strict guardrails.
+mode: all
 skills:
   - coding-standards
   - architecture-rules
