@@ -5,7 +5,12 @@ import CharSpecialActions from './char-special-actions';
 // Mock the useActionPopup hook
 vi.mock('./common/use-action-popup', () => ({
   default: vi.fn(),
-  buildFeatureDetailHtml: vi.fn(),
+  buildFeatureDetailHtml: (entity) => {
+    if (entity.details) {
+      return `<b>${entity.name}</b><br/>${entity.description}<br/><br/>${entity.details}`;
+    }
+    return null;
+  },
 }));
 
 // Mock sanitizeHtml

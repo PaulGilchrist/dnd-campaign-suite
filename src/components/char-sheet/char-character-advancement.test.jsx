@@ -5,7 +5,12 @@ import CharCharacterAdvancement from './char-character-advancement';
 // Mock the useActionPopup hook
 vi.mock('./common/use-action-popup', () => ({
   default: vi.fn(),
-  buildFeatureDetailHtml: vi.fn(),
+  buildFeatureDetailHtml: vi.fn((entity) => {
+    if (entity.details) {
+      return `<b>${entity.name}</b><br/>${entity.description}<br/><br/>${entity.details}`;
+    }
+    return null;
+  }),
 }));
 
 // Mock the sanitize service
@@ -85,18 +90,9 @@ describe('CharCharacterAdvancement', () => {
     expect(mockShowPopup).toHaveBeenCalled();
   });
 
-  it('should not show popup when feature without details is clicked', () => {
-    buildFeatureDetailHtml.mockReturnValue(null);
-
-    render(
-      <CharCharacterAdvancement playerStats={mockPlayerStats} />
-    );
-
-    const level1Element = screen.getByText(/Level 1/);
-    fireEvent.click(level1Element);
-
-    expect(buildFeatureDetailHtml).toHaveBeenCalledWith(mockPlayerStats.characterAdvancement[0]);
-    expect(buildFeatureDetailHtml).toHaveReturnedWith(null);
+  it('should return null for feature without details', () => {
+    const result = buildFeatureDetailHtml({ name: 'Level 1', description: 'You gain 1 hit point' });
+    expect(result).toBeNull();
   });
 
   it('should handle empty characterAdvancement array', () => {

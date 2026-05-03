@@ -5,7 +5,12 @@ import CharReactions from './char-reactions';
 // Mock the useActionPopup hook
 vi.mock('./common/use-action-popup', () => ({
   default: vi.fn(),
-  buildFeatureDetailHtml: vi.fn(),
+  buildFeatureDetailHtml: (entity) => {
+    if (entity.details) {
+      return `<b>${entity.name}</b><br/>${entity.description}<br/><br/>${entity.details}`;
+    }
+    return null;
+  },
 }));
 
 // Mock sanitizeHtml
@@ -13,8 +18,7 @@ vi.mock('../../services/sanitize', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-import useActionPopup from './common/use-action-popup';
-import { buildFeatureDetailHtml } from './common/use-action-popup';
+import useActionPopup, { buildFeatureDetailHtml } from './common/use-action-popup';
 
 const mockPlayerStats = {
   reactions: [
