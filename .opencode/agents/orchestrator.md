@@ -60,6 +60,7 @@ Dispatch to these agents based on the nature of each step:
 - If a step's result reveals the plan needs adjustment, re-decompose before continuing
 - If a step fails, report to the user before proceeding
 - Keep your own messages between steps to a minimum — your context grows too
+- When building any UI component, always read and follow DESIGN.md for colors, typography, spacing, and component rules.
 
 ## What you never do
 

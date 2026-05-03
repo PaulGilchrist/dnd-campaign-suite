@@ -1,11 +1,16 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CharActions from './char-actions';
+import { buildFeatureDetailHtml } from './common/use-action-popup';
 
-// Mock the usePopup hook
-vi.mock('./common/use-popup', () => ({
-  default: vi.fn(),
-}));
+// Mock the useActionPopup hook
+vi.mock('./common/use-action-popup', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    default: vi.fn(),
+    buildFeatureDetailHtml: actual.buildFeatureDetailHtml,
+  };
+});
 
 // Mock sanitizeHtml
 vi.mock('../../services/sanitize.js', () => ({
@@ -17,71 +22,71 @@ vi.mock('node-fetch', () => ({
   default: vi.fn(),
 }));
 
-import usePopup from './common/use-popup';
+import useActionPopup from './common/use-action-popup';
 
 const mockPlayerStats = {
   rules: '5e',
   attacks: [
-    {
-      name: 'Longsword',
-      range: 5,
-      hitBonus: 5,
-      hitBonusFormula: '+5 to hit',
-      damage: '1d8+3',
-      damageFormula: '1d8+3 slashing',
-      damageType: 'Slashing',
-      type: 'Action',
-       },
-     ],
+      {
+       name: 'Longsword',
+       range: 5,
+       hitBonus: 5,
+       hitBonusFormula: '+5 to hit',
+       damage: '1d8+3',
+       damageFormula: '1d8+3 slashing',
+       damageType: 'Slashing',
+       type: 'Action',
+         },
+       ],
   actions: [
-    {
-      name: 'Dash',
-      description: 'You focus on movement',
-      details: 'Your speed doubles',
-       },
-     ],
+      {
+       name: 'Dash',
+       description: 'You focus on movement',
+       details: 'Your speed doubles',
+         },
+       ],
   bonusActions: [
-    {
-      name: 'Cunning Action',
-      description: 'You can take a bonus action',
-      details: 'Dash, Hide, or Disengage',
-       },
-     ],
+      {
+       name: 'Cunning Action',
+       description: 'You can take a bonus action',
+       details: 'Dash, Hide, or Disengage',
+         },
+       ],
   equipment: [
-    {
-      name: 'Longsword',
-      equipment_category: 'Weapon',
-      mastery: 'Piercing',
-       },
-     ],
+      {
+       name: 'Longsword',
+       equipment_category: 'Weapon',
+       mastery: 'Piercing',
+         },
+       ],
 };
 
 describe('CharActions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-     
-     // Mock fetch for actions.json
+      
+    // Mock fetch for actions.json
     global.fetch = vi.fn().mockResolvedValue({
       json: () => Promise.resolve(['Dash', 'Disengage', 'Dodge', 'Hide', 'Withdraw']),
-     });
-      
-      // Mock usePopup
-    usePopup.mockImplementation((buildHtml) => ({
+    });
+    
+    // Mock useActionPopup
+    useActionPopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
       PopupElement: null,
       setPopupHtml: vi.fn(),
-      }));
-    });
+    }));
+  });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    });
+  });
 
   it('should render Actions section header', async () => {
     render(<CharActions playerStats={mockPlayerStats} />);
 
     expect(screen.getByText('Actions')).toBeInTheDocument();
-    });
+  });
 
   it('should display attack headers', async () => {
     render(<CharActions playerStats={mockPlayerStats} />);
@@ -91,7 +96,7 @@ describe('CharActions', () => {
     expect(screen.getByText('Hit')).toBeInTheDocument();
     expect(screen.getByText('Damage')).toBeInTheDocument();
     expect(screen.getByText('Type')).toBeInTheDocument();
-    });
+  });
 
   it('should display attack details', async () => {
     render(<CharActions playerStats={mockPlayerStats} />);
@@ -100,27 +105,27 @@ describe('CharActions', () => {
     expect(screen.getByText('5 ft.')).toBeInTheDocument();
     expect(screen.getByText('1d8+3')).toBeInTheDocument();
     expect(screen.getByText('Slashing')).toBeInTheDocument();
-    });
+  });
 
   it('should display actions list', async () => {
     render(<CharActions playerStats={mockPlayerStats} />);
 
     expect(screen.getByText(/Dash:/)).toBeInTheDocument();
-    });
+  });
 
   it('should display bonus actions section', async () => {
     render(<CharActions playerStats={mockPlayerStats} />);
 
     expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
-    });
+  });
 
   it('should call setPopupHtml when hit bonus is clicked', async () => {
     const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
+    useActionPopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
       PopupElement: null,
       setPopupHtml: mockSetPopupHtml,
-      }));
+    }));
 
     render(<CharActions playerStats={mockPlayerStats} />);
 
@@ -128,15 +133,15 @@ describe('CharActions', () => {
     fireEvent.click(hitBonusElement);
 
     expect(mockSetPopupHtml).toHaveBeenCalledWith('+5 to hit');
-    });
+  });
 
   it('should call setPopupHtml when damage is clicked', async () => {
     const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
+    useActionPopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
       PopupElement: null,
       setPopupHtml: mockSetPopupHtml,
-      }));
+    }));
 
     render(<CharActions playerStats={mockPlayerStats} />);
 
@@ -144,14 +149,14 @@ describe('CharActions', () => {
     fireEvent.click(damageElement);
 
     expect(mockSetPopupHtml).toHaveBeenCalledWith('1d8+3 slashing');
-    });
+  });
 
   it('should not show Mastery column for 5e rules', async () => {
     render(<CharActions playerStats={mockPlayerStats} />);
 
     const masteryHeaders = screen.queryAllByText('Mastery');
     expect(masteryHeaders).toHaveLength(0);
-    });
+  });
 
   it('should show Mastery column for 2024 rules', async () => {
     const stats2024 = {
@@ -161,21 +166,21 @@ describe('CharActions', () => {
         {
           ...mockPlayerStats.attacks[0],
           type: 'Action',
-          },
-        ],
+        },
+      ],
       equipment: [
         {
           name: 'Longsword',
           equipment_category: 'Weapon',
           mastery: 'Piercing',
-          },
-        ],
-     };
+        },
+      ],
+    };
 
     render(<CharActions playerStats={stats2024} />);
 
     expect(screen.getByText('Mastery')).toBeInTheDocument();
-    });
+  });
 
   it('should display weapon mastery for 2024 rules', async () => {
     const stats2024 = {
@@ -185,21 +190,21 @@ describe('CharActions', () => {
         {
           ...mockPlayerStats.attacks[0],
           type: 'Action',
-          },
-        ],
+        },
+      ],
       equipment: [
         {
           name: 'Longsword',
           equipment_category: 'Weapon',
           mastery: 'Piercing',
-          },
-        ],
-     };
+        },
+      ],
+    };
 
     render(<CharActions playerStats={stats2024} />);
 
     expect(screen.getByText('Piercing')).toBeInTheDocument();
-    });
+  });
 
   it('should handle empty attacks array', async () => {
     const emptyStats = {
@@ -207,12 +212,12 @@ describe('CharActions', () => {
       attacks: [],
       actions: [],
       bonusActions: [],
-     };
+    };
 
     render(<CharActions playerStats={emptyStats} />);
 
     expect(screen.getByText('Actions')).toBeInTheDocument();
-    });
+  });
 
   it('should handle bonus action attacks', async () => {
     const statsWithBonusAttack = {
@@ -227,33 +232,33 @@ describe('CharActions', () => {
           damageFormula: null,
           damageType: 'Slashing',
           type: 'Bonus Action',
-          },
-        ],
+        },
+      ],
       actions: [],
       bonusActions: [],
-     };
+    };
 
     render(<CharActions playerStats={statsWithBonusAttack} />);
 
     expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
     expect(screen.getByText('Handaxe')).toBeInTheDocument();
-    });
+  });
 
   it('should load base actions from API', async () => {
     render(<CharActions playerStats={mockPlayerStats} />);
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith('/data/actions.json');
-     });
     });
+  });
 
   it('should display base actions after loading', async () => {
     render(<CharActions playerStats={mockPlayerStats} />);
 
     await waitFor(() => {
       expect(screen.getByText(/Base Actions:/)).toBeInTheDocument();
-     });
     });
+  });
 
   it('should sanitize action descriptions', async () => {
     const { sanitizeHtml } = await import('../../services/sanitize.js');
@@ -261,15 +266,15 @@ describe('CharActions', () => {
     render(<CharActions playerStats={mockPlayerStats} />);
 
     expect(screen.getByText(/You focus on movement/)).toBeInTheDocument();
-    });
+  });
 
   it('should show popup when action with details is clicked', async () => {
     const mockShowPopup = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
+    useActionPopup.mockImplementation((buildHtml) => ({
       showPopup: mockShowPopup,
       PopupElement: null,
       setPopupHtml: vi.fn(),
-      }));
+    }));
 
     render(<CharActions playerStats={mockPlayerStats} />);
 
@@ -277,39 +282,15 @@ describe('CharActions', () => {
     fireEvent.click(actionElement);
 
     expect(mockShowPopup).toHaveBeenCalled();
-    });
+  });
 
-  it('should return null for action without details in popup callback', async () => {
-    let capturedCallback;
-    usePopup.mockImplementation((buildHtml) => {
-      capturedCallback = buildHtml;
-      return {
-        showPopup: vi.fn(),
-        PopupElement: null,
-        setPopupHtml: vi.fn(),
-      };
-    });
-
-    render(<CharActions playerStats={mockPlayerStats} />);
-
-    const result = capturedCallback({ name: 'Test', description: 'Test desc' }); // No details
+  it('should return null for feature without details', () => {
+    const result = buildFeatureDetailHtml({ name: 'Test', description: 'Test desc' });
     expect(result).toBeNull();
   });
 
-  it('should return html for action with details in popup callback', async () => {
-    let capturedCallback;
-    usePopup.mockImplementation((buildHtml) => {
-      capturedCallback = buildHtml;
-      return {
-        showPopup: vi.fn(),
-        PopupElement: null,
-        setPopupHtml: vi.fn(),
-      };
-    });
-
-    render(<CharActions playerStats={mockPlayerStats} />);
-
-    const result = capturedCallback({ name: 'Test', description: 'Test desc', details: 'Some details' });
+  it('should return html for feature with details', () => {
+    const result = buildFeatureDetailHtml({ name: 'Test', description: 'Test desc', details: 'Some details' });
     expect(result).toContain('<b>Test</b>');
     expect(result).toContain('Some details');
   });

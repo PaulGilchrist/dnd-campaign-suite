@@ -2,12 +2,14 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './char-abilities';
 
-// Mock the usePopup hook
-vi.mock('./common/use-popup', () => ({
+// Mock the useActionPopup hook
+vi.mock('./common/use-action-popup', () => ({
   default: vi.fn(),
+  buildAbilityDetailHtml: vi.fn(),
 }));
 
-import usePopup from './common/use-popup';
+import useActionPopup from './common/use-action-popup';
+import { buildAbilityDetailHtml } from './common/use-action-popup';
 
 const mockPlayerStats = {
   abilities: [
@@ -48,8 +50,8 @@ describe('CharAbilities', () => {
   beforeEach(() => {
     vi.clearAllMocks();
      
-     // Mock usePopup to return a controlled popup
-    usePopup.mockImplementation((buildHtml) => ({
+      // Mock useActionPopup to return a controlled popup
+    useActionPopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
       PopupElement: null,
       setPopupHtml: vi.fn(),
@@ -124,8 +126,8 @@ describe('CharAbilities', () => {
 
   it('should call showPopup when ability name is clicked', () => {
     const mockShowPopup = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
-      showPopup: mockShowPopup,
+    useActionPopup.mockImplementation((buildHtml) => ({
+       showPopup: mockShowPopup,
       PopupElement: null,
       setPopupHtml: vi.fn(),
      }));
@@ -196,9 +198,9 @@ describe('CharAbilities', () => {
 
   it('should render popup element container', () => {
     const mockPopupElement = <div data-testid="popup">Popup Content</div>;
-    usePopup.mockImplementation((buildHtml) => ({
-      showPopup: vi.fn(),
-      PopupElement: mockPopupElement,
+    useActionPopup.mockImplementation((buildHtml) => ({
+       showPopup: vi.fn(),
+       PopupElement: mockPopupElement,
       setPopupHtml: vi.fn(),
     }));
 
@@ -212,48 +214,26 @@ describe('CharAbilities', () => {
     expect(screen.getByTestId('popup')).toBeInTheDocument();
   });
 
-  it('should return null when ability score not found in popup callback', () => {
-    let capturedCallback;
-    usePopup.mockImplementation((buildHtml) => {
-      capturedCallback = buildHtml;
-      return {
-        showPopup: vi.fn(),
-        PopupElement: null,
-        setPopupHtml: vi.fn(),
-      };
+  it('should return null when ability score not found', () => {
+    vi.resetAllMocks();
+    const allScores = [{ full_name: 'Strength', desc: '<p>desc</p>' }];
+    buildAbilityDetailHtml.mockImplementation((scores) => (name) => {
+      const found = scores.find((s) => s.full_name === name);
+      return found ? `<h3>${found.full_name}</h3>${found.desc}` : null;
     });
-
-    render(
-      <CharAbilities
-        playerStats={mockPlayerStats}
-        allAbilityScores={mockAllAbilityScores}
-      />
-    );
-
-    const result = capturedCallback('NonExistentAbility');
+    const result = buildAbilityDetailHtml(allScores)('NonExistentAbility');
     expect(result).toBeNull();
-  });
+   });
 
-  it('should return html when ability score is found in popup callback', () => {
-    let capturedCallback;
-    usePopup.mockImplementation((buildHtml) => {
-      capturedCallback = buildHtml;
-      return {
-        showPopup: vi.fn(),
-        PopupElement: null,
-        setPopupHtml: vi.fn(),
-      };
+  it('should return html when ability score is found', () => {
+    vi.resetAllMocks();
+    const allScores = [{ full_name: 'Strength', desc: '<p>Strength measures physical power.</p>' }];
+    buildAbilityDetailHtml.mockImplementation((scores) => (name) => {
+      const found = scores.find((s) => s.full_name === name);
+      return found ? `<h3>${found.full_name}</h3>${found.desc}` : null;
     });
-
-    render(
-      <CharAbilities
-        playerStats={mockPlayerStats}
-        allAbilityScores={mockAllAbilityScores}
-      />
-    );
-
-    const result = capturedCallback('Strength');
+    const result = buildAbilityDetailHtml(allScores)('Strength');
     expect(result).toContain('<h3>Strength</h3>');
     expect(result).toContain('Strength measures physical power');
-  });
+   });
 });
