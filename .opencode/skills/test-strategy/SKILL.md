@@ -13,6 +13,8 @@ Follow these rules when writing or modifying tests.
 - Keep tests isolated and deterministic
 - Use descriptive `describe` and `it` blocks
 - Prefer realistic user flows over shallow assertions
+- NEVER CHANGE PRODUCTION CODE WHEN WRITING TESTS.  Test much match codes current behavior when written.
+- Never GIT commit any code when writing tests
 
 ## General Architecture
 
