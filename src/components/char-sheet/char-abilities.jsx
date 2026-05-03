@@ -1,16 +1,10 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
-import usePopup from './common/use-popup'
+import useActionPopup from './common/use-action-popup'
 import './char-abilities.css'
 
 function CharAbilities({ allAbilityScores, playerStats }) {
-    const { showPopup, PopupElement, setPopupHtml } = usePopup((name) => {
-        const abilityScore = allAbilityScores.find((abilityScore) => abilityScore.full_name === name);
-        if (abilityScore) {
-            return `<h3>${name}</h3>${abilityScore.desc}<br/>`;
-           }
-        return null;
-       });
+    const { showPopup, PopupElement, setPopupHtml } = useActionPopup('ability', { allAbilityScores });
     let signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
     return (
         <div className='abilities-popup-parent'>

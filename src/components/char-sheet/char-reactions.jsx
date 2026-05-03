@@ -1,15 +1,10 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
-import usePopup from './common/use-popup'
+import useActionPopup from './common/use-action-popup'
 import { sanitizeHtml } from '../../services/sanitize.js';
 
 function CharReactions({ playerStats }) {
-    const { showPopup, PopupElement } = usePopup((specialAction) => {
-        if (specialAction.details) {
-            return `<b>${specialAction.name}</b><br/>${specialAction.description}<br/><br/>${specialAction.details}`;
-        }
-        return null;
-    });
+    const { showPopup, PopupElement } = useActionPopup('feature');
      // Build reactions list immutably
     let reactions = [...(playerStats.reactions || [])];
 

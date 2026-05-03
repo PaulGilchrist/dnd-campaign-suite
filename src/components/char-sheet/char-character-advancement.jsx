@@ -1,15 +1,10 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
-import usePopup from './common/use-popup'
+import useActionPopup from './common/use-action-popup'
 import { sanitizeHtml } from '../../services/sanitize.js';
 
 function CharCharacterAdvancement({ playerStats }) {
-    const { showPopup, PopupElement } = usePopup((feature) => {
-        if (feature.details) {
-            return `<b>${feature.name}</b><br/>${feature.description}<br/><br/>${feature.details}`;
-            }
-        return null;
-       });
+    const { showPopup, PopupElement } = useActionPopup('feature');
     const features = playerStats.characterAdvancement || [];
     
     return (

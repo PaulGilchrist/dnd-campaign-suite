@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
 import React, { useState, useEffect } from 'react'
-import usePopup from './common/use-popup'
+import useActionPopup from './common/use-action-popup'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { parseMagicItemName } from '../../services/attack-calc.js';
 import './char-actions.css'
@@ -14,12 +14,7 @@ function CharActions({ playerStats }) {
           .then(data => setActions(data))
           .catch(error => console.error('Error loading actions:', error));
     }, []);
-    const { showPopup, PopupElement, setPopupHtml } = usePopup((actionOrBonusAction) => {
-        if (actionOrBonusAction.details) {
-            return `<b>${actionOrBonusAction.name}</b><br/>${actionOrBonusAction.description}<br/><br/>${actionOrBonusAction.details}`;
-        }
-            return null;
-     });
+    const { showPopup, PopupElement, setPopupHtml } = useActionPopup('feature');
     let signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
     // Helper function to get mastery for a weapon name

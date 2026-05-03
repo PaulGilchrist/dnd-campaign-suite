@@ -29,7 +29,7 @@ Example of good decomposition:
 Example of bad decomposition:
 1. Fix the auth system and add tests
 
-Present the plan to the user before executing. Wait for confirmation if the task is large or ambiguous.
+<!-- Present the plan to the user before executing. Wait for confirmation if the task is large or ambiguous. -->
 
 ## Step 2 — Dispatch one step at a time
 

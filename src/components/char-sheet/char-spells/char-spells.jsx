@@ -1,25 +1,12 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import { cloneDeep } from 'lodash';
-import usePopup from '../common/use-popup'
+import useActionPopup from '../common/use-action-popup'
 import CharSpellSlots from './char-spell-slots'
 import './char-spells.css'
 
 function CharSpells({ playerStats, handleTogglePreparedSpells }) {
-    const { showPopup, PopupElement } = usePopup((spell) => {
-        if (spell.desc) {
-            return showPopup({
-                spellData: spell,
-                rules: playerStats.rules || '5e (default)'
-              });
-            let html = `<b>${spell.name}</b><br/><br/>${spell.desc}<br/>`;
-            if (typeof spell.higher_level === 'string' && spell.higher_level.trim()) {
-                html += `<br/><b>At higher levels.</b>&nbsp;${spell.higher_level}`;
-              }
-            return html;
-            }
-        return null;
-        });
+    const { showPopup, PopupElement } = useActionPopup('spell');
     const [filterPrepared, setFilterPrepared] = React.useState(false);
     const [spells, setSpells] = React.useState([]);
     React.useEffect(() => {
