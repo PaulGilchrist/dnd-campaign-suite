@@ -4,6 +4,7 @@ import raceRules from './race-rules'
 import utils from './utils.js';
 import { loadSkills, loadPassiveSkills } from './data-loader';
 import { parseMagicItemName, findEquippedWeapons, buildWeaponAttack, buildMonkAttacks, buildSpellAttacks } from './attack-calc.js';
+import * as proficiencyUtils from './proficiency-utils.js';
 
 const rules = {
     getAbilityLongName: utils.getAbilityLongName,
@@ -308,55 +309,34 @@ const rules = {
         return proficiencyChoiceCount
     },
     getProficiencies: (playerStats, skill = true) => {
-              // Dependencies: Class, Race
-          let proficienciesAllowed = 0;
-          let proficiencies = [...new Set([...(playerStats.class.proficiencies || []), ...(playerStats.race.starting_proficiencies || [])])];
-            // Race Specific
-        playerStats.race.traits.forEach(trait => {
-            if (trait.proficiencies && trait.proficiencies.length > 0) {
-                proficiencies = [...new Set([...proficiencies, ...trait.proficiencies])];
-               }
-           });
-        if(playerStats.race.subrace) {
-                            proficiencies = [...new Set([...proficiencies, ...(playerStats.race.subrace.starting_proficiencies || [])])];
-                            if (playerStats.race.subrace.racial_traits) {
-                                playerStats.race.subrace.racial_traits.forEach(racial_trait => {
-                                    if (racial_trait.proficiencies && racial_trait.proficiencies.length > 0) {
-                                        proficiencies = [...new Set([...proficiencies, ...racial_trait.proficiencies])];
-                          }
-                                   });
-                               }
-                           }
-        if(skill) {
-            proficiencies = proficiencies.filter((proficiency) => proficiency.startsWith('Skill'));
-            proficiencies = proficiencies.map((proficiency) => {
-                return proficiency.substring(7);
-               });
-             // Allowed Count
-            proficienciesAllowed = proficiencies.length + 2; // dndbeyond allows one given based on background and another choosen based on background
-             // Check for subclass skill proficiency bonuses from JSON (e.g., Bard/Lore, Cleric/Knowledge, Cleric/Nature)
-            if(playerStats.class.subclass && playerStats.class.subclass.bonus_skill_proficiencies) {
-                proficienciesAllowed += playerStats.class.subclass.bonus_skill_proficiencies;
+         return proficiencyUtils.getProficiencies(
+           playerStats,
+           skill,
+           rules.getProficiencyChoiceCount,
+            {
+               raceProficiencies: (ps) => {
+                   const extra = [];
+                   ps.race.traits.forEach(trait => {
+                       if (trait.proficiencies && trait.proficiencies.length > 0) {
+                           extra.push(...trait.proficiencies);
+                         }
+                     });
+                   if (ps.race.subrace) {
+                       extra.push(...(ps.race.subrace.starting_proficiencies || []));
+                       if (ps.race.subrace.racial_traits) {
+                           ps.race.subrace.racial_traits.forEach(racial_trait => {
+                               if (racial_trait.proficiencies && racial_trait.proficiencies.length > 0) {
+                                   extra.push(...racial_trait.proficiencies);
+                                 }
+                             });
+                         }
+                     }
+                   return extra;
+                },
+               bonusSource: playerStats.class.subclass || {},
              }
-             // Allowed - Both class and race
-            proficienciesAllowed += rules.getProficiencyChoiceCount(playerStats, true);
-            if(playerStats.skillProficiencies) {
-                proficiencies = [...new Set([...proficiencies, ...playerStats.skillProficiencies])];
-             }
-         } else {
-            proficiencies = proficiencies.filter((proficiency) => !proficiency.startsWith('Skill'));
-             // Add subclass proficiencies from JSON (e.g., Bard/Valor, Cleric subclasses, Rogue/Assassin)
-            if(playerStats.class.subclass && playerStats.class.subclass.bonus_proficiencies) {
-                proficiencies = [...new Set([...proficiencies, ...playerStats.class.subclass.bonus_proficiencies])];
-             }
-             // Allowed Count
-            proficienciesAllowed = proficiencies.length + rules.getProficiencyChoiceCount(playerStats, false);
-            if(playerStats.proficiencies) {
-                proficiencies = [...new Set([...proficiencies, ...playerStats.proficiencies])];
-        }
-         }
-        return [proficienciesAllowed, proficiencies.sort()];
-    },
+           );
+      },
                 getSpellAbilities: (allSpells, playerStats) => {
             // Dependencies: Abilities, Class 
         let spellAbilities = null;

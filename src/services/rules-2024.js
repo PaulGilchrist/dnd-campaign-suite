@@ -3,6 +3,7 @@ import classRules from './class-rules-2024.js';
 import raceRules from './race-rules-2024.js';
 import utils from './utils.js';
 import { loadSkills, loadPassiveSkills } from './data-loader';
+import * as proficiencyUtils from './proficiency-utils.js';
 import { parseMagicItemName, findEquippedWeapons, buildWeaponAttack, buildMonkAttacks, buildSpellAttacks } from './attack-calc.js';
 
 const rules = {
@@ -341,41 +342,16 @@ const rules = {
         return proficiencyChoiceCount;
     },
     getProficiencies: (playerStats, skill = true) => {
-        // 2024 Rules: Simplified proficiency calculation
-        let proficienciesAllowed = 0;
-        const raceStartingProfs = playerStats.race?.starting_proficiencies || [];
-        let proficiencies = [...new Set([...(playerStats.class.proficiencies || []), ...raceStartingProfs])];
-
-        if (skill) {
-            proficiencies = proficiencies.filter((proficiency) => proficiency.startsWith('Skill'));
-            proficiencies = proficiencies.map((proficiency) => {
-                return proficiency.substring(7);
-            });
-            proficienciesAllowed = proficiencies.length + 2; // Background proficiencies
-
-            // Check for major skill proficiency bonuses from JSON (e.g., Bard/Lore, Cleric/Knowledge, Cleric/Nature)
-            if (playerStats.class.major && playerStats.class.major.bonus_skill_proficiencies) {
-                proficienciesAllowed += playerStats.class.major.bonus_skill_proficiencies;
-            }
-
-            if (playerStats.skillProficiencies) {
-                proficiencies = [...new Set([...proficiencies, ...playerStats.skillProficiencies])];
-            }
-        } else {
-            proficiencies = proficiencies.filter((proficiency) => !proficiency.startsWith('Skill'));
-            // Add major proficiencies from JSON (e.g., Bard/Valor, Cleric majors, Rogue/Assassin)
-            if (playerStats.class.major && playerStats.class.major.bonus_proficiencies) {
-                proficiencies = [...new Set([...proficiencies, ...playerStats.class.major.bonus_proficiencies])];
-            }
-            proficienciesAllowed = proficiencies.length + rules.getProficiencyChoiceCount(playerStats, false);
-
-            if (playerStats.proficiencies) {
-                proficiencies = [...new Set([...proficiencies, ...playerStats.proficiencies])];
-            }
-        }
-
-        return [proficienciesAllowed, proficiencies.sort()];
-    },
+          return proficiencyUtils.getProficiencies(
+           playerStats,
+           skill,
+           rules.getProficiencyChoiceCount,
+             {
+               raceProficiencies: () => [], // 2024 rules have no extra race proficiencies
+               bonusSource: playerStats.class.major || {},
+              }
+            );
+       },
     getSpellAbilities: (allSpells, playerStats) => {
         // 2024 Rules: Simplified spellcasting
         let spellAbilities = null;
