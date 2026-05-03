@@ -2,87 +2,14 @@ import { cloneDeep, uniqBy } from 'lodash';
 import classRules from './class-rules-2024.js';
 import raceRules from './race-rules-2024.js';
 import utils from './utils.js';
-
-// Load passive skills from public/data/passive-skills.json
-const loadPassiveSkills = async () => {
-    try {
-        const response = await fetch('/data/passive-skills.json');
-        if (response.ok) {
-            return await response.json();
-        }
-    } catch (error) {
-        console.error('Error loading passive skills:', error);
-    }
-    // Fallback
-    return ['Insight', 'Investigation', 'Perception'];
-};
-
-let cachedPassiveSkills = null;
-
-const getPassiveSkills = async () => {
-    if (cachedPassiveSkills) {
-        return cachedPassiveSkills;
-    }
-    cachedPassiveSkills = await loadPassiveSkills();
-    return cachedPassiveSkills;
-};
-
-// Load skills from public/data/ability-scores.json
-const loadSkills = async () => {
-    try {
-        const response = await fetch('/data/ability-scores.json');
-        if (response.ok) {
-            const abilities = await response.json();
-            const skills = [];
-            abilities.forEach(ability => {
-                ability.skills.forEach(skillName => {
-                    skills.push({ name: skillName, ability: ability.full_name });
-                });
-            });
-            return skills;
-        }
-    } catch (error) {
-        console.error('Error loading skills:', error);
-    }
-    // Fallback
-    return [
-        { name: 'Acrobatics', ability: 'Dexterity' },
-        { name: 'Animal Handling', ability: 'Wisdom' },
-        { name: 'Arcana', ability: 'Intelligence' },
-        { name: 'Athletics', ability: 'Strength' },
-        { name: 'Deception', ability: 'Charisma' },
-        { name: 'History', ability: 'Intelligence' },
-        { name: 'Insight', ability: 'Wisdom' },
-        { name: 'Intimidation', ability: 'Charisma' },
-        { name: 'Investigation', ability: 'Intelligence' },
-        { name: 'Medicine', ability: 'Wisdom' },
-        { name: 'Nature', ability: 'Intelligence' },
-        { name: 'Perception', ability: 'Wisdom' },
-        { name: 'Performance', ability: 'Charisma' },
-        { name: 'Persuasion', ability: 'Charisma' },
-        { name: 'Religion', ability: 'Intelligence' },
-        { name: 'Sleight of Hand', ability: 'Dexterity' },
-        { name: 'Stealth', ability: 'Dexterity' },
-        { name: 'Survival', ability: 'Wisdom' }
-    ];
-};
-
-let cachedSkills = null;
-
-const getSkills = async () => {
-    if (cachedSkills) {
-        return cachedSkills;
-    }
-    cachedSkills = await loadSkills();
-    return cachedSkills;
-};
+import { loadSkills, loadPassiveSkills } from './data-loader';
 
 const rules = {
     getAbilityLongName: utils.getAbilityLongName,
     getAbilities: async (playerStats) => {
         // 2024 Rules: Simpler ability calculation, no racial bonuses
-        const skills = await getSkills();
-        const passiveSkills = await getPassiveSkills();
+        const skills = await loadSkills();
+        const passiveSkills = await loadPassiveSkills();
         return playerStats.abilities.map((ability) => {
             const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
             const newAbility = { ...ability };

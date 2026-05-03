@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock fetch for loadPassiveSkills and loadSkills - must be before imports
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+// Mock data-loader before importing rules
+vi.mock('./data-loader', () => ({
+  loadSkills: vi.fn(),
+  loadPassiveSkills: vi.fn()
+}));
 
 import rules from './rules-2024';
+import * as dataLoader from './data-loader';
 
 // Mock dependencies
 vi.mock('lodash', () => ({
@@ -58,10 +61,9 @@ import classRules from './class-rules-2024.js';
 import raceRules from './race-rules-2024.js';
 
 describe('rules 2024', () => {
-  beforeEach(() => {
+    beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn();
-      });
+       });
 
   describe('getAbilityLongName', () => {
     it('should delegate to utils.getAbilityLongName', () => {
@@ -341,31 +343,21 @@ describe('rules 2024', () => {
         });
       });
 
-  describe('getAbilities', () => {
-    beforeEach(() => {
-      mockFetch.mockImplementation((url) => {
-        if (url.includes('ability-scores.json')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve([
-              { full_name: 'Strength', skills: ['Athletics'] },
-              { full_name: 'Dexterity', skills: ['Stealth', 'Acrobatics'] },
-              { full_name: 'Constitution', skills: [] },
-              { full_name: 'Intelligence', skills: ['Arcana', 'History'] },
-              { full_name: 'Wisdom', skills: ['Perception', 'Insight'] },
-              { full_name: 'Charisma', skills: ['Persuasion', 'Deception'] }
-            ])
-          });
-        }
-        if (url.includes('passive-skills.json')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(['Insight', 'Investigation', 'Perception'])
-          });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
-    });
+   describe('getAbilities', () => {
+     beforeEach(() => {
+       vi.mocked(dataLoader.loadSkills).mockResolvedValue([
+          { name: 'Athletics', ability: 'Strength' },
+          { name: 'Stealth', ability: 'Dexterity' },
+          { name: 'Acrobatics', ability: 'Dexterity' },
+          { name: 'Arcana', ability: 'Intelligence' },
+          { name: 'History', ability: 'Intelligence' },
+          { name: 'Perception', ability: 'Wisdom' },
+          { name: 'Insight', ability: 'Wisdom' },
+          { name: 'Persuasion', ability: 'Charisma' },
+          { name: 'Deception', ability: 'Charisma' }
+         ]);
+      vi.mocked(dataLoader.loadPassiveSkills).mockResolvedValue(['Insight', 'Investigation', 'Perception']);
+});
 
     it('should calculate abilities without racial bonuses (2024 rules)', async () => {
       const playerStats = {
@@ -971,39 +963,25 @@ describe('rules 2024', () => {
         characterAdvancement: []
       });
 
-      classRules.getFeatures.mockReturnValue({
-        actions: [],
-        bonusActions: [],
-        reactions: [],
-        specialActions: [],
-        characterAdvancement: []
-      });
+       classRules.getFeatures.mockReturnValue({
+         actions: [],
+         bonusActions: [],
+         reactions: [],
+         specialActions: [],
+         characterAdvancement: []
+        });
 
-      mockFetch.mockImplementation((url) => {
-        if (url.includes('ability-scores.json')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve([
-              { full_name: 'Strength', skills: ['Athletics'] },
-              { full_name: 'Dexterity', skills: ['Stealth'] },
-              { full_name: 'Constitution', skills: [] },
-              { full_name: 'Intelligence', skills: ['Arcana'] },
-              { full_name: 'Wisdom', skills: ['Perception'] },
-              { full_name: 'Charisma', skills: ['Persuasion'] }
-            ])
-          });
-        }
-        if (url.includes('passive-skills.json')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(['Insight', 'Investigation', 'Perception'])
-          });
-        }
-        return Promise.reject(new Error('Unknown URL'));
-      });
+       vi.mocked(dataLoader.loadSkills).mockResolvedValue([
+           { name: 'Athletics', ability: 'Strength' },
+           { name: 'Stealth', ability: 'Dexterity' },
+           { name: 'Arcana', ability: 'Intelligence' },
+           { name: 'Perception', ability: 'Wisdom' },
+           { name: 'Persuasion', ability: 'Charisma' }
+          ]);
+      vi.mocked(dataLoader.loadPassiveSkills).mockResolvedValue(['Insight', 'Investigation', 'Perception']);
 
-      classRules.getMartialArtsDie.mockReturnValue(6);
-    });
+       classRules.getMartialArtsDie.mockReturnValue(6);
+      });
 
     it('should build complete player stats (2024)', async () => {
       const allClasses = [{ name: 'Fighter', hit_die: 10 }];
@@ -1428,29 +1406,30 @@ describe('rules 2024', () => {
     });
   });
 
-  describe('loadSkills and loadPassiveSkills (2024)', () => {
-    it('should use fallback skills when fetch fails (2024)', async () => {
-      mockFetch.mockImplementation(() => Promise.reject(new Error('Network error')));
+   describe('loadSkills and loadPassiveSkills (2024)', () => {
+	    it('should use data-loader for skills', async () => {
+	      vi.mocked(dataLoader.loadSkills).mockResolvedValue([
+	         { name: 'Acrobatics', ability: 'Dexterity' },
+	         { name: 'Athletics', ability: 'Strength' }
+	       ]);
+	      vi.mocked(dataLoader.loadPassiveSkills).mockResolvedValue(['Insight', 'Investigation', 'Perception']);
 
-      vi.resetModules();
-      const freshRules = await import('./rules-2024');
+	      const playerStats = {
+	        level: 1,
+	        abilities: [
+	           { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+	          ],
+	        class: {
+	          name: 'Fighter',
+	          saving_throw_proficiencies: []
+	          },
+	        skillProficiencies: [],
+	        expertise: []
+	          };
 
-      const playerStats = {
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
-        ],
-        class: {
-          name: 'Fighter',
-          saving_throw_proficiencies: []
-        },
-        skillProficiencies: [],
-        expertise: []
-      };
-
-      const abilities = await freshRules.default.getAbilities(playerStats);
-      expect(abilities).toHaveLength(1);
-      expect(abilities[0].skills.length).toBeGreaterThan(0);
-    });
-  });
+	      const abilities = await rules.getAbilities(playerStats);
+	      expect(abilities).toHaveLength(1);
+	      expect(abilities[0].skills.length).toBeGreaterThan(0);
+	      });
+	    });
 });

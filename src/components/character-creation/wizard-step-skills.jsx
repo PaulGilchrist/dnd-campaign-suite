@@ -1,56 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './wizard-step-skills.css';
 import { validateSkills, getSkillLimits, getExpertiseLimits } from '../../services/skill-validation.js';
-
-// Load skills from public/data/ability-scores.json
-const loadSkills = async () => {
-	try {
-		const response = await fetch('/data/ability-scores.json');
-		if (response.ok) {
-			const abilities = await response.json();
-			const skills = [];
-			abilities.forEach(ability => {
-				ability.skills.forEach(skillName => {
-					skills.push({ name: skillName, ability: ability.full_name });
-				});
-			});
-			return skills;
-		}
-	} catch (error) {
-		console.error('Error loading skills:', error);
-	}
-	// Fallback
-	return [
-		{ name: 'Acrobatics', ability: 'Dexterity' },
-		{ name: 'Animal Handling', ability: 'Wisdom' },
-		{ name: 'Arcana', ability: 'Intelligence' },
-		{ name: 'Athletics', ability: 'Strength' },
-		{ name: 'Deception', ability: 'Charisma' },
-		{ name: 'History', ability: 'Intelligence' },
-		{ name: 'Insight', ability: 'Wisdom' },
-		{ name: 'Intimidation', ability: 'Charisma' },
-		{ name: 'Investigation', ability: 'Intelligence' },
-		{ name: 'Medicine', ability: 'Wisdom' },
-		{ name: 'Nature', ability: 'Intelligence' },
-		{ name: 'Perception', ability: 'Wisdom' },
-		{ name: 'Performance', ability: 'Charisma' },
-		{ name: 'Persuasion', ability: 'Charisma' },
-		{ name: 'Religion', ability: 'Intelligence' },
-		{ name: 'Sleight of Hand', ability: 'Dexterity' },
-		{ name: 'Stealth', ability: 'Dexterity' },
-		{ name: 'Survival', ability: 'Wisdom' }
-	];
-};
-
-let cachedSkills = null;
-
-const getSkills = async () => {
-	if (cachedSkills) {
-		return cachedSkills;
-	}
-	cachedSkills = await loadSkills();
-	return cachedSkills;
-};
+import { loadSkills } from '../../services/data-loader';
 
 function WizardStepSkills({ formData, errors, onSkillToggle, onSkillExpertiseToggle, skillLimits, expertiseLimits, warnings, preSelectedSkills }) {
   const [showExpertiseFeedback, setShowExpertiseFeedback] = useState(null);
@@ -58,9 +9,9 @@ function WizardStepSkills({ formData, errors, onSkillToggle, onSkillExpertiseTog
 
 	useEffect(() => {
 		const loadSkillsData = async () => {
-			const skillsData = await getSkills();
+			const skillsData = await loadSkills();
 			setSkills(skillsData);
-		};
+			};
 		loadSkillsData();
 	}, []);
 
@@ -69,21 +20,21 @@ function WizardStepSkills({ formData, errors, onSkillToggle, onSkillExpertiseTog
 		const isCurrentlyProficient = (formData.skillProficiencies || []).includes(skill);
 
 		if (isCurrentlyExpert) {
-		 // Deselecting expertise - remove from expertSkills only
+		  // Deselecting expertise - remove from expertSkills only
 			onSkillExpertiseToggle(skill, false);
 			setShowExpertiseFeedback(null);
-		} else {
+			} else {
 			// Elevating to expertise
 			if (!isCurrentlyProficient) {
 				setShowExpertiseFeedback(`Please select ${skill} as proficient first`);
 				setTimeout(() => setShowExpertiseFeedback(null), 3000);
 				return;
-			}
+				}
 			onSkillExpertiseToggle(skill, true);
 			setShowExpertiseFeedback(`${skill} is now Expert!`);
 			setTimeout(() => setShowExpertiseFeedback(null), 3000);
-		}
-	};
+			}
+		};
 
 	const isSkillExpert = (skill) => (formData.expertSkills || []).includes(skill);
 	const isSkillProficient = (skill) => (formData.skillProficiencies || []).includes(skill);
@@ -116,7 +67,7 @@ function WizardStepSkills({ formData, errors, onSkillToggle, onSkillExpertiseTog
 						<div key={index} className={`warning-message ${warning.type}`}>
 							{warning.message}
 						</div>
-					))}
+				))}
 				</div>
 			)}
 
@@ -125,14 +76,14 @@ function WizardStepSkills({ formData, errors, onSkillToggle, onSkillExpertiseTog
 				<div className="multi-select-container multi-select-compact">
 					{skills.map(skill => (
 						<label
-							key={skill.name}
-							className={`multi-select-item ${(formData.skillProficiencies || []).includes(skill.name) ? 'selected' : ''} ${isPreSelected(skill.name) ? 'pre-selected' : ''}`}
+						key={skill.name}
+						className={`multi-select-item ${(formData.skillProficiencies || []).includes(skill.name) ? 'selected' : ''} ${isPreSelected(skill.name) ? 'pre-selected' : ''}`}
 						>
 							<input
-								type="checkbox"
-								checked={isSkillProficient(skill.name)}
-								onChange={() => onSkillToggle(skill.name)}
-								disabled={isPreSelected(skill.name)}
+							type="checkbox"
+							checked={isSkillProficient(skill.name)}
+							onChange={() => onSkillToggle(skill.name)}
+							disabled={isPreSelected(skill.name)}
 							/>
 							&nbsp;
 							<span className={isSkillExpert(skill.name) ? 'skill-expert-label' : ''}>
@@ -142,16 +93,16 @@ function WizardStepSkills({ formData, errors, onSkillToggle, onSkillExpertiseTog
 								)}
 							</span>
 							<button
-								type="button"
-								className={`expertise-toggle-btn ${isSkillExpert(skill.name) ? 'active' : ''}`}
-								onClick={() => handleExpertiseToggle(skill.name)}
-								disabled={!isSkillProficient(skill.name) || (!expertiseLimits?.allowed && !isSkillExpert(skill.name))}
-								title={isSkillProficient(skill.name) ? 'Click to elevate to Expert' : 'Select proficient first'}
+							type="button"
+							className={`expertise-toggle-btn ${isSkillExpert(skill.name) ? 'active' : ''}`}
+							onClick={() => handleExpertiseToggle(skill.name)}
+							disabled={!isSkillProficient(skill.name) || (!expertiseLimits?.allowed && !isSkillExpert(skill.name))}
+							title={isSkillProficient(skill.name) ? 'Click to elevate to Expert' : 'Select proficient first'}
 							>
 								{isSkillExpert(skill.name) ? '✓ Expert' : 'Elevate'}
 							</button>
 						</label>
-					))}
+				))}
 				</div>
 				{errors.skillProficiencies && <span className="error-message">{errors.skillProficiencies}</span>}
 			</div>
@@ -166,4 +117,3 @@ function WizardStepSkills({ formData, errors, onSkillToggle, onSkillExpertiseTog
 }
 
 export default WizardStepSkills;
-

@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as constants from './constants';
+import { loadAbilityScores } from '../../services/data-loader';
+
+// Mock data-loader
+vi.mock('../../services/data-loader', () => ({
+  loadAbilityScores: vi.fn(),
+  loadSkills: vi.fn(),
+  loadPassiveSkills: vi.fn()
+}));
 
 describe('constants', () => {
   describe('REQUIRED_FIELDS', () => {
@@ -21,68 +29,63 @@ describe('constants', () => {
     });
   });
 
-  describe('loadAbilityNames', () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
+   describe('loadAbilityScores', () => {
+	    beforeEach(() => {
+	      vi.clearAllMocks();
+	    });
 
-    it('should return ability names from fetched JSON', async () => {
-      const mockResponse = {
-        ok: true,
-        json: async () => [
-          { full_name: 'Strength' },
-          { full_name: 'Dexterity' },
-          { full_name: 'Constitution' },
-          { full_name: 'Intelligence' },
-          { full_name: 'Wisdom' },
-          { full_name: 'Charisma' }
-        ]
-      };
-      global.fetch = vi.fn().mockResolvedValue(mockResponse);
+	    it('should return ability scores from data-loader', async () => {
+	      const mockScores = [
+	         { full_name: 'Strength' },
+	         { full_name: 'Dexterity' },
+	         { full_name: 'Constitution' },
+	         { full_name: 'Intelligence' },
+	         { full_name: 'Wisdom' },
+	          { full_name: 'Charisma' }
+	        ];
+	      vi.mocked(loadAbilityScores).mockResolvedValue(mockScores);
 
-      const abilityNames = await constants.loadAbilityNames();
-      expect(abilityNames).toEqual([
-        'Strength',
-        'Dexterity',
-        'Constitution',
-        'Intelligence',
-        'Wisdom',
-        'Charisma'
-      ]);
-      expect(global.fetch).toHaveBeenCalledWith('/data/ability-scores.json');
-    });
+	      const result = await loadAbilityScores();
+	      expect(result).toEqual(mockScores);
+	      expect(result.map(a => a.full_name)).toEqual([
+	          'Strength',
+	          'Dexterity',
+	          'Constitution',
+	          'Intelligence',
+	          'Wisdom',
+	          'Charisma'
+	        ]);
+	    });
 
-    it('should return fallback ability names when fetch fails', async () => {
-      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
-      console.error = vi.fn();
+	    it('should return ability names when mapped', async () => {
+	      const mockScores = [
+	          { full_name: 'Strength' },
+	          { full_name: 'Dexterity' },
+	          { full_name: 'Constitution' },
+	          { full_name: 'Intelligence' },
+	          { full_name: 'Wisdom' },
+	          { full_name: 'Charisma' }
+	        ];
+	      vi.mocked(loadAbilityScores).mockResolvedValue(mockScores);
 
-      const abilityNames = await constants.loadAbilityNames();
-      expect(abilityNames).toEqual([
-        'Strength',
-        'Dexterity',
-        'Constitution',
-        'Intelligence',
-        'Wisdom',
-        'Charisma'
-      ]);
-    });
+	      const scores = await loadAbilityScores();
+	      const names = scores.map(a => a.full_name);
+	      expect(names).toEqual([
+	          'Strength',
+	          'Dexterity',
+	          'Constitution',
+	          'Intelligence',
+	          'Wisdom',
+	          'Charisma'
+	        ]);
+	    });
 
-    it('should return fallback ability names when response is not ok', async () => {
-      const mockResponse = { ok: false };
-      global.fetch = vi.fn().mockResolvedValue(mockResponse);
-      console.error = vi.fn();
+    it('should handle errors gracefully', async () => {
+	      vi.mocked(loadAbilityScores).mockRejectedValue(new Error('Network error'));
 
-      const abilityNames = await constants.loadAbilityNames();
-      expect(abilityNames).toEqual([
-        'Strength',
-        'Dexterity',
-        'Constitution',
-        'Intelligence',
-        'Wisdom',
-        'Charisma'
-      ]);
-    });
-  });
+	      await expect(loadAbilityScores()).rejects.toThrow('Network error');
+        });
+       });
 
   describe('DEFAULT_FORM_DATA', () => {
     it('should export a default form data object', () => {

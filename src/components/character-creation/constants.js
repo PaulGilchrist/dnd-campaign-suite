@@ -14,31 +14,16 @@ export { default as WizardStepResistances } from './wizard-step-resistances';
 export { default as WizardStepMagicItems } from './wizard-step-magic-items';
 
 export const REQUIRED_FIELDS = [
-       'name',
-       'level',
-    'alignment',
-    'race',
-    'class',
-    'abilities',
-    'inventory',
-    'skillProficiencies',
-    'expertSkills',
-];
-
-// Load ability names from public/data/ability-scores.json
-export const loadAbilityNames = async () => {
-	try {
-		const response = await fetch('/data/ability-scores.json');
-		if (response.ok) {
-			const abilities = await response.json();
-			return abilities.map(ability => ability.full_name);
-		}
-	} catch (error) {
-		console.error('Error loading ability names:', error);
-	}
-	// Fallback
-	return ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
-};
+        'name',
+        'level',
+     'alignment',
+     'race',
+     'class',
+     'abilities',
+     'inventory',
+     'skillProficiencies',
+     'expertSkills',
+ ];
 
 // POINT_BUY_COSTS is now loaded from public/data/rules-validation.json
 // Use getPointBuyCosts() from utils.js instead

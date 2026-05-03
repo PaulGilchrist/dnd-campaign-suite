@@ -1,23 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import './wizard-step-abilities.css';
 import { getPointBuyCosts } from './utils';
+import { loadAbilityScores } from '../../services/data-loader';
 
-// Load ability names from public/data/ability-scores.json
-const loadAbilityNames = async () => {
-	try {
-		const response = await fetch('/data/ability-scores.json');
-		if (response.ok) {
-			const abilities = await response.json();
-			return abilities.map(ability => ability.full_name);
-		}
-	} catch (error) {
-		console.error('Error loading ability names:', error);
-	}
-	// Fallback
-	return ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
-};
-
-function WizardStepAbilities({ 
+function WizardStepAbilities({
   formData, 
   errors, 
   onAbilityBaseScoreChange,
@@ -31,9 +17,9 @@ function WizardStepAbilities({
 	 // Load ability names from JSON
   useEffect(() => {
     const loadNames = async () => {
-      const names = await loadAbilityNames();
-      setAbilityNames(names);
-    };
+      const scores = await loadAbilityScores();
+      setAbilityNames(scores.map(a => a.full_name));
+     };
     loadNames();
   }, []);
 

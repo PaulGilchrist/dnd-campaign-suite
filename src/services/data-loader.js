@@ -6,20 +6,27 @@
 
 // Single shared cache for all data types across all rulesets
 const dataCache = {
-  '5e': {
-    classes: null,
-    races: null,
-    backgrounds: null,
-    feats: null,
-    'rules-validation': null
-  },
-  '2024': {
-    classes: null,
-    races: null,
-    backgrounds: null,
-    feats: null,
-    'rules-validation': null
-  }
+    '5e': {
+     classes: null,
+     races: null,
+     backgrounds: null,
+     feats: null,
+     'rules-validation': null
+    },
+    '2024': {
+     classes: null,
+     races: null,
+     backgrounds: null,
+     feats: null,
+     'rules-validation': null
+    }
+};
+
+// Shared cache for version-agnostic data (files in /data/ not /data/2024/)
+const sharedDataCache = {
+    skills: null,
+    abilityScores: null,
+    passiveSkills: null
 };
 
 /**
@@ -207,24 +214,121 @@ export async function fetchFeatData(featName, version = '5e') {
 }
 
 /**
- * Clears the data cache (useful for testing or data refresh)
- */
+  * Fetches ability scores data (with caching) - version agnostic
+  * @returns {Promise<object[]>} - Raw abilities array from /data/ability-scores.json
+  */
+export async function loadAbilityScores() {
+    if (sharedDataCache.abilityScores) {
+        return sharedDataCache.abilityScores;
+     }
+    try {
+        const response = await fetch('/data/ability-scores.json');
+        if (response.ok) {
+            const data = await response.json();
+            sharedDataCache.abilityScores = data;
+            return data;
+         }
+    } catch (error) {
+        console.error('Error loading ability scores:', error);
+     }
+    return [
+        { full_name: 'Strength', skills: ['Athletics'] },
+        { full_name: 'Dexterity', skills: ['Acrobatics', 'Sleight of Hand', 'Stealth'] },
+        { full_name: 'Constitution', skills: [] },
+        { full_name: 'Intelligence', skills: ['Arcana', 'History', 'Investigation', 'Nature', 'Religion'] },
+        { full_name: 'Wisdom', skills: ['Animal Handling', 'Insight', 'Medicine', 'Perception', 'Survival'] },
+        { full_name: 'Charisma', skills: ['Deception', 'Intimidation', 'Performance', 'Persuasion'] }
+     ];
+ }
+
+/**
+  * Fetches skills derived from ability scores (with caching) - version agnostic
+  * @returns {Promise<object[]>} - Array of { name, ability } objects
+  */
+export async function loadSkills() {
+    if (sharedDataCache.skills) {
+        return sharedDataCache.skills;
+     }
+    try {
+        const abilities = await loadAbilityScores();
+        const skills = [];
+        abilities.forEach(ability => {
+            ability.skills.forEach(skillName => {
+                skills.push({ name: skillName, ability: ability.full_name });
+             });
+            });
+        sharedDataCache.skills = skills;
+        return skills;
+     } catch (error) {
+        console.error('Error loading skills:', error);
+     }
+     // Fallback
+    return [
+         { name: 'Acrobatics', ability: 'Dexterity' },
+         { name: 'Animal Handling', ability: 'Wisdom' },
+         { name: 'Arcana', ability: 'Intelligence' },
+         { name: 'Athletics', ability: 'Strength' },
+         { name: 'Deception', ability: 'Charisma' },
+         { name: 'History', ability: 'Intelligence' },
+         { name: 'Insight', ability: 'Wisdom' },
+         { name: 'Intimidation', ability: 'Charisma' },
+         { name: 'Investigation', ability: 'Intelligence' },
+         { name: 'Medicine', ability: 'Wisdom' },
+         { name: 'Nature', ability: 'Intelligence' },
+         { name: 'Perception', ability: 'Wisdom' },
+         { name: 'Performance', ability: 'Charisma' },
+         { name: 'Persuasion', ability: 'Charisma' },
+         { name: 'Religion', ability: 'Intelligence' },
+         { name: 'Sleight of Hand', ability: 'Dexterity' },
+         { name: 'Stealth', ability: 'Dexterity' },
+         { name: 'Survival', ability: 'Wisdom' }
+     ];
+ }
+
+/**
+  * Fetches passive skills (with caching) - version agnostic
+  * @returns {Promise<string[]>} - Array of passive skill names
+  */
+export async function loadPassiveSkills() {
+    if (sharedDataCache.passiveSkills) {
+        return sharedDataCache.passiveSkills;
+     }
+    try {
+        const response = await fetch('/data/passive-skills.json');
+        if (response.ok) {
+            const data = await response.json();
+            sharedDataCache.passiveSkills = data;
+            return data;
+         }
+    } catch (error) {
+        console.error('Error loading passive skills:', error);
+     }
+     // Fallback
+     return ['Insight', 'Investigation', 'Perception'];
+ }
+
+/**
+  * Clears the data cache (useful for testing or data refresh)
+  */
 export function clearDataCache() {
-  dataCache['5e'] = {
-    classes: null,
-    races: null,
-    backgrounds: null,
-    feats: null,
-    'rules-validation': null
-  };
-  dataCache['2024'] = {
-    classes: null,
-    races: null,
-    backgrounds: null,
-    feats: null,
-    'rules-validation': null
-  };
-}
+    dataCache['5e'] = {
+     classes: null,
+     races: null,
+     backgrounds: null,
+     feats: null,
+     'rules-validation': null
+     };
+    dataCache['2024'] = {
+     classes: null,
+     races: null,
+     backgrounds: null,
+     feats: null,
+     'rules-validation': null
+     };
+    sharedDataCache.skills = null;
+    sharedDataCache.abilityScores = null;
+    sharedDataCache.passiveSkills = null;
+ }
 
 /**
  * Gets the current cache state (useful for debugging)
