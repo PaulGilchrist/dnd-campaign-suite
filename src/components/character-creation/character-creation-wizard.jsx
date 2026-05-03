@@ -254,15 +254,17 @@ function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, a
 
   const handleSubmit = useCallback(async () => {
     const stepErrors = await validateStep(currentStep, formData, {}, racesData, classSubtypes, ruleset);
-    if (Object.keys(stepErrors).length === 0) {
-      const finalErrors = validateFinalFormData(formData);
-      if (Object.keys(finalErrors).length > 0) {
-        setErrors(finalErrors);
-        return;
-         }
-      onComplete(formData);
-       }
-     }, [currentStep, formData, racesData, classSubtypes, ruleset, onComplete, setErrors]);
+    if (Object.keys(stepErrors).length > 0) {
+      setErrors(stepErrors);
+      return;
+        }
+    const finalErrors = validateFinalFormData(formData);
+    if (Object.keys(finalErrors).length > 0) {
+      setErrors(finalErrors);
+      return;
+        }
+    onComplete(formData);
+      }, [currentStep, formData, racesData, classSubtypes, ruleset, onComplete, setErrors]);
 
   const renderStep = useCallback(() => {
     const stepConfig = WIZARD_STEPS.find((step) => step.step === currentStep);

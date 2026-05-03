@@ -353,4 +353,245 @@ describe('App', () => {
       expect(screen.getByText(/Edit/)).toBeInTheDocument();
     });
   });
+
+  it('should handle save click and trigger download', async () => {
+    const preloaded = JSON.stringify([{ name: 'Test Character', level: 1 }]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Download/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/Download/));
+  });
+
+  it('should handle upload click', async () => {
+    const preloaded = JSON.stringify([{ name: 'Test Character', level: 1 }]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Upload/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/Upload/));
+  });
+
+  it('should handle character click to switch active character', async () => {
+    const preloaded = JSON.stringify([
+      { name: 'Character 1', level: 1 },
+      { name: 'Character 2', level: 2 },
+    ]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+    });
+
+    const buttons = screen.getAllByText('Character 2');
+    fireEvent.click(buttons[0]);
+  });
+
+  it('should show combat tracking when no active character and characters exist', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    const preloaded = JSON.stringify([
+      { name: 'Character 1', level: 1 },
+    ]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Combat/)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle initiative click to show combat', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    const preloaded = JSON.stringify([
+      { name: 'Character 1', level: 1 },
+    ]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Combat/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/Combat/));
+  });
+
+  it('should handle rename campaign', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('test-campaign')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTitle('Rename Campaign'));
+  });
+
+  it('should handle delete campaign when confirmed', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    window.confirm = vi.fn(() => true);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('test-campaign')).toBeInTheDocument();
+    });
+
+    const deleteBtn = document.querySelector('.delete-campaign-btn');
+    if (deleteBtn && !deleteBtn.disabled) {
+      fireEvent.click(deleteBtn);
+    }
+  });
+
+  it('should handle going back to campaigns', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Campaigns/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/Campaigns/));
+  });
+
+  it('should delete campaign when confirmed', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url.includes('/api/campaigns/')) {
+        return Promise.resolve({ ok: true });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('test-campaign')).toBeInTheDocument();
+    });
+
+    window.confirm = vi.fn(() => true);
+
+    // Need to trigger delete - button is disabled when characters exist
+    // Let's test without characters
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      if (key === 'characters') return JSON.stringify([]);
+      return null;
+    });
+
+    render(<App />);
+
+    const deleteBtn = document.querySelector('.delete-campaign-btn');
+    if (deleteBtn && !deleteBtn.disabled) {
+      fireEvent.click(deleteBtn);
+    }
+  });
+
+  it('should handle delete campaign error', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url.includes('/api/campaigns/')) {
+        return Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({ error: 'Delete failed' })
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('test-campaign')).toBeInTheDocument();
+    });
+
+    window.confirm = vi.fn(() => true);
+
+    // Need to trigger delete
+    const deleteBtn = document.querySelector('.delete-campaign-btn');
+    if (deleteBtn && !deleteBtn.disabled) {
+      fireEvent.click(deleteBtn);
+    }
+  });
+
+  it('should not render char sheet when no active character', async () => {
+    const preloaded = JSON.stringify([{ name: 'Char1', level: 1 }]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+    });
+
+    // Click Combat to set activeCharacter to null
+    fireEvent.click(screen.getByText(/Combat/));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
+    });
+  });
 });

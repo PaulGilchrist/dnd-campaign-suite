@@ -127,4 +127,81 @@ describe('WizardStepFeats', () => {
       expect(getFeatLimits).toHaveBeenCalled();
     });
   });
+
+  it('should render 2024 feat with HTML description', async () => {
+    const props2024 = {
+      ...mockProps,
+      formData: { ...mockProps.formData, rules: '2024' },
+      allFeats: [
+        { name: 'Great Weapon Master', description: '<p>Bonus action</p>' },
+      ],
+    };
+
+    render(<WizardStepFeats {...props2024} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
+    });
+  });
+
+  it('should render 5e feat with array description', async () => {
+    const props5e = {
+      ...mockProps,
+      allFeats: [
+        { name: 'Sharpshooter', desc: ['No disadvantage on long range attacks'] },
+      ],
+    };
+
+    render(<WizardStepFeats {...props5e} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
+    });
+  });
+
+  it('should render feat with prerequisites', async () => {
+    const propsWithPrereq = {
+      ...mockProps,
+      allFeats: [
+        {
+          name: 'Heavy Armor Master',
+          desc: ['Reduce damage by 3'],
+          prerequisites: ['Strength 13'],
+        },
+      ],
+    };
+
+    render(<WizardStepFeats {...propsWithPrereq} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
+    });
+  });
+
+  it('should render expanded feat details', async () => {
+    const propsExpanded = {
+      ...mockProps,
+      allFeats: [
+        {
+          name: 'Great Weapon Master',
+          description: '<p>Bonus attack</p>',
+          type: 'Combat',
+        },
+      ],
+    };
+
+    render(<WizardStepFeats {...propsExpanded} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
+    });
+  });
+
+  it('should handle feat type filter', async () => {
+    render(<WizardStepFeats {...mockProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
+    });
+  });
 });

@@ -332,14 +332,62 @@ describe('spell-validation', () => {
             vi.mocked(dataLoader.loadBackgroundData).mockResolvedValue([]);
 
             const result = await getSpellValidationInfo(
-                   { class: { name: 'Wizard' } },
-                   [],
-                   [],
-                   '5e'
-                );
+                { class: { name: 'Wizard' } },
+                [],
+                [],
+                '5e'
+            );
 
             expect(result.spellCount).toBe(0);
-       });
-         });
+        });
+    });
+
+    describe('getSpellSourceName (via getSpellSources)', () => {
+        it('should identify spell source as race', async () => {
+            vi.mocked(dataLoader.loadClassData).mockResolvedValue([]);
+            vi.mocked(dataLoader.loadRaceData).mockResolvedValue([
+                { name: 'Elf', traits: [{ desc: ['You know the <em>Darkvision</em> spell.'] }] }
+            ]);
+            vi.mocked(dataLoader.loadBackgroundData).mockResolvedValue([]);
+
+            const result = await getSpellSources(
+                { race: { name: 'Elf' } },
+                '5e'
+            );
+
+            expect(result.race.cantrips).toBeDefined();
+        });
+
+        it('should identify spell source as background', async () => {
+            vi.mocked(dataLoader.loadClassData).mockResolvedValue([]);
+            vi.mocked(dataLoader.loadRaceData).mockResolvedValue([]);
+            vi.mocked(dataLoader.loadBackgroundData).mockResolvedValue([
+                { name: 'Acolyte', features: [{ desc: ['You learn the <em>Guidance</em> cantrip.'] }] }
+            ]);
+
+            const result = await getSpellSources(
+                { background: { name: 'Acolyte' } },
+                '5e'
+            );
+
+            expect(result.background.cantrips).toBeDefined();
+        });
+
+        it('should identify spell source as feat', async () => {
+            vi.mocked(dataLoader.loadClassData).mockResolvedValue([]);
+            vi.mocked(dataLoader.loadRaceData).mockResolvedValue([]);
+            vi.mocked(dataLoader.loadBackgroundData).mockResolvedValue([]);
+            vi.mocked(dataLoader.loadFeatData).mockResolvedValue([
+                { name: 'Magic Initiate', spells: ['Message'], cantrips: [] }
+            ]);
+
+            const result = await getSpellSources(
+                { feats: ['Magic Initiate'] },
+                '5e'
+            );
+
+            expect(result.feats.grantedCantrips).toBeDefined();
+        });
+    });
 });
 

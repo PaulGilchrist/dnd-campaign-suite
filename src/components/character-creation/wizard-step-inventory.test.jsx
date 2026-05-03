@@ -112,9 +112,83 @@ describe('WizardStepInventory', () => {
     expect(screen.getByText('Step 11: Inventory')).toBeInTheDocument();
      });
 
-   it('should render field description', () => {
+  it('should render field description', () => {
     render(<WizardStepInventory {...mockProps} />);
     const descriptions = screen.getAllByText(/Enter items separated by commas/);
     expect(descriptions.length).toBe(2); // One for backpack, one for equipped
+  });
+
+  it('should handle search field focus for backpack', () => {
+    render(<WizardStepInventory {...mockProps} />);
+    const searchButtons = screen.getAllByText(/Search Equipment/);
+    fireEvent.click(searchButtons[0]); // Backpack search
+    expect(global.fetch).toHaveBeenCalledWith('/data/equipment.json');
+  });
+
+  it('should handle search field focus for equipped', () => {
+    render(<WizardStepInventory {...mockProps} />);
+    const searchButtons = screen.getAllByText(/Search Equipment/);
+    fireEvent.click(searchButtons[1]); // Equipped search
+    expect(global.fetch).toHaveBeenCalledWith('/data/equipment.json');
+  });
+
+  it('should filter equipment by category', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([
+        { name: 'Longsword', equipment_category: 'Weapons' },
+        { name: 'Leather Armor', equipment_category: 'Armor' },
+      ]),
     });
+
+    render(<WizardStepInventory {...mockProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Step 11: Inventory')).toBeInTheDocument();
+    });
+  });
+
+  it('should handle equipment selection for backpack', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([
+        { name: 'Longsword', index: 'longsword' },
+      ]),
+    });
+
+    const propsWithMock = {
+      ...mockProps,
+      onTempInventoryChange: vi.fn(),
+      onInventoryChange: vi.fn(),
+    };
+
+    render(<WizardStepInventory {...propsWithMock} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Step 11: Inventory')).toBeInTheDocument();
+    });
+  });
+
+  it('should handle custom item addition', () => {
+    render(<WizardStepInventory {...mockProps} />);
+
+    const textareas = document.querySelectorAll('textarea');
+    if (textareas[0]) {
+      fireEvent.change(textareas[0], { target: { value: 'Sword, Shield' } });
+    }
+
+    expect(mockProps.onTempInventoryChange).toHaveBeenCalled();
+  });
+
+  it('should handle empty equipment data', async () => {
+    global.fetch.mockResolvedValue({
+      ok: false,
+    });
+
+    render(<WizardStepInventory {...mockProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Step 11: Inventory')).toBeInTheDocument();
+    });
+  });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import rules from './rules';
 import classRules from './class-rules';
 import raceRules from './race-rules';
@@ -38,6 +38,10 @@ vi.mock('./race-rules', () => ({
     getTraits: vi.fn()
        }
      }));
+
+// Mock fetch for loadPassiveSkills and loadSkills
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
 describe('rules', () => {
   describe('getAbilityLongName', () => {
@@ -781,4 +785,1293 @@ describe('rules', () => {
       expect(proficiencies).toContain('Armor: Medium Armor');
        });
         });
+
+  describe('getAbilities', () => {
+    beforeEach(() => {
+      // Mock fetch for loadSkills and loadPassiveSkills with fallback data
+      mockFetch.mockReset();
+      mockFetch.mockImplementation((url) => {
+        if (url.includes('ability-scores.json')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve([
+              { full_name: 'Strength', skills: ['Athletics'] },
+              { full_name: 'Dexterity', skills: ['Stealth', 'Acrobatics'] },
+              { full_name: 'Constitution', skills: [] },
+              { full_name: 'Intelligence', skills: ['Arcana', 'History'] },
+              { full_name: 'Wisdom', skills: ['Perception', 'Insight'] },
+              { full_name: 'Charisma', skills: ['Persuasion', 'Deception'] }
+            ])
+          });
+        }
+        if (url.includes('passive-skills.json')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(['Insight', 'Investigation', 'Perception'])
+          });
+        }
+        return Promise.reject(new Error('Unknown URL'));
+      });
+
+      raceRules.getRacialBonus.mockReturnValue(0);
+    });
+
+    it('should calculate abilities with correct totalScore and bonus', async () => {
+      const playerStats = {
+        level: 5,
+        abilities: [
+          { name: 'Strength', baseScore: 15, abilityImprovements: 2, miscBonus: 0 },
+          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Constitution', baseScore: 13, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
+        ],
+        class: {
+          name: 'Fighter',
+          saving_throws: ['Strength', 'Constitution']
+        },
+        skillProficiencies: ['Athletics', 'Perception'],
+        expertise: []
+      };
+
+      const abilities = await rules.getAbilities(playerStats);
+
+      expect(abilities).toHaveLength(6);
+      const str = abilities.find(a => a.name === 'Strength');
+      expect(str.totalScore).toBe(17); // 15 + 2 + 0 + 0
+      expect(str.bonus).toBe(3); // (17-10)/2
+      expect(str.proficient).toBe(true);
+      const proficiency = Math.floor((5 - 1) / 4 + 2); // 3
+      expect(str.save).toBe(str.bonus + proficiency); // 3 + 3 = 6
+    });
+
+    it('should apply racial bonus from raceRules.getRacialBonus', async () => {
+      raceRules.getRacialBonus.mockReturnValue(2);
+
+      const playerStats = {
+        level: 1,
+        abilities: [
+          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+        ],
+        class: {
+          name: 'Fighter',
+          saving_throws: []
+        },
+        skillProficiencies: [],
+        expertise: []
+      };
+
+      const abilities = await rules.getAbilities(playerStats);
+
+      const str = abilities.find(a => a.name === 'Strength');
+      expect(str.totalScore).toBe(17); // 15 + 0 + 0 + 2 (racial)
+      expect(raceRules.getRacialBonus).toHaveBeenCalled();
+    });
+
+    it('should apply Barbarian Primal Champion bonus at level 20+', async () => {
+      const playerStats = {
+        level: 20,
+        abilities: [
+          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Constitution', baseScore: 14, abilityImprovements: 0, miscBonus: 0 }
+        ],
+        class: {
+          name: 'Barbarian',
+          saving_throws: []
+        },
+        skillProficiencies: [],
+        expertise: []
+      };
+
+      const abilities = await rules.getAbilities(playerStats);
+
+      const str = abilities.find(a => a.name === 'Strength');
+      expect(str.totalScore).toBe(19); // 15 + 0 + 0 + 4 (Primal Champion)
+      const con = abilities.find(a => a.name === 'Constitution');
+      expect(con.totalScore).toBe(18); // 14 + 0 + 0 + 4 (Primal Champion)
+    });
+
+    it('should not apply Primal Champion before level 20', async () => {
+      const playerStats = {
+        level: 19,
+        abilities: [
+          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+        ],
+        class: {
+          name: 'Barbarian',
+          saving_throws: []
+        },
+        skillProficiencies: [],
+        expertise: []
+      };
+
+      const abilities = await rules.getAbilities(playerStats);
+
+      const str = abilities.find(a => a.name === 'Strength');
+      expect(str.totalScore).toBe(15); // No Primal Champion yet
+    });
+
+    it('should calculate proficiency bonus based on level', async () => {
+      const playerStats = {
+        level: 1,
+        abilities: [
+          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+        ],
+        class: {
+          name: 'Fighter',
+          saving_throws: []
+        },
+        skillProficiencies: [],
+        expertise: []
+      };
+
+      const abilities = await rules.getAbilities(playerStats);
+      const proficiency = Math.floor((1 - 1) / 4 + 2); // 2
+      // skillProficiencies is empty, so the skill won't be proficient
+      // bonus should just be the ability bonus
+      const str = abilities[0];
+      expect(str.skills[0].bonus).toBe(str.bonus); // Not proficient, no proficiency added
+    });
+
+    it('should apply expertise bonus for Rogues', async () => {
+      const playerStats = {
+        level: 5,
+        abilities: [
+          { name: 'Dexterity', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+        ],
+        class: {
+          name: 'Rogue',
+          saving_throws: []
+        },
+        skillProficiencies: ['Stealth'],
+        expertise: ['Stealth']
+      };
+
+      const abilities = await rules.getAbilities(playerStats);
+      const dex = abilities.find(a => a.name === 'Dexterity');
+      const stealth = dex.skills.find(s => s.name === 'Stealth');
+      const proficiency = Math.floor((5 - 1) / 4 + 2); // 3
+      expect(stealth.bonus).toBe(dex.bonus + proficiency + proficiency); // Double proficiency
+    });
+
+    it('should add skills from ability-scores.json', async () => {
+      const playerStats = {
+        level: 1,
+        abilities: [
+          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+        ],
+        class: {
+          name: 'Fighter',
+          saving_throws: []
+        },
+        skillProficiencies: [],
+        expertise: []
+      };
+
+      const abilities = await rules.getAbilities(playerStats);
+
+      const str = abilities.find(a => a.name === 'Strength');
+      expect(str.skills).toContainEqual(expect.objectContaining({ name: 'Athletics', ability: 'Strength' }));
+    });
+  });
+
+  describe('getArmorClass', () => {
+    const createEquipment = () => [
+      { name: 'Leather Armor', equipment_category: 'Armor', armor_class: { base: 11, dex_bonus: true, max_bonus: null } },
+      { name: 'Chain Mail', equipment_category: 'Armor', armor_class: { base: 16, dex_bonus: false } },
+      { name: 'Breastplate', equipment_category: 'Armor', armor_class: { base: 14, dex_bonus: true, max_bonus: 2 } },
+      { name: 'Shield', equipment_category: 'Armor', armor_class: { base: 2 } },
+      { name: 'Longsword', equipment_category: 'Weapon', weapon_range: 'Melee', damage: { damage_dice: '1d8', damage_type: 'Slashing' } }
+    ];
+
+    it('should calculate AC for unarmored character', () => {
+      const playerStats = {
+        class: { name: 'Wizard' },
+        abilities: [
+          { name: 'Dexterity', bonus: 3 },
+          { name: 'Constitution', bonus: 2 },
+          { name: 'Wisdom', bonus: 1 }
+        ],
+        inventory: { equipped: [] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(13); // 10 + 3 (dex)
+    });
+
+    it('should calculate AC with armor', () => {
+      const playerStats = {
+        class: { name: 'Fighter' },
+        abilities: [
+          { name: 'Dexterity', bonus: 2 },
+          { name: 'Constitution', bonus: 2 },
+          { name: 'Wisdom', bonus: 1 }
+        ],
+        inventory: { equipped: ['Leather Armor'] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(13); // 11 (leather) + 2 (dex)
+    });
+
+    it('should calculate AC with armor and max dex bonus', () => {
+      const playerStats = {
+        class: { name: 'Fighter' },
+        abilities: [
+          { name: 'Dexterity', bonus: 4 },
+          { name: 'Constitution', bonus: 2 },
+          { name: 'Wisdom', bonus: 1 }
+        ],
+        inventory: { equipped: ['Breastplate'] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(16); // 14 (breastplate) + 2 (max dex bonus)
+    });
+
+    it('should calculate AC with shield', () => {
+      const playerStats = {
+        class: { name: 'Fighter' },
+        abilities: [
+          { name: 'Dexterity', bonus: 2 },
+          { name: 'Constitution', bonus: 2 },
+          { name: 'Wisdom', bonus: 1 }
+        ],
+        inventory: { equipped: ['Leather Armor', 'Shield'] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(15); // 11 + 2 + 2 (shield)
+    });
+
+    it('should calculate AC with magic armor', () => {
+      const playerStats = {
+        class: { name: 'Fighter' },
+        abilities: [
+          { name: 'Dexterity', bonus: 2 },
+          { name: 'Constitution', bonus: 2 },
+          { name: 'Wisdom', bonus: 1 }
+        ],
+        inventory: { equipped: ['+1 Leather Armor'] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(14); // 11 (leather) + 2 (dex) + 1 (magic)
+    });
+
+    it('should calculate AC with magic shield', () => {
+      const playerStats = {
+        class: { name: 'Fighter' },
+        abilities: [
+          { name: 'Dexterity', bonus: 2 },
+          { name: 'Constitution', bonus: 2 },
+          { name: 'Wisdom', bonus: 1 }
+        ],
+        inventory: { equipped: ['Leather Armor', '+2 Shield'] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(17); // 11 + 2 + 2 (shield) + 2 (magic shield)
+    });
+
+    it('should apply Monk wisdom bonus to AC', () => {
+      const playerStats = {
+        class: { name: 'Monk' },
+        abilities: [
+          { name: 'Dexterity', bonus: 2 },
+          { name: 'Constitution', bonus: 2 },
+          { name: 'Wisdom', bonus: 3 }
+        ],
+        inventory: { equipped: [] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(15); // 10 + 2 (dex) + 3 (wisdom for Monk)
+    });
+
+    it('should apply Barbarian unarmored defense', () => {
+      const playerStats = {
+        class: { name: 'Barbarian' },
+        abilities: [
+          { name: 'Dexterity', bonus: 2 },
+          { name: 'Constitution', bonus: 3 }
+        ],
+        inventory: { equipped: [] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(15); // 10 + 2 (dex) + 3 (con for Barbarian)
+    });
+
+    it('should apply Draconic Sorcerer unarmored defense', () => {
+      const playerStats = {
+        class: {
+          name: 'Sorcerer',
+          subclass: { name: 'Draconic' }
+        },
+        abilities: [
+          { name: 'Dexterity', bonus: 2 },
+          { name: 'Constitution', bonus: 2 }
+        ],
+        inventory: { equipped: [] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(15); // 13 + 2 (dex) for Draconic
+    });
+
+    it('should apply Defense fighting style', () => {
+      const playerStats = {
+        class: {
+          name: 'Fighter',
+          fightingStyles: ['Defense']
+        },
+        abilities: [
+          { name: 'Dexterity', bonus: 2 }
+        ],
+        inventory: { equipped: ['Leather Armor'] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(14); // 11 + 2 + 1 (Defense)
+    });
+
+    it('should apply Cloak of Protection', () => {
+      const playerStats = {
+        class: { name: 'Wizard' },
+        abilities: [
+          { name: 'Dexterity', bonus: 2 }
+        ],
+        inventory: {
+          equipped: [],
+          magicItems: [{ name: 'Cloak of Protection' }]
+        }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(13); // 10 + 2 (dex) + 1 (Cloak)
+    });
+
+    it('should apply Ring of Protection', () => {
+      const playerStats = {
+        class: { name: 'Wizard' },
+        abilities: [
+          { name: 'Dexterity', bonus: 2 }
+        ],
+        inventory: {
+          equipped: [],
+          magicItems: [{ name: 'Ring of Protection' }]
+        }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(13); // 10 + 2 (dex) + 1 (Ring)
+    });
+
+    it('should return AC contributions formula', () => {
+      const playerStats = {
+        class: { name: 'Wizard' },
+        abilities: [
+          { name: 'Dexterity', bonus: 3 }
+        ],
+        inventory: { equipped: [] }
+      };
+
+      const [ac, formula] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(13);
+      expect(formula).toContain('Unarmored AC (10)');
+      expect(formula).toContain('Dexterity Bonus (3)');
+    });
+  });
+
+  describe('getAttacks', () => {
+    const createEquipment = () => [
+      { name: 'Longsword', equipment_category: 'Weapon', weapon_range: 'Melee', damage: { damage_dice: '1d8', damage_type: 'Slashing' }, range: { normal: 5 } },
+      { name: 'Shortbow', equipment_category: 'Weapon', weapon_range: 'Ranged', damage: { damage_dice: '1d6', damage_type: 'Piercing' }, range: { normal: 150 } },
+      { name: 'Dagger', equipment_category: 'Weapon', weapon_range: 'Melee', damage: { damage_dice: '1d4', damage_type: 'Piercing' }, range: { normal: 5 } }
+    ];
+
+    const createSpells = () => [
+      { name: 'Fireball', level: 3, damage: { damage_at_slot_level: { '3': '8d6' }, damage_type: 'Fire' }, range: 150, casting_time: '1 action' },
+      { name: 'Magic Missile', level: 1, damage: { damage_at_slot_level: { '1': '3d4+3' }, damage_type: 'Force' }, range: 120, casting_time: '1 action' },
+      { name: 'Light', level: 0, damage_type: 'Light' },
+      { name: 'Mage Hand', level: 0, damage_type: 'Conjuration' }
+    ];
+
+    it('should add melee weapon attack', () => {
+      const playerStats = {
+        level: 5,
+        class: { name: 'Fighter' },
+        abilities: [
+          { name: 'Strength', bonus: 3 },
+          { name: 'Dexterity', bonus: 2 }
+        ],
+        inventory: { equipped: ['Longsword'] },
+        spellAbilities: null
+      };
+
+      const attacks = rules.getAttacks(createEquipment(), createSpells(), playerStats);
+
+      expect(attacks).toContainEqual(expect.objectContaining({
+        name: 'Longsword',
+        damage: '1d8+3',
+        damageType: 'Slashing',
+        type: 'Action'
+      }));
+    });
+
+    it('should add ranged weapon attack', () => {
+      const playerStats = {
+        level: 5,
+        class: { name: 'Ranger' },
+        abilities: [
+          { name: 'Dexterity', bonus: 3 }
+        ],
+        inventory: { equipped: ['Shortbow'] },
+        spellAbilities: null
+      };
+
+      const attacks = rules.getAttacks(createEquipment(), createSpells(), playerStats);
+
+      expect(attacks).toContainEqual(expect.objectContaining({
+        name: 'Shortbow',
+        damage: '1d6+3',
+        damageType: 'Piercing',
+        type: 'Action'
+      }));
+    });
+
+    it('should add magic weapon attack with bonus', () => {
+      const playerStats = {
+        level: 5,
+        class: { name: 'Fighter' },
+        abilities: [
+          { name: 'Strength', bonus: 3 },
+          { name: 'Dexterity', bonus: 2 }
+        ],
+        inventory: { equipped: ['+1 Longsword'] },
+        spellAbilities: null
+      };
+
+      const attacks = rules.getAttacks(createEquipment(), createSpells(), playerStats);
+
+      expect(attacks).toContainEqual(expect.objectContaining({
+        name: '+1 Longsword',
+        type: 'Action'
+      }));
+      const longsword = attacks.find(a => a.name === '+1 Longsword');
+      expect(longsword.damage).toBe('1d8+4'); // 1d8 + 3 (str) + 1 (magic)
+    });
+
+    it('should handle dual wielding', () => {
+      const playerStats = {
+        level: 5,
+        class: { name: 'Fighter' },
+        abilities: [
+          { name: 'Strength', bonus: 3 },
+          { name: 'Dexterity', bonus: 2 }
+        ],
+        inventory: { equipped: ['Longsword', 'Dagger'] },
+        spellAbilities: null
+      };
+
+      const attacks = rules.getAttacks(createEquipment(), createSpells(), playerStats);
+
+      expect(attacks).toContainEqual(expect.objectContaining({
+        name: 'Longsword',
+        type: 'Action'
+      }));
+      expect(attacks).toContainEqual(expect.objectContaining({
+        name: 'Dagger',
+        type: 'Bonus Action'
+      }));
+    });
+
+    it('should add Monk unarmed strikes', () => {
+      const playerStats = {
+        level: 5,
+        class: {
+          name: 'Monk',
+          class_levels: [
+            null, null, null, null, {
+              class_specific: {
+                martial_arts: { dice_count: 1, dice_value: 6 }
+              }
+            }
+          ]
+        },
+        abilities: [
+          { name: 'Dexterity', bonus: 3 }
+        ],
+        inventory: { equipped: [] },
+        spellAbilities: null
+      };
+
+      const attacks = rules.getAttacks(createEquipment(), createSpells(), playerStats);
+
+      const unarmed = attacks.filter(a => a.name === 'Unarmed Strike');
+      expect(unarmed).toHaveLength(2); // Action and Bonus Action
+      expect(unarmed[0].damage).toBe('1d6+3');
+    });
+
+    it('should add spell attacks', () => {
+      const playerStats = {
+        level: 5,
+        class: { name: 'Wizard' },
+        abilities: [
+          { name: 'Intelligence', bonus: 3 }
+        ],
+        inventory: { equipped: [] },
+        spellAbilities: {
+          modifier: 3,
+          spells: [
+            { name: 'Fireball', prepared: 'Prepared' }
+          ]
+        }
+      };
+
+      const attacks = rules.getAttacks(createEquipment(), createSpells(), playerStats);
+
+      const fireball = attacks.find(a => a.name === 'Fireball');
+      expect(fireball).toBeDefined();
+      expect(fireball.damage).toBe('8d6');
+      expect(fireball.hitBonus).toBe(3);
+    });
+
+    it('should apply Archery fighting style to ranged attacks', () => {
+      const playerStats = {
+        level: 5,
+        class: {
+          name: 'Ranger',
+          fightingStyles: ['Archery']
+        },
+        abilities: [
+          { name: 'Dexterity', bonus: 3 }
+        ],
+        inventory: { equipped: ['Shortbow'] },
+        spellAbilities: null
+      };
+
+      const attacks = rules.getAttacks(createEquipment(), createSpells(), playerStats);
+
+      const shortbow = attacks.find(a => a.name === 'Shortbow');
+      const proficiency = Math.floor((5 - 1) / 4 + 2); // 3
+      expect(shortbow.hitBonus).toBe(3 + proficiency + 2); // 3 (dex) + 3 (prof) + 2 (Archery) = 8
+    });
+
+    it('should use finesse (dex) for melee if higher', () => {
+      const playerStats = {
+        level: 5,
+        class: { name: 'Fighter' },
+        abilities: [
+          { name: 'Strength', bonus: 2 },
+          { name: 'Dexterity', bonus: 4 }
+        ],
+        inventory: { equipped: ['Longsword'] },
+        spellAbilities: null
+      };
+
+      const attacks = rules.getAttacks(createEquipment(), createSpells(), playerStats);
+
+      const longsword = attacks.find(a => a.name === 'Longsword');
+      expect(longsword.damage).toContain('4'); // Using dex bonus (4)
+    });
+  });
+
+  describe('getSpellAbilities', () => {
+    const createSpells = () => [
+      { name: 'Fireball', level: 3, damage: { damage_at_slot_level: { '3': '8d6' }, damage_type: 'Fire' } },
+      { name: 'Magic Missile', level: 1, damage: { damage_at_slot_level: { '1': '3d4+3' }, damage_type: 'Force' } },
+      { name: 'Light', level: 0, damage_type: 'Light' },
+      { name: 'Mage Hand', level: 0, damage_type: 'Conjuration' }
+    ];
+
+    it('should return null when no spellcasting', () => {
+      const playerStats = {
+        level: 1,
+        race: {},
+        class: {
+          class_levels: [{}]
+        },
+        abilities: [],
+        spells: []
+      };
+
+      const result = rules.getSpellAbilities(createSpells(), playerStats);
+
+      expect(result).toBeNull();
+    });
+
+    it('should calculate spell abilities for wizard', () => {
+      const playerStats = {
+        level: 5,
+        race: {},
+        class: {
+          name: 'Wizard',
+          spell_casting_ability: 'Intelligence',
+          class_levels: [
+            null, null, null, null, {
+              spellcasting: {
+                spellCastingAbility: 'Intelligence',
+                cantrips_known: 3,
+                spells_known: 6
+              }
+            }
+          ]
+        },
+        abilities: [
+          { name: 'Intelligence', bonus: 3 }
+        ],
+        proficiency: 3,
+        spells: ['Fireball', 'Magic Missile']
+      };
+
+      const result = rules.getSpellAbilities(createSpells(), playerStats);
+
+      expect(result).not.toBeNull();
+      expect(result.spellCastingAbility).toBe('Intelligence');
+      expect(result.modifier).toBe(3);
+      expect(result.toHit).toBe(6); // 3 + 3
+      expect(result.saveDc).toBe(14); // 8 + 3 + 3
+      expect(result.spells.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should add Tiefling racial spells', () => {
+      const playerStats = {
+        level: 5,
+        race: { name: 'Tiefling' },
+        class: {
+          name: 'Sorcerer',
+          spell_casting_ability: 'Charisma',
+          class_levels: [
+            null, null, null, null, {
+              spellcasting: {
+                spellCastingAbility: 'Charisma',
+                cantrips_known: 3,
+                spells_known: 6
+              }
+            }
+          ]
+        },
+        abilities: [
+          { name: 'Charisma', bonus: 2 }
+        ],
+        proficiency: 3,
+        spells: []
+      };
+
+      const result = rules.getSpellAbilities(createSpells(), playerStats);
+
+      expect(result.spells).toContainEqual(expect.objectContaining({ name: 'Thaumaturgy', prepared: 'Always' }));
+      expect(result.spells).toContainEqual(expect.objectContaining({ name: 'Hellish Rebuke', prepared: 'Always' }));
+    });
+
+    it('should add High Elf racial cantrip', () => {
+      const playerStats = {
+        level: 1,
+        race: { subrace: { name: 'High Elf' } },
+        class: {
+          name: 'Wizard',
+          spell_casting_ability: 'Intelligence',
+          class_levels: [
+            {
+              spellcasting: {
+                spellCastingAbility: 'Intelligence',
+                cantrips_known: 3,
+                spells_known: 6
+              }
+            }
+          ]
+        },
+        abilities: [
+          { name: 'Intelligence', bonus: 2 }
+        ],
+        proficiency: 2,
+        spells: []
+      };
+
+      const result = rules.getSpellAbilities(createSpells(), playerStats);
+
+      expect(result.cantrips_known).toBeGreaterThan(3); // Base + High Elf bonus
+    });
+
+    it('should add Forest Gnome racial cantrip', () => {
+      const playerStats = {
+        level: 1,
+        race: { subrace: { name: 'Forest Gnome' } },
+        class: {
+          name: 'Wizard',
+          spell_casting_ability: 'Intelligence',
+          class_levels: [
+            {
+              spellcasting: {
+                spellCastingAbility: 'Intelligence',
+                cantrips_known: 3,
+                spells_known: 6
+              }
+            }
+          ]
+        },
+        abilities: [
+          { name: 'Intelligence', bonus: 2 }
+        ],
+        proficiency: 2,
+        spells: []
+      };
+
+      const result = rules.getSpellAbilities(createSpells(), playerStats);
+
+      expect(result.spells).toContainEqual(expect.objectContaining({ name: 'Minor Illusion', prepared: 'Always' }));
+    });
+
+    it('should set all spells to Always for known spellcasters', () => {
+      const playerStats = {
+        level: 5,
+        race: {},
+        class: {
+          name: 'Bard',
+          spell_casting_ability: 'Charisma',
+          class_levels: [
+            null, null, null, null, {
+              spellcasting: {
+                spellCastingAbility: 'Charisma',
+                cantrips_known: 2,
+                spells_known: 8
+              }
+            }
+          ]
+        },
+        abilities: [
+          { name: 'Charisma', bonus: 3 }
+        ],
+        proficiency: 3,
+        spells: ['Fireball']
+      };
+
+      const result = rules.getSpellAbilities(createSpells(), playerStats);
+
+      const fireball = result.spells.find(s => s.name === 'Fireball');
+      expect(fireball.prepared).toBe('Always');
+    });
+
+    it('should calculate maxPreparedSpells for prepared casters', () => {
+      const playerStats = {
+        level: 5,
+        race: {},
+        class: {
+          name: 'Cleric',
+          spell_casting_ability: 'Wisdom',
+          class_levels: [
+            null, null, null, null, {
+              spellcasting: {
+                spellCastingAbility: 'Wisdom',
+                cantrips_known: 3,
+                spells_known: null
+              }
+            }
+          ]
+        },
+        abilities: [
+          { name: 'Wisdom', bonus: 3 }
+        ],
+        proficiency: 3,
+        spells: ['Fireball']
+      };
+
+      const result = rules.getSpellAbilities(createSpells(), playerStats);
+
+      expect(result.maxPreparedSpells).toBe(8); // 3 (wis) + 5 (level)
+    });
+
+    it('should apply Eldritch Knight school limits', () => {
+      const playerStats = {
+        level: 5,
+        race: {},
+        class: {
+          name: 'Fighter',
+          spell_casting_ability: 'Intelligence',
+          subclass: { name: 'Eldritch Knight' },
+          class_levels: [
+            null, null, null, null, {
+              spellcasting: {
+                spellCastingAbility: 'Intelligence',
+                cantrips_known: 3,
+                spells_known: 8
+              }
+            }
+          ]
+        },
+        abilities: [
+          { name: 'Intelligence', bonus: 3 }
+        ],
+        proficiency: 3,
+        spells: ['Fireball']
+      };
+
+      const result = rules.getSpellAbilities(createSpells(), playerStats);
+
+      expect(result.schoolLimits).toEqual(['abjuration', 'evocation']);
+    });
+
+    it('should add cantrip for Land Druid subclass', () => {
+      const playerStats = {
+        level: 5,
+        race: {},
+        class: {
+          name: 'Druid',
+          spell_casting_ability: 'Wisdom',
+          subclass: { name: 'Land' },
+          class_levels: [
+            null, null, null, null, {
+              spellcasting: {
+                spellCastingAbility: 'Wisdom',
+                cantrips_known: 2,
+                spells_known: 8
+              }
+            }
+          ]
+        },
+        abilities: [
+          { name: 'Wisdom', bonus: 3 }
+        ],
+        proficiency: 3,
+        spells: []
+      };
+
+      const result = rules.getSpellAbilities(createSpells(), playerStats);
+
+      expect(result.cantrips_known).toBe(3); // 2 + 1 for Land
+    });
+
+    it('should add subclass spells for characters meeting prerequisites', () => {
+      const allSpells = [
+        { name: 'Flame Strike', level: 5, classes: ['Druid'] }
+      ];
+      const playerStats = {
+        level: 5,
+        race: {},
+        class: {
+          name: 'Druid',
+          spell_casting_ability: 'Wisdom',
+          subclass: {
+            name: 'Land',
+            circle: 'Land',
+            spells: [
+              { spell: { name: 'Flame Strike' }, prerequisites: [{ index: 'level-5' }, { name: 'circle-Land' }] }
+            ]
+          },
+          class_levels: [
+            null, null, null, null, {
+              spellcasting: {
+                spellCastingAbility: 'Wisdom',
+                cantrips_known: 2,
+                spells_known: 8
+              }
+            }
+          ]
+        },
+        abilities: [
+          { name: 'Wisdom', bonus: 3 }
+        ],
+        proficiency: 3,
+        spells: []
+      };
+
+      const result = rules.getSpellAbilities(allSpells, playerStats);
+
+      const flameStrike = result.spells.find(s => s.name === 'Flame Strike');
+      expect(flameStrike).toBeDefined();
+      expect(flameStrike.prepared).toBe('Always');
+    });
+
+    it('should skip subclass spells not meeting prerequisites', () => {
+      const allSpells = [
+        { name: 'Flame Strike', level: 5, classes: ['Druid'] }
+      ];
+      const playerStats = {
+        level: 3, // Doesn't meet level-5 prerequisite
+        race: {},
+        class: {
+          name: 'Druid',
+          spell_casting_ability: 'Wisdom',
+          subclass: {
+            name: 'Land',
+            spells: [
+              { spell: { name: 'Flame Strike' }, prerequisites: [{ index: 'level-5' }, { name: 'circle-Land' }] }
+            ]
+          },
+          class_levels: [
+            null, null, {
+              spellcasting: {
+                spellCastingAbility: 'Wisdom',
+                cantrips_known: 2,
+                spells_known: 8
+              }
+            }
+          ]
+        },
+        abilities: [
+          { name: 'Wisdom', bonus: 3 }
+        ],
+        proficiency: 2,
+        spells: []
+      };
+
+      const result = rules.getSpellAbilities(allSpells, playerStats);
+
+      const flameStrike = result.spells.find(s => s.name === 'Flame Strike');
+      expect(flameStrike).toBeUndefined();
+    });
+
+    it('should set spells_known to null for Druid', () => {
+      const allSpells = [
+        { name: 'Fireball', level: 3, classes: ['Druid'], damage: { damage_at_slot_level: { '3': '8d6' } } },
+        { name: 'Magic Missile', level: 1, classes: ['Wizard'], damage: { damage_at_slot_level: { '1': '3d4+3' } } },
+        { name: 'Entangle', level: 1, classes: ['Druid'] },
+        { name: 'Flame Strike', level: 5, classes: ['Druid'] }
+      ];
+      const playerStats = {
+        level: 5,
+        race: {},
+        class: {
+          name: 'Druid',
+          spell_casting_ability: 'Wisdom',
+          class_levels: [
+            null, null, null, null, {
+              spellcasting: {
+                spellCastingAbility: 'Wisdom',
+                cantrips_known: 2,
+                spells_known: 8,
+                spell_slots_level_1: 4,
+                spell_slots_level_2: 3,
+                spell_slots_level_3: 3
+              }
+            }
+          ]
+        },
+        abilities: [
+          { name: 'Wisdom', bonus: 3 }
+        ],
+        proficiency: 3,
+        spells: ['Fireball']
+      };
+
+      const result = rules.getSpellAbilities(allSpells, playerStats);
+
+      expect(result.spells_known).toBeNull();
+      // Should have Fireball (from player) and some Druid spells up to level 3
+      expect(result.spells.length).toBeGreaterThan(1);
+    });
+
+    it('should set spells_known to null for Paladin', () => {
+      const playerStats = {
+        level: 5,
+        race: {},
+        class: {
+          name: 'Paladin',
+          spell_casting_ability: 'Charisma',
+          class_levels: [
+            null, null, null, null, {
+              spellcasting: {
+                spellCastingAbility: 'Charisma',
+                cantrips_known: 0,
+                spells_known: 4
+              }
+            }
+          ]
+        },
+        abilities: [
+          { name: 'Charisma', bonus: 3 }
+        ],
+        proficiency: 3,
+        spells: ['Fireball']
+      };
+
+      const result = rules.getSpellAbilities(createSpells(), playerStats);
+
+      expect(result.spells_known).toBeNull();
+    });
+
+    it('should add subclass spells for Land Druid', () => {
+      const playerStats = {
+        level: 5,
+        race: {},
+        class: {
+          name: 'Druid',
+          spell_casting_ability: 'Wisdom',
+          subclass: {
+            name: 'Land',
+            spells: [
+              { spell: { name: 'Flame Strike' }, prerequisites: [{ index: 'level-5' }, { name: 'circle-Land' }] }
+            ]
+          },
+          class_levels: [
+            null, null, null, null, {
+              spellcasting: {
+                spellCastingAbility: 'Wisdom',
+                cantrips_known: 2,
+                spells_known: 8
+              }
+            }
+          ]
+        },
+        abilities: [
+          { name: 'Wisdom', bonus: 3 }
+        ],
+        proficiency: 3,
+        spells: []
+      };
+
+      const result = rules.getSpellAbilities(createSpells(), playerStats);
+
+      // Land Druid gets bonus cantrip
+      expect(result.cantrips_known).toBeGreaterThan(2);
+    });
+
+    it('should calculate maxPreparedSpells for Paladin', () => {
+      const playerStats = {
+        level: 5,
+        race: {},
+        class: {
+          name: 'Paladin',
+          spell_casting_ability: 'Charisma',
+          class_levels: [
+            null, null, null, null, {
+              spellcasting: {
+                spellCastingAbility: 'Charisma',
+                cantrips_known: 0,
+                spells_known: 4
+              }
+            }
+          ]
+        },
+        abilities: [
+          { name: 'Charisma', bonus: 3 }
+        ],
+        proficiency: 3,
+        spells: ['Fireball']
+      };
+
+      const result = rules.getSpellAbilities(createSpells(), playerStats);
+
+      // maxPreparedSpells = charisma bonus + floor(level/2) = 3 + 2 = 5
+      expect(result.maxPreparedSpells).toBe(5);
+    });
+  });
+
+  describe('getPlayerStats', () => {
+    beforeEach(() => {
+      classRules.getClass.mockReturnValue({
+        name: 'Fighter',
+        hit_die: 10,
+        saving_throws: ['Strength', 'Constitution'],
+        proficiencies: [],
+        class_levels: [
+          {
+            spellcasting: null
+          }
+        ]
+      });
+
+      raceRules.getRace.mockReturnValue({
+        name: 'Human',
+        languages: ['Common'],
+        starting_proficiencies: [],
+        traits: []
+      });
+
+      raceRules.getImmunities.mockReturnValue([]);
+      raceRules.getResistances.mockReturnValue([]);
+      raceRules.getSenses.mockReturnValue([]);
+      raceRules.getTraits.mockReturnValue({
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: [],
+        characterAdvancement: []
+      });
+
+      raceRules.getRacialBonus.mockReturnValue(0);
+
+      // Mock fetch for loadSkills and loadPassiveSkills
+      mockFetch.mockImplementation((url) => {
+        if (url.includes('ability-scores.json')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve([
+              { full_name: 'Strength', skills: ['Athletics'] },
+              { full_name: 'Dexterity', skills: ['Stealth'] },
+              { full_name: 'Constitution', skills: [] },
+              { full_name: 'Intelligence', skills: ['Arcana'] },
+              { full_name: 'Wisdom', skills: ['Perception'] },
+              { full_name: 'Charisma', skills: ['Persuasion'] }
+            ])
+          });
+        }
+        if (url.includes('passive-skills.json')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(['Insight', 'Investigation', 'Perception'])
+          });
+        }
+        return Promise.reject(new Error('Unknown URL'));
+      });
+    });
+
+    it('should build complete player stats', async () => {
+      const allClasses = [{ name: 'Fighter', hit_die: 10 }];
+      const allEquipment = [];
+      const allMagicItems = [];
+      const allRaces = [{ name: 'Human' }];
+      const allSpells = [];
+      const playerSummary = {
+        level: 1,
+        abilities: [
+          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Constitution', baseScore: 13, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
+        ],
+        inventory: { equipped: [], magicItems: [] },
+        skillProficiencies: [],
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: []
+      };
+
+      const result = await rules.getPlayerStats(allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary);
+
+      expect(result).toHaveProperty('proficiency');
+      expect(result).toHaveProperty('class');
+      expect(result).toHaveProperty('race');
+      expect(result).toHaveProperty('abilities');
+      expect(result).toHaveProperty('hitPoints');
+      expect(result).toHaveProperty('initiative');
+      expect(result).toHaveProperty('armorClass');
+      expect(result).toHaveProperty('attacks');
+      expect(result).toHaveProperty('actions');
+      expect(result).toHaveProperty('bonusActions');
+      expect(result).toHaveProperty('reactions');
+      expect(result).toHaveProperty('languages');
+      expect(result).toHaveProperty('proficiencies');
+      expect(result).toHaveProperty('skillProficiencies');
+    });
+
+    it('should call all required services', async () => {
+      const allClasses = [{ name: 'Fighter', hit_die: 10 }];
+      const allEquipment = [];
+      const allMagicItems = [];
+      const allRaces = [{ name: 'Human' }];
+      const allSpells = [];
+      const playerSummary = {
+        level: 1,
+        abilities: [
+          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Constitution', baseScore: 13, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
+        ],
+        inventory: { equipped: [], magicItems: [] },
+        skillProficiencies: [],
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: []
+      };
+
+      await rules.getPlayerStats(allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary);
+
+      expect(classRules.getClass).toHaveBeenCalled();
+      expect(raceRules.getRace).toHaveBeenCalled();
+      expect(raceRules.getImmunities).toHaveBeenCalled();
+      expect(raceRules.getResistances).toHaveBeenCalled();
+      expect(raceRules.getSenses).toHaveBeenCalled();
+    });
+  });
+
+  describe('loadSkills and loadPassiveSkills', () => {
+    it('should use fallback skills when fetch fails', async () => {
+      mockFetch.mockImplementation(() => Promise.reject(new Error('Network error')));
+
+      // Reset the cached values by re-importing
+      vi.resetModules();
+      const freshRules = await import('./rules');
+
+      const playerStats = {
+        level: 1,
+        abilities: [
+          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+        ],
+        class: {
+          name: 'Fighter',
+          saving_throws: []
+        },
+        skillProficiencies: [],
+        expertise: []
+      };
+
+      const abilities = await freshRules.default.getAbilities(playerStats);
+      expect(abilities).toHaveLength(1);
+      expect(abilities[0].skills.length).toBeGreaterThan(0);
+    });
+
+    it('should load skills from fetch when available', async () => {
+      mockFetch.mockImplementation((url) => {
+        if (url.includes('ability-scores.json')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve([
+              { full_name: 'Strength', skills: ['Athletics', 'Custom Skill'] }
+            ])
+          });
+        }
+        if (url.includes('passive-skills.json')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(['Insight', 'Investigation', 'Perception'])
+          });
+        }
+        return Promise.reject(new Error('Unknown URL'));
+      });
+
+      vi.resetModules();
+      const freshRules = await import('./rules');
+
+      const playerStats = {
+        level: 1,
+        abilities: [
+          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+        ],
+        class: {
+          name: 'Fighter',
+          saving_throws: []
+        },
+        skillProficiencies: [],
+        expertise: []
+      };
+
+      const abilities = await freshRules.default.getAbilities(playerStats);
+      const str = abilities.find(a => a.name === 'Strength');
+      expect(str.skills).toContainEqual(expect.objectContaining({ name: 'Custom Skill' }));
+    });
+  });
 });
