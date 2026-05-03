@@ -58,7 +58,11 @@ const mockFetchData = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.spyOn(window, 'location', 'get').mockReturnValue({ hostname: 'localhost' });
+  window.alert = vi.fn();
+  Object.defineProperty(window, 'location', {
+    value: { hostname: 'localhost', reload: vi.fn() },
+    writable: true,
+  });
 
   window.sessionStorage = {
     getItem: vi.fn(() => null),
@@ -214,7 +218,7 @@ describe('App', () => {
   });
 
   it('should render rename campaign button when on localhost', async () => {
-    vi.spyOn(window, 'location', 'get').mockReturnValue({ hostname: 'localhost' });
+    Object.defineProperty(window, 'location', { value: { hostname: 'localhost', reload: vi.fn() }, writable: true });
     window.sessionStorage.getItem = vi.fn((key) => {
       if (key === 'currentCampaign') return 'test-campaign';
       return null;
@@ -228,7 +232,7 @@ describe('App', () => {
   });
 
   it('should disable rename campaign button when not on localhost', async () => {
-    vi.spyOn(window, 'location', 'get').mockReturnValue({ hostname: 'example.com' });
+    Object.defineProperty(window, 'location', { value: { hostname: 'example.com', reload: vi.fn() }, writable: true });
     window.sessionStorage.getItem = vi.fn((key) => {
       if (key === 'currentCampaign') return 'test-campaign';
       return null;
