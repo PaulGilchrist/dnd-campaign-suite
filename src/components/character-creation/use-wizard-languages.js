@@ -1,39 +1,24 @@
-import { useState, useEffect } from 'react';
+import useWizardConfig from '../../hooks/useWizardConfig.js';
 import { getLanguageLimits, getFightingStyleLimits, validateLanguagesAndFightingStyles } from '../../services/languages-fightingstyles-validation.js';
 
 function useWizardLanguages(formData) {
-  const [languageLimits, setLanguageLimits] = useState(null);
-  const [fightingStyleLimits, setFightingStyleLimits] = useState(null);
-  const [languageWarnings, setLanguageWarnings] = useState([]);
-  const [preSelectedLanguages, setPreSelectedLanguages] = useState([]);
-  const [preSelectedFightingStyles, setPreSelectedFightingStyles] = useState([]);
-
-  useEffect(() => {
-    const validate = async () => {
-      try {
-        const langLimits = await getLanguageLimits(formData);
-        const styleLimits = await getFightingStyleLimits(formData);
-        const warnings = await validateLanguagesAndFightingStyles(formData);
-        setLanguageLimits(langLimits);
-        setFightingStyleLimits(styleLimits);
-        setLanguageWarnings(warnings);
-        setPreSelectedLanguages(langLimits?.preSelected || []);
-        setPreSelectedFightingStyles(styleLimits?.preSelected || []);
-          } catch (error) {
-        console.error('Error validating languages and fighting styles:', error);
-            }
-          };
-
-    validate();
-      }, [formData.languages, formData.class?.fightingStyles, formData.class?.name, formData.race?.name, formData.background, formData.rules, formData.level]);
-
-  return {
+  const {
     languageLimits,
     fightingStyleLimits,
-    languageWarnings,
+    warnings: languageWarnings,
     preSelectedLanguages,
     preSelectedFightingStyles,
-     };
+  } = useWizardConfig({
+    formData,
+    validateFn: validateLanguagesAndFightingStyles,
+    slots: [
+      { get: getLanguageLimits, state: { initial: null, key: 'languageLimits' }, isLimit: true, preSelectedKey: 'preSelectedLanguages' },
+      { get: getFightingStyleLimits, state: { initial: null, key: 'fightingStyleLimits' }, isLimit: true, preSelectedKey: 'preSelectedFightingStyles' },
+    ],
+    getDeps: (f) => [f.languages, f.class?.fightingStyles, f.class?.name, f.race?.name, f.background, f.rules, f.level],
+  });
+
+  return { languageLimits, fightingStyleLimits, languageWarnings, preSelectedLanguages, preSelectedFightingStyles };
 }
 
 export default useWizardLanguages;

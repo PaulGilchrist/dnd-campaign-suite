@@ -1,40 +1,25 @@
-import { useState, useEffect } from 'react';
+import useWizardConfig from '../../hooks/useWizardConfig.js';
 import { getPreSelectedFeats } from '../../services/feat-validation.js';
 
 function useWizardFeats(formData, setFormData) {
-  const [preSelectedFeats, setPreSelectedFeats] = useState([]);
+  const { preSelectedFeats } = useWizardConfig({
+    formData,
+    setFormData,
+    validateFn: () => [],
+    slots: [],
+    getDeps: (f) => [f.background, f.rules],
+    preSelect: {
+      getFn: getPreSelectedFeats,
+      merge: (prev, items) => ({
+        ...prev,
+        feats: [...(prev.feats || []), ...items.filter(feat => !(prev.feats || []).includes(feat))]
+      }),
+      deps: (f) => [f.background, f.rules],
+      stateKey: 'preSelectedFeats'
+    }
+  });
 
-  useEffect(() => {
-    const preSelectFeats = async () => {
-      try {
-        const preSelected = await getPreSelectedFeats(formData);
-        setPreSelectedFeats(preSelected);
-
-         if (preSelected.length > 0) {
-          setFormData(prev => {
-            const currentFeats = prev.feats || [];
-            const missingFeats = preSelected.filter(feat => !currentFeats.includes(feat));
-
-            if (missingFeats.length > 0) {
-              return {
-                   ...prev,
-                feats: [...currentFeats, ...missingFeats]
-                 };
-               }
-            return prev;
-              });
-             }
-           } catch (error) {
-        console.error('Error pre-selecting feats:', error);
-           }
-       };
-
-    preSelectFeats();
-      }, [formData.background, formData.rules, setFormData]);
-
-  return {
-    preSelectedFeats,
-     };
+  return { preSelectedFeats };
 }
 
 export default useWizardFeats;

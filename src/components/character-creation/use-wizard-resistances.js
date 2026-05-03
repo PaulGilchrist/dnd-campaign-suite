@@ -1,60 +1,62 @@
-import { useState, useEffect } from 'react';
+import useWizardConfig from '../../hooks/useWizardConfig.js';
 import { getPreSelectedResistances, validateResistances } from '../../services/resistances-validation.js';
 
 function useWizardResistances(formData, setFormData) {
-  const [resistanceWarnings, setResistanceWarnings] = useState([]);
-  const [preSelectedResistancesList, setPreSelectedResistancesList] = useState({ resistances: [], immunities: [] });
-
-  useEffect(() => {
-    const validate = async () => {
-      try {
-        const warnings = await validateResistances(formData);
-        setResistanceWarnings(warnings);
-          } catch (error) {
-        console.error('Error validating resistances:', error);
-          }
-         };
-
-    validate();
-      }, [formData.resistances, formData.immunities, formData.class?.name, formData.race?.name, formData.race?.subrace?.name, formData.background, formData.rules, formData.level]);
-
-  useEffect(() => {
-    const preSelect = async () => {
-      try {
-        const preSelected = await getPreSelectedResistances(formData);
-        setPreSelectedResistancesList(preSelected);
-
-         if (preSelected.resistances.length > 0 || preSelected.immunities.length > 0) {
-          setFormData(prev => {
-            const currentResistances = prev.resistances || [];
-            const currentImmunities = prev.immunities || [];
-
-            const missingResistances = preSelected.resistances.filter(r => !currentResistances.includes(r));
-            const missingImmunities = preSelected.immunities.filter(i => !currentImmunities.includes(i));
-
-            if (missingResistances.length > 0 || missingImmunities.length > 0) {
-              return {
-                  ...prev,
-                resistances: [...currentResistances, ...missingResistances],
-                immunities: [...currentImmunities, ...missingImmunities]
-                 };
-               }
-            return prev;
-             });
-           }
-          } catch (error) {
-        console.error('Error pre-selecting resistances:', error);
-          }
-       };
-
-    preSelect();
-      }, [formData.race?.name, formData.race?.subrace?.name, formData.class?.name, formData.rules, setFormData]);
+  const result = useWizardConfig({
+    formData,
+    setFormData,
+    validateFn: validateResistances,
+    slots: [
+      {
+        get: getPreSelectedResistances,
+        state: {
+          initial: { resistances: [], immunities: [] },
+          key: 'preSelectedResistancesList'
+        },
+        isLimit: false
+      }
+    ],
+    getDeps: (f) => [
+      f.resistances,
+      f.immunities,
+      f.class?.name,
+      f.race?.name,
+      f.race?.subrace?.name,
+      f.background,
+      f.rules,
+      f.level
+    ],
+    preSelect: {
+      getFn: getPreSelectedResistances,
+      merge: (prev, items) => ({
+        ...prev,
+        resistances: [
+          ...(prev.resistances || []),
+          ...items.resistances.filter(r => !(prev.resistances || []).includes(r))
+        ],
+        immunities: [
+          ...(prev.immunities || []),
+          ...items.immunities.filter(i => !(prev.immunities || []).includes(i))
+        ]
+      }),
+      hasItems: (items) =>
+        (items.resistances?.length > 0 || items.immunities?.length > 0),
+      deps: (f) => [
+        f.race?.name,
+        f.race?.subrace?.name,
+        f.class?.name,
+        f.rules
+      ],
+      stateKey: 'preSelectedResistancesList',
+        stateInitial: { resistances: [], immunities: [] }
+      }
+  });
 
   return {
-    resistanceWarnings,
-    preSelectedResistancesList,
-    setResistanceWarnings,
-      };
+    preSelectedResistancesList: result.preSelectedResistancesList,
+    resistanceWarnings: result.warnings,
+    setResistanceWarnings: result.setWarnings
+  };
 }
 
 export default useWizardResistances;
