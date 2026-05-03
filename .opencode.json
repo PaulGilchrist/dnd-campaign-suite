@@ -8,15 +8,18 @@
         "Never execute GIT commands without explicit user confirmation.",
         "Always generate a step-by-step plan before making any code changes.",
         "Follow the project's coding-standards and architecture-rules skills at all times."
-    ],
-    "mcp": {
+      ],
+      "default_agent": "orchestrator",
+      "mcp": {
         "chrome-devtools": {
             "type": "local",
             "command": [
                 "npx",
                 "-y",
                 "chrome-devtools-mcp@latest"
-            ]
+            ],
+            "enabled": true,
+            "timeout": 30000
         }
     },
     "model": "ollama/qwen3.6:27b-coding-nvfp4"
