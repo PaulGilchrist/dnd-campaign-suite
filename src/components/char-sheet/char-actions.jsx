@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import usePopup from './common/use-popup'
 import { sanitizeHtml } from '../../services/sanitize.js';
+import { parseMagicItemName } from '../../services/attack-calc.js';
 import './char-actions.css'
 
 function CharActions({ playerStats }) {
@@ -28,10 +29,7 @@ function CharActions({ playerStats }) {
          }
 
          // Remove magic prefix if present
-        let nonMagicalName = weaponName;
-        if (nonMagicalName.charAt(0) === '+') {
-            nonMagicalName = nonMagicalName.substring(3);
-         }
+        const nonMagicalName = parseMagicItemName(weaponName).baseName;
 
          // Find the weapon in equipment
         const weapon = playerStats.equipment?.find(item => item.name === nonMagicalName);

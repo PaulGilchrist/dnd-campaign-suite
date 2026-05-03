@@ -1,17 +1,17 @@
 /**
- * Strip magic weapon prefix (+1, +2, +3) from weapon name.
- * @param {string} weaponName
+ * Strip magic item prefix (+1, +2, +3) from an item name.
+ * @param {string} itemName
  * @returns {{ baseName: string, magicBonus: number }}
  */
-export function parseMagicWeaponName(weaponName) {
-    if (weaponName && typeof weaponName === 'string' && weaponName.charAt(0) === '+') {
-        const magicBonus = Number(weaponName.charAt(1));
+export function parseMagicItemName(itemName) {
+    if (itemName && typeof itemName === 'string' && itemName.charAt(0) === '+') {
+        const magicBonus = Number(itemName.charAt(1));
         return {
-            baseName: weaponName.substring(3),
+            baseName: itemName.substring(3),
             magicBonus: isNaN(magicBonus) ? 0 : magicBonus,
         };
     }
-    return { baseName: weaponName, magicBonus: 0 };
+    return { baseName: itemName, magicBonus: 0 };
 }
 
 /**
@@ -24,7 +24,7 @@ export function parseMagicWeaponName(weaponName) {
 export function findEquippedWeapons(allEquipment, equipped, weaponRange) {
     return (equipped || []).filter(itemName => {
         if (!itemName || typeof itemName !== 'string') return false;
-        const { baseName } = parseMagicWeaponName(itemName);
+        const { baseName } = parseMagicItemName(itemName);
         const item = allEquipment.find(item => item.name === baseName);
         return item && item.equipment_category === 'Weapon' && item.weapon_range === weaponRange;
     });
@@ -53,7 +53,7 @@ export function buildWeaponAttack(opts) {
         includeAbilityBonusInDamage = true,
     } = opts;
 
-    const { magicBonus } = parseMagicWeaponName(weaponName);
+    const { magicBonus } = parseMagicItemName(weaponName);
 
     let damage = weapon.damage.damage_dice;
     let damageFormula = `Damage Formula = Weapon (${weapon.damage.damage_dice})`;

@@ -3,7 +3,7 @@ import classRules from './class-rules-2024.js';
 import raceRules from './race-rules-2024.js';
 import utils from './utils.js';
 import { loadSkills, loadPassiveSkills } from './data-loader';
-import { parseMagicWeaponName, findEquippedWeapons, buildWeaponAttack, buildMonkAttacks, buildSpellAttacks } from './attack-calc.js';
+import { parseMagicItemName, findEquippedWeapons, buildWeaponAttack, buildMonkAttacks, buildSpellAttacks } from './attack-calc.js';
 
 const rules = {
     getAbilityLongName: utils.getAbilityLongName,
@@ -86,15 +86,12 @@ const rules = {
         const wisdom = playerStats.abilities.find((ability) => ability.name === 'Wisdom');
 
         let armorName = playerStats.inventory.equipped.find(itemName => {
-            if (itemName.charAt(0) === "+") {
-                itemName = itemName.substring(3);
-            }
-            let item = allEquipment.find((item) => item.name === itemName);
+            let item = allEquipment.find((item) => item.name === parseMagicItemName(itemName).baseName);
             if (item) {
                 return item.equipment_category === 'Armor';
-            }
+             }
             return false;
-        });
+         });
 
         let addedBonus = 0;
         let contributions = [];
@@ -107,14 +104,10 @@ const rules = {
 
         let armorClass;
         if (armorName) {
-            let magicBonus = 0;
-            if (armorName.charAt(0) === '+') {
-                magicBonus = Number(armorName.charAt(1));
-                contributions.push(`Armor Magic Bonus (${magicBonus})`);
-                armorName = armorName.substring(3);
-            }
-            let armor = allEquipment.find((item) => item.name === armorName);
-            armorClass = armor.armor_class.base + addedBonus + magicBonus;
+            let parsedArmor = parseMagicItemName(armorName);
+            contributions.push(`Armor Magic Bonus (${parsedArmor.magicBonus})`);
+            let armor = allEquipment.find((item) => item.name === parsedArmor.baseName);
+            armorClass = armor.armor_class.base + addedBonus + parsedArmor.magicBonus;
             contributions.push(`Armor (${armor.armor_class.base})`);
 
             if (armor.armor_class.dex_bonus) {
@@ -122,8 +115,8 @@ const rules = {
                 contributions.push(`Dexterity Bonus (${dexterity.bonus})`);
                 if (armor.armor_class.max_bonus) {
                     armorBonus = Math.min(armor.armor_class.max_bonus, armorBonus);
-                }
-                armorClass = armor.armor_class.base + armorBonus + addedBonus + magicBonus;
+                 }
+                armorClass = armor.armor_class.base + armorBonus + addedBonus + parsedArmor.magicBonus;
             }
         } else {
             // 2024: Default unarmored defense
@@ -132,11 +125,11 @@ const rules = {
         }
 
         // Shield
-        let shield = playerStats.inventory.equipped.find(item => item.substring(3) === 'Shield');
+        let shield = playerStats.inventory.equipped.find(item => parseMagicItemName(item).baseName === 'Shield');
         if (shield) {
-            const magicBonus = Number(shield.charAt(1));
-            armorClass += 2 + magicBonus;
-            contributions.push(`Shield (2) + Shield Magic Bonus (${magicBonus})`);
+            const parsedShield = parseMagicItemName(shield);
+            armorClass += 2 + parsedShield.magicBonus;
+            contributions.push(`Shield (2) + Shield Magic Bonus (${parsedShield.magicBonus})`);
         } else if (playerStats.inventory.equipped.find(item => item === 'Shield')) {
             armorClass += 2;
             contributions.push(`Shield (2)`);
@@ -154,7 +147,7 @@ const rules = {
         const rangedWeapons = findEquippedWeapons(allEquipment, playerStats.inventory.equipped, 'Ranged');
         if (rangedWeapons.length > 0) {
             const rangedWeaponName = rangedWeapons[0];
-            const { baseName } = parseMagicWeaponName(rangedWeaponName);
+            const { baseName } = parseMagicItemName(rangedWeaponName);
             const rangedWeapon = allEquipment.find(item => item.name === baseName);
             if (rangedWeapon) {
                 attacks.push(buildWeaponAttack({
@@ -174,7 +167,7 @@ const rules = {
             const bonus = Math.max(strength.bonus, dexterity.bonus);
             const abilityName = strength.bonus > dexterity.bonus ? 'Strength' : 'Dexterity';
             const mainHandName = meleeWeaponNames[0];
-            const { baseName: mainBaseName } = parseMagicWeaponName(mainHandName);
+            const { baseName: mainBaseName } = parseMagicItemName(mainHandName);
             const mainHandWeapon = allEquipment.find(item => item.name === mainBaseName);
             if (mainHandWeapon) {
                 attacks.push(buildWeaponAttack({
@@ -190,7 +183,7 @@ const rules = {
              // Off-hand (2024: no ability bonus on off-hand damage, no Two-Weapon Fighting style)
             if (meleeWeaponNames.length > 1) {
                 const offHandName = meleeWeaponNames[1];
-                const { baseName: offBaseName } = parseMagicWeaponName(offHandName);
+                const { baseName: offBaseName } = parseMagicItemName(offHandName);
                 const offHandWeapon = allEquipment.find(item => item.name === offBaseName);
                 if (offHandWeapon) {
                     attacks.push(buildWeaponAttack({
