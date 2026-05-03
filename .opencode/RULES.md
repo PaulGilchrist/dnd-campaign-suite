@@ -1,0 +1,3 @@
+- Never execute GIT commands without explicit user confirmation.
+- Always generate a step-by-step plan before making any code changes.
+- Follow the project's coding-standards and architecture-rules skills at all times.

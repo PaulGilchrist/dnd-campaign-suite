@@ -1,16 +1,13 @@
 {
     "$schema": "https://opencode.ai/config.json",
-    "skills": [
-        "architecture-rules",
-        "coding-standards"
-    ],
+    "autoupdate": true,
+    "default_agent": "orchestrator-medium-context",
     "instructions": [
-        "Never execute GIT commands without explicit user confirmation.",
-        "Always generate a step-by-step plan before making any code changes.",
-        "Follow the project's coding-standards and architecture-rules skills at all times."
-      ],
-      "default_agent": "orchestrator-medium-context",
-      "mcp": {
+        "RULES.md",
+        "./.opencode/skills/architecture/SKILL.md",
+        "./.opencode/skills/coding-standards/SKILL.md"
+    ],
+    "mcp": {
         "chrome-devtools": {
             "type": "local",
             "command": [
