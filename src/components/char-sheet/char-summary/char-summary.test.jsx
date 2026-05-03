@@ -70,7 +70,15 @@ vi.mock('./char-class-wizard', () => ({ default: vi.fn(({ playerStats }) => <div
 vi.mock('../../../services/class-rules-2024', () => ({
   default: {
     getUnarmoredMovementIncrease: vi.fn(() => 0),
-    },
+    getMartialArtsDie: vi.fn(() => 1),
+    getFocusPoints: vi.fn(() => 0),
+    getFavoredEnemy: vi.fn(() => 0),
+    getDruidMaxWildShapeChallengeRating: vi.fn(() => 0),
+    getDruidWildShapeUses: vi.fn(() => 0),
+    getDruidBeastKnownForms: vi.fn(() => 0),
+    getDruidBeastFlySpeed: vi.fn(() => false),
+    getEldritchInvocations: vi.fn(() => 0),
+      },
 }));
 
 beforeEach(() => {
@@ -371,14 +379,18 @@ describe('CharSummary', () => {
 
   it('should render Rogue class component', () => {
     const rogueStats = {
-      ...mockPlayerStats,
-      class: { name: 'Rogue', subclass: null },
+       ...mockPlayerStats,
+       class: {
+         name: 'Rogue',
+         subclass: null,
+         class_levels: [{}, {}, {}, {}, { sneak_attack_num_d6: 4 }],
+       },
     };
 
     render(<CharSummary playerStats={rogueStats} onDeleteCharacter={vi.fn()} />);
 
     expect(screen.getByTestId('char-class-rogue')).toBeInTheDocument();
-  });
+    });
 
   it('should render Warlock class component', () => {
     const warlockStats = {
@@ -427,8 +439,9 @@ describe('CharSummary', () => {
 
     render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
 
-    expect(screen.getByTestId('hidden-value')).toHaveTextContent('3');
-  });
+    const hiddenValues = screen.getAllByTestId('hidden-value');
+    expect(hiddenValues[0]).toHaveTextContent('3');
+   });
 
   it('should not render short rest hit dice input when not toggled', () => {
     render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);

@@ -6,18 +6,7 @@ import storage from '../../../services/storage'
 import classRules from '../../../services/class-rules-2024.js'
 import CharGold from './char-gold'
 import CharHitPoints from './char-hit-points'
-import CharClassBarbarian from './char-class-barbarian'
-import CharClassBard from './char-class-bard'
-import CharClassCleric from './char-class-cleric'
-import CharClassDruid from './char-class-druid'
-import CharClassFighter from './char-class-fighter'
-import CharClassMonk from './char-class-monk'
-import CharClassPaladin from './char-class-paladin'
-import CharClassRanger from './char-class-ranger'
-import CharClassRogue from './char-class-rogue'
-import CharClassSorcerer from './char-class-sorcerer'
-import CharClassWarlock from './char-class-warlock'
-import CharClassWizard from './char-class-wizard'
+import CharClassFeatures from './char-class-features'
 import CharFeats from '../char-feats/char-feats'
 import HiddenInput from '../../common/hidden-input'
 import usePopup from '../common/use-popup'
@@ -142,18 +131,7 @@ function CharSummary({ playerStats, onDeleteCharacter }) {
                         }
                     }} />
                     {playerStats.background && <div><b>Background: </b>{playerStats.background}</div>}
-                    {playerStats.class.name == 'Barbarian' && <CharClassBarbarian playerStats={playerStats}></CharClassBarbarian>}
-                    {playerStats.class.name == 'Bard' && <CharClassBard playerStats={playerStats}></CharClassBard>}
-                    {playerStats.class.name == 'Cleric' && <CharClassCleric playerStats={playerStats}></CharClassCleric>}
-                    {playerStats.class.name == 'Druid' && <CharClassDruid playerStats={playerStats}></CharClassDruid>}
-                    {playerStats.class.name == 'Fighter' && <CharClassFighter playerStats={playerStats}></CharClassFighter>}
-                    {playerStats.class.name == 'Monk' && <CharClassMonk playerStats={playerStats}></CharClassMonk>}
-                    {playerStats.class.name == 'Paladin' && <CharClassPaladin playerStats={playerStats}></CharClassPaladin>}
-                    {playerStats.class.name == 'Ranger' && <CharClassRanger playerStats={playerStats}></CharClassRanger>}
-                    {playerStats.class.name == 'Rogue' && <CharClassRogue playerStats={playerStats}></CharClassRogue>}
-                    {playerStats.class.name == 'Sorcerer' && <CharClassSorcerer playerStats={playerStats}></CharClassSorcerer>}
-                    {playerStats.class.name == 'Warlock' && <CharClassWarlock playerStats={playerStats}></CharClassWarlock>}
-                    {playerStats.class.name == 'Wizard' && <CharClassWizard playerStats={playerStats}></CharClassWizard>}
+                      <CharClassFeatures playerStats={playerStats} />
                 </div>
             </div>
         </div>
