@@ -1,5 +1,5 @@
 import { cloneDeep, merge, uniqBy } from 'lodash';
-import rules from './rules'
+import utils from './utils.js'
 import * as featureCategories from './feature-categories-5e'
 import { categorizeFeatures, mergeCategorizedFeatures } from './feature-categorization-utils'
 
@@ -30,7 +30,7 @@ const raceRules = {
         const race = merge(cloneDeep(foundRace), cloneDeep(playerSummary.race));
         if (race.ability_bonuses) {
         race.ability_bonuses = race.ability_bonuses.map((ability_bonus) => {
-            ability_bonus.ability_score = rules.getAbilityLongName(ability_bonus.ability_score);
+            ability_bonus.ability_score = utils.getAbilityLongName(ability_bonus.ability_score);
             return ability_bonus;
            });
               }
@@ -45,7 +45,7 @@ const raceRules = {
         delete race.subraces; // We don't need these anymore
         if (race.subrace && race.subrace.ability_bonuses) {
                     race.subrace.ability_bonuses = race.subrace.ability_bonuses.map((ability_bonus) => {
-                        ability_bonus.ability_score = rules.getAbilityLongName(ability_bonus.ability_score);
+            ability_bonus.ability_score = utils.getAbilityLongName(ability_bonus.ability_score);
                         return ability_bonus;
                         });
                     }

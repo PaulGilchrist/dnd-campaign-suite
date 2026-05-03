@@ -1,5 +1,5 @@
 import { cloneDeep, merge, uniqBy } from 'lodash';
-import rules from './rules'
+import utils from './utils.js'
 import * as featureCategories from './feature-categories-5e'
 import { categorizeFeatures, mergeCategorizedFeatures } from './feature-categorization-utils'
 
@@ -20,7 +20,7 @@ const classRules = {
         }
         delete characterClass.subclasses; // We don't need these anymore
         if (characterClass.saving_throws) {
-            characterClass.saving_throws = characterClass.saving_throws.map((savingThrow) => rules.getAbilityLongName(savingThrow));
+            characterClass.saving_throws = characterClass.saving_throws.map((savingThrow) => utils.getAbilityLongName(savingThrow));
         }
         return characterClass;
     },

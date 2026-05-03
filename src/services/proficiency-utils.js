@@ -71,3 +71,29 @@ export const getProficiencies = (playerStats, skill = true, getProficiencyChoice
 
     return [proficienciesAllowed, proficiencies.sort()];
 };
+
+/**
+ * Calculate the number of proficiency choices allowed by class and race (5e rules).
+ * @param {Object} playerStats
+ * @param {boolean} skills - If true, count skill choices; if false, count non-skill choices
+ * @returns {number}
+ */
+export function getProficiencyChoiceCount(playerStats, skills = true) {
+  let proficiencyChoiceCount = 0;
+   (playerStats.class.proficiency_choices || []).forEach((proficiency) => {
+    if((skills && proficiency.from[0].startsWith('Skill: ') || (!skills && !proficiency.from[0].startsWith('Skill: ')))) {
+      proficiencyChoiceCount += proficiency.choose;
+     }
+   })
+  if(playerStats.race.starting_proficiency_options && ((skills && playerStats.race.starting_proficiency_options.from[0].startsWith('Skill: ')) || (!skills && !playerStats.race.starting_proficiency_options.from[0].startsWith('Skill: ')))) {
+    proficiencyChoiceCount += playerStats.race.starting_proficiency_options.choose;
+   }
+  if(playerStats.race.subrace && playerStats.race.subrace.racial_traits) {
+      playerStats.race.subrace.racial_traits.forEach(racial_trait => {
+          if (racial_trait.proficiency_choices && ((skills && racial_trait.proficiency_choices.from[0].startsWith('Skill: ')) || (!skills && !racial_trait.proficiency_choices.from[0].startsWith('Skill: ')))) {
+              proficiencyChoiceCount += racial_trait.proficiency_choices.choose;
+             }
+       });
+       }
+  return proficiencyChoiceCount
+}

@@ -168,3 +168,100 @@ export function buildSpellAttacks(playerSpells, allSpells, spellAbilities) {
 
     return attacks;
 }
+
+/**
+ * Build all attack entries for a character (5e rules).
+ * @param {Array} allEquipment
+ * @param {Array} allSpells
+ * @param {Object} playerStats
+ * @returns {Object[]}
+ */
+export function getAttacks(allEquipment, allSpells, playerStats) {
+    const strength = playerStats.abilities.find(a => a.name === 'Strength');
+    const dexterity = playerStats.abilities.find(a => a.name === 'Dexterity');
+    const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
+    const attacks = [];
+    const fightingStyles = playerStats.class?.fightingStyles || [];
+
+     // Ranged weapon
+    const rangedWeapons = findEquippedWeapons(allEquipment, playerStats.inventory.equipped, 'Ranged');
+    if (rangedWeapons.length > 0) {
+        const rangedWeaponName = rangedWeapons[0];
+        const { baseName } = parseMagicItemName(rangedWeaponName);
+        const rangedWeapon = allEquipment.find(item => item.name === baseName);
+        if (rangedWeapon) {
+            const archeryBonus = fightingStyles.includes('Archery') ? 2 : 0;
+            attacks.push(buildWeaponAttack({
+                weapon: rangedWeapon,
+                weaponName: rangedWeaponName,
+                abilityBonus: dexterity.bonus,
+                abilityName: 'Dexterity',
+                proficiency,
+                actionType: 'Action',
+                extraHitBonus: archeryBonus,
+                extraHitBonusLabel: archeryBonus ? 'Archery Fighting Style (2)' : '',
+         }));
+         }
+     }
+
+     // Melee weapons
+    const meleeWeaponNames = findEquippedWeapons(allEquipment, playerStats.inventory.equipped, 'Melee');
+    if (meleeWeaponNames.length > 0) {
+        const bonus = Math.max(strength.bonus, dexterity.bonus);
+        const abilityName = strength.bonus > dexterity.bonus ? 'Strength' : 'Dexterity';
+        const mainHandName = meleeWeaponNames[0];
+        const { baseName: mainBaseName } = parseMagicItemName(mainHandName);
+        const mainHandWeapon = allEquipment.find(item => item.name === mainBaseName);
+        if (mainHandWeapon) {
+            const isDueling = fightingStyles.includes('Dueling') && meleeWeaponNames.length === 1;
+            attacks.push(buildWeaponAttack({
+                weapon: mainHandWeapon,
+                weaponName: mainHandName,
+                abilityBonus: bonus,
+                abilityName,
+                proficiency,
+                actionType: 'Action',
+                extraDamage: isDueling ? '+2' : '',
+                extraDamageLabel: isDueling ? 'Dueling Fighting Style (2)' : '',
+             }));
+         }
+
+         // Off-hand weapon
+        if (meleeWeaponNames.length > 1) {
+            const offHandName = meleeWeaponNames[1];
+            const { baseName: offBaseName } = parseMagicItemName(offHandName);
+            const offHandWeapon = allEquipment.find(item => item.name === offBaseName);
+            if (offHandWeapon) {
+                const isTwoWeapon = fightingStyles.includes('Two-Weapon Fighting');
+                attacks.push(buildWeaponAttack({
+                    weapon: offHandWeapon,
+                    weaponName: offHandName,
+                    abilityBonus: bonus,
+                    abilityName,
+                    proficiency,
+                    actionType: 'Bonus Action',
+                    includeAbilityBonusInDamage: false,
+                    extraDamage: isTwoWeapon ? `+${bonus}` : '',
+                    extraDamageLabel: isTwoWeapon ? `Two-Weapon Fighting Style (${bonus})` : '',
+                 }));
+             }
+         }
+     }
+
+     // Monk unarmed strikes
+    if (playerStats.class?.name === 'Monk') {
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+        const martialArts = classLevel?.class_specific?.martial_arts;
+        if (martialArts) {
+            const diceStr = `${martialArts.dice_count}d${martialArts.dice_value}`;
+            attacks.push(...buildMonkAttacks({ diceStr, dexterityBonus: dexterity.bonus, proficiency }));
+         }
+     }
+
+     // Spell attacks
+    if (playerStats.spellAbilities) {
+        attacks.push(...buildSpellAttacks(playerStats.spellAbilities.spells, allSpells, playerStats.spellAbilities));
+     }
+
+    return attacks;
+}
