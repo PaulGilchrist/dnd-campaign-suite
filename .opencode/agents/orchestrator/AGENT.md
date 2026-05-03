@@ -1,9 +1,6 @@
 ---
 name: orchestrator
-description: |
-  A orchestration agent that analyzes the user's request and automatically delegates
-  the task to the correct specialized agent. This agent does not perform work
-  itself; it only classifies and forwards the request.
+description: Delegates tasks to specialized agents
 
 skills:
   - coding-standards
