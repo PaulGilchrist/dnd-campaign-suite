@@ -285,11 +285,22 @@ describe('feat-validation', () => {
             const allFeats = [
                   { name: 'Tough' }
               ];
-
+            
             const result = getFeatTypeInfo('Tough', allFeats);
-
+            
             expect(result.type).toBe('General');
-     });
+        });
+
+        it('should handle feat with type as array', () => {
+            const allFeats = [
+                  { name: 'MultiType', type: ['Origin Feat', 'General'] }
+              ];
+            
+            const result = getFeatTypeInfo('MultiType', allFeats);
+            
+            // When type is an array, it returns the array as the type
+            expect(Array.isArray(result.type)).toBe(true);
+        });
         });
 
     describe('getPreSelectedFeats', () => {

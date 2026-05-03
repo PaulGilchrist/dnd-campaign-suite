@@ -542,6 +542,81 @@ describe('App', () => {
     }
   });
 
+  it('should handle rename campaign error', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url.includes('/api/campaigns/')) {
+        return Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({ error: 'Rename failed' })
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('test-campaign')).toBeInTheDocument();
+    });
+
+    window.prompt = vi.fn(() => 'New Name');
+    
+    fireEvent.click(screen.getByTitle('Rename Campaign'));
+  });
+
+  it('should handle delete character error', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      if (key === 'characters') return JSON.stringify([{ name: 'Test', level: 1 }]);
+      return null;
+    });
+
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url.includes('/api/characters/')) {
+        return Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({ error: 'Delete failed' })
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+    });
+
+    window.confirm = vi.fn(() => true);
+    
+    const deleteButton = document.querySelector('[title="Delete Character"]');
+    if (deleteButton) {
+      fireEvent.click(deleteButton);
+    }
+  });
+
+  it('should handle campaign name prompt cancel', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('test-campaign')).toBeInTheDocument();
+    });
+
+    window.prompt = vi.fn(() => null); // User cancels prompt
+    
+    fireEvent.click(screen.getByTitle('Rename Campaign'));
+  });
+
   it('should handle delete campaign error', async () => {
     window.sessionStorage.getItem = vi.fn((key) => {
       if (key === 'currentCampaign') return 'test-campaign';
