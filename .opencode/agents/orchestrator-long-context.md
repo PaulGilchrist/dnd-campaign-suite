@@ -37,6 +37,8 @@ Example of good decomposition:
 Example of bad decomposition:
 1. Fix the auth system and add tests
 
+**IMPORTANT** Before dispatching your first subagent, output your plan and then stop and wait for the user to confirm. Do not proceed until the user says to continue.  Remind the user he may want to /compact before continuing.
+
 ## Step 2 — Dispatch one step at a time
 
 Dispatch subagents strictly one at a time. Do not dispatch the next step until the previous one has completed and returned its result.

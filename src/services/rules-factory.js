@@ -1,173 +1,139 @@
-import rules5e from './rules.js';
-import rules2024 from './rules-2024.js';
-import raceRules5e from './race-rules.js';
+import rules from './rules.js';
+import raceRules from './race-rules.js';
 import raceRules2024 from './race-rules-2024.js';
-import classRules5e from './class-rules.js';
+import classRules from './class-rules.js';
 import classRules2024 from './class-rules-2024.js';
 
 const rulesFactory = {
-    getRules: (playerSummary, characterName = 'Unknown') => {
+      /**
+       * Get the appropriate rule modules for the given ruleset.
+       */
+    getRules(playerSummary) {
         const rulesType = playerSummary.rules || '5e';
-        
-        let selectedRules;
-        switch (rulesType) {
-            case '2024':
-                selectedRules = {
-                    rules: rules2024,
-                    raceRules: raceRules2024,
-                    classRules: classRules2024
-                };
-                break;
-            case '5e':
-            default:
-                selectedRules = {
-                    rules: rules5e,
-                    raceRules: raceRules5e,
-                    classRules: classRules5e
-                };
-                break;
-        }
-        
-        return selectedRules;
-    },
-    
+        const use2024 = rulesType === '2024';
+
+        return {
+            rules,
+            raceRules: use2024 ? raceRules2024 : raceRules,
+            classRules: use2024 ? classRules2024 : classRules
+          };
+      },
+
+      /**
+       * Get the full ruleset name from a player summary.
+       */
+    getRulesType(playerSummary) {
+        return playerSummary.rules || '5e';
+      },
+
+      // === DELEGATION WRAPPERS (preserve existing API for callers) ===
+
     getAbilityLongName: (shortName, playerSummary) => {
-        const characterName = playerSummary.name || 'Unknown';
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const result = selectedRules.rules.getAbilityLongName(shortName);
-        return result;
-    },
-    
-        getAbilities: async (playerStats, playerSummary) => {
-        const characterName = playerSummary.name || 'Unknown';
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const result = await selectedRules.rules.getAbilities(playerStats);
-        return result;
-    },
-    
+        return rules.getAbilityLongName(shortName);
+      },
+
+    getAbilities: async (playerStats, playerSummary) => {
+        return rules.getAbilities(playerStats, playerSummary);
+      },
+
     getActions: (playerStats, playerSummary) => {
-                const characterName = playerSummary.name || 'Unknown';
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const result = selectedRules.rules.getActions(playerStats);
-        return result;
-    },
-    
+        return rules.getActions(playerStats, playerSummary);
+      },
+
     getArmorClass: (allEquipment, playerStats, playerSummary) => {
-        const characterName = playerSummary.name || 'Unknown';
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const result = selectedRules.rules.getArmorClass(allEquipment, playerStats);
-        return result;
-    },
-    
+        return rules.getArmorClass(allEquipment, playerStats, playerSummary);
+      },
+
     getAttacks: (allEquipment, allSpells, playerStats, playerSummary) => {
-        const characterName = playerSummary.name || 'Unknown';
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const result = selectedRules.rules.getAttacks(allEquipment, allSpells, playerStats);
-        return result;
-    },
-    
+        return rules.getAttacks(allEquipment, allSpells, playerStats, playerSummary);
+      },
+
     getHitPoints: (playerStats, playerSummary) => {
-        const characterName = playerSummary.name || 'Unknown';
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const result = selectedRules.rules.getHitPoints(playerStats);
-        return result;
-    },
-    
+        return rules.getHitPoints(playerStats, playerSummary);
+      },
+
     getLanguages: (playerStats, playerSummary) => {
-                const characterName = playerSummary.name || 'Unknown';
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const result = selectedRules.rules.getLanguages(playerStats);
-        return result;
-    },
-    
-    getMagicItems: (allMagicItems, playerSummary) => {
-        const characterName = playerSummary.name || 'Unknown';
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const result = selectedRules.rules.getMagicItems(allMagicItems, playerSummary);
-        return result;
-    },
-    
+        return rules.getLanguages(playerStats, playerSummary);
+      },
+
+    getMagicItems: (allMagicItems, playerSummary, playerStats) => {
+        return rules.getMagicItems(allMagicItems, playerSummary, playerStats);
+      },
+
     getProficiencyChoiceCount: (playerStats, skills, playerSummary) => {
-        const characterName = playerSummary.name || 'Unknown';
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const result = selectedRules.rules.getProficiencyChoiceCount(playerStats, skills);
-        return result;
-    },
-    
+        return rules.getProficiencyChoiceCount(playerStats, skills, playerSummary);
+      },
+
     getProficiencies: (playerStats, skill, playerSummary) => {
-                const characterName = playerSummary.name || 'Unknown';
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const result = selectedRules.rules.getProficiencies(playerStats, skill);
-        return result;
-    },
-    
+        return rules.getProficiencies(playerStats, skill, playerSummary);
+      },
+
     getSpellAbilities: (allSpells, playerStats, playerSummary) => {
-        const characterName = playerSummary.name || 'Unknown';
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const result = selectedRules.rules.getSpellAbilities(allSpells, playerStats);
-        return result;
-    },
-    
-    getSpellMaxLevel: (spellAbilities, playerSummary) => {
-        const characterName = playerSummary.name || 'Unknown';
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const result = selectedRules.rules.getSpellMaxLevel(spellAbilities);
-        return result;
-     },
-    
-        getDruidMaxWildShapeChallengeRating: (playerStats, playerSummary) => {
-        const characterName = playerSummary.name || 'Unknown';
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const result = selectedRules.classRules.getDruidMaxWildShapeChallengeRating(playerStats);
-        return result;
+        return rules.getSpellAbilities(allSpells, playerStats, playerSummary);
       },
-    
-        getDruidWildShapeUses: (playerStats, playerSummary) => {
-        const characterName = playerSummary.name || 'Unknown';
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const result = selectedRules.classRules.getDruidWildShapeUses(playerStats);
-        return result;
+
+    getSpellMaxLevel: (spellAbilities) => {
+        return rules.getSpellMaxLevel(spellAbilities);
       },
-    
+
+      // Class rules delegation - raceRules-specific
+    getDruidMaxWildShapeChallengeRating: (playerStats, playerSummary) => {
+        const { classRules: cr } = rulesFactory.getRules(playerSummary);
+        return cr.getDruidMaxWildShapeChallengeRating(playerStats);
+      },
+
+    getDruidWildShapeUses: (playerStats, playerSummary) => {
+        const { classRules: cr } = rulesFactory.getRules(playerSummary);
+        return cr.getDruidWildShapeUses(playerStats);
+      },
+
     getDruidBeastKnownForms: (playerStats, playerSummary) => {
-        const characterName = playerSummary.name || 'Unknown';
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const result = selectedRules.classRules.getDruidBeastKnownForms(playerStats);
-        return result;
+        const { classRules: cr } = rulesFactory.getRules(playerSummary);
+        return cr.getDruidBeastKnownForms(playerStats);
       },
-    
+
     getDruidBeastFlySpeed: (playerStats, playerSummary) => {
-            const characterName = playerSummary.name || 'Unknown';
-            const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-            const result = selectedRules.classRules.getDruidBeastFlySpeed(playerStats);
-            return result;
-          },
-    
-        getRogueSneakAttack: (playerStats, playerSummary) => {
-            const characterName = playerSummary.name || 'Unknown';
-            const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-            const result = selectedRules.classRules.getRogueSneakAttack(playerStats);
-            return result;
-          },
-    
-    
-        getPlayerStats: async (allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary) => {
-            const characterName = playerSummary.name || 'Unknown';
-        
-        const selectedRules = rulesFactory.getRules(playerSummary, characterName);
-        const { rules, raceRules, classRules } = selectedRules;
-        
+        const { classRules: cr } = rulesFactory.getRules(playerSummary);
+        return cr.getDruidBeastFlySpeed(playerStats);
+      },
+
+    getRogueSneakAttack: (playerStats, playerSummary) => {
+        const { classRules: cr } = rulesFactory.getRules(playerSummary);
+        return cr.getRogueSneakAttack(playerStats);
+      },
+
+      // Race rules delegation
+    getImmunities: (playerSummary) => {
+        const { raceRules: rr } = rulesFactory.getRules(playerSummary);
+        return rr.getImmunities(playerSummary);
+      },
+
+    getResistances: (playerSummary) => {
+        const { raceRules: rr } = rulesFactory.getRules(playerSummary);
+        return rr.getResistances(playerSummary);
+      },
+
+    getSenses: (playerStats, playerSummary) => {
+        const { raceRules: rr } = rulesFactory.getRules(playerSummary);
+        return rr.getSenses(playerStats);
+      },
+
+      // Master method - delegates to unified rules
+    getPlayerStats: async (allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary) => {
         const playerStats = await rules.getPlayerStats(allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary);
-        
-        playerStats.immunities = raceRules.getImmunities(playerSummary);
-        playerStats.race = raceRules.getRace(allRaces, playerStats);
-        playerStats.resistances = raceRules.getResistances(playerSummary);
-        playerStats.senses = raceRules.getSenses(playerStats);
-        
-        playerStats.class = classRules.getClass(allClasses, playerStats);
-        
+
+        const { classRules: cr, raceRules: rr } = rulesFactory.getRules(playerSummary);
+
+          // Re-read class/race from the appropriate ruleset after playerStats is built
+         // because rules.getPlayerStats may have set them differently
+        playerStats.class = cr.getClass(allClasses, playerStats);
+        playerStats.race = rr.getRace(allRaces, playerStats);
+        playerStats.immunities = rr.getImmunities(playerStats);
+        playerStats.resistances = rr.getResistances(playerStats);
+        playerStats.senses = rr.getSenses(playerStats);
+
         return playerStats;
-     }
+      }
 };
 
 export default rulesFactory;

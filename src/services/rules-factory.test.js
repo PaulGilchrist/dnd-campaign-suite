@@ -20,23 +20,6 @@ vi.mock('./rules.js', () => ({
     }
 }));
 
-vi.mock('./rules-2024.js', () => ({
-  default: {
-    getAbilityLongName: vi.fn(),
-    getAbilities: vi.fn(),
-    getActions: vi.fn(),
-    getArmorClass: vi.fn(),
-    getAttacks: vi.fn(),
-    getHitPoints: vi.fn(),
-    getLanguages: vi.fn(),
-    getMagicItems: vi.fn(),
-    getProficiencyChoiceCount: vi.fn(),
-    getProficiencies: vi.fn(),
-    getSpellAbilities: vi.fn(),
-    getSpellMaxLevel: vi.fn(),
-    getPlayerStats: vi.fn()
-    }
-}));
 
 vi.mock('./race-rules.js', () => ({
   default: {
@@ -81,7 +64,6 @@ vi.mock('./class-rules-2024.js', () => ({
 }));
 
 import * as rules5e from './rules.js';
-import * as rules2024 from './rules-2024.js';
 import * as raceRules5e from './race-rules.js';
 import * as raceRules2024 from './race-rules-2024.js';
 import * as classRules5e from './class-rules.js';
@@ -115,10 +97,10 @@ describe('rulesFactory', () => {
       const playerSummary = { rules: '2024' };
       const rules = rulesFactory.getRules(playerSummary);
 
-      expect(rules.rules).toBe(rules2024.default);
+      expect(rules.rules).toBe(rules5e.default);
       expect(rules.raceRules).toBe(raceRules2024.default);
       expect(rules.classRules).toBe(classRules2024.default);
-      });
+    });
    });
 
   describe('getAbilityLongName', () => {
@@ -143,7 +125,7 @@ describe('rulesFactory', () => {
       const result = await rulesFactory.getAbilities(playerStats, playerSummary);
 
       expect(result).toBe(mockAbilities);
-      expect(rules5e.default.getAbilities).toHaveBeenCalledWith(playerStats);
+      expect(rules5e.default.getAbilities).toHaveBeenCalledWith(playerStats, playerSummary);
       });
    });
 
@@ -157,7 +139,7 @@ describe('rulesFactory', () => {
       const result = rulesFactory.getActions(playerStats, playerSummary);
 
       expect(result).toBe(mockActions);
-      expect(rules5e.default.getActions).toHaveBeenCalledWith(playerStats);
+      expect(rules5e.default.getActions).toHaveBeenCalledWith(playerStats, playerSummary);
       });
    });
 
@@ -170,7 +152,7 @@ describe('rulesFactory', () => {
       const result = rulesFactory.getHitPoints(playerStats, playerSummary);
 
       expect(result).toBe(20);
-      expect(rules5e.default.getHitPoints).toHaveBeenCalledWith(playerStats);
+      expect(rules5e.default.getHitPoints).toHaveBeenCalledWith(playerStats, playerSummary);
       });
    });
 
@@ -184,7 +166,7 @@ describe('rulesFactory', () => {
       const result = rulesFactory.getLanguages(playerStats, playerSummary);
 
       expect(result).toBe(mockLanguages);
-      expect(rules5e.default.getLanguages).toHaveBeenCalledWith(playerStats);
+      expect(rules5e.default.getLanguages).toHaveBeenCalledWith(playerStats, playerSummary);
       });
    });
 
@@ -193,12 +175,13 @@ describe('rulesFactory', () => {
       const mockMagicItems = [{ name: 'Ring of Protection' }];
       rules5e.default.getMagicItems.mockReturnValue(mockMagicItems);
       const allMagicItems = [];
+      const playerStats = {};
       const playerSummary = { name: 'Test Character' };
 
-      const result = rulesFactory.getMagicItems(allMagicItems, playerSummary);
+      const result = rulesFactory.getMagicItems(allMagicItems, playerSummary, playerStats);
 
       expect(result).toBe(mockMagicItems);
-      expect(rules5e.default.getMagicItems).toHaveBeenCalledWith(allMagicItems, playerSummary);
+      expect(rules5e.default.getMagicItems).toHaveBeenCalledWith(allMagicItems, playerSummary, playerStats);
       });
    });
 
@@ -211,7 +194,7 @@ describe('rulesFactory', () => {
       const result = rulesFactory.getProficiencyChoiceCount(playerStats, true, playerSummary);
 
       expect(result).toBe(4);
-      expect(rules5e.default.getProficiencyChoiceCount).toHaveBeenCalledWith(playerStats, true);
+      expect(rules5e.default.getProficiencyChoiceCount).toHaveBeenCalledWith(playerStats, true, playerSummary);
       });
    });
 
@@ -225,7 +208,7 @@ describe('rulesFactory', () => {
       const result = rulesFactory.getProficiencies(playerStats, true, playerSummary);
 
       expect(result).toBe(mockProficiencies);
-      expect(rules5e.default.getProficiencies).toHaveBeenCalledWith(playerStats, true);
+      expect(rules5e.default.getProficiencies).toHaveBeenCalledWith(playerStats, true, playerSummary);
       });
    });
 

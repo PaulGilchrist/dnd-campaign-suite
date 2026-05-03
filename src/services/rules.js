@@ -1,82 +1,234 @@
 import { cloneDeep, uniqBy } from 'lodash';
-import classRules from './class-rules';
-import raceRules from './race-rules';
+import classRules from './class-rules.js';
+import classRules2024 from './class-rules-2024.js';
+import raceRules from './race-rules.js';
+import raceRules2024 from './race-rules-2024.js';
 import utils from './utils.js';
 import { loadSkills, loadPassiveSkills } from './data-loader';
 import { parseMagicItemName } from './attack-calc.js';
 import * as proficiencyUtils from './proficiency-utils.js';
-import { getAbilities, getHitPoints } from './ability-calc.js';
-import { getSpellAbilities, getSpellMaxLevel } from './spell-calc.js';
-import { getAttacks } from './attack-calc.js';
+import * as proficiencyUtils2024 from './proficiency-utils-2024.js';
+import { getAbilities as getAbilities5e, getHitPoints as getHitPoints5e } from './ability-calc.js';
+import { getAbilities as getAbilities2024, getHitPoints as getHitPoints2024 } from './ability-calc-2024.js';
+import { getSpellAbilities as getSpellAbilities5e } from './spell-calc.js';
+import { getSpellAbilities as getSpellAbilities2024 } from './spell-calc-2024.js';
+import { getAttacks as getAttacks5e } from './attack-calc.js';
+import { getAttacks as getAttacks2024 } from './attack-calc-2024.js';
+import { getSpellMaxLevel } from './shared/spell-utils.js';
+
+/**
+ * Determine which ruleset to use. Checks playerStats.rules first,
+ * then falls back to playerSummary.rules, then defaults to '5e'.
+ */
+function getRulesType(playerStats, playerSummary) {
+    if (playerStats && playerStats.rules) return playerStats.rules;
+    if (playerSummary && playerSummary.rules) return playerSummary.rules;
+    return '5e';
+}
+
+function is2024(playerStats, playerSummary) {
+    return getRulesType(playerStats, playerSummary) === '2024';
+}
 
 const rules = {
+     // === SHARED METHODS (identical in both rulesets) ===
+
     getAbilityLongName: utils.getAbilityLongName,
-    getAbilities,
-    getHitPoints,
-    getSpellAbilities,
+
     getSpellMaxLevel,
-    getAttacks,
-    getProficiencies: (playerStats, skill = true) => {
-        return proficiencyUtils.getProficiencies(
+
+     /**
+      * Get the appropriate sub-module imports for the ruleset.
+      */
+    getSubModules(playerStats, playerSummary) {
+        const use2024 = is2024(playerStats, playerSummary);
+        return {
+            abilityCalc: use2024 ? { getAbilities: getAbilities2024, getHitPoints: getHitPoints2024 } : { getAbilities: getAbilities5e, getHitPoints: getHitPoints5e },
+            spellCalc: use2024 ? { getSpellAbilities: getSpellAbilities2024 } : { getSpellAbilities: getSpellAbilities5e },
+            attackCalc: use2024 ? getAttacks2024 : getAttacks5e,
+            proficiencyUtils: use2024 ? proficiencyUtils2024 : proficiencyUtils,
+            classRules: use2024 ? classRules2024 : classRules,
+            raceRules: use2024 ? raceRules2024 : raceRules,
+            use2024
+         };
+     },
+
+     // === RULESET-SPECIFIC: getAbilities ===
+    getAbilities: async (playerStats, playerSummary) => {
+        if (is2024(playerStats, playerSummary)) {
+            return getAbilities2024(playerStats);
+         }
+        return getAbilities5e(playerStats);
+     },
+
+     // === RULESET-SPECIFIC: getHitPoints ===
+    getHitPoints: (playerStats, playerSummary) => {
+        if (is2024(playerStats, playerSummary)) {
+            return getHitPoints2024(playerStats);
+         }
+        return getHitPoints5e(playerStats);
+     },
+
+     // === RULESET-SPECIFIC: getSpellAbilities ===
+    getSpellAbilities: (allSpells, playerStats, playerSummary) => {
+        if (is2024(playerStats, playerSummary)) {
+            return getSpellAbilities2024(allSpells, playerStats);
+         }
+        return getSpellAbilities5e(allSpells, playerStats);
+     },
+
+     // === RULESET-SPECIFIC: getAttacks ===
+    getAttacks: (allEquipment, allSpells, playerStats, playerSummary) => {
+        if (is2024(playerStats, playerSummary)) {
+            return getAttacks2024(allEquipment, allSpells, playerStats);
+         }
+        return getAttacks5e(allEquipment, allSpells, playerStats);
+     },
+
+     // === SHARED: getProficiencesChoiceCount (ruleset-specific) ===
+    getProficiencyChoiceCount: (playerStats, skills, playerSummary) => {
+        const { proficiencyUtils: pu } = rules.getSubModules(playerStats, playerSummary);
+        return pu.getProficiencyChoiceCount(playerStats, skills);
+     },
+
+     // === RULESET-SPECIFIC: getProficiencies ===
+    getProficiencies: (playerStats, skill = true, playerSummary) => {
+        const { proficiencyUtils: pu, classRules: cr } = rules.getSubModules(playerStats, playerSummary);
+
+        if (is2024(playerStats, playerSummary)) {
+             // 2024: no racial extra proficiencies, uses class.major
+            return pu.getProficiencies(
+                playerStats,
+                skill,
+                pu.getProficiencyChoiceCount,
+                 {
+                    raceProficiencies: () => [],
+                    bonusSource: playerStats.class.major || {},
+                 }
+             );
+         }
+
+         // 5e: race proficiencies from traits/subrace, uses class.subclass
+        return pu.getProficiencies(
             playerStats,
             skill,
-            proficiencyUtils.getProficiencyChoiceCount,
-            {
+            pu.getProficiencyChoiceCount,
+             {
                 raceProficiencies: (ps) => {
                     const extra = [];
                     ps.race.traits.forEach(trait => {
                         if (trait.proficiencies && trait.proficiencies.length > 0) {
                             extra.push(...trait.proficiencies);
-                        }
-                    });
+                         }
+                     });
                     if (ps.race.subrace) {
                         extra.push(...(ps.race.subrace.starting_proficiencies || []));
                         if (ps.race.subrace.racial_traits) {
                             ps.race.subrace.racial_traits.forEach(racial_trait => {
                                 if (racial_trait.proficiencies && racial_trait.proficiencies.length > 0) {
                                     extra.push(...racial_trait.proficiencies);
-                                }
-                            });
-                        }
-                    }
+                                 }
+                             });
+                         }
+                     }
                     return extra;
-                },
+                 },
                 bonusSource: playerStats.class.subclass || {},
-            }
-        );
-    },
-    getProficiencyChoiceCount: proficiencyUtils.getProficiencyChoiceCount,
-    getActions: (playerStats) => {
-        const features = classRules.getFeatures(playerStats);
-        const traits = raceRules.getTraits(playerStats);
+             }
+         );
+     },
+
+     // === RULESET-SPECIFIC: getActions ===
+    getActions: (playerStats, playerSummary) => {
+        const { classRules: cr, raceRules: rr } = rules.getSubModules(playerStats, playerSummary);
+        const features = cr.getFeatures(playerStats);
+        const traits = rr.getTraits(playerStats);
+
+        if (is2024(playerStats, playerSummary)) {
+             // 2024: normalize string actions, include magic/utilize/craft actions
+            const playerActions = (playerStats.actions || []).map(action =>
+                typeof action === 'string' ? { name: action, description: '', details: null } : action
+             );
+
+            const actions = uniqBy([
+                 ...playerActions,
+                 ...features.actions,
+                 ...traits.actions,
+                 ...(playerStats.magicActions ? playerStats.magicActions : []),
+                 ...(playerStats.utilizeActions ? playerStats.utilizeActions : []),
+                 ...(playerStats.craftActions ? playerStats.craftActions : [])
+             ], 'name').sort((a, b) => a.name.localeCompare(b.name));
+
+            const bonusActions = uniqBy([
+                 ...(playerStats.bonusActions ? playerStats.bonusActions : []),
+                 ...features.bonusActions,
+                 ...traits.bonusActions
+             ], 'name').sort((a, b) => a.name.localeCompare(b.name));
+
+            const reactions = uniqBy([
+                 ...(playerStats.reactions ? playerStats.reactions : []),
+                 ...features.reactions,
+                 ...traits.reactions
+             ], 'name').sort((a, b) => a.name.localeCompare(b.name));
+
+            const playerSpecialActions = (playerStats.specialActions || []).map(action =>
+                typeof action === 'string' ? { name: action, description: '', details: null } : action
+             );
+
+            const specialActions = uniqBy([
+                 ...playerSpecialActions,
+                 ...features.specialActions,
+                 ...traits.specialActions,
+                 ...(playerStats.magicSpecialActions ? playerStats.magicSpecialActions : []),
+                 ...(playerStats.utilizeSpecialActions ? playerStats.utilizeSpecialActions : []),
+                 ...(playerStats.craftSpecialActions ? playerStats.craftSpecialActions : [])
+             ], 'name').sort((a, b) => a.name.localeCompare(b.name));
+
+            const characterAdvancement = uniqBy([...features.characterAdvancement, ...traits.characterAdvancement], 'name').sort((a, b) => a.name.localeCompare(b.name));
+
+            return [actions, bonusActions, reactions, specialActions, characterAdvancement];
+         }
+
+         // 5e: original action handling
         const actions = uniqBy([...(playerStats.actions || []), ...features.actions, ...traits.actions], 'name').sort((a, b) => a.name.localeCompare(b.name));
         const bonusActions = uniqBy([...(playerStats.bonusActions || []), ...features.bonusActions, ...traits.bonusActions], 'name').sort((a, b) => a.name.localeCompare(b.name));
         const reactions = uniqBy([...(playerStats.reactions || []), ...features.reactions, ...traits.reactions], 'name').sort((a, b) => a.name.localeCompare(b.name));
         const specialActions = uniqBy([...(playerStats.specialActions || []), ...features.specialActions, ...traits.specialActions], 'name').sort((a, b) => a.name.localeCompare(b.name));
         const characterAdvancement = uniqBy([...features.characterAdvancement, ...traits.characterAdvancement], 'name').sort((a, b) => a.name.localeCompare(b.name));
+
         return [actions, bonusActions, reactions, specialActions, characterAdvancement];
-    },
-    getArmorClass: (allEquipment, playerStats) => {
+     },
+
+     // === SHARED: getArmorClass (mostly shared, 5e-specific features at bottom) ===
+    getArmorClass: (allEquipment, playerStats, playerSummary) => {
         const constitution = playerStats.abilities.find((ability) => ability.name === 'Constitution');
         const dexterity = playerStats.abilities.find((ability) => ability.name === 'Dexterity');
         const wisdom = playerStats.abilities.find((ability) => ability.name === 'Wisdom');
+
         let armorName = playerStats.inventory.equipped.find(itemName => {
             let item = allEquipment.find((item) => item.name === parseMagicItemName(itemName).baseName);
             if (item) {
                 return item.equipment_category === 'Armor';
-            }
+             }
             return false;
-        });
+         });
+
         let addedBonus = 0;
         let contributions = [];
+
         if (playerStats.class.name === 'Monk') {
             addedBonus += wisdom.bonus;
             contributions.push(`Monk Wisdom Bonus (${wisdom.bonus})`);
-        }
-        if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Defense')) {
-            addedBonus += 1;
-            contributions.push(`Fighting Style Defense (1)`);
-        }
+         }
+
+         // 5e-specific: Defense fighting style
+        if (!is2024(playerStats, playerSummary)) {
+            if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Defense')) {
+                addedBonus += 1;
+                contributions.push(`Fighting Style Defense (1)`);
+             }
+         }
+
         let armorClass;
         if (armorName) {
             let parsedArmor = parseMagicItemName(armorName);
@@ -89,112 +241,191 @@ const rules = {
                 contributions.push(`Dexterity Bonus (${dexterity.bonus})`);
                 if (armor.armor_class.max_bonus) {
                     armorBonus = Math.min(armor.armor_class.max_bonus, armorBonus);
-                }
+                 }
                 armorClass = armor.armor_class.base + armorBonus + addedBonus + parsedArmor.magicBonus;
-            }
-        } else {
+             }
+         } else {
             armorClass = 10 + dexterity.bonus + addedBonus;
             contributions.push(`Unarmored AC (10) + Dexterity Bonus (${dexterity.bonus})`);
-        }
+         }
+
         let shield = playerStats.inventory.equipped.find(item => parseMagicItemName(item).baseName === 'Shield');
         if (shield) {
             const parsedShield = parseMagicItemName(shield);
             armorClass += 2 + parsedShield.magicBonus;
             contributions.push(`Shield (2) + Shield Magic Bonus (${parsedShield.magicBonus})`);
-        } else if (playerStats.inventory.equipped.find(item => item === 'Shield')) {
+         } else if (playerStats.inventory.equipped.find(item => item === 'Shield')) {
             armorClass += 2;
             contributions.push(`Shield (2)`);
-        }
-        if (playerStats.inventory.magicItems && playerStats.inventory.magicItems.some(item => item.name === 'Cloak of Protection')) {
-            armorClass += 1;
-            contributions.push(`Cloak of Protection (1)`);
-        }
-        if (playerStats.inventory.magicItems && playerStats.inventory.magicItems.some(item => item.name === 'Ring of Protection')) {
-            armorClass += 1;
-            contributions.push(`Ring of Protection (1)`);
-        }
-        if (playerStats.class.name === 'Barbarian') {
-            const barbarianAc = 10 + dexterity.bonus + constitution.bonus;
-            if (barbarianAc > armorClass) {
-                armorClass = barbarianAc;
-                contributions = [`Unarmored AC (10) + Dexterity Bonus (${dexterity.bonus}) + Constitution Bonus (${constitution.bonus})`];
-            }
-        } else if (playerStats.class.subclass && playerStats.class.subclass.name === 'Draconic') {
-            const sorcererAc = 13 + dexterity.bonus;
-            if (sorcererAc > armorClass) {
-                armorClass = sorcererAc;
-                contributions = [`Unarmored AC (13) + Dexterity Bonus (${dexterity.bonus})`];
-            }
-        }
+         }
+
+         // 5e-specific: Cloak and Ring of Protection
+        if (!is2024(playerStats, playerSummary)) {
+            if (playerStats.inventory.magicItems && playerStats.inventory.magicItems.some(item => item.name === 'Cloak of Protection')) {
+                armorClass += 1;
+                contributions.push(`Cloak of Protection (1)`);
+             }
+            if (playerStats.inventory.magicItems && playerStats.inventory.magicItems.some(item => item.name === 'Ring of Protection')) {
+                armorClass += 1;
+                contributions.push(`Ring of Protection (1)`);
+             }
+         }
+
+         // 5e-specific: Barbarian and Draconic Sorcerer unarmored defense
+        if (!is2024(playerStats, playerSummary)) {
+            if (playerStats.class.name === 'Barbarian') {
+                const barbarianAc = 10 + dexterity.bonus + constitution.bonus;
+                if (barbarianAc > armorClass) {
+                    armorClass = barbarianAc;
+                    contributions = [`Unarmored AC (10) + Dexterity Bonus (${dexterity.bonus}) + Constitution Bonus (${constitution.bonus})`];
+                 }
+             } else if (playerStats.class.subclass && playerStats.class.subclass.name === 'Draconic') {
+                const sorcererAc = 13 + dexterity.bonus;
+                if (sorcererAc > armorClass) {
+                    armorClass = sorcererAc;
+                    contributions = [`Unarmored AC (13) + Dexterity Bonus (${dexterity.bonus})`];
+                 }
+             }
+         }
+
         return [armorClass, contributions.join(' + ')];
-    },
-    getLanguages: (playerStats) => {
-        let languages = [...(playerStats.race.languages || [])];
+     },
+
+     // === SHARED: getLanguages (handles both rulesets internally) ===
+    getLanguages: (playerStats, playerSummary) => {
+        let languages = [...(playerStats.race?.languages || [])];
         let languagesAllowed = languages.length;
-        languagesAllowed += 2;
+        languagesAllowed += 2; // Background languages
+
         if (playerStats.race.language_choices) {
             languagesAllowed += playerStats.race.language_choices.choose || 0;
-        }
+         }
+
         if (playerStats.race.subrace && playerStats.race.subrace.language_options) {
             languages = [...new Set([...languages, ...(playerStats.race.subrace.languages || [])])];
             languagesAllowed += playerStats.race.subrace.language_options.choose || 0;
-        }
-        languages = [...new Set([...languages, ...(playerStats.class.languages || [])])];
-        if (playerStats.class.language_choices) {
+         }
+
+        languages = [...new Set([...languages, ...(playerStats.class?.languages || [])])];
+
+        if (playerStats.class?.language_choices) {
             let rangerLanguageBonus = playerStats.class.language_choices.choose || 0;
             languagesAllowed += rangerLanguageBonus;
             if (playerStats.class.name === 'Ranger') {
                 if (playerStats.level > 5) languagesAllowed += 1;
                 if (playerStats.level > 13) languagesAllowed += 1;
-            }
-        }
-        if (playerStats.class.subclass) {
-            if (playerStats.class.subclass.language_choices) {
+             }
+         }
+
+         // 5e: class.subclass.language_choices, 2024: class.major.language_choices
+        const use2024 = is2024(playerStats, playerSummary);
+        if (use2024) {
+            if (playerStats.class.major && playerStats.class.major.language_choices) {
+                languagesAllowed += playerStats.class.major.language_choices.choose || 0;
+             }
+         } else {
+            if (playerStats.class.subclass && playerStats.class.subclass.language_choices) {
                 languagesAllowed += playerStats.class.subclass.language_choices.choose || 0;
-            }
-        }
+             }
+         }
+
         if (playerStats.languages) {
             languages = [...new Set([...languages, ...playerStats.languages])];
-        }
+         }
+
         return [languagesAllowed, languages.sort()];
-    },
-    getMagicItems: (allMagicItems, playerSummary) => {
-        if (playerSummary.inventory.magicItems) {
-            const playerMagicItems = playerSummary.inventory.magicItems.map(playerMagicItem => {
-                const magicItem = allMagicItems.find(magicItem => magicItem.name === playerMagicItem.name);
-                if (magicItem) {
-                    if (magicItem.name === 'Ring of Spell Storing' || magicItem.name === 'Spell Ring' || magicItem.name === 'Spell Scroll') {
-                        return { ...magicItem, details: magicItem.description, description: playerMagicItem.spell };
-                    }
-                    return { ...magicItem, quantity: playerMagicItem.quantity, rarity: playerMagicItem.rarity ? playerMagicItem.rarity : magicItem.rarity };
-                }
-                return { ...playerMagicItem };
-            });
-            return playerMagicItems;
-        }
-        return null;
-    },
+     },
+
+     // === SHARED: getMagicItems (handles both rulesets internally) ===
+    getMagicItems: (allMagicItems, playerSummary, playerStats) => {
+        const inventoryMagicItems = playerSummary.inventory?.magicItems || [];
+
+        if (!allMagicItems || inventoryMagicItems.length === 0) {
+             // 2024 returns [], 5e returns null
+            if (is2024(playerStats, playerSummary)) {
+                return [];
+             }
+            return null;
+         }
+
+        const processedItems = inventoryMagicItems.map(itemNameOrObj => {
+            let itemName = typeof itemNameOrObj === 'string' ? itemNameOrObj : itemNameOrObj.name;
+            const magicItem = allMagicItems.find(m => m.name === itemName);
+
+            if (!magicItem) {
+                if (is2024(playerStats, playerSummary)) {
+                    return null; // 2024 filters out nulls
+                 }
+                return { ...itemNameOrObj }; // 5e keeps the item even if not found
+             }
+
+            if (magicItem.name === 'Ring of Spell Storing' || magicItem.name === 'Spell Ring' || magicItem.name === 'Spell Scroll') {
+                return { ...magicItem, details: magicItem.description, description: itemNameOrObj.spell || itemNameOrObj.description };
+             }
+
+            const result = { ...magicItem };
+            if (typeof itemNameOrObj === 'object' && itemNameOrObj.quantity) {
+                result.quantity = itemNameOrObj.quantity;
+             }
+            if (typeof itemNameOrObj === 'object' && itemNameOrObj.rarity) {
+                result.rarity = itemNameOrObj.rarity;
+             }
+
+            return result;
+         });
+
+         // 2024 filters out nulls, 5e does not
+        if (is2024(playerStats, playerSummary)) {
+            return processedItems.filter(item => item !== null);
+         }
+
+        return processedItems;
+     },
+
+     // === SHARED: getPlayerStats (handles both rulesets internally) ===
     getPlayerStats: async (allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary) => {
         const playerStats = cloneDeep(playerSummary);
+
+         // Preserve rules type for downstream dispatch
+        playerStats.rules = playerSummary.rules || '5e';
+
         playerStats.proficiency = Math.floor((playerSummary.level - 1) / 4 + 2);
-        playerStats.class = classRules.getClass(allClasses, playerSummary);
-        playerStats.immunities = raceRules.getImmunities(playerSummary);
-        playerStats.inventory.magicItems = rules.getMagicItems(allMagicItems, playerSummary);
-        playerStats.race = raceRules.getRace(allRaces, playerSummary);
-        playerStats.resistances = raceRules.getResistances(playerSummary);
-        [playerStats.actions, playerStats.bonusActions, playerStats.reactions, playerStats.specialActions, playerStats.characterAdvancement] = rules.getActions(playerStats);
-        [playerStats.languagesAllowed, playerStats.languages] = rules.getLanguages(playerStats);
-        [playerStats.proficienciesAllowed, playerStats.proficiencies] = rules.getProficiencies(playerStats, false);
-        [playerStats.skillProficienciesAllowed, playerStats.skillProficiencies] = rules.getProficiencies(playerStats, true);
-        playerStats.senses = raceRules.getSenses(playerStats);
-        playerStats.abilities = await rules.getAbilities(playerStats);
-        playerStats.hitPoints = rules.getHitPoints(playerStats);
+
+        const { classRules: cr, raceRules: rr } = rules.getSubModules(playerStats, playerSummary);
+
+        playerStats.class = cr.getClass(allClasses, playerSummary);
+        playerStats.race = rr.getRace(allRaces, playerSummary);
+        playerStats.inventory.magicItems = rules.getMagicItems(allMagicItems, playerSummary, playerStats);
+
+         // 2024-specific: set senses early, store equipment
+        if (is2024(playerStats, playerSummary)) {
+            playerStats.senses = [];
+            playerStats.equipment = allEquipment;
+         }
+
+         [playerStats.actions, playerStats.bonusActions, playerStats.reactions, playerStats.specialActions, playerStats.characterAdvancement] = rules.getActions(playerStats, playerSummary);
+         [playerStats.languagesAllowed, playerStats.languages] = rules.getLanguages(playerStats, playerSummary);
+         [playerStats.proficienciesAllowed, playerStats.proficiencies] = rules.getProficiencies(playerStats, false, playerSummary);
+         [playerStats.skillProficienciesAllowed, playerStats.skillProficiencies] = rules.getProficiencies(playerStats, true, playerSummary);
+
+        playerStats.abilities = await rules.getAbilities(playerStats, playerSummary);
+        playerStats.hitPoints = rules.getHitPoints(playerStats, playerSummary);
         playerStats.initiative = playerStats.abilities.find((ability) => ability.name === 'Dexterity').bonus;
-        [playerStats.armorClass, playerStats.armorClassFormula] = rules.getArmorClass(allEquipment, playerStats);
-        playerStats.spellAbilities = rules.getSpellAbilities(allSpells, playerStats);
-        playerStats.attacks = rules.getAttacks(allEquipment, allSpells, playerStats);
+         [playerStats.armorClass, playerStats.armorClassFormula] = rules.getArmorClass(allEquipment, playerStats, playerSummary);
+        playerStats.spellAbilities = rules.getSpellAbilities(allSpells, playerStats, playerSummary);
+        playerStats.attacks = rules.getAttacks(allEquipment, allSpells, playerStats, playerSummary);
+
+         // 2024-specific: senses set later (override), 5e-specific: immunities/resistances
+        if (is2024(playerStats, playerSummary)) {
+            playerStats.senses = rr.getSenses(playerStats);
+         } else {
+            playerStats.immunities = rr.getImmunities(playerSummary);
+            playerStats.resistances = rr.getResistances(playerSummary);
+            playerStats.senses = rr.getSenses(playerStats);
+         }
+
         return playerStats;
-    }
+     }
 };
 
 export default rules;

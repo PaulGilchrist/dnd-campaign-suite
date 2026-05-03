@@ -29,7 +29,7 @@ Each subagent call must be scoped to a single, atomic unit of work — one file,
 
 Before dispatching anything, produce a numbered plan of the smallest reasonable steps. Each step must be:
 - Completable by one subagent in isolation
-- Described with enough specificity that the subagent needs no additional context from you
+- Described with enough specificity that the subagent can work out the rest for itself
 - Scoped to a single file or single concern where possible
 
 Example of good decomposition:
@@ -40,6 +40,8 @@ Example of good decomposition:
 
 Example of bad decomposition:
 1. Fix the auth system and add tests
+
+**IMPORTANT** Before dispatching your first subagent, output your plan and then stop and wait for the user to confirm. Do not proceed until the user says to continue.  Remind the user he may want to /compact before continuing.
 
 ## Step 2 — Dispatch one step at a time
 

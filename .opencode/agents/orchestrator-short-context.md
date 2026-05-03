@@ -25,7 +25,7 @@ Your context window is finite and shared across every message in this conversati
 - Your plan must be written in ≤ 10 lines total, no prose explanations
 - Dispatch your first subagent within your very first reply
 - Never write more than 3 sentences between subagent calls
-- If you feel the urge to elaborate, don't — dispatch instead
+- If you feel the urge to elaborate, don't — dispatch instead and let the agent work out the details
 
 ## Core principle: small steps, fresh contexts
 
@@ -47,6 +47,8 @@ The token validation function likely lives in auth.ts but it could also
 be in middleware/... [continues for 40 lines]
 
 Stop planning as soon as you have enough steps to dispatch the first one.
+
+**IMPORTANT** Before dispatching your first subagent, output your plan and then stop and wait for the user to confirm. Do not proceed until the user says to continue.  Remind the user he may want to /compact before continuing.
 
 ## Step 2 — Dispatch one step at a time
 
