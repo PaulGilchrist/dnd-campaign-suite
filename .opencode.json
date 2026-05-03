@@ -9,7 +9,7 @@
         "Always generate a step-by-step plan before making any code changes.",
         "Follow the project's coding-standards and architecture-rules skills at all times."
       ],
-      "default_agent": "Orchestrator",
+      "default_agent": "orchestrator-medium-context",
       "mcp": {
         "chrome-devtools": {
             "type": "local",
