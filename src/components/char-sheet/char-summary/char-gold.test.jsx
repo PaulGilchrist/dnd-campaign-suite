@@ -58,51 +58,51 @@ describe('CharGold', () => {
     expect(screen.getByTestId('hidden-value')).toHaveTextContent('250');
    });
 
-  it('should toggle input visibility when clicked', () => {
-    render(<CharGold playerStats={mockPlayerStats} />);
-    
-    const clickable = screen.getByText((content, element) => element.textContent.includes('Gold')).parentElement;
-    expect(screen.queryByTestId('hidden-input')).not.toBeInTheDocument();
-    
-    fireEvent.click(clickable);
-    
-    expect(screen.getByTestId('hidden-input')).toBeInTheDocument();
-   });
+   it('should toggle input visibility when clicked', () => {
+     render(<CharGold playerStats={mockPlayerStats} />);
+     
+     const clickable = document.querySelector('.clickable');
+     expect(screen.queryByTestId('hidden-input')).not.toBeInTheDocument();
+     
+     fireEvent.click(clickable);
+     
+     expect(screen.getByTestId('hidden-input')).toBeInTheDocument();
+    });
 
-  it('should toggle input visibility when keydown', () => {
-    render(<CharGold playerStats={mockPlayerStats} />);
-    
-    const clickable = screen.getByText((content, element) => element.textContent.includes('Gold')).parentElement;
-    fireEvent.keyDown(clickable);
-    
-    expect(screen.getByTestId('hidden-input')).toBeInTheDocument();
-   });
+   it('should toggle input visibility when keydown', () => {
+     render(<CharGold playerStats={mockPlayerStats} />);
+     
+     const clickable = document.querySelector('.clickable');
+     fireEvent.keyDown(clickable);
+     
+     expect(screen.getByTestId('hidden-input')).toBeInTheDocument();
+    });
 
-  it('should call storage.setProperty when gold value changes', () => {
-    storage.getProperty.mockReturnValue(250);
-    
-    render(<CharGold playerStats={mockPlayerStats} />);
-    
-    const clickable = screen.getByText((content, element) => element.textContent.includes('Gold')).parentElement;
-    fireEvent.click(clickable);
-    
-    const input = screen.getByTestId('hidden-input');
-    fireEvent.change(input, { target: { value: '1000' } });
-    
-    expect(storage.setProperty).toHaveBeenCalledWith('Test Character', 'gold', '1000');
-   });
+   it('should call storage.setProperty when gold value changes', () => {
+     storage.getProperty.mockReturnValue(250);
+     
+     render(<CharGold playerStats={mockPlayerStats} />);
+     
+     const clickable = document.querySelector('.clickable');
+     fireEvent.click(clickable);
+     
+     const input = screen.getByTestId('hidden-input');
+     fireEvent.change(input, { target: { value: '1000' } });
+     
+     expect(storage.setProperty).toHaveBeenCalledWith('Test Character', 'gold', '1000');
+    });
 
-  it('should have tabIndex for accessibility', () => {
-    render(<CharGold playerStats={mockPlayerStats} />);
-    
-    const clickable = screen.getByText((content, element) => element.textContent.includes('Gold')).parentElement;
-    expect(clickable).toHaveAttribute('tabIndex', '0');
-   });
+   it('should have tabIndex for accessibility', () => {
+     render(<CharGold playerStats={mockPlayerStats} />);
+     
+     const clickable = document.querySelector('.clickable');
+     expect(clickable).toHaveAttribute('tabIndex', '0');
+    });
 
-  it('should have clickable class', () => {
-    render(<CharGold playerStats={mockPlayerStats} />);
-    
-    const clickable = screen.getByText((content, element) => element.textContent.includes('Gold')).parentElement;
-    expect(clickable).toHaveClass('clickable');
-   });
+   it('should have clickable class', () => {
+     render(<CharGold playerStats={mockPlayerStats} />);
+     
+     const clickable = document.querySelector('.clickable');
+     expect(clickable).toHaveClass('clickable');
+    });
 });

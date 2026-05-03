@@ -18,9 +18,13 @@ Follow these rules when writing or modifying tests.
 
 ## General Architecture
 
-- Vitest config: `vitest.config.js` — jsdom environment, globals enabled, setup file at `src/test/setup.js` (imports `@testing-library/jest-dom`).
-- Tests are co-located or in `src/**/*.test.{js,jsx}` — ~48 test files across components, hooks, utils, and data layers.
-- To run a single test: `npx vitest run src/path/to/file.test.jsx`
+- Framework: Vitest with jsdom, globals enabled
+- Setup: `src/tests/setup.js` (imports `@testing-library/jest-dom/vitest` + cleanup)
+- Pattern: `src/**/*.{test,spec}.{js,jsx}`
+- Run single test: `npm run test:run src/path/to/file.test.jsx`
+- All `services/*.js` files have a paired `*.test.js` — keep tests in sync
+- Each service module is co-located with its test file (`foo.js` + `foo.test.js`)
+- Coverage thresholds are all 0 (no enforced minimums)
 
 ## Components
 

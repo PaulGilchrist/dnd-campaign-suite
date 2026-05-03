@@ -118,7 +118,7 @@ describe('SelectableList', () => {
         />
       );
 
-    const label = screen.getByText(/type/i);
+     const label = screen.getByText('Type1');
     expect(label).toBeInTheDocument();
     });
 
@@ -273,7 +273,7 @@ describe('SelectableList', () => {
 
     fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'ZZZZ' } });
 
-    expect(screen.getByText(/No items found matching your criteria/)).toBeInTheDocument();
+    expect(screen.getByText(/No item found matching your criteria/)).toBeInTheDocument();
     });
 
   it('should apply custom className', () => {

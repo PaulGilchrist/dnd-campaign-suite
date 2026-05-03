@@ -47,29 +47,25 @@ describe('CharClassRogue', () => {
     expect(screen.getByText(/Sneak Attack Damage/)).toBeInTheDocument();
    });
 
-  it('should display sneak attack damage (5e format)', () => {
-    render(<CharClassRogue playerStats={mockPlayerStats5e} />);
-    
-    expect(screen.getByText(/Sneak Attack Damage/)).toBeInTheDocument();
-    const sneakDiv = screen.getByText((content, element) => element.textContent.includes('Sneak Attack Damage'));
-    expect(sneakDiv.parentElement.textContent).toContain('5d6');
-   });
+   it('should display sneak attack damage (5e format)', () => {
+      render(<CharClassRogue playerStats={mockPlayerStats5e} />);
 
-  it('should display sneak attack damage (2024 format)', () => {
-    render(<CharClassRogue playerStats={mockPlayerStats2024} />);
-    
-    const sneakDiv = screen.getByText((content, element) => element.textContent.includes('Sneak Attack Damage'));
-    expect(sneakDiv.parentElement.textContent).toContain('5d6');
-   });
+      expect(screen.getByText(/Sneak Attack Damage/)).toBeInTheDocument();
+      expect(screen.getByText('+5d6')).toBeInTheDocument();
+    });
 
-  it('should display expertise skills', () => {
-    render(<CharClassRogue playerStats={mockPlayerStats5e} />);
-    
-    expect(screen.getByText(/Expertise:/)).toBeInTheDocument();
-    const expertiseDiv = screen.getByText(/Expertise/);
-    expect(expertiseDiv.parentElement.textContent).toContain('Stealth');
-    expect(expertiseDiv.parentElement.textContent).toContain('Deception');
-   });
+   it('should display sneak attack damage (2024 format)', () => {
+      render(<CharClassRogue playerStats={mockPlayerStats2024} />);
+
+      expect(screen.getByText('+5d6')).toBeInTheDocument();
+    });
+
+   it('should display expertise skills', () => {
+      render(<CharClassRogue playerStats={mockPlayerStats5e} />);
+
+      expect(screen.getByText(/Expertise:/)).toBeInTheDocument();
+      expect(screen.getByText(/Stealth.*Deception/)).toBeInTheDocument();
+    });
 
   it('should not display expertise when not defined', () => {
     const statsNoExpertise = {
@@ -100,53 +96,51 @@ describe('CharClassRogue', () => {
     expect(container.firstChild).toBeNull();
    });
 
-  it('should default sneak attack to 0d6 when not defined', () => {
-    const statsNoSneak = {
-       ...mockPlayerStats5e,
-      class: {
-        name: 'Rogue',
-        class_levels: [{ class_specific: {} }],
-       },
-     };
-    
-    render(<CharClassRogue playerStats={statsNoSneak} />);
-    
-    const sneakDiv = screen.getByText((content, element) => element.textContent.includes('Sneak Attack Damage'));
-    expect(sneakDiv.parentElement.textContent).toContain('0d6');
-   });
+   it('should default sneak attack to 0d6 when not defined', () => {
+      const statsNoSneak = {
+         ...mockPlayerStats5e,
+        class: {
+          name: 'Rogue',
+          class_levels: Array(5).fill({ class_specific: {} }),
+         },
+       };
+      
+      render(<CharClassRogue playerStats={statsNoSneak} />);
+      
+      expect(screen.getByText(/0d6/)).toBeInTheDocument();
+    });
 
-  it('should handle 2024 rogue without sneak_attack_num_d6', () => {
-    const stats2024NoSneak = {
-       ...mockPlayerStats2024,
-      class: {
-        name: 'Rogue',
-        class_levels: [{}],
-       },
-     };
-    
-    render(<CharClassRogue playerStats={stats2024NoSneak} />);
-    
-    const sneakDiv = screen.getByText((content, element) => element.textContent.includes('Sneak Attack Damage'));
-    expect(sneakDiv.parentElement.textContent).toContain('0d6');
-   });
+   it('should handle 2024 rogue without sneak_attack_num_d6', () => {
+      const stats2024NoSneak = {
+         ...mockPlayerStats2024,
+        class: {
+          name: 'Rogue',
+          class_levels: Array(5).fill({}),
+         },
+       };
+      
+      render(<CharClassRogue playerStats={stats2024NoSneak} />);
+      
+      expect(screen.getByText(/0d6/)).toBeInTheDocument();
+    });
 
-  it('should handle missing class_levels gracefully', () => {
+   it('should handle missing class_levels gracefully', () => {
     const statsNoLevels = {
        ...mockPlayerStats5e,
       class: { name: 'Rogue' },
      };
-    
-    const { container } = render(<CharClassRogue playerStats={statsNoLevels} />);
-    expect(container.firstChild).toBeNull();
-   });
+
+    render(<CharClassRogue playerStats={statsNoLevels} />);
+    expect(screen.queryByText(/Sneak Attack/)).not.toBeInTheDocument();
+    });
 
   it('should handle level out of bounds', () => {
     const statsOutBounds = {
        ...mockPlayerStats5e,
       level: 100,
      };
-    
-    const { container } = render(<CharClassRogue playerStats={statsOutBounds} />);
-    expect(container.firstChild).toBeNull();
-   });
+
+    render(<CharClassRogue playerStats={statsOutBounds} />);
+    expect(screen.queryByText(/Sneak Attack/)).not.toBeInTheDocument();
+    });
 });

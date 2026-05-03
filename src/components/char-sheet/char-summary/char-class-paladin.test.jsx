@@ -49,41 +49,41 @@ describe('CharClassPaladin', () => {
     expect(screen.getByText(/Channel Divinity/)).toBeInTheDocument();
    });
 
-  it('should display fighting styles', () => {
-    render(<CharClassPaladin playerStats={mockPlayerStats5e} />);
-    
-    const stylesDiv = screen.getByText((content, element) => element.textContent.includes('Fighting Styles'));
-    expect(stylesDiv.parentElement.textContent).toContain('Defense');
-   });
+   it('should display fighting styles', () => {
+     render(<CharClassPaladin playerStats={mockPlayerStats5e} />);
+     
+     expect(screen.getByText('Fighting Styles:')).toBeInTheDocument();
+     expect(screen.getByText('Defense')).toBeInTheDocument();
+    });
 
-  it('should display extra attacks for level > 4', () => {
-    render(<CharClassPaladin playerStats={mockPlayerStats5e} />);
-    
-    const extraDiv = screen.getByText((content, element) => element.textContent.includes('Extra Attacks'));
-    expect(extraDiv.parentElement.textContent).toContain('1');
-   });
+   it('should display extra attacks for level > 4', () => {
+     render(<CharClassPaladin playerStats={mockPlayerStats5e} />);
+     
+     expect(screen.getByText('Extra Attacks:')).toBeInTheDocument();
+     expect(screen.getByText('1')).toBeInTheDocument();
+    });
 
-  it('should display 0 extra attacks for level <= 4', () => {
-    const statsLevel4 = {
-       ...mockPlayerStats5e,
-      level: 4,
-      class: {
-         ...mockPlayerStats5e.class,
-        fightingStyles: ['Defense'],
-        class_levels: [
-           { class_specific: { channel_divinity_charges: 1, aura_range: 0 } },
-           { class_specific: { channel_divinity_charges: 1, aura_range: 0 } },
-           { class_specific: { channel_divinity_charges: 1, aura_range: 0 } },
-           { class_specific: { channel_divinity_charges: 1, aura_range: 0 } },
-          ],
-       },
-     };
-    
-    render(<CharClassPaladin playerStats={statsLevel4} />);
-    
-    const extraDiv = screen.getByText((content, element) => element.textContent.includes('Extra Attacks'));
-    expect(extraDiv.parentElement.textContent).toContain('0');
-   });
+   it('should display 0 extra attacks for level <= 4', () => {
+     const statsLevel4 = {
+        ...mockPlayerStats5e,
+       level: 4,
+       class: {
+          ...mockPlayerStats5e.class,
+         fightingStyles: ['Defense'],
+         class_levels: [
+            { class_specific: { channel_divinity_charges: 1, aura_range: 0 } },
+            { class_specific: { channel_divinity_charges: 1, aura_range: 0 } },
+            { class_specific: { channel_divinity_charges: 1, aura_range: 0 } },
+            { class_specific: { channel_divinity_charges: 1, aura_range: 0 } },
+           ],
+        },
+      };
+     
+     render(<CharClassPaladin playerStats={statsLevel4} />);
+     
+     const extraAttacksDiv = screen.getByText('Extra Attacks:').closest('div');
+     expect(extraAttacksDiv).toHaveTextContent('0');
+    });
 
   it('should display channel divinity charges (5e)', () => {
     render(<CharClassPaladin playerStats={mockPlayerStats5e} />);
@@ -91,12 +91,12 @@ describe('CharClassPaladin', () => {
     expect(screen.getByText(/Channel Divinity/)).toBeInTheDocument();
    });
 
-  it('should display channel divinity (2024)', () => {
-    render(<CharClassPaladin playerStats={mockPlayerStats2024} />);
-    
-    const cd2024 = screen.getByText((content, element) => element.textContent.includes('Channel Divinity'));
-    expect(cd2024.parentElement.textContent).toContain('2');
-   });
+   it('should display channel divinity (2024)', () => {
+     render(<CharClassPaladin playerStats={mockPlayerStats2024} />);
+     
+     expect(screen.getByText('Channel Divinity:')).toBeInTheDocument();
+     expect(screen.getByText('2')).toBeInTheDocument();
+    });
 
   it('should display aura range for 5e', () => {
     render(<CharClassPaladin playerStats={mockPlayerStats5e} />);
@@ -136,18 +136,18 @@ describe('CharClassPaladin', () => {
     expect(screen.getByText(/Fighting Styles/)).toBeInTheDocument();
    });
 
-  it('should handle undefined fighting styles', () => {
-    const statsNoStyles = {
-       ...mockPlayerStats5e,
-      class: {
-        name: 'Paladin',
-        class_levels: [{ class_specific: { channel_divinity_charges: 1, aura_range: 0 } }],
-       },
-     };
-    
-    const { container } = render(<CharClassPaladin playerStats={statsNoStyles} />);
-    expect(container.firstChild).not.toBeNull();
-   });
+   it('should handle undefined fighting styles', () => {
+     const statsNoStyles = {
+        ...mockPlayerStats5e,
+       class: {
+         name: 'Paladin',
+         class_levels: [{ class_specific: { channel_divinity_charges: 1, aura_range: 0 } }],
+        },
+      };
+     
+     render(<CharClassPaladin playerStats={statsNoStyles} />);
+     expect(screen.queryByText('Fighting Styles:')).not.toBeInTheDocument();
+    });
 
   it('should default channel divinity to 0 when not defined', () => {
     const statsNoCD = {

@@ -2,34 +2,46 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from './App';
 
+const { MockCharSheet } = vi.hoisted(() => ({
+  MockCharSheet: vi.fn(({ playerSummary }) => <div data-testid="char-sheet">{playerSummary?.name || 'no character'}</div>)
+}));
+
+const { MockCombat } = vi.hoisted(() => ({
+  MockCombat: vi.fn(({ characters }) => <div data-testid="combat-tracking">{characters?.length || 0} chars</div>)
+}));
+
+const { CampaignSelectionFn } = vi.hoisted(() => ({
+  CampaignSelectionFn: vi.fn(({ onCampaignSelect }) => (
+    <div data-testid="campaign-selection">
+      <button onClick={() => onCampaignSelect('test-campaign', [])}>Select Campaign</button>
+    </div>
+  ))
+}));
+
+const { WizardFn } = vi.hoisted(() => ({
+  WizardFn: vi.fn(({ onComplete, onCancel, characterData, isEditing }) => (
+    <div data-testid="character-wizard">
+      <button onClick={() => onComplete({ name: 'New Character', level: 1 })}>Complete</button>
+      <button onClick={onCancel}>Cancel</button>
+      {characterData && <div>Editing: {characterData.name}</div>}
+      {isEditing && <div>Editing Mode</div>}
+    </div>
+  ))
+}));
+
 vi.mock('../services/utils', () => ({
   default: { getFirstName: vi.fn((name) => name ? name.split(' ')[0] : '') }
 }));
 
 vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
 
-const MockCharSheet = vi.fn(({ playerSummary }) => <div data-testid="char-sheet">{playerSummary?.name || 'no character'}</div>);
-vi.mock('../components/char-sheet/char-sheet', () => ({ default: MockCharSheet }));
+vi.mock('./components/char-sheet/char-sheet', () => ({ default: MockCharSheet }));
 
-const MockCombat = vi.fn(({ characters }) => <div data-testid="combat-tracking">{characters?.length || 0} chars</div>);
-vi.mock('../components/combat-tracking/combat-tracking', () => ({ default: MockCombat }));
+vi.mock('./components/combat-tracking/combat-tracking', () => ({ default: MockCombat }));
 
-const CampaignSelectionFn = vi.fn(({ onCampaignSelect }) => (
-  <div data-testid="campaign-selection">
-    <button onClick={() => onCampaignSelect('test-campaign', [])}>Select Campaign</button>
-  </div>
-));
-vi.mock('../components/campaign-selection/campaign-selection', () => ({ default: CampaignSelectionFn }));
+vi.mock('./components/campaign-selection/campaign-selection', () => ({ default: CampaignSelectionFn }));
 
-const WizardFn = vi.fn(({ onComplete, onCancel, characterData, isEditing }) => (
-  <div data-testid="character-wizard">
-    <button onClick={() => onComplete({ name: 'New Character', level: 1 })}>Complete</button>
-    <button onClick={onCancel}>Cancel</button>
-    {characterData && <div>Editing: {characterData.name}</div>}
-    {isEditing && <div>Editing Mode</div>}
-  </div>
-));
-vi.mock('../components/character-creation/character-creation-wizard', () => ({ default: WizardFn }));
+vi.mock('./components/character-creation/character-creation-wizard', () => ({ default: WizardFn }));
 
 const mockFetchData = {
   '/data/ability-scores.json': [{ full_name: 'Strength' }],
@@ -79,7 +91,9 @@ describe('App', () => {
   });
 
   it('should navigate to main view when campaign is selected', async () => {
+    const preloaded = JSON.stringify([{ name: 'Test Character', level: 1 }]);
     window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
       if (key === 'currentCampaign') return 'test-campaign';
       return null;
     });
@@ -87,7 +101,22 @@ describe('App', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(document.querySelector('.app')).toBeInTheDocument();
+      expect(screen.queryByTestId('campaign-selection')).not.toBeInTheDocument();
+    });
+  });
+
+  it('should show character sheet when campaign has characters', async () => {
+    const preloaded = JSON.stringify([{ name: 'Test Character', level: 1 }]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     });
   });
 
@@ -95,6 +124,19 @@ describe('App', () => {
     const preloaded = JSON.stringify([{ name: 'Preloaded Character', level: 1 }]);
     window.sessionStorage.getItem = vi.fn((key) => {
       if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('campaign-selection')).not.toBeInTheDocument();
+    });
+  });
+
+  it('should show main view when campaign was previously selected', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
       if (key === 'currentCampaign') return 'test-campaign';
       return null;
     });
@@ -252,6 +294,379 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(document.querySelector('.app')).toBeInTheDocument();
+    });
+  });
+
+  it('should handle upload error gracefully', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      if (key === 'characters') return JSON.stringify([{ name: 'Test Character', level: 1 }]);
+      return null;
+    });
+
+    // Mock FileReader to simulate error
+    const mockFileReader = {
+      onload: null,
+      readAsText: vi.fn(function() {
+        // Simulate error
+        if (this.onerror) this.onerror(new Error('Read error'));
+      }),
+      onerror: null,
+    };
+    global.FileReader = vi.fn(() => mockFileReader);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Upload/)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle wizard completion with no campaign', async () => {
+    window.sessionStorage.getItem = vi.fn(() => null);
+
+    render(<App />);
+
+    fireEvent.click(screen.getByText('Select Campaign'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('character-wizard')).toBeInTheDocument();
+    });
+  });
+
+  it('should handle edit wizard completion with no campaign', async () => {
+    window.sessionStorage.getItem = vi.fn(() => null);
+
+    render(<App />);
+
+    // Set up active character first
+    const preloaded = JSON.stringify([{ name: 'Test Character', level: 1 }]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Edit/)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle save click and trigger download', async () => {
+    const preloaded = JSON.stringify([{ name: 'Test Character', level: 1 }]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Download/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/Download/));
+  });
+
+  it('should handle upload click', async () => {
+    const preloaded = JSON.stringify([{ name: 'Test Character', level: 1 }]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Upload/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/Upload/));
+  });
+
+  it('should handle character click to switch active character', async () => {
+    const preloaded = JSON.stringify([
+      { name: 'Character 1', level: 1 },
+      { name: 'Character 2', level: 2 },
+    ]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+    });
+
+    const buttons = screen.getAllByText('Character 2');
+    fireEvent.click(buttons[0]);
+  });
+
+  it('should show combat tracking when no active character and characters exist', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    const preloaded = JSON.stringify([
+      { name: 'Character 1', level: 1 },
+    ]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Combat/)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle initiative click to show combat', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    const preloaded = JSON.stringify([
+      { name: 'Character 1', level: 1 },
+    ]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Combat/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/Combat/));
+  });
+
+  it('should handle rename campaign', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('test-campaign')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTitle('Rename Campaign'));
+  });
+
+  it('should handle delete campaign when confirmed', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    window.confirm = vi.fn(() => true);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('test-campaign')).toBeInTheDocument();
+    });
+
+    const deleteBtn = document.querySelector('.delete-campaign-btn');
+    if (deleteBtn && !deleteBtn.disabled) {
+      fireEvent.click(deleteBtn);
+    }
+  });
+
+  it('should handle going back to campaigns', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Campaigns/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/Campaigns/));
+  });
+
+  it('should delete campaign when confirmed', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url.includes('/api/campaigns/')) {
+        return Promise.resolve({ ok: true });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('test-campaign')).toBeInTheDocument();
+    });
+
+    window.confirm = vi.fn(() => true);
+
+    // Need to trigger delete - button is disabled when characters exist
+    // Let's test without characters
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      if (key === 'characters') return JSON.stringify([]);
+      return null;
+    });
+
+    render(<App />);
+
+    const deleteBtn = document.querySelector('.delete-campaign-btn');
+    if (deleteBtn && !deleteBtn.disabled) {
+      fireEvent.click(deleteBtn);
+    }
+  });
+
+  it('should handle rename campaign error', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url.includes('/api/campaigns/')) {
+        return Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({ error: 'Rename failed' })
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('test-campaign')).toBeInTheDocument();
+    });
+
+    window.prompt = vi.fn(() => 'New Name');
+    
+    fireEvent.click(screen.getByTitle('Rename Campaign'));
+  });
+
+  it('should handle delete character error', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      if (key === 'characters') return JSON.stringify([{ name: 'Test', level: 1 }]);
+      return null;
+    });
+
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url.includes('/api/characters/')) {
+        return Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({ error: 'Delete failed' })
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+    });
+
+    window.confirm = vi.fn(() => true);
+    
+    const deleteButton = document.querySelector('[title="Delete Character"]');
+    if (deleteButton) {
+      fireEvent.click(deleteButton);
+    }
+  });
+
+  it('should handle campaign name prompt cancel', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('test-campaign')).toBeInTheDocument();
+    });
+
+    window.prompt = vi.fn(() => null); // User cancels prompt
+    
+    fireEvent.click(screen.getByTitle('Rename Campaign'));
+  });
+
+  it('should handle delete campaign error', async () => {
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (url.includes('/api/campaigns/')) {
+        return Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({ error: 'Delete failed' })
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('test-campaign')).toBeInTheDocument();
+    });
+
+    window.confirm = vi.fn(() => true);
+
+    // Need to trigger delete
+    const deleteBtn = document.querySelector('.delete-campaign-btn');
+    if (deleteBtn && !deleteBtn.disabled) {
+      fireEvent.click(deleteBtn);
+    }
+  });
+
+  it('should not render char sheet when no active character', async () => {
+    const preloaded = JSON.stringify([{ name: 'Char1', level: 1 }]);
+    window.sessionStorage.getItem = vi.fn((key) => {
+      if (key === 'characters') return preloaded;
+      if (key === 'currentCampaign') return 'test-campaign';
+      return null;
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+    });
+
+    // Click Combat to set activeCharacter to null
+    fireEvent.click(screen.getByText(/Combat/));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
     });
   });
 });

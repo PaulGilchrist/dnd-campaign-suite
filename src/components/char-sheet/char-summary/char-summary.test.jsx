@@ -27,16 +27,23 @@ vi.mock('../../common/hidden-input', () => ({
     }),
 }));
 
+const setPopupHtmlMock = vi.fn();
+
 vi.mock('../common/use-popup', () => ({
   default: vi.fn(() => ({
     PopupElement: null,
-    setPopupHtml: vi.fn(),
+    setPopupHtml: setPopupHtmlMock,
     showPopup: vi.fn(),
-    })),
+  })),
 }));
 
 vi.mock('../char-feats/char-feats', () => ({
-  default: vi.fn(({ playerStats, showPopup }) => <div data-testid="char-feats">Feats: {playerStats.class.name}</div>),
+  default: vi.fn(({ playerStats, showPopup }) => (
+    <div data-testid="char-feats">
+      Feats: {playerStats.class.name}
+      <button onClick={() => showPopup({ name: 'Test Feat', desc: ['Test description'] })}>Trigger Popup</button>
+    </div>
+  )),
 }));
 
 vi.mock('./char-hit-points', () => ({
@@ -119,11 +126,11 @@ describe('CharSummary', () => {
     expect(screen.getByText(/Mountain Dwarf/)).toBeInTheDocument();
     });
 
-  it('should display class name', () => {
-    render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
+   it('should display class name', () => {
+     render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
 
-    expect(screen.getByText(/Fighter/)).toBeInTheDocument();
-    });
+     expect(screen.getByTestId('char-class-fighter')).toBeInTheDocument();
+     });
 
   it('should display level', () => {
     render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
@@ -131,11 +138,11 @@ describe('CharSummary', () => {
     expect(screen.getByText(/Level 5/)).toBeInTheDocument();
     });
 
-  it('should display alignment', () => {
-    render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
+   it('should display alignment', () => {
+     render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
 
-    expect(screen.getByText('Lawful Good')).toBeInTheDocument();
-    });
+     expect(screen.getByText(/Lawful Good/)).toBeInTheDocument();
+     });
 
   it('should render armor class', () => {
     render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
@@ -256,5 +263,281 @@ describe('CharSummary', () => {
 
     const checkbox = document.querySelector('input[type="checkbox"]');
     expect(checkbox).toBeChecked();
-    });
+  });
+
+  it('should calculate speed with Monk unarmored movement', () => {
+    const monkStats = {
+      ...mockPlayerStats,
+      class: { name: 'Monk' },
+      rules: '5e',
+    };
+
+    render(<CharSummary playerStats={monkStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByText(/Speed/)).toBeInTheDocument();
+  });
+
+  it('should calculate speed with Barbarian unarmored movement', () => {
+    const barbarianStats = {
+      ...mockPlayerStats,
+      class: {
+        name: 'Barbarian',
+        class_levels: [
+          { class_specific: { unarmored_movement: 10 } },
+        ],
+      },
+      rules: '5e',
+    };
+
+    render(<CharSummary playerStats={barbarianStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByText(/Speed/)).toBeInTheDocument();
+  });
+
+  it('should show armor class formula popup on click', () => {
+    render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
+
+    const acElement = screen.getByText(/Armor Class/);
+    fireEvent.click(acElement);
+
+    expect(setPopupHtmlMock).toHaveBeenCalled();
+  });
+
+  it('should render Barbarian class component', () => {
+    const barbarianStats = {
+      ...mockPlayerStats,
+      class: { name: 'Barbarian', subclass: null },
+    };
+
+    render(<CharSummary playerStats={barbarianStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('char-class-barbarian')).toBeInTheDocument();
+  });
+
+  it('should render Bard class component', () => {
+    const bardStats = {
+      ...mockPlayerStats,
+      class: { name: 'Bard', subclass: null },
+    };
+
+    render(<CharSummary playerStats={bardStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('char-class-bard')).toBeInTheDocument();
+  });
+
+  it('should render Cleric class component', () => {
+    const clericStats = {
+      ...mockPlayerStats,
+      class: { name: 'Cleric', subclass: null },
+    };
+
+    render(<CharSummary playerStats={clericStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('char-class-cleric')).toBeInTheDocument();
+  });
+
+  it('should render Druid class component', () => {
+    const druidStats = {
+      ...mockPlayerStats,
+      class: { name: 'Druid', subclass: null },
+    };
+
+    render(<CharSummary playerStats={druidStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('char-class-druid')).toBeInTheDocument();
+  });
+
+  it('should render Paladin class component', () => {
+    const paladinStats = {
+      ...mockPlayerStats,
+      class: { name: 'Paladin', subclass: null },
+    };
+
+    render(<CharSummary playerStats={paladinStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('char-class-paladin')).toBeInTheDocument();
+  });
+
+  it('should render Ranger class component', () => {
+    const rangerStats = {
+      ...mockPlayerStats,
+      class: { name: 'Ranger', subclass: null },
+    };
+
+    render(<CharSummary playerStats={rangerStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('char-class-ranger')).toBeInTheDocument();
+  });
+
+  it('should render Rogue class component', () => {
+    const rogueStats = {
+      ...mockPlayerStats,
+      class: { name: 'Rogue', subclass: null },
+    };
+
+    render(<CharSummary playerStats={rogueStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('char-class-rogue')).toBeInTheDocument();
+  });
+
+  it('should render Warlock class component', () => {
+    const warlockStats = {
+      ...mockPlayerStats,
+      class: { name: 'Warlock', subclass: null },
+    };
+
+    render(<CharSummary playerStats={warlockStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('char-class-warlock')).toBeInTheDocument();
+  });
+
+  it('should render Wizard class component', () => {
+    const wizardStats = {
+      ...mockPlayerStats,
+      class: { name: 'Wizard', subclass: null },
+    };
+
+    render(<CharSummary playerStats={wizardStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('char-class-wizard')).toBeInTheDocument();
+  });
+
+  it('should render background when present', () => {
+    const statsWithBackground = {
+      ...mockPlayerStats,
+      background: 'Noble',
+    };
+
+    render(<CharSummary playerStats={statsWithBackground} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByText(/Background/)).toBeInTheDocument();
+  });
+
+  it('should handle short rest hit dice toggle', () => {
+    render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
+
+    const hitDiceElement = screen.getByText(/Short Rest Hit Dice/);
+    fireEvent.click(hitDiceElement);
+
+    expect(screen.getByTestId('hidden-input')).toBeInTheDocument();
+  });
+
+  it('should update short rest hit dice value', () => {
+    storage.getProperty.mockReturnValue(3);
+
+    render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('hidden-value')).toHaveTextContent('3');
+  });
+
+  it('should not render short rest hit dice input when not toggled', () => {
+    render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.queryByTestId('hidden-input')).not.toBeInTheDocument();
+  });
+
+  it('should show feats popup with array description format', () => {
+    const featsStats = {
+      ...mockPlayerStats,
+      feats: [
+        { name: 'Great Weapon Master', desc: ['Bonus attack', 'Power attack'] },
+      ],
+    };
+
+    render(<CharSummary playerStats={featsStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('char-feats')).toBeInTheDocument();
+  });
+
+  it('should show feats popup with string description format', () => {
+    const featsStats = {
+      ...mockPlayerStats,
+      feats: [
+        { name: 'Sharpshooter', description: 'No disadvantage on long range' },
+      ],
+    };
+
+    render(<CharSummary playerStats={featsStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('char-feats')).toBeInTheDocument();
+  });
+
+  it('should show feat with benefits', () => {
+    const featsStats = {
+      ...mockPlayerStats,
+      feats: [
+        {
+          name: 'Great Weapon Master',
+          desc: ['Bonus attack'],
+          benefits: [{ description: 'Power attack' }]
+        },
+      ],
+    };
+
+    render(<CharSummary playerStats={featsStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('char-feats')).toBeInTheDocument();
+  });
+
+  it('should show feat with prerequisites - level', () => {
+    const featsStats = {
+      ...mockPlayerStats,
+      feats: [
+        {
+          name: 'Heavy Armor Master',
+          desc: ['Reduces damage by 3'],
+          prerequisites: { level: 4 }
+        },
+      ],
+    };
+
+    render(<CharSummary playerStats={featsStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('char-feats')).toBeInTheDocument();
+  });
+
+  it('should show feat with prerequisites - ability scores', () => {
+    const featsStats = {
+      ...mockPlayerStats,
+      feats: [
+        {
+          name: 'Sharpshooter',
+          desc: ['No disadvantage'],
+          prerequisites: { ability_scores: [{ name: 'Dexterity', minimum: 13 }] }
+        },
+      ],
+    };
+
+    render(<CharSummary playerStats={featsStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('char-feats')).toBeInTheDocument();
+  });
+
+  it('should show Monk class component', () => {
+    const monkStats = {
+      ...mockPlayerStats,
+      class: { name: 'Monk', subclass: null },
+    };
+
+    render(<CharSummary playerStats={monkStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByTestId('char-class-monk')).toBeInTheDocument();
+  });
+
+  it('should trigger feat popup with description', () => {
+    const featsStats = {
+      ...mockPlayerStats,
+      feats: [
+        { name: 'Great Weapon Master', desc: ['Bonus attack'] },
+      ],
+    };
+
+    render(<CharSummary playerStats={featsStats} onDeleteCharacter={vi.fn()} />);
+
+    // Click the button that triggers showPopup
+    const triggerButton = screen.getByText('Trigger Popup');
+    fireEvent.click(triggerButton);
+
+    expect(setPopupHtmlMock).toHaveBeenCalled();
+  });
 });

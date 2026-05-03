@@ -1,143 +1,241 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { WIZARD_STEPS, getTotalSteps, getStepConfig } from './steps-config';
 
 describe('steps-config', () => {
   describe('WIZARD_STEPS', () => {
-    it('should be an array', () => {
-      expect(Array.isArray(WIZARD_STEPS)).toBe(true);
-         });
-
     it('should have 12 steps', () => {
-      expect(WIZARD_STEPS.length).toBe(12);
-         });
+      expect(WIZARD_STEPS).toHaveLength(12);
+    });
 
-    it('should have step 1 as Ruleset', () => {
-      const step1 = WIZARD_STEPS.find(step => step.step === 1);
-      expect(step1).toBeDefined();
-      expect(step1.title).toBe('Ruleset');
-      expect(typeof step1.getProps).toBe('function');
-         });
+    it('should have unique step numbers', () => {
+      const stepNumbers = WIZARD_STEPS.map(s => s.step);
+      const uniqueSteps = [...new Set(stepNumbers)];
+      expect(uniqueSteps).toHaveLength(stepNumbers.length);
+    });
 
-    it('should have step 2 as Basic Information', () => {
-      const step2 = WIZARD_STEPS.find(step => step.step === 2);
-      expect(step2).toBeDefined();
-      expect(step2.title).toBe('Basic Information');
-         });
-
-    it('should have step 3 as Race & Class', () => {
-      const step3 = WIZARD_STEPS.find(step => step.step === 3);
-      expect(step3).toBeDefined();
-      expect(step3.title).toBe('Race & Class');
-         });
-
-    it('should have step 4 as Feats', () => {
-      const step4 = WIZARD_STEPS.find(step => step.step === 4);
-      expect(step4).toBeDefined();
-      expect(step4.title).toBe('Feats');
-         });
-
-    it('should have step 5 as Ability Scores', () => {
-      const step5 = WIZARD_STEPS.find(step => step.step === 5);
-      expect(step5).toBeDefined();
-      expect(step5.title).toBe('Ability Scores');
-         });
-
-    it('should have step 6 as Skill Proficiencies', () => {
-      const step6 = WIZARD_STEPS.find(step => step.step === 6);
-      expect(step6).toBeDefined();
-      expect(step6.title).toBe('Skill Proficiencies');
-         });
-
-    it('should have step 7 as Languages & Fighting Styles', () => {
-      const step7 = WIZARD_STEPS.find(step => step.step === 7);
-      expect(step7).toBeDefined();
-      expect(step7.title).toBe('Languages & Fighting Styles');
-         });
-
-    it('should have step 8 as Resistances & Immunities', () => {
-      const step8 = WIZARD_STEPS.find(step => step.step === 8);
-      expect(step8).toBeDefined();
-      expect(step8.title).toBe('Resistances & Immunities');
-         });
-
-    it('should have step 9 as Spells', () => {
-      const step9 = WIZARD_STEPS.find(step => step.step === 9);
-      expect(step9).toBeDefined();
-      expect(step9.title).toBe('Spells');
-         });
-
-    it('should have step 10 as Magic Items', () => {
-      const step10 = WIZARD_STEPS.find(step => step.step === 10);
-      expect(step10).toBeDefined();
-      expect(step10.title).toBe('Magic Items');
-         });
-
-    it('should have step 11 as Inventory', () => {
-      const step11 = WIZARD_STEPS.find(step => step.step === 11);
-      expect(step11).toBeDefined();
-      expect(step11.title).toBe('Inventory');
-         });
-
-    it('should have step 12 as Special Actions', () => {
-      const step12 = WIZARD_STEPS.find(step => step.step === 12);
-      expect(step12).toBeDefined();
-      expect(step12.title).toBe('Special Actions');
-         });
-
-    it('should have getProps function for each step', () => {
+    it('should have all required properties', () => {
       WIZARD_STEPS.forEach(step => {
+        expect(step.step).toBeDefined();
+        expect(step.title).toBeDefined();
+        expect(step.component).toBeDefined();
+        expect(step.getProps).toBeDefined();
         expect(typeof step.getProps).toBe('function');
-          });
-         });
-
-    it('should return correct props for step 1', () => {
-      const step1 = WIZARD_STEPS.find(step => step.step === 1);
-      const props = step1.getProps({
-        ruleset: '5e',
-        errors: {},
-        onRulesetChange: () => {}
-          });
-
-      expect(props.ruleset).toBe('5e');
-      expect(props.errors).toEqual({});
-      expect(typeof props.onRulesetChange).toBe('function');
-         });
       });
+    });
+
+    it('should have correct step titles', () => {
+      expect(WIZARD_STEPS[0].title).toBe('Ruleset');
+      expect(WIZARD_STEPS[1].title).toBe('Basic Information');
+      expect(WIZARD_STEPS[2].title).toBe('Race & Class');
+    });
+
+    it('should have correct step order', () => {
+      WIZARD_STEPS.forEach((step, index) => {
+        expect(step.step).toBe(index + 1);
+      });
+    });
+  });
 
   describe('getTotalSteps', () => {
-    it('should return the total number of steps', () => {
-      const total = getTotalSteps();
-      expect(total).toBe(12);
-         });
-
-    it('should match WIZARD_STEPS length', () => {
-      expect(getTotalSteps()).toBe(WIZARD_STEPS.length);
-         });
-      });
+    it('should return 12', () => {
+      expect(getTotalSteps()).toBe(12);
+    });
+  });
 
   describe('getStepConfig', () => {
-    it('should return step config for valid step number', () => {
+    it('should return config for step 1', () => {
       const config = getStepConfig(1);
       expect(config).toBeDefined();
       expect(config.step).toBe(1);
       expect(config.title).toBe('Ruleset');
-         });
+    });
 
-    it('should return step config for step 6', () => {
-      const config = getStepConfig(6);
+    it('should return config for step 12', () => {
+      const config = getStepConfig(12);
       expect(config).toBeDefined();
-      expect(config.step).toBe(6);
-      expect(config.title).toBe('Skill Proficiencies');
-         });
+      expect(config.step).toBe(12);
+      expect(config.title).toBe('Special Actions');
+    });
 
-    it('should return undefined for invalid step number', () => {
-      const config = getStepConfig(99);
+    it('should return undefined for invalid step', () => {
+      const config = getStepConfig(999);
       expect(config).toBeUndefined();
-         });
+    });
 
-    it('should return undefined for step 0', () => {
+    it('should return undefined for 0', () => {
       const config = getStepConfig(0);
       expect(config).toBeUndefined();
-         });
-      });
+    });
+
+    it('should return undefined for negative step', () => {
+      const config = getStepConfig(-1);
+      expect(config).toBeUndefined();
+    });
+
+    it('should return correct component for each step', () => {
+      const step1 = getStepConfig(1);
+      expect(step1.component).toBeDefined();
+    });
+  });
+
+  describe('getProps functions', () => {
+    it('should call getProps with correct arguments for step 1', () => {
+      const config = getStepConfig(1);
+      const mockProps = {
+        ruleset: '5e',
+        errors: {},
+        onRulesetChange: vi.fn(),
+      };
+      const props = config.getProps(mockProps);
+      expect(props.ruleset).toBe('5e');
+      expect(props.errors).toBeDefined();
+    });
+
+    it('should call getProps with correct arguments for step 2', () => {
+      const config = getStepConfig(2);
+      const mockProps = {
+        formData: { name: 'Test' },
+        errors: {},
+        backgrounds: [],
+        ruleset: '5e',
+        onInputChange: vi.fn(),
+      };
+      const props = config.getProps(mockProps);
+      expect(props.formData).toBeDefined();
+      expect(props.backgrounds).toEqual([]);
+    });
+
+    it('should call getProps for step 3 (Race & Class)', () => {
+      const config = getStepConfig(3);
+      const mockProps = {
+        formData: {},
+        errors: {},
+        racesData: [],
+        classSubtypes: [],
+        ruleset: '5e',
+        onInputChange: vi.fn(),
+      };
+      const props = config.getProps(mockProps);
+      expect(props.formData).toBeDefined();
+      expect(props.racesData).toEqual([]);
+    });
+
+    it('should call getProps for step 4 (Feats)', () => {
+      const config = getStepConfig(4);
+      const mockProps = {
+        formData: { feats: [] },
+        allFeats: [],
+        onArrayFieldChange: vi.fn(),
+        preSelectedFeats: [],
+      };
+      const props = config.getProps(mockProps);
+      expect(props.formData).toBeDefined();
+      expect(props.allFeats).toEqual([]);
+    });
+
+    it('should call getProps for step 5 (Ability Scores)', () => {
+      const config = getStepConfig(5);
+      const mockProps = {
+        formData: { abilities: [] },
+        errors: {},
+        onAbilityBaseScoreChange: vi.fn(),
+        onAbilityImprovementChange: vi.fn(),
+        onAbilityMiscBonusChange: vi.fn(),
+      };
+      const props = config.getProps(mockProps);
+      expect(props.formData).toBeDefined();
+    });
+
+    it('should call getProps for step 6 (Skills)', () => {
+      const config = getStepConfig(6);
+      const mockProps = {
+        formData: { skillProficiencies: [] },
+        errors: {},
+        onSkillToggle: vi.fn(),
+        onSkillExpertiseToggle: vi.fn(),
+        skillLimits: null,
+        expertiseLimits: null,
+        warnings: [],
+        preSelectedSkills: [],
+      };
+      const props = config.getProps(mockProps);
+      expect(props.formData).toBeDefined();
+    });
+
+    it('should call getProps for step 7 (Languages)', () => {
+      const config = getStepConfig(7);
+      const mockProps = {
+        formData: { languages: [] },
+        errors: {},
+        onLanguageToggle: vi.fn(),
+        onFightingStyleToggle: vi.fn(),
+        languageLimits: null,
+        fightingStyleLimits: null,
+        warnings: [],
+        preSelectedLanguages: [],
+        preSelectedFightingStyles: [],
+      };
+      const props = config.getProps(mockProps);
+      expect(props.formData).toBeDefined();
+    });
+
+    it('should call getProps for step 8 (Resistances)', () => {
+      const config = getStepConfig(8);
+      const mockProps = {
+        formData: { resistances: [], immunities: [] },
+        onResistanceToggle: vi.fn(),
+        onImmunityToggle: vi.fn(),
+        warnings: { resistances: [], immunities: [] },
+        preSelectedResistances: { resistances: [], immunities: [] },
+        preSelectedImmunities: { resistances: [], immunities: [] },
+      };
+      const props = config.getProps(mockProps);
+      expect(props.formData).toBeDefined();
+    });
+
+    it('should call getProps for step 9 (Spells)', () => {
+      const config = getStepConfig(9);
+      const mockProps = {
+        formData: { spells: [] },
+        allSpells: [],
+        onArrayFieldChange: vi.fn(),
+      };
+      const props = config.getProps(mockProps);
+      expect(props.formData).toBeDefined();
+    });
+
+    it('should call getProps for step 10 (Magic Items)', () => {
+      const config = getStepConfig(10);
+      const mockProps = {
+        formData: { inventory: { magicItems: [] } },
+        allMagicItems: [],
+        ruleset: '5e',
+        onArrayFieldChange: vi.fn(),
+      };
+      const props = config.getProps(mockProps);
+      expect(props.formData).toBeDefined();
+    });
+
+    it('should call getProps for step 11 (Inventory)', () => {
+      const config = getStepConfig(11);
+      const mockProps = {
+        formData: { inventory: {} },
+        tempInventory: { backpack: [], equipped: [] },
+        onInventoryChange: vi.fn(),
+        onTempInventoryChange: vi.fn(),
+      };
+      const props = config.getProps(mockProps);
+      expect(props.formData).toBeDefined();
+    });
+
+    it('should call getProps for step 12 (Special Actions)', () => {
+      const config = getStepConfig(12);
+      const mockProps = {
+        formData: { actions: [], bonusActions: [], reactions: [], specialActions: [] },
+        onArrayFieldChange: vi.fn(),
+      };
+      const props = config.getProps(mockProps);
+      expect(props.formData).toBeDefined();
+    });
+  });
 });

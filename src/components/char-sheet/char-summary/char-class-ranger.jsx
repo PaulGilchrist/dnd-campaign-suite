@@ -13,12 +13,12 @@ function CharClassRanger({ playerStats }) {
     const favoredEnemiesCount = classRules.getFavoredEnemy(playerStats);
     
         return (<React.Fragment>
-               {playerStats.class.name === 'Ranger' && <div>
-                   <div><b>Fighting Styles: </b>{playerStats.level > 1 ? playerStats.class.fightingStyles.join(', ') : ''}</div>
-                   <div><b>Extra Attacks: </b>{extraAttacks}</div>
-                   <div><b>Favored Enemies: </b>{favoredEnemiesCount}</div>
-               </div>}
-           </React.Fragment>)
+                {playerStats.class.name === 'Ranger' && <div>
+                    {playerStats.class.fightingStyles && <div><b>Fighting Styles: </b>{playerStats.level > 1 ? playerStats.class.fightingStyles.join(', ') : ''}</div>}
+                    <div><b>Extra Attacks: </b>{extraAttacks}</div>
+                    <div><b>Favored Enemies: </b>{favoredEnemiesCount}</div>
+                </div>}
+            </React.Fragment>)
 }
 
 export default CharClassRanger

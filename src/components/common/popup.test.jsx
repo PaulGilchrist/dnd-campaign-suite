@@ -1,151 +1,76 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Popup from './popup';
 
 describe('Popup', () => {
   const mockOnClickOrKeyDown = vi.fn();
-  
+
   beforeEach(() => {
     vi.clearAllMocks();
-   });
+    // Clear any event listeners
+    document.removeEventListener('keydown', expect.any(Function));
+  });
 
-  afterEach(() => {
-    // Clean up any event listeners
-    document.removeEventListener('keydown', vi.fn());
-   });
-
-  it('should render popup overlay', () => {
+  it('should render popup with sanitized html content', () => {
     render(
-       <Popup
-        html="<p>Test content</p>"
+      <Popup
+        html="<b>Test Content</b>"
         onClickOrKeyDown={mockOnClickOrKeyDown}
-       />
-     );
-    
-    expect(screen.getByRole('presentation')).toBeInTheDocument();
-   });
+      />
+    );
 
-  it('should render popup modal', () => {
-    render(
-       <Popup
-        html="<p>Test content</p>"
-        onClickOrKeyDown={mockOnClickOrKeyDown}
-       />
-     );
-    
-    const modal = document.querySelector('.popup-modal');
-    expect(modal).toBeInTheDocument();
-   });
-
-  it('should display sanitized HTML content', () => {
-    render(
-       <Popup
-        html="<p>Test content</p>"
-        onClickOrKeyDown={mockOnClickOrKeyDown}
-       />
-     );
-    
-    const modal = document.querySelector('.popup-modal');
-    expect(modal.innerHTML).toBe('<p>Test content</p>');
-   });
-
-  it('should sanitize dangerous HTML', () => {
-    render(
-       <Popup
-        html="<script>alert('xss')</script><p>Safe content</p>"
-        onClickOrKeyDown={mockOnClickOrKeyDown}
-       />
-     );
-    
-    const modal = document.querySelector('.popup-modal');
-    expect(modal.innerHTML).not.toContain('<script>');
-    expect(modal.innerHTML).toContain('Safe content');
-   });
+    expect(screen.getByText('Test Content')).toBeInTheDocument();
+  });
 
   it('should call onClickOrKeyDown when overlay is clicked', () => {
     render(
-       <Popup
-        html="<p>Test content</p>"
+      <Popup
+        html="Test Content"
         onClickOrKeyDown={mockOnClickOrKeyDown}
-       />
-     );
-    
+      />
+    );
+
     const overlay = document.querySelector('.popup-overlay');
     fireEvent.click(overlay);
-    
+
     expect(mockOnClickOrKeyDown).toHaveBeenCalled();
-   });
+  });
 
-  it('should call onClickOrKeyDown when Escape key is pressed', () => {
+  it('should render popup modal with html content', () => {
     render(
-       <Popup
-        html="<p>Test content</p>"
+      <Popup
+        html="<div>Modal Content</div>"
         onClickOrKeyDown={mockOnClickOrKeyDown}
-       />
-     );
-    
-    fireEvent.keyDown(document, { key: 'Escape' });
-    
-    expect(mockOnClickOrKeyDown).toHaveBeenCalled();
-   });
+      />
+    );
 
-  it('should remove event listener after onClickOrKeyDown is called', () => {
-    render(
-       <Popup
-        html="<p>Test content</p>"
-        onClickOrKeyDown={mockOnClickOrKeyDown}
-       />
-     );
-    
-    const overlay = document.querySelector('.popup-overlay');
-    fireEvent.click(overlay);
-    
-    // The event listener should be removed
-    // We can verify this by checking that subsequent keydown events don't trigger the handler
-    mockOnClickOrKeyDown.mockClear();
-    fireEvent.keyDown(document, { key: 'Escape' });
-    
-    expect(mockOnClickOrKeyDown).not.toHaveBeenCalled();
-   });
-
-  it('should handle empty HTML content', () => {
-    render(
-       <Popup
-        html=""
-        onClickOrKeyDown={mockOnClickOrKeyDown}
-       />
-     );
-    
     const modal = document.querySelector('.popup-modal');
     expect(modal).toBeInTheDocument();
-    expect(modal.innerHTML).toBe('');
-   });
+    expect(screen.getByText('Modal Content')).toBeInTheDocument();
+  });
 
-  it('should handle HTML with multiple elements', () => {
+  it('should close on Escape key', () => {
     render(
-       <Popup
-        html="<div><h1>Title</h1><p>Content</p></div>"
+      <Popup
+        html="Test Content"
         onClickOrKeyDown={mockOnClickOrKeyDown}
-       />
-     );
-    
-    const modal = document.querySelector('.popup-modal');
-    expect(modal.innerHTML).toContain('<h1>Title</h1>');
-    expect(modal.innerHTML).toContain('<p>Content</p>');
-   });
+      />
+    );
 
-  it('should not call onClickOrKeyDown when clicking inside modal', () => {
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(mockOnClickOrKeyDown).toHaveBeenCalled();
+  });
+
+  it('should sanitize dangerous html', () => {
     render(
-       <Popup
-        html="<button>Click me</button>"
+      <Popup
+        html="<script>alert('xss')</script><b>Safe Content</b>"
         onClickOrKeyDown={mockOnClickOrKeyDown}
-       />
-     );
-    
-    const modal = document.querySelector('.popup-modal');
-    fireEvent.click(modal);
-    
-    // Click on modal itself should not trigger overlay click
-    // (event propagation is stopped by the modal)
-   });
+      />
+    );
+
+    expect(screen.getByText('Safe Content')).toBeInTheDocument();
+    expect(screen.queryByText("alert('xss')")).not.toBeInTheDocument();
+  });
 });

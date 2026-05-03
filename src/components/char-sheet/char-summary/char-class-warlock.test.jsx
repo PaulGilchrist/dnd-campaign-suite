@@ -9,7 +9,7 @@ vi.mock('../../../services/class-rules-2024', () => ({
   },
 }));
 
-const mockPlayerStats5e = {
+  const mockPlayerStats5e = {
   name: 'Test Warlock',
   level: 11,
   rules: '5e',
@@ -18,12 +18,7 @@ const mockPlayerStats5e = {
     invocations: ['Agonizing Blast', 'Devils Sight'],
     eldritchInvocations: ['Arcane Charge', 'Beast Aspect'],
     pactBoon: 'Pact of the Blade',
-    arcanums: {
-      '6': ['Cone of Cold'],
-      '7': ['Conjure Elemental'],
-      '8': ['Dominate Person'],
-      '9': ['Apocalypse'],
-    },
+    arcanums: ['Cone of Cold', 'Conjure Elemental', 'Dominate Person', 'Apocalypse'],
     class_levels: Array(11).fill(null).map((_, i) => ({
       class_specific: {
         invocations_known: Math.floor(i / 2) + 1,
@@ -65,27 +60,26 @@ describe('CharClassWarlock', () => {
     expect(screen.getByText(/Invocations Known/)).toBeInTheDocument();
   });
 
-  it('should display eldritch invocations (2024)', () => {
+   it('should display eldritch invocations (2024)', () => {
     render(<CharClassWarlock playerStats={mockPlayerStats2024} />);
 
-    expect(screen.getByText(/Eldritch Invocations/)).toBeInTheDocument();
+    expect(screen.getByText(/Eldritch Invocations:/)).toBeInTheDocument();
   });
 
-  it('should display invocations list when defined', () => {
+   it('should display invocations list when defined', () => {
     render(<CharClassWarlock playerStats={mockPlayerStats5e} />);
 
     expect(screen.getByText(/Invocations:/)).toBeInTheDocument();
-    const invDiv = screen.getByText(/Invocations:/).parentElement;
-    expect(invDiv.textContent).toContain('Agonizing Blast');
+    expect(screen.getByText(/Agonizing Blast.*Devils Sight/)).toBeInTheDocument();
   });
 
-  it('should display pact boon when defined', () => {
-    render(<CharClassWarlock playerStats={mockPlayerStats5e} />);
-
-    expect(screen.getByText(/Pact Boon:/)).toBeInTheDocument();
-    const pactDiv = screen.getByText(/Pact Boon:/).parentElement;
-    expect(pactDiv.textContent).toContain('Pact of the Blade');
-  });
+   it('should display pact boon when defined', () => {
+     render(<CharClassWarlock playerStats={mockPlayerStats5e} />);
+ 
+     expect(screen.getByText(/Pact Boon:/)).toBeInTheDocument();
+     const pactDiv = screen.getByText('Pact of the Blade').closest('div');
+     expect(pactDiv.textContent).toContain('Pact of the Blade');
+   });
 
   it('should display eldritch invocations list when defined', () => {
     render(<CharClassWarlock playerStats={mockPlayerStats5e} />);
