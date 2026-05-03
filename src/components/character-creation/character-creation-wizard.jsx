@@ -95,10 +95,14 @@ function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, a
 		setTempInventory(prev => ({ ...prev, [field]: value }));
 	}, []);
 
-  // Abilities validation
-  useWizardAbilities(formData, currentStep, setErrors);
+   // Abilities validation
+  const {
+    onAbilityBaseScoreChange,
+    onAbilityImprovementChange,
+    onAbilityMiscBonusChange,
+  } = useWizardAbilities(formData, currentStep, setErrors, updateAbility);
 
-  // Handlers
+   // Handlers
   const handleRulesetChange = useCallback(async (newRuleset) => {
     setRuleset(newRuleset);
 
@@ -123,39 +127,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, a
     goToStep(2);
     }, [setFormData, goToStep]);
 
-  const handleAbilityBaseScoreChange = useCallback(async (index, value) => {
-    const newBaseScore = parseInt(value) || 8;
-    const oldBaseScore = parseInt(formData.abilities[index].baseScore) || 8;
-
-    const rules = await getPointBuyCosts(formData.rules || '5e');
-    const calculateCost = (score) => rules[score] || 0;
-
-    const newCost = calculateCost(newBaseScore);
-    const oldCost = calculateCost(oldBaseScore);
-
-    const currentTotalSpent = formData.abilities.reduce((sum, ability, i) => {
-      if (i === index) {
-        return sum + newCost;
-         }
-      const baseScore = parseInt(ability.baseScore) || 8;
-      const cost = calculateCost(baseScore);
-      return sum + cost;
-       }, 0);
-
-    if (currentTotalSpent <= 27) {
-      updateAbility(index, 'baseScore', newBaseScore);
-       }
-     }, [formData.abilities, formData.rules, updateAbility]);
-
-  const handleAbilityImprovementChange = useCallback((index, value) => {
-    updateAbility(index, 'abilityImprovements', value);
-    }, [updateAbility]);
-
-  const handleAbilityMiscBonusChange = useCallback((index, value) => {
-    updateAbility(index, 'miscBonus', value);
-    }, [updateAbility]);
-
-   // Skills - Pattern A: preSelectedItems from closure
+    // Skills - Pattern A: preSelectedItems from closure
    const { toggleItem: handleSkillToggle } = useWizardArrayToggle(
      setFormData, setErrors, 'skillProficiencies', preSelectedSkills
    );
@@ -246,9 +218,9 @@ function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, a
       onArrayFieldChange: updateArrayField,
       onInventoryChange: updateInventory,
       onTempInventoryChange: updateTempInventory,
-      onAbilityBaseScoreChange: handleAbilityBaseScoreChange,
-      onAbilityImprovementChange: handleAbilityImprovementChange,
-      onAbilityMiscBonusChange: handleAbilityMiscBonusChange,
+      onAbilityBaseScoreChange,
+      onAbilityImprovementChange,
+      onAbilityMiscBonusChange,
       onSkillToggle: handleSkillToggle,
       onSkillExpertiseToggle: handleSkillExpertiseToggle,
       onLanguageToggle: handleLanguageToggle,
@@ -267,7 +239,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, a
     languageLimits, fightingStyleLimits, languageWarnings, resistanceWarnings,
     tempInventory, allSpells,
     handleRulesetChange, updateField, updateArrayField, updateInventory, updateTempInventory,
-    handleAbilityBaseScoreChange, handleAbilityImprovementChange, handleAbilityMiscBonusChange,
+    onAbilityBaseScoreChange, onAbilityImprovementChange, onAbilityMiscBonusChange,
     handleSkillToggle, handleSkillExpertiseToggle, handleLanguageToggle, handleFightingStyleToggle,
     handleResistanceToggle, handleImmunityToggle]);
 
