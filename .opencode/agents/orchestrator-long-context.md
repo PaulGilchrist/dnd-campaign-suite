@@ -2,7 +2,7 @@
 name: orchestrator
 description: Orchestrates tasks to subagent to prevent single agent context growth. Thinking is long to generate best possible plan.
 mode: primary
-temperature: 0.1
+temperature: 0
 permission:
   edit: deny
   bash: deny

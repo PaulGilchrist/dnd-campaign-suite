@@ -1,7 +1,7 @@
 ---
 description: Orchestrates tasks to subagent to prevent single agent context growth. Thinking is short to keep context short.
 mode: primary
-temperature: 0.1
+temperature: 0
 permission:
   edit: deny
   bash: deny
