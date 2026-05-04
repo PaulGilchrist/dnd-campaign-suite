@@ -88,7 +88,7 @@ function App() {
         <button className="icon-button delete-campaign-btn" onClick={handleDeleteCampaign} disabled={characters.length > 0} title="Delete Campaign"><i className="fas fa-trash"></i></button>
       </div>
       {characters.map(character => (
-        <button key={Utils.getFirstName(character.name)} className={`no-print ${activeCharacter && activeCharacter.name === character.name ? 'active' : ''}`} onClick={() => handleCharacterClick(character)}>{character.name}</button>
+        <button key={Utils.getFirstName(character.name)} className={`no-print character-btn ${activeCharacter && activeCharacter.name === character.name ? 'active' : ''}`} onClick={() => handleCharacterClick(character)}>{character.name}</button>
       ))}
       {showButton && <button className="clickable mutted no-print" onClick={handleAddCharacter}><i className="fas fa-plus"></i> Add</button>}
       {showButton && <button className="clickable mutted no-print" onClick={handleUploadClick}><i className="fas fa-arrow-up"></i> Upload</button>}

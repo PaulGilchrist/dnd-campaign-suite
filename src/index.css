@@ -283,21 +283,21 @@ th {
          --background-color-checkbox: #f5f5f5;
 
          /* Text */
-         --color-main: #333;
+          --color-main: #222;
          --color-body: #000;
          --color-header: #070;
          --color-header-inner: #070;
-         --color-text: #333;
-         --color-text-secondary: #555;
-         --color-text-muted: #666;
+          --color-text: #222;
+          --color-text-secondary: #444;
+          --color-text-muted: #555;
          --color-text-inverse: #fff;
          --color-link: #070;
          --color-link-hover: #747bff;
 
          /* Borders */
-         --border-color: #e0e0e0;
-         --border-color-light: #ddd;
-         --border-color-input: #ddd;
+          --border-color: #aaa;
+          --border-color-light: #bbb;
+          --border-color-input: #bbb;
          --border-color-error: #ef9a9a;
          --border-color-success: #a5d6a7;
          --border-color-warning: #ffe0b2;

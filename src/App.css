@@ -60,15 +60,29 @@
     color: var(--color-header);
 }
 
-button {
-    color: #aaa;
+/* Character selector buttons */
+button.character-btn {
+    background-color: var(--background-color-card);
+    border: 1px solid var(--border-color);
+    color: var(--color-text);
     margin-left: 10px;
     margin-top: 10px;
 }
 
-button.active {
-    background-color: green;
-    color: #fff;
+button.character-btn:hover {
+    background-color: var(--background-color-card-hover);
+    border-color: var(--color-hover);
+}
+
+button.character-btn.active {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-text-inverse);
+}
+
+button.character-btn.active:hover {
+    background-color: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
 }
 
 button.download {
@@ -79,6 +93,8 @@ button.download {
 button.mutted {
     background-color: grey;
     color: #000;
+    margin-left: 10px;
+    margin-top: 10px;
 }
 
 /* Hidden buttons - kept for future use */
