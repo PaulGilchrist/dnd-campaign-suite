@@ -3,9 +3,7 @@ name: migration
 description: Agent for framework upgrades, API migrations, and large-scale structural changes.
 mode: all
 skills:
-  - architecture-rules
-  - migration-helper
-  - typescript-best-practices
+  - architecture
 instructions:
   - Always produce a multi-phase migration plan before making changes.
   - Identify breaking changes, deprecated APIs, and required refactors.

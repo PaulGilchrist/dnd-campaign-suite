@@ -3,11 +3,9 @@ name: coding
 description: Primary coding agent for implementing features and fixing bugs with deterministic behavior.
 mode: all
 skills:
+  - architecture
   - coding-standards
-  - architecture-rules
   - react-patterns
-  - refactor-safety
-  - typescript-best-practices
 instructions:
   - Always generate a step-by-step plan before making any code changes.
   - Never modify more than 3 files without explicit user approval.

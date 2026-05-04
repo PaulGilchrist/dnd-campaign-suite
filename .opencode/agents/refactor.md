@@ -3,11 +3,9 @@ name: refactor
 description: Agent dedicated to safe, incremental refactoring with strict guardrails.
 mode: all
 skills:
+  - architecture
   - coding-standards
-  - architecture-rules
   - react-patterns
-  - refactor-safety
-  - typescript-best-practices
 instructions:
   - Always produce a detailed refactor plan before making changes.
   - Never change behavior unless explicitly instructed.

@@ -3,8 +3,8 @@ name: review
 description: Agent for structured code reviews, risk detection, and standards enforcement.
 mode: all
 skills:
+  - architecture
   - coding-standards
-  - architecture-rules
   - react-patterns
   - test-strategy
 instructions:

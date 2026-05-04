@@ -5,7 +5,8 @@
     "instructions": [
         "RULES.md",
         "./.opencode/skills/architecture/SKILL.md",
-        "./.opencode/skills/coding-standards/SKILL.md"
+        "./.opencode/skills/coding-standards/SKILL.md",
+        "./.opencode/skills/tool-calling/SKILL.md"
     ],
     "mcp": {
         "chrome-devtools": {
