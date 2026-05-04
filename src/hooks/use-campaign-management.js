@@ -1,7 +1,9 @@
 import { useState, useRef } from 'react';
 
 function useCampaignManagement() {
-  const [showCampaignSelection, setShowCampaignSelection] = useState(true);
+  const [showCampaignSelection, setShowCampaignSelection] = useState(() =>
+  !sessionStorage.getItem('currentCampaign')
+);
   const [campaignName, setCampaignName] = useState(() =>
     sessionStorage.getItem('currentCampaign')
   );
