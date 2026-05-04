@@ -1,8 +1,8 @@
 import { cloneDeep, uniqBy } from 'lodash';
 import classRules from './class-rules.js';
 import classRules2024 from './class-rules-2024.js';
-import raceRules from './race-rules.js';
-import raceRules2024 from './race-rules-2024.js';
+import { rules5e } from './race-rules/index.js';
+import { rules2024 } from './race-rules/index.js';
 import utils from './utils.js';
 import { loadSkills, loadPassiveSkills } from './data-loader';
 import { parseMagicItemName } from './attack-calc.js';
@@ -48,7 +48,7 @@ const rules = {
             attackCalc: use2024 ? getAttacks2024 : getAttacks5e,
             proficiencyUtils: use2024 ? proficiencyUtils2024 : proficiencyUtils,
             classRules: use2024 ? classRules2024 : classRules,
-            raceRules: use2024 ? raceRules2024 : raceRules,
+            raceRules: use2024 ? rules2024 : rules5e,
             use2024
          };
      },

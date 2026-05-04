@@ -21,22 +21,19 @@ vi.mock('./rules.js', () => ({
 }));
 
 
-vi.mock('./race-rules.js', () => ({
-  default: {
+vi.mock('./race-rules/index.js', () => ({
+  rules5e: {
     getImmunities: vi.fn(),
     getRace: vi.fn(),
     getResistances: vi.fn(),
     getSenses: vi.fn()
-    }
-}));
-
-vi.mock('./race-rules-2024.js', () => ({
-  default: {
+  },
+  rules2024: {
     getImmunities: vi.fn(),
     getRace: vi.fn(),
     getResistances: vi.fn(),
     getSenses: vi.fn()
-    }
+  }
 }));
 
 vi.mock('./class-rules.js', () => ({
@@ -64,8 +61,7 @@ vi.mock('./class-rules-2024.js', () => ({
 }));
 
 import * as rules5e from './rules.js';
-import * as raceRules5e from './race-rules.js';
-import * as raceRules2024 from './race-rules-2024.js';
+import { rules5e as raceRules5e, rules2024 as raceRules2024 } from './race-rules/index.js';
 import * as classRules5e from './class-rules.js';
 import * as classRules2024 from './class-rules-2024.js';
 
@@ -80,7 +76,7 @@ describe('rulesFactory', () => {
       const rules = rulesFactory.getRules(playerSummary);
 
       expect(rules.rules).toBe(rules5e.default);
-      expect(rules.raceRules).toBe(raceRules5e.default);
+      expect(rules.raceRules).toBe(raceRules5e);
       expect(rules.classRules).toBe(classRules5e.default);
       });
 
@@ -89,7 +85,7 @@ describe('rulesFactory', () => {
       const rules = rulesFactory.getRules(playerSummary);
 
       expect(rules.rules).toBe(rules5e.default);
-      expect(rules.raceRules).toBe(raceRules5e.default);
+      expect(rules.raceRules).toBe(raceRules5e);
       expect(rules.classRules).toBe(classRules5e.default);
       });
 
@@ -98,7 +94,7 @@ describe('rulesFactory', () => {
       const rules = rulesFactory.getRules(playerSummary);
 
       expect(rules.rules).toBe(rules5e.default);
-      expect(rules.raceRules).toBe(raceRules2024.default);
+      expect(rules.raceRules).toBe(raceRules2024);
       expect(rules.classRules).toBe(classRules2024.default);
     });
    });
@@ -294,10 +290,10 @@ describe('rulesFactory', () => {
     it('should gather all player stats', async () => {
       const mockPlayerStats = {};
       rules5e.default.getPlayerStats.mockResolvedValue(mockPlayerStats);
-      raceRules5e.default.getImmunities.mockReturnValue([]);
-      raceRules5e.default.getRace.mockReturnValue({ name: 'Human' });
-      raceRules5e.default.getResistances.mockReturnValue([]);
-      raceRules5e.default.getSenses.mockReturnValue(['Darkvision']);
+      raceRules5e.getImmunities.mockReturnValue([]);
+      raceRules5e.getRace.mockReturnValue({ name: 'Human' });
+      raceRules5e.getResistances.mockReturnValue([]);
+      raceRules5e.getSenses.mockReturnValue(['Darkvision']);
       classRules5e.default.getClass.mockReturnValue({ name: 'Fighter' });
 
       const allClasses = [];

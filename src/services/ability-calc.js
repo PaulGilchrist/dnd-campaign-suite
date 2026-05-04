@@ -1,4 +1,4 @@
-import raceRules from './race-rules';
+import { rules5e as raceRules } from './race-rules/index.js';
 import { loadSkills, loadPassiveSkills } from './data-loader';
 
 export async function getAbilities(playerStats) {

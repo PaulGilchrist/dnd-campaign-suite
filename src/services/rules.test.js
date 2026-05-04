@@ -8,7 +8,7 @@ vi.mock('./data-loader', () => ({
 
 import rules from './rules';
 import classRules from './class-rules';
-import raceRules from './race-rules';
+import { rules5e as raceRules } from './race-rules/index.js';
 import * as dataLoader from './data-loader';
 
 // Mock dependencies
@@ -36,16 +36,16 @@ vi.mock('./class-rules', () => ({
           }
         }));
 
-vi.mock('./race-rules', () => ({
-  default: {
+vi.mock('./race-rules/index.js', () => ({
+  rules5e: {
     getRace: vi.fn(),
     getRacialBonus: vi.fn(),
     getImmunities: vi.fn(),
     getResistances: vi.fn(),
     getSenses: vi.fn(),
     getTraits: vi.fn()
-       }
-     }));
+  }
+}));
 
 describe('rules', () => {
   describe('getAbilityLongName', () => {

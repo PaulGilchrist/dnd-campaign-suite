@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import raceRules from './race-rules-2024';
+import { rules2024 as raceRules } from './race-rules/index.js';
 
 // Mock dependencies
 vi.mock('lodash', () => ({

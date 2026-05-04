@@ -1,6 +1,6 @@
 import rules from './rules.js';
-import raceRules from './race-rules.js';
-import raceRules2024 from './race-rules-2024.js';
+import { rules5e } from './race-rules/index.js';
+import { rules2024 } from './race-rules/index.js';
 import classRules from './class-rules.js';
 import classRules2024 from './class-rules-2024.js';
 
@@ -14,7 +14,7 @@ const rulesFactory = {
 
         return {
             rules,
-            raceRules: use2024 ? raceRules2024 : raceRules,
+            raceRules: use2024 ? rules2024 : rules5e,
             classRules: use2024 ? classRules2024 : classRules
           };
       },

@@ -1,7 +1,7 @@
 import { cloneDeep, uniqBy } from 'lodash';
-import * as featureCategories from './feature-categories-2024'
-import { categorizeFeatures, mergeCategorizedFeatures } from './feature-categorization-utils'
-import utils from './utils.js';
+import * as featureCategories from '../feature-categories-2024.js'
+import { categorizeFeatures, mergeCategorizedFeatures } from '../feature-categorization-utils.js'
+import utils from '../utils.js';
 
 const raceRules = {
     getImmunities: (playerSummary) => {
