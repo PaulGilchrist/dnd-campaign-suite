@@ -4,7 +4,8 @@ import WizardStepFeats from './wizard-step-feats.jsx';
 
 vi.mock('../../services/feat-validation.js', () => ({
   validateFeats: vi.fn(() => Promise.resolve([])),
-  getFeatLimits: vi.fn(() => Promise.resolve({ allowed: 2, originRequired: false, details: 'Test rules' }))
+  getFeatLimits: vi.fn(() => Promise.resolve({ allowed: 2, originRequired: false, details: 'Test rules' })),
+  normalizeFeatDescription: vi.fn((feat) => ({ text: feat.description || (feat.desc && feat.desc[0]) || '', isHtml: !!feat.description }))
 }));
 
 vi.mock('../../services/sanitize.js', () => ({
