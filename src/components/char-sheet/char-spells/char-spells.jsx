@@ -1,11 +1,16 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
-import { cloneDeep } from 'lodash';
+import { cloneDeep, isEqual } from 'lodash';
 import useActionPopup from '../common/use-action-popup'
 import CharSpellSlots from './char-spell-slots'
 import './char-spells.css'
 
-function CharSpells({ playerStats, handleTogglePreparedSpells }) {
+const areEqual = (prevProps, nextProps) => {
+  return isEqual(prevProps.playerStats, nextProps.playerStats) && 
+         prevProps.handleTogglePreparedSpells === nextProps.handleTogglePreparedSpells;
+};
+
+const CharSpells = React.memo(function CharSpells({ playerStats, handleTogglePreparedSpells }) {
     const { showPopup, PopupElement } = useActionPopup('spell');
     const [filterPrepared, setFilterPrepared] = React.useState(false);
     const [spells, setSpells] = React.useState([]);
@@ -104,7 +109,7 @@ function CharSpells({ playerStats, handleTogglePreparedSpells }) {
             </div>}
         </div>
     )
-}
+}, areEqual);
 
 export default CharSpells
 

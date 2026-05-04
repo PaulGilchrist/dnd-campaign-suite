@@ -4,6 +4,9 @@ import storage from '../../../services/storage'
 import classRules from '../../../services/class-rules'
 import classRules2024 from '../../../services/class-rules-2024'
 import HiddenInput from '../../common/hidden-input'
+import { isEqual } from 'lodash';
+
+const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats);
 
 /* Shared hook for tracked (editable) class resources.
    Follows the same pattern across all classes: load from storage on mount,
@@ -24,7 +27,7 @@ function useTrackedResource(storageKey, playerName, max) {
 }
 
 /* ─── Barbarian ─── */
-function BarbarianFeatures({ playerStats }) {
+const BarbarianFeatures = React.memo(function BarbarianFeatures({ playerStats }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const { value: ragePoints, showInput, handleToggle, handleChange } =
         useTrackedResource('ragePoints', playerStats.name, classLevel?.rages || 0);
@@ -38,10 +41,10 @@ function BarbarianFeatures({ playerStats }) {
               <div><b>Weapon Mastery: </b>{classLevel?.weapon_mastery ?? 'N/A'}</div>
           </div>
       );
-}
+}, areEqual);
 
 /* ─── Bard ─── */
-function BardFeatures({ playerStats }) {
+const BardFeatures = React.memo(function BardFeatures({ playerStats }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const is2024 = playerStats.rules === '2024';
     const charisma = playerStats.abilities?.find((a) => a.name === 'Charisma');
@@ -73,10 +76,10 @@ function BardFeatures({ playerStats }) {
               {playerStats.level > 2 && playerStats.class.expertise && <div><b>Expertise: </b>{playerStats.class.expertise.join(', ')}</div>}
           </div>
       );
-}
+}, areEqual);
 
 /* ─── Cleric ─── */
-function ClericFeatures({ playerStats }) {
+const ClericFeatures = React.memo(function ClericFeatures({ playerStats }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const is2024 = playerStats.rules === '2024';
     const maxChannelDivinity = is2024
@@ -95,10 +98,10 @@ function ClericFeatures({ playerStats }) {
               {destroyUndeadCR !== null && <div><b>Destroy Undead Challenge Rating: </b>{destroyUndeadCR}</div>}
           </div>
       );
-}
+}, areEqual);
 
 /* ─── Druid ─── */
-function DruidFeatures({ playerStats }) {
+const DruidFeatures = React.memo(function DruidFeatures({ playerStats }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const is2024 = playerStats.rules === '2024';
     if (playerStats.level < 2) return null;
@@ -134,10 +137,10 @@ function DruidFeatures({ playerStats }) {
               <div><b>Wild Shape Limitations: </b>{wildShapeLimitations}</div>
           </div>
       );
-}
+}, areEqual);
 
 /* ─── Fighter ─── */
-function FighterFeatures({ playerStats }) {
+const FighterFeatures = React.memo(function FighterFeatures({ playerStats }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     if (!classLevel) return null;
     const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name;
@@ -166,10 +169,10 @@ function FighterFeatures({ playerStats }) {
               )}
           </div>
       );
-}
+}, areEqual);
 
 /* ─── Monk ─── */
-function MonkFeatures({ playerStats }) {
+const MonkFeatures = React.memo(function MonkFeatures({ playerStats }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     if (playerStats.level < 2) return null;
     const wisdom = playerStats.abilities?.find((a) => a.name === 'Wisdom');
@@ -189,10 +192,10 @@ function MonkFeatures({ playerStats }) {
               <div><b>Unarmored Movement:</b> +{unarmoredMovementIncrease} ft.</div>
           </div>
       );
-}
+}, areEqual);
 
 /* ─── Paladin ─── */
-function PaladinFeatures({ playerStats }) {
+const PaladinFeatures = React.memo(function PaladinFeatures({ playerStats }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const is2024 = playerStats.rules === '2024';
     const classSpecific = classLevel?.class_specific || {};
@@ -209,10 +212,10 @@ function PaladinFeatures({ playerStats }) {
               {!is2024 && <div><b>Aura Range: </b>{classSpecific.aura_range}</div>}
           </div>
       );
-}
+}, areEqual);
 
 /* ─── Ranger ─── */
-function RangerFeatures({ playerStats }) {
+const RangerFeatures = React.memo(function RangerFeatures({ playerStats }) {
     let extraAttacks = 0;
     if (playerStats.level > 4) extraAttacks = 1;
     const favoredEnemiesCount = classRules2024.getFavoredEnemy(playerStats);
@@ -223,10 +226,10 @@ function RangerFeatures({ playerStats }) {
               <div><b>Favored Enemies: </b>{favoredEnemiesCount}</div>
           </div>
       );
-}
+}, areEqual);
 
 /* ─── Rogue ─── */
-function RogueFeatures({ playerStats }) {
+const RogueFeatures = React.memo(function RogueFeatures({ playerStats }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     if (!classLevel) return null;
     let sneakAttack;
@@ -243,10 +246,10 @@ function RogueFeatures({ playerStats }) {
               {playerStats.class.expertise && <div><b>Expertise: </b>{playerStats.class.expertise.join(', ')}</div>}
           </div>
       );
-}
+}, areEqual);
 
 /* ─── Sorcerer ─── */
-function SorcererFeatures({ playerStats }) {
+const SorcererFeatures = React.memo(function SorcererFeatures({ playerStats }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const is2024 = playerStats.rules === '2024';
     const maxSorceryPoints = is2024
@@ -277,10 +280,10 @@ function SorcererFeatures({ playerStats }) {
               {creatingSpellSlotCosts.length > 0 && <div><b>Spell Slot (level 1-5) Costs: </b>{creatingSpellSlotCosts.join(', ')}</div>}
           </div>
       );
-}
+}, areEqual);
 
 /* ─── Warlock ─── */
-function WarlockFeatures({ playerStats }) {
+const WarlockFeatures = React.memo(function WarlockFeatures({ playerStats }) {
     const is2024 = playerStats.rules === '2024';
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     let invocationsKnown = 0;
@@ -313,10 +316,10 @@ function WarlockFeatures({ playerStats }) {
               )}
           </div>
       );
-}
+}, areEqual);
 
 /* ─── Wizard ─── */
-function WizardFeatures({ playerStats }) {
+const WizardFeatures = React.memo(function WizardFeatures({ playerStats }) {
     if (playerStats.rules === '2024') return null;
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const classSpecific = classLevel?.class_specific || {};
@@ -331,7 +334,7 @@ function WizardFeatures({ playerStats }) {
               </div>
           </div>
       );
-}
+}, areEqual);
 
 /* ─── Registry (maps class name → component) ─── */
 const CLASS_COMPONENTS = {

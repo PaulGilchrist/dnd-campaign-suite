@@ -4,8 +4,11 @@ import useActionPopup from './common/use-action-popup'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { parseMagicItemName } from '../../services/attack-calc.js';
 import './char-actions.css'
+import { isEqual } from 'lodash';
 
-function CharActions({ playerStats }) {
+const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats);
+
+const CharActions = React.memo(function CharActions({ playerStats }) {
   const [actions, setActions] = useState([]);
 
   useEffect(() => {
@@ -111,7 +114,7 @@ function CharActions({ playerStats }) {
             </div>
         </div>
     )
-}
+}, areEqual);
 
 export default CharActions
 

@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from 'react';
 // No component-specific CSS needed - uses shared wizard styles
+import { isEqual } from 'lodash';
 
-function WizardStepInventory({ formData, tempInventory, onInventoryChange, onTempInventoryChange }) {
+const areEqual = (prevProps, nextProps) => {
+  return (
+    prevProps.formData === nextProps.formData &&
+    prevProps.onInventoryChange === nextProps.onInventoryChange &&
+    prevProps.onTempInventoryChange === nextProps.onTempInventoryChange &&
+    isEqual(prevProps.tempInventory, nextProps.tempInventory)
+  );
+};
+
+const WizardStepInventory = React.memo(function WizardStepInventory({ formData, tempInventory, onInventoryChange, onTempInventoryChange }) {
   const [equipmentData, setEquipmentData] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredEquipment, setFilteredEquipment] = useState([]);
@@ -325,7 +335,7 @@ function WizardStepInventory({ formData, tempInventory, onInventoryChange, onTem
        {renderSearchModal()}
      </div>
    );
-}
-
-export default WizardStepInventory;
+ }, areEqual);
+ 
+ export default WizardStepInventory;
 

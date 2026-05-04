@@ -3,8 +3,22 @@ import WarningList from '../common/warning-list';
 import './wizard-step-skills.css';
 import { validateSkills, getSkillLimits, getExpertiseLimits } from '../../services/skill-validation.js';
 import { loadSkills } from '../../services/data-loader';
+import { isEqual } from 'lodash';
 
-function WizardStepSkills({ formData, errors, onSkillToggle, onSkillExpertiseToggle, skillLimits, expertiseLimits, warnings, preSelectedSkills }) {
+const areEqual = (prevProps, nextProps) => {
+  return (
+    prevProps.formData === nextProps.formData &&
+    prevProps.errors === nextProps.errors &&
+    prevProps.onSkillToggle === nextProps.onSkillToggle &&
+    prevProps.onSkillExpertiseToggle === nextProps.onSkillExpertiseToggle &&
+    isEqual(prevProps.skillLimits, nextProps.skillLimits) &&
+    isEqual(prevProps.expertiseLimits, nextProps.expertiseLimits) &&
+    isEqual(prevProps.warnings, nextProps.warnings) &&
+    isEqual(prevProps.preSelectedSkills, nextProps.preSelectedSkills)
+  );
+};
+
+const WizardStepSkills = React.memo(function WizardStepSkills({ formData, errors, onSkillToggle, onSkillExpertiseToggle, skillLimits, expertiseLimits, warnings, preSelectedSkills }) {
   const [showExpertiseFeedback, setShowExpertiseFeedback] = useState(null);
 	const [skills, setSkills] = useState([]);
 
@@ -107,6 +121,6 @@ function WizardStepSkills({ formData, errors, onSkillToggle, onSkillExpertiseTog
 			)}
 		</div>
 	);
-}
+}, areEqual);
 
 export default WizardStepSkills;
