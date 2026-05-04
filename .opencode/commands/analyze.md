@@ -30,7 +30,12 @@ Identify:
 - Unused functions
 - Unused components
 - Unused constants or utilities
+- Duplicated code
 - Dead code paths
+- Opportunities for simplification
+- Opportunities for re-use
+- Opportunities for standardization
+- Opportunities for improvement
 
 Mark each for cleanup or refactoring.
 
@@ -51,8 +56,6 @@ These must be addressed before adding new features.
 
 Check:
 - Components under `src/components`
-- Business logic under `src/lib`
-- API routes under `src/api`
 - No cross‑layer imports that violate architecture rules
 
 ## Step 5 — Summarize findings
