@@ -336,8 +336,8 @@
 /* Common container styles */
 .list-filter-container {
     color: var(--color-text);
-    display: grid;
-    grid-template-columns: auto 80px 80px;
+    display: flex;
+    flex-wrap: wrap;
     gap: 20px;
     align-items: center;
     padding: 10px;
