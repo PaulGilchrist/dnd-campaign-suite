@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 
 function useCampaignManagement() {
   const [showCampaignSelection, setShowCampaignSelection] = useState(true);
@@ -12,13 +12,7 @@ function useCampaignManagement() {
     window.location.hostname === 'localhost' ||
     window.location.hostname === '127.0.0.1';
 
-  useEffect(() => {
-    const current = sessionStorage.getItem('currentCampaign');
-    if (current) {
-      setCampaignName(current);
-      setShowCampaignSelection(false);
-    }
-  }, []);
+
 
   const handleCampaignSelect = (campaign, characters) => {
     sessionStorage.setItem('currentCampaign', campaign);
