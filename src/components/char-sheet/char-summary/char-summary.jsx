@@ -2,7 +2,6 @@
 import React from 'react'
 import './char-summary.css'
 
-import storage from '../../../services/storage'
 import classRules from '../../../services/class-rules-2024.js'
 import CharGold from './char-gold'
 import CharHitPoints from './char-hit-points'
@@ -10,30 +9,34 @@ import CharClassFeatures from './char-class-features'
 import CharFeats from '../char-feats/char-feats'
 import HiddenInput from '../../common/hidden-input'
 import usePopup from '../common/use-popup'
+import useTrackedResource from '../../../hooks/use-tracked-resource'
 
 function CharSummary({ playerStats, onDeleteCharacter }) {
-    const [hasInspiration, setHasInspiration] = React.useState(false);
     const { PopupElement, setPopupHtml } = usePopup(() => null);
-    const [shortRestHitDice, setShortRestHitDice] = React.useState(0);
     const [showInput, setShowInput] = React.useState(false);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-    React.useEffect(() => {
-        let shortRestHitDice = storage.getProperty(playerStats.name, 'shortRestHitDice');
-        setShortRestHitDice(shortRestHitDice ? shortRestHitDice : playerStats.level);
-    }, [playerStats]);
+    const { current: hasInspiration, update: setHasInspiration } = useTrackedResource(
+        'hasInspiration',
+        playerStats.name,
+        () => false,
+        [playerStats]
+    );
+    const handleToggleInspiraction = () => {
+        const newValue = !hasInspiration;
+        setHasInspiration(newValue);
+    };
+
+    const { current: shortRestHitDice, update: handleShortRestHitDiceChange } = useTrackedResource(
+        'shortRestHitDice',
+        playerStats.name,
+        () => playerStats.level,
+        [playerStats]
+    );
     const handleShortRestHitDiceToggle = () => {
         setShowInput((showInput) => !showInput);
     };
-    const handleShortRestHitDiceChange = (shortRestHitDice) => {
-        storage.setProperty(playerStats.name, 'shortRestHitDice', shortRestHitDice);
-        setShortRestHitDice(shortRestHitDice);
-    };
 
-    React.useEffect(() => {
-        let value = storage.getProperty(playerStats.name, 'hasInspiration');
-        setHasInspiration(value ? value : false);
-    }, [playerStats]);
     let speed = playerStats.race.subrace && playerStats.race.subrace.speed ? playerStats.race.subrace.speed : playerStats.race.speed;
     if (playerStats.class.name === 'Monk') {
         const unarmoredMovementIncrease = classRules.getUnarmoredMovementIncrease(playerStats);
@@ -43,11 +46,6 @@ function CharSummary({ playerStats, onDeleteCharacter }) {
         const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
         const unarmoredMovement = classLevel?.class_specific?.unarmored_movement || 0;
         speed += unarmoredMovement;
-    }
-    const handleToggleInspiraction = () => {
-        const newValue = !hasInspiration;
-        storage.setProperty(playerStats.name, 'hasInspiration', newValue);
-        setHasInspiration(newValue);
     }
     const showArmorClassFormulaPopup = () => {
         const html = `Armor Class (${playerStats.armorClass}) = ${playerStats.armorClassFormula}`

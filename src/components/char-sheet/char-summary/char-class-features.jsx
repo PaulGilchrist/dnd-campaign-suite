@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
-import storage from '../../../services/storage'
+import useTrackedResource from '../../../hooks/use-tracked-resource';
 import classRules from '../../../services/class-rules'
 import classRules2024 from '../../../services/class-rules-2024'
 import HiddenInput from '../../common/hidden-input'
@@ -8,29 +8,13 @@ import { isEqual } from 'lodash';
 
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats);
 
-/* Shared hook for tracked (editable) class resources.
-   Follows the same pattern across all classes: load from storage on mount,
-   fall back to a computed max, persist on change.                    */
-function useTrackedResource(storageKey, playerName, max) {
-    const [value, setValue] = React.useState(0);
-    const [showInput, setShowInput] = React.useState(false);
-    React.useEffect(() => {
-        const stored = storage.getProperty(playerName, storageKey);
-        setValue(stored ? stored : max);
-      }, [playerName, storageKey, max]);
-    const handleToggle = () => setShowInput((s) => !s);
-    const handleChange = (v) => {
-        storage.setProperty(playerName, storageKey, v);
-        setValue(v);
-      };
-    return { value, showInput, handleToggle, handleChange };
-}
-
 /* ─── Barbarian ─── */
 const BarbarianFeatures = React.memo(function BarbarianFeatures({ playerStats }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-    const { value: ragePoints, showInput, handleToggle, handleChange } =
-        useTrackedResource('ragePoints', playerStats.name, classLevel?.rages || 0);
+    const [showInput, setShowInput] = React.useState(false);
+    const handleToggle = () => setShowInput((s) => !s);
+    const { current: ragePoints, update: handleChange } =
+        useTrackedResource('ragePoints', playerStats.name, () => classLevel?.rages || 0, [playerStats]);
     return (
           <div data-testid="char-class-barbarian">
               <div><b>Extra Attacks: </b>{classLevel?.extra_attacks || 0}</div>
@@ -60,8 +44,10 @@ const BardFeatures = React.memo(function BardFeatures({ playerStats }) {
         subclassMagicalSecrets = classRules.getHighestSubclassLevel(playerStats)?.subclass_specific?.additional_magical_secrets_max_lvl || 0;
       }
     const maxInspiration = charisma?.bonus || 0;
-    const { value: bardicInspirationUses, showInput, handleToggle, handleChange } =
-        useTrackedResource('bardicInspirationUses', playerStats.name, maxInspiration);
+    const [showInput, setShowInput] = React.useState(false);
+    const handleToggle = () => setShowInput((s) => !s);
+    const { current: bardicInspirationUses, update: handleChange } =
+        useTrackedResource('bardicInspirationUses', playerStats.name, () => maxInspiration, [playerStats]);
     return (
           <div data-testid="char-class-bard">
               {playerStats.level > 5 && !is2024 && <div><b>Extra Attacks: </b>{extraAttacks}</div>}
@@ -88,8 +74,10 @@ const ClericFeatures = React.memo(function ClericFeatures({ playerStats }) {
     const destroyUndeadCR = is2024
           ? null
           : classLevel?.class_specific?.destroy_undead_cr;
-    const { value: channelDivinityCharges, showInput, handleToggle, handleChange } =
-        useTrackedResource('channelDivinityCharges', playerStats.name, maxChannelDivinity);
+    const [showInput, setShowInput] = React.useState(false);
+    const handleToggle = () => setShowInput((s) => !s);
+    const { current: channelDivinityCharges, update: handleChange } =
+        useTrackedResource('channelDivinityCharges', playerStats.name, () => maxChannelDivinity, [playerStats]);
     return (
           <div data-testid="char-class-cleric">
               <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
@@ -125,8 +113,10 @@ const DruidFeatures = React.memo(function DruidFeatures({ playerStats }) {
                   ? 'walk or swim only (no fly)'
                   : 'walk only (no swim or fly)';
       }
-    const { value: wildShapeUses, showInput, handleToggle, handleChange } =
-        useTrackedResource('wildShapeUses', playerStats.name, maxWildShapeUses || 0);
+    const [showInput, setShowInput] = React.useState(false);
+    const handleToggle = () => setShowInput((s) => !s);
+    const { current: wildShapeUses, update: handleChange } =
+        useTrackedResource('wildShapeUses', playerStats.name, () => maxWildShapeUses || 0, [playerStats]);
     return (
           <div data-testid="char-class-druid">
               <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
@@ -145,11 +135,19 @@ const FighterFeatures = React.memo(function FighterFeatures({ playerStats }) {
     if (!classLevel) return null;
     const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name;
     const hasEnergy = classLevel.energy && classLevel.energy.required_major === majorName;
-    const { value: secondWindUses, showInput: showSecondWindInput, handleToggle: handleSecondWindToggle, handleChange: handleSecondWindChange } =
-        useTrackedResource('secondWindUses', playerStats.name, classLevel.second_wind || 0);
+
+    const [showSecondWindInput, setShowSecondWindInput] = React.useState(false);
+    const handleSecondWindToggle = () => setShowSecondWindInput((s) => !s);
+    const { current: secondWindUses, update: handleSecondWindChange } =
+        useTrackedResource('secondWindUses', playerStats.name, () => classLevel.second_wind || 0, [playerStats]);
+
     const maxEnergy = hasEnergy ? classLevel.energy?.energy_die_num || 0 : 0;
-    const { value: psionicEnergy, showInput: showPsionicEnergyInput, handleToggle: handlePsionicEnergyToggle, handleChange: handlePsionicEnergyChange } =
-        useTrackedResource('psionicEnergy', playerStats.name, maxEnergy);
+
+    const [showPsionicEnergyInput, setShowPsionicEnergyInput] = React.useState(false);
+    const handlePsionicEnergyToggle = () => setShowPsionicEnergyInput((s) => !s);
+    const { current: psionicEnergy, update: handlePsionicEnergyChange } =
+        useTrackedResource('psionicEnergy', playerStats.name, () => maxEnergy, [playerStats]);
+
     return (
           <div data-testid="char-class-fighter">
               <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles?.join(', ') || 'N/A'}</div>
@@ -179,8 +177,10 @@ const MonkFeatures = React.memo(function MonkFeatures({ playerStats }) {
     const martialArtsDie = classRules2024.getMartialArtsDie(playerStats);
     const unarmoredMovementIncrease = classRules2024.getUnarmoredMovementIncrease(playerStats);
     const maxFocusPoints = classRules2024.getFocusPoints(playerStats);
-    const { value: focusPoints, showInput, handleToggle, handleChange } =
-        useTrackedResource('focusPoints', playerStats.name, maxFocusPoints || 0);
+    const [showInput, setShowInput] = React.useState(false);
+    const handleToggle = () => setShowInput((s) => !s);
+    const { current: focusPoints, update: handleChange } =
+        useTrackedResource('focusPoints', playerStats.name, () => maxFocusPoints || 0, [playerStats]);
     return (
           <div data-testid="char-class-monk">
               <div><b>Martial Arts Die:</b> d{martialArtsDie}</div>
@@ -269,8 +269,10 @@ const SorcererFeatures = React.memo(function SorcererFeatures({ playerStats }) {
             creatingSpellSlotCosts.push(slot.sorcery_point_cost);
           });
       }
-    const { value: sorceryPoints, showInput, handleToggle, handleChange } =
-        useTrackedResource('sorceryPoints', playerStats.name, maxSorceryPoints);
+    const [showInput, setShowInput] = React.useState(false);
+    const handleToggle = () => setShowInput((s) => !s);
+    const { current: sorceryPoints, update: handleChange } =
+        useTrackedResource('sorceryPoints', playerStats.name, () => maxSorceryPoints, [playerStats]);
     return (
           <div data-testid="char-class-sorcerer">
               <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
@@ -323,8 +325,10 @@ const WizardFeatures = React.memo(function WizardFeatures({ playerStats }) {
     if (playerStats.rules === '2024') return null;
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const classSpecific = classLevel?.class_specific || {};
-    const { value: arcaneRecoveryLevels, showInput, handleToggle, handleChange } =
-        useTrackedResource('arcaneRecoveryLevels', playerStats.name, classSpecific.arcane_recovery_levels || 0);
+    const [showInput, setShowInput] = React.useState(false);
+    const handleToggle = () => setShowInput((s) => !s);
+    const { current: arcaneRecoveryLevels, update: handleChange } =
+        useTrackedResource('arcaneRecoveryLevels', playerStats.name, () => classSpecific.arcane_recovery_levels || 0, [playerStats]);
     return (
           <div data-testid="char-class-wizard">
               <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
@@ -359,4 +363,4 @@ function CharClassFeatures({ playerStats }) {
     return <Cmp playerStats={playerStats} />;
 }
 
-export default CharClassFeatures
+export default CharClassFeatures;
