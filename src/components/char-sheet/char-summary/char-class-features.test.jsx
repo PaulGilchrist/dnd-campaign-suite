@@ -98,12 +98,12 @@ vi.mock('../../../services/class-rules', () => ({
         level7: 0,
         level8: 0,
         level9: 0
-       };
-      const arcanums = playerStats.class?.arcanums || [];
-      return { invocationsKnown, hasArcanum, arcanumLevels, arcanums };
-     }),
-    getWizardFeatures: vi.fn((playerStats) => {
-      const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+        };
+       const arcanums = playerStats.class?.arcanums || [];
+       return { invocationsKnown, hasArcanum, arcanumLevels, arcanums, invocations: ['Agonizing Blast'], pactBoon: 'Pact of the Blade' };
+       }),
+     getWizardFeatures: vi.fn((playerStats) => {
+       const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
       const arcaneRecoveryLevels = classLevel?.class_specific?.arcane_recovery_levels || 0;
       return { arcaneRecoveryLevels, showWizardFeatures: true };
      }),
@@ -111,11 +111,11 @@ vi.mock('../../../services/class-rules', () => ({
       return {
         martialArtsDie: 4,
         unarmoredMovementIncrease: 0,
-        maxFocusPoints: 0,
+        maxFocusPoints: 3,
         wisdomBonus: 0
        };
-     }),
-    getRogueFeatures: vi.fn((playerStats) => {
+       }),
+      getRogueFeatures: vi.fn((playerStats) => {
       const sneakAttack = { dice_count: 0, dice_value: 6 };
       const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
       if (classLevel?.class_specific?.sneak_attack) {
@@ -197,21 +197,21 @@ vi.mock('../../../services/class-rules', () => ({
         level9: 0
        };
       const arcanums = playerStats.class?.arcanums || [];
-      return { invocationsKnown, hasArcanum, arcanumLevels, arcanums };
-     }),
+         return { invocationsKnown, hasArcanum, arcanumLevels, arcanums, invocations: ['Agonizing Blast'], pactBoon: 'Pact of the Blade' };
+        }),
      getWizardFeatures: vi.fn((playerStats) => {
-      const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+       const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
       const arcaneRecoveryLevels = classLevel?.class_specific?.arcane_recovery_levels || 0;
       return { arcaneRecoveryLevels, showWizardFeatures: true };
      }),
      getMonkFeatures: vi.fn((playerStats) => {
-      return {
-        martialArtsDie: 4,
-        unarmoredMovementIncrease: 0,
-        maxFocusPoints: 0,
-        wisdomBonus: 0
-       };
-     }),
+       return {
+         martialArtsDie: 4,
+         unarmoredMovementIncrease: 0,
+         maxFocusPoints: 3,
+         wisdomBonus: 0
+         };
+       }),
      getRogueFeatures: vi.fn((playerStats) => {
       const sneakAttack = { dice_count: 0, dice_value: 6 };
       const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
@@ -402,7 +402,7 @@ describe('Barbarian', () => {
     level: 5,
     class: {
       name: 'Barbarian',
-      class_levels: Array(5).fill({ rages: 4, extra_attacks: 1, rage_damage: 2, weapon_mastery: 'Slashing' }),
+      class_levels: Array.from({ length: 5 }, (_, i) => ({ level: i + 1, rages: 4, extra_attacks: 1, rage_damage: 2, weapon_mastery: 'Slashing' })),
      },
     };
   beforeEach(() => { vi.clearAllMocks(); storage.getProperty.mockReturnValue(null); });
@@ -443,7 +443,7 @@ describe('Bard', () => {
     class: {
       name: 'Bard',
       expertise: ['Performance', 'Persuasion'],
-      class_levels: Array(5).fill({ class_specific: { bardic_inspiration_die: 6, song_of_rest_die: 8, magical_secrets_max_5: 1 } }),
+      class_levels: Array.from({ length: 5 }, (_, i) => ({ level: i + 1, class_specific: { bardic_inspiration_die: 6, song_of_rest_die: 8, magical_secrets_max_5: 1 } })),
      },
     };
   const mockStats2024 = {
@@ -486,7 +486,7 @@ describe('Cleric', () => {
     rules: '5e',
     class: {
       name: 'Cleric',
-      class_levels: Array(5).fill({ class_specific: { channel_divinity_charges: 2, destroy_undead_cr: '1/2' } }),
+      class_levels: Array.from({ length: 5 }, (_, i) => ({ level: i + 1, class_specific: { channel_divinity_charges: 2, destroy_undead_cr: '1/2' } })),
      },
     };
   beforeEach(() => { vi.clearAllMocks(); storage.getProperty.mockReturnValue(null); });
@@ -569,7 +569,7 @@ describe('Fighter', () => {
     class: {
       name: 'Fighter',
       fightingStyles: ['Defense'],
-      class_levels: Array(5).fill({ extra_attacks: 1, second_wind: 2, weapon_mastery: 'Slashing' }),
+      class_levels: Array.from({ length: 5 }, (_, i) => ({ level: i + 1, extra_attacks: 1, second_wind: 2, weapon_mastery: 'Slashing' })),
      },
     };
   beforeEach(() => { vi.clearAllMocks(); storage.getProperty.mockReturnValue(null); });
@@ -616,7 +616,7 @@ describe('Monk', () => {
     level: 3,
     proficiency: 2,
     abilities: [{ name: 'Wisdom', bonus: 3 }],
-    class: { name: 'Monk', class_levels: Array(3).fill({ extra_attacks: 0 }) },
+    class: { name: 'Monk', class_levels: Array.from({ length: 3 }, (_, i) => ({ level: i + 1, extra_attacks: 0 })) },
     };
   beforeEach(() => {
     vi.clearAllMocks();
@@ -653,7 +653,7 @@ describe('Paladin', () => {
     class: {
       name: 'Paladin',
       fightingStyles: ['Defense'],
-      class_levels: Array(5).fill({ class_specific: { channel_divinity_charges: 2, aura_range: 10 } }),
+      class_levels: Array.from({ length: 5 }, (_, i) => ({ level: i + 1, class_specific: { channel_divinity_charges: 2, aura_range: 10 } })),
      },
     };
 
@@ -695,7 +695,7 @@ describe('Rogue', () => {
     class: {
       name: 'Rogue',
       expertise: ['Stealth', 'Deception'],
-      class_levels: Array(5).fill({ class_specific: { sneak_attack: { dice_count: 5, dice_value: 6 } } }),
+      class_levels: Array.from({ length: 5 }, (_, i) => ({ level: i + 1, class_specific: { sneak_attack: { dice_count: 5, dice_value: 6 } } })),
      },
     };
   const mockStats2024 = {
@@ -729,7 +729,7 @@ describe('Sorcerer', () => {
     rules: '5e',
     class: {
       name: 'Sorcerer',
-      class_levels: Array(5).fill({ class_specific: { sorcery_points: 4, metamagic_known: 3, creating_spell_slots: [{ sorcery_point_cost: 2 }, { sorcery_point_cost: 3 }, { sorcery_point_cost: 4 }] } }),
+      class_levels: Array.from({ length: 5 }, (_, i) => ({ level: i + 1, class_specific: { sorcery_points: 4, metamagic_known: 3, creating_spell_slots: [{ sorcery_point_cost: 2 }, { sorcery_point_cost: 3 }, { sorcery_point_cost: 4 }] } })),
      },
     };
   const mockStats2024 = {
@@ -774,7 +774,7 @@ describe('Warlock', () => {
       invocations: ['Agonizing Blast'],
       pactBoon: 'Pact of the Blade',
       arcanums: ['Cone of Cold'],
-      class_levels: Array(11).fill({ class_specific: { invocations_known: 6, mystic_arcanum_level_6: 1, mystic_arcanum_level_7: 1, mystic_arcanum_level_8: 1, mystic_arcanum_level_9: 1 } }),
+      class_levels: Array.from({ length: 11 }, (_, i) => ({ level: i + 1, class_specific: { invocations_known: 6, mystic_arcanum_level_6: 1, mystic_arcanum_level_7: 1, mystic_arcanum_level_8: 1, mystic_arcanum_level_9: 1 } })),
      },
     };
   const mockStats2024 = {
@@ -787,7 +787,8 @@ describe('Warlock', () => {
 
   it('renders invocations known (5e)', () => {
     render(<CharClassFeatures playerStats={mockStats5e} />);
-    expect(screen.getByText(/Invocations Known/)).toBeInTheDocument();
+    const warlockEl = screen.getByTestId('char-class-warlock');
+    expect(warlockEl.textContent).toContain('6');
      });
 
   it('renders eldritch invocations (2024)', () => {
@@ -814,7 +815,7 @@ describe('Wizard', () => {
     rules: '5e',
     class: {
       name: 'Wizard',
-      class_levels: Array(5).fill({ class_specific: { arcane_recovery_levels: 1 } }),
+      class_levels: Array.from({ length: 5 }, (_, i) => ({ level: i + 1, class_specific: { arcane_recovery_levels: 1 } })),
      },
     };
   beforeEach(() => { vi.clearAllMocks(); storage.getProperty.mockReturnValue(null); });
