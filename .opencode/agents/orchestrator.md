@@ -5,7 +5,8 @@ mode: primary
 skills:
   - architecture
   - coding-standards
-  - tool-calling
+  - tool-subagent-calling
+  - tool-todo-calling
 temperature: 0
 permission:
   edit: deny

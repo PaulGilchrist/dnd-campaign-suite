@@ -1,5 +1,5 @@
 ---
-name: tool-calling
+name: tool-subagent-calling
 description: Proper method to call a subagent in OpenCode
 ---
 
