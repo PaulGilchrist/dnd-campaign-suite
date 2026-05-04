@@ -88,8 +88,8 @@
 
 /* Magic Item Item Styles */
 .magic-item {
-    padding: 1rem;
-    margin-bottom: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 0.25rem;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     cursor: pointer;
@@ -122,6 +122,4 @@
     }
 }
 /* ===== MIN-HEIGHT OVERRIDE FOR MAGIC ITEMS STEP ===== */
-.wizard-step-magic-items .wizard-step {
-    min-height: 700px;
-}
+/* Removed: min-height override was causing layout issues */
