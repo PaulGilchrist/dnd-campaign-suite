@@ -1,4 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import {
+  loadAbilityScores,
+  loadClassData,
+  loadEquipment,
+  loadMagicItems,
+  loadRaceData,
+  loadSpells
+} from '../services/data-loader';
 
 function useAppData() {
   const [abilityScores, setAbilityScores] = useState(null);
@@ -28,16 +36,16 @@ function useAppData() {
           spellsData,
           spells2024Data,
         ] = await Promise.all([
-          fetch('/data/ability-scores.json').then(response => response.json()),
-          fetch('/data/classes.json').then(response => response.json()),
-          fetch('/data/2024/classes.json').then(response => response.json()),
-          fetch('/data/equipment.json').then(response => response.json()),
-          fetch('/data/magic-items.json').then(response => response.json()),
-          fetch('/data/2024/magic-items.json').then(response => response.json()),
-          fetch('/data/races.json').then(response => response.json()),
-          fetch('/data/2024/races.json').then(response => response.json()),
-          fetch('/data/spells.json').then(response => response.json()),
-          fetch('/data/2024/spells.json').then(response => response.json()),
+          loadAbilityScores(),
+          loadClassData('5e'),
+          loadClassData('2024'),
+          loadEquipment(),
+          loadMagicItems('5e'),
+          loadMagicItems('2024'),
+          loadRaceData('5e'),
+          loadRaceData('2024'),
+          loadSpells('5e'),
+          loadSpells('2024'),
         ]);
 
         setAbilityScores(abilityScoresData);

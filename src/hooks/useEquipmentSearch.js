@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { loadEquipment } from '../services/data-loader';
 
 export function useEquipmentSearch(tempInventory, onTempInventoryChange, onInventoryChange) {
   const [equipmentData, setEquipmentData] = useState([]);
@@ -12,17 +13,11 @@ export function useEquipmentSearch(tempInventory, onTempInventoryChange, onInven
 
   // Load equipment data
   useEffect(() => {
-    const loadEquipment = async () => {
-      try {
-        const response = await fetch('/data/equipment.json');
-        const data = await response.json();
-        setEquipmentData(data);
-      } catch (error) {
-        console.error('Failed to load equipment:', error);
-        setEquipmentData([]);
-      }
+    const fetchEquipment = async () => {
+      const data = await loadEquipment();
+      setEquipmentData(data);
     };
-    loadEquipment();
+    fetchEquipment();
   }, []);
 
   // Filter equipment based on search query and category

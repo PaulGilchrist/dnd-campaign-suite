@@ -2,6 +2,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CharInventory from './char-inventory';
 
+// Mock the data-loader service
+vi.mock('../../services/data-loader', () => ({
+  loadEquipment: vi.fn(),
+  clearDataCache: vi.fn(),
+}));
+
 // Mock the usePopup hook
 vi.mock('./common/use-popup', () => ({
   default: vi.fn(),
@@ -13,6 +19,7 @@ vi.mock('../../services/sanitize', () => ({
 }));
 
 import usePopup from './common/use-popup';
+import { loadEquipment } from '../../services/data-loader';
 
 const mockPlayerStats = {
   inventory: {
@@ -63,8 +70,8 @@ describe('CharInventory', () => {
       setPopupHtml: vi.fn(),
       }));
 
-      // Mock fetch
-    global.fetch = vi.fn();
+      // Set up default mock for loadEquipment
+    loadEquipment.mockResolvedValue(mockEquipmentData);
     });
 
   afterEach(() => {
@@ -158,12 +165,7 @@ describe('CharInventory', () => {
     expect(screen.getByText('Healing Potion')).toBeInTheDocument();
     });
 
-  it('should call fetch when equipped item is clicked', async () => {
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => mockEquipmentData,
-      });
-
+  it('should call loadEquipment when equipped item is clicked', async () => {
     render(
          <CharInventory playerStats={mockPlayerStats} />
        );
@@ -173,12 +175,12 @@ describe('CharInventory', () => {
     fireEvent.click(shieldElement);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/data/equipment.json');
+      expect(loadEquipment).toHaveBeenCalled();
     });
      });
 
-  it('should handle fetch error gracefully', async () => {
-    global.fetch.mockRejectedValue(new Error('Network error'));
+  it('should handle loadEquipment error gracefully', async () => {
+    loadEquipment.mockRejectedValue(new Error('Network error'));
 
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
@@ -201,10 +203,7 @@ describe('CharInventory', () => {
      });
 
   it('should handle item not found in database', async () => {
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => [],
-      });
+    loadEquipment.mockResolvedValue([]);
 
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
@@ -337,10 +336,7 @@ describe('CharInventory', () => {
       },
     ];
 
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => dataWithSingular,
-    });
+    loadEquipment.mockResolvedValue(dataWithSingular);
 
     const stats = {
       inventory: {
@@ -380,10 +376,7 @@ describe('CharInventory', () => {
       },
     ];
 
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => dataWithPlural,
-    });
+    loadEquipment.mockResolvedValue(dataWithPlural);
 
     const stats = {
       inventory: {
@@ -412,11 +405,6 @@ describe('CharInventory', () => {
   });
 
   it('should display item cost property', async () => {
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => mockEquipmentData,
-    });
-
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
@@ -439,11 +427,6 @@ describe('CharInventory', () => {
   });
 
   it('should display item weight property', async () => {
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => mockEquipmentData,
-    });
-
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
@@ -472,10 +455,7 @@ describe('CharInventory', () => {
       },
     ];
 
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => dataWithAbility,
-    });
+    loadEquipment.mockResolvedValue(dataWithAbility);
 
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
@@ -505,10 +485,7 @@ describe('CharInventory', () => {
       },
     ];
 
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => dataWithUtilize,
-    });
+    loadEquipment.mockResolvedValue(dataWithUtilize);
 
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
@@ -538,10 +515,7 @@ describe('CharInventory', () => {
       },
     ];
 
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => dataWithCraft,
-    });
+    loadEquipment.mockResolvedValue(dataWithCraft);
 
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({

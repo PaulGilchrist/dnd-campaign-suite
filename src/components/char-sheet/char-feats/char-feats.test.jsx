@@ -2,12 +2,18 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CharFeats from './char-feats';
 
+// Mock the data-loader module
+vi.mock('../../../services/data-loader', () => ({
+  loadFeatData: vi.fn(),
+}));
+
 // Mock the usePopup hook
 vi.mock('../common/use-popup', () => ({
   default: vi.fn(),
 }));
 
 import usePopup from '../common/use-popup';
+import { loadFeatData } from '../../../services/data-loader';
 
 const mockPlayerStats = {
   feats: ['Actor', 'Athlete'],
@@ -38,8 +44,8 @@ describe('CharFeats', () => {
       setPopupHtml: vi.fn(),
      }));
 
-     // Mock fetch
-    global.fetch = vi.fn();
+     // Mock loadFeatData to return mock data by default
+    loadFeatData.mockResolvedValue(mockFeatsData);
    });
 
   afterEach(() => {
@@ -80,12 +86,7 @@ describe('CharFeats', () => {
     expect(screen.getByText(/Feats:/)).toBeInTheDocument();
    });
 
-  it('should call fetch when feat is clicked', async () => {
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => mockFeatsData,
-     });
-
+  it('should call loadFeatData when feat is clicked', async () => {
     render(
         <CharFeats playerStats={mockPlayerStats} />
       );
@@ -95,16 +96,11 @@ describe('CharFeats', () => {
     fireEvent.click(actorElements[0]);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/data/feats.json');
+      expect(loadFeatData).toHaveBeenCalledWith('5e');
    });
     });
 
   it('should show popup with feat details when found', async () => {
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => mockFeatsData,
-     });
-
     render(
         <CharFeats playerStats={mockPlayerStats} />
       );
@@ -114,14 +110,14 @@ describe('CharFeats', () => {
     fireEvent.click(actorElements[0]);
 
      // The component uses showPopup from props, not from usePopup
-     // Let's check that fetch was called
+     // Let's check that loadFeatData was called
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalled();
+      expect(loadFeatData).toHaveBeenCalled();
    });
     });
 
-  it('should handle fetch error gracefully', async () => {
-    global.fetch.mockRejectedValue(new Error('Network error'));
+  it('should handle loadFeatData error gracefully', async () => {
+    loadFeatData.mockRejectedValue(new Error('Network error'));
 
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
@@ -144,10 +140,7 @@ describe('CharFeats', () => {
     });
 
   it('should handle feat not found in database', async () => {
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => [],
-     });
+    loadFeatData.mockResolvedValue([]);
 
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
@@ -200,11 +193,6 @@ describe('CharFeats', () => {
       rules: '2024',
      };
 
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => mockFeatsData,
-     });
-
     render(
         <CharFeats playerStats={stats2024} />
       );
@@ -214,7 +202,7 @@ describe('CharFeats', () => {
     fireEvent.click(actorElements[0]);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/data/2024/feats.json');
+      expect(loadFeatData).toHaveBeenCalledWith('2024');
    });
     });
 });

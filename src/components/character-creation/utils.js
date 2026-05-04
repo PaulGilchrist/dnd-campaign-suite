@@ -1,37 +1,13 @@
 import { REQUIRED_FIELDS } from './constants';
-
-// Cache for validation rules
-let validationRulesCache = {
-  '5e': null,
-  '2024': null
-};
+import { loadValidationRules as loadValidationRulesFromService } from '../../services/data-loader';
 
 /**
- * Load validation rules from JSON file (with caching)
+ * Load validation rules from JSON file (uses centralized data-loader)
  * @param {string} ruleset - '5e' or '2024'
  * @returns {Promise<object>} - Validation rules object
  */
 async function loadValidationRules(ruleset = '5e') {
-  if (validationRulesCache[ruleset]) {
-    return validationRulesCache[ruleset];
-  }
-  
-  try {
-    const path = ruleset === '2024' 
-      ? '/data/2024/rules-validation.json'
-      : '/data/rules-validation.json';
-    const response = await fetch(path);
-    if (!response.ok) {
-      throw new Error(`Failed to load ${ruleset} rules-validation.json`);
-    }
-    const data = await response.json();
-    validationRulesCache[ruleset] = data[ruleset] || data;
-    return validationRulesCache[ruleset];
-  } catch (error) {
-    console.error(`Error loading ${ruleset} rules-validation.json:`, error);
-    // Fallback to defaults if JSON fails to load
-    return getDefaultValidationRules(ruleset);
-  }
+  return loadValidationRulesFromService(ruleset);
 }
 
 /**

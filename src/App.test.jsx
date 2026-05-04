@@ -2,6 +2,15 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from './App';
 
+const dataLoaderMocks = vi.hoisted(() => ({
+  loadAbilityScores: vi.fn(),
+  loadClassData: vi.fn(),
+  loadEquipment: vi.fn(),
+  loadMagicItems: vi.fn(),
+  loadRaceData: vi.fn(),
+  loadSpells: vi.fn(),
+}));
+
 const { MockCharSheet } = vi.hoisted(() => ({
   MockCharSheet: vi.fn(({ playerSummary }) => <div data-testid="char-sheet">{playerSummary?.name || 'no character'}</div>)
 }));
@@ -43,6 +52,8 @@ vi.mock('./components/campaign-selection/campaign-selection', () => ({ default: 
 
 vi.mock('./components/character-creation/character-creation-wizard', () => ({ default: WizardFn }));
 
+vi.mock('./services/data-loader', () => dataLoaderMocks);
+
 const mockFetchData = {
   '/data/ability-scores.json': [{ full_name: 'Strength' }],
   '/data/classes.json': [{ name: 'Fighter' }],
@@ -70,12 +81,20 @@ beforeEach(() => {
     removeItem: vi.fn(),
   };
 
-  global.fetch = vi.fn((url) => {
-    if (mockFetchData[url]) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(mockFetchData[url]) });
-    }
-    return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
-  });
+  dataLoaderMocks.loadAbilityScores.mockResolvedValue([{ full_name: 'Strength' }]);
+  dataLoaderMocks.loadClassData.mockImplementation((version) =>
+    Promise.resolve(version === '2024' ? [{ name: 'Fighter 2024' }] : [{ name: 'Fighter' }])
+  );
+  dataLoaderMocks.loadEquipment.mockResolvedValue([{ name: 'Longsword' }]);
+  dataLoaderMocks.loadMagicItems.mockImplementation((version) =>
+    Promise.resolve(version === '2024' ? [{ name: 'Wand 2024' }] : [{ name: 'Wand' }])
+  );
+  dataLoaderMocks.loadRaceData.mockImplementation((version) =>
+    Promise.resolve(version === '2024' ? [{ name: 'Human 2024' }] : [{ name: 'Human' }])
+  );
+  dataLoaderMocks.loadSpells.mockImplementation((version) =>
+    Promise.resolve(version === '2024' ? [{ name: 'Fireball 2024' }] : [{ name: 'Fireball' }])
+  );
 
   window.confirm = vi.fn(() => true);
   window.prompt = vi.fn(() => 'New Campaign Name');
@@ -515,13 +534,6 @@ describe('App', () => {
       return null;
     });
 
-    global.fetch = vi.fn().mockImplementation((url) => {
-      if (url.includes('/api/campaigns/')) {
-        return Promise.resolve({ ok: true });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
-    });
-
     render(<App />);
 
     await waitFor(() => {
@@ -552,16 +564,6 @@ describe('App', () => {
       return null;
     });
 
-    global.fetch = vi.fn().mockImplementation((url) => {
-      if (url.includes('/api/campaigns/')) {
-        return Promise.resolve({
-          ok: false,
-          json: () => Promise.resolve({ error: 'Rename failed' })
-        });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
-    });
-
     render(<App />);
 
     await waitFor(() => {
@@ -578,16 +580,6 @@ describe('App', () => {
       if (key === 'currentCampaign') return 'test-campaign';
       if (key === 'characters') return JSON.stringify([{ name: 'Test', level: 1 }]);
       return null;
-    });
-
-    global.fetch = vi.fn().mockImplementation((url) => {
-      if (url.includes('/api/characters/')) {
-        return Promise.resolve({
-          ok: false,
-          json: () => Promise.resolve({ error: 'Delete failed' })
-        });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
     });
 
     render(<App />);
@@ -625,16 +617,6 @@ describe('App', () => {
     window.sessionStorage.getItem = vi.fn((key) => {
       if (key === 'currentCampaign') return 'test-campaign';
       return null;
-    });
-
-    global.fetch = vi.fn().mockImplementation((url) => {
-      if (url.includes('/api/campaigns/')) {
-        return Promise.resolve({
-          ok: false,
-          json: () => Promise.resolve({ error: 'Delete failed' })
-        });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
     });
 
     render(<App />);

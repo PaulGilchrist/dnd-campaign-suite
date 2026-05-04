@@ -1,10 +1,15 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { useEquipmentSearch } from './useEquipmentSearch';
+import { loadEquipment } from '../services/data-loader';
+
+vi.mock('../services/data-loader', () => ({
+  loadEquipment: vi.fn()
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();
-  global.fetch = vi.fn();
+  loadEquipment.mockResolvedValue([]);
 });
 
 describe('useEquipmentSearch', () => {
@@ -19,11 +24,6 @@ describe('useEquipmentSearch', () => {
 
   describe('initial state', () => {
     it('returns correct initial values', async () => {
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => [],
-      });
-
       const { result } = renderHook(() => useEquipmentSearch(
         mockTempInventory,
         onTempInventoryChange,
@@ -46,11 +46,6 @@ describe('useEquipmentSearch', () => {
 
   describe('handleSearchFieldFocus', () => {
     it('sets searchField and resets searchQuery and filteredEquipment', async () => {
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => [],
-      });
-
       const { result } = renderHook(() => useEquipmentSearch(
         mockTempInventory,
         onTempInventoryChange,
@@ -73,11 +68,6 @@ describe('useEquipmentSearch', () => {
 
   describe('handleCategoryChange', () => {
     it('updates selectedCategory', async () => {
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => [],
-      });
-
       const { result } = renderHook(() => useEquipmentSearch(
         mockTempInventory,
         onTempInventoryChange,
@@ -98,11 +88,6 @@ describe('useEquipmentSearch', () => {
 
   describe('handleEquipmentSelect', () => {
     it('calls callbacks and resets state when adding to backpack', async () => {
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => [],
-      });
-
       const { result } = renderHook(() => useEquipmentSearch(
         mockTempInventory,
         onTempInventoryChange,
@@ -132,10 +117,6 @@ describe('useEquipmentSearch', () => {
 
     it('does not add duplicate items', async () => {
       const tempInventoryWithItem = { backpack: ['Longsword'], equipped: [] };
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => [],
-      });
 
       const { result } = renderHook(() => useEquipmentSearch(
         tempInventoryWithItem,
@@ -164,11 +145,6 @@ describe('useEquipmentSearch', () => {
 
   describe('handleAddCustomItem', () => {
     it('adds custom item to backpack and resets state', async () => {
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => [],
-      });
-
       const { result } = renderHook(() => useEquipmentSearch(
         mockTempInventory,
         onTempInventoryChange,
@@ -195,10 +171,6 @@ describe('useEquipmentSearch', () => {
 
     it('does not add duplicate custom items', async () => {
       const tempInventoryWithItem = { backpack: ['Magic Sword'], equipped: [] };
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => [],
-      });
 
       const { result } = renderHook(() => useEquipmentSearch(
         tempInventoryWithItem,
@@ -232,10 +204,7 @@ describe('useEquipmentSearch', () => {
         { name: 'Potion of Healing', index: 'potion-healing', equipment_category: 'Adventuring Gear' },
       ];
 
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockEquipment,
-      });
+      loadEquipment.mockResolvedValue(mockEquipment);
 
       const { result } = renderHook(() => useEquipmentSearch(
         mockTempInventory,

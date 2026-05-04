@@ -1,8 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+const { mockLoadValidationRules, mockLoadAbilityScores } = vi.hoisted(() => ({
+  mockLoadValidationRules: vi.fn(),
+  mockLoadAbilityScores: vi.fn()
+}));
 
-// Mock fetch for the async functions
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+vi.mock('../../services/data-loader', () => ({
+  loadValidationRules: mockLoadValidationRules,
+  loadAbilityScores: mockLoadAbilityScores
+}));
+
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockValidationRules = {
     level_range: { min: 1, max: 20 },
@@ -207,10 +213,7 @@ describe('character-creation/utils', () => {
         let utils;
         beforeEach(async () => {
             vi.resetModules();
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ '5e': mockValidationRules })
-         });
+            mockLoadValidationRules.mockResolvedValue(mockValidationRules);
             utils = await importUtils();
           });
 
@@ -244,10 +247,7 @@ describe('character-creation/utils', () => {
         let utils;
         beforeEach(async () => {
             vi.resetModules();
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ '5e': mockValidationRules })
-         });
+            mockLoadValidationRules.mockResolvedValue(mockValidationRules);
             utils = await importUtils();
           });
 
@@ -326,10 +326,7 @@ describe('character-creation/utils', () => {
         let utils;
         beforeEach(async () => {
             vi.resetModules();
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ '5e': mockValidationRules })
-         });
+            mockLoadValidationRules.mockResolvedValue(mockValidationRules);
             utils = await importUtils();
           });
 
@@ -358,10 +355,7 @@ describe('character-creation/utils', () => {
         let utils;
         beforeEach(async () => {
             vi.resetModules();
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ '5e': mockValidationRules })
-              });
+            mockLoadValidationRules.mockResolvedValue(mockValidationRules);
             utils = await importUtils();
           });
 
@@ -372,24 +366,18 @@ describe('character-creation/utils', () => {
 
         it('should return empty object when point_buy is missing', async () => {
             vi.resetModules();
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ '5e': { level_range: { min: 1, max: 20 } } })
-              });
+            mockLoadValidationRules.mockResolvedValue({ level_range: { min: 1, max: 20 } });
             utils = await importUtils();
             const costs = await utils.getPointBuyCosts('5e');
             expect(costs).toEqual({});
-     });
-      });
+       });
+       });
 
     describe('getFeatRules', () => {
         let utils;
         beforeEach(async () => {
             vi.resetModules();
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ '5e': mockValidationRules })
-              });
+            mockLoadValidationRules.mockResolvedValue(mockValidationRules);
             utils = await importUtils();
           });
 
@@ -400,24 +388,18 @@ describe('character-creation/utils', () => {
 
         it('should return empty object when feats is missing', async () => {
             vi.resetModules();
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ '5e': { level_range: { min: 1, max: 20 } } })
-              });
+            mockLoadValidationRules.mockResolvedValue({ level_range: { min: 1, max: 20 } });
             utils = await importUtils();
             const rules = await utils.getFeatRules('5e');
             expect(rules).toEqual({});
-     });
-      });
+       });
+       });
 
     describe('getBackgroundLanguageCount', () => {
         let utils;
         beforeEach(async () => {
             vi.resetModules();
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ '5e': mockValidationRules })
-              });
+            mockLoadValidationRules.mockResolvedValue(mockValidationRules);
             utils = await importUtils();
           });
 
@@ -428,15 +410,12 @@ describe('character-creation/utils', () => {
 
         it('should return default value of 2 when background_languages is missing', async () => {
             vi.resetModules();
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ '5e': {} })
-              });
+            mockLoadValidationRules.mockResolvedValue({});
             utils = await importUtils();
             const count = await utils.getBackgroundLanguageCount('5e');
             expect(count).toBe(2);
-     });
-      });
+       });
+       });
 
     describe('getSkillsFromAbilityScores', () => {
         let utils;
@@ -446,14 +425,11 @@ describe('character-creation/utils', () => {
           });
 
         it('should return unique skills from ability scores', async () => {
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => [
+            mockLoadAbilityScores.mockResolvedValue([
                       { full_name: 'Strength', skills: ['Athletics'] },
                       { full_name: 'Dexterity', skills: ['Acrobatics', 'Sleight of Hand', 'Stealth'] },
                       { full_name: 'Intelligence', skills: ['Arcana', 'History', 'Investigation', 'Medicine', 'Nature', 'Religion'] }
-                  ]
-              });
+                  ]);
             const skills = await utils.getSkillsFromAbilityScores('5e');
             expect(skills).toContain('Athletics');
             expect(skills).toContain('Acrobatics');
@@ -461,16 +437,16 @@ describe('character-creation/utils', () => {
             expect(skills.length).toBeGreaterThan(0);
         });
 
-        it('should return fallback skills when fetch fails', async () => {
-            mockFetch.mockRejectedValue(new Error('Network error'));
+        it('should return fallback skills when loadAbilityScores fails', async () => {
+            mockLoadAbilityScores.mockRejectedValue(new Error('Network error'));
             console.error = vi.fn();
 
             const skills = await utils.getSkillsFromAbilityScores('5e');
             expect(skills).toContain('Acrobatics');
             expect(skills).toContain('Athletics');
             expect(skills).toContain('Perception');
-     });
       });
+       });
 
     describe('getAbilityNamesFromJson', () => {
         let utils;
@@ -480,38 +456,32 @@ describe('character-creation/utils', () => {
           });
 
         it('should return ability names from JSON', async () => {
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => [
+            mockLoadAbilityScores.mockResolvedValue([
                       { full_name: 'Strength' },
                       { full_name: 'Dexterity' },
                       { full_name: 'Constitution' },
                       { full_name: 'Intelligence' },
                       { full_name: 'Wisdom' },
                       { full_name: 'Charisma' }
-                  ]
-              });
+                  ]);
             const names = await utils.getAbilityNamesFromJson();
             expect(names).toEqual(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']);
         });
 
-        it('should return fallback names when fetch fails', async () => {
-            mockFetch.mockRejectedValue(new Error('Network error'));
+        it('should return fallback names when loadAbilityScores fails', async () => {
+            mockLoadAbilityScores.mockRejectedValue(new Error('Network error'));
             console.error = vi.fn();
 
             const names = await utils.getAbilityNamesFromJson();
             expect(names).toEqual(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']);
-     });
       });
+       });
 
     describe('validateStep', () => {
         let utils;
         beforeEach(async () => {
             vi.resetModules();
-            mockFetch.mockResolvedValue({
-                ok: true,
-                json: async () => ({ '5e': mockValidationRules })
-         });
+            mockLoadValidationRules.mockResolvedValue(mockValidationRules);
             utils = await importUtils();
           });
 
@@ -584,5 +554,5 @@ describe('character-creation/utils', () => {
                 expect(errors.subclass).toBeUndefined();
      });
           });
-      });
+       });
 });

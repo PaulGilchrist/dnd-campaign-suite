@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './wizard-step-abilities.css';
-import { getPointBuyCosts } from './utils';
-import { loadAbilityScores } from '../../services/data-loader';
+import { loadAbilityScores, loadValidationRules } from '../../services/data-loader';
 
 function WizardStepAbilities({
   formData, 
@@ -23,24 +22,18 @@ function WizardStepAbilities({
     loadNames();
   }, []);
 
-       // Load point buy costs from JSON
+       // Load point buy costs and validation rules from JSON
   useEffect(() => {
     const loadCosts = async () => {
-      const costs = await getPointBuyCosts(formData.rules || '5e');
-      setPointBuyCosts(costs);
-          // Also load the total points allowed from validation rules
       try {
-        const path = formData.rules === '2024' ? '/data/2024/rules-validation.json' : '/data/rules-validation.json';
-        const response = await fetch(path);
-        if (response.ok) {
-          const data = await response.json();
-          const rules = data[formData.rules] || data;
-          setPointsAllowed(rules.point_buy?.total_points ?? 27);
-            }
-           } catch (error) {
+        const version = formData.rules || '5e';
+        const rules = await loadValidationRules(version);
+        setPointBuyCosts(rules.point_buy?.costs || {});
+        setPointsAllowed(rules.point_buy?.total_points ?? 27);
+      } catch (error) {
         console.error('Error loading validation rules:', error);
-           }
-          };
+      }
+         };
     loadCosts();
        }, [formData.rules]);
 

@@ -11,14 +11,18 @@ const dataCache = {
      races: null,
      backgrounds: null,
      feats: null,
-     'rules-validation': null
+     'rules-validation': null,
+     magicItems: null,
+     spells: null
     },
     '2024': {
      classes: null,
      races: null,
      backgrounds: null,
      feats: null,
-     'rules-validation': null
+     'rules-validation': null,
+     magicItems: null,
+     spells: null
     }
 };
 
@@ -26,7 +30,8 @@ const dataCache = {
 const sharedDataCache = {
     skills: null,
     abilityScores: null,
-    passiveSkills: null
+    passiveSkills: null,
+    equipment: null
 };
 
 /**
@@ -72,7 +77,7 @@ async function loadData(dataType, version = '5e', optional = false) {
           }
 
         // Check if response is actually JSON (Vite dev server may return HTML for missing files)
-        const contentType = response.headers.get('content-type');
+        const contentType = response.headers?.get?.('content-type') ?? response.headers?.['content-type'];
         if (!contentType || !contentType.includes('application/json')) {
           if (optional) {
             versionCache[cacheKey] = [];
@@ -231,15 +236,90 @@ export async function loadAbilityScores() {
     } catch (error) {
         console.error('Error loading ability scores:', error);
      }
-    return [
-        { full_name: 'Strength', skills: ['Athletics'] },
-        { full_name: 'Dexterity', skills: ['Acrobatics', 'Sleight of Hand', 'Stealth'] },
-        { full_name: 'Constitution', skills: [] },
-        { full_name: 'Intelligence', skills: ['Arcana', 'History', 'Investigation', 'Nature', 'Religion'] },
-        { full_name: 'Wisdom', skills: ['Animal Handling', 'Insight', 'Medicine', 'Perception', 'Survival'] },
-        { full_name: 'Charisma', skills: ['Deception', 'Intimidation', 'Performance', 'Persuasion'] }
-     ];
- }
+     return [
+         { full_name: 'Strength', skills: ['Athletics'] },
+         { full_name: 'Dexterity', skills: ['Acrobatics', 'Sleight of Hand', 'Stealth'] },
+         { full_name: 'Constitution', skills: [] },
+         { full_name: 'Intelligence', skills: ['Arcana', 'History', 'Investigation', 'Nature', 'Religion'] },
+         { full_name: 'Wisdom', skills: ['Animal Handling', 'Insight', 'Medicine', 'Perception', 'Survival'] },
+         { full_name: 'Charisma', skills: ['Deception', 'Intimidation', 'Performance', 'Persuasion'] }
+      ];
+  }
+
+/**
+  * Fetches equipment data (with caching) - version agnostic
+  * @returns {Promise<object[]>} - Array of equipment data from /data/equipment.json
+  */
+export async function loadEquipment() {
+    if (sharedDataCache.equipment) {
+        return sharedDataCache.equipment;
+    }
+    try {
+        const response = await fetch('/data/equipment.json');
+        if (response.ok) {
+            const data = await response.json();
+            sharedDataCache.equipment = data;
+            return data;
+        }
+    } catch (error) {
+        console.error('Error loading equipment:', error);
+    }
+    return [];
+}
+
+/**
+  * Fetches magic items data (with caching)
+  * @param {string} version - '5e' or '2024'
+  * @returns {Promise<object[]>} - Array of magic items data
+  */
+export async function loadMagicItems(version = '5e') {
+    const cacheKey = 'magicItems';
+    const versionCache = dataCache[version];
+
+    if (versionCache[cacheKey]) {
+        return versionCache[cacheKey];
+    }
+
+    try {
+        const path = getDataPath('magic-items', version);
+        const response = await fetch(path);
+        if (response.ok) {
+            const data = await response.json();
+            versionCache[cacheKey] = data;
+            return data;
+        }
+    } catch (error) {
+        console.error(`Error loading ${version} magic-items.json:`, error);
+    }
+    return [];
+}
+
+/**
+  * Fetches spells data (with caching)
+  * @param {string} version - '5e' or '2024'
+  * @returns {Promise<object[]>} - Array of spells data
+  */
+export async function loadSpells(version = '5e') {
+    const cacheKey = 'spells';
+    const versionCache = dataCache[version];
+
+    if (versionCache[cacheKey]) {
+        return versionCache[cacheKey];
+    }
+
+    try {
+        const path = getDataPath('spells', version);
+        const response = await fetch(path);
+        if (response.ok) {
+            const data = await response.json();
+            versionCache[cacheKey] = data;
+            return data;
+        }
+    } catch (error) {
+        console.error(`Error loading ${version} spells.json:`, error);
+    }
+    return [];
+}
 
 /**
   * Fetches skills derived from ability scores (with caching) - version agnostic
@@ -316,18 +396,23 @@ export function clearDataCache() {
      races: null,
      backgrounds: null,
      feats: null,
-     'rules-validation': null
+     'rules-validation': null,
+     magicItems: null,
+     spells: null
      };
     dataCache['2024'] = {
      classes: null,
      races: null,
      backgrounds: null,
      feats: null,
-     'rules-validation': null
+     'rules-validation': null,
+     magicItems: null,
+     spells: null
      };
     sharedDataCache.skills = null;
     sharedDataCache.abilityScores = null;
     sharedDataCache.passiveSkills = null;
+    sharedDataCache.equipment = null;
  }
 
 /**
