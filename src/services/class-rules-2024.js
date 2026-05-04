@@ -99,35 +99,35 @@ const classRules = {
 
         return characterClass;
        },
-        getDruidMaxWildShapeChallengeRating: (playerStats) => {
-            // 2024 Rules: Use beast_max_cr from class_levels
-        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+    getDruidMaxWildShapeChallengeRating(playerStats) {
+             // 2024 Rules: Use beast_max_cr from class_levels
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
         let maxWildShapeChallengeRating = classLevel?.beast_max_cr || 0;
 
         if (playerStats.class.major && playerStats.class.major.name === 'Moon' && playerStats.level > 1) {
             maxWildShapeChallengeRating = 1;
             if (playerStats.level > 5) {
                 maxWildShapeChallengeRating = Math.floor(playerStats.level / 3);
-           }
+            }
             }
 
         return maxWildShapeChallengeRating;
-       },
-        getDruidWildShapeUses: (playerStats) => {
-             // 2024 Rules: Use wild_shape from class_levels
-        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+        },
+    getDruidWildShapeUses(playerStats) {
+          // 2024 Rules: Use wild_shape from class_levels
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
         return classLevel?.wild_shape || 0;
         },
-        getDruidBeastKnownForms: (playerStats) => {
-              // 2024 Rules: Use beast_known_forms from class_levels
-        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+    getDruidBeastKnownForms(playerStats) {
+           // 2024 Rules: Use beast_known_forms from class_levels
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
         return classLevel?.beast_known_forms || 0;
         },
-    getDruidBeastFlySpeed: (playerStats) => {
-              // 2024 Rules: Use beast_fly_speed from class_levels ("Yes" or "No")
-        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+    getDruidBeastFlySpeed(playerStats) {
+           // 2024 Rules: Use beast_fly_speed from class_levels ("Yes" or "No")
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
         return classLevel?.beast_fly_speed === 'Yes';
-       },
+        },
         addFeatures: (levels) => {
          // Flatten all features from all levels, maintaining reverse order (highest level first)
         const allFeatures = [];
@@ -170,7 +170,7 @@ const classRules = {
        },
     getEnergy: (playerStats) => {
            // 2024 Rules: Get energy properties for Psi Warrior and other classes with energy dice
-        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
         if (!classLevel || !classLevel.energy) {
             return null;
            }
@@ -183,40 +183,40 @@ const classRules = {
         return classLevel.energy;
        },
     getSecondWind: (playerStats) => {
-           // 2024 Rules: Get second wind uses for Fighter
-        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+            // 2024 Rules: Get second wind uses for Fighter
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
         if (!classLevel) {
             return 0;
            }
         return classLevel.second_wind || 0;
        },
     getWeaponMastery: (playerStats) => {
-            // 2024 Rules: Get weapon mastery count for Fighter and Barbarian
-            const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+             // 2024 Rules: Get weapon mastery count for Fighter and Barbarian
+             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
             if (!classLevel) {
                 return 0;
             }
             return classLevel.weapon_mastery || 0;
         },
         getMartialArtsDie: (playerStats) => {
-            // 2024 Rules: Get martial arts die for Monk
-            const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+             // 2024 Rules: Get martial arts die for Monk
+             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
             if (!classLevel) {
                 return 4; // Default d4 if no level found
             }
             return classLevel.martial_arts_die || 4;
         },
         getFocusPoints: (playerStats) => {
-            // 2024 Rules: Get focus points (formerly ki points) for Monk
-            const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+             // 2024 Rules: Get focus points (formerly ki points) for Monk
+             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
             if (!classLevel) {
                 return 0;
             }
             return classLevel.focus_points || 0;
         },
         getUnarmoredMovementIncrease: (playerStats) => {
-                     // 2024 Rules: Get unarmored movement increase for Monk
-                    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+                       // 2024 Rules: Get unarmored movement increase for Monk
+                     const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
                     if (!classLevel) {
                         return 0;
                      }
@@ -224,11 +224,11 @@ const classRules = {
                  },
                 getFavoredEnemy: (playerStats) => {
                                       // 2024 Rules: Get favored enemy count for Ranger
-                                    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-                                    if (!classLevel) {
-                                        return 0;
-                                      }
-                                    return classLevel.favored_enemy || 0;
+                                    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+                                     if (!classLevel) {
+                                         return 0;
+                                        }
+                                     return classLevel.favored_enemy || 0;
                                   },
                                 getRogueSneakAttack: (playerStats) => {
                                                                        // 2024 Rules: Get sneak attack dice count for Rogue
@@ -245,7 +245,107 @@ const classRules = {
                                                                         return 0;
                                                                        }
                                                                     return classLevel.eldritch_invocations || 0;
-                                                                   }
-                                                               };
+                                                                     },
+      getClericFeatures: (playerStats) => {
+          // 2024 Rules: Get Cleric features
+          const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+          const maxChannelDivinity = classLevel?.channel_divinity || 0;
+          return {
+              maxChannelDivinity,
+              destroyUndeadCR: null
+          };
+      },
+      getDruidFeatures(playerStats) {
+          const maxWildShapeChallengeRating = this.getDruidMaxWildShapeChallengeRating(playerStats);
+          const maxWildShapeUses = this.getDruidWildShapeUses(playerStats);
+          const beastKnownForms = this.getDruidBeastKnownForms(playerStats);
+          const canFly = this.getDruidBeastFlySpeed(playerStats);
+          const wildShapeLimitations = canFly ? 'walk, swim, or fly' : 'walk or swim only (no fly)';
+          return {
+              maxWildShapeUses,
+              maxWildShapeChallengeRating,
+              beastKnownForms,
+              wildShapeLimitations
+          };
+       },
+        getPaladinFeatures(playerStats) {
+            const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+            const maxChannelDivinity = classLevel?.channel_divinity || 0;
+            const extraAttacks = playerStats.level > 4 ? 1 : 0;
+            return {
+                maxChannelDivinity,
+                auraRange: null,
+                extraAttacks
+            };
+        },
+        getSorcererFeatures(playerStats) {
+            const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+            const maxSorceryPoints = classLevel?.sorcery_points || 0;
+            let metamagicKnown = 0;
+            if (playerStats.level >= 17) {
+                metamagicKnown = 6;
+            } else if (playerStats.level >= 10) {
+                metamagicKnown = 4;
+            } else if (playerStats.level >= 3) {
+                metamagicKnown = 2;
+            }
+            return {
+                maxSorceryPoints,
+                metamagicKnown,
+                creatingSpellSlotCosts: []
+            };
+        },
+        getWarlockFeatures(playerStats) {
+            const invocationsKnown = this.getEldritchInvocations(playerStats);
+            return {
+                invocationsKnown,
+                hasArcanum: false,
+                arcanumLevels: null,
+                arcanums: playerStats.class?.eldritchInvocations || [],
+                pactBoon: playerStats.class?.pactBoon || null,
+                invocations: playerStats.class?.invocations || []
+            };
+        },
+         getWizardFeatures(playerStats) {
+             return {
+                 showWizardFeatures: false
+             };
+         },
+         getMonkFeatures(playerStats) {
+             const martialArtsDie = this.getMartialArtsDie(playerStats);
+             const unarmoredMovementIncrease = this.getUnarmoredMovementIncrease(playerStats);
+             const maxFocusPoints = this.getFocusPoints(playerStats);
+             return {
+                 martialArtsDie,
+                 unarmoredMovementIncrease,
+                 maxFocusPoints,
+                 wisdomBonus: 0
+             };
+          },
+          getRangerFeatures(playerStats) {
+              const favoredEnemies = this.getFavoredEnemy(playerStats);
+              const extraAttacks = playerStats.level > 4 ? 1 : 0;
+              return {
+                  favoredEnemies,
+                  extraAttacks
+              };
+           },
+           getRogueFeatures(playerStats) {
+               const sneakAttack = this.getRogueSneakAttack(playerStats);
+               const expertise = playerStats.class?.expertise || [];
+               return { sneakAttack, expertise };
+           },
+          getBardFeatures: (playerStats) => {
+        // 2024 Rules: Get Bard features
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+        const bardicDie = classLevel?.bardic_die || 0;
+        return {
+            bardicDie,
+            songOfRestDie: null,
+            magicalSecrets: null,
+            subclassMagicalSecrets: 0
+        };
+    }
+};
 
 export default classRules;

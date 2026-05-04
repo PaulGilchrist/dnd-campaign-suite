@@ -1,9 +1,8 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import useTrackedResource from '../../../hooks/use-tracked-resource';
-import classRules from '../../../services/class-rules'
-import classRules2024 from '../../../services/class-rules-2024'
 import HiddenInput from '../../common/hidden-input'
+import { getClassFeatures } from '../../../services/class-features';
 import { isEqual } from 'lodash';
 
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats);
@@ -16,117 +15,77 @@ const BarbarianFeatures = React.memo(function BarbarianFeatures({ playerStats })
     const { current: ragePoints, update: handleChange } =
         useTrackedResource('ragePoints', playerStats.name, () => classLevel?.rages || 0, [playerStats]);
     return (
-          <div data-testid="char-class-barbarian">
-              <div><b>Extra Attacks: </b>{classLevel?.extra_attacks || 0}</div>
-              <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
-                  <b>Rage Points:</b> {classLevel?.rages || 0}/<HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={ragePoints}></HiddenInput> <span className="text-muted">(max/cur)</span>
-              </div>
-              <div><b>Rage Damage Bonus: </b>{classLevel?.rage_damage || 0}</div>
-              <div><b>Weapon Mastery: </b>{classLevel?.weapon_mastery ?? 'N/A'}</div>
-          </div>
-      );
+         <div data-testid="char-class-barbarian">
+             <div><b>Extra Attacks: </b>{classLevel?.extra_attacks || 0}</div>
+             <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
+                 <b>Rage Points:</b> {classLevel?.rages || 0}/<HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={ragePoints}></HiddenInput> <span className="text-muted">(max/cur)</span>
+             </div>
+             <div><b>Rage Damage Bonus: </b>{classLevel?.rage_damage || 0}</div>
+             <div><b>Weapon Mastery: </b>{classLevel?.weapon_mastery ?? 'N/A'}</div>
+         </div>
+    );
 }, areEqual);
 
 /* ─── Bard ─── */
 const BardFeatures = React.memo(function BardFeatures({ playerStats }) {
-    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-    const is2024 = playerStats.rules === '2024';
     const charisma = playerStats.abilities?.find((a) => a.name === 'Charisma');
-    let extraAttacks = 0;
-    if (playerStats.level > 5) extraAttacks = 1;
-    const bardicDie = is2024
-          ? classLevel?.bardic_die || 0
-          : classLevel?.class_specific?.bardic_inspiration_die || 0;
-    const songOfRestDie = is2024 ? null : classLevel?.class_specific?.song_of_rest_die;
-    const magicalSecrets = is2024 ? null : classLevel?.class_specific?.magical_secrets_max_5 || 0;
-    let subclassMagicalSecrets = 0;
-    if (!is2024 && playerStats.class.subclass && playerStats.class.subclass.name === 'Lore' && playerStats.level > 2) {
-        subclassMagicalSecrets = classRules.getHighestSubclassLevel(playerStats)?.subclass_specific?.additional_magical_secrets_max_lvl || 0;
-      }
+    const bardFeatures = getClassFeatures(playerStats);
     const maxInspiration = charisma?.bonus || 0;
     const [showInput, setShowInput] = React.useState(false);
     const handleToggle = () => setShowInput((s) => !s);
     const { current: bardicInspirationUses, update: handleChange } =
         useTrackedResource('bardicInspirationUses', playerStats.name, () => maxInspiration, [playerStats]);
     return (
-          <div data-testid="char-class-bard">
-              {playerStats.level > 5 && !is2024 && <div><b>Extra Attacks: </b>{extraAttacks}</div>}
-              <div>
-                  <b>Bardic Inspiration Die: </b>d{bardicDie}
-                  <span className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
-                      &nbsp;&nbsp;<b>Uses:</b> {maxInspiration}/<HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={bardicInspirationUses}></HiddenInput> <span className="text-muted">(max/cur)</span>
-                  </span>
-              </div>
-              {songOfRestDie && <div><b>Song of Rest Die: </b>d{songOfRestDie}</div>}
-              {magicalSecrets !== null && <div><b>Magical Secrets: </b>{magicalSecrets + subclassMagicalSecrets}</div>}
-              {playerStats.level > 2 && playerStats.class.expertise && <div><b>Expertise: </b>{playerStats.class.expertise.join(', ')}</div>}
-          </div>
-      );
+         <div data-testid="char-class-bard">
+             {playerStats.level > 5 && (bardFeatures?.magicalSecrets ?? false) && <div><b>Extra Attacks: </b>1</div>}
+             <div>
+                 <b>Bardic Inspiration Die: </b>d{bardFeatures?.bardicDie ?? 0}
+                 <span className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
+                     &nbsp;&nbsp;<b>Uses:</b> {maxInspiration}/<HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={bardicInspirationUses}></HiddenInput> <span className="text-muted">(max/cur)</span>
+                 </span>
+             </div>
+             {bardFeatures?.songOfRestDie && <div><b>Song of Rest Die: </b>d{bardFeatures.songOfRestDie}</div>}
+             {bardFeatures?.magicalSecrets !== null && <div><b>Magical Secrets: </b>{bardFeatures.magicalSecrets + bardFeatures.subclassMagicalSecrets}</div>}
+             {playerStats.level > 2 && playerStats.class.expertise && <div><b>Expertise: </b>{playerStats.class.expertise.join(', ')}</div>}
+         </div>
+    );
 }, areEqual);
 
 /* ─── Cleric ─── */
 const ClericFeatures = React.memo(function ClericFeatures({ playerStats }) {
-    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-    const is2024 = playerStats.rules === '2024';
-    const maxChannelDivinity = is2024
-          ? classLevel?.channel_divinity || 0
-          : classLevel?.class_specific?.channel_divinity_charges || 0;
-    const destroyUndeadCR = is2024
-          ? null
-          : classLevel?.class_specific?.destroy_undead_cr;
+    const clericFeatures = getClassFeatures(playerStats);
     const [showInput, setShowInput] = React.useState(false);
     const handleToggle = () => setShowInput((s) => !s);
     const { current: channelDivinityCharges, update: handleChange } =
-        useTrackedResource('channelDivinityCharges', playerStats.name, () => maxChannelDivinity, [playerStats]);
+        useTrackedResource('channelDivinityCharges', playerStats.name, () => clericFeatures?.maxChannelDivinity || 0, [playerStats]);
     return (
-          <div data-testid="char-class-cleric">
-              <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
-                  <b>Channel Divinity Charges:</b> {maxChannelDivinity}/<HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={channelDivinityCharges}></HiddenInput> <span className="text-muted">(max/cur)</span>
-              </div>
-              {destroyUndeadCR !== null && <div><b>Destroy Undead Challenge Rating: </b>{destroyUndeadCR}</div>}
-          </div>
-      );
+         <div data-testid="char-class-cleric">
+             <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
+                 <b>Channel Divinity Charges:</b> {clericFeatures?.maxChannelDivinity || 0}/<HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={channelDivinityCharges}></HiddenInput> <span className="text-muted">(max/cur)</span>
+             </div>
+             {clericFeatures?.destroyUndeadCR !== null && <div><b>Destroy Undead Challenge Rating: </b>{clericFeatures.destroyUndeadCR}</div>}
+         </div>
+    );
 }, areEqual);
 
 /* ─── Druid ─── */
 const DruidFeatures = React.memo(function DruidFeatures({ playerStats }) {
-    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-    const is2024 = playerStats.rules === '2024';
     if (playerStats.level < 2) return null;
-    let maxWildShapeUses;
-    let maxWildShapeChallengeRating;
-    let beastKnownForms;
-    let wildShapeLimitations;
-    if (is2024) {
-        maxWildShapeChallengeRating = classRules2024.getDruidMaxWildShapeChallengeRating(playerStats);
-        maxWildShapeUses = classRules2024.getDruidWildShapeUses(playerStats);
-        beastKnownForms = classRules2024.getDruidBeastKnownForms(playerStats);
-        const canFly = classRules2024.getDruidBeastFlySpeed(playerStats);
-        wildShapeLimitations = canFly ? 'walk, swim, or fly' : 'walk or swim only (no fly)';
-      } else {
-        const classSpecific = classLevel?.class_specific;
-        maxWildShapeChallengeRating = classRules.getDruidMaxWildShapeChallengeRating(playerStats);
-        maxWildShapeUses = 2;
-        wildShapeLimitations = classSpecific?.wild_shape_fly
-              ? 'walk, swim, or fly'
-              : classSpecific?.wild_shape_swim
-                  ? 'walk or swim only (no fly)'
-                  : 'walk only (no swim or fly)';
-      }
+    const druidFeatures = getClassFeatures(playerStats);
     const [showInput, setShowInput] = React.useState(false);
     const handleToggle = () => setShowInput((s) => !s);
     const { current: wildShapeUses, update: handleChange } =
-        useTrackedResource('wildShapeUses', playerStats.name, () => maxWildShapeUses || 0, [playerStats]);
+        useTrackedResource('wildShapeUses', playerStats.name, () => druidFeatures?.maxWildShapeUses || 0, [playerStats]);
     return (
-          <div data-testid="char-class-druid">
-              <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
-                  <b>Wild Shape Uses:</b> {maxWildShapeUses}/<HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={wildShapeUses}></HiddenInput> <span className="text-muted">(max/cur)</span>
-              </div>
-              <div><b>Wild Shape Max Challenge Rating: </b>{maxWildShapeChallengeRating}</div>
-              {is2024 && <div><b>Beast Forms Known: </b>{beastKnownForms}</div>}
-              <div><b>Wild Shape Limitations: </b>{wildShapeLimitations}</div>
-          </div>
-      );
+         <div data-testid="char-class-druid">
+             <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
+                 <b>Wild Shape Uses:</b> {druidFeatures?.maxWildShapeUses || 0}/<HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={wildShapeUses}></HiddenInput> <span className="text-muted">(max/cur)</span>
+             </div>
+             <div><b>Wild Shape Max Challenge Rating: </b>{druidFeatures?.maxWildShapeChallengeRating}</div>
+             {druidFeatures?.beastKnownForms > 0 && <div><b>Beast Forms Known: </b>{druidFeatures.beastKnownForms}</div>}
+             <div><b>Wild Shape Limitations: </b>{druidFeatures.wildShapeLimitations}</div>
+         </div>
+    );
 }, areEqual);
 
 /* ─── Fighter ─── */
@@ -149,195 +108,145 @@ const FighterFeatures = React.memo(function FighterFeatures({ playerStats }) {
         useTrackedResource('psionicEnergy', playerStats.name, () => maxEnergy, [playerStats]);
 
     return (
-          <div data-testid="char-class-fighter">
-              <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles?.join(', ') || 'N/A'}</div>
-              <div><b>Extra Attacks: </b>{classLevel.extra_attacks || 0}</div>
-              <div><b>Weapon Mastery: </b>{classLevel.weapon_mastery}</div>
-              <div className="clickable" onClick={handleSecondWindToggle} onKeyDown={handleSecondWindToggle} tabIndex={0}>
-                  <b>Second Wind:</b> {secondWindUses}/{classLevel.second_wind}<HiddenInput handleInputToggle={handleSecondWindToggle} handleValueChange={handleSecondWindChange} showInput={showSecondWindInput} value={secondWindUses} displayValue={false}></HiddenInput> <span className="text-muted">(cur/max)</span>
-              </div>
-              {hasEnergy && (
-                  <div>
-                      <div><b>Psionic Energy (Psi Warrior):</b></div>
-                      <div className="clickable" onClick={handlePsionicEnergyToggle} onKeyDown={handlePsionicEnergyToggle} tabIndex={0}>
-                          <b>Energy Dice:</b> {psionicEnergy}/{classLevel.energy?.energy_die_num}<HiddenInput handleInputToggle={handlePsionicEnergyToggle} handleValueChange={handlePsionicEnergyChange} showInput={showPsionicEnergyInput} value={psionicEnergy} displayValue={false}></HiddenInput> <span className="text-muted">(cur/max)</span>
-                      </div>
-                      <div><b>Energy Die Type: </b>d{classLevel.energy.energy_die_type}</div>
-                  </div>
-              )}
-          </div>
-      );
+         <div data-testid="char-class-fighter">
+             <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles?.join(', ') || 'N/A'}</div>
+             <div><b>Extra Attacks: </b>{classLevel.extra_attacks || 0}</div>
+             <div><b>Weapon Mastery: </b>{classLevel.weapon_mastery}</div>
+             <div className="clickable" onClick={handleSecondWindToggle} onKeyDown={handleSecondWindToggle} tabIndex={0}>
+                 <b>Second Wind:</b> {secondWindUses}/{classLevel.second_wind}<HiddenInput handleInputToggle={handleSecondWindToggle} handleValueChange={handleSecondWindChange} showInput={showSecondWindInput} value={secondWindUses} displayValue={false}></HiddenInput> <span className="text-muted">(cur/max)</span>
+             </div>
+             {hasEnergy && (
+                 <div>
+                     <div><b>Psionic Energy (Psi Warrior):</b></div>
+                     <div className="clickable" onClick={handlePsionicEnergyToggle} onKeyDown={handlePsionicEnergyToggle} tabIndex={0}>
+                         <b>Energy Dice:</b> {psionicEnergy}/{classLevel.energy?.energy_die_num}<HiddenInput handleInputToggle={handlePsionicEnergyToggle} handleValueChange={handlePsionicEnergyChange} showInput={showPsionicEnergyInput} value={psionicEnergy} displayValue={false}></HiddenInput> <span className="text-muted">(cur/max)</span>
+                     </div>
+                     <div><b>Energy Die Type: </b>d{classLevel.energy.energy_die_type}</div>
+                 </div>
+             )}
+         </div>
+    );
 }, areEqual);
 
 /* ─── Monk ─── */
 const MonkFeatures = React.memo(function MonkFeatures({ playerStats }) {
-    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     if (playerStats.level < 2) return null;
     const wisdom = playerStats.abilities?.find((a) => a.name === 'Wisdom');
-    const martialArtsDie = classRules2024.getMartialArtsDie(playerStats);
-    const unarmoredMovementIncrease = classRules2024.getUnarmoredMovementIncrease(playerStats);
-    const maxFocusPoints = classRules2024.getFocusPoints(playerStats);
+    const monkFeatures = getClassFeatures(playerStats);
     const [showInput, setShowInput] = React.useState(false);
     const handleToggle = () => setShowInput((s) => !s);
     const { current: focusPoints, update: handleChange } =
-        useTrackedResource('focusPoints', playerStats.name, () => maxFocusPoints || 0, [playerStats]);
+        useTrackedResource('focusPoints', playerStats.name, () => monkFeatures?.maxFocusPoints || 0, [playerStats]);
     return (
-          <div data-testid="char-class-monk">
-              <div><b>Martial Arts Die:</b> d{martialArtsDie}</div>
-              <div><b>Extra Attacks: </b>{classLevel?.extra_attacks || 0}</div>
-              <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
-                  <b>Focus Points:</b> {maxFocusPoints}/<HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={focusPoints}></HiddenInput> <span className="text-muted">(max/cur)</span>
-              </div>
-              <div><b>Focus Save DC: </b>{8 + (wisdom?.bonus || 0) + playerStats.proficiency}</div>
-              <div><b>Unarmored Movement:</b> +{unarmoredMovementIncrease} ft.</div>
-          </div>
-      );
+         <div data-testid="char-class-monk">
+             <div><b>Martial Arts Die:</b> d{monkFeatures?.martialArtsDie || 0}</div>
+             <div><b>Extra Attacks: </b>{playerStats.class?.class_levels?.[playerStats.level - 1]?.extra_attacks || 0}</div>
+             <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
+                 <b>Focus Points:</b> {monkFeatures?.maxFocusPoints || 0}/<HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={focusPoints}></HiddenInput> <span className="text-muted">(max/cur)</span>
+             </div>
+             <div><b>Focus Save DC: </b>{8 + (wisdom?.bonus || 0) + playerStats.proficiency}</div>
+             <div><b>Unarmored Movement:</b> +{monkFeatures?.unarmoredMovementIncrease || 0} ft.</div>
+         </div>
+    );
 }, areEqual);
 
 /* ─── Paladin ─── */
 const PaladinFeatures = React.memo(function PaladinFeatures({ playerStats }) {
-    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-    const is2024 = playerStats.rules === '2024';
-    const classSpecific = classLevel?.class_specific || {};
-    const channelDivinity = is2024
-          ? classLevel?.channel_divinity || 0
-          : classSpecific.channel_divinity_charges || 0;
-    let extraAttacks = 0;
-    if (playerStats.level > 4) extraAttacks = 1;
+    const paladinFeatures = getClassFeatures(playerStats);
     return (
-          <div data-testid="char-class-paladin">
-              {playerStats.class.fightingStyles && <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles.join(', ')}</div>}
-              <div><b>Extra Attacks: </b>{extraAttacks}</div>
-              <div><b>Channel Divinity: </b>{channelDivinity}</div>
-              {!is2024 && <div><b>Aura Range: </b>{classSpecific.aura_range}</div>}
-          </div>
-      );
+         <div data-testid="char-class-paladin">
+             {playerStats.class.fightingStyles && <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles.join(', ')}</div>}
+             <div><b>Extra Attacks: </b>{paladinFeatures?.extraAttacks || 0}</div>
+             <div><b>Channel Divinity: </b>{paladinFeatures?.maxChannelDivinity || 0}</div>
+             {paladinFeatures?.auraRange !== null && <div><b>Aura Range: </b>{paladinFeatures.auraRange}</div>}
+         </div>
+    );
 }, areEqual);
 
 /* ─── Ranger ─── */
 const RangerFeatures = React.memo(function RangerFeatures({ playerStats }) {
-    let extraAttacks = 0;
-    if (playerStats.level > 4) extraAttacks = 1;
-    const favoredEnemiesCount = classRules2024.getFavoredEnemy(playerStats);
+    const rangerFeatures = getClassFeatures(playerStats);
     return (
-          <div data-testid="char-class-ranger">
-              {playerStats.class.fightingStyles && playerStats.level > 1 && <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles.join(', ')}</div>}
-              <div><b>Extra Attacks: </b>{extraAttacks}</div>
-              <div><b>Favored Enemies: </b>{favoredEnemiesCount}</div>
-          </div>
-      );
+         <div data-testid="char-class-ranger">
+             {playerStats.class.fightingStyles && playerStats.level > 1 && <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles.join(', ')}</div>}
+             <div><b>Extra Attacks: </b>{rangerFeatures?.extraAttacks || 0}</div>
+             <div><b>Favored Enemies: </b>{rangerFeatures?.favoredEnemies}</div>
+         </div>
+    );
 }, areEqual);
 
 /* ─── Rogue ─── */
 const RogueFeatures = React.memo(function RogueFeatures({ playerStats }) {
-    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-    if (!classLevel) return null;
-    let sneakAttack;
-    if (classLevel.sneak_attack_num_d6 !== undefined) {
-        sneakAttack = { dice_count: classLevel.sneak_attack_num_d6, dice_value: 6 };
-      } else if (classLevel.class_specific && classLevel.class_specific.sneak_attack) {
-        sneakAttack = classLevel.class_specific.sneak_attack;
-      } else {
-        sneakAttack = { dice_count: 0, dice_value: 6 };
-      }
+    const rogueFeatures = getClassFeatures(playerStats);
     return (
-          <div data-testid="char-class-rogue">
-              <div><b>Sneak Attack Damage: </b>+{sneakAttack.dice_count}d{sneakAttack.dice_value}</div>
-              {playerStats.class.expertise && <div><b>Expertise: </b>{playerStats.class.expertise.join(', ')}</div>}
-          </div>
-      );
+         <div data-testid="char-class-rogue">
+             <div><b>Sneak Attack Damage: </b>+{rogueFeatures?.sneakAttack?.dice_count || 0}d{rogueFeatures?.sneakAttack?.dice_value || 0}</div>
+             {rogueFeatures?.expertise && <div><b>Expertise: </b>{rogueFeatures.expertise.join(', ')}</div>}
+         </div>
+    );
 }, areEqual);
 
 /* ─── Sorcerer ─── */
 const SorcererFeatures = React.memo(function SorcererFeatures({ playerStats }) {
-    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-    const is2024 = playerStats.rules === '2024';
-    const maxSorceryPoints = is2024
-          ? classLevel?.sorcery_points || 0
-          : classLevel?.class_specific?.sorcery_points || 0;
-    let metamagicKnown = 0;
-    if (is2024) {
-        if (playerStats.level >= 3) metamagicKnown = 2;
-        if (playerStats.level >= 10) metamagicKnown = 4;
-        if (playerStats.level >= 17) metamagicKnown = 6;
-      } else {
-        metamagicKnown = classLevel?.class_specific?.metamagic_known || 0;
-      }
-    const creatingSpellSlotCosts = [];
-    if (!is2024 && classLevel?.class_specific?.creating_spell_slots) {
-        classLevel.class_specific.creating_spell_slots.forEach((slot) => {
-            creatingSpellSlotCosts.push(slot.sorcery_point_cost);
-          });
-      }
+    const sorcererFeatures = getClassFeatures(playerStats);
     const [showInput, setShowInput] = React.useState(false);
     const handleToggle = () => setShowInput((s) => !s);
     const { current: sorceryPoints, update: handleChange } =
-        useTrackedResource('sorceryPoints', playerStats.name, () => maxSorceryPoints, [playerStats]);
+        useTrackedResource('sorceryPoints', playerStats.name, () => sorcererFeatures?.maxSorceryPoints || 0, [playerStats]);
     return (
-          <div data-testid="char-class-sorcerer">
-              <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
-                  <b>Sorcery Points:</b> {maxSorceryPoints}/<HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={sorceryPoints}></HiddenInput> <span className="text-muted">(max/cur)</span>
-              </div>
-              <div><b>Metamagic Known: </b>{metamagicKnown}</div>
-              {creatingSpellSlotCosts.length > 0 && <div><b>Spell Slot (level 1-5) Costs: </b>{creatingSpellSlotCosts.join(', ')}</div>}
-          </div>
-      );
+         <div data-testid="char-class-sorcerer">
+             <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
+                 <b>Sorcery Points:</b> {sorcererFeatures?.maxSorceryPoints || 0}/<HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={sorceryPoints}></HiddenInput> <span className="text-muted">(max/cur)</span>
+             </div>
+             <div><b>Metamagic Known: </b>{sorcererFeatures?.metamagicKnown}</div>
+             {sorcererFeatures?.creatingSpellSlotCosts?.length > 0 && <div><b>Spell Slot (level 1-5) Costs: </b>{sorcererFeatures.creatingSpellSlotCosts.join(', ')}</div>}
+         </div>
+    );
 }, areEqual);
 
 /* ─── Warlock ─── */
 const WarlockFeatures = React.memo(function WarlockFeatures({ playerStats }) {
-    const is2024 = playerStats.rules === '2024';
-    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-    let invocationsKnown = 0;
-    if (is2024) {
-        invocationsKnown = classRules2024.getEldritchInvocations(playerStats);
-      } else {
-        invocationsKnown = classLevel?.class_specific?.invocations_known || 0;
-      }
+    const warlockFeatures = getClassFeatures(playerStats);
     return (
-          <div data-testid="char-class-warlock">
-              {playerStats.level > 10 && !is2024 && (() => {
-                 const cls = playerStats.class?.class_levels?.[playerStats.level - 1];
-                 const classSpecific = cls?.class_specific;
-                 return (
-                      <React.Fragment>
-                          <div><b>Arcanums Known (levels 6-9): </b>{classSpecific?.mystic_arcanum_level_6 || 0}, {classSpecific?.mystic_arcanum_level_7 || 0}, {classSpecific?.mystic_arcanum_level_8 || 0}, {classSpecific?.mystic_arcanum_level_9 || 0}</div>
-                          {playerStats.class.arcanums && Array.isArray(playerStats.class.arcanums) && (
-                              <div><b>Arcanums: </b>{[...playerStats.class.arcanums].sort().join(', ')}</div>
-                          )}
-                      </React.Fragment>
-                  );
-              })()}
-              <div><b>{is2024 ? 'Eldritch Invocations' : 'Invocations Known'}: </b>{invocationsKnown}</div>
-              {playerStats.class.invocations && Array.isArray(playerStats.class.invocations) && (
-                  <div><b>Invocations: </b>{[...playerStats.class.invocations].sort().join(', ')}</div>
-              )}
-              {playerStats.class.pactBoon && <div><b>Pact Boon: </b>{playerStats.class.pactBoon}</div>}
-              {playerStats.class.eldritchInvocations && playerStats.class.eldritchInvocations.length > 0 && (
-                  <div><b>Eldritch Invocations List: </b>{playerStats.class.eldritchInvocations.join(', ')}</div>
-              )}
-          </div>
-      );
+         <div data-testid="char-class-warlock">
+             {warlockFeatures?.hasArcanum && (
+                 <React.Fragment>
+                     <div><b>Arcanums Known (levels 6-9): </b>{warlockFeatures.arcanumLevels?.level6 || 0}, {warlockFeatures.arcanumLevels?.level7 || 0}, {warlockFeatures.arcanumLevels?.level8 || 0}, {warlockFeatures.arcanumLevels?.level9 || 0}</div>
+                     {warlockFeatures.arcanums && Array.isArray(warlockFeatures.arcanums) && (
+                         <div><b>Arcanums: </b>{[...warlockFeatures.arcanums].sort().join(', ')}</div>
+                     )}
+                 </React.Fragment>
+             )}
+             <div><b>{(warlockFeatures?.invocationsKnown ?? 0) > 0 ? 'Eldritch Invocations' : 'Invocations Known'}: </b>{warlockFeatures.invocationsKnown}</div>
+             {warlockFeatures?.invocations && Array.isArray(warlockFeatures.invocations) && (
+                 <div><b>Invocations: </b>{[...warlockFeatures.invocations].sort().join(', ')}</div>
+             )}
+             {warlockFeatures?.pactBoon && <div><b>Pact Boon: </b>{warlockFeatures.pactBoon}</div>}
+             {warlockFeatures?.arcanums && Array.isArray(warlockFeatures.arcanums) && warlockFeatures.arcanums.length > 0 && (
+                 <div><b>Eldritch Invocations List: </b>{warlockFeatures.arcanums.join(', ')}</div>
+             )}
+         </div>
+    );
 }, areEqual);
 
 /* ─── Wizard ─── */
 const WizardFeatures = React.memo(function WizardFeatures({ playerStats }) {
-    if (playerStats.rules === '2024') return null;
-    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-    const classSpecific = classLevel?.class_specific || {};
+    const wizardFeatures = getClassFeatures(playerStats);
+    if ((wizardFeatures?.showWizardFeatures ?? true) === false) return null;
+
     const [showInput, setShowInput] = React.useState(false);
     const handleToggle = () => setShowInput((s) => !s);
     const { current: arcaneRecoveryLevels, update: handleChange } =
-        useTrackedResource('arcaneRecoveryLevels', playerStats.name, () => classSpecific.arcane_recovery_levels || 0, [playerStats]);
+        useTrackedResource('arcaneRecoveryLevels', playerStats.name, () => wizardFeatures?.arcaneRecoveryLevels || 0, [playerStats]);
     return (
-          <div data-testid="char-class-wizard">
-              <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
-                  <b>Arcane Recovery Levels:</b> {classSpecific.arcane_recovery_levels || 0}/
-                  <HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={arcaneRecoveryLevels}></HiddenInput>&nbsp;
-                  <span className="text-muted">(max/cur)</span>
-              </div>
-          </div>
-      );
+         <div data-testid="char-class-wizard">
+             <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
+                 <b>Arcane Recovery Levels:</b> {wizardFeatures?.arcaneRecoveryLevels || 0}/
+                 <HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={arcaneRecoveryLevels}></HiddenInput>&nbsp;
+                 <span className="text-muted">(max/cur)</span>
+             </div>
+         </div>
+    );
 }, areEqual);
 
 /* ─── Registry (maps class name → component) ─── */

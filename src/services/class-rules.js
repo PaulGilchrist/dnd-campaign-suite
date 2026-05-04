@@ -25,7 +25,7 @@ const classRules = {
         return characterClass;
     },
     getDruidMaxWildShapeChallengeRating: (playerStats) => {
-            const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+            const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
             let maxWildShapeChallengeRating = classLevel?.class_specific?.wild_shape_max_cr || 0;
             if (playerStats.class.subclass && playerStats.class.subclass.name === 'Moon' && playerStats.level > 1) {
                 maxWildShapeChallengeRating = 1;
@@ -45,7 +45,7 @@ const classRules = {
     },
                 getDruidBeastFlySpeed: (playerStats) => {
           // 5e Rules: Use class_specific.wild_shape_fly
-        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+         const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
         const wildShapeFly = classLevel?.class_specific?.wild_shape_fly;
         if (wildShapeFly === true) return true;
         if (wildShapeFly === false) return false;
@@ -83,14 +83,143 @@ const classRules = {
              }
             return subClassLevel
          },
-                getRogueSneakAttack: (playerStats) => {
-              // 5e Rules: Get sneak attack from class_specific
-            const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-            if (!classLevel || !classLevel.class_specific || !classLevel.class_specific.sneak_attack) {
-                return { dice_count: 0, dice_value: 6 };
+                 getRogueSneakAttack: (playerStats) => {
+       // 5e Rules: Get sneak attack from class_specific
+          const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+             if (!classLevel || !classLevel.class_specific || !classLevel.class_specific.sneak_attack) {
+                 return { dice_count: 0, dice_value: 6 };
+              }
+             return classLevel.class_specific.sneak_attack;
+           },
+      getClericFeatures: (playerStats) => {
+           // 5e Rules: Get Cleric class features
+           const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+          const maxChannelDivinity = classLevel?.class_specific?.channel_divinity_charges || 0;
+          const destroyUndeadCR = classLevel?.class_specific?.destroy_undead_cr || null;
+          return {
+              maxChannelDivinity,
+              destroyUndeadCR
+          };
+       },
+      getDruidFeatures: (playerStats) => {
+            const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+            const classSpecific = classLevel?.class_specific;
+            const maxWildShapeChallengeRating = classRules.getDruidMaxWildShapeChallengeRating(playerStats);
+            const maxWildShapeUses = 2;
+            const beastKnownForms = 0;
+            let wildShapeLimitations = 'walk only (no swim or fly)';
+            if (classSpecific?.wild_shape_fly) {
+                wildShapeLimitations = 'walk, swim, or fly';
+             } else if (classSpecific?.wild_shape_swim) {
+                wildShapeLimitations = 'walk or swim only (no fly)';
              }
-            return classLevel.class_specific.sneak_attack;
+            return {
+                maxWildShapeUses,
+                maxWildShapeChallengeRating,
+                beastKnownForms,
+                wildShapeLimitations
+             };
+          },
+          getPaladinFeatures: (playerStats) => {
+              const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+             const classSpecific = classLevel?.class_specific;
+             const maxChannelDivinity = classSpecific?.channel_divinity_charges || 0;
+             const auraRange = classSpecific?.aura_range || null;
+             const extraAttacks = playerStats.level > 4 ? 1 : 0;
+             return {
+                 maxChannelDivinity,
+                 auraRange,
+                 extraAttacks
+             };
+         },
+          getSorcererFeatures: (playerStats) => {
+               const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+              const classSpecific = classLevel?.class_specific;
+              const maxSorceryPoints = classSpecific?.sorcery_points || 0;
+              const metamagicKnown = classSpecific?.metamagic_known || 0;
+              const creatingSpellSlotCosts = classSpecific?.creating_spell_slots
+                  ? classSpecific.creating_spell_slots.map(slot => slot.sorcery_point_cost)
+                  : [];
+              return {
+                  maxSorceryPoints,
+                  metamagicKnown,
+                  creatingSpellSlotCosts
+              };
+          },
+           getWarlockFeatures: (playerStats) => {
+               const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+              const classSpecific = classLevel?.class_specific;
+              const invocationsKnown = classSpecific?.invocations_known || 0;
+              const hasArcanum = playerStats.level > 10;
+              const arcanumLevels = hasArcanum ? {
+                  level6: classSpecific?.mystic_arcanum_level_6 || 0,
+                  level7: classSpecific?.mystic_arcanum_level_7 || 0,
+                  level8: classSpecific?.mystic_arcanum_level_8 || 0,
+                  level9: classSpecific?.mystic_arcanum_level_9 || 0
+              } : {
+                  level6: 0,
+                  level7: 0,
+                  level8: 0,
+                  level9: 0
+              };
+              const arcanums = playerStats.class?.arcanums || [];
+              return {
+                  invocationsKnown,
+                  hasArcanum,
+                  arcanumLevels,
+                  arcanums
+              };
+           },
+           getWizardFeatures: (playerStats) => {
+                const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+                const arcaneRecoveryLevels = classLevel?.class_specific?.arcane_recovery_levels || 0;
+               return {
+                   arcaneRecoveryLevels,
+                   showWizardFeatures: true
+               };
+            },
+            getMonkFeatures: (playerStats) => {
+              const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+                return {
+                    martialArtsDie: 4,
+                    unarmoredMovementIncrease: 0,
+                    maxFocusPoints: 0,
+                    wisdomBonus: 0
+                };
+             },
+             getRangerFeatures: (playerStats) => {
+                 // 5e Rules: Ranger features
+                 const favoredEnemies = 0;
+                 const extraAttacks = playerStats.level > 4 ? 1 : 0;
+                 return {
+                     favoredEnemies,
+                     extraAttacks
+                 };
+              },
+              getRogueFeatures: (playerStats) => {
+                  // 5e Rules: Get Rogue class features
+                  const sneakAttack = classRules.getRogueSneakAttack(playerStats);
+                  const expertise = playerStats.class?.expertise || [];
+                  return { sneakAttack, expertise };
+              },
+              getBardFeatures: (playerStats) => {
+         // 5e Rules: Get Bard class features
+          const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+          const bardicDie = classLevel?.class_specific?.bardic_inspiration_die || 0;
+         const songOfRestDie = classLevel?.class_specific?.song_of_rest_die ?? null;
+         const magicalSecrets = classLevel?.class_specific?.magical_secrets_max_5 ?? null;
+         let subclassMagicalSecrets = 0;
+         if (playerStats.class?.subclass?.name === 'Lore' && playerStats.level > 2) {
+             const highestSubclassLevel = classRules.getHighestSubclassLevel(playerStats);
+             subclassMagicalSecrets = highestSubclassLevel?.subclass_specific?.additional_magical_secrets_max_lvl || 0;
          }
-    }
+         return {
+             bardicDie,
+             songOfRestDie,
+             magicalSecrets,
+             subclassMagicalSecrets
+         };
+     }
+     }
 
 export default classRules
