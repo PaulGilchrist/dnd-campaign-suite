@@ -8,11 +8,12 @@ vi.mock('./data-loader.js', () => ({
 }));
 
 // Import after mocking
-import { 
-    getFeatLimits, 
+import {
+    getFeatLimits,
     validateFeats,
     getFeatTypeInfo,
-    getPreSelectedFeats
+    getPreSelectedFeats,
+    normalizeFeatDescription
 } from './feat-validation.js';
 
 describe('feat-validation', () => {
@@ -345,4 +346,96 @@ describe('feat-validation', () => {
             expect(result).toEqual([]);
      });
         });
+
+    describe('normalizeFeatDescription', () => {
+        it('should return empty text and isHtml false for feat with no description', () => {
+            const feat = {};
+            const result = normalizeFeatDescription(feat);
+            expect(result).toEqual({ text: '', isHtml: false });
+        });
+
+        it('should handle 2024 format with string description (HTML)', () => {
+            const feat = { description: '<p>Gain +1 Strength</p>' };
+            const result = normalizeFeatDescription(feat);
+            expect(result).toEqual({ text: '<p>Gain +1 Strength</p>', isHtml: true });
+        });
+
+        it('should handle 2024 format with array description containing string (HTML)', () => {
+            const feat = { description: ['<p>Gain +1 Strength</p>', '<p>Additional text</p>'] };
+            const result = normalizeFeatDescription(feat);
+            expect(result).toEqual({ text: '<p>Gain +1 Strength</p>', isHtml: true });
+        });
+
+        it('should handle 2024 format with array description containing object with text (HTML)', () => {
+            const feat = { description: [{ text: '<p>Gain +1 Strength</p>' }] };
+            const result = normalizeFeatDescription(feat);
+            expect(result).toEqual({ text: '<p>Gain +1 Strength</p>', isHtml: true });
+        });
+
+        it('should handle 2024 format with array description containing object with content (HTML)', () => {
+            const feat = { description: [{ content: '<p>Gain +1 Strength</p>' }] };
+            const result = normalizeFeatDescription(feat);
+            expect(result).toEqual({ text: '<p>Gain +1 Strength</p>', isHtml: true });
+        });
+
+        it('should handle 2024 format with array description containing object with description (HTML)', () => {
+            const feat = { description: [{ description: '<p>Gain +1 Strength</p>' }] };
+            const result = normalizeFeatDescription(feat);
+            expect(result).toEqual({ text: '<p>Gain +1 Strength</p>', isHtml: true });
+        });
+
+        it('should handle 2024 format with object that has level property (unexpected structure)', () => {
+            const feat = { description: [{ level: 1, name: 'Some Feat' }] };
+            const result = normalizeFeatDescription(feat);
+            expect(result).toEqual({ text: '', isHtml: false });
+        });
+
+        it('should handle 5e format with string desc (plain text)', () => {
+            const feat = { desc: 'Gain +1 Strength' };
+            const result = normalizeFeatDescription(feat);
+            expect(result).toEqual({ text: 'Gain +1 Strength', isHtml: false });
+        });
+
+        it('should handle 5e format with array desc containing string (plain text)', () => {
+            const feat = { desc: ['Gain +1 Strength', 'Additional text'] };
+            const result = normalizeFeatDescription(feat);
+            expect(result).toEqual({ text: 'Gain +1 Strength', isHtml: false });
+        });
+
+        it('should handle 5e format with array desc containing object with text (plain text)', () => {
+            const feat = { desc: [{ text: 'Gain +1 Strength' }] };
+            const result = normalizeFeatDescription(feat);
+            expect(result).toEqual({ text: 'Gain +1 Strength', isHtml: false });
+        });
+
+        it('should handle 5e format with array desc containing object with content (plain text)', () => {
+            const feat = { desc: [{ content: 'Gain +1 Strength' }] };
+            const result = normalizeFeatDescription(feat);
+            expect(result).toEqual({ text: 'Gain +1 Strength', isHtml: false });
+        });
+
+        it('should handle 5e format with array desc containing object with description (plain text)', () => {
+            const feat = { desc: [{ description: 'Gain +1 Strength' }] };
+            const result = normalizeFeatDescription(feat);
+            expect(result).toEqual({ text: 'Gain +1 Strength', isHtml: false });
+        });
+
+        it('should prioritize 2024 format over 5e format when both exist', () => {
+            const feat = {
+                description: '<p>2024 Description</p>',
+                desc: '5e Description'
+            };
+            const result = normalizeFeatDescription(feat);
+            expect(result).toEqual({ text: '<p>2024 Description</p>', isHtml: true });
+        });
+
+        it('should fallback to 5e format when 2024 format has no valid description', () => {
+            const feat = {
+                description: [{ level: 1 }],
+                desc: '5e Description'
+            };
+            const result = normalizeFeatDescription(feat);
+            expect(result).toEqual({ text: '5e Description', isHtml: false });
+        });
+    });
 });

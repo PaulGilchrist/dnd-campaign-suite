@@ -187,5 +187,64 @@ export async function getPreSelectedFeats(formData) {
           }
 
     return Array.from(preSelected);
-     }
+      }
+
+/**
+ * Normalizes feat description data from both 2024 and 5e formats
+ * @param {object} feat - The feat object
+ * @returns {object} - { text: string, isHtml: boolean }
+ */
+export function normalizeFeatDescription(feat) {
+    let descriptionData = { text: '', isHtml: false };
+
+    // Try 2024 format first (description field) - HTML
+    if (feat.description) {
+        const desc = feat.description;
+        if (typeof desc === 'string') {
+            descriptionData = { text: desc, isHtml: true };
+        } else if (Array.isArray(desc) && desc[0]) {
+            const firstItem = desc[0];
+            if (typeof firstItem === 'string') {
+                descriptionData = { text: firstItem, isHtml: true };
+            } else if (typeof firstItem === 'object') {
+                if (firstItem.text) {
+                    descriptionData = { text: firstItem.text, isHtml: true };
+                } else if (firstItem.content) {
+                    descriptionData = { text: firstItem.content, isHtml: true };
+                } else if (firstItem.description) {
+                    descriptionData = { text: firstItem.description, isHtml: true };
+                } else if (firstItem.level !== undefined) {
+                    console.warn('Unexpected description object structure:', firstItem);
+                    descriptionData = { text: '', isHtml: false };
+                }
+            }
+        }
+    }
+
+    // Try 5e format (desc field) - text/plain
+    if (!descriptionData.isHtml && feat.desc) {
+        const desc = feat.desc;
+        if (typeof desc === 'string') {
+            descriptionData = { text: desc, isHtml: false };
+        } else if (Array.isArray(desc) && desc[0]) {
+            const firstItem = desc[0];
+            if (typeof firstItem === 'string') {
+                descriptionData = { text: firstItem, isHtml: false };
+            } else if (typeof firstItem === 'object') {
+                if (firstItem.text) {
+                    descriptionData = { text: firstItem.text, isHtml: false };
+                } else if (firstItem.content) {
+                    descriptionData = { text: firstItem.content, isHtml: false };
+                } else if (firstItem.description) {
+                    descriptionData = { text: firstItem.description, isHtml: false };
+                } else if (firstItem.level !== undefined) {
+                    console.warn('Unexpected description object structure:', firstItem);
+                    descriptionData = { text: '', isHtml: false };
+                }
+            }
+        }
+    }
+
+    return descriptionData;
+}
 

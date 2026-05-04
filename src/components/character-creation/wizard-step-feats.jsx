@@ -1,7 +1,7 @@
 import React from 'react';
 import SelectableList from './selectable-list';
 import WarningList from '../common/warning-list';
-import { validateFeats, getFeatLimits } from '../../services/feat-validation.js';
+import { validateFeats, getFeatLimits, normalizeFeatDescription } from '../../services/feat-validation.js';
 import { sanitizeHtml } from '../../services/sanitize.js';
 
 function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFeats }) {
@@ -25,61 +25,6 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
         fetchLimits();
       }, [formData.level, formData.rules]);
 
-    // Complex description extraction logic
-  const getDescriptionData = (feat) => {
-            let descriptionData = { text: '', isHtml: false };
-
-            // Try 2024 format first (description field) - HTML
-            if (feat.description) {
-                const desc = feat.description;
-                if (typeof desc === 'string') {
-                    descriptionData = { text: desc, isHtml: true };
-                } else if (Array.isArray(desc) && desc[0]) {
-                    const firstItem = desc[0];
-                    if (typeof firstItem === 'string') {
-                        descriptionData = { text: firstItem, isHtml: true };
-                    } else if (typeof firstItem === 'object') {
-                        if (firstItem.text) {
-                            descriptionData = { text: firstItem.text, isHtml: true };
-                        } else if (firstItem.content) {
-                            descriptionData = { text: firstItem.content, isHtml: true };
-                        } else if (firstItem.description) {
-                            descriptionData = { text: firstItem.description, isHtml: true };
-                        } else if (firstItem.level !== undefined) {
-                            console.warn('Unexpected description object structure:', firstItem);
-                            descriptionData = { text: '', isHtml: false };
-                        }
-                    }
-                }
-            }
-
-            // Try 5e format (desc field) - text/plain
-            if (!descriptionData.isHtml && feat.desc) {
-                const desc = feat.desc;
-                if (typeof desc === 'string') {
-                    descriptionData = { text: desc, isHtml: false };
-                } else if (Array.isArray(desc) && desc[0]) {
-                    const firstItem = desc[0];
-                    if (typeof firstItem === 'string') {
-                        descriptionData = { text: firstItem, isHtml: false };
-                    } else if (typeof firstItem === 'object') {
-                        if (firstItem.text) {
-                            descriptionData = { text: firstItem.text, isHtml: false };
-                        } else if (firstItem.content) {
-                            descriptionData = { text: firstItem.content, isHtml: false };
-                        } else if (firstItem.description) {
-                            descriptionData = { text: firstItem.description, isHtml: false };
-                        } else if (firstItem.level !== undefined) {
-                            console.warn('Unexpected description object structure:', firstItem);
-                            descriptionData = { text: '', isHtml: false };
-                        }
-                    }
-                }
-            }
-
-            return descriptionData;
-        };
-
     // Render prerequisites
   const renderPrerequisites = (feat) => {
             if (!feat.prerequisites) return '';
@@ -94,7 +39,7 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
 
     // Render item function
   const renderItem = (feat, index, { isSelected, isPreSelected, isExpanded, onToggle, onToggleExpand }) => {
-    const descData = getDescriptionData(feat);
+    const descData = normalizeFeatDescription(feat);
 
         return (
             <div
