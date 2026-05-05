@@ -66,7 +66,7 @@ describe('CharInventory', () => {
       // Mock usePopup to return a controlled popup
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      popupData: null,
+      popupHtml: null,
       setPopupHtml: vi.fn(),
       }));
 
@@ -183,24 +183,24 @@ describe('CharInventory', () => {
     loadEquipment.mockRejectedValue(new Error('Network error'));
 
     const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
+      usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      popupData: null,
+      popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
       }));
 
     render(
-         <CharInventory playerStats={mockPlayerStats} />
-       );
+          <CharInventory playerStats={mockPlayerStats} />
+        );
 
-       // Click on Shield which is unique
-     const shieldElement = screen.getByText('Shield');
-     fireEvent.click(shieldElement);
+        // Click on Shield which is unique
+      const shieldElement = screen.getByText('Shield');
+      fireEvent.click(shieldElement);
 
-     await waitFor(() => {
-       expect(mockSetPopupHtml).toHaveBeenCalled();
-     });
+      await waitFor(() => {
+        expect(mockSetPopupHtml).toHaveBeenCalled();
       });
+       });
 
   it('should handle item not found in database', async () => {
     loadEquipment.mockResolvedValue([]);
@@ -208,7 +208,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      popupData: null,
+      popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
       }));
 
@@ -258,7 +258,7 @@ describe('CharInventory', () => {
     const mockPopupElement = <div data-testid="popup-overlay">Popup Content</div>;
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      popupData: mockPopupElement,
+      popupHtml: mockPopupElement,
       setPopupHtml: vi.fn(),
     }));
 
@@ -348,7 +348,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      popupData: null,
+      popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 
@@ -388,7 +388,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      popupData: null,
+      popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 
@@ -408,7 +408,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      popupData: null,
+      popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 
@@ -430,7 +430,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      popupData: null,
+      popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 
@@ -460,7 +460,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      popupData: null,
+      popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 
@@ -490,7 +490,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      popupData: null,
+      popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 
@@ -520,7 +520,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      popupData: null,
+      popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 
@@ -550,7 +550,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      popupData: null,
+      popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 

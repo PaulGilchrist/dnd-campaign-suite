@@ -53,7 +53,7 @@ describe('CharAbilities', () => {
       // Mock useActionPopup to return a controlled popup
     useActionPopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupHtml: null,
       setPopupHtml: vi.fn(),
      }));
    });
@@ -128,9 +128,9 @@ describe('CharAbilities', () => {
     const mockShowPopup = vi.fn();
     useActionPopup.mockImplementation((buildHtml) => ({
        showPopup: mockShowPopup,
-      PopupElement: null,
-      setPopupHtml: vi.fn(),
-     }));
+       popupHtml: null,
+       setPopupHtml: vi.fn(),
+      }));
 
     render(
       <CharAbilities
@@ -200,9 +200,9 @@ describe('CharAbilities', () => {
     const mockPopupElement = <div data-testid="popup">Popup Content</div>;
     useActionPopup.mockImplementation((buildHtml) => ({
        showPopup: vi.fn(),
-       PopupElement: mockPopupElement,
-      setPopupHtml: vi.fn(),
-    }));
+       popupHtml: mockPopupElement,
+       setPopupHtml: vi.fn(),
+     }));
 
     render(
       <CharAbilities

@@ -53,7 +53,7 @@ describe('CharReactions', () => {
     // Mock useActionPopup to return a controlled popup
     useActionPopup.mockImplementation(() => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupHtml: null,
      }));
    });
 
@@ -174,7 +174,7 @@ describe('CharReactions', () => {
     const mockShowPopup = vi.fn();
     useActionPopup.mockImplementation(() => ({
       showPopup: mockShowPopup,
-      PopupElement: null,
+      popupHtml: null,
      }));
 
     const playerStatsWithDetails = {
@@ -213,7 +213,7 @@ describe('CharReactions', () => {
     const mockPopupElement = <div data-testid="popup">Popup Content</div>;
     useActionPopup.mockImplementation(() => ({
       showPopup: vi.fn(),
-      PopupElement: mockPopupElement,
+      popupHtml: mockPopupElement,
      }));
 
     render(

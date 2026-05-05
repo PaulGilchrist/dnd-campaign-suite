@@ -1,10 +1,11 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import useActionPopup from './common/use-action-popup'
+import Popup from '../common/popup'
 import { sanitizeHtml } from '../../services/sanitize.js';
 
 function CharReactions({ playerStats }) {
-    const { showPopup, PopupElement } = useActionPopup('feature');
+    const { showPopup, popupHtml, setPopupHtml } = useActionPopup('feature');
      // Build reactions list immutably
     let reactions = [...(playerStats.reactions || [])];
 
@@ -27,15 +28,14 @@ function CharReactions({ playerStats }) {
     return (
         <div>
             <div className='sectionHeader'>Reactions</div>
-            {PopupElement}
+            {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
               {reactions.map((reaction) => {
-               return <div key={reaction.name}>
-                    <b className={reaction.details ? "clickable" : ""} onClick={() => showPopup(reaction)}>{reaction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(reaction.description) }}></span>
-                </div>
-            })}
+                return <div key={reaction.name}>
+                     <b className={reaction.details ? "clickable" : ""} onClick={() => showPopup(reaction)}>{reaction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(reaction.description) }}></span>
+                 </div>
+             })}
         </div>
     )
 }
 
 export default CharReactions
-

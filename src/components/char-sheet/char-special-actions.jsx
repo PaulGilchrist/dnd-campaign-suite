@@ -1,10 +1,11 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import useActionPopup from './common/use-action-popup'
+import Popup from '../common/popup'
 import { sanitizeHtml } from '../../services/sanitize.js';
 
 function CharSpecialActions({ playerStats }) {
-    const { showPopup, PopupElement } = useActionPopup('feature')
+    const { showPopup, popupHtml, setPopupHtml } = useActionPopup('feature')
      // Build specialActions list immutably
     let specialActions = [...(playerStats.specialActions || [])];
 
@@ -33,15 +34,14 @@ function CharSpecialActions({ playerStats }) {
     return (
            <div>
                <div className='sectionHeader'>Special Actions</div>
-            {PopupElement}
+            {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
                {uniqueActions.map((specialAction, index) => {
-               return <div key={specialAction.name || `special-action-${index}`}>
-                       <b className={specialAction.details ? "clickable" : ""} onClick={() => showPopup(specialAction)}>{specialAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(specialAction.description) }}></span>
-                   </div>
-               })}
+                return <div key={specialAction.name || `special-action-${index}`}>
+                        <b className={specialAction.details ? "clickable" : ""} onClick={() => showPopup(specialAction)}>{specialAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(specialAction.description) }}></span>
+                    </div>
+                })}
            </div>
        )
 }
 
 export default CharSpecialActions
-

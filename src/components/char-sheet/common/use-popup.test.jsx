@@ -4,12 +4,12 @@ import usePopup from './use-popup';
 
 // Helper component to test the hook
 function TestComponent({ buildHtml }) {
-  const { showPopup, popupData, setPopupHtml } = usePopup(buildHtml);
+  const { showPopup, popupHtml, setPopupHtml } = usePopup(buildHtml);
   return (
     <div>
       <button onClick={() => showPopup({ name: 'Test' })}>Show Popup</button>
       <button onClick={() => setPopupHtml('<p>New HTML</p>')}>Set HTML</button>
-      {popupData && <div data-testid="popup" dangerouslySetInnerHTML={{ __html: popupData }} />}
+      {popupHtml && <div data-testid="popup" dangerouslySetInnerHTML={{ __html: popupHtml }} />}
     </div>
   );
 }

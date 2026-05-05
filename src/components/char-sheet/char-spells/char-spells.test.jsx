@@ -84,7 +84,7 @@ describe('CharSpells', () => {
     vi.clearAllMocks();
     useActionPopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupHtml: null,
       setPopupHtml: vi.fn(),
          }));
         });
@@ -306,7 +306,7 @@ describe('CharSpells', () => {
     const mockShowPopup = vi.fn();
     useActionPopup.mockImplementation((buildHtml) => ({
       showPopup: mockShowPopup,
-      PopupElement: null,
+      popupHtml: null,
       setPopupHtml: vi.fn(),
       }));
 
@@ -501,7 +501,7 @@ describe('CharSpells', () => {
     const mockPopupElement = <div data-testid="popup">Popup Content</div>;
     useActionPopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: mockPopupElement,
+      popupHtml: mockPopupElement,
       setPopupHtml: vi.fn(),
       }));
 

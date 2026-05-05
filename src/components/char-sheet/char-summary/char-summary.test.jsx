@@ -31,7 +31,7 @@ const setPopupHtmlMock = vi.fn();
 
 vi.mock('../common/use-popup', () => ({
   default: vi.fn(() => ({
-    PopupElement: null,
+    popupHtml: null,
     setPopupHtml: setPopupHtmlMock,
     showPopup: vi.fn(),
   })),

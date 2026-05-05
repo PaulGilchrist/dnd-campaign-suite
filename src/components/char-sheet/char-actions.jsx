@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 import React, { useState, useEffect } from 'react'
 import useActionPopup from './common/use-action-popup'
+import Popup from '../common/popup'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { parseMagicItemName } from '../../services/attack-calc.js';
 import './char-actions.css'
@@ -17,7 +18,7 @@ const CharActions = React.memo(function CharActions({ playerStats }) {
           .then(data => setActions(data))
           .catch(error => console.error('Error loading actions:', error));
     }, []);
-    const { showPopup, PopupElement, setPopupHtml } = useActionPopup('feature');
+    const { showPopup, popupHtml, setPopupHtml } = useActionPopup('feature');
     let signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
     // Helper function to get mastery for a weapon name
@@ -65,7 +66,7 @@ const CharActions = React.memo(function CharActions({ playerStats }) {
                 <br />
                 {playerStats.actions.map((action) => {
                                         return <div key={action.name}>
-                          {PopupElement}
+                          {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
                           <b className={action.details ? "clickable" : ""} onClick={() => showPopup(action)}>{action.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }}></span>
                      </div>
                 })}
@@ -105,7 +106,7 @@ const CharActions = React.memo(function CharActions({ playerStats }) {
                     {(playerStats.bonusActions.length > 0) && <div>
                         {playerStats.bonusActions.map((bonusAction) => {
                                                         return <div key={bonusAction.name}>
-                                  {PopupElement}
+                                  {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
                                   <b className={bonusAction.details ? "clickable" : ""} onClick={() => showPopup(bonusAction)}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(bonusAction.description) }}></span>
                              </div>
                         })}
@@ -117,4 +118,3 @@ const CharActions = React.memo(function CharActions({ playerStats }) {
 }, areEqual);
 
 export default CharActions
-

@@ -38,11 +38,11 @@ describe('CharFeats', () => {
     vi.clearAllMocks();
 
       // Mock usePopup to return a controlled popup
-     usePopup.mockImplementation((buildHtml) => ({
-       showPopup: vi.fn(),
-       popupData: null,
-       setPopupHtml: vi.fn(),
-      }));
+      usePopup.mockImplementation((buildHtml) => ({
+        showPopup: vi.fn(),
+        popupHtml: null,
+        setPopupHtml: vi.fn(),
+       }));
 
      // Mock loadFeatData to return mock data by default
     loadFeatData.mockResolvedValue(mockFeatsData);
@@ -122,7 +122,7 @@ describe('CharFeats', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
      }));
 
@@ -143,11 +143,11 @@ describe('CharFeats', () => {
      loadFeatData.mockResolvedValue([]);
 
      const mockSetPopupHtml = vi.fn();
-     usePopup.mockImplementation((buildHtml) => ({
-       showPopup: vi.fn(),
-       popupData: null,
-       setPopupHtml: mockSetPopupHtml,
-      }));
+      usePopup.mockImplementation((buildHtml) => ({
+        showPopup: vi.fn(),
+        popupHtml: null,
+        setPopupHtml: mockSetPopupHtml,
+       }));
 
     render(
         <CharFeats playerStats={mockPlayerStats} />
@@ -166,7 +166,7 @@ describe('CharFeats', () => {
       const mockPopupElement = <div data-testid="popup-overlay">Popup Content</div>;
       usePopup.mockImplementation((buildHtml) => ({
         showPopup: vi.fn(),
-        popupData: mockPopupElement,
+        popupHtml: mockPopupElement,
         setPopupHtml: vi.fn(),
        }));
 

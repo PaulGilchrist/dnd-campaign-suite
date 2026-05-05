@@ -7,7 +7,7 @@ import { loadEquipment } from '../../services/data-loader';
 import './char-inventory.css'
 
 function CharInventory({ playerStats }) {
-    const { popupData, setPopupHtml } = usePopup(() => null);
+    const { popupHtml, setPopupHtml } = usePopup(() => null);
     
     const handleItemClick = async (itemName) => {
         // Extract name if item has quantity info in parentheses (e.g., "Arrows (10)" -> "Arrows")
@@ -115,7 +115,7 @@ function CharInventory({ playerStats }) {
     
     return (
         <div>
-             {popupData && <Popup html={popupData} onClickOrKeyDown={() => setPopupHtml(null)} />}
+             {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)} />}
             {playerStats.inventory.magicItems && <div>
                 <div className='sectionHeader'>Magic Items</div>
                 {playerStats.inventory.magicItems.map((magicItem, index) => {
@@ -141,4 +141,3 @@ function CharInventory({ playerStats }) {
 }
 
 export default CharInventory
-

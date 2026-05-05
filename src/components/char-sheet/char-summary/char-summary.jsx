@@ -13,7 +13,7 @@ import Popup from '../../common/popup'
 import useTrackedResource from '../../../hooks/use-tracked-resource'
 
 function CharSummary({ playerStats, onDeleteCharacter }) {
-    const { popupData, setPopupHtml } = usePopup(() => null);
+    const { popupHtml, setPopupHtml } = usePopup(() => null);
     const [showInput, setShowInput] = React.useState(false);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
@@ -61,7 +61,7 @@ function CharSummary({ playerStats, onDeleteCharacter }) {
 
     return (
         <div>
-              {popupData && <Popup html={popupData} onClickOrKeyDown={() => setPopupHtml(null)} />}
+              {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)} />}
             <div className='name'>
                 {playerStats.name}
                 {isLocalhost && (

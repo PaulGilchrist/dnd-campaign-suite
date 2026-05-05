@@ -73,7 +73,7 @@ describe('CharActions', () => {
     // Mock useActionPopup
     useActionPopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupHtml: null,
       setPopupHtml: vi.fn(),
     }));
   });
@@ -123,7 +123,7 @@ describe('CharActions', () => {
     const mockSetPopupHtml = vi.fn();
     useActionPopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 
@@ -139,7 +139,7 @@ describe('CharActions', () => {
     const mockSetPopupHtml = vi.fn();
     useActionPopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 
@@ -272,7 +272,7 @@ describe('CharActions', () => {
     const mockShowPopup = vi.fn();
     useActionPopup.mockImplementation((buildHtml) => ({
       showPopup: mockShowPopup,
-      PopupElement: null,
+      popupHtml: null,
       setPopupHtml: vi.fn(),
     }));
 

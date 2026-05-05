@@ -2,6 +2,7 @@
 import React from 'react'
 import { cloneDeep, isEqual } from 'lodash';
 import useActionPopup from '../common/use-action-popup'
+import Popup from '../../common/popup'
 import CharSpellSlots from './char-spell-slots'
 import './char-spells.css'
 
@@ -11,7 +12,7 @@ const areEqual = (prevProps, nextProps) => {
 };
 
 const CharSpells = React.memo(function CharSpells({ playerStats, handleTogglePreparedSpells }) {
-    const { showPopup, PopupElement } = useActionPopup('spell');
+    const { showPopup, popupHtml, setPopupHtml } = useActionPopup('spell');
     const [filterPrepared, setFilterPrepared] = React.useState(false);
     const [spells, setSpells] = React.useState([]);
     React.useEffect(() => {
@@ -49,7 +50,7 @@ const CharSpells = React.memo(function CharSpells({ playerStats, handleTogglePre
     return (
         <div>
             {(playerStats.spellAbilities && playerStats.spellAbilities.spells.length > 0) && <div className="spell-popup-parent">
-                     {PopupElement}
+                      {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
                 <hr />
                 <div className='spell-abilities'>
                     <div className="sectionHeader"><h4>&nbsp;Spells</h4></div>
@@ -112,4 +113,3 @@ const CharSpells = React.memo(function CharSpells({ playerStats, handleTogglePre
 }, areEqual);
 
 export default CharSpells
-

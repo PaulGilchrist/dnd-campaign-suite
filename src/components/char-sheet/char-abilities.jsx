@@ -1,14 +1,15 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import useActionPopup from './common/use-action-popup'
+import Popup from '../common/popup'
 import './char-abilities.css'
 
 function CharAbilities({ allAbilityScores, playerStats }) {
-    const { showPopup, PopupElement, setPopupHtml } = useActionPopup('ability', { allAbilityScores });
+    const { showPopup, popupHtml, setPopupHtml } = useActionPopup('ability', { allAbilityScores });
     let signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
     return (
         <div className='abilities-popup-parent'>
-               {PopupElement}
+               {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
             <div className='abilities'>
                 <div className='left'><b>Ability</b></div>
                 <div><b>Score</b></div>
@@ -32,4 +33,3 @@ function CharAbilities({ allAbilityScores, playerStats }) {
 }
 
 export default CharAbilities
-
