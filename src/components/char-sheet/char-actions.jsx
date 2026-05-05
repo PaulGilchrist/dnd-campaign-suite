@@ -7,6 +7,8 @@ import { parseMagicItemName } from '../../services/attack-calc.js';
 import './char-actions.css'
 import { isEqual } from 'lodash';
 
+const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
+
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats);
 
 const CharActions = React.memo(function CharActions({ playerStats }) {
@@ -19,7 +21,6 @@ const CharActions = React.memo(function CharActions({ playerStats }) {
           .catch(error => console.error('Error loading actions:', error));
     }, []);
     const { showPopup, popupHtml, setPopupHtml } = useActionPopup('feature');
-    let signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
     // Helper function to get mastery for a weapon name
     const getWeaponMastery = (weaponName) => {

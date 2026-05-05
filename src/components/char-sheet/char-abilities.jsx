@@ -4,9 +4,10 @@ import useActionPopup from './common/use-action-popup'
 import Popup from '../common/popup'
 import './char-abilities.css'
 
+const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
+
 function CharAbilities({ allAbilityScores, playerStats }) {
     const { showPopup, popupHtml, setPopupHtml } = useActionPopup('ability', { allAbilityScores });
-    let signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
     return (
         <div className='abilities-popup-parent'>
                {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
