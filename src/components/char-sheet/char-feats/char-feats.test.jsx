@@ -37,12 +37,12 @@ describe('CharFeats', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-     // Mock usePopup to return a controlled popup
-    usePopup.mockImplementation((buildHtml) => ({
-      showPopup: vi.fn(),
-      PopupElement: null,
-      setPopupHtml: vi.fn(),
-     }));
+      // Mock usePopup to return a controlled popup
+     usePopup.mockImplementation((buildHtml) => ({
+       showPopup: vi.fn(),
+       popupData: null,
+       setPopupHtml: vi.fn(),
+      }));
 
      // Mock loadFeatData to return mock data by default
     loadFeatData.mockResolvedValue(mockFeatsData);
@@ -140,14 +140,14 @@ describe('CharFeats', () => {
     });
 
   it('should handle feat not found in database', async () => {
-    loadFeatData.mockResolvedValue([]);
+     loadFeatData.mockResolvedValue([]);
 
-    const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
-      showPopup: vi.fn(),
-      PopupElement: null,
-      setPopupHtml: mockSetPopupHtml,
-     }));
+     const mockSetPopupHtml = vi.fn();
+     usePopup.mockImplementation((buildHtml) => ({
+       showPopup: vi.fn(),
+       popupData: null,
+       setPopupHtml: mockSetPopupHtml,
+      }));
 
     render(
         <CharFeats playerStats={mockPlayerStats} />
@@ -163,19 +163,19 @@ describe('CharFeats', () => {
     });
 
   it('should render popup element container', () => {
-    const mockPopupElement = <div data-testid="popup">Popup Content</div>;
-    usePopup.mockImplementation((buildHtml) => ({
-      showPopup: vi.fn(),
-      PopupElement: mockPopupElement,
-      setPopupHtml: vi.fn(),
-     }));
+      const mockPopupElement = <div data-testid="popup-overlay">Popup Content</div>;
+      usePopup.mockImplementation((buildHtml) => ({
+        showPopup: vi.fn(),
+        popupData: mockPopupElement,
+        setPopupHtml: vi.fn(),
+       }));
 
-    render(
-        <CharFeats playerStats={mockPlayerStats} />
-      );
+     render(
+         <CharFeats playerStats={mockPlayerStats} />
+       );
 
-    expect(screen.getByTestId('popup')).toBeInTheDocument();
-   });
+     expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
+    });
 
   it('should separate multiple feats with commas', () => {
     render(

@@ -1,12 +1,13 @@
 /* eslint-disable react/prop-types */
 import React from 'react'
 import usePopup from './common/use-popup'
+import Popup from '../common/popup'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { loadEquipment } from '../../services/data-loader';
 import './char-inventory.css'
 
 function CharInventory({ playerStats }) {
-    const { PopupElement, setPopupHtml } = usePopup(() => null);
+    const { popupData, setPopupHtml } = usePopup(() => null);
     
     const handleItemClick = async (itemName) => {
         // Extract name if item has quantity info in parentheses (e.g., "Arrows (10)" -> "Arrows")
@@ -114,7 +115,7 @@ function CharInventory({ playerStats }) {
     
     return (
         <div>
-             {PopupElement}
+             {popupData && <Popup html={popupData} onClickOrKeyDown={() => setPopupHtml(null)} />}
             {playerStats.inventory.magicItems && <div>
                 <div className='sectionHeader'>Magic Items</div>
                 {playerStats.inventory.magicItems.map((magicItem, index) => {

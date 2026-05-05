@@ -9,10 +9,11 @@ import CharClassFeatures from './char-class-features'
 import CharFeats from '../char-feats/char-feats'
 import HiddenInput from '../../common/hidden-input'
 import usePopup from '../common/use-popup'
+import Popup from '../../common/popup'
 import useTrackedResource from '../../../hooks/use-tracked-resource'
 
 function CharSummary({ playerStats, onDeleteCharacter }) {
-    const { PopupElement, setPopupHtml } = usePopup(() => null);
+    const { popupData, setPopupHtml } = usePopup(() => null);
     const [showInput, setShowInput] = React.useState(false);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
@@ -60,7 +61,7 @@ function CharSummary({ playerStats, onDeleteCharacter }) {
 
     return (
         <div>
-             {PopupElement}
+              {popupData && <Popup html={popupData} onClickOrKeyDown={() => setPopupHtml(null)} />}
             <div className='name'>
                 {playerStats.name}
                 {isLocalhost && (

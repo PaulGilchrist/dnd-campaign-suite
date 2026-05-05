@@ -17,7 +17,7 @@ function Popup({ html, onClickOrKeyDown }) {
     }, [handleOnClickOrKeyDown]);
 
     return (
-        <div className="popup-overlay" role="presentation" onClick={handleOnClickOrKeyDown}>
+        <div className="popup-overlay" data-testid="popup-overlay" role="presentation" onClick={handleOnClickOrKeyDown}>
             <div className="popup-modal" dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}></div>
         </div>
     );

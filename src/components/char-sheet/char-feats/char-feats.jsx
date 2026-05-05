@@ -2,10 +2,11 @@
 import React from 'react'
 import { loadFeatData } from '../../../services/data-loader'
 import usePopup from '../common/use-popup'
+import Popup from '../../common/popup'
 import './char-feats.css'
 
 function CharFeats({ playerStats, showPopup }) {
-    const { PopupElement, setPopupHtml } = usePopup(() => null);
+    const { popupData, setPopupHtml } = usePopup(() => null);
     
     const handleFeatClick = async (featName) => {
         try {
@@ -46,8 +47,8 @@ function CharFeats({ playerStats, showPopup }) {
     
     return (
          <div className="char-feats-section">
-             {PopupElement}
-             <div className="feats-container">
+              {popupData && <Popup html={popupData} onClickOrKeyDown={() => setPopupHtml(null)} />}
+              <div className="feats-container">
                  <b>Feats: </b>
                  {playerStats.feats.map((featName, index) => (
                      <span key={index} className="feat-name clickable" onClick={() => handleFeatClick(featName)}>

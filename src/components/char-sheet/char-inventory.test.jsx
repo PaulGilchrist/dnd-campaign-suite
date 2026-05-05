@@ -66,7 +66,7 @@ describe('CharInventory', () => {
       // Mock usePopup to return a controlled popup
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupData: null,
       setPopupHtml: vi.fn(),
       }));
 
@@ -185,7 +185,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupData: null,
       setPopupHtml: mockSetPopupHtml,
       }));
 
@@ -193,14 +193,14 @@ describe('CharInventory', () => {
          <CharInventory playerStats={mockPlayerStats} />
        );
 
-      // Click on Shield which is unique
-    const shieldElement = screen.getByText('Shield');
-    fireEvent.click(shieldElement);
+       // Click on Shield which is unique
+     const shieldElement = screen.getByText('Shield');
+     fireEvent.click(shieldElement);
 
-    await waitFor(() => {
-      expect(mockSetPopupHtml).toHaveBeenCalled();
-    });
+     await waitFor(() => {
+       expect(mockSetPopupHtml).toHaveBeenCalled();
      });
+      });
 
   it('should handle item not found in database', async () => {
     loadEquipment.mockResolvedValue([]);
@@ -208,7 +208,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupData: null,
       setPopupHtml: mockSetPopupHtml,
       }));
 
@@ -255,19 +255,19 @@ describe('CharInventory', () => {
     });
 
   it('should render popup element container', () => {
-    const mockPopupElement = <div data-testid="popup">Popup Content</div>;
+    const mockPopupElement = <div data-testid="popup-overlay">Popup Content</div>;
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: mockPopupElement,
+      popupData: mockPopupElement,
       setPopupHtml: vi.fn(),
-      }));
+    }));
 
     render(
-         <CharInventory playerStats={mockPlayerStats} />
-       );
+      <CharInventory playerStats={mockPlayerStats} />
+    );
 
-    expect(screen.getByTestId('popup')).toBeInTheDocument();
-    });
+    expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
+  });
 
   it('should separate multiple items with commas', () => {
     render(
@@ -348,7 +348,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupData: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 
@@ -388,7 +388,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupData: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 
@@ -408,7 +408,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupData: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 
@@ -430,7 +430,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupData: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 
@@ -460,7 +460,37 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupData: null,
+      setPopupHtml: mockSetPopupHtml,
+    }));
+
+    render(
+      <CharInventory playerStats={mockPlayerStats} />
+    );
+
+    const equippedSection = screen.getByText(/Equipped:/).parentElement;
+    const longswordElement = equippedSection.querySelector('.clickable');
+    fireEvent.click(longswordElement);
+
+    await waitFor(() => {
+      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Weight:'));
+    });
+  });
+
+  it('should display item ability property', async () => {
+    const dataWithAbility = [
+      {
+        ...mockEquipmentData[0],
+        ability: 'Strength',
+      },
+    ];
+
+    loadEquipment.mockResolvedValue(dataWithAbility);
+
+    const mockSetPopupHtml = vi.fn();
+    usePopup.mockImplementation((buildHtml) => ({
+      showPopup: vi.fn(),
+      popupData: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 
@@ -490,7 +520,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupData: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 
@@ -520,7 +550,7 @@ describe('CharInventory', () => {
     const mockSetPopupHtml = vi.fn();
     usePopup.mockImplementation((buildHtml) => ({
       showPopup: vi.fn(),
-      PopupElement: null,
+      popupData: null,
       setPopupHtml: mockSetPopupHtml,
     }));
 

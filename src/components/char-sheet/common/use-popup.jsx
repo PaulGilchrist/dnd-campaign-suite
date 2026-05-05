@@ -3,10 +3,10 @@ import React from 'react'
 import Popup from '../../common/popup'
 
 /**
- * Hook that manages popup state and provides a render method.
+ * Hook that manages popup state and provides HTML string.
  * 
  * @param {Function} buildHtml - Function that receives an entity and returns HTML string (or null to not show)
- * @returns {Object} { showPopup, PopupElement, setPopupHtml }
+ * @returns {Object} { showPopup, popupData, setPopupHtml }
  */
 function usePopup(buildHtml) {
     const [popupHtml, setPopupHtml] = React.useState(null);
@@ -18,11 +18,9 @@ function usePopup(buildHtml) {
           }
       };
       
-    const PopupElement = popupHtml ? (
-          <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)} />
-      ) : null;
+    const popupData = popupHtml;
       
-    return { showPopup, PopupElement, setPopupHtml };
+    return { showPopup, popupData, setPopupHtml };
 }
 
 export default usePopup
