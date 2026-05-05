@@ -1,9 +1,6 @@
 {
     "$schema": "https://opencode.ai/config.json",
-    "autoupdate": true,
-    "default_agent": "orchestrator",
     "instructions": [
-        "RULES.md"
-    ],
-    "mcp": {}
+        "./.opencode/skills/architecture/SKILL.md"
+    ]
 }
