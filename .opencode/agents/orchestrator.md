@@ -3,7 +3,6 @@ name: orchestrator
 description: Orchestrates tasks to subagent to prevent single agent context growth. Thinking is long to generate best possible plan.
 mode: primary
 skills:
-  - tool-subagent-calling
   - architecture
   - coding-standards
 temperature: 0
