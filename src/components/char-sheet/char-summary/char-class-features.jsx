@@ -28,22 +28,23 @@ const BarbarianFeatures = React.memo(function BarbarianFeatures({ playerStats })
 
 /* ─── Bard ─── */
 const BardFeatures = React.memo(function BardFeatures({ playerStats }) {
-    const charisma = playerStats.abilities?.find((a) => a.name === 'Charisma');
     const bardFeatures = getClassFeatures(playerStats);
-    const maxInspiration = charisma?.bonus || 0;
     const [showInput, setShowInput] = React.useState(false);
     const handleToggle = () => setShowInput((s) => !s);
     const { current: bardicInspirationUses, update: handleChange } =
-        useTrackedResource('bardicInspirationUses', playerStats.name, () => maxInspiration, [playerStats]);
+        useTrackedResource('bardicInspirationUses', playerStats.name, () => {
+            const charisma = playerStats.abilities?.find((a) => a.name === 'Charisma');
+            return charisma?.bonus || 0;
+        }, [playerStats]);
     return (
          <div data-testid="char-class-bard">
              {playerStats.level > 5 && (bardFeatures?.magicalSecrets ?? false) && <div><b>Extra Attacks: </b>1</div>}
-             <div>
-                 <b>Bardic Inspiration Die: </b>d{bardFeatures?.bardicDie ?? 0}
-                 <span className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
-                     &nbsp;&nbsp;<b>Uses:</b> {maxInspiration}/<HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={bardicInspirationUses}></HiddenInput> <span className="text-muted">(max/cur)</span>
-                 </span>
-             </div>
+              <div>
+                  <b>Bardic Inspiration Die: </b>d{bardFeatures?.bardicDie ?? 0}
+                  <span className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
+                      &nbsp;&nbsp;<b>Uses:</b> {(() => { const charisma = playerStats.abilities?.find((a) => a.name === 'Charisma'); return charisma?.bonus || 0; })()}/<HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={bardicInspirationUses}></HiddenInput> <span className="text-muted">(max/cur)</span>
+                  </span>
+              </div>
              {bardFeatures?.songOfRestDie && <div><b>Song of Rest Die: </b>d{bardFeatures.songOfRestDie}</div>}
              {bardFeatures?.magicalSecrets !== null && <div><b>Magical Secrets: </b>{bardFeatures.magicalSecrets + bardFeatures.subclassMagicalSecrets}</div>}
              {playerStats.level > 2 && playerStats.class.expertise && <div><b>Expertise: </b>{playerStats.class.expertise.join(', ')}</div>}

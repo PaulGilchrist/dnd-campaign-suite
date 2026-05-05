@@ -16,6 +16,102 @@ import useWizardFeats from './use-wizard-feats';
 import useWizardAbilities from './use-wizard-abilities';
 import useWizardArrayToggle from '../../hooks/use-wizard-array-toggle';
 
+const WizardStepRenderer = React.memo(({
+  currentStep,
+  ruleset,
+  errors,
+  formData,
+  backgrounds,
+  racesData,
+  classSubtypes,
+  feats,
+  magicItems,
+  allSpells,
+  preSelectedFeats,
+  preSelectedSkills,
+  preSelectedLanguages,
+  preSelectedFightingStyles,
+  preSelectedResistances,
+  preSelectedImmunities,
+  skillLimits,
+  expertiseLimits,
+  skillWarnings,
+  languageLimits,
+  fightingStyleLimits,
+  languageWarnings,
+  resistanceWarnings,
+  tempInventory,
+  onRulesetChange,
+  onInputChange,
+  onArrayFieldChange,
+  onInventoryChange,
+  onTempInventoryChange,
+  onAbilityBaseScoreChange,
+  onAbilityImprovementChange,
+  onAbilityMiscBonusChange,
+  onSkillToggle,
+  onSkillExpertiseToggle,
+  onLanguageToggle,
+  onFightingStyleToggle,
+  onResistanceToggle,
+  onImmunityToggle,
+  warnings,
+  allFeats,
+  allMagicItems,
+}) => {
+  const stepConfig = WIZARD_STEPS.find((step) => step.step === currentStep);
+  if (!stepConfig) {
+    return null;
+  }
+
+  const StepComponent = stepConfig.component;
+  const props = stepConfig.getProps({
+    ruleset,
+    errors,
+    formData,
+    backgrounds,
+    racesData,
+    classSubtypes,
+    feats,
+    magicItems,
+    allSpells,
+    preSelectedFeats,
+    preSelectedSkills,
+    preSelectedLanguages,
+    preSelectedFightingStyles,
+    preSelectedResistances,
+    preSelectedImmunities,
+    skillLimits,
+    expertiseLimits,
+    skillWarnings,
+    languageLimits,
+    fightingStyleLimits,
+    languageWarnings,
+    resistanceWarnings,
+    tempInventory,
+    onRulesetChange,
+    onInputChange,
+    onArrayFieldChange,
+    onInventoryChange,
+    onTempInventoryChange,
+    onAbilityBaseScoreChange,
+    onAbilityImprovementChange,
+    onAbilityMiscBonusChange,
+    onSkillToggle,
+    onSkillExpertiseToggle,
+    onLanguageToggle,
+    onFightingStyleToggle,
+    onResistanceToggle,
+    onImmunityToggle,
+    warnings,
+    allFeats,
+    allMagicItems,
+  });
+
+  return <StepComponent {...props} />;
+});
+WizardStepRenderer.displayName = 'WizardStepRenderer';
+
 function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, allSpells, allSpells2024, characterData, isEditing = false }) {
   // Core form state
   const {
@@ -183,65 +279,90 @@ function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, a
       }, [currentStep, formData, racesData, classSubtypes, ruleset, onComplete, setErrors]);
 
   const renderStep = useCallback(() => {
-    const stepConfig = WIZARD_STEPS.find((step) => step.step === currentStep);
-    if (!stepConfig) {
-        return null;
-      }
-
-    const StepComponent = stepConfig.component;
-    const props = stepConfig.getProps({
-      ruleset,
-      errors,
-      formData,
-      backgrounds,
-      racesData,
-      classSubtypes,
-      feats,
-      magicItems,
-      allSpells,
-      preSelectedFeats,
-      preSelectedSkills,
-      preSelectedLanguages,
-      preSelectedFightingStyles,
-      preSelectedResistances: preSelectedResistancesList.resistances,
-      preSelectedImmunities: preSelectedResistancesList.immunities,
-      skillLimits,
-      expertiseLimits,
-      skillWarnings,
-      languageLimits,
-      fightingStyleLimits,
-      languageWarnings,
-      resistanceWarnings,
-      tempInventory,
-      onRulesetChange: handleRulesetChange,
-      onInputChange: updateField,
-      onArrayFieldChange: updateArrayField,
-      onInventoryChange: updateInventory,
-      onTempInventoryChange: updateTempInventory,
-      onAbilityBaseScoreChange,
-      onAbilityImprovementChange,
-      onAbilityMiscBonusChange,
-      onSkillToggle: handleSkillToggle,
-      onSkillExpertiseToggle: handleSkillExpertiseToggle,
-      onLanguageToggle: handleLanguageToggle,
-      onFightingStyleToggle: handleFightingStyleToggle,
-      onResistanceToggle: handleResistanceToggle,
-      onImmunityToggle: handleImmunityToggle,
-      warnings: skillWarnings,
-      allFeats: feats,
-      allMagicItems: magicItems,
-      });
-
-    return <StepComponent {...props} />;
-     }, [currentStep, ruleset, errors, formData, backgrounds, racesData, classSubtypes, feats, magicItems,
-    preSelectedFeats, preSelectedSkills, preSelectedLanguages, preSelectedFightingStyles,
-    preSelectedResistancesList, skillLimits, expertiseLimits, skillWarnings,
-    languageLimits, fightingStyleLimits, languageWarnings, resistanceWarnings,
-    tempInventory, allSpells,
-    handleRulesetChange, updateField, updateArrayField, updateInventory, updateTempInventory,
-    onAbilityBaseScoreChange, onAbilityImprovementChange, onAbilityMiscBonusChange,
-    handleSkillToggle, handleSkillExpertiseToggle, handleLanguageToggle, handleFightingStyleToggle,
-    handleResistanceToggle, handleImmunityToggle]);
+    return (
+      <WizardStepRenderer
+        currentStep={currentStep}
+        ruleset={ruleset}
+        errors={errors}
+        formData={formData}
+        backgrounds={backgrounds}
+        racesData={racesData}
+        classSubtypes={classSubtypes}
+        feats={feats}
+        magicItems={magicItems}
+        allSpells={allSpells}
+        preSelectedFeats={preSelectedFeats}
+        preSelectedSkills={preSelectedSkills}
+        preSelectedLanguages={preSelectedLanguages}
+        preSelectedFightingStyles={preSelectedFightingStyles}
+        preSelectedResistances={preSelectedResistancesList.resistances}
+        preSelectedImmunities={preSelectedResistancesList.immunities}
+        skillLimits={skillLimits}
+        expertiseLimits={expertiseLimits}
+        skillWarnings={skillWarnings}
+        languageLimits={languageLimits}
+        fightingStyleLimits={fightingStyleLimits}
+        languageWarnings={languageWarnings}
+        resistanceWarnings={resistanceWarnings}
+        tempInventory={tempInventory}
+        onRulesetChange={handleRulesetChange}
+        onInputChange={updateField}
+        onArrayFieldChange={updateArrayField}
+        onInventoryChange={updateInventory}
+        onTempInventoryChange={updateTempInventory}
+        onAbilityBaseScoreChange={onAbilityBaseScoreChange}
+        onAbilityImprovementChange={onAbilityImprovementChange}
+        onAbilityMiscBonusChange={onAbilityMiscBonusChange}
+        onSkillToggle={handleSkillToggle}
+        onSkillExpertiseToggle={handleSkillExpertiseToggle}
+        onLanguageToggle={handleLanguageToggle}
+        onFightingStyleToggle={handleFightingStyleToggle}
+        onResistanceToggle={handleResistanceToggle}
+        onImmunityToggle={handleImmunityToggle}
+        warnings={skillWarnings}
+        allFeats={feats}
+        allMagicItems={magicItems}
+      />
+    );
+  }, [
+    currentStep,
+    ruleset,
+    errors,
+    formData,
+    backgrounds,
+    racesData,
+    classSubtypes,
+    feats,
+    magicItems,
+    allSpells,
+    preSelectedFeats,
+    preSelectedSkills,
+    preSelectedLanguages,
+    preSelectedFightingStyles,
+    preSelectedResistancesList,
+    skillLimits,
+    expertiseLimits,
+    skillWarnings,
+    languageLimits,
+    fightingStyleLimits,
+    languageWarnings,
+    resistanceWarnings,
+    tempInventory,
+    handleRulesetChange,
+    updateField,
+    updateArrayField,
+    updateInventory,
+    updateTempInventory,
+    onAbilityBaseScoreChange,
+    onAbilityImprovementChange,
+    onAbilityMiscBonusChange,
+    handleSkillToggle,
+    handleSkillExpertiseToggle,
+    handleLanguageToggle,
+    handleFightingStyleToggle,
+    handleResistanceToggle,
+    handleImmunityToggle,
+  ]);
 
   const totalSteps = getTotalSteps();
 
