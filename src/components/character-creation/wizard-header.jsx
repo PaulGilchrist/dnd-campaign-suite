@@ -1,4 +1,3 @@
-import React from 'react';
 
 function WizardHeader({ title, onClose }) {
   return (

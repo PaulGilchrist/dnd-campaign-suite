@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 // No component-specific CSS needed - uses shared wizard styles
 
 function WizardStepSpecial({ formData, onArrayFieldChange }) {

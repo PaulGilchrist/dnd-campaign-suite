@@ -54,19 +54,6 @@ vi.mock('./components/character-creation/character-creation-wizard', () => ({ de
 
 vi.mock('./services/data-loader', () => dataLoaderMocks);
 
-const mockFetchData = {
-  '/data/ability-scores.json': [{ full_name: 'Strength' }],
-  '/data/classes.json': [{ name: 'Fighter' }],
-  '/data/2024/classes.json': [{ name: 'Fighter 2024' }],
-  '/data/equipment.json': [{ name: 'Longsword' }],
-  '/data/magic-items.json': [{ name: 'Wand' }],
-  '/data/races.json': [{ name: 'Human' }],
-  '/data/2024/races.json': [{ name: 'Human 2024' }],
-  '/data/magic-items-2024.json': [{ name: 'Wand 2024' }],
-  '/data/spells.json': [{ name: 'Fireball' }],
-  '/data/2024/spells.json': [{ name: 'Fireball 2024' }],
-};
-
 beforeEach(() => {
   vi.clearAllMocks();
   window.alert = vi.fn();

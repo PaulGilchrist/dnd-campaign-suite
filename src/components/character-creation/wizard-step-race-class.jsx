@@ -1,4 +1,4 @@
-import React from 'react';
+
 import CascadingSelect from './CascadingSelect';
 
 function WizardStepRaceClass({ 

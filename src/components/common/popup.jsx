@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+ 
 import { useEffect, useCallback } from 'react';
 import { sanitizeHtml } from '../../services/sanitize.js';
 import './popup.css'

@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+ 
 
 function WarningList({ warnings, showIcons = false }) {
   if (!warnings || warnings.length === 0) {

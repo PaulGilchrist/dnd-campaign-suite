@@ -1,4 +1,3 @@
-import React from 'react';
 
 function CascadingSelect({
   label,
@@ -6,7 +5,6 @@ function CascadingSelect({
   subOptionsSelector,
   fieldName,
   childFieldName,
-  childValueKey,
   errorKey,
   loadingText,
   ruleset,

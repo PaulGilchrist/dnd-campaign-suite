@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+ 
 import usePopup from './use-popup'
 
 export function buildFeatureDetailHtml(entity) {
@@ -30,15 +30,18 @@ export function buildAbilityDetailHtml(allAbilityScores) {
 }
 
 export default function useActionPopup(preset, context = {}) {
-    switch (preset) {
-        case 'feature':
-            return usePopup(buildFeatureDetailHtml);
-        case 'spell':
-            return usePopup(buildSpellDetailHtml);
-        case 'ability':
-            return usePopup(buildAbilityDetailHtml(context.allAbilityScores));
-        default:
-            if (typeof preset === 'function') return usePopup(preset);
-            return usePopup(() => null);
+    let handler;
+    if (preset === 'feature') {
+        handler = buildFeatureDetailHtml;
+    } else if (preset === 'spell') {
+        handler = buildSpellDetailHtml;
+    } else if (preset === 'ability') {
+        handler = buildAbilityDetailHtml(context.allAbilityScores);
+    } else if (typeof preset === 'function') {
+        handler = preset;
+    } else {
+        handler = () => null;
     }
+
+    return usePopup(handler);
 }

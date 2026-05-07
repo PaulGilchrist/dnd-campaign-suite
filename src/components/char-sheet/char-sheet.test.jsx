@@ -4,49 +4,49 @@ import CharSheet from './char-sheet';
 
 // Mock all child components
 vi.mock('./char-summary/char-summary', () => ({
-  default: vi.fn(({ playerStats, onDeleteCharacter }) => (
+  default: vi.fn(() => (
     <div data-testid="char-summary">Summary</div>
   )),
 }));
 
 vi.mock('./char-abilities', () => ({
-  default: vi.fn(({ playerStats, allAbilityScores }) => (
+  default: vi.fn(() => (
     <div data-testid="char-abilities">Abilities</div>
   )),
 }));
 
 vi.mock('./char-actions', () => ({
-  default: vi.fn(({ playerStats }) => (
+  default: vi.fn(() => (
     <div data-testid="char-actions">Actions</div>
   )),
 }));
 
 vi.mock('./char-reactions', () => ({
-  default: vi.fn(({ playerStats }) => (
+  default: vi.fn(() => (
     <div data-testid="char-reactions">Reactions</div>
   )),
 }));
 
 vi.mock('./char-spells/char-spells', () => ({
-  default: vi.fn(({ playerStats, handleTogglePreparedSpells }) => (
-    <div data-testid="char-spells" onClick={() => handleTogglePreparedSpells && handleTogglePreparedSpells('Fireball')}>Spells</div>
+  default: vi.fn(() => (
+    <div data-testid="char-spells">Spells</div>
   )),
 }));
 
 vi.mock('./char-special-actions', () => ({
-  default: vi.fn(({ playerStats }) => (
+  default: vi.fn(() => (
     <div data-testid="char-special-actions">Special Actions</div>
   )),
 }));
 
 vi.mock('./char-inventory', () => ({
-  default: vi.fn(({ playerStats }) => (
+  default: vi.fn(() => (
     <div data-testid="char-inventory">Inventory</div>
   )),
 }));
 
 vi.mock('./char-character-advancement', () => ({
-  default: vi.fn(({ playerStats }) => (
+  default: vi.fn(() => (
     <div data-testid="char-character-advancement">Character Advancement</div>
   )),
 }));
@@ -72,9 +72,6 @@ vi.mock('../../services/storage', () => ({
     getProperty: vi.fn(),
   },
 }));
-
-// Capture handleEvent from Subscriber mock
-let capturedHandleEvent = null;
 
 // Mock utils
 vi.mock('../../services/utils', () => ({

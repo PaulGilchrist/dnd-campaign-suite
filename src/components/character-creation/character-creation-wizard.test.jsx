@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharacterCreationWizard from './character-creation-wizard';
 
@@ -144,13 +144,13 @@ vi.mock('./wizard-header', () => ({
 }));
 
 vi.mock('./wizard-progress-bar', () => ({
-  default: function WizardProgressBarMock({ currentStep, totalSteps, isEditing }) {
+  default: function WizardProgressBarMock({ currentStep, totalSteps }) {
     return <div data-testid="wizard-progress-bar"><span>Step {currentStep} of {totalSteps}</span></div>;
   },
 }));
 
 vi.mock('./wizard-footer', () => ({
-  default: function WizardFooterMock({ currentStep, isFirstStep, isLastStep, onCancel, onPrevious, onNext, onSubmit, isEditing, isNextDisabled }) {
+  default: function WizardFooterMock({ isFirstStep, isLastStep, onCancel, onPrevious, onNext, onSubmit, isNextDisabled }) {
     return (
       <div data-testid="wizard-footer">
         <button onClick={onPrevious} disabled={isFirstStep}>Previous</button>

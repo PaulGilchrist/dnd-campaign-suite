@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import WarningList from '../common/warning-list';
 import './wizard-step-skills.css';
-import { validateSkills, getSkillLimits, getExpertiseLimits } from '../../services/skill-validation.js';
 import { loadSkills } from '../../services/data-loader';
 import { isEqual } from 'lodash';
 
@@ -35,7 +34,7 @@ const WizardStepSkills = React.memo(function WizardStepSkills({ formData, errors
 		const isCurrentlyProficient = (formData.skillProficiencies || []).includes(skill);
 
 		if (isCurrentlyExpert) {
-		  // Deselecting expertise - remove from expertSkills only
+      // Deselecting expertise - remove from expertSkills only
 			onSkillExpertiseToggle(skill, false);
 			setShowExpertiseFeedback(null);
 			} else {

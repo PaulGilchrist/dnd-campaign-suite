@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import SelectableList from './selectable-list';
 import WarningList from '../common/warning-list';
 import { getSpellLimits, validateSpellSelection } from '../../services/spell-limits.js';
@@ -7,9 +7,9 @@ import './wizard-step-spells.css';
 function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
   const [spellCounts, setSpellCounts] = useState({ cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 });
   const [spellLimits, setSpellLimits] = useState({ cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 });
-  const [validationMessage, setValidationMessage] = useState('');
   const [spellWarnings, setSpellWarnings] = useState([]);
-  const [isLoadingLimits, setIsLoadingLimits] = useState(false);
+  const [, setValidationMessage] = useState('');
+  const [, setIsLoadingLimits] = useState(false);
   // Fetch spell limits dynamically based on class and level
   useEffect(() => {
     const fetchSpellLimits = async () => {
@@ -32,7 +32,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
       } finally {
         setIsLoadingLimits(false);
        }
-     };
+      };
     
     fetchSpellLimits();
   }, [formData.class, formData.level, formData.rules]);
@@ -222,7 +222,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
               </div>
             ))}
           </div>
-          
+            
             {spellWarnings.length > 0 && <WarningList warnings={spellWarnings} showIcons />}
         </div>
     );

@@ -1,5 +1,5 @@
-/* eslint-disable react/prop-types */
-import React from 'react'
+ 
+
 import useActionPopup from './common/use-action-popup'
 import Popup from '../common/popup'
 import { sanitizeHtml } from '../../services/sanitize.js';

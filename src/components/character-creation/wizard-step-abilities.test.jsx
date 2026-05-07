@@ -23,12 +23,6 @@ const mockPointBuyCosts = {
   15: 9
 };
 
-const mockRulesValidation = {
-  point_buy: {
-    total_points: 27
-  }
-};
-
 global.fetch = vi.fn(() =>
   Promise.resolve({
     ok: true,

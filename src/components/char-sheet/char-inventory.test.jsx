@@ -64,7 +64,7 @@ describe('CharInventory', () => {
     vi.clearAllMocks();
 
       // Mock usePopup to return a controlled popup
-    usePopup.mockImplementation((buildHtml) => ({
+    usePopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: vi.fn(),
@@ -183,34 +183,34 @@ describe('CharInventory', () => {
     loadEquipment.mockRejectedValue(new Error('Network error'));
 
     const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation((buildHtml) => ({
+      usePopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
       }));
 
-    render(
-          <CharInventory playerStats={mockPlayerStats} />
-        );
+     render(
+           <CharInventory playerStats={mockPlayerStats} />
+         );
 
-        // Click on Shield which is unique
-      const shieldElement = screen.getByText('Shield');
-      fireEvent.click(shieldElement);
+         // Click on Shield which is unique
+       const shieldElement = screen.getByText('Shield');
+       fireEvent.click(shieldElement);
 
-      await waitFor(() => {
-        expect(mockSetPopupHtml).toHaveBeenCalled();
-      });
+       await waitFor(() => {
+         expect(mockSetPopupHtml).toHaveBeenCalled();
        });
+        });
 
-  it('should handle item not found in database', async () => {
-    loadEquipment.mockResolvedValue([]);
+   it('should handle item not found in database', async () => {
+     loadEquipment.mockResolvedValue([]);
 
-    const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
-      showPopup: vi.fn(),
-      popupHtml: null,
-      setPopupHtml: mockSetPopupHtml,
-      }));
+     const mockSetPopupHtml = vi.fn();
+     usePopup.mockImplementation(() => ({
+       showPopup: vi.fn(),
+       popupHtml: null,
+       setPopupHtml: mockSetPopupHtml,
+       }));
 
     render(
          <CharInventory playerStats={mockPlayerStats} />
@@ -256,7 +256,7 @@ describe('CharInventory', () => {
 
   it('should render popup element container', () => {
     const mockPopupElement = <div data-testid="popup-overlay">Popup Content</div>;
-    usePopup.mockImplementation((buildHtml) => ({
+    usePopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: mockPopupElement,
       setPopupHtml: vi.fn(),
@@ -346,7 +346,7 @@ describe('CharInventory', () => {
     };
 
     const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
+    usePopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
@@ -386,7 +386,7 @@ describe('CharInventory', () => {
     };
 
     const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
+    usePopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
@@ -406,7 +406,7 @@ describe('CharInventory', () => {
 
   it('should display item cost property', async () => {
     const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
+    usePopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
@@ -428,7 +428,7 @@ describe('CharInventory', () => {
 
   it('should display item weight property', async () => {
     const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
+    usePopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
@@ -458,7 +458,7 @@ describe('CharInventory', () => {
     loadEquipment.mockResolvedValue(dataWithAbility);
 
     const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
+    usePopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
@@ -488,7 +488,7 @@ describe('CharInventory', () => {
     loadEquipment.mockResolvedValue(dataWithAbility);
 
     const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
+    usePopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
@@ -518,7 +518,7 @@ describe('CharInventory', () => {
     loadEquipment.mockResolvedValue(dataWithUtilize);
 
     const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
+    usePopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
@@ -548,7 +548,7 @@ describe('CharInventory', () => {
     loadEquipment.mockResolvedValue(dataWithCraft);
 
     const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
+    usePopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: mockSetPopupHtml,

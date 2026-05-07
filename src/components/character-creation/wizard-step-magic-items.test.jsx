@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepMagicItems from './wizard-step-magic-items';
 
 vi.mock('./selectable-list', () => ({
-  default: vi.fn(({ title, resultLabel, renderItem, renderWarnings, items }) => (
+  default: vi.fn(({ title, resultLabel, renderWarnings, items }) => (
      <div data-testid="selectable-list">
        <h2>{title}</h2>
        <div data-testid="result-label">{resultLabel}</div>

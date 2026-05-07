@@ -38,7 +38,7 @@ describe('CharFeats', () => {
     vi.clearAllMocks();
 
       // Mock usePopup to return a controlled popup
-      usePopup.mockImplementation((buildHtml) => ({
+      usePopup.mockImplementation(() => ({
         showPopup: vi.fn(),
         popupHtml: null,
         setPopupHtml: vi.fn(),
@@ -120,34 +120,34 @@ describe('CharFeats', () => {
     loadFeatData.mockRejectedValue(new Error('Network error'));
 
     const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation((buildHtml) => ({
+    usePopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
      }));
 
-    render(
-        <CharFeats playerStats={mockPlayerStats} />
-      );
+     render(
+         <CharFeats playerStats={mockPlayerStats} />
+       );
 
-       // Use getAllByText since text includes comma
-    const actorElements = screen.getAllByText(/Actor/);
-    fireEvent.click(actorElements[0]);
+        // Use getAllByText since text includes comma
+     const actorElements = screen.getAllByText(/Actor/);
+     fireEvent.click(actorElements[0]);
 
-    await waitFor(() => {
-      expect(mockSetPopupHtml).toHaveBeenCalled();
-   });
+     await waitFor(() => {
+       expect(mockSetPopupHtml).toHaveBeenCalled();
     });
+     });
 
-  it('should handle feat not found in database', async () => {
-     loadFeatData.mockResolvedValue([]);
+   it('should handle feat not found in database', async () => {
+      loadFeatData.mockResolvedValue([]);
 
-     const mockSetPopupHtml = vi.fn();
-      usePopup.mockImplementation((buildHtml) => ({
-        showPopup: vi.fn(),
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-       }));
+      const mockSetPopupHtml = vi.fn();
+       usePopup.mockImplementation(() => ({
+         showPopup: vi.fn(),
+         popupHtml: null,
+         setPopupHtml: mockSetPopupHtml,
+        }));
 
     render(
         <CharFeats playerStats={mockPlayerStats} />
@@ -164,7 +164,7 @@ describe('CharFeats', () => {
 
   it('should render popup element container', () => {
       const mockPopupElement = <div data-testid="popup-overlay">Popup Content</div>;
-      usePopup.mockImplementation((buildHtml) => ({
+      usePopup.mockImplementation(() => ({
         showPopup: vi.fn(),
         popupHtml: mockPopupElement,
         setPopupHtml: vi.fn(),

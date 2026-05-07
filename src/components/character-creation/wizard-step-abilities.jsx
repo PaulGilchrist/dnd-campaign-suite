@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import './wizard-step-abilities.css';
 import { loadAbilityScores, loadValidationRules } from '../../services/data-loader';
 
@@ -13,7 +13,7 @@ function WizardStepAbilities({
   const [pointsAllowed, setPointsAllowed] = useState(27);
   const [abilityNames, setAbilityNames] = useState(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']);
 
-	 // Load ability names from JSON
+    // Load ability names from JSON
   useEffect(() => {
     const loadNames = async () => {
       const scores = await loadAbilityScores();
@@ -43,13 +43,6 @@ function WizardStepAbilities({
        }, 0);
 
   const pointsRemaining = pointsAllowed - totalPointsSpent;
-
-  const calculateTotalScore = (ability) => {
-    const base = parseInt(ability.baseScore) || 8;
-    const improvements = parseInt(ability.abilityImprovements) || 0;
-    const misc = parseInt(ability.miscBonus) || 0;
-    return base + improvements + misc;
-  };
 
   return (
      <div className="wizard-step wizard-step-4">

@@ -71,7 +71,7 @@ describe('CharActions', () => {
     });
     
     // Mock useActionPopup
-    useActionPopup.mockImplementation((buildHtml) => ({
+    useActionPopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: vi.fn(),
@@ -121,7 +121,7 @@ describe('CharActions', () => {
 
   it('should call setPopupHtml when hit bonus is clicked', async () => {
     const mockSetPopupHtml = vi.fn();
-    useActionPopup.mockImplementation((buildHtml) => ({
+    useActionPopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
@@ -137,7 +137,7 @@ describe('CharActions', () => {
 
   it('should call setPopupHtml when damage is clicked', async () => {
     const mockSetPopupHtml = vi.fn();
-    useActionPopup.mockImplementation((buildHtml) => ({
+    useActionPopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
@@ -261,7 +261,6 @@ describe('CharActions', () => {
   });
 
   it('should sanitize action descriptions', async () => {
-    const { sanitizeHtml } = await import('../../services/sanitize.js');
 
     render(<CharActions playerStats={mockPlayerStats} />);
 
@@ -270,7 +269,7 @@ describe('CharActions', () => {
 
   it('should show popup when action with details is clicked', async () => {
     const mockShowPopup = vi.fn();
-    useActionPopup.mockImplementation((buildHtml) => ({
+    useActionPopup.mockImplementation(() => ({
       showPopup: mockShowPopup,
       popupHtml: null,
       setPopupHtml: vi.fn(),

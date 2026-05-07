@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import './character-creation-wizard.css';
-import { validateStep, validateFinalFormData, getPointBuyCosts } from './utils';
+import { validateStep, validateFinalFormData } from './utils';
 import WizardHeader from './wizard-header';
 import WizardProgressBar from './wizard-progress-bar';
 import WizardFooter from './wizard-footer';
@@ -112,7 +112,7 @@ const WizardStepRenderer = React.memo(({
 });
 WizardStepRenderer.displayName = 'WizardStepRenderer';
 
-function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, allSpells, allSpells2024, characterData, isEditing = false }) {
+function CharacterCreationWizard({ onComplete, onCancel, allSpells, characterData, isEditing = false }) {
   // Core form state
   const {
     formData,
@@ -123,7 +123,6 @@ function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, a
     updateArrayField,
     updateAbility,
     updateInventory,
-    updateClass,
     resetErrors,
    } = useWizardForm(characterData, isEditing);
 
@@ -137,7 +136,6 @@ function CharacterCreationWizard({ onComplete, onCancel, allRaces, allClasses, a
     classSubtypes,
     feats,
     magicItems,
-    isDataLoading,
    } = useWizardData(ruleset);
 
   // Navigation

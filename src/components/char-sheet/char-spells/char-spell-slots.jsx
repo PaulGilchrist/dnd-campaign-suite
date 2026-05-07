@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+ 
 import React from 'react'
 import './char-spell-slots.css'
 import rules from '../../../services/rules'

@@ -1,7 +1,5 @@
-import React from 'react';
 
 function WizardFooter({ 
-  currentStep, 
   isFirstStep, 
   isLastStep, 
   onCancel, 

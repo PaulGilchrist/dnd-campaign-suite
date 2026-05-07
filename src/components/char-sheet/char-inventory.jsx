@@ -1,5 +1,5 @@
-/* eslint-disable react/prop-types */
-import React from 'react'
+ 
+
 import usePopup from './common/use-popup'
 import Popup from '../common/popup'
 import { sanitizeHtml } from '../../services/sanitize.js';
@@ -44,6 +44,7 @@ function CharInventory({ playerStats }) {
                 const singularName = lookupName.slice(0, -1);
                 item = findItem(singularName);
                 if (item) {
+                    // intentionally empty — item handled below
                 }
             }
             
@@ -52,6 +53,7 @@ function CharInventory({ playerStats }) {
                 const pluralName = lookupName + 's';
                 item = findItem(pluralName);
                 if (item) {
+                    // intentionally empty — item handled below
                 }
             }
             

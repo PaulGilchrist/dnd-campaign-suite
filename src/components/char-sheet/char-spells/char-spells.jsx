@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+ 
 import React from 'react'
 import { cloneDeep, isEqual } from 'lodash';
 import useActionPopup from '../common/use-action-popup'

@@ -51,7 +51,7 @@ describe('CharAbilities', () => {
     vi.clearAllMocks();
      
       // Mock useActionPopup to return a controlled popup
-    useActionPopup.mockImplementation((buildHtml) => ({
+    useActionPopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: vi.fn(),
@@ -126,7 +126,7 @@ describe('CharAbilities', () => {
 
   it('should call showPopup when ability name is clicked', () => {
     const mockShowPopup = vi.fn();
-    useActionPopup.mockImplementation((buildHtml) => ({
+    useActionPopup.mockImplementation(() => ({
        showPopup: mockShowPopup,
        popupHtml: null,
        setPopupHtml: vi.fn(),
@@ -198,7 +198,7 @@ describe('CharAbilities', () => {
 
   it('should render popup element container', () => {
     const mockPopupElement = <div data-testid="popup">Popup Content</div>;
-    useActionPopup.mockImplementation((buildHtml) => ({
+    useActionPopup.mockImplementation(() => ({
        showPopup: vi.fn(),
        popupHtml: mockPopupElement,
        setPopupHtml: vi.fn(),

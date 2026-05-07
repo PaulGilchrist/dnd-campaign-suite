@@ -107,14 +107,14 @@ vi.mock('../../../services/class-rules', () => ({
       const arcaneRecoveryLevels = classLevel?.class_specific?.arcane_recovery_levels || 0;
       return { arcaneRecoveryLevels, showWizardFeatures: true };
      }),
-    getMonkFeatures: vi.fn((playerStats) => {
-      return {
-        martialArtsDie: 4,
-        unarmoredMovementIncrease: 0,
-        maxFocusPoints: 3,
-        wisdomBonus: 0
-       };
-       }),
+     getMonkFeatures: vi.fn(() => {
+       return {
+         martialArtsDie: 4,
+         unarmoredMovementIncrease: 0,
+         maxFocusPoints: 3,
+         wisdomBonus: 0
+        };
+        }),
       getRogueFeatures: vi.fn((playerStats) => {
       const sneakAttack = { dice_count: 0, dice_value: 6 };
       const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
@@ -129,105 +129,8 @@ vi.mock('../../../services/class-rules', () => ({
       const favoredEnemies = 0;
       const extraAttacks = playerStats.level > 4 ? 1 : 0;
       return { favoredEnemies, extraAttacks };
-     }),
-    getBardFeatures: vi.fn((playerStats) => {
-      const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
-      const bardicDie = classLevel?.class_specific?.bardic_inspiration_die || 0;
-      const songOfRestDie = classLevel?.class_specific?.song_of_rest_die ?? null;
-      const magicalSecrets = classLevel?.class_specific?.magical_secrets_max_5 ?? null;
-      let subclassMagicalSecrets = 0;
-      if (playerStats.class?.subclass?.name === 'Lore' && playerStats.level > 2) {
-        const highestSubclassLevel = classRules.getHighestSubclassLevel(playerStats);
-        subclassMagicalSecrets = highestSubclassLevel?.subclass_specific?.additional_magical_secrets_max_lvl || 0;
-       }
-      return { bardicDie, songOfRestDie, magicalSecrets, subclassMagicalSecrets };
-    }),
-     getClericFeatures: vi.fn((playerStats) => {
-      const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
-      const maxChannelDivinity = classLevel?.class_specific?.channel_divinity_charges || 0;
-      const destroyUndeadCR = classLevel?.class_specific?.destroy_undead_cr || null;
-      return { maxChannelDivinity, destroyUndeadCR };
-     }),
-     getDruidFeatures: vi.fn((playerStats) => {
-      const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
-      const classSpecific = classLevel?.class_specific;
-      const maxWildShapeChallengeRating = classRules.getDruidMaxWildShapeChallengeRating(playerStats);
-      const maxWildShapeUses = 2;
-      const beastKnownForms = 0;
-      let wildShapeLimitations = 'walk only (no swim or fly)';
-      if (classSpecific?.wild_shape_fly) {
-        wildShapeLimitations = 'walk, swim, or fly';
-       } else if (classSpecific?.wild_shape_swim) {
-        wildShapeLimitations = 'walk or swim only (no fly)';
-       }
-      return { maxWildShapeUses, maxWildShapeChallengeRating, beastKnownForms, wildShapeLimitations };
-     }),
-     getPaladinFeatures: vi.fn((playerStats) => {
-      const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
-      const classSpecific = classLevel?.class_specific;
-      const maxChannelDivinity = classSpecific?.channel_divinity_charges || 0;
-      const auraRange = classSpecific?.aura_range || null;
-      const extraAttacks = playerStats.level > 4 ? 1 : 0;
-      return { maxChannelDivinity, auraRange, extraAttacks };
-     }),
-     getSorcererFeatures: vi.fn((playerStats) => {
-      const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
-      const classSpecific = classLevel?.class_specific;
-      const maxSorceryPoints = classSpecific?.sorcery_points || 0;
-      const metamagicKnown = classSpecific?.metamagic_known || 0;
-      const creatingSpellSlotCosts = classSpecific?.creating_spell_slots
-         ? classSpecific.creating_spell_slots.map(slot => slot.sorcery_point_cost)
-         : [];
-      return { maxSorceryPoints, metamagicKnown, creatingSpellSlotCosts };
-     }),
-     getWarlockFeatures: vi.fn((playerStats) => {
-      const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
-      const classSpecific = classLevel?.class_specific;
-      const invocationsKnown = classSpecific?.invocations_known || 0;
-      const hasArcanum = playerStats.level > 10;
-      const arcanumLevels = hasArcanum ? {
-        level6: classSpecific?.mystic_arcanum_level_6 || 0,
-        level7: classSpecific?.mystic_arcanum_level_7 || 0,
-        level8: classSpecific?.mystic_arcanum_level_8 || 0,
-        level9: classSpecific?.mystic_arcanum_level_9 || 0
-       } : {
-        level6: 0,
-        level7: 0,
-        level8: 0,
-        level9: 0
-       };
-      const arcanums = playerStats.class?.arcanums || [];
-         return { invocationsKnown, hasArcanum, arcanumLevels, arcanums, invocations: ['Agonizing Blast'], pactBoon: 'Pact of the Blade' };
-        }),
-     getWizardFeatures: vi.fn((playerStats) => {
-       const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-      const arcaneRecoveryLevels = classLevel?.class_specific?.arcane_recovery_levels || 0;
-      return { arcaneRecoveryLevels, showWizardFeatures: true };
-     }),
-     getMonkFeatures: vi.fn((playerStats) => {
-       return {
-         martialArtsDie: 4,
-         unarmoredMovementIncrease: 0,
-         maxFocusPoints: 3,
-         wisdomBonus: 0
-         };
-       }),
-     getRogueFeatures: vi.fn((playerStats) => {
-      const sneakAttack = { dice_count: 0, dice_value: 6 };
-      const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
-      if (classLevel?.class_specific?.sneak_attack) {
-        sneakAttack.dice_count = classLevel.class_specific.sneak_attack.dice_count || 0;
-        sneakAttack.dice_value = classLevel.class_specific.sneak_attack.dice_value || 6;
-       }
-      const expertise = playerStats.class?.expertise || [];
-      return { sneakAttack, expertise };
-     }),
-     getRangerFeatures: vi.fn((playerStats) => {
-      const favoredEnemies = 0;
-      const extraAttacks = playerStats.level > 4 ? 1 : 0;
-      return { favoredEnemies, extraAttacks };
-     }),
-    },
+      }),
+     },
 }));
 
 vi.mock('../../../services/class-rules-2024', () => ({
@@ -339,22 +242,24 @@ vi.mock('../../../services/class-rules-2024', () => ({
         invocations: playerStats.class?.invocations || []
        };
      }),
-     getWizardFeatures: vi.fn((playerStats) => {
-      return {
-        showWizardFeatures: false
-       };
-     }),
-     getMonkFeatures: vi.fn((playerStats) => {
-      const martialArtsDie = classRules2024.getMartialArtsDie(playerStats);
-      const unarmoredMovementIncrease = classRules2024.getUnarmoredMovementIncrease(playerStats);
-      const maxFocusPoints = classRules2024.getFocusPoints(playerStats);
-      return {
-        martialArtsDie,
-        unarmoredMovementIncrease,
-        maxFocusPoints,
-        wisdomBonus: 0
-       };
-     }),
+      getWizardFeatures: vi.fn(() => {
+       return {
+         showWizardFeatures: false
+        };
+      }),
+       /* eslint-disable no-undef */
+       getMonkFeatures: vi.fn((playerStats) => {
+        const martialArtsDie = classRules2024.getMartialArtsDie(playerStats);
+        const unarmoredMovementIncrease = classRules2024.getUnarmoredMovementIncrease(playerStats);
+        const maxFocusPoints = classRules2024.getFocusPoints(playerStats);
+        /* eslint-enable no-undef */
+       return {
+         martialArtsDie,
+         unarmoredMovementIncrease,
+         maxFocusPoints,
+         wisdomBonus: 0
+        };
+      }),
      getRangerFeatures: vi.fn((playerStats) => {
       const favoredEnemies = classRules2024.getFavoredEnemy(playerStats);
       const extraAttacks = playerStats.level > 4 ? 1 : 0;

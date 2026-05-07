@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import WarningList from '../common/warning-list';
 
 function WizardStepLanguages({ formData, errors, onLanguageToggle, onFightingStyleToggle, languageLimits, fightingStyleLimits, warnings, preSelectedLanguages, preSelectedFightingStyles }) {

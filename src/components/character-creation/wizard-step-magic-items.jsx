@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import SelectableList from './selectable-list';
 import WarningList from '../common/warning-list';
 import { sanitizeHtml } from '../../services/sanitize.js';
 import './wizard-step-magic-items.css';
-function WizardStepMagicItems({ formData, allMagicItems, ruleset, onArrayFieldChange }) {
+function WizardStepMagicItems({ formData, allMagicItems, onArrayFieldChange }) {
   const [warnings, setWarnings] = useState([]);
     // Check for attunement limit warnings
     useEffect(() => {

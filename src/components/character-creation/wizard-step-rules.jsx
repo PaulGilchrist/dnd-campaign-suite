@@ -1,4 +1,4 @@
-import React from 'react';
+
 
 function WizardStepRules({ ruleset, errors, onRulesetChange }) {
   return (

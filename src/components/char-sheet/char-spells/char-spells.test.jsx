@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpells from './char-spells';
 
@@ -9,7 +9,7 @@ vi.mock('../common/use-action-popup', () => ({
 
 // Mock the CharSpellSlots component
 vi.mock('./char-spell-slots', () => ({
-  default: function MockCharSpellSlots({ playerStats }) {
+  default: function MockCharSpellSlots() {
     return <div data-testid="char-spell-slots">Spell Slots</div>;
     },
 }));
@@ -82,7 +82,7 @@ const mockHandleTogglePreparedSpells = vi.fn();
 describe('CharSpells', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useActionPopup.mockImplementation((buildHtml) => ({
+    useActionPopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: vi.fn(),
@@ -304,7 +304,7 @@ describe('CharSpells', () => {
 
   it('should call showPopup when spell name is clicked', () => {
     const mockShowPopup = vi.fn();
-    useActionPopup.mockImplementation((buildHtml) => ({
+    useActionPopup.mockImplementation(() => ({
       showPopup: mockShowPopup,
       popupHtml: null,
       setPopupHtml: vi.fn(),
@@ -499,7 +499,7 @@ describe('CharSpells', () => {
 
   it('should render PopupElement in the container', () => {
     const mockPopupElement = <div data-testid="popup">Popup Content</div>;
-    useActionPopup.mockImplementation((buildHtml) => ({
+    useActionPopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: mockPopupElement,
       setPopupHtml: vi.fn(),

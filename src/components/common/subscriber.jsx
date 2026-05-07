@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+ 
 import React, { useEffect } from 'react';
 
 const Subscriber = ({handleEvent}) => {

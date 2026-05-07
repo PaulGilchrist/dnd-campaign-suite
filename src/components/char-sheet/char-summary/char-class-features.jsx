@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+ 
 import React from 'react'
 import useTrackedResource from '../../../hooks/use-tracked-resource';
 import HiddenInput from '../../common/hidden-input'
@@ -71,12 +71,12 @@ const ClericFeatures = React.memo(function ClericFeatures({ playerStats }) {
 
 /* ─── Druid ─── */
 const DruidFeatures = React.memo(function DruidFeatures({ playerStats }) {
-    if (playerStats.level < 2) return null;
     const druidFeatures = getClassFeatures(playerStats);
     const [showInput, setShowInput] = React.useState(false);
     const handleToggle = () => setShowInput((s) => !s);
     const { current: wildShapeUses, update: handleChange } =
         useTrackedResource('wildShapeUses', playerStats.name, () => druidFeatures?.maxWildShapeUses || 0, [playerStats]);
+    if (playerStats.level < 2) return null;
     return (
          <div data-testid="char-class-druid">
              <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
@@ -92,21 +92,22 @@ const DruidFeatures = React.memo(function DruidFeatures({ playerStats }) {
 /* ─── Fighter ─── */
 const FighterFeatures = React.memo(function FighterFeatures({ playerStats }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-    if (!classLevel) return null;
     const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name;
-    const hasEnergy = classLevel.energy && classLevel.energy.required_major === majorName;
+    const hasEnergy = classLevel?.energy && classLevel.energy.required_major === majorName;
 
     const [showSecondWindInput, setShowSecondWindInput] = React.useState(false);
     const handleSecondWindToggle = () => setShowSecondWindInput((s) => !s);
     const { current: secondWindUses, update: handleSecondWindChange } =
-        useTrackedResource('secondWindUses', playerStats.name, () => classLevel.second_wind || 0, [playerStats]);
+        useTrackedResource('secondWindUses', playerStats.name, () => classLevel?.second_wind || 0, [playerStats]);
 
-    const maxEnergy = hasEnergy ? classLevel.energy?.energy_die_num || 0 : 0;
+    const maxEnergy = hasEnergy ? classLevel?.energy?.energy_die_num || 0 : 0;
 
     const [showPsionicEnergyInput, setShowPsionicEnergyInput] = React.useState(false);
     const handlePsionicEnergyToggle = () => setShowPsionicEnergyInput((s) => !s);
     const { current: psionicEnergy, update: handlePsionicEnergyChange } =
         useTrackedResource('psionicEnergy', playerStats.name, () => maxEnergy, [playerStats]);
+
+    if (!classLevel) return null;
 
     return (
          <div data-testid="char-class-fighter">
@@ -131,13 +132,13 @@ const FighterFeatures = React.memo(function FighterFeatures({ playerStats }) {
 
 /* ─── Monk ─── */
 const MonkFeatures = React.memo(function MonkFeatures({ playerStats }) {
-    if (playerStats.level < 2) return null;
     const wisdom = playerStats.abilities?.find((a) => a.name === 'Wisdom');
     const monkFeatures = getClassFeatures(playerStats);
     const [showInput, setShowInput] = React.useState(false);
     const handleToggle = () => setShowInput((s) => !s);
     const { current: focusPoints, update: handleChange } =
         useTrackedResource('focusPoints', playerStats.name, () => monkFeatures?.maxFocusPoints || 0, [playerStats]);
+    if (playerStats.level < 2) return null;
     return (
          <div data-testid="char-class-monk">
              <div><b>Martial Arts Die:</b> d{monkFeatures?.martialArtsDie || 0}</div>
@@ -233,12 +234,11 @@ const WarlockFeatures = React.memo(function WarlockFeatures({ playerStats }) {
 /* ─── Wizard ─── */
 const WizardFeatures = React.memo(function WizardFeatures({ playerStats }) {
     const wizardFeatures = getClassFeatures(playerStats);
-    if ((wizardFeatures?.showWizardFeatures ?? true) === false) return null;
-
     const [showInput, setShowInput] = React.useState(false);
     const handleToggle = () => setShowInput((s) => !s);
     const { current: arcaneRecoveryLevels, update: handleChange } =
         useTrackedResource('arcaneRecoveryLevels', playerStats.name, () => wizardFeatures?.arcaneRecoveryLevels || 0, [playerStats]);
+    if ((wizardFeatures?.showWizardFeatures ?? true) === false) return null;
     return (
          <div data-testid="char-class-wizard">
              <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>

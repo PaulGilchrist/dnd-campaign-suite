@@ -1,4 +1,3 @@
-import React from 'react';
 
 const EquipmentSearchModal = ({
   showSearchModal,
@@ -13,7 +12,6 @@ const EquipmentSearchModal = ({
   onEquipmentSelect,
   onAddCustomItem,
   currentItemCount,
-  searchField,
   uniqueCategories = ['All']
 }) => {
   if (!showSearchModal) return null;

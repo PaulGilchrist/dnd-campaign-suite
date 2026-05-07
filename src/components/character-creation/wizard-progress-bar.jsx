@@ -1,4 +1,3 @@
-import React from 'react';
 
 function WizardProgressBar({ currentStep, totalSteps, isEditing }) {
   const effectiveStep = isEditing ? currentStep - 1 : currentStep;

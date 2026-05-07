@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaignService';
 import './campaign-selection.css';
 

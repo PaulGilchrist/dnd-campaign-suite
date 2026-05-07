@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+ 
 import React, { useState, useEffect } from 'react'
 import useActionPopup from './common/use-action-popup'
 import Popup from '../common/popup'
