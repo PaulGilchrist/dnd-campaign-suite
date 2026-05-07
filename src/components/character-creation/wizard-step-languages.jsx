@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import WarningList from '../common/warning-list';
 
 function WizardStepLanguages({ formData, errors, onLanguageToggle, onFightingStyleToggle, languageLimits, fightingStyleLimits, warnings, preSelectedLanguages, preSelectedFightingStyles }) {
   const [languagesList, setLanguagesList] = useState([]);
   const [fightingStylesList, setFightingStylesList] = useState([]);
-  const fightingStyles = formData.class?.fightingStyles || [];
-  const languages = formData.languages || [];
+  const fightingStyles = useMemo(() => formData.class?.fightingStyles || [], [formData.class]);
+  const languages = useMemo(() => formData.languages || [], [formData.languages]);
 
   useEffect(() => {
     fetch('/data/languages.json')
@@ -30,7 +30,7 @@ function WizardStepLanguages({ formData, errors, onLanguageToggle, onFightingSty
          }
        });
      }
-   }, [languageLimits]);
+     }, [languageLimits, languages, onLanguageToggle]);
 
    // Auto-select pre-selected fighting styles when fightingStyleLimits changes
   useEffect(() => {
@@ -41,7 +41,7 @@ function WizardStepLanguages({ formData, errors, onLanguageToggle, onFightingSty
          }
        });
      }
-   }, [fightingStyleLimits]);
+     }, [fightingStyleLimits, fightingStyles, onFightingStyleToggle]);
 
   const isLanguagePreSelected = (language) => (preSelectedLanguages || []).includes(language);
   const isFightingStylePreSelected = (style) => (preSelectedFightingStyles || []).includes(style);

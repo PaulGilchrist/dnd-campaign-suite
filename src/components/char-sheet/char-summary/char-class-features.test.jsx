@@ -247,13 +247,11 @@ vi.mock('../../../services/class-rules-2024', () => ({
          showWizardFeatures: false
         };
       }),
-       /* eslint-disable no-undef */
-       getMonkFeatures: vi.fn((playerStats) => {
+        getMonkFeatures: vi.fn((playerStats) => {
         const martialArtsDie = classRules2024.getMartialArtsDie(playerStats);
         const unarmoredMovementIncrease = classRules2024.getUnarmoredMovementIncrease(playerStats);
-        const maxFocusPoints = classRules2024.getFocusPoints(playerStats);
-        /* eslint-enable no-undef */
-       return {
+         const maxFocusPoints = classRules2024.getFocusPoints(playerStats);
+        return {
          martialArtsDie,
          unarmoredMovementIncrease,
          maxFocusPoints,

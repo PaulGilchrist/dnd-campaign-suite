@@ -15,7 +15,7 @@ const Subscriber = ({handleEvent}) => {
         return () => {
             eventSource.close();
         };
-    }, []);
+    }, [handleEvent]);
     return (
         <React.Fragment></React.Fragment>
     );

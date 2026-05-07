@@ -1,4 +1,4 @@
- 
+
 import React from 'react'
 import { cloneDeep, isEqual } from 'lodash';
 import utils from '../../services/utils'
@@ -12,6 +12,74 @@ function CombatTracking({ characters }) {
     const [numOfNpc, setNumOfNpc] = React.useState(5);
     const [forceRefresh, setForceRefresh] = React.useState(0);
     const [activeCreatureId, setActiveCreatureId] = React.useState(null);
+
+    const setupCreatures = React.useCallback(() => {
+        const creatureList = characters.map((character) => { return { id: utils.guid(), name: utils.getFirstName(character.name), type: 'player', initiative: '', notes: '' } });
+        creatureList.sort((a, b) => a.name.localeCompare(b.name)); // asc
+        for (let i = 0; i < numOfNpc; i++) {
+            creatureList.push({ id: utils.guid(), name: `NPC ${i + 1}`, type: 'npc', initiative: '', notes: '' });
+        }
+        return creatureList;
+    }, [characters, numOfNpc]);
+
+    const handleAddNpc = React.useCallback(() => {
+        combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${numOfNpc + 1}`, type: 'npc', initiative: '', notes: '' });
+        setNumOfNpc(numOfNpc + 1);
+        storage.set('combatSummary', combatSummary);
+        setCombatSummary(cloneDeep(combatSummary));
+    }, [combatSummary, numOfNpc]);
+
+    const handleRemoveNpc = React.useCallback(() => {
+        for (let i = combatSummary.creatures.length - 1; i >= 0; i--) {
+            if (combatSummary.creatures[i].type === 'npc') {
+                if (combatSummary.creatures[i].initiative == '' || window.confirm(`${combatSummary.creatures[i].name} has initiative assigned.  Remove anyway?`)) {
+                    combatSummary.creatures.splice(i, 1);
+                    setNumOfNpc(numOfNpc - 1);
+                    storage.set('combatSummary', combatSummary);
+                    setCombatSummary(cloneDeep(combatSummary));
+                }
+                break;
+            }
+        }
+    }, [combatSummary, numOfNpc]);
+
+    const handleAddCombatRound = React.useCallback(() => {
+        combatSummary.round++;
+        storage.set('combatSummary', combatSummary);
+        setCombatSummary({...combatSummary});
+    }, [combatSummary]);
+
+    const handleRemoveCombatRound = React.useCallback(() => {
+        combatSummary.round--;
+        storage.set('combatSummary', combatSummary);
+        setCombatSummary({...combatSummary});
+    }, [combatSummary]);
+
+    const handleNextCreature = React.useCallback(() => {
+        const currentIndex = combatSummary.creatures.findIndex((creature) => creature.id === activeCreatureId);
+        if (currentIndex < combatSummary.creatures.length - 1) {
+            const nextId = combatSummary.creatures[currentIndex + 1].id;
+            storage.set('activeCreatureId', nextId);
+            setActiveCreatureId(nextId);
+        } else {
+            const firstId = combatSummary.creatures[0].id;
+            storage.set('activeCreatureId', firstId);
+            setActiveCreatureId(firstId);
+        }
+    }, [combatSummary.creatures, activeCreatureId]);
+
+    const handlePreviousCreature = React.useCallback(() => {
+        const currentIndex = combatSummary.creatures.findIndex((creature) => creature.id === activeCreatureId);
+        if (currentIndex > 0) {
+            const prevId = combatSummary.creatures[currentIndex - 1].id;
+            storage.set('activeCreatureId', prevId);
+            setActiveCreatureId(prevId);
+        } else {
+            const lastId = combatSummary.creatures[combatSummary.creatures.length - 1].id;
+            storage.set('activeCreatureId', lastId);
+            setActiveCreatureId(lastId);
+        }
+    }, [combatSummary.creatures, activeCreatureId]);
 
     React.useEffect(() => {
         let combatSummary = storage.get('combatSummary');
@@ -30,7 +98,7 @@ function CombatTracking({ characters }) {
             storage.set('activeCreatureId', activeId);
         }
         setActiveCreatureId(activeId);
-    }, [characters, forceRefresh]);
+    }, [characters, forceRefresh, setupCreatures]);
 
     React.useEffect(() => {
         const handleKeyDown = (event) => {
@@ -57,7 +125,8 @@ function CombatTracking({ characters }) {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [combatSummary, activeCreatureId]);
+    }, [combatSummary, activeCreatureId, handleAddCombatRound, handleAddNpc, handleNextCreature, handlePreviousCreature, handleRemoveCombatRound, handleRemoveNpc]);
+
     const handleClear = () => {
         if (window.confirm('Are you sure you want to clear all combat status?')) {
             const combatSummary = {
@@ -98,67 +167,7 @@ function CombatTracking({ characters }) {
         storage.set('combatSummary', combatSummary);
         setCombatSummary(cloneDeep(combatSummary));
     };
-    const handleAddNpc = () => {
-        combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${numOfNpc + 1}`, type: 'npc', initiative: '', notes: '' });
-        setNumOfNpc(numOfNpc + 1);
-        storage.set('combatSummary', combatSummary);
-        setCombatSummary(cloneDeep(combatSummary));
-    };
-    const handleRemoveNpc = () => {
-        for (let i = combatSummary.creatures.length - 1; i >= 0; i--) {
-            if (combatSummary.creatures[i].type === 'npc') {
-                if (combatSummary.creatures[i].initiative == '' || window.confirm(`${combatSummary.creatures[i].name} has initiative assigned.  Remove anyway?`)) {
-                    combatSummary.creatures.splice(i, 1);
-                    setNumOfNpc(numOfNpc - 1);
-                    storage.set('combatSummary', combatSummary);
-                    setCombatSummary(cloneDeep(combatSummary));
-                }
-                break;
-            }
-        }
-    };
-    const handleAddCombatRound = () => {
-        combatSummary.round++;
-        storage.set('combatSummary', combatSummary);
-        setCombatSummary({...combatSummary});
-    };
-    const handleRemoveCombatRound = () => {
-        combatSummary.round--;
-        storage.set('combatSummary', combatSummary);
-        setCombatSummary({...combatSummary});
-    };
-    const handleNextCreature = () => {
-        const currentIndex = combatSummary.creatures.findIndex((creature) => creature.id === activeCreatureId);
-        if (currentIndex < combatSummary.creatures.length - 1) {
-            const nextId = combatSummary.creatures[currentIndex + 1].id;
-            storage.set('activeCreatureId', nextId);
-            setActiveCreatureId(nextId);
-        } else {
-            const firstId = combatSummary.creatures[0].id;
-            storage.set('activeCreatureId', firstId);
-            setActiveCreatureId(firstId);
-        }
-    };
-    const handlePreviousCreature = () => {
-        const currentIndex = combatSummary.creatures.findIndex((creature) => creature.id === activeCreatureId);
-        if (currentIndex > 0) {
-            const prevId = combatSummary.creatures[currentIndex - 1].id;
-            storage.set('activeCreatureId', prevId);
-            setActiveCreatureId(prevId);
-        } else {
-            const lastId = combatSummary.creatures[combatSummary.creatures.length - 1].id;
-            storage.set('activeCreatureId', lastId);
-            setActiveCreatureId(lastId);
-        }
-    };
-    const setupCreatures = () => {
-        const creatureList = characters.map((character) => { return { id: utils.guid(), name: utils.getFirstName(character.name), type: 'player', initiative: '', notes: '' } });
-        creatureList.sort((a, b) => a.name.localeCompare(b.name)); // asc
-        for (let i = 0; i < numOfNpc; i++) {
-            creatureList.push({ id: utils.guid(), name: `NPC ${i + 1}`, type: 'npc', initiative: '', notes: '' });
-        }
-        return creatureList;
-    };
+
     return (
         <div className='combat-tracking'>
             <h4>Combat Tracking (round {combatSummary.round})</h4>
@@ -211,4 +220,3 @@ function CombatTracking({ characters }) {
 }
 
 export default CombatTracking
-

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import SelectableList from './selectable-list';
 import WarningList from '../common/warning-list';
 import { getSpellLimits, validateSpellSelection } from '../../services/spell-limits.js';
@@ -35,7 +35,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
       };
     
     fetchSpellLimits();
-  }, [formData.class, formData.level, formData.rules]);
+  }, [formData, formData.class, formData.level, formData.rules]);
 
   // Calculate spell counts by level
   useEffect(() => {   
@@ -56,31 +56,31 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
   }, [formData.spells, allSpells]);
 
   // Check if spell selection exceeds limits
-  const getValidationMessage = async () => {
+  const getValidationMessage = useCallback(async () => {
     if (!formData || !formData.class) {
       return '';
     }
-    
+
     const className = formData.class.name;
     const charLevel = parseInt(formData.level) || 1;
     const version = formData.rules || '5e';
     const majorName = formData.class.major?.name || formData.class.subclass?.name || null;
-    
-     // Validate spell selection
+
+    // Validate spell selection
     const validation = await validateSpellSelection(formData.spells || [], allSpells || [], className, charLevel, version, majorName);
-    
+
     if (className === 'Barbarian' || className === 'Monk' || className === 'Rogue' || className === 'Fighter') {
       if (validation.valid) {
         return 'This class does not have spellcasting abilities. Consider choosing a spellcasting class.';
       }
     }
-    
+
     if (!validation.valid) {
       return `Spell limit exceeded: ${validation.violations.join(', ')}`;
     }
-    
+
     return '';
-  };
+  }, [formData, allSpells]);
 
   useEffect(() => {
     const validate = async () => {
@@ -88,7 +88,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
       setValidationMessage(message);
     };
     validate();
-  }, [spellCounts, spellLimits, formData.class, formData.level, formData.spells, allSpells, formData.rules]);
+  }, [spellCounts, spellLimits, formData.class, formData.level, formData.spells, allSpells, formData.rules, getValidationMessage]);
 
   // Spell validation warnings using the new spell-validation service
   useEffect(() => {
@@ -115,7 +115,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
       };
     
     validateSpells();
-   }, [formData.class, formData.race, formData.background, formData.feats, formData.spells, formData.level, formData.rules, allSpells]);
+   }, [formData, formData.class, formData.race, formData.background, formData.feats, formData.spells, formData.level, formData.rules, allSpells]);
 
    // Get level class for styling
   const getLevelClass = (spell) => {

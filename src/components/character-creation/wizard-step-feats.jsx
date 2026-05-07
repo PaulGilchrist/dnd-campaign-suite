@@ -13,7 +13,7 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
               setWarnings(validationWarnings);
             };
             fetchWarnings();
-         }, [formData.feats, formData.level, formData.rules, allFeats]);
+          }, [formData, formData.feats, formData.level, formData.rules, allFeats]);
 
     // Get feat limits for display
     const [featLimits, setFeatLimits] = React.useState({ allowed: 0, originRequired: false, details: '' });
@@ -23,7 +23,7 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
           setFeatLimits(limits);
           };
         fetchLimits();
-      }, [formData.level, formData.rules]);
+      }, [formData, formData.level, formData.rules]);
 
     // Render prerequisites
   const renderPrerequisites = (feat) => {
