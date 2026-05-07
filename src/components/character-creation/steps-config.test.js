@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { WIZARD_STEPS, getTotalSteps, getStepConfig } from './steps-config';
+import { WIZARD_STEPS, getTotalSteps, getStepConfig } from './steps-config.js';
 
 describe('steps-config', () => {
   describe('WIZARD_STEPS', () => {

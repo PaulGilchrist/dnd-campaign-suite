@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import WizardProgressBar from './wizard-progress-bar';
+import WizardProgressBar from './wizard-progress-bar.jsx';
 
 describe('WizardProgressBar', () => {
     it('should render a progress bar', () => {

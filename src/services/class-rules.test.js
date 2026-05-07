@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import classRules from './class-rules';
+import classRules from './class-rules.js';
 
 describe('classRules', () => {
   describe('getClass', () => {

@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { 
-  getCharacterFolders, 
-  getCharacterFiles, 
-  loadCharacters 
-} from './campaignService';
+import {
+  getCharacterFolders,
+  getCharacterFiles,
+  loadCharacters,
+  deleteCharacter,
+  createCharacter,
+  updateCharacter
+} from './campaign-service.js';
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -238,7 +241,7 @@ describe('campaignService', () => {
              ],
         spells: ['Fireball', 'Magic Missile']
           };
-      
+
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(characterData)
@@ -249,4 +252,138 @@ describe('campaignService', () => {
       expect(result).toEqual([characterData]);
         });
       });
+
+  describe('deleteCharacter', () => {
+    it('should delete character on success', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+      });
+
+      await expect(deleteCharacter('campaign1', 'char1.json')).resolves.toBeUndefined();
+      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign1/char1.json', { method: 'DELETE' });
+    });
+
+    it('should encode campaign and file names in URL', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+      });
+
+      await deleteCharacter('campaign with spaces', 'char 1.json');
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign%20with%20spaces/char%201.json', { method: 'DELETE' });
+    });
+
+    it('should throw on API error', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        statusText: 'Not Found',
+      });
+
+      await expect(deleteCharacter('campaign1', 'char1.json')).rejects.toThrow('Failed to delete character: Not Found');
+    });
+
+    it('should throw on network error', async () => {
+      mockFetch.mockRejectedValue(new Error('Network error'));
+
+      await expect(deleteCharacter('campaign1', 'char1.json')).rejects.toThrow('Network error');
+    });
+  });
+
+  describe('createCharacter', () => {
+    it('should create character and return response', async () => {
+      const characterData = { name: 'New Character', level: 1 };
+      const responseData = { character: { ...characterData, id: '123' } };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(responseData),
+      });
+
+      const result = await createCharacter('campaign1', characterData);
+
+      expect(result).toEqual(responseData);
+      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignName: 'campaign1', character: characterData }),
+      });
+    });
+
+    it('should encode campaign name in URL', async () => {
+      const characterData = { name: 'New Character' };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ character: characterData }),
+      });
+
+      await createCharacter('campaign with spaces', characterData);
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign%20with%20spaces', expect.any(Object));
+    });
+
+    it('should throw on API error', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        statusText: 'Bad Request',
+      });
+
+      await expect(createCharacter('campaign1', { name: 'Test' })).rejects.toThrow('Failed to create character: Bad Request');
+    });
+
+    it('should throw on network error', async () => {
+      mockFetch.mockRejectedValue(new Error('Network error'));
+
+      await expect(createCharacter('campaign1', { name: 'Test' })).rejects.toThrow('Network error');
+    });
+  });
+
+  describe('updateCharacter', () => {
+    it('should update character and return response', async () => {
+      const characterData = { name: 'Updated Character', level: 5 };
+      const responseData = { character: characterData };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(responseData),
+      });
+
+      const result = await updateCharacter('campaign1', 'char1.json', characterData);
+
+      expect(result).toEqual(responseData);
+      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign1/char1.json', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(characterData),
+      });
+    });
+
+    it('should encode campaign and file names in URL', async () => {
+      const characterData = { name: 'Updated Character' };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ character: characterData }),
+      });
+
+      await updateCharacter('campaign with spaces', 'char 1.json', characterData);
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign%20with%20spaces/char%201.json', expect.any(Object));
+    });
+
+    it('should throw on API error', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        statusText: 'Conflict',
+      });
+
+      await expect(updateCharacter('campaign1', 'char1.json', { name: 'Test' })).rejects.toThrow('Failed to update character: Conflict');
+    });
+
+    it('should throw on network error', async () => {
+      mockFetch.mockRejectedValue(new Error('Network error'));
+
+      await expect(updateCharacter('campaign1', 'char1.json', { name: 'Test' })).rejects.toThrow('Network error');
+    });
+  });
 });

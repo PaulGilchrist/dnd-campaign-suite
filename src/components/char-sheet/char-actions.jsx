@@ -1,7 +1,7 @@
  
 import React, { useState, useEffect } from 'react'
-import useActionPopup from './common/use-action-popup'
-import Popup from '../common/popup'
+import useActionPopup from './common/use-action-popup.jsx'
+import Popup from '../common/popup.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { parseMagicItemName } from '../../services/attack-calc.js';
 import './char-actions.css'

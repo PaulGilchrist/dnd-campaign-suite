@@ -1,16 +1,16 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CharSummary from './char-summary';
-import storage from '../../../services/storage';
+import CharSummary from './char-summary.jsx';
+import storage from '../../../services/storage.js';
 
-vi.mock('../../../services/storage', () => ({
+vi.mock('../../../services/storage.js', () => ({
   default: {
     getProperty: vi.fn(),
     setProperty: vi.fn(),
     },
 }));
 
-vi.mock('../../common/hidden-input', () => ({
+vi.mock('../../common/hidden-input.jsx', () => ({
   default: vi.fn(({ value, showInput, handleInputToggle, handleValueChange }) => {
     if (showInput) {
       return (
@@ -29,7 +29,7 @@ vi.mock('../../common/hidden-input', () => ({
 
 const setPopupHtmlMock = vi.fn();
 
-vi.mock('../common/use-popup', () => ({
+vi.mock('../common/use-popup.jsx', () => ({
   default: vi.fn(() => ({
     popupHtml: null,
     setPopupHtml: setPopupHtmlMock,
@@ -37,7 +37,7 @@ vi.mock('../common/use-popup', () => ({
   })),
 }));
 
-vi.mock('../char-feats/char-feats', () => ({
+vi.mock('../char-feats/char-feats.jsx', () => ({
   default: vi.fn(({ playerStats, showPopup }) => (
     <div data-testid="char-feats">
       Feats: {playerStats.class.name}
@@ -46,11 +46,11 @@ vi.mock('../char-feats/char-feats', () => ({
   )),
 }));
 
-vi.mock('./char-hit-points', () => ({
+vi.mock('./char-hit-points.jsx', () => ({
   default: vi.fn(({ playerStats }) => <div data-testid="char-hit-points">HP: {playerStats.hitPoints}</div>),
 }));
 
-vi.mock('./char-gold', () => ({
+vi.mock('./char-gold.jsx', () => ({
   default: vi.fn(({ playerStats }) => <div data-testid="char-gold">Gold: {playerStats.inventory?.gold}</div>),
 }));
 
@@ -67,7 +67,7 @@ vi.mock('./char-class-sorcerer', () => ({ default: vi.fn(({ playerStats }) => <d
 vi.mock('./char-class-warlock', () => ({ default: vi.fn(({ playerStats }) => <div data-testid="char-class-warlock">{playerStats.class.name}</div>) }));
 vi.mock('./char-class-wizard', () => ({ default: vi.fn(({ playerStats }) => <div data-testid="char-class-wizard">{playerStats.class.name}</div>) }));
 
-vi.mock('../../../services/class-rules-2024', () => ({
+vi.mock('../../../services/class-rules-2024.js', () => ({
   default: {
     getUnarmoredMovementIncrease: vi.fn(() => 0),
     getMartialArtsDie: vi.fn(() => 1),

@@ -1,16 +1,16 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CharSpellSlotLevel from './char-spell-slot-level';
+import CharSpellSlotLevel from './char-spell-slot-level.jsx';
 
 // Mock the storage service with factory function
-vi.mock('../../../services/storage', () => ({
+vi.mock('../../../services/storage.js', () => ({
   default: {
     getProperty: vi.fn(),
     setProperty: vi.fn(),
-     },
+   },
 }));
 
-import storage from '../../../services/storage';
+import storage from '../../../services/storage.js';
 
 const mockPlayerStats = {
   name: 'Test Character',

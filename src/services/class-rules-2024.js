@@ -1,6 +1,6 @@
 import { cloneDeep } from 'lodash';
-import * as featureCategories from './feature-categories-2024'
-import { categorizeFeatures, mergeCategorizedFeatures } from './feature-categorization-utils'
+import * as featureCategories from './feature-categories-2024.js'
+import { categorizeFeatures, mergeCategorizedFeatures } from './feature-categorization-utils.js'
 import utils from './utils.js';
 
 const classRules = {

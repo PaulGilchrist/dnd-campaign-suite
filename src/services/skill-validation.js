@@ -6,7 +6,6 @@
 
 import { fetchClassData, fetchRaceData, fetchBackgroundData } from './data-loader.js';
 
-export { fetchClassData, fetchRaceData, fetchBackgroundData };
 /**
  * Parses skill proficiencies from a class/race/background data object
  * Handles both "Choose X from..." format and direct skill lists

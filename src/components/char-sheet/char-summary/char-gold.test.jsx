@@ -1,16 +1,16 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CharGold from './char-gold';
-import storage from '../../../services/storage';
+import CharGold from './char-gold.jsx';
+import storage from '../../../services/storage.js';
 
-vi.mock('../../../services/storage', () => ({
+vi.mock('../../../services/storage.js', () => ({
   default: {
     getProperty: vi.fn(),
     setProperty: vi.fn(),
    },
 }));
 
-vi.mock('../../common/hidden-input', () => ({
+vi.mock('../../common/hidden-input.jsx', () => ({
   default: vi.fn(({ value, showInput, handleInputToggle, handleValueChange }) => {
     if (showInput) {
       return (

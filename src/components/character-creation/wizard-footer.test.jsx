@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import WizardFooter from './wizard-footer';
+import WizardFooter from './wizard-footer.jsx';
 
 describe('WizardFooter', () => {
   const defaultProps = {

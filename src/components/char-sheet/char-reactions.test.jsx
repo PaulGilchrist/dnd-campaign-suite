@@ -1,9 +1,9 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CharReactions from './char-reactions';
+import CharReactions from './char-reactions.jsx';
 
 // Mock the useActionPopup hook
-vi.mock('./common/use-action-popup', () => ({
+vi.mock('./common/use-action-popup.jsx', () => ({
   default: vi.fn(),
   buildFeatureDetailHtml: (entity) => {
     if (entity.details) {
@@ -14,11 +14,11 @@ vi.mock('./common/use-action-popup', () => ({
 }));
 
 // Mock sanitizeHtml
-vi.mock('../../services/sanitize', () => ({
+vi.mock('../../services/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-import useActionPopup, { buildFeatureDetailHtml } from './common/use-action-popup';
+import useActionPopup, { buildFeatureDetailHtml } from './common/use-action-popup.jsx';
 
 const mockPlayerStats = {
   reactions: [

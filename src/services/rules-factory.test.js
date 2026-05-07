@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import rulesFactory from './rules-factory';
+import rulesFactory from './rules-factory.js';
 
 // Mock the rules modules
 vi.mock('./rules.js', () => ({

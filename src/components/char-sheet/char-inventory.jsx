@@ -1,9 +1,9 @@
  
 
-import usePopup from './common/use-popup'
-import Popup from '../common/popup'
+import usePopup from './common/use-popup.jsx'
+import Popup from '../common/popup.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
-import { loadEquipment } from '../../services/data-loader';
+import { loadEquipment } from '../../services/data-loader.js';
 import './char-inventory.css'
 
 function CharInventory({ playerStats }) {

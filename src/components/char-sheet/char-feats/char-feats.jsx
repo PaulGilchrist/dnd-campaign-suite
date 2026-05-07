@@ -1,8 +1,8 @@
  
 
-import { loadFeatData } from '../../../services/data-loader'
-import usePopup from '../common/use-popup'
-import Popup from '../../common/popup'
+import { loadFeatData } from '../../../services/data-loader.js'
+import usePopup from '../common/use-popup.jsx'
+import Popup from '../../common/popup.jsx'
 import './char-feats.css'
 
 function CharFeats({ playerStats, showPopup }) {

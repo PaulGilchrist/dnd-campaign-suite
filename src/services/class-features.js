@@ -1,5 +1,5 @@
-import classRules from './class-rules'
-import classRules2024 from './class-rules-2024'
+import classRules from './class-rules.js'
+import classRules2024 from './class-rules-2024.js'
 
 export function getClassFeatures(playerStats) {
   const is2024 = playerStats.rules === '2024'

@@ -1,14 +1,14 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CharSpells from './char-spells';
+import CharSpells from './char-spells.jsx';
 
 // Mock the usePopup hook
-vi.mock('../common/use-action-popup', () => ({
+vi.mock('../common/use-action-popup.jsx', () => ({
   default: vi.fn(),
 }));
 
 // Mock the CharSpellSlots component
-vi.mock('./char-spell-slots', () => ({
+vi.mock('./char-spell-slots.jsx', () => ({
   default: function MockCharSpellSlots() {
     return <div data-testid="char-spell-slots">Spell Slots</div>;
     },
@@ -19,7 +19,7 @@ vi.mock('lodash', () => ({
   cloneDeep: vi.fn(obj => JSON.parse(JSON.stringify(obj))),
 }));
 
-import useActionPopup from '../common/use-action-popup';
+import useActionPopup from '../common/use-action-popup.jsx';
 
 const mockPlayerStats = {
   name: 'Test Character',

@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import WizardStepAbilities from './wizard-step-abilities';
+import WizardStepAbilities from './wizard-step-abilities.jsx';
 
 // Mock fetch for loading ability names and point buy costs
 const mockAbilityScores = [
@@ -31,7 +31,7 @@ global.fetch = vi.fn(() =>
 );
 
 // Mock the utils module
-vi.mock('./utils', () => ({
+vi.mock('./utils.js', () => ({
   getPointBuyCosts: vi.fn(() => Promise.resolve(mockPointBuyCosts)),
 }));
 

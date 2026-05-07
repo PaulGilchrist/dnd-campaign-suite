@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import useWizardSkills from './use-wizard-skills';
+import useWizardSkills from './use-wizard-skills.js';
 
 // Mock the skill validation services
 vi.mock('../../services/skill-validation.js', () => ({

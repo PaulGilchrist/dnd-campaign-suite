@@ -45,7 +45,7 @@ async function loadClassData(version = '5e') {
  * @param {string} version - '5e' or '2024'
  * @returns {object|null} - The class data or null if not found
  */
-export async function fetchClassData(className, version = '5e') {
+async function fetchClassData(className, version = '5e') {
   const classes = await loadClassData(version);
   return classes.find(c => c.name === className || c.index === className.toLowerCase()) || null;
 }

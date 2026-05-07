@@ -1,16 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import React from 'react';
-import useTrackedResource from './use-tracked-resource';
+import useTrackedResource from './use-tracked-resource.js';
 
-vi.mock('../services/storage', () => ({
+vi.mock('../services/storage.js', () => ({
   default: {
     getProperty: vi.fn(),
     setProperty: vi.fn(),
   }
 }));
 
-import storage from '../services/storage';
+import storage from '../services/storage.js';
 
 function TestComponent({ storageKey, playerName, maxGetter, deps, onRender }) {
   const { current, max, update } = useTrackedResource(storageKey, playerName, maxGetter, deps);

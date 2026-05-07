@@ -1,9 +1,9 @@
 
 import React from 'react'
 import { cloneDeep, isEqual } from 'lodash';
-import utils from '../../services/utils'
-import storage from '../../services/storage'
-import Subscriber from '../common/subscriber';
+import utils from '../../services/utils.js'
+import storage from '../../services/storage.js'
+import Subscriber from '../common/subscriber.jsx';
 
 import './combat-tracking.css'
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { categorizeFeatures, mergeCategorizedFeatures } from './feature-categorization-utils';
+import { categorizeFeatures, mergeCategorizedFeatures } from './feature-categorization-utils.js';
 
 describe('feature-categorization-utils', () => {
   describe('categorizeFeatures', () => {

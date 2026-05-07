@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getClassFeatures } from './class-features';
+import { getClassFeatures } from './class-features.js';
 
 describe('getClassFeatures', () => {
   describe('Bard Features (5e)', () => {

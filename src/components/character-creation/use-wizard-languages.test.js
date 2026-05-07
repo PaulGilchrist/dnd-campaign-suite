@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import useWizardLanguages from './use-wizard-languages';
+import useWizardLanguages from './use-wizard-languages.js';
 
 // Mock the languages validation services
 vi.mock('../../services/languages-fightingstyles-validation.js', () => ({

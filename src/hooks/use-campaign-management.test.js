@@ -1,5 +1,5 @@
 import { renderHook, act } from '@testing-library/react';
-import useCampaignManagement from './use-campaign-management';
+import useCampaignManagement from './use-campaign-management.js';
 
 describe('useCampaignManagement', () => {
   let sessionStorageMock;

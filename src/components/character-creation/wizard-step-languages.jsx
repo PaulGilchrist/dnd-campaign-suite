@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import WarningList from '../common/warning-list';
+import WarningList from '../common/warning-list.jsx';
 
 function WizardStepLanguages({ formData, errors, onLanguageToggle, onFightingStyleToggle, languageLimits, fightingStyleLimits, warnings, preSelectedLanguages, preSelectedFightingStyles }) {
   const [languagesList, setLanguagesList] = useState([]);

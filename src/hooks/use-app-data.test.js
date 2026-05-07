@@ -2,7 +2,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the data-loader module before importing useAppData
-vi.mock('../services/data-loader', () => ({
+vi.mock('../services/data-loader.js', () => ({
   loadAbilityScores: vi.fn(),
   loadClassData: vi.fn(),
   loadEquipment: vi.fn(),
@@ -11,7 +11,7 @@ vi.mock('../services/data-loader', () => ({
   loadSpells: vi.fn(),
 }));
 
-import useAppData from './use-app-data';
+import useAppData from './use-app-data.js';
 import {
   loadAbilityScores,
   loadClassData,
@@ -19,7 +19,7 @@ import {
   loadMagicItems,
   loadRaceData,
   loadSpells,
-} from '../services/data-loader';
+} from '../services/data-loader.js';
 
 // Mock data
 const mockAbilityScores = [{ name: 'Strength' }];

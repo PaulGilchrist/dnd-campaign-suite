@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import WizardStepRaceClass from './wizard-step-race-class';
+import WizardStepRaceClass from './wizard-step-race-class.jsx';
 
 describe('WizardStepRaceClass', () => {
   const mockProps = {

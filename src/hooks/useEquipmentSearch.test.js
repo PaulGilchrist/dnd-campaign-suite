@@ -1,9 +1,9 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { useEquipmentSearch } from './useEquipmentSearch';
-import { loadEquipment } from '../services/data-loader';
+import { useEquipmentSearch } from './useEquipmentSearch.js';
+import { loadEquipment } from '../services/data-loader.js';
 
-vi.mock('../services/data-loader', () => ({
+vi.mock('../services/data-loader.js', () => ({
   loadEquipment: vi.fn()
 }));
 

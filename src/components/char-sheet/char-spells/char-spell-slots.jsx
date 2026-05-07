@@ -1,8 +1,8 @@
  
 import React from 'react'
 import './char-spell-slots.css'
-import rules from '../../../services/rules'
-import CharSpellSlotLevel from './char-spell-slot-level'
+import rules from '../../../services/rules.js'
+import CharSpellSlotLevel from './char-spell-slot-level.jsx'
 
 function CharSpellSlots({ playerStats }) {
     let spellMaxLevel = rules.getSpellMaxLevel(playerStats.spellAbilities);

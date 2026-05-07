@@ -1,9 +1,9 @@
  
 import React from 'react'
 import { cloneDeep, isEqual } from 'lodash';
-import useActionPopup from '../common/use-action-popup'
-import Popup from '../../common/popup'
-import CharSpellSlots from './char-spell-slots'
+import useActionPopup from '../common/use-action-popup.jsx'
+import Popup from '../../common/popup.jsx'
+import CharSpellSlots from './char-spell-slots.jsx'
 import './char-spells.css'
 
 const areEqual = (prevProps, nextProps) => {

@@ -1,7 +1,7 @@
 import React from 'react';
 // No component-specific CSS needed - uses shared wizard styles
-import { useEquipmentSearch } from '../../hooks/useEquipmentSearch';
-import EquipmentSearchModal from './EquipmentSearchModal';
+import { useEquipmentSearch } from '../../hooks/useEquipmentSearch.js';
+import EquipmentSearchModal from './EquipmentSearchModal.jsx';
 
 const WizardStepInventory = React.memo(function WizardStepInventory({ formData, tempInventory, onInventoryChange, onTempInventoryChange }) {
   const {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import utils from './utils';
+import utils from './utils.js';
 
 describe('utils', () => {
     describe('getAbilityLongName', () => {

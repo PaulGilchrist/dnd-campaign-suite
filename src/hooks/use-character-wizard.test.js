@@ -27,7 +27,7 @@ async function setup(campaign) {
   vi.resetModules();
   const mockStorage = createMockSessionStorage(campaign);
   vi.stubGlobal('sessionStorage', mockStorage);
-  const { useCharacterWizard } = await import('./use-character-wizard');
+  const { useCharacterWizard } = await import('./use-character-wizard.js');
   return { useCharacterWizard, mockStorage };
 }
 
@@ -156,7 +156,7 @@ describe('useCharacterWizard', () => {
       });
 
       expect(global.fetch).toHaveBeenCalledTimes(3);
-      expect(global.fetch).toHaveBeenCalledWith('/api/characters', {
+      expect(global.fetch).toHaveBeenCalledWith(`/api/characters/${encodeURIComponent(campaignName)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ campaignName, character: characterData }),
@@ -191,6 +191,7 @@ describe('useCharacterWizard', () => {
       global.fetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
+        statusText: 'Internal Server Error',
       });
 
       const { result } = renderHook(() => useCharacterWizard());
@@ -199,7 +200,7 @@ describe('useCharacterWizard', () => {
         result.current.handleWizardComplete(characterData);
       });
 
-      expect(window.alert).toHaveBeenCalledWith('Failed to create character: Failed: 500');
+      expect(window.alert).toHaveBeenCalledWith('Failed to create character: Failed to create character: Internal Server Error');
     });
   });
 
@@ -249,6 +250,7 @@ describe('useCharacterWizard', () => {
       global.fetch.mockResolvedValueOnce({
         ok: false,
         status: 400,
+        statusText: 'Bad Request',
       });
 
       const { result } = renderHook(() => useCharacterWizard());
@@ -257,7 +259,7 @@ describe('useCharacterWizard', () => {
         result.current.handleEditWizardComplete(characterData);
       });
 
-      expect(window.alert).toHaveBeenCalledWith('Failed to update character: Failed: 400');
+      expect(window.alert).toHaveBeenCalledWith('Failed to update character: Failed to update character: Bad Request');
     });
   });
 });

@@ -1,5 +1,5 @@
  
-import usePopup from './use-popup'
+import usePopup from './use-popup.jsx'
 
 export function buildFeatureDetailHtml(entity) {
     if (entity.details) {
@@ -8,7 +8,7 @@ export function buildFeatureDetailHtml(entity) {
     return null;
 }
 
-export function buildSpellDetailHtml(entity) {
+function buildSpellDetailHtml(entity) {
     if (entity.desc) {
         let html = `<b>${entity.name}</b><br/><br/>${entity.desc}<br/>`;
         if (typeof entity.higher_level === 'string' && entity.higher_level.trim()) {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaignService';
+import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaign-service.js';
 import './campaign-selection.css';
 
 function CampaignSelection({ onCampaignSelect }) {

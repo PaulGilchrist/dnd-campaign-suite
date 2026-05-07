@@ -1,13 +1,13 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import useWizardNavigation from './use-wizard-navigation';
+import useWizardNavigation from './use-wizard-navigation.js';
 
 // Mock the validateStep function
-vi.mock('./utils', () => ({
+vi.mock('./utils.js', () => ({
   validateStep: vi.fn()
 }));
 
-import { validateStep } from './utils';
+import { validateStep } from './utils.js';
 
 describe('useWizardNavigation', () => {
   const mockFormData = {

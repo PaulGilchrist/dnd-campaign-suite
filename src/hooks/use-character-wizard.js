@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import cloneDeep from 'lodash/cloneDeep';
+import * as campaignService from '../services/campaign-service.js';
 
 export function useCharacterWizard() {
   const [showCharacterWizard, setShowCharacterWizard] = useState(false);
@@ -22,13 +23,7 @@ export function useCharacterWizard() {
     try {
       const storedCampaign = sessionStorage.getItem('currentCampaign');
       if (!storedCampaign) throw new Error('No campaign selected');
-      const response = await fetch('/api/characters', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ campaignName: storedCampaign, character: characterData }),
-      });
-      if (!response.ok) throw new Error(`Failed: ${response.status}`);
-      const result = await response.json();
+      const result = await campaignService.createCharacter(storedCampaign, characterData);
       callbacksRef.current.setActiveCharacter(cloneDeep(result.character));
       setShowCharacterWizard(false);
       const encodedCampaign = encodeURIComponent(storedCampaign);
@@ -55,14 +50,8 @@ export function useCharacterWizard() {
     try {
       const storedCampaign = sessionStorage.getItem('currentCampaign');
       if (!storedCampaign) throw new Error('No campaign selected');
-      const encodedCampaign = encodeURIComponent(storedCampaign);
       const fileName = `${characterData.name.toLowerCase().replace(/\s+/g, '-')}.json`;
-      const response = await fetch(`/api/characters/${encodedCampaign}/${encodeURIComponent(fileName)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(characterData),
-      });
-      if (!response.ok) throw new Error(`Failed: ${response.status}`);
+      await campaignService.updateCharacter(storedCampaign, fileName, characterData);
       callbacksRef.current.setActiveCharacter(cloneDeep(characterData));
       setShowEditCharacterWizard(false);
       const { setCharacters } = callbacksRef.current;

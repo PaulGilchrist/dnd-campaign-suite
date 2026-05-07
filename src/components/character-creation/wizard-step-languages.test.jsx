@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import WizardStepLanguages from './wizard-step-languages';
+import WizardStepLanguages from './wizard-step-languages.jsx';
 
 global.fetch = vi.fn();
 

@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import EquipmentSearchModal from './EquipmentSearchModal';
+import EquipmentSearchModal from './EquipmentSearchModal.jsx';
 
 const mockEquipment = [
   {

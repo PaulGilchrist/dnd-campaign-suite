@@ -1,19 +1,19 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import CharFeats from './char-feats';
+import CharFeats from './char-feats.jsx';
 
 // Mock the data-loader module
-vi.mock('../../../services/data-loader', () => ({
+vi.mock('../../../services/data-loader.js', () => ({
   loadFeatData: vi.fn(),
 }));
 
 // Mock the usePopup hook
-vi.mock('../common/use-popup', () => ({
+vi.mock('../common/use-popup.jsx', () => ({
   default: vi.fn(),
 }));
 
-import usePopup from '../common/use-popup';
-import { loadFeatData } from '../../../services/data-loader';
+import usePopup from '../common/use-popup.jsx';
+import { loadFeatData } from '../../../services/data-loader.js';
 
 const mockPlayerStats = {
   feats: ['Actor', 'Athlete'],

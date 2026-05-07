@@ -1,15 +1,16 @@
 import { useEffect, useRef } from 'react';
 import { cloneDeep } from 'lodash';
 import './App.css';
-import CharSheet from './components/char-sheet/char-sheet';
-import CombatTracking from './components/combat-tracking/combat-tracking';
-import CampaignSelection from './components/campaign-selection/campaign-selection';
-import CharacterCreationWizard from './components/character-creation/character-creation-wizard';
-import Utils from './services/utils';
-import useAppData from './hooks/use-app-data';
-import useCharacterManagement from './hooks/use-character-management';
-import useCampaignManagement from './hooks/use-campaign-management';
-import { useCharacterWizard } from './hooks/use-character-wizard';
+import CharSheet from './components/char-sheet/char-sheet.jsx';
+import CombatTracking from './components/combat-tracking/combat-tracking.jsx';
+import CampaignSelection from './components/campaign-selection/campaign-selection.jsx';
+import CharacterCreationWizard from './components/character-creation/character-creation-wizard.jsx';
+import * as campaignService from './services/campaign-service.js';
+import utils from './services/utils.js';
+import useAppData from './hooks/use-app-data.js';
+import useCharacterManagement from './hooks/use-character-management.js';
+import useCampaignManagement from './hooks/use-campaign-management.js';
+import { useCharacterWizard } from './hooks/use-character-wizard.js';
 
 function App() {
   const appData = useAppData();
@@ -61,10 +62,8 @@ function App() {
     try {
       const storedCampaign = sessionStorage.getItem('currentCampaign');
       if (!storedCampaign) throw new Error('No campaign selected');
-      const encodedCampaign = encodeURIComponent(storedCampaign);
       const fileName = `${characterName.toLowerCase().replace(/\s+/g, '-')}.json`;
-      const response = await fetch(`/api/characters/${encodedCampaign}/${encodeURIComponent(fileName)}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error(`Failed: ${response.status}`);
+      await campaignService.deleteCharacter(storedCampaign, fileName);
       setCharacters(prev => prev.filter(char => char.name !== characterName));
       if (activeCharacter && activeCharacter.name === characterName) setActiveCharacter(null);
       const remaining = characters.filter(char => char.name !== characterName);
@@ -73,7 +72,7 @@ function App() {
       console.error('Error deleting character:', error);
       alert(`Failed to delete character: ${error.message}`);
      }
-   };
+  };
 
   const combatTrackingActive = characters.length > 0 && activeCharacter == null;
 
@@ -88,7 +87,7 @@ function App() {
         <button className="icon-button delete-campaign-btn" onClick={handleDeleteCampaign} disabled={characters.length > 0} title="Delete Campaign"><i className="fas fa-trash"></i></button>
       </div>
       {characters.map(character => (
-        <button key={Utils.getFirstName(character.name)} className={`no-print character-btn ${activeCharacter && activeCharacter.name === character.name ? 'active' : ''}`} onClick={() => handleCharacterClick(character)}>{character.name}</button>
+        <button key={utils.getFirstName(character.name)} className={`no-print character-btn ${activeCharacter && activeCharacter.name === character.name ? 'active' : ''}`} onClick={() => handleCharacterClick(character)}>{character.name}</button>
       ))}
       {showButton && <button className="clickable mutted no-print" onClick={handleAddCharacter}><i className="fas fa-plus"></i> Add</button>}
       {showButton && <button className="clickable mutted no-print" onClick={handleUploadClick}><i className="fas fa-arrow-up"></i> Upload</button>}

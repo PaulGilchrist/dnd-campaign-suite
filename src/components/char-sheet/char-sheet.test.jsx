@@ -1,71 +1,71 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CharSheet from './char-sheet';
+import CharSheet from './char-sheet.jsx';
 
 // Mock all child components
-vi.mock('./char-summary/char-summary', () => ({
+vi.mock('./char-summary/char-summary.jsx', () => ({
   default: vi.fn(() => (
     <div data-testid="char-summary">Summary</div>
   )),
 }));
 
-vi.mock('./char-abilities', () => ({
+vi.mock('./char-abilities.jsx', () => ({
   default: vi.fn(() => (
     <div data-testid="char-abilities">Abilities</div>
   )),
 }));
 
-vi.mock('./char-actions', () => ({
+vi.mock('./char-actions.jsx', () => ({
   default: vi.fn(() => (
     <div data-testid="char-actions">Actions</div>
   )),
 }));
 
-vi.mock('./char-reactions', () => ({
+vi.mock('./char-reactions.jsx', () => ({
   default: vi.fn(() => (
     <div data-testid="char-reactions">Reactions</div>
   )),
 }));
 
-vi.mock('./char-spells/char-spells', () => ({
+vi.mock('./char-spells/char-spells.jsx', () => ({
   default: vi.fn(() => (
     <div data-testid="char-spells">Spells</div>
   )),
 }));
 
-vi.mock('./char-special-actions', () => ({
+vi.mock('./char-special-actions.jsx', () => ({
   default: vi.fn(() => (
     <div data-testid="char-special-actions">Special Actions</div>
   )),
 }));
 
-vi.mock('./char-inventory', () => ({
+vi.mock('./char-inventory.jsx', () => ({
   default: vi.fn(() => (
     <div data-testid="char-inventory">Inventory</div>
   )),
 }));
 
-vi.mock('./char-character-advancement', () => ({
+vi.mock('./char-character-advancement.jsx', () => ({
   default: vi.fn(() => (
     <div data-testid="char-character-advancement">Character Advancement</div>
   )),
 }));
 
-vi.mock('../common/subscriber', () => ({
+vi.mock('../common/subscriber.jsx', () => ({
   default: vi.fn(({ handleEvent }) => {
     return <div data-testid="subscriber" data-handle-event={handleEvent}>Subscriber</div>;
   }),
 }));
 
 // Mock rulesFactory
-vi.mock('../../services/rules-factory', () => ({
+vi.mock('../../services/rules-factory.js', () => ({
   default: {
     getPlayerStats: vi.fn(),
   },
 }));
 
 // Mock storage
-vi.mock('../../services/storage', () => ({
+vi.mock('../../services/storage.js', () => ({
   default: {
     get: vi.fn(),
     setProperty: vi.fn(),
@@ -74,7 +74,7 @@ vi.mock('../../services/storage', () => ({
 }));
 
 // Mock utils
-vi.mock('../../services/utils', () => ({
+vi.mock('../../services/utils.js', () => ({
   default: {
     getFirstName: vi.fn((name) => name),
     guid: vi.fn(() => 'unique-id'),
@@ -92,9 +92,9 @@ Object.defineProperty(window, 'localStorage', {
   writable: true,
 });
 
-import rulesFactory from '../../services/rules-factory';
-import storage from '../../services/storage';
-import utils from '../../services/utils';
+import rulesFactory from '../../services/rules-factory.js';
+import storage from '../../services/storage.js';
+import utils from '../../services/utils.js';
 
 const mockPlayerSummary = {
   name: 'Test Character',

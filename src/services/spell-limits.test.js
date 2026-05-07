@@ -4,7 +4,7 @@ import {
   validateSpellSelection, 
   getAllSpellLimits,
   resetClassDataCache
-} from './spell-limits';
+} from './spell-limits.js';
 
 // Mock fetch for all tests
 const mockFetch = vi.fn();

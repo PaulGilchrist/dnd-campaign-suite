@@ -1,10 +1,10 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import useCharacterManagement from './use-character-management';
+import useCharacterManagement from './use-character-management.js';
 
 vi.mock('lodash/cloneDeep', () => ({ default: vi.fn(val => val) }));
 vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
-vi.mock('../services/utils', () => ({ default: { getFirstName: vi.fn(n => n) } }));
+vi.mock('../services/utils.js', () => ({ default: { getFirstName: vi.fn(n => n) } }));
 
 const createMockSessionStorage = () => {
   const store = {};
@@ -85,7 +85,7 @@ describe('useCharacterManagement', () => {
   describe('handleSaveClick', () => {
     it('calls saveAs with correct filename and JSON blob', async () => {
       const { saveAs } = await import('file-saver');
-      const { default: Utils } = await import('../services/utils');
+      const { default: Utils } = await import('../services/utils.js');
       const char = { name: 'Dark Lord' };
 
       const { result } = renderHook(() => useCharacterManagement());

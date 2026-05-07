@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import WizardStepResistances from './wizard-step-resistances';
+import WizardStepResistances from './wizard-step-resistances.jsx';
 
 // Mock fetch for loading resistances/immunities data
 const mockResistancesData = ['Acid', 'Cold', 'Fire', 'Force', 'Lightning', 'Necrotic', 'Psychic', 'Radiant', 'Thunder'];

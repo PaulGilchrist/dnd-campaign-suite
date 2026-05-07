@@ -1,8 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import WizardStepMagicItems from './wizard-step-magic-items';
+import WizardStepMagicItems from './wizard-step-magic-items.jsx';
 
-vi.mock('./selectable-list', () => ({
+vi.mock('./selectable-list.jsx', () => ({
   default: vi.fn(({ title, resultLabel, renderWarnings, items }) => (
      <div data-testid="selectable-list">
        <h2>{title}</h2>
@@ -13,7 +13,7 @@ vi.mock('./selectable-list', () => ({
    ))
 }));
 
-vi.mock('../../services/sanitize', () => ({
+vi.mock('../../services/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 

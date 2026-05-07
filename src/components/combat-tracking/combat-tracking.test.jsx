@@ -2,18 +2,18 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import CombatTracking from './combat-tracking.jsx';
 
-vi.mock('../common/subscriber', () => ({
+vi.mock('../common/subscriber.jsx', () => ({
   default: () => <div data-testid="subscriber" />,
 }));
 
-vi.mock('../../services/storage', () => ({
+vi.mock('../../services/storage.js', () => ({
   default: {
     get: vi.fn(),
     set: vi.fn(),
   },
 }));
 
-vi.mock('../../services/utils', () => ({
+vi.mock('../../services/utils.js', () => ({
   default: {
     guid: vi.fn(() => 'test-guid'),
     getFirstName: vi.fn((name) => name?.split(' ')[0] || name),

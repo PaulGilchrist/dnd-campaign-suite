@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react';
-import { getPointBuyCosts } from './utils';
+import { getPointBuyCosts } from './utils.js';
 
 function useWizardAbilities(formData, currentStep, setErrors, updateAbility) {
   useEffect(() => {

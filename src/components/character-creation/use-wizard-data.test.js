@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import useWizardData from './use-wizard-data';
+import useWizardData from './use-wizard-data.js';
 
 describe('useWizardData', () => {
   beforeEach(() => {

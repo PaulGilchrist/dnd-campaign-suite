@@ -1,13 +1,13 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import useWizardAbilities from './use-wizard-abilities';
+import useWizardAbilities from './use-wizard-abilities.js';
 
 // Mock the utils module
-vi.mock('./utils', () => ({
+vi.mock('./utils.js', () => ({
   getPointBuyCosts: vi.fn()
 }));
 
-import { getPointBuyCosts } from './utils';
+import { getPointBuyCosts } from './utils.js';
 
 describe('useWizardAbilities', () => {
   const mockFormData = {

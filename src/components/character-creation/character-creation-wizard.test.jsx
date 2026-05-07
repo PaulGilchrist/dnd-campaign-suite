@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CharacterCreationWizard from './character-creation-wizard';
+import CharacterCreationWizard from './character-creation-wizard.jsx';
 
 // Stable mock data - defined outside vi.fn() to preserve reference identity across renders
 const mockFormData = {
@@ -43,7 +43,7 @@ vi.mock('lodash/merge.js', () => ({
 }));
 
 // Mock all the hooks with stable references
-vi.mock('./use-wizard-form', () => ({
+vi.mock('./use-wizard-form.js', () => ({
   default: vi.fn(() => ({
     formData: mockFormData,
     errors: mockErrors,
@@ -58,7 +58,7 @@ vi.mock('./use-wizard-form', () => ({
   })),
 }));
 
-vi.mock('./use-wizard-data', () => ({
+vi.mock('./use-wizard-data.js', () => ({
   default: vi.fn(() => ({
     backgrounds: [],
     racesData: [],
@@ -69,7 +69,7 @@ vi.mock('./use-wizard-data', () => ({
   })),
 }));
 
-vi.mock('./use-wizard-navigation', () => ({
+vi.mock('./use-wizard-navigation.js', () => ({
   default: vi.fn(() => ({
     currentStep: 1,
     isNextDisabled: false,
@@ -79,7 +79,7 @@ vi.mock('./use-wizard-navigation', () => ({
   })),
 }));
 
-vi.mock('./use-wizard-skills', () => ({
+vi.mock('./use-wizard-skills.js', () => ({
   default: vi.fn(() => ({
     skillLimits: null,
     expertiseLimits: null,
@@ -88,7 +88,7 @@ vi.mock('./use-wizard-skills', () => ({
   })),
 }));
 
-vi.mock('./use-wizard-languages', () => ({
+vi.mock('./use-wizard-languages.js', () => ({
   default: vi.fn(() => ({
     languageLimits: null,
     fightingStyleLimits: null,
@@ -98,14 +98,14 @@ vi.mock('./use-wizard-languages', () => ({
   })),
 }));
 
-vi.mock('./use-wizard-resistances', () => ({
+vi.mock('./use-wizard-resistances.js', () => ({
   default: vi.fn(() => ({
     resistanceWarnings: [],
     preSelectedResistancesList: { resistances: [], immunities: [] },
   })),
 }));
 
-vi.mock('./use-wizard-feats', () => ({
+vi.mock('./use-wizard-feats.js', () => ({
   default: vi.fn(() => ({
     preSelectedFeats: [],
   })),
@@ -118,7 +118,7 @@ vi.mock('./use-wizard-inventory', () => ({
   })),
 }));
 
-vi.mock('./use-wizard-abilities', () => ({
+vi.mock('./use-wizard-abilities.js', () => ({
   default: vi.fn(() => ({
     calculateTotalPointsSpent: vi.fn(),
     onAbilityBaseScoreChange: vi.fn(),
@@ -128,7 +128,7 @@ vi.mock('./use-wizard-abilities', () => ({
 }));
 
 // Mock useWizardArrayToggle - used by wizard but not previously mocked (caused OOM)
-vi.mock('../../hooks/use-wizard-array-toggle', () => ({
+vi.mock('../../hooks/use-wizard-array-toggle.js', () => ({
   default: vi.fn(() => ({
     toggleItem: vi.fn(),
     setItem: vi.fn(),
@@ -137,19 +137,19 @@ vi.mock('../../hooks/use-wizard-array-toggle', () => ({
 }));
 
 // Mock child components
-vi.mock('./wizard-header', () => ({
+vi.mock('./wizard-header.jsx', () => ({
   default: function WizardHeaderMock({ title, onClose }) {
     return <div data-testid="wizard-header"><h1>{title}</h1><button onClick={onClose}>Close</button></div>;
   },
 }));
 
-vi.mock('./wizard-progress-bar', () => ({
+vi.mock('./wizard-progress-bar.jsx', () => ({
   default: function WizardProgressBarMock({ currentStep, totalSteps }) {
     return <div data-testid="wizard-progress-bar"><span>Step {currentStep} of {totalSteps}</span></div>;
   },
 }));
 
-vi.mock('./wizard-footer', () => ({
+vi.mock('./wizard-footer.jsx', () => ({
   default: function WizardFooterMock({ isFirstStep, isLastStep, onCancel, onPrevious, onNext, onSubmit, isNextDisabled }) {
     return (
       <div data-testid="wizard-footer">
@@ -164,7 +164,7 @@ vi.mock('./wizard-footer', () => ({
 }));
 
 // Mock steps-config with components that call handlers
-vi.mock('./steps-config', () => {
+vi.mock('./steps-config.js', () => {
   const StepComponent = ({ onRulesetChange, onSkillToggle, onSkillExpertiseToggle, onLanguageToggle, onFightingStyleToggle, onResistanceToggle, onImmunityToggle, onAbilityBaseScoreChange, onAbilityImprovementChange, onAbilityMiscBonusChange }) => (
     <div data-testid="step-ruleset">
       <button onClick={() => onRulesetChange('2024')}>Change Ruleset</button>
@@ -201,7 +201,7 @@ vi.mock('./steps-config', () => {
 });
 
 // Mock utils
-vi.mock('./utils', () => ({
+vi.mock('./utils.js', () => ({
   validateStep: vi.fn(() => Promise.resolve({})),
   validateFinalFormData: vi.fn(() => ({})),
   getPointBuyCosts: vi.fn(() => Promise.resolve({ 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 })),

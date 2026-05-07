@@ -6,7 +6,6 @@
 
 import { loadFeatData, fetchClassData, fetchRaceData, fetchBackgroundData, fetchSubraceData } from './data-loader.js';
 
-export { fetchClassData, fetchRaceData, fetchBackgroundData, fetchSubraceData };
 /**
  * Gets the class data for a specific class name
  * @param {string} className - The name of the class

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import WarningList from '../common/warning-list';
+import WarningList from '../common/warning-list.jsx';
 import './wizard-step-skills.css';
-import { loadSkills } from '../../services/data-loader';
+import { loadSkills } from '../../services/data-loader.js';
 import { isEqual } from 'lodash';
 
 const areEqual = (prevProps, nextProps) => {

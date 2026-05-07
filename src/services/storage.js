@@ -1,4 +1,4 @@
-import utils from './utils'
+import utils from './utils.js'
 const storage = {
     get: (key) => {
         const json = localStorage.getItem(key);

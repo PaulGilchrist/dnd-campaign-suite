@@ -1,16 +1,16 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CharSpellSlots from './char-spell-slots';
+import CharSpellSlots from './char-spell-slots.jsx';
 
 // Mock the rules service
-vi.mock('../../../services/rules', () => ({
+vi.mock('../../../services/rules.js', () => ({
   default: {
     getSpellMaxLevel: vi.fn(),
    },
 }));
 
 // Mock the CharSpellSlotLevel component
-vi.mock('./char-spell-slot-level', () => ({
+vi.mock('./char-spell-slot-level.jsx', () => ({
   default: function MockCharSpellSlotLevel({ level, totalSlots }) {
     return (
          <div data-testid={`spell-slot-level-${level}`}>
@@ -21,7 +21,7 @@ vi.mock('./char-spell-slot-level', () => ({
       },
 }));
 
-import rules from '../../../services/rules';
+import rules from '../../../services/rules.js';
 
 const mockPlayerStats = {
   name: 'Test Character',

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import SelectableList from './selectable-list';
-import WarningList from '../common/warning-list';
+import SelectableList from './selectable-list.jsx';
+import WarningList from '../common/warning-list.jsx';
 import { sanitizeHtml } from '../../services/sanitize.js';
 import './wizard-step-magic-items.css';
 function WizardStepMagicItems({ formData, allMagicItems, onArrayFieldChange }) {

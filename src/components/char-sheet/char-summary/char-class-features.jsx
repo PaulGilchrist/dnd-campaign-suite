@@ -1,8 +1,8 @@
  
 import React from 'react'
-import useTrackedResource from '../../../hooks/use-tracked-resource';
-import HiddenInput from '../../common/hidden-input'
-import { getClassFeatures } from '../../../services/class-features';
+import useTrackedResource from '../../../hooks/use-tracked-resource.js';
+import HiddenInput from '../../common/hidden-input.jsx'
+import { getClassFeatures } from '../../../services/class-features.js';
 import { isEqual } from 'lodash';
 
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats);

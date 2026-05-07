@@ -1,20 +1,20 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import './character-creation-wizard.css';
-import { validateStep, validateFinalFormData } from './utils';
-import WizardHeader from './wizard-header';
-import WizardProgressBar from './wizard-progress-bar';
-import WizardFooter from './wizard-footer';
-import { WIZARD_STEPS, getTotalSteps } from './steps-config';
-import useWizardForm from './use-wizard-form';
-import useWizardData from './use-wizard-data';
-import useWizardNavigation from './use-wizard-navigation';
-import useWizardSkills from './use-wizard-skills';
-import useWizardLanguages from './use-wizard-languages';
-import useWizardResistances from './use-wizard-resistances';
-import useWizardFeats from './use-wizard-feats';
+import { validateStep, validateFinalFormData } from './utils.js';
+import WizardHeader from './wizard-header.jsx';
+import WizardProgressBar from './wizard-progress-bar.jsx';
+import WizardFooter from './wizard-footer.jsx';
+import { WIZARD_STEPS, getTotalSteps } from './steps-config.js';
+import useWizardForm from './use-wizard-form.js';
+import useWizardData from './use-wizard-data.js';
+import useWizardNavigation from './use-wizard-navigation.js';
+import useWizardSkills from './use-wizard-skills.js';
+import useWizardLanguages from './use-wizard-languages.js';
+import useWizardResistances from './use-wizard-resistances.js';
+import useWizardFeats from './use-wizard-feats.js';
 
-import useWizardAbilities from './use-wizard-abilities';
-import useWizardArrayToggle from '../../hooks/use-wizard-array-toggle';
+import useWizardAbilities from './use-wizard-abilities.js';
+import useWizardArrayToggle from '../../hooks/use-wizard-array-toggle.js';
 
 const WizardStepRenderer = React.memo(({
   currentStep,

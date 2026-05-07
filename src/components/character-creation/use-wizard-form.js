@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import merge from 'lodash/merge';
-import { DEFAULT_FORM_DATA } from './constants';
+import { DEFAULT_FORM_DATA } from './constants.js';
 
 function useWizardForm(characterData, isEditing) {
   const [formData, setFormData] = useState(() => {

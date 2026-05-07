@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CascadingSelect from './CascadingSelect';
+import CascadingSelect from './CascadingSelect.jsx';
 
 describe('CascadingSelect', () => {
   const baseProps = {

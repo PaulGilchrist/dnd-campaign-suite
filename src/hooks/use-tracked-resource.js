@@ -1,5 +1,5 @@
 import React from 'react';
-import storage from '../services/storage';
+import storage from '../services/storage.js';
 
 function useTrackedResource(storageKey, playerName, maxGetter, deps) {
   const [current, setCurrent] = React.useState(() => {

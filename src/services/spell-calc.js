@@ -1,4 +1,4 @@
-import classRules from './class-rules';
+import classRules from './class-rules.js';
 import { getSpellMaxLevel } from './shared/spell-utils.js';
 
 export function getSpellAbilities(allSpells, playerStats) {
@@ -185,7 +185,5 @@ export function getSpellAbilities(allSpells, playerStats) {
              });
          }
      }
-    return spellAbilities;
-}
-
-export { getSpellMaxLevel } from './shared/spell-utils.js';
+     return spellAbilities;
+ }

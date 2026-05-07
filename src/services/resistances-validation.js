@@ -4,9 +4,8 @@
  * Supports both 5e and 2024 rulesets
  */
 
-import { fetchClassData, fetchRaceData, fetchBackgroundData } from './data-loader.js';
+import { fetchClassData, fetchRaceData } from './data-loader.js';
 
-export { fetchClassData, fetchRaceData, fetchBackgroundData };
 /**
  * Extracts resistances from race traits for 5e
  * Reads from race JSON data instead of hardcoded mappings

@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import WizardHeader from './wizard-header';
+import WizardHeader from './wizard-header.jsx';
 
 describe('WizardHeader', () => {
   it('should render the title', () => {

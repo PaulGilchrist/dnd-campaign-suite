@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import App from './App';
+import App from './App.jsx';
 
 const dataLoaderMocks = vi.hoisted(() => ({
   loadAbilityScores: vi.fn(),
@@ -38,21 +38,21 @@ const { WizardFn } = vi.hoisted(() => ({
   ))
 }));
 
-vi.mock('../services/utils', () => ({
+vi.mock('./services/utils.js', () => ({
   default: { getFirstName: vi.fn((name) => name ? name.split(' ')[0] : '') }
 }));
 
 vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
 
-vi.mock('./components/char-sheet/char-sheet', () => ({ default: MockCharSheet }));
+vi.mock('./components/char-sheet/char-sheet.jsx', () => ({ default: MockCharSheet }));
 
-vi.mock('./components/combat-tracking/combat-tracking', () => ({ default: MockCombat }));
+vi.mock('./components/combat-tracking/combat-tracking.jsx', () => ({ default: MockCombat }));
 
-vi.mock('./components/campaign-selection/campaign-selection', () => ({ default: CampaignSelectionFn }));
+vi.mock('./components/campaign-selection/campaign-selection.jsx', () => ({ default: CampaignSelectionFn }));
 
-vi.mock('./components/character-creation/character-creation-wizard', () => ({ default: WizardFn }));
+vi.mock('./components/character-creation/character-creation-wizard.jsx', () => ({ default: WizardFn }));
 
-vi.mock('./services/data-loader', () => dataLoaderMocks);
+vi.mock('./services/data-loader.js', () => dataLoaderMocks);
 
 beforeEach(() => {
   vi.clearAllMocks();

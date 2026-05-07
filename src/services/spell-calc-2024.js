@@ -65,6 +65,4 @@ export function getSpellAbilities(allSpells, playerStats) {
     }
 
     return spellAbilities;
-}
-
-export { getSpellMaxLevel } from './shared/spell-utils.js';
+ }

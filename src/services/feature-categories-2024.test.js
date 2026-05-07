@@ -5,7 +5,7 @@ import {
   bonusActions,
   reactions,
   characterAdvancement
-} from './feature-categories-2024';
+} from './feature-categories-2024.js';
 
 describe('feature-categories-2024', () => {
   describe('featuresToIgnore', () => {

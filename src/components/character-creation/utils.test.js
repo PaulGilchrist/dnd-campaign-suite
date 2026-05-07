@@ -3,7 +3,7 @@ const { mockLoadValidationRules, mockLoadAbilityScores } = vi.hoisted(() => ({
   mockLoadAbilityScores: vi.fn()
 }));
 
-vi.mock('../../services/data-loader', () => ({
+vi.mock('../../services/data-loader.js', () => ({
   loadValidationRules: mockLoadValidationRules,
   loadAbilityScores: mockLoadAbilityScores
 }));

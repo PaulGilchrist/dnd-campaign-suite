@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import WarningList from '../common/warning-list';
+import WarningList from '../common/warning-list.jsx';
 
 function WizardStepResistances({ formData, onResistanceToggle, onImmunityToggle, warnings, preSelectedResistances, preSelectedImmunities }) {
   const [resistancesImmunities, setResistancesImmunities] = useState([]);

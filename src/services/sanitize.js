@@ -54,4 +54,3 @@ export function sanitizeHtml(html) {
     });
 }
 
-export default sanitizeHtml;

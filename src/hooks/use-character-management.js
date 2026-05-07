@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import cloneDeep from 'lodash/cloneDeep';
 import { saveAs } from 'file-saver';
-import Utils from '../services/utils';
+import utils from '../services/utils.js';
 
 function useCharacterManagement() {
   const [characters, setCharacters] = useState([]);
@@ -77,7 +77,7 @@ function useCharacterManagement() {
    };
 
   const handleSaveClick = async () => {
-    let fileName = `${Utils.getFirstName(activeCharacter.name)}.json`;
+    let fileName = `${utils.getFirstName(activeCharacter.name)}.json`;
     fileName = fileName.toLowerCase();
     const json = JSON.stringify(activeCharacter, null, 4);
     const blob = new Blob([json], { type: 'application/json' });

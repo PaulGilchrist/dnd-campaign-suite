@@ -1,5 +1,5 @@
 
-import CascadingSelect from './CascadingSelect';
+import CascadingSelect from './CascadingSelect.jsx';
 
 function WizardStepRaceClass({ 
   formData, 

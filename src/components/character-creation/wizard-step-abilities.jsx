@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import './wizard-step-abilities.css';
-import { loadAbilityScores, loadValidationRules } from '../../services/data-loader';
+import { loadAbilityScores, loadValidationRules } from '../../services/data-loader.js';
 
 function WizardStepAbilities({
   formData, 

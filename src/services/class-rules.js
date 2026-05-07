@@ -1,7 +1,7 @@
 import { cloneDeep, merge } from 'lodash';
 import utils from './utils.js'
-import * as featureCategories from './feature-categories-5e'
-import { categorizeFeatures, mergeCategorizedFeatures } from './feature-categorization-utils'
+import * as featureCategories from './feature-categories-5e.js'
+import { categorizeFeatures, mergeCategorizedFeatures } from './feature-categorization-utils.js'
 
 const classRules = {
     getClass: (allClasses, playerSummary) => {

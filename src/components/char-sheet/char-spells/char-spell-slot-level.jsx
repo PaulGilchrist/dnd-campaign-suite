@@ -2,7 +2,7 @@
 import React from 'react'
 
 import './char-spell-slot-level.css'
-import storage from '../../../services/storage'
+import storage from '../../../services/storage.js'
 
 function CharSpellSlotLevel({ level, totalSlots, playerStats }) {
     const [availableSlots, setAvailableSlots] = React.useState(totalSlots);

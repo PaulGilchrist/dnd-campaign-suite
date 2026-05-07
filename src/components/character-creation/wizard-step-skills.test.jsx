@@ -1,10 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import WizardStepSkills from './wizard-step-skills';
+import WizardStepSkills from './wizard-step-skills.jsx';
 
 global.fetch = vi.fn();
 
-vi.mock('../../services/skill-validation', () => ({
+vi.mock('../../services/skill-validation.js', () => ({
   validateSkills: vi.fn(() => Promise.resolve([])),
   getSkillLimits: vi.fn(() => Promise.resolve({ allowed: 3, details: 'Your class and level grant 3 skills.' })),
   getExpertiseLimits: vi.fn(() => Promise.resolve({ allowed: true, count: 2, details: 'Rogues get expertise in 2 skills.' })),

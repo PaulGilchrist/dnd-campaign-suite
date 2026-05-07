@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import HiddenInput from './hidden-input';
+import HiddenInput from './hidden-input.jsx';
 
 describe('HiddenInput', () => {
   const mockHandleInputToggle = vi.fn();

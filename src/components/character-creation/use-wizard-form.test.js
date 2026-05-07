@@ -1,8 +1,8 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import useWizardForm from './use-wizard-form';
+import useWizardForm from './use-wizard-form.js';
 
-vi.mock('./constants', () => ({
+vi.mock('./constants.js', () => ({
   DEFAULT_FORM_DATA: {
     name: '',
     level: 1,

@@ -1,25 +1,25 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import CharInventory from './char-inventory';
+import CharInventory from './char-inventory.jsx';
 
 // Mock the data-loader service
-vi.mock('../../services/data-loader', () => ({
+vi.mock('../../services/data-loader.js', () => ({
   loadEquipment: vi.fn(),
   clearDataCache: vi.fn(),
 }));
 
 // Mock the usePopup hook
-vi.mock('./common/use-popup', () => ({
+vi.mock('./common/use-popup.jsx', () => ({
   default: vi.fn(),
 }));
 
 // Mock the sanitize service
-vi.mock('../../services/sanitize', () => ({
+vi.mock('../../services/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-import usePopup from './common/use-popup';
-import { loadEquipment } from '../../services/data-loader';
+import usePopup from './common/use-popup.jsx';
+import { loadEquipment } from '../../services/data-loader.js';
 
 const mockPlayerStats = {
   inventory: {

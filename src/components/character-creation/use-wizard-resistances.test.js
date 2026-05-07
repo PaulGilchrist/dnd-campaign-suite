@@ -1,6 +1,6 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import useWizardResistances from './use-wizard-resistances';
+import useWizardResistances from './use-wizard-resistances.js';
 
 // Mock the resistances validation service
 vi.mock('../../services/resistances-validation.js', () => ({

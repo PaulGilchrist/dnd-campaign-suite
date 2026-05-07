@@ -1,5 +1,5 @@
-import { REQUIRED_FIELDS } from './constants';
-import { loadValidationRules as loadValidationRulesFromService } from '../../services/data-loader';
+import { REQUIRED_FIELDS } from './constants.js';
+import { loadValidationRules as loadValidationRulesFromService } from '../../services/data-loader.js';
 
 /**
  * Load validation rules from JSON file (uses centralized data-loader)

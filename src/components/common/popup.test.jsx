@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import Popup from './popup';
+import Popup from './popup.jsx';
 
 describe('Popup', () => {
   const mockOnClickOrKeyDown = vi.fn();

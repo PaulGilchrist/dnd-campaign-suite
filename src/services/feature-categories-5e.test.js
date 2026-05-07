@@ -5,7 +5,7 @@ import {
   bonusActions,
   reactions,
   characterAdvancement
-} from './feature-categories-5e';
+} from './feature-categories-5e.js';
 
 describe('feature-categories-5e', () => {
   describe('featuresToIgnore', () => {

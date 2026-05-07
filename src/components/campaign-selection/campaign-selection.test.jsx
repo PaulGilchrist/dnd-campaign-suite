@@ -1,16 +1,16 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import CampaignSelection from './campaign-selection';
+import CampaignSelection from './campaign-selection.jsx';
 
 // Mock the campaignService
-vi.mock('../../services/campaignService', () => ({
+vi.mock('../../services/campaign-service.js', () => ({
   getCharacterFolders: vi.fn(),
   getCharacterFiles: vi.fn(),
   loadCharacters: vi.fn(),
 }));
 
 // Import mocked functions
-import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaignService';
+import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaign-service.js';
 
 // Mock sessionStorage
 const mockSessionStorage = {

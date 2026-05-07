@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import classRules from './class-rules-2024';
+import classRules from './class-rules-2024.js';
 
 // Mock dependencies
 vi.mock('lodash', () => ({
@@ -13,7 +13,7 @@ vi.mock('./utils.js', () => ({
      }
 }));
 
-vi.mock('./feature-categories-2024', () => ({
+vi.mock('./feature-categories-2024.js', () => ({
   actions: [],
   bonusActions: [],
   reactions: [],
@@ -21,7 +21,7 @@ vi.mock('./feature-categories-2024', () => ({
   maintained: []
 }));
 
-vi.mock('./feature-categorization-utils', () => ({
+vi.mock('./feature-categorization-utils.js', () => ({
   categorizeFeatures: vi.fn((features) => ({
     actions: features.filter(f => f.type === 'action'),
     bonusActions: features.filter(f => f.type === 'bonusAction'),

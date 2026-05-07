@@ -3,14 +3,14 @@ import React from 'react'
 import './char-summary.css'
 
 import classRules from '../../../services/class-rules-2024.js'
-import CharGold from './char-gold'
-import CharHitPoints from './char-hit-points'
-import CharClassFeatures from './char-class-features'
-import CharFeats from '../char-feats/char-feats'
-import HiddenInput from '../../common/hidden-input'
-import usePopup from '../common/use-popup'
-import Popup from '../../common/popup'
-import useTrackedResource from '../../../hooks/use-tracked-resource'
+import CharGold from './char-gold.jsx'
+import CharHitPoints from './char-hit-points.jsx'
+import CharClassFeatures from './char-class-features.jsx'
+import CharFeats from '../char-feats/char-feats.jsx'
+import HiddenInput from '../../common/hidden-input.jsx'
+import usePopup from '../common/use-popup.jsx'
+import Popup from '../../common/popup.jsx'
+import useTrackedResource from '../../../hooks/use-tracked-resource.js'
 
 function CharSummary({ playerStats, onDeleteCharacter }) {
     const { popupHtml, setPopupHtml } = usePopup(() => null);

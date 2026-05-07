@@ -1,9 +1,9 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CharCharacterAdvancement from './char-character-advancement';
+import CharCharacterAdvancement from './char-character-advancement.jsx';
 
 // Mock the useActionPopup hook
-vi.mock('./common/use-action-popup', () => ({
+vi.mock('./common/use-action-popup.jsx', () => ({
   default: vi.fn(),
   buildFeatureDetailHtml: vi.fn((entity) => {
     if (entity.details) {
@@ -14,11 +14,11 @@ vi.mock('./common/use-action-popup', () => ({
 }));
 
 // Mock the sanitize service
-vi.mock('../../services/sanitize', () => ({
+vi.mock('../../services/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-import useActionPopup, { buildFeatureDetailHtml } from './common/use-action-popup';
+import useActionPopup, { buildFeatureDetailHtml } from './common/use-action-popup.jsx';
 
 const mockPlayerStats = {
   characterAdvancement: [

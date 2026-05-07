@@ -1,7 +1,7 @@
  
 import React from 'react'
-import storage from '../../../services/storage'
-import HiddenInput from '../../common/hidden-input'
+import storage from '../../../services/storage.js'
+import HiddenInput from '../../common/hidden-input.jsx'
 
 function CharHitPoints({ playerStats }) {
     const [currentHitPoints, setCurrentHitPoints] = React.useState(0);

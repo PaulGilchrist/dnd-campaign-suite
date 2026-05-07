@@ -1,18 +1,18 @@
  
 import React from 'react'
 import { cloneDeep, isEqual } from 'lodash';
-import storage from '../../services/storage'
-import utils from '../../services/utils'
-import rulesFactory from '../../services/rules-factory'
-import CharAbilities from './char-abilities'
-import CharActions from './char-actions'
-import CharInventory from './char-inventory'
-import CharReactions from './char-reactions'
-import CharSpecialActions from './char-special-actions'
-import CharCharacterAdvancement from './char-character-advancement'
-import CharSpells from './char-spells/char-spells'
-import CharSummary from './char-summary/char-summary'
-import Subscriber from '../common/subscriber';
+import storage from '../../services/storage.js'
+import utils from '../../services/utils.js'
+import rulesFactory from '../../services/rules-factory.js'
+import CharAbilities from './char-abilities.jsx'
+import CharActions from './char-actions.jsx'
+import CharInventory from './char-inventory.jsx'
+import CharReactions from './char-reactions.jsx'
+import CharSpecialActions from './char-special-actions.jsx'
+import CharCharacterAdvancement from './char-character-advancement.jsx'
+import CharSpells from './char-spells/char-spells.jsx'
+import CharSummary from './char-summary/char-summary.jsx'
+import Subscriber from '../common/subscriber.jsx';
 import './char-sheet.css'
 
 function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter }) {
