@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock data-loader before importing rules
 vi.mock('./data-loader', () => ({
@@ -341,7 +341,9 @@ describe('rules', () => {
         level: 1
            };
 
-      const [languagesAllowed, languages] = rules.getLanguages(playerStats);
+      const [_languagesAllowed, languages] = rules.getLanguages(playerStats);
+      void _languagesAllowed;
+      void languages;
 
       expect(languages).toContain('Common');
       expect(languages).toContain('Elvish');
@@ -358,7 +360,9 @@ describe('rules', () => {
         level: 1
            };
 
-      const [languagesAllowed, languages] = rules.getLanguages(playerStats);
+      const [_languagesAllowed, languages] = rules.getLanguages(playerStats);
+      void _languagesAllowed;
+      void languages;
 
       expect(languages).toContain('Common');
       expect(languages).toContain('Druidic');
@@ -375,9 +379,11 @@ describe('rules', () => {
         level: 1
            };
 
-      const [languagesAllowed, languages] = rules.getLanguages(playerStats);
+      const [_languagesAllowed, languages] = rules.getLanguages(playerStats);
+      void _languagesAllowed;
+      void languages;
 
-      expect(languagesAllowed).toBeGreaterThanOrEqual(2);
+       expect(_languagesAllowed).toBeGreaterThanOrEqual(2);
          });
 
     it('should include player languages', () => {
@@ -392,7 +398,9 @@ describe('rules', () => {
         level: 1
            };
 
-      const [languagesAllowed, languages] = rules.getLanguages(playerStats);
+      const [_languagesAllowed, languages] = rules.getLanguages(playerStats);
+      void _languagesAllowed;
+      void languages;
 
       expect(languages).toContain('Common');
       expect(languages).toContain('Dwarvish');
@@ -410,7 +418,9 @@ describe('rules', () => {
         level: 1
            };
 
-      const [languagesAllowed, languages] = rules.getLanguages(playerStats);
+      const [_languagesAllowed, languages] = rules.getLanguages(playerStats);
+      void _languagesAllowed;
+      void languages;
 
       expect(languages.filter(l => l === 'Common')).toHaveLength(1);
          });
@@ -426,7 +436,9 @@ describe('rules', () => {
         level: 1
            };
 
-      const [languagesAllowed, languages] = rules.getLanguages(playerStats);
+      const [_languagesAllowed, languages] = rules.getLanguages(playerStats);
+      void _languagesAllowed;
+      void languages;
 
       expect(languages[0]).toBe('Common');
          });
@@ -446,9 +458,11 @@ describe('rules', () => {
         level: 1
            };
 
-      const [languagesAllowed, languages] = rules.getLanguages(playerStats);
+      const [_languagesAllowed, languages] = rules.getLanguages(playerStats);
+      void _languagesAllowed;
+      void languages;
 
-      expect(languagesAllowed).toBeGreaterThanOrEqual(4); // 1 base + 2 backstory + 2 choices
+       expect(_languagesAllowed).toBeGreaterThanOrEqual(4); // 1 base + 2 backstory + 2 choices
          });
 
     it('should handle Ranger bonus languages at level 6+', () => {
@@ -466,10 +480,12 @@ describe('rules', () => {
         level: 6
            };
 
-      const [languagesAllowed, languages] = rules.getLanguages(playerStats);
+      const [_languagesAllowed, languages] = rules.getLanguages(playerStats);
+      void _languagesAllowed;
+      void languages;
 
        // Should include bonus language for level 6+
-      expect(languagesAllowed).toBeGreaterThan(4);
+       expect(_languagesAllowed).toBeGreaterThan(4);
          });
 
     it('should handle Ranger bonus languages at level 14+', () => {
@@ -487,10 +503,12 @@ describe('rules', () => {
         level: 14
            };
 
-      const [languagesAllowed, languages] = rules.getLanguages(playerStats);
+      const [_languagesAllowed, languages] = rules.getLanguages(playerStats);
+      void _languagesAllowed;
+      void languages;
 
        // Should include both bonus languages
-      expect(languagesAllowed).toBeGreaterThan(5);
+       expect(_languagesAllowed).toBeGreaterThan(5);
        });
         });
 
@@ -678,7 +696,9 @@ describe('rules', () => {
         skillProficiencies: ['Religion']
            };
 
-      const [allowed, proficiencies] = rules.getProficiencies(playerStats, true);
+      const [_allowed, proficiencies] = rules.getProficiencies(playerStats, true);
+      void _allowed;
+      void proficiencies;
 
       expect(proficiencies).toContain('Arcana');
       expect(proficiencies).toContain('History');
@@ -700,7 +720,8 @@ describe('rules', () => {
         proficiencies: ['Armor: Medium Armor']
            };
 
-      const [allowed, proficiencies] = rules.getProficiencies(playerStats, false);
+      const [_allowed, proficiencies] = rules.getProficiencies(playerStats, false);
+      void _allowed;
 
       expect(proficiencies).toContain('Tool: Carpenter Tools');
       expect(proficiencies).toContain('Tool: Thief Tools');
@@ -722,7 +743,9 @@ describe('rules', () => {
         skillProficiencies: []
            };
 
-      const [allowed, proficiencies] = rules.getProficiencies(playerStats, true);
+      const [_allowed, proficiencies] = rules.getProficiencies(playerStats, true);
+      void _allowed;
+      void proficiencies;
 
       expect(proficiencies.filter(p => p === 'Arcana')).toHaveLength(1);
          });
@@ -740,7 +763,9 @@ describe('rules', () => {
         skillProficiencies: []
            };
 
-      const [allowed, proficiencies] = rules.getProficiencies(playerStats, true);
+      const [_allowed, proficiencies] = rules.getProficiencies(playerStats, true);
+      void _allowed;
+      void proficiencies;
 
       expect(proficiencies[0]).toBe('Arcana');
          });
@@ -762,9 +787,11 @@ describe('rules', () => {
         skillProficiencies: []
            };
 
-      const [allowed, proficiencies] = rules.getProficiencies(playerStats, true);
+      const [_allowed, proficiencies] = rules.getProficiencies(playerStats, true);
+      void _allowed;
+      void proficiencies;
 
-      expect(allowed).toBeGreaterThanOrEqual(4); // 2 backstory + 2 subclass bonus
+       expect(_allowed).toBeGreaterThanOrEqual(4); // 2 backstory + 2 subclass bonus
          });
 
     it('should include subclass tool proficiencies', () => {
@@ -784,14 +811,15 @@ describe('rules', () => {
         proficiencies: []
            };
 
-      const [allowed, proficiencies] = rules.getProficiencies(playerStats, false);
+      const [_allowed, proficiencies] = rules.getProficiencies(playerStats, false);
+      void _allowed;
 
       expect(proficiencies).toContain('Armor: Medium Armor');
        });
         });
 
    describe('getAbilities', () => {
-	    beforeEach(() => {
+      beforeEach(() => {
         vi.mocked(dataLoader.loadSkills).mockResolvedValue([
               { name: 'Athletics', ability: 'Strength' },
               { name: 'Stealth', ability: 'Dexterity' },
@@ -919,7 +947,8 @@ describe('rules', () => {
       };
 
       const abilities = await rules.getAbilities(playerStats);
-      const proficiency = Math.floor((1 - 1) / 4 + 2); // 2
+      const _proficiency = Math.floor((1 - 1) / 4 + 2); // 2
+      void _proficiency;
       // skillProficiencies is empty, so the skill won't be proficient
       // bonus should just be the ability bonus
       const str = abilities[0];
@@ -1986,56 +2015,56 @@ describe('rules', () => {
   });
 
    describe('loadSkills and loadPassiveSkills', () => {
-	    it('should use fallback skills when fetch fails', async () => {
-	      vi.mocked(dataLoader.loadSkills).mockResolvedValue([
-	         { name: 'Acrobatics', ability: 'Dexterity' },
-	         { name: 'Athletics', ability: 'Strength' }
-	       ]);
-	      vi.mocked(dataLoader.loadPassiveSkills).mockResolvedValue(['Insight', 'Investigation', 'Perception']);
+      it('should use fallback skills when fetch fails', async () => {
+        vi.mocked(dataLoader.loadSkills).mockResolvedValue([
+           { name: 'Acrobatics', ability: 'Dexterity' },
+           { name: 'Athletics', ability: 'Strength' }
+         ]);
+        vi.mocked(dataLoader.loadPassiveSkills).mockResolvedValue(['Insight', 'Investigation', 'Perception']);
 
-	      const playerStats = {
-	        level: 1,
-	        abilities: [
-	           { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
-	         ],
-	        class: {
-	          name: 'Fighter',
-	          saving_throws: []
-	         },
-	        skillProficiencies: [],
-	        expertise: []
-	       };
+        const playerStats = {
+          level: 1,
+          abilities: [
+             { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+           ],
+          class: {
+            name: 'Fighter',
+            saving_throws: []
+           },
+          skillProficiencies: [],
+          expertise: []
+         };
 
-	      const abilities = await rules.getAbilities(playerStats);
-	      expect(abilities).toHaveLength(1);
-	      expect(abilities[0].skills.length).toBeGreaterThan(0);
-	     });
+        const abilities = await rules.getAbilities(playerStats);
+        expect(abilities).toHaveLength(1);
+        expect(abilities[0].skills.length).toBeGreaterThan(0);
+       });
 
-	    it('should load skills from data-loader when available', async () => {
-	      vi.mocked(dataLoader.loadSkills).mockResolvedValue([
-	         { name: 'Athletics', ability: 'Strength' },
-	         { name: 'Custom Skill', ability: 'Strength' },
-	         { name: 'Acrobatics', ability: 'Dexterity' }
-	       ]);
-	      vi.mocked(dataLoader.loadPassiveSkills).mockResolvedValue(['Insight', 'Investigation', 'Perception']);
+      it('should load skills from data-loader when available', async () => {
+        vi.mocked(dataLoader.loadSkills).mockResolvedValue([
+           { name: 'Athletics', ability: 'Strength' },
+           { name: 'Custom Skill', ability: 'Strength' },
+           { name: 'Acrobatics', ability: 'Dexterity' }
+         ]);
+        vi.mocked(dataLoader.loadPassiveSkills).mockResolvedValue(['Insight', 'Investigation', 'Perception']);
 
-	      const playerStats = {
-	        level: 1,
-	        abilities: [
-	           { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-	           { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 }
-	         ],
-	        class: {
-	          name: 'Fighter',
-	          saving_throws: []
-	         },
-	        skillProficiencies: [],
-	        expertise: []
-	       };
+        const playerStats = {
+          level: 1,
+          abilities: [
+             { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
+             { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 }
+           ],
+          class: {
+            name: 'Fighter',
+            saving_throws: []
+           },
+          skillProficiencies: [],
+          expertise: []
+         };
 
-	      const abilities = await rules.getAbilities(playerStats);
-	      const str = abilities.find(a => a.name === 'Strength');
-	      expect(str.skills).toContainEqual(expect.objectContaining({ name: 'Custom Skill' }));
-	      });
-	    });
+        const abilities = await rules.getAbilities(playerStats);
+        const str = abilities.find(a => a.name === 'Strength');
+        expect(str.skills).toContainEqual(expect.objectContaining({ name: 'Custom Skill' }));
+        });
+      });
 });

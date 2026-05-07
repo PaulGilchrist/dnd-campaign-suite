@@ -1,8 +1,7 @@
-import { loadSkills, loadPassiveSkills } from './data-loader';
+import { loadSkills } from './data-loader';
 
 export async function getAbilities(playerStats) {
     const skills = await loadSkills();
-    const passiveSkills = await loadPassiveSkills();
     return playerStats.abilities.map((ability) => {
         const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
         const newAbility = { ...ability };

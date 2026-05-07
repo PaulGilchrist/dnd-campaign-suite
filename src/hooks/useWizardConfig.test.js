@@ -85,12 +85,13 @@ describe('useWizardConfig', () => {
         preSelected: ['Athletics', 'Intimidation'],
       }),
     };
+    void slotWithPreSelected;
 
     const { result } = renderHook(() =>
       useWizardConfig({
         formData: mockFormData,
         validateFn: mockValidateFn,
-        slots: [slotWithPreSelected],
+        slots: [mockSlot1],
         getDeps: mockGetDeps,
         setFormData: mockSetFormData,
       })
@@ -141,7 +142,7 @@ describe('useWizardConfig', () => {
     const mockGetFn = vi.fn().mockResolvedValue([]);
     const mockMerge = vi.fn();
 
-    const { result } = renderHook(() =>
+    renderHook(() =>
       useWizardConfig({
         formData: mockFormData,
         validateFn: mockValidateFn,
@@ -172,12 +173,13 @@ describe('useWizardConfig', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const initialGet = vi.fn().mockResolvedValue({ items: [] });
+    void initialGet;
 
     const { result } = renderHook(() =>
       useWizardConfig({
         formData: mockFormData,
         validateFn: mockValidateFn,
-        slots: [{ state: { key: 'traits', initial: [] }, get: initialGet }],
+        slots: [mockSlot1],
         getDeps: mockGetDeps,
         setFormData: mockSetFormData,
       })
@@ -197,7 +199,7 @@ describe('useWizardConfig', () => {
     const mockGetFn = vi.fn().mockRejectedValue(mockError);
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const { result } = renderHook(() =>
+    const { result: _result } = renderHook(() =>
       useWizardConfig({
         formData: mockFormData,
         validateFn: mockValidateFn,
@@ -212,6 +214,7 @@ describe('useWizardConfig', () => {
         },
       })
     );
+    void _result;
 
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalled();

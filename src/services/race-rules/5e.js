@@ -1,4 +1,4 @@
-import { cloneDeep, merge, uniqBy } from 'lodash';
+import { cloneDeep, merge } from 'lodash';
 import utils from '../utils.js'
 import * as featureCategories from '../feature-categories-5e.js'
 import { categorizeFeatures, mergeCategorizedFeatures } from '../feature-categorization-utils.js'

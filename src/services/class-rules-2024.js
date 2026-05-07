@@ -1,4 +1,4 @@
-import { cloneDeep, uniqBy } from 'lodash';
+import { cloneDeep } from 'lodash';
 import * as featureCategories from './feature-categories-2024'
 import { categorizeFeatures, mergeCategorizedFeatures } from './feature-categorization-utils'
 import utils from './utils.js';
@@ -306,7 +306,7 @@ const classRules = {
                 invocations: playerStats.class?.invocations || []
             };
         },
-         getWizardFeatures(playerStats) {
+         getWizardFeatures() {
              return {
                  showWizardFeatures: false
              };

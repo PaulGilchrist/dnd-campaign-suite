@@ -135,7 +135,7 @@ function extractSpellsFromDescription(description, result) {
  * @param {string} version - '5e' or '2024'
  * @returns {object} - { spells: string[], cantrips: string[], details: string[] }
  */
-function extractBackgroundSpells(backgroundData, version = '5e') {
+function extractBackgroundSpells(backgroundData) {
   const result = { spells: [], cantrips: [], details: [] };
   
   if (!backgroundData) {
@@ -158,7 +158,7 @@ function extractBackgroundSpells(backgroundData, version = '5e') {
  * @param {string} version - '5e' or '2024'
  * @returns {object} - { spells: string[], cantrips: string[], spellListAccess: string[], details: string[] }
  */
-function extractFeatSpells(featData, version = '5e') {
+function extractFeatSpells(featData) {
   const result = { 
     spells: [], 
     cantrips: [], 
@@ -360,7 +360,8 @@ export async function validateSpells(formData, selectedSpells, allSpells, versio
      }
     
     const spellClasses = spellData.classes || [];
-    const spellLevel = spellData.level !== undefined ? spellData.level : 0;
+    const _spellLevel = spellData.level !== undefined ? spellData.level : 0;
+    void _spellLevel;
     
     // Check if spell is allowed by class
     const isClassSpell = spellClasses.includes(sources.class.name);
@@ -388,25 +389,6 @@ export async function validateSpells(formData, selectedSpells, allSpells, versio
     warnings,
     valid: warnings.filter(w => w.type === 'warning').length === 0
    };
-}
-
-/**
- * Gets the name of the source that grants a spell
- * @param {string} spellName - The spell name
- * @param {object} sources - The spell sources object
- * @returns {string} - Name of the source or empty string
- */
-function getSpellSourceName(spellName, sources) {
-  if (sources.race.spells.includes(spellName) || sources.race.cantrips.includes(spellName)) {
-    return `your ${sources.race.name} race`;
-   }
-  if (sources.background.spells.includes(spellName) || sources.background.cantrips.includes(spellName)) {
-    return `your ${sources.background.name} background`;
-   }
-  if (sources.feats.grantedSpells.includes(spellName) || sources.feats.grantedCantrips.includes(spellName)) {
-    return 'a feat you have selected';
-   }
-  return '';
 }
 
 /**

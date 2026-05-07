@@ -134,6 +134,7 @@ app.get('/api/characters/:campaign/:file', (req, res) => {
 const readFile = () => {
     fs.readFile('characterChangeData.json', 'utf-8', (err, data) => {
         if (err) {
+            console.error('Failed to read character file');
         } else {
             characterChangeData = JSON.parse(data.toString());
         }
@@ -257,7 +258,7 @@ app.put('/api/campaigns/:campaign', (req, res) => {
      }
     
     // Validate campaign name - only allow alphanumeric, spaces, hyphens, underscores, and periods
-    const campaignNamePattern = /^[a-zA-Z0-9 _.\-]+$/;
+    const campaignNamePattern = /^[a-zA-Z0-9 _.\\-]+$/;
     if (!campaignNamePattern.test(newName.trim())) {
         return res.status(400).json({ error: 'Campaign name can only contain letters, numbers, spaces, hyphens, underscores, and periods' });
       }
@@ -367,7 +368,7 @@ const publish = (key, data) => {
 
 const keepAlive = () => {
     fetch(`http://localhost:${PORT}/health`)
-        .then((response) => {
+        .then(() => {
          })
          .catch((error) => {
             console.error(`Error: ${error.message}`);

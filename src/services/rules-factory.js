@@ -28,7 +28,7 @@ const rulesFactory = {
 
       // === DELEGATION WRAPPERS (preserve existing API for callers) ===
 
-    getAbilityLongName: (shortName, playerSummary) => {
+    getAbilityLongName: (shortName) => {
         return rules.getAbilityLongName(shortName);
       },
 

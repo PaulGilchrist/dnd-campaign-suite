@@ -130,7 +130,6 @@ function extract2024RaceResistances(raceData, subraceName) {
   if (subraceName && raceData.subraces) {
     const subrace = raceData.subraces.find(sr => sr.name === subraceName);
     if (subrace) {
-      const subDesc = subrace.description || '';
       const subraceTraits = subrace.traits || [];
 
       subraceTraits.forEach(trait => {

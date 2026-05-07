@@ -1,4 +1,4 @@
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardAbilities from './use-wizard-abilities';
 
@@ -52,7 +52,7 @@ describe('useWizardAbilities', () => {
       });
 
   it('should validate abilities when on step 5', async () => {
-    const { result } = renderHook(() =>
+    renderHook(() =>
       useWizardAbilities(mockFormData, 5, mockSetErrors)
         );
 
@@ -94,7 +94,7 @@ describe('useWizardAbilities', () => {
            ]
          };
 
-    const { result } = renderHook(() =>
+     renderHook(() =>
       useWizardAbilities(formDataWithLowScore, 5, mockSetErrors)
         );
 
@@ -121,7 +121,7 @@ describe('useWizardAbilities', () => {
            ]
          };
 
-    const { result } = renderHook(() =>
+     renderHook(() =>
       useWizardAbilities(formDataWithHighScore, 5, mockSetErrors)
         );
 
@@ -148,7 +148,7 @@ describe('useWizardAbilities', () => {
               ]
             };
 
-      const { result } = renderHook(() =>
+       renderHook(() =>
         useWizardAbilities(formDataWithHighTotal, 5, mockSetErrors)
             );
 
@@ -179,7 +179,7 @@ describe('useWizardAbilities', () => {
            ]
          };
 
-    const { result } = renderHook(() =>
+     renderHook(() =>
       useWizardAbilities(formDataWithExcessPoints, 5, mockSetErrors)
         );
 

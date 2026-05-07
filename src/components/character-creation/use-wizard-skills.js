@@ -19,7 +19,7 @@ function useWizardSkills(formData, setFormData) {
      },
    });
 
-  const { warnings, setWarnings: _sw, ...rest } = configResult;
+  const { warnings, ...rest } = configResult;
   return { ...rest, skillWarnings: warnings };
 }
 

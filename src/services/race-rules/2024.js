@@ -1,4 +1,4 @@
-import { cloneDeep, uniqBy } from 'lodash';
+import { cloneDeep } from 'lodash';
 import * as featureCategories from '../feature-categories-2024.js'
 import { categorizeFeatures, mergeCategorizedFeatures } from '../feature-categorization-utils.js'
 import utils from '../utils.js';
@@ -66,7 +66,7 @@ const raceRules = {
 
         return race;
          },
-    getRacialBonus: (playerStats, abilityName) => {
+     getRacialBonus: () => {
             // 2024 Rules: No racial ability score bonuses
             // This is a placeholder for future implementation if needed
         return 0;

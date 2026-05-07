@@ -78,11 +78,11 @@ describe('useWizardResistances', () => {
     getPreSelectedResistances.mockResolvedValue({
       resistances: ['Poison'],
       immunities: ['Disease']
-       });
+        });
 
-    const { result } = renderHook(() =>
+    renderHook(() =>
       useWizardResistances(mockFormData, mockSetFormData)
-         );
+          );
 
     await waitFor(() => {
       expect(mockSetFormData).toHaveBeenCalled();

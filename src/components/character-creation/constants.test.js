@@ -30,60 +30,60 @@ describe('constants', () => {
   });
 
    describe('loadAbilityScores', () => {
-	    beforeEach(() => {
-	      vi.clearAllMocks();
-	    });
+      beforeEach(() => {
+        vi.clearAllMocks();
+      });
 
-	    it('should return ability scores from data-loader', async () => {
-	      const mockScores = [
-	         { full_name: 'Strength' },
-	         { full_name: 'Dexterity' },
-	         { full_name: 'Constitution' },
-	         { full_name: 'Intelligence' },
-	         { full_name: 'Wisdom' },
-	          { full_name: 'Charisma' }
-	        ];
-	      vi.mocked(loadAbilityScores).mockResolvedValue(mockScores);
+      it('should return ability scores from data-loader', async () => {
+        const mockScores = [
+           { full_name: 'Strength' },
+           { full_name: 'Dexterity' },
+           { full_name: 'Constitution' },
+           { full_name: 'Intelligence' },
+           { full_name: 'Wisdom' },
+            { full_name: 'Charisma' }
+          ];
+        vi.mocked(loadAbilityScores).mockResolvedValue(mockScores);
 
-	      const result = await loadAbilityScores();
-	      expect(result).toEqual(mockScores);
-	      expect(result.map(a => a.full_name)).toEqual([
-	          'Strength',
-	          'Dexterity',
-	          'Constitution',
-	          'Intelligence',
-	          'Wisdom',
-	          'Charisma'
-	        ]);
-	    });
+        const result = await loadAbilityScores();
+        expect(result).toEqual(mockScores);
+        expect(result.map(a => a.full_name)).toEqual([
+            'Strength',
+            'Dexterity',
+            'Constitution',
+            'Intelligence',
+            'Wisdom',
+            'Charisma'
+          ]);
+      });
 
-	    it('should return ability names when mapped', async () => {
-	      const mockScores = [
-	          { full_name: 'Strength' },
-	          { full_name: 'Dexterity' },
-	          { full_name: 'Constitution' },
-	          { full_name: 'Intelligence' },
-	          { full_name: 'Wisdom' },
-	          { full_name: 'Charisma' }
-	        ];
-	      vi.mocked(loadAbilityScores).mockResolvedValue(mockScores);
+      it('should return ability names when mapped', async () => {
+        const mockScores = [
+            { full_name: 'Strength' },
+            { full_name: 'Dexterity' },
+            { full_name: 'Constitution' },
+            { full_name: 'Intelligence' },
+            { full_name: 'Wisdom' },
+            { full_name: 'Charisma' }
+          ];
+        vi.mocked(loadAbilityScores).mockResolvedValue(mockScores);
 
-	      const scores = await loadAbilityScores();
-	      const names = scores.map(a => a.full_name);
-	      expect(names).toEqual([
-	          'Strength',
-	          'Dexterity',
-	          'Constitution',
-	          'Intelligence',
-	          'Wisdom',
-	          'Charisma'
-	        ]);
-	    });
+        const scores = await loadAbilityScores();
+        const names = scores.map(a => a.full_name);
+        expect(names).toEqual([
+            'Strength',
+            'Dexterity',
+            'Constitution',
+            'Intelligence',
+            'Wisdom',
+            'Charisma'
+          ]);
+      });
 
     it('should handle errors gracefully', async () => {
-	      vi.mocked(loadAbilityScores).mockRejectedValue(new Error('Network error'));
+        vi.mocked(loadAbilityScores).mockRejectedValue(new Error('Network error'));
 
-	      await expect(loadAbilityScores()).rejects.toThrow('Network error');
+        await expect(loadAbilityScores()).rejects.toThrow('Network error');
         });
        });
 

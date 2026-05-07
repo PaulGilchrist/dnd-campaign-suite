@@ -281,7 +281,8 @@ export async function validateSkills(formData) {
   const warnings = [];
   const selectedSkills = formData.skillProficiencies || [];
   const expertSkills = formData.expertSkills || [];
-  const ruleset = formData.rules || '5e';
+  const _ruleset = formData.rules || '5e';
+  void _ruleset;
 
   // Get skill limits
   const limits = await getSkillLimits(formData);

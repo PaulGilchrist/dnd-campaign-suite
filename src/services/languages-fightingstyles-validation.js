@@ -4,7 +4,7 @@
  * Supports both 5e and 2024 rulesets
  */
 
-import { loadClassData, loadRaceData, loadBackgroundData, loadFeatData, fetchClassData, fetchRaceData, fetchBackgroundData, fetchSubraceData } from './data-loader.js';
+import { loadFeatData, fetchClassData, fetchRaceData, fetchBackgroundData, fetchSubraceData } from './data-loader.js';
 
 export { fetchClassData, fetchRaceData, fetchBackgroundData, fetchSubraceData };
 /**

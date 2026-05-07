@@ -1,4 +1,4 @@
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardSkills from './use-wizard-skills';
 
@@ -78,9 +78,9 @@ describe('useWizardSkills', () => {
   it('should add missing pre-selected skills to form data', async () => {
     getPreSelectedSkills.mockResolvedValue(['Athletics', 'Intimidation']);
 
-    const { result } = renderHook(() =>
+    renderHook(() =>
       useWizardSkills(mockFormData, mockSetFormData)
-       );
+        );
 
     await waitFor(() => {
       expect(mockSetFormData).toHaveBeenCalled();

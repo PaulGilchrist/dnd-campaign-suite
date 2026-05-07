@@ -1,4 +1,4 @@
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardFeats from './use-wizard-feats';
 
@@ -47,7 +47,7 @@ describe('useWizardFeats', () => {
   it('should add missing pre-selected feats to form data', async () => {
     getPreSelectedFeats.mockResolvedValue(['Tough', 'Resilient']);
 
-    const { result } = renderHook(() =>
+    renderHook(() =>
       useWizardFeats(mockFormData, mockSetFormData)
         );
 

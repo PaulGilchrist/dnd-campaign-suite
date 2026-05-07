@@ -4,7 +4,6 @@ import classRules2024 from './class-rules-2024.js';
 import { rules5e } from './race-rules/index.js';
 import { rules2024 } from './race-rules/index.js';
 import utils from './utils.js';
-import { loadSkills, loadPassiveSkills } from './data-loader';
 import { parseMagicItemName } from './attack-calc.js';
 import * as proficiencyUtils from './proficiency-utils.js';
 import * as proficiencyUtils2024 from './proficiency-utils-2024.js';
@@ -92,8 +91,8 @@ const rules = {
      },
 
      // === RULESET-SPECIFIC: getProficiencies ===
-    getProficiencies: (playerStats, skill = true, playerSummary) => {
-        const { proficiencyUtils: pu, classRules: cr } = rules.getSubModules(playerStats, playerSummary);
+     getProficiencies: (playerStats, skill = true, playerSummary) => {
+         const { proficiencyUtils: pu } = rules.getSubModules(playerStats, playerSummary);
 
         if (is2024(playerStats, playerSummary)) {
              // 2024: no racial extra proficiencies, uses class.major

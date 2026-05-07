@@ -1,4 +1,4 @@
-import { cloneDeep, merge, uniqBy } from 'lodash';
+import { cloneDeep, merge } from 'lodash';
 import utils from './utils.js'
 import * as featureCategories from './feature-categories-5e'
 import { categorizeFeatures, mergeCategorizedFeatures } from './feature-categorization-utils'
@@ -35,11 +35,11 @@ const classRules = {
                }
             return maxWildShapeChallengeRating
          },
-    getDruidWildShapeUses: (playerStats) => {
+     getDruidWildShapeUses: () => {
         // 5e Rules: Always 2 uses per day
         return 2;
     },
-    getDruidBeastKnownForms: (playerStats) => {
+     getDruidBeastKnownForms: () => {
         // 5e Rules: No limit on known forms (returns null or 0)
         return 0;
     },
@@ -178,8 +178,7 @@ const classRules = {
                    showWizardFeatures: true
                };
             },
-            getMonkFeatures: (playerStats) => {
-              const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+             getMonkFeatures: () => {
                 return {
                     martialArtsDie: 4,
                     unarmoredMovementIncrease: 0,

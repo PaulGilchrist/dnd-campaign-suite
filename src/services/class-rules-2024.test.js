@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import classRules from './class-rules-2024';
 
 // Mock dependencies
 vi.mock('lodash', () => ({
   cloneDeep: vi.fn(obj => obj),
-  uniqBy: vi.fn((arr, key) => arr)
+  uniqBy: vi.fn()
 }));
 
 vi.mock('./utils.js', () => ({

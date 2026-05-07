@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { rules2024 as raceRules } from './race-rules/index.js';
 
 // Mock dependencies
 vi.mock('lodash', () => ({
   cloneDeep: vi.fn(obj => obj && Object.assign({}, obj)),
-  uniqBy: vi.fn((arr, key) => arr)
+  uniqBy: vi.fn()
 }));
 
 vi.mock('./utils.js', () => ({

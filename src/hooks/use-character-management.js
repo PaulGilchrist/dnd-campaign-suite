@@ -38,14 +38,14 @@ function useCharacterManagement() {
     const uploadedCharacters = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      const reader = new FileReader();
       const readPromise = new Promise((resolve) => {
-        const reader = new FileReader();
         reader.onload = (evt) => {
           uploadedCharacters.push(JSON.parse(evt.target.result));
           resolve();
          };
-       });
-      reader.readAsText(file);
+        });
+       reader.readAsText(file);
       await readPromise;
      }
 

@@ -11,32 +11,6 @@ async function loadValidationRules(ruleset = '5e') {
 }
 
 /**
- * Default validation rules (fallback if JSON fails to load)
- * @param {string} ruleset - '5e' or '2024'
- * @returns {object} - Default validation rules
- */
-function getDefaultValidationRules(ruleset) {
-  return {
-    level_range: { min: 1, max: 20 },
-    point_buy: {
-      total_points: 27,
-      min_base_score: 8,
-      max_base_score: 15,
-      max_total_score: 20,
-      max_total_score_level_20: 24,
-      costs: { "8": 0, "9": 1, "10": 2, "11": 3, "12": 4, "13": 5, "14": 7, "15": 9 }
-    },
-    feats: {
-      available_levels: ruleset === '2024' ? [1, 4, 8, 12, 16, 19] : [4, 8, 12, 16, 19],
-      origin_feat_required: ruleset === '2024',
-      origin_feat_level: 1
-    },
-    background_languages: 2,
-    ability_score_max: { standard: 20, level_20: 24 }
-  };
-}
-
-/**
  * Get point buy costs (async, loads from JSON)
  * @param {string} ruleset - '5e' or '2024'
  * @returns {Promise<object>} - Point buy costs object
@@ -240,7 +214,7 @@ export async function getBackgroundLanguageCount(ruleset = '5e') {
  * @param {string} ruleset - '5e' or '2024' (currently skills are the same for both)
  * @returns {Promise<string[]>} - Array of skill names
  */
-export async function getSkillsFromAbilityScores(ruleset = '5e') {
+export async function getSkillsFromAbilityScores() {
   try {
     const path = '/data/ability-scores.json';
     const response = await fetch(path);
