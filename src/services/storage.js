@@ -10,13 +10,13 @@ const storage = {
     set: (key, value) => {
         const json = JSON.stringify(value);
         localStorage.setItem(key, json);
-        const fullUrl = `http://${window.location.hostname}/api/${key}/`;
+        const fullUrl = `/api/${key}`;
         // console.log(fullUrl)
         fetch(fullUrl, {
             method: 'POST',
             mode: 'cors',
             headers: { 'Content-Type': 'application/json' },
-            body: json
+            body: JSON.stringify({ value })
         }).catch(() => {
             // Silently ignore — fire-and-forget sync
         });

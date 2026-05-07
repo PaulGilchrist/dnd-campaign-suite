@@ -342,7 +342,7 @@ app.get('/api/:key', (req, res) => {
 });
 app.post('/api/:key', (req, res) => {
     const { key } = req.params;
-    const data = req.body;
+    const data = req.body?.value ?? req.body;
     characterChangeData[key] = data;
     res.status(200).json({ message: 'Data stored successfully' });
     if (!saveTimer) {
