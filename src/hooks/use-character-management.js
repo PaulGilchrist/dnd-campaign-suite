@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import cloneDeep from 'lodash/cloneDeep';
 import { saveAs } from 'file-saver';
+import * as campaignService from '../services/campaign-service.js';
 import utils from '../services/utils.js';
 
 function useCharacterManagement() {
@@ -88,6 +89,26 @@ function useCharacterManagement() {
     inputRef.current.click();
   };
 
+  const handleDeleteCharacter = async (characterName) => {
+    if (!window.confirm(`Are you sure you want to delete '${characterName}'? This cannot be undone.`)) {
+      return;
+    }
+
+    const storedCampaign = sessionStorage.getItem('currentCampaign');
+    if (!storedCampaign) throw new Error('No campaign selected');
+
+    const fileName = `${characterName.toLowerCase().replace(/\s+/g, '-')}.json`;
+    await campaignService.deleteCharacter(storedCampaign, fileName);
+
+    setCharacters(prev => {
+      const remaining = prev.filter(char => char.name !== characterName);
+      if (activeCharacter && activeCharacter.name === characterName) {
+        setActiveCharacter(remaining.length > 0 ? cloneDeep(remaining[0]) : null);
+      }
+      return remaining;
+    });
+  };
+
   return {
     characters,
     activeCharacter,
@@ -96,6 +117,7 @@ function useCharacterManagement() {
     handleUploadChange,
     handleSaveClick,
     handleUploadClick,
+    handleDeleteCharacter,
     setCharacters,
     setActiveCharacter,
     inputRef,

@@ -5,7 +5,6 @@ import CharSheet from './components/char-sheet/char-sheet.jsx';
 import CombatTracking from './components/combat-tracking/combat-tracking.jsx';
 import CampaignSelection from './components/campaign-selection/campaign-selection.jsx';
 import CharacterCreationWizard from './components/character-creation/character-creation-wizard.jsx';
-import * as campaignService from './services/campaign-service.js';
 import utils from './services/utils.js';
 import useAppData from './hooks/use-app-data.js';
 import useCharacterManagement from './hooks/use-character-management.js';
@@ -36,7 +35,7 @@ function App() {
   }, []);
 
   const { showCampaignSelection, campaignName, isLocalhost, handleCampaignSelect, handleRenameCampaign: handleRenameCampaignRaw, handleDeleteCampaign: handleDeleteCampaignRaw, handleBackToCampaigns } = campaignMgmt;
-  const { characters, activeCharacter, handleCharacterClick, handleInitiativeClick, handleUploadChange, handleSaveClick, handleUploadClick, inputRef, setCharacters, setActiveCharacter } = charMgmt;
+  const { characters, activeCharacter, handleCharacterClick, handleInitiativeClick, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, inputRef } = charMgmt;
   const { showButton, abilityScores, classes, classes2024, equipment, magicItems, magicItems2024, races, races2024, spells, spells2024 } = appData;
   const { showCharacterWizard, showEditCharacterWizard, handleAddCharacter, handleWizardComplete, handleWizardCancel, handleEditCharacter, handleEditWizardComplete, handleEditWizardCancel } = wizard;
 
@@ -60,18 +59,11 @@ function App() {
 
   const handleDeleteCharacter = async (characterName) => {
     try {
-      const storedCampaign = sessionStorage.getItem('currentCampaign');
-      if (!storedCampaign) throw new Error('No campaign selected');
-      const fileName = `${characterName.toLowerCase().replace(/\s+/g, '-')}.json`;
-      await campaignService.deleteCharacter(storedCampaign, fileName);
-      setCharacters(prev => prev.filter(char => char.name !== characterName));
-      if (activeCharacter && activeCharacter.name === characterName) setActiveCharacter(null);
-      const remaining = characters.filter(char => char.name !== characterName);
-      if (remaining.length > 0) setActiveCharacter(cloneDeep(remaining[0]));
-     } catch (error) {
+      await handleDeleteCharacterRaw(characterName);
+    } catch (error) {
       console.error('Error deleting character:', error);
       alert(`Failed to delete character: ${error.message}`);
-     }
+    }
   };
 
   const combatTrackingActive = characters.length > 0 && activeCharacter == null;

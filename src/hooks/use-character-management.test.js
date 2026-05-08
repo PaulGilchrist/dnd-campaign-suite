@@ -5,6 +5,9 @@ import useCharacterManagement from './use-character-management.js';
 vi.mock('lodash/cloneDeep', () => ({ default: vi.fn(val => val) }));
 vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
 vi.mock('../services/utils.js', () => ({ default: { getFirstName: vi.fn(n => n) } }));
+vi.mock('../services/campaign-service.js', () => ({
+  deleteCharacter: vi.fn().mockResolvedValue(undefined),
+}));
 
 const createMockSessionStorage = () => {
   const store = {};
@@ -205,5 +208,128 @@ describe('useCharacterManagement', () => {
 
       expect(result.current.activeCharacter).toEqual({ name: 'Eowyn' });
      });
+  });
+
+  describe('handleDeleteCharacter', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      window.confirm = vi.fn(() => true);
+    });
+
+    it('deletes character and removes from state when confirmed', async () => {
+      const { deleteCharacter } = await import('../services/campaign-service.js');
+      const chars = [{ name: 'Frodo' }, { name: 'Sam' }];
+      window.sessionStorage.setItem('currentCampaign', 'test-campaign');
+
+      const { result } = renderHook(() => useCharacterManagement());
+      act(() => {
+        result.current.setCharacters(chars);
+      });
+
+      await act(async () => {
+        result.current.handleDeleteCharacter('Frodo');
+      });
+
+      expect(window.confirm).toHaveBeenCalledWith("Are you sure you want to delete 'Frodo'? This cannot be undone.");
+      expect(deleteCharacter).toHaveBeenCalledWith('test-campaign', 'frodo.json');
+      expect(result.current.characters).toEqual([{ name: 'Sam' }]);
+    });
+
+    it('does not delete when user cancels confirmation', async () => {
+      const { deleteCharacter } = await import('../services/campaign-service.js');
+      window.confirm = vi.fn(() => false);
+      const chars = [{ name: 'Frodo' }, { name: 'Sam' }];
+
+      const { result } = renderHook(() => useCharacterManagement());
+      act(() => {
+        result.current.setCharacters(chars);
+      });
+
+      await act(async () => {
+        result.current.handleDeleteCharacter('Frodo');
+      });
+
+      expect(window.confirm).toHaveBeenCalled();
+      expect(deleteCharacter).not.toHaveBeenCalled();
+      expect(result.current.characters).toEqual(chars);
+    });
+
+    it('switches activeCharacter to next character when deleting active', async () => {
+      const cloneDeep = (await import('lodash/cloneDeep')).default;
+      const chars = [{ name: 'Frodo' }, { name: 'Sam' }];
+      window.sessionStorage.setItem('currentCampaign', 'test-campaign');
+
+      const { result } = renderHook(() => useCharacterManagement());
+      act(() => {
+        result.current.setCharacters(chars);
+        result.current.setActiveCharacter(chars[0]);
+      });
+
+      await act(async () => {
+        result.current.handleDeleteCharacter('Frodo');
+      });
+
+      expect(cloneDeep).toHaveBeenCalledWith({ name: 'Sam' });
+      expect(result.current.activeCharacter).toEqual({ name: 'Sam' });
+      expect(result.current.characters).toEqual([{ name: 'Sam' }]);
+    });
+
+    it('clears activeCharacter when deleting the last character', async () => {
+      const chars = [{ name: 'Frodo' }];
+      window.sessionStorage.setItem('currentCampaign', 'test-campaign');
+
+      const { result } = renderHook(() => useCharacterManagement());
+      act(() => {
+        result.current.setCharacters(chars);
+        result.current.setActiveCharacter(chars[0]);
+      });
+
+      await act(async () => {
+        result.current.handleDeleteCharacter('Frodo');
+      });
+
+      expect(result.current.activeCharacter).toBeNull();
+      expect(result.current.characters).toEqual([]);
+    });
+
+    it('throws error when no campaign is selected', async () => {
+      const { deleteCharacter } = await import('../services/campaign-service.js');
+      window.sessionStorage.getItem = vi.fn(() => null);
+
+      const { result } = renderHook(() => useCharacterManagement());
+
+      await expect(result.current.handleDeleteCharacter('Frodo')).rejects.toThrow('No campaign selected');
+      expect(deleteCharacter).not.toHaveBeenCalled();
+    });
+
+    it('throws error when server delete fails', async () => {
+      const { deleteCharacter } = await import('../services/campaign-service.js');
+      deleteCharacter.mockRejectedValueOnce(new Error('Server error'));
+      window.sessionStorage.setItem('currentCampaign', 'test-campaign');
+
+      const { result } = renderHook(() => useCharacterManagement());
+      act(() => {
+        result.current.setCharacters([{ name: 'Frodo' }]);
+      });
+
+      await expect(result.current.handleDeleteCharacter('Frodo')).rejects.toThrow('Server error');
+      expect(result.current.characters).toEqual([{ name: 'Frodo' }]);
+    });
+
+    it('builds filename with hyphens for spaces', async () => {
+      const { deleteCharacter } = await import('../services/campaign-service.js');
+      window.sessionStorage.setItem('currentCampaign', 'test-campaign');
+
+      const { result } = renderHook(() => useCharacterManagement());
+      act(() => {
+        result.current.setCharacters([{ name: 'Dark Lord' }]);
+      });
+
+      await act(async () => {
+        result.current.handleDeleteCharacter('Dark Lord');
+      });
+
+      expect(deleteCharacter).toHaveBeenCalledWith('test-campaign', 'dark-lord.json');
+    });
   });
 });
