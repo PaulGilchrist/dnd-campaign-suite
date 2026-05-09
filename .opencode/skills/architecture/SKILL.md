@@ -1,6 +1,9 @@
 ---
 name: architecture
-description: Project Architecture
+description: >
+  When exploring, explaining, or making structural changes to the project,
+  to understand the tech stack, folder layout, data layer, server setup,
+  and dual-ruleset architecture
 ---
 ## Project Overview
 D&D character sheet SPA for creating, managing, and playing D&D character sheets. Supports dual rulesets: classic 5e and 2024 Essentials, with full parallel logic throughout.
