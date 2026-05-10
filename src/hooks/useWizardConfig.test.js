@@ -85,13 +85,12 @@ describe('useWizardConfig', () => {
         preSelected: ['Athletics', 'Intimidation'],
       }),
     };
-    void slotWithPreSelected;
 
     const { result } = renderHook(() =>
       useWizardConfig({
         formData: mockFormData,
         validateFn: mockValidateFn,
-        slots: [mockSlot1],
+        slots: [slotWithPreSelected],
         getDeps: mockGetDeps,
         setFormData: mockSetFormData,
       })

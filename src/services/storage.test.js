@@ -50,12 +50,12 @@ describe('storage', () => {
       storage.set('TestName', testData);
 
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/api/TestName/'),
+        '/api/TestName',
         expect.objectContaining({
           method: 'POST',
           mode: 'cors',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(testData)
+          body: JSON.stringify({ value: testData })
         })
       );
     });
