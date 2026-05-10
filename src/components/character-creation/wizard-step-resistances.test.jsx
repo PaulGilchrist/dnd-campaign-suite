@@ -183,7 +183,7 @@ describe('WizardStepResistances', () => {
    });
     });
 
-  it('should disable pre-selected resistance checkbox when not selected', async () => {
+  it('should enable pre-selected resistance checkbox when not selected', async () => {
     const propsWithPreSelected = {
        ...mockProps,
       preSelectedResistances: ['Fire'],
@@ -198,11 +198,11 @@ describe('WizardStepResistances', () => {
     await waitFor(() => {
       const checkboxes = screen.getAllByRole('checkbox');
        // Fire is the 3rd item in resistances (index 2)
-      expect(checkboxes[2]).toBeDisabled();
+      expect(checkboxes[2]).not.toBeDisabled();
       });
     });
 
-  it('should enable pre-selected resistance checkbox when selected', async () => {
+  it('should disable pre-selected resistance checkbox when selected', async () => {
     const propsWithPreSelected = {
        ...mockProps,
       preSelectedResistances: ['Fire'],
@@ -217,7 +217,7 @@ describe('WizardStepResistances', () => {
     await waitFor(() => {
       const checkboxes = screen.getAllByRole('checkbox');
        // Fire is the 3rd item in resistances (index 2)
-      expect(checkboxes[2]).not.toBeDisabled();
+      expect(checkboxes[2]).toBeDisabled();
       });
     });
 

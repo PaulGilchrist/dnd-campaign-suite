@@ -89,7 +89,7 @@ const WizardStepSkills = React.memo(function WizardStepSkills({ formData, errors
 							type="checkbox"
 							checked={isSkillProficient(skill.name)}
 							onChange={() => onSkillToggle(skill.name)}
-							disabled={isPreSelected(skill.name)}
+							disabled={isPreSelected(skill.name) && isSkillProficient(skill.name)}
 							/>
 							&nbsp;
 							<span className={isSkillExpert(skill.name) ? 'skill-expert-label' : ''}>

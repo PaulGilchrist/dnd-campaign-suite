@@ -7,12 +7,20 @@ function getNestedValue(obj, path) {
 function setNestedValue(obj, path, value) {
   const keys = path.split('.');
   const lastKey = keys.pop();
-  const target = keys.reduce((current, key) => {
-    if (!current[key]) current[key] = {};
-    return current[key];
-  }, obj);
-  target[lastKey] = value;
-  return obj;
+
+  // Start with a shallow copy of the root
+  let result = { ...obj };
+  let current = result;
+
+  // For each intermediate key, create a new object copy
+  for (const key of keys) {
+    current[key] = { ...(current[key] || {}) };
+    current = current[key];
+  }
+
+  // Set the final value
+  current[lastKey] = value;
+  return result;
 }
 
 export default function useWizardArrayToggle(
@@ -52,7 +60,8 @@ export default function useWizardArrayToggle(
         }
 
         clearError();
-        return setNestedValue(prev, fieldName, copiedCurrent);
+        const result = { ...prev };
+        return setNestedValue(result, fieldName, copiedCurrent);
       });
     },
     [setFormData, fieldName, preSelectedItems, clearError]
@@ -66,7 +75,8 @@ export default function useWizardArrayToggle(
           ? [...current]
           : [...current, item];
         clearError();
-        return setNestedValue(prev, fieldName, updated);
+        const result = { ...prev };
+        return setNestedValue(result, fieldName, updated);
       });
     },
     [setFormData, fieldName, clearError]
@@ -78,7 +88,8 @@ export default function useWizardArrayToggle(
         const current = getNestedValue(prev, fieldName) || [];
         const updated = current.filter(i => i !== item);
         clearError();
-        return setNestedValue(prev, fieldName, updated);
+        const result = { ...prev };
+        return setNestedValue(result, fieldName, updated);
       });
     },
     [setFormData, fieldName, clearError]

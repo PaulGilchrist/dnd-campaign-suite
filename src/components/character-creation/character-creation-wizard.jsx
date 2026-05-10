@@ -248,15 +248,15 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, characterDat
      setFormData, setErrors, 'class.fightingStyles', preSelectedFightingStyles
    );
 
-   // Resistances - Pattern C: boolean param guard
-   const { toggleItem: handleResistanceToggle } = useWizardArrayToggle(
-     setFormData, setErrors, 'resistances'
-   );
+    // Resistances - Pattern A: preSelectedResistancesList from useWizardResistances
+    const { toggleItem: handleResistanceToggle } = useWizardArrayToggle(
+      setFormData, setErrors, 'resistances', preSelectedResistancesList.resistances
+    );
 
-   // Immunities - Pattern C: boolean param guard
-   const { toggleItem: handleImmunityToggle } = useWizardArrayToggle(
-     setFormData, setErrors, 'immunities'
-   );
+    // Immunities - Pattern A: preSelectedResistancesList from useWizardResistances
+    const { toggleItem: handleImmunityToggle } = useWizardArrayToggle(
+      setFormData, setErrors, 'immunities', preSelectedResistancesList.immunities
+    );
 
   const handleNext = useCallback(async () => {
     const success = await navigateNext();

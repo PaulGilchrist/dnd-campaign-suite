@@ -31,8 +31,8 @@ function WizardStepResistances({ formData, onResistanceToggle, onImmunityToggle,
                 <input
                   type="checkbox"
                   checked={isSelected}
-                  onChange={() => onResistanceToggle(type, isPreSelected)}
-                  disabled={isPreSelected && !isSelected}
+                  onChange={() => onResistanceToggle(type)}
+                  disabled={isPreSelected && isSelected}
                 />
                 &nbsp;{type}{isPreSelected ? ' (Granted)' : ''}
               </label>
@@ -55,8 +55,8 @@ function WizardStepResistances({ formData, onResistanceToggle, onImmunityToggle,
                 <input
                   type="checkbox"
                   checked={isSelected}
-                  onChange={() => onImmunityToggle(type, isPreSelected)}
-                  disabled={isPreSelected && !isSelected}
+                  onChange={() => onImmunityToggle(type)}
+                  disabled={isPreSelected && isSelected}
                 />
                 &nbsp;{type}{isPreSelected ? ' (Granted)' : ''}
               </label>

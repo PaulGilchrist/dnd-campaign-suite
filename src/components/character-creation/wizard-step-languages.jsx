@@ -81,7 +81,7 @@ function WizardStepLanguages({ formData, errors, onLanguageToggle, onFightingSty
                 type="checkbox"
                  checked={languages.includes(language)}
                 onChange={() => onLanguageToggle(language)}
-                disabled={isLanguagePreSelected(language)}
+                 disabled={isLanguagePreSelected(language) && languages.includes(language)}
                />
                &nbsp;{language}
              </label>
@@ -102,7 +102,7 @@ function WizardStepLanguages({ formData, errors, onLanguageToggle, onFightingSty
                 type="checkbox"
                 checked={fightingStyles.includes(style)}
                 onChange={() => onFightingStyleToggle(style)}
-                disabled={isFightingStylePreSelected(style)}
+                 disabled={isFightingStylePreSelected(style) && fightingStyles.includes(style)}
                />
                &nbsp;{style}
              </label>
