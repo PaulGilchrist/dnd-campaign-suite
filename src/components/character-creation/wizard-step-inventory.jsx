@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 // No component-specific CSS needed - uses shared wizard styles
 import { useEquipmentSearch } from '../../hooks/useEquipmentSearch.js';
 import EquipmentSearchModal from './EquipmentSearchModal.jsx';
@@ -21,30 +21,75 @@ const WizardStepInventory = React.memo(function WizardStepInventory({ formData, 
     handleSearchFieldFocus,
   } = useEquipmentSearch(tempInventory, onTempInventoryChange, onInventoryChange);
 
+  // Raw text state for each textarea field - allows free typing including commas
+  const [rawTexts, setRawTexts] = useState({ backpack: '', equipped: '' });
+  // Track which field's textarea currently has focus
+  const [focusedField, setFocusedField] = useState(null);
+
+  // Sync raw text from items array when items change AND the field is NOT focused
+  // This ensures the textarea updates when the search modal adds an item
+  useEffect(() => {
+    if (!focusedField) {
+      setRawTexts({
+        backpack: (tempInventory.backpack || []).join(', '),
+        equipped: (tempInventory.equipped || []).join(', '),
+      });
+    }
+  }, [tempInventory.backpack, tempInventory.equipped, focusedField]);
+
   const handleManualInputChange = (field, value) => {
-    const items = value.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(item => 
+    const items = value.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(item =>
       item.trim().replace(/^"|"$/g, '')
     ).filter(item => item.length > 0);
-    
+
     onTempInventoryChange(field, items);
     onInventoryChange(field, items);
   };
 
+  const commitRawText = (fieldName) => {
+    const raw = rawTexts[fieldName] || '';
+    handleManualInputChange(fieldName, raw);
+  };
+
   const renderInputWithSearch = (label, fieldValue, fieldName, placeholder) => {
     const items = fieldValue;
-    
+
+    // Initialize raw text from items if empty (first render)
+    const currentRaw = rawTexts[fieldName] !== undefined ? rawTexts[fieldName] : items.join(', ');
+
+    const handleRawChange = (e) => {
+      setRawTexts(prev => ({
+        ...prev,
+        [fieldName]: e.target.value,
+      }));
+    };
+
+    const handleBlur = () => {
+      commitRawText(fieldName);
+      setFocusedField(null);
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        commitRawText(fieldName);
+      }
+    };
+
+    const handleFocus = () => {
+      setFocusedField(fieldName);
+    };
+
     return (
       <div className="form-group">
         <label>{label}</label>
         <div className="searchable-input-container">
           <textarea
-            value={items.join(', ')}
-            onChange={(e) => handleManualInputChange(fieldName, e.target.value)}
-            onBlur={() => {
-              const cleanItems = items.filter(item => item.trim().length > 0);
-              onTempInventoryChange(fieldName, cleanItems);
-              onInventoryChange(fieldName, cleanItems);
-            }}
+            value={currentRaw}
+            onChange={handleRawChange}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            onFocus={handleFocus}
             placeholder={placeholder}
             rows={3}
             className="inventory-textarea"
@@ -108,6 +153,7 @@ const WizardStepInventory = React.memo(function WizardStepInventory({ formData, 
       <EquipmentSearchModal
         showSearchModal={searchField !== null}
         onClose={() => {
+          setFocusedField(null);
           setSearchField(null);
           setSearchQuery('');
         }}

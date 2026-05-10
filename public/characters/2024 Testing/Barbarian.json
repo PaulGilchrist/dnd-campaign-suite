@@ -1,29 +1,102 @@
 {
-    "abilities": [
-        { "name": "Strength", "abilityImprovements": 0, "baseScore": 15, "miscBonus": 0 },
-        { "name": "Dexterity", "abilityImprovements": 0, "baseScore": 12, "miscBonus": 0 },
-        { "name": "Constitution", "abilityImprovements": 0, "baseScore": 15, "miscBonus": 0 },
-        { "name": "Intelligence", "abilityImprovements": 0, "baseScore": 9, "miscBonus": 0 },
-        { "name": "Wisdom", "abilityImprovements": 0, "baseScore": 11, "miscBonus": 0 },
-        { "name": "Charisma", "abilityImprovements": 0, "baseScore": 9, "miscBonus": 0 }
-    ],
-    "alignment": "Neutral Good",
-    "class": {
-        "name": "Barbarian",
-        "subclass": {
-            "name": "Berserker"
-        }
+  "name": "Barbarian",
+  "level": 20,
+  "alignment": "Neutral Good",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 15,
+      "abilityImprovements": 0,
+      "miscBonus": 0
     },
-    "inventory": {
-        "backpack": ["Fishing Tackle","Grappling Hook","Playing Card Set","Rations (5 days)","Rope, Silk (50 feet)","String","Waterskin"],
-        "equipped": ["Longbow","Greatsword","Dagger"],
-        "gold": 10
+    {
+      "name": "Dexterity",
+      "baseScore": 12,
+      "abilityImprovements": 0,
+      "miscBonus": 0
     },
-    "level": 20,
+    {
+      "name": "Constitution",
+      "baseScore": 15,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 9,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 11,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 9,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    }
+  ],
+  "background": "",
+  "class": {
     "name": "Barbarian",
-    "race": {
-        "name": "Aasimar"
-    },
-    "skillProficiencies": ["Athletics","Intimidation","Perception","Survival"],
-    "rules": "2024"
+    "subclass": {
+      "name": "Berserker"
+    }
+  },
+  "expertSkills": [],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Aasimar",
+    "subrace": {
+      "name": ""
+    }
+  },
+  "immunities": [],
+  "inventory": {
+    "backpack": [
+      "Fishing Tackle",
+      "Grappling Hook",
+      "Playing Card Set",
+      "Rations (5 days)",
+      "Rope",
+      "Silk (50 feet)",
+      "String",
+      "Waterskin",
+      "Warhorse"
+    ],
+    "equipped": [
+      "Longbow",
+      "Greatsword",
+      "Dagger"
+    ],
+    "gold": 10,
+    "magicItems": []
+  },
+  "languages": [
+    "Common"
+  ],
+  "resistances": [
+    "Necrotic",
+    "Radiant"
+  ],
+  "skillProficiencies": [
+    "Athletics",
+    "Intimidation",
+    "Perception",
+    "Survival",
+    "Choose any 2 from Animal Handling",
+    "Nature",
+    "or Survival"
+  ],
+  "specialActions": [],
+  "spells": [],
+  "rules": "2024",
+  "magicItems": [
+    "Adamantine Armor"
+  ]
 }
