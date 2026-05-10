@@ -28,7 +28,7 @@ describe('campaignService', () => {
       const result = await getCharacterFolders();
 
       expect(result).toEqual(['Campaign 1', 'Campaign 2']);
-      expect(mockFetch).toHaveBeenCalledWith('/api/characters');
+      expect(mockFetch).toHaveBeenCalledWith('/api/campaigns');
         });
 
     it('should return empty array when no folders in response', async () => {
@@ -69,7 +69,7 @@ describe('campaignService', () => {
 
       await getCharacterFolders();
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/characters');
+      expect(mockFetch).toHaveBeenCalledWith('/api/campaigns');
         });
       });
 
@@ -85,7 +85,7 @@ describe('campaignService', () => {
       const result = await getCharacterFiles('campaign1');
 
       expect(result).toEqual(['character1.json', 'character2.json']);
-      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign1');
+      expect(mockFetch).toHaveBeenCalledWith('/api/campaigns/campaign1');
         });
 
     it('should return empty array when no files in response', async () => {
@@ -126,7 +126,7 @@ describe('campaignService', () => {
 
       await getCharacterFiles('campaign with spaces');
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign%20with%20spaces');
+      expect(mockFetch).toHaveBeenCalledWith('/api/campaigns/campaign%20with%20spaces');
         });
 
     it('should handle special characters in campaign name', async () => {
@@ -137,7 +137,7 @@ describe('campaignService', () => {
 
       await getCharacterFiles('campaign/with/slashes');
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign%2Fwith%2Fslashes');
+      expect(mockFetch).toHaveBeenCalledWith('/api/campaigns/campaign%2Fwith%2Fslashes');
         });
       });
 
@@ -173,7 +173,7 @@ describe('campaignService', () => {
 
       await loadCharacters('campaign 1', characterFiles);
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign%201/char%201.json');
+      expect(mockFetch).toHaveBeenCalledWith('/api/campaigns/campaign%201/char%201.json');
         });
 
     it('should return empty array when one character fails to load', async () => {
@@ -260,7 +260,7 @@ describe('campaignService', () => {
       });
 
       await expect(deleteCharacter('campaign1', 'char1.json')).resolves.toBeUndefined();
-      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign1/char1.json', { method: 'DELETE' });
+      expect(mockFetch).toHaveBeenCalledWith('/api/campaigns/campaign1/char1.json', { method: 'DELETE' });
     });
 
     it('should encode campaign and file names in URL', async () => {
@@ -270,7 +270,7 @@ describe('campaignService', () => {
 
       await deleteCharacter('campaign with spaces', 'char 1.json');
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign%20with%20spaces/char%201.json', { method: 'DELETE' });
+      expect(mockFetch).toHaveBeenCalledWith('/api/campaigns/campaign%20with%20spaces/char%201.json', { method: 'DELETE' });
     });
 
     it('should throw on API error', async () => {
@@ -302,7 +302,7 @@ describe('campaignService', () => {
       const result = await createCharacter('campaign1', characterData);
 
       expect(result).toEqual(responseData);
-      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign1', {
+      expect(mockFetch).toHaveBeenCalledWith('/api/campaigns/campaign1', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ campaignName: 'campaign1', character: characterData }),
@@ -319,7 +319,7 @@ describe('campaignService', () => {
 
       await createCharacter('campaign with spaces', characterData);
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign%20with%20spaces', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('/api/campaigns/campaign%20with%20spaces', expect.any(Object));
     });
 
     it('should throw on API error', async () => {
@@ -351,7 +351,7 @@ describe('campaignService', () => {
       const result = await updateCharacter('campaign1', 'char1.json', characterData);
 
       expect(result).toEqual(responseData);
-      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign1/char1.json', {
+      expect(mockFetch).toHaveBeenCalledWith('/api/campaigns/campaign1/char1.json', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(characterData),
@@ -368,7 +368,7 @@ describe('campaignService', () => {
 
       await updateCharacter('campaign with spaces', 'char 1.json', characterData);
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/characters/campaign%20with%20spaces/char%201.json', expect.any(Object));
+      expect(mockFetch).toHaveBeenCalledWith('/api/campaigns/campaign%20with%20spaces/char%201.json', expect.any(Object));
     });
 
     it('should throw on API error', async () => {

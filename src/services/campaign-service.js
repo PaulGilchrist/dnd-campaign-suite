@@ -1,6 +1,6 @@
 export const getCharacterFolders = async () => {
   try {
-    const response = await fetch('/api/characters');
+    const response = await fetch('/api/campaigns');
     if (!response.ok) {
       throw new Error('Failed to fetch character folders');
     }
@@ -15,7 +15,7 @@ export const getCharacterFolders = async () => {
 
 export const getCharacterFiles = async (campaign) => {
   try {
-    const response = await fetch(`/api/characters/${encodeURIComponent(campaign)}`);
+    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaign)}`);
     if (!response.ok) {
       throw new Error('Failed to fetch character files');
     }
@@ -30,7 +30,7 @@ export const getCharacterFiles = async (campaign) => {
 
 export const loadCharacters = async (campaign, characterFiles) => {
   const encodedCampaign = encodeURIComponent(campaign);
-  const urls = characterFiles.map(file => `/api/characters/${encodedCampaign}/${encodeURIComponent(file)}`);
+  const urls = characterFiles.map(file => `/api/campaigns/${encodedCampaign}/${encodeURIComponent(file)}`);
   const promises = urls.map(url => fetch(url).then(response => {
     if (!response.ok) {
       throw new Error(`Failed to load character: ${response.statusText}`);
@@ -51,7 +51,7 @@ export const deleteCharacter = async (campaignName, fileName) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
     const encodedFileName = encodeURIComponent(fileName);
-    const response = await fetch(`/api/characters/${encodedCampaign}/${encodedFileName}`, { method: 'DELETE' });
+    const response = await fetch(`/api/campaigns/${encodedCampaign}/${encodedFileName}`, { method: 'DELETE' });
     if (!response.ok) {
       throw new Error(`Failed to delete character: ${response.statusText}`);
     }
@@ -64,7 +64,7 @@ export const deleteCharacter = async (campaignName, fileName) => {
 export const createCharacter = async (campaignName, characterData) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
-    const response = await fetch(`/api/characters/${encodedCampaign}`, {
+    const response = await fetch(`/api/campaigns/${encodedCampaign}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ campaignName, character: characterData }),
@@ -83,7 +83,7 @@ export const updateCharacter = async (campaignName, fileName, characterData) => 
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
     const encodedFileName = encodeURIComponent(fileName);
-    const response = await fetch(`/api/characters/${encodedCampaign}/${encodedFileName}`, {
+    const response = await fetch(`/api/campaigns/${encodedCampaign}/${encodedFileName}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(characterData),

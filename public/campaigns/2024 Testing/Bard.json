@@ -1,0 +1,106 @@
+{
+  "name": "Bard",
+  "level": 20,
+  "alignment": "Neutral Good",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 10,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Dexterity",
+      "baseScore": 15,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Constitution",
+      "baseScore": 12,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 9,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 11,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    }
+  ],
+  "background": "Artisan",
+  "class": {
+    "name": "Bard",
+    "subclass": {
+      "name": "College of Glamour",
+      "type": ""
+    },
+    "expertise": [
+      "Performance",
+      "Persuasion"
+    ]
+  },
+  "expertSkills": [],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Dragonborn",
+    "subrace": {
+      "name": "Black"
+    }
+  },
+  "immunities": [],
+  "inventory": {
+    "backpack": [
+      "Fishing Tackle",
+      "Grappling Hook",
+      "Playing Card Set",
+      "Rations (5 days)",
+      "Rope, Silk (50 feet)",
+      "String",
+      "Waterskin"
+    ],
+    "equipped": [
+      "Studded Leather",
+      "Crossbow, hand",
+      "Rapier",
+      "Dagger"
+    ],
+    "gold": 10,
+    "magicItems": []
+  },
+  "languages": [],
+  "resistances": [
+    "Fire"
+  ],
+  "skillProficiencies": [
+    "Insight",
+    "Performance",
+    "Perception",
+    "Persuasion",
+    "Deception",
+    "Choose any 3 (see chapter 1)"
+  ],
+  "specialActions": [],
+  "spells": [
+    "Charm Person",
+    "Disguise Self",
+    "Hideous Laughter",
+    "Mage Hand",
+    "Minor Illusion",
+    "Sleep"
+  ],
+  "rules": "2024"
+}

@@ -122,7 +122,7 @@ describe('useCharacterWizard', () => {
   });
 
   describe('handleWizardComplete (create)', () => {
-    it('POSTs to /api/characters, sets active character, and refreshes character list', async () => {
+    it('POSTs to /api/campaigns, sets active character, and refreshes character list', async () => {
       const setCharacters = vi.fn();
       const setActiveCharacter = vi.fn();
       const characterData = { name: 'TestChar', class: 'Wizard' };
@@ -156,7 +156,7 @@ describe('useCharacterWizard', () => {
       });
 
       expect(global.fetch).toHaveBeenCalledTimes(3);
-      expect(global.fetch).toHaveBeenCalledWith(`/api/characters/${encodeURIComponent(campaignName)}`, {
+      expect(global.fetch).toHaveBeenCalledWith(`/api/campaigns/${encodeURIComponent(campaignName)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ campaignName, character: characterData }),
@@ -229,7 +229,7 @@ describe('useCharacterWizard', () => {
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        `/api/characters/${encodeURIComponent(campaignName)}/${encodeURIComponent(fileName)}`,
+        `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(fileName)}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },

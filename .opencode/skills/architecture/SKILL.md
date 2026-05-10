@@ -54,14 +54,14 @@ Wizard infrastructure: `steps-config.js` (declarative step definitions), `consta
 - **Validation:** `feat-validation.js`, `skill-validation.js`, `resistances-validation.js`, `languages-fightingstyles-validation.js`
 ## Data Layer
 - **Static JSON:** `public/data/*.json` (5e) and `public/data/2024/*.json` (2024) — classes, races, spells, feats, magic items, backgrounds, ability scores, skills, alignments, languages, fighting styles, equipment, rules-validation
-- **Character files:** `public/characters/<campaign>/<name>.json` — JSON Schema draft-07 (`character.schema.json`)
+- **Character files:** `public/campaigns/<campaign>/<name>.json` — JSON Schema draft-07 (`character.schema.json`)
 - **Runtime state:** `characterChangeData.json` — in-memory, debounced 60s save
 ## Data Flow
 Static JSON → data-loader → rules.js + *-calc → React Components
 Character JSON → Express REST API → React Hooks
 SSE /subscribe → Subscriber component (real-time broadcast)
 1. `data-loader.js` loads all static JSON catalogs (cached per ruleset). Exposed via `use-app-data.js`.
-2. Character CRUD via Express REST API (`/api/characters/*`). Characters persisted as JSON files on disk.
+2. Character CRUD via Express REST API (`/api/campaigns/*`). Characters persisted as JSON files on disk.
 3. SSE (`/subscribe`) broadcasts character updates to all connected clients.
 4. `rules.js` dispatches to 5e or 2024 logic based on `playerStats.rules`.
 ## Dependency Rules

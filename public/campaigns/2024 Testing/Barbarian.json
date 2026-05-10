@@ -40,11 +40,12 @@
       "miscBonus": 0
     }
   ],
-  "background": "",
+  "background": "Acolyte",
   "class": {
     "name": "Barbarian",
     "subclass": {
-      "name": "Berserker"
+      "name": "Path of the Berserker",
+      "type": ""
     }
   },
   "expertSkills": [],

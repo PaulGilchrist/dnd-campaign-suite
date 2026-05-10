@@ -1,0 +1,105 @@
+{
+  "name": "Cleric",
+  "level": 20,
+  "alignment": "Neutral Good",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Dexterity",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Constitution",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 10,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 15,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 10,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    }
+  ],
+  "background": "Charlatan",
+  "class": {
+    "name": "Cleric",
+    "subclass": {
+      "name": "Trickery Domain",
+      "type": ""
+    }
+  },
+  "expertSkills": [],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Dwarf",
+    "subrace": {
+      "name": "Hill"
+    }
+  },
+  "immunities": [
+    "Magical Sleep"
+  ],
+  "inventory": {
+    "backpack": [
+      "Mess Kit",
+      "Playing Card Set",
+      "Rations (5 days)",
+      "Rope, Silk (50 feet)",
+      "Tinderbox",
+      "Torch",
+      "Waterskin"
+    ],
+    "equipped": [
+      "Arrows",
+      "Chain Mail",
+      "Holy Symbol",
+      "Longbow",
+      "Longsword",
+      "Shield"
+    ],
+    "gold": 10,
+    "magicItems": []
+  },
+  "languages": [],
+  "resistances": [
+    "Poison"
+  ],
+  "skillProficiencies": [
+    "Insight",
+    "Medicine",
+    "Religion",
+    "Survival"
+  ],
+  "specialActions": [],
+  "spells": [
+    "Detect Magic",
+    "Guidance",
+    "Guiding Bolt",
+    "Healing Word",
+    "Inflict Wounds",
+    "Sacred Flame",
+    "Spare the Dying"
+  ],
+  "rules": "2024"
+}

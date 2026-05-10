@@ -27,9 +27,9 @@ export function useCharacterWizard() {
       callbacksRef.current.setActiveCharacter(cloneDeep(result.character));
       setShowCharacterWizard(false);
       const encodedCampaign = encodeURIComponent(storedCampaign);
-      const characterFiles = await fetch(`/api/characters/${encodedCampaign}`).then(res => res.json()).then(data => data.files);
+      const characterFiles = await fetch(`/api/campaigns/${encodedCampaign}`).then(res => res.json()).then(data => data.files);
       const newCharacters = await Promise.all(
-        characterFiles.map(file => fetch(`/api/characters/${encodedCampaign}/${encodeURIComponent(file)}`).then(res => res.json()))
+        characterFiles.map(file => fetch(`/api/campaigns/${encodedCampaign}/${encodeURIComponent(file)}`).then(res => res.json()))
       );
       callbacksRef.current.setCharacters(newCharacters);
     } catch (error) {

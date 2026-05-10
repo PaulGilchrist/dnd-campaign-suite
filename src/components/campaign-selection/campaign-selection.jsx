@@ -18,7 +18,7 @@ function CampaignSelection({ onCampaignSelect }) {
         setCampaigns(folders);
         setLoading(false);
       } catch (err) {
-        setError('Failed to load campaigns. Please ensure character folders exist under ./public/characters');
+        setError('Failed to load campaigns. Please ensure campaign folders exist under ./public/campaigns');
         setLoading(false);
        }
       };
@@ -136,7 +136,7 @@ function CampaignSelection({ onCampaignSelect }) {
          <button className="new-campaign-button" onClick={openNewCampaignModal}><i className="fas fa-plus"></i> Add</button>
          {campaigns.length === 0 ? (
            <p className="no-campaigns">
-          No campaigns found. Please create folders under ./public/characters to get started.
+           No campaigns found. Please create folders under ./public/campaigns to get started.
            </p>
          ) : (
            <div className="campaign-list">

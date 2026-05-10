@@ -76,11 +76,11 @@ app.listen(PORT, () => {
 app.use(express.static(path.join(process.cwd(), 'public')));
 
 // API endpoint to list character folders
-app.get('/api/characters', (req, res) => {
-    const charactersDir = path.join(process.cwd(), 'public', 'characters');
+app.get('/api/campaigns', (req, res) => {
+    const campaignsDir = path.join(process.cwd(), 'public', 'campaigns');
     
     try {
-        const items = fs.readdirSync(charactersDir, { withFileTypes: true });
+        const items = fs.readdirSync(campaignsDir, { withFileTypes: true });
         const folders = items
             .filter(item => item.isDirectory())
             .map(item => item.name)
@@ -88,15 +88,15 @@ app.get('/api/characters', (req, res) => {
         
         res.json({ folders });
     } catch (error) {
-        console.error('Error reading characters directory:', error);
-        res.status(500).json({ error: 'Failed to read characters directory' });
+        console.error('Error reading campaigns directory:', error);
+        res.status(500).json({ error: 'Failed to read campaigns directory' });
     }
 });
 
 // API endpoint to list character files in a specific campaign
-app.get('/api/characters/:campaign', (req, res) => {
+app.get('/api/campaigns/:campaign', (req, res) => {
     const { campaign } = req.params;
-    const campaignDir = path.join(process.cwd(), 'public', 'characters', campaign);
+    const campaignDir = path.join(process.cwd(), 'public', 'campaigns', campaign);
     
     try {
         const items = fs.readdirSync(campaignDir, { withFileTypes: true });
@@ -113,9 +113,9 @@ app.get('/api/characters/:campaign', (req, res) => {
 });
 
 // API endpoint to get a specific character file in a campaign
-app.get('/api/characters/:campaign/:file', (req, res) => {
+app.get('/api/campaigns/:campaign/:file', (req, res) => {
     const { campaign, file } = req.params;
-    const campaignDir = path.join(process.cwd(), 'public', 'characters', campaign);
+    const campaignDir = path.join(process.cwd(), 'public', 'campaigns', campaign);
     const filePath = path.join(campaignDir, file);
     
     try {
@@ -156,7 +156,7 @@ app.post('/api/campaigns', (req, res) => {
         return res.status(400).json({ error: 'Campaign name is required' });
     }
     
-    const campaignsDir = path.join(process.cwd(), 'public', 'characters');
+    const campaignsDir = path.join(process.cwd(), 'public', 'campaigns');
     const newCampaignDir = path.join(campaignsDir, campaignName.trim());
     
     try {
@@ -174,7 +174,7 @@ app.post('/api/campaigns', (req, res) => {
 });
 
 // API endpoint to update an existing character in a campaign
-app.put('/api/characters/:campaign/:file', (req, res) => {
+app.put('/api/campaigns/:campaign/:file', (req, res) => {
     const { campaign, file } = req.params;
     const character = req.body;
     
@@ -182,7 +182,7 @@ app.put('/api/characters/:campaign/:file', (req, res) => {
         return res.status(400).json({ error: 'Campaign, file, and character data are required' });
     }
     
-    const campaignDir = path.join(process.cwd(), 'public', 'characters', campaign);
+    const campaignDir = path.join(process.cwd(), 'public', 'campaigns', campaign);
     const filePath = path.join(campaignDir, file);
     
     try {
@@ -203,9 +203,9 @@ app.put('/api/characters/:campaign/:file', (req, res) => {
 });
 
 // API endpoint to delete a character in a campaign
-app.delete('/api/characters/:campaign/:file', (req, res) => {
+app.delete('/api/campaigns/:campaign/:file', (req, res) => {
     const { campaign, file } = req.params;
-    const campaignDir = path.join(process.cwd(), 'public', 'characters', campaign);
+    const campaignDir = path.join(process.cwd(), 'public', 'campaigns', campaign);
     const filePath = path.join(campaignDir, file);
     
     try {
@@ -225,7 +225,7 @@ app.delete('/api/characters/:campaign/:file', (req, res) => {
 // API endpoint to delete a campaign
 app.delete('/api/campaigns/:campaign', (req, res) => {
     const { campaign } = req.params;
-    const campaignDir = path.join(process.cwd(), 'public', 'characters', campaign);
+    const campaignDir = path.join(process.cwd(), 'public', 'campaigns', campaign);
     
     try {
         if (!fs.existsSync(campaignDir)) {
@@ -263,7 +263,7 @@ app.put('/api/campaigns/:campaign', (req, res) => {
         return res.status(400).json({ error: 'Campaign name can only contain letters, numbers, spaces, hyphens, underscores, and periods' });
       }
     
-    const campaignsDir = path.join(process.cwd(), 'public', 'characters');
+    const campaignsDir = path.join(process.cwd(), 'public', 'campaigns');
     const oldCampaignDir = path.join(campaignsDir, decodeURIComponent(campaign));
     const newCampaignDir = path.join(campaignsDir, newName.trim());
     
@@ -287,7 +287,7 @@ app.put('/api/campaigns/:campaign', (req, res) => {
 });
 
 // API endpoint to create a new character in the selected campaign
-app.post('/api/characters', (req, res) => {
+app.post('/api/campaigns/character', (req, res) => {
     const { campaignName, character } = req.body;
     
     
@@ -296,7 +296,7 @@ app.post('/api/characters', (req, res) => {
         return res.status(400).json({ error: 'Campaign name and character data are required' });
     }
     
-    const campaignsDir = path.join(process.cwd(), 'public', 'characters');
+    const campaignsDir = path.join(process.cwd(), 'public', 'campaigns');
     const campaignDir = path.join(campaignsDir, campaignName.trim());
     
     

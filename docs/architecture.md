@@ -106,10 +106,10 @@ JSON catalogs loaded at runtime by `data-loader.js`:
 | Equipment | `equipment.json` | (shared) |
 | Rules | `rules-validation.json` | `2024/rules-validation.json` |
 
-### 2.5 Character Storage (`public/characters/`)
+### 2.5 Character Storage (`public/campaigns/`)
 
 - **Schema:** `character.schema.json` (JSON Schema draft-07)
-- **Structure:** `public/characters/<campaign>/<name>.json`
+- **Structure:** `public/campaigns/<campaign>/<name>.json`
 - **Active campaigns:** "Campaign 1" (7 characters), "Campaign 2" (5 characters)
 - **Test campaigns:** "2024 Testing", "5e Testing", "Campaign Testing"
 - Each character file includes a `rules` field specifying 5e or 2024
