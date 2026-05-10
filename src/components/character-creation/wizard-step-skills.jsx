@@ -102,7 +102,7 @@ const WizardStepSkills = React.memo(function WizardStepSkills({ formData, errors
 							type="button"
 							className={`expertise-toggle-btn ${isSkillExpert(skill.name) ? 'active' : ''}`}
 							onClick={() => handleExpertiseToggle(skill.name)}
-							disabled={!isSkillProficient(skill.name) || (!expertiseLimits?.allowed && !isSkillExpert(skill.name))}
+							disabled={!isSkillProficient(skill.name)}
 							title={isSkillProficient(skill.name) ? 'Click to elevate to Expert' : 'Select proficient first'}
 							>
 								{isSkillExpert(skill.name) ? '✓ Expert' : 'Elevate'}
