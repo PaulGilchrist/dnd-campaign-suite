@@ -2,6 +2,17 @@ import { useState, useCallback } from 'react';
 import merge from 'lodash/merge';
 import { DEFAULT_FORM_DATA } from './constants.js';
 
+function setNestedValue(obj, path, value) {
+  const keys = path.split('.');
+  const lastKey = keys.pop();
+  const target = keys.reduce((current, key) => {
+    if (!current[key]) current[key] = {};
+    return current[key];
+  }, obj);
+  target[lastKey] = value;
+  return obj;
+}
+
 function useWizardForm(characterData, isEditing) {
   const [formData, setFormData] = useState(() => {
     if (isEditing && characterData) {
@@ -17,7 +28,15 @@ function useWizardForm(characterData, isEditing) {
   }, []);
 
   const updateArrayField = useCallback((field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const next = { ...prev };
+      if (field.includes('.')) {
+        setNestedValue(next, field, value);
+      } else {
+        next[field] = value;
+      }
+      return next;
+    });
     setErrors(prev => ({ ...prev, [field]: null }));
   }, []);
 

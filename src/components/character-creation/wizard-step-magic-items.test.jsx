@@ -24,8 +24,10 @@ describe('WizardStepMagicItems', () => {
 
   const mockProps = {
     formData: {
-      magicItems: ['Wand of Magic'],
-     },
+      inventory: {
+        magicItems: ['Wand of Magic'],
+      },
+    },
     allMagicItems: [
       { name: 'Wand of Magic', index: 'wand', type: 'Rod', rarity: 'Uncommon', description: '<p>A magic wand.</p>', requiresAttunement: false },
       { name: 'Amulet of Health', index: 'amulet', type: 'Amulet', rarity: 'Uncommon', description: '<p>Health amulet.</p>', requiresAttunement: true },
@@ -61,7 +63,7 @@ describe('WizardStepMagicItems', () => {
     render(
        <WizardStepMagicItems
         {...mockProps}
-        formData={{ magicItems: ['Item 1', 'Item 2', 'Item 3', 'Item 4'] }}
+        formData={{ inventory: { magicItems: ['Item 1', 'Item 2', 'Item 3', 'Item 4'] } }}
         allMagicItems={attunedItems}
        />
      );
@@ -80,7 +82,7 @@ describe('WizardStepMagicItems', () => {
     render(
        <WizardStepMagicItems
         {...mockProps}
-        formData={{ magicItems: ['Item 1', 'Item 2'] }}
+        formData={{ inventory: { magicItems: ['Item 1', 'Item 2'] } }}
         allMagicItems={attunedItems}
        />
      );
@@ -102,7 +104,7 @@ describe('WizardStepMagicItems', () => {
     render(
        <WizardStepMagicItems
         {...mockProps}
-        formData={{ magicItems: [] }}
+        formData={{ inventory: { magicItems: [] } }}
         allMagicItems={[]}
        />
      );

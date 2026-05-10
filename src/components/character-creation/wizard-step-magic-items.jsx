@@ -8,7 +8,7 @@ function WizardStepMagicItems({ formData, allMagicItems, onArrayFieldChange }) {
     // Check for attunement limit warnings
     useEffect(() => {
         const warnings = [];
-        const selectedItems = formData.magicItems || [];
+	const selectedItems = formData.inventory?.magicItems || [];
 
         if (selectedItems.length > 0 && allMagicItems) {
             const attunementItems = selectedItems.filter(itemName => {
@@ -25,7 +25,7 @@ function WizardStepMagicItems({ formData, allMagicItems, onArrayFieldChange }) {
         }
 
         setWarnings(warnings);
-    }, [formData.magicItems, allMagicItems]);
+	}, [formData.inventory?.magicItems, allMagicItems]);
 
       // Render item function
   const renderItem = (item, index, { isSelected, isExpanded, onToggle, onToggleExpand }) => {
@@ -92,7 +92,7 @@ function WizardStepMagicItems({ formData, allMagicItems, onArrayFieldChange }) {
     return (
              <SelectableList
           items={allMagicItems}
-          fieldName="magicItems"
+	  fieldName="inventory.magicItems"
           formData={formData}
           onArrayFieldChange={onArrayFieldChange}
           title="Step 10: Magic Items"

@@ -102,6 +102,18 @@ describe('useWizardForm', () => {
     expect(result.current.formData.feats).toEqual(['Feat 1', 'Feat 2']);
     });
 
+  it('should update a nested array field via dot notation', () => {
+    const { result } = renderHook(() =>
+      useWizardForm(null, false)
+     );
+
+    act(() => {
+      result.current.updateArrayField('inventory.magicItems', ['Wand of Wonder', 'Amulet of Health']);
+     });
+
+    expect(result.current.formData.inventory.magicItems).toEqual(['Wand of Wonder', 'Amulet of Health']);
+   });
+
   it('should update an ability score', () => {
     const { result } = renderHook(() =>
       useWizardForm(null, false)

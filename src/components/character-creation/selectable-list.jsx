@@ -1,5 +1,9 @@
 import { useState, useMemo } from 'react';
 
+function getNestedValue(obj, path) {
+  return path.split('.').reduce((current, key) => current?.[key], obj);
+}
+
 function SelectableList({
   items,
   fieldName,
@@ -82,7 +86,7 @@ function SelectableList({
 
     // Apply showOnlySelected filter
     if (showOnlySelected) {
-      const selectedNames = formData[fieldName] || [];
+      const selectedNames = getNestedValue(formData, fieldName) || [];
       results = results.filter(item => selectedNames.includes(item.name));
     }
 
@@ -91,7 +95,7 @@ function SelectableList({
 
   // Handle item toggle
   const handleItemToggle = (itemName) => {
-    const currentItems = formData[fieldName] || [];
+    const currentItems = getNestedValue(formData, fieldName) || [];
     const isPreSelected = preSelectedItems.includes(itemName);
     const isCurrentlySelected = currentItems.includes(itemName);
 
@@ -108,7 +112,7 @@ function SelectableList({
 
   // Check if item is selected
   const itemIsSelected = (itemName) => {
-    return (formData[fieldName] || []).includes(itemName);
+    return (getNestedValue(formData, fieldName) || []).includes(itemName);
   };
 
   // Check if item is pre-selected
@@ -199,7 +203,7 @@ function SelectableList({
             Show Only Selected&nbsp;(
            </label>
            <span className="filter-checkbox-count">
-             {(formData[fieldName] || []).length} selected)
+              {(getNestedValue(formData, fieldName) || []).length} selected)
            </span>
          </div>
        </div>
