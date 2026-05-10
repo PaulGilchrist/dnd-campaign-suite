@@ -1,12 +1,8 @@
 import { useState, useRef } from 'react';
 
 function useCampaignManagement() {
-  const [showCampaignSelection, setShowCampaignSelection] = useState(() =>
-  !sessionStorage.getItem('currentCampaign')
-);
-  const [campaignName, setCampaignName] = useState(() =>
-    sessionStorage.getItem('currentCampaign')
-  );
+  const [showCampaignSelection, setShowCampaignSelection] = useState(true);
+  const [campaignName, setCampaignName] = useState(null);
   const onCampaignSelectRef = useRef(null);
   const onDeleteCampaignRef = useRef(null);
 
@@ -17,7 +13,6 @@ function useCampaignManagement() {
 
 
   const handleCampaignSelect = (campaign, characters) => {
-    sessionStorage.setItem('currentCampaign', campaign);
     setCampaignName(campaign);
     setShowCampaignSelection(false);
     if (onCampaignSelectRef.current) {
@@ -26,12 +21,11 @@ function useCampaignManagement() {
   };
 
   const handleRenameCampaign = async () => {
-    const currentCampaign = sessionStorage.getItem('currentCampaign');
-    const newName = prompt('Enter new campaign name:', currentCampaign);
+    const newName = prompt('Enter new campaign name:', campaignName);
     if (!newName || newName.trim() === '') return;
 
     const response = await fetch(
-      `/api/campaigns/${encodeURIComponent(currentCampaign)}`,
+      `/api/campaigns/${encodeURIComponent(campaignName)}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -44,18 +38,16 @@ function useCampaignManagement() {
       throw new Error(error || 'Failed to rename campaign');
     }
 
-    sessionStorage.setItem('currentCampaign', newName.trim());
     setCampaignName(newName.trim());
     window.location.reload();
   };
 
   const handleDeleteCampaign = async () => {
-    const currentCampaign = sessionStorage.getItem('currentCampaign');
-    if (!currentCampaign || !window.confirm(`Are you sure you want to delete the campaign '${currentCampaign}'? This will delete all characters in the campaign and cannot be undone.`))
+    if (!campaignName || !window.confirm(`Are you sure you want to delete the campaign '${campaignName}'? This will delete all characters in the campaign and cannot be undone.`))
       return;
 
     const response = await fetch(
-      `/api/campaigns/${encodeURIComponent(currentCampaign)}`,
+      `/api/campaigns/${encodeURIComponent(campaignName)}`,
       { method: 'DELETE' }
     );
 

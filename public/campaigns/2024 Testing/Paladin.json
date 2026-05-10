@@ -1,31 +1,98 @@
 {
-    "abilities": [
-        {"name": "Strength","abilityImprovements": 0,"baseScore": 14,"miscBonus": 0},
-        {"name": "Dexterity","abilityImprovements": 0,"baseScore": 10,"miscBonus": 0},
-        {"name": "Constitution","abilityImprovements": 0,"baseScore": 14,"miscBonus": 0},
-        {"name": "Intelligence","abilityImprovements": 0,"baseScore": 8,"miscBonus": 0},
-        {"name": "Wisdom","abilityImprovements": 0,"baseScore": 12,"miscBonus": 0},
-        {"name": "Charisma","abilityImprovements": 0,"baseScore": 14,"miscBonus": 0}
-    ],
-    "alignment": "Lawful Good",
-    "class": {
-        "name": "Paladin",
-        "fightingStyles": ["Defense"],
-        "subclass": {
-            "name": "Vengeance"
-        }
+  "name": "Paladin",
+  "level": 20,
+  "alignment": "Lawful Good",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
     },
-    "inventory": {
-        "backpack": ["Bedroll","Light Hammer","Mess Kit","Rations (10 days)","Rope, Hempen (50 feet)","Tinderbox","Torch","Waterskin"],
-        "equipped": ["Chain Mail","Shield","Crossbow, heavy","Longsword","Dagger"],
-        "gold": 25
+    {
+      "name": "Dexterity",
+      "baseScore": 10,
+      "abilityImprovements": 0,
+      "miscBonus": 0
     },
-    "languages": ["Elvish"],
-    "level": 20,
+    {
+      "name": "Constitution",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 12,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    }
+  ],
+  "background": "Guard",
+  "class": {
     "name": "Paladin",
-    "race": {
-        "name": "Halfling"
+    "subclass": {
+      "name": "Oath of Glory",
+      "type": ""
     },
-    "skillProficiencies": ["Athletics","History","Intimidation","Persuasion"],
-    "rules": "2024"
+    "fightingStyles": [
+      "Defense"
+    ]
+  },
+  "expertSkills": [],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Halfling",
+    "subrace": {
+      "name": ""
+    }
+  },
+  "immunities": [],
+  "inventory": {
+    "backpack": [
+      "Bedroll",
+      "Light Hammer",
+      "Mess Kit",
+      "Rations (10 days)",
+      "Rope, Hempen (50 feet)",
+      "Tinderbox",
+      "Torch",
+      "Waterskin"
+    ],
+    "equipped": [
+      "Chain Mail",
+      "Shield",
+      "Crossbow, heavy",
+      "Longsword",
+      "Dagger"
+    ],
+    "gold": 25,
+    "magicItems": []
+  },
+  "languages": [
+    "Elvish"
+  ],
+  "resistances": [],
+  "skillProficiencies": [
+    "Athletics",
+    "History",
+    "Intimidation",
+    "Persuasion"
+  ],
+  "specialActions": [],
+  "spells": [],
+  "rules": "2024"
 }

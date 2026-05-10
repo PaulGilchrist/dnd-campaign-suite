@@ -1,31 +1,103 @@
 {
-    "abilities": [
-        { "name": "Strength", "abilityImprovements": 0, "baseScore": 8, "miscBonus": 0 },
-        { "name": "Dexterity", "abilityImprovements": 0, "baseScore": 14, "miscBonus": 0 },
-        { "name": "Constitution", "abilityImprovements": 0, "baseScore": 14, "miscBonus": 2 },
-        { "name": "Intelligence", "abilityImprovements": 0, "baseScore": 10, "miscBonus": 0 },
-        { "name": "Wisdom", "abilityImprovements": 0, "baseScore": 12, "miscBonus": 0 },
-        { "name": "Charisma", "abilityImprovements": 0, "baseScore": 14, "miscBonus": 0 }
-    ],
-    "alignment": "Neutral Good",
-    "class": {
-        "name": "Sorcerer",
-        "subclass": {
-            "name": "Draconic",
-            "type": "Brass"
-        }
+  "name": "Sorcerer",
+  "level": 20,
+  "alignment": "Neutral Good",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
     },
-    "inventory": {
-        "backpack": ["Blanket","Case,Map or Scroll","Fishing Tackle","Grappling Hook","Ink (4, 1 oz bottles)","Ink Pens (2)","Parchment (20 sheets)","Playing Card Set","Rations (5 days)","Rope, Silk (50 feet)","String","Waterskin"],
-        "equipped": ["Quarterstaff","Dagger"],
-        "gold": 10
+    {
+      "name": "Dexterity",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
     },
-    "level": 20,
+    {
+      "name": "Constitution",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 2
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 10,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 12,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    }
+  ],
+  "background": "Merchant",
+  "class": {
     "name": "Sorcerer",
-    "race": {
-        "name": "Orc"
-    },
-    "skillProficiencies": ["Arcana","History","Insight","Investigation","Perception","Survival"],
-    "spells": ["Chill Touch","Fire Bolt","Mage Hand","Magic Missile","Shield","Shocking Grasp"],
-    "rules": "2024"
+    "subclass": {
+      "name": "Wild Magic Sorcery",
+      "type": ""
+    }
+  },
+  "expertSkills": [],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Orc",
+    "subrace": {
+      "name": ""
+    }
+  },
+  "immunities": [],
+  "inventory": {
+    "backpack": [
+      "Blanket",
+      "Case,Map or Scroll",
+      "Fishing Tackle",
+      "Grappling Hook",
+      "Ink (4, 1 oz bottles)",
+      "Ink Pens (2)",
+      "Parchment (20 sheets)",
+      "Playing Card Set",
+      "Rations (5 days)",
+      "Rope, Silk (50 feet)",
+      "String",
+      "Waterskin"
+    ],
+    "equipped": [
+      "Quarterstaff",
+      "Dagger"
+    ],
+    "gold": 10,
+    "magicItems": []
+  },
+  "languages": [],
+  "resistances": [],
+  "skillProficiencies": [
+    "Arcana",
+    "History",
+    "Insight",
+    "Investigation",
+    "Perception",
+    "Survival"
+  ],
+  "specialActions": [],
+  "spells": [
+    "Chill Touch",
+    "Fire Bolt",
+    "Mage Hand",
+    "Magic Missile",
+    "Shield",
+    "Shocking Grasp"
+  ],
+  "rules": "2024"
 }

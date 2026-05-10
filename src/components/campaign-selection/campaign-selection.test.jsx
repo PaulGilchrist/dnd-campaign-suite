@@ -156,22 +156,6 @@ describe('CampaignSelection', () => {
    });
     });
 
-  it('should store campaign in sessionStorage when selected', async () => {
-    getCharacterFolders.mockResolvedValue(['Campaign1']);
-    getCharacterFiles.mockResolvedValue(['char1.json']);
-    loadCharacters.mockResolvedValue([{ name: 'Character1' }]);
-
-    render(<CampaignSelection />);
-
-    await waitFor(() => {
-      const campaignButton = screen.getByText('Campaign1');
-      fireEvent.click(campaignButton);
-    });
-
-    await waitFor(() => {
-      expect(mockSessionStorage.setItem).toHaveBeenCalledWith('currentCampaign', 'Campaign1');
-   });
-    });
 
   it('should open modal and allow entering campaign name', async () => {
     getCharacterFolders.mockResolvedValue([]);

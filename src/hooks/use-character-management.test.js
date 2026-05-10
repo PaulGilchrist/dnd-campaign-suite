@@ -9,57 +9,22 @@ vi.mock('../services/campaign-service.js', () => ({
   deleteCharacter: vi.fn().mockResolvedValue(undefined),
 }));
 
-const createMockSessionStorage = () => {
-  const store = {};
-  return {
-    getItem: vi.fn((key) => store[key] ?? null),
-    setItem: vi.fn((key, value) => { store[key] = value; }),
-    removeItem: vi.fn((key) => { delete store[key]; }),
-    clear: vi.fn(() => { Object.keys(store).forEach(k => delete store[k]); }),
-  };
-};
-
-beforeEach(() => {
-  const mockStorage = createMockSessionStorage();
-  Object.defineProperty(window, 'sessionStorage', {
-    value: mockStorage,
-    writable: true,
-    configurable: true,
-  });
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
 describe('useCharacterManagement', () => {
   describe('initial state', () => {
     it('defaults to characters=[] and activeCharacter=null', () => {
-      const { result } = renderHook(() => useCharacterManagement());
+      const { result } = renderHook(() => useCharacterManagement(undefined));
       expect(result.current.characters).toEqual([]);
       expect(result.current.activeCharacter).toBeNull();
     });
   });
 
-  describe('preload from sessionStorage', () => {
-    it('loads characters and sets first as active, then clears the key', () => {
-      const stored = JSON.stringify([{ name: 'Frodo' }, { name: 'Sam' }]);
-      window.sessionStorage.setItem('characters', stored);
-
-      const { result } = renderHook(() => useCharacterManagement());
-
-      expect(result.current.characters).toEqual([{ name: 'Frodo' }, { name: 'Sam' }]);
-      expect(result.current.activeCharacter).toEqual({ name: 'Frodo' });
-      expect(window.sessionStorage.removeItem).toHaveBeenCalledWith('characters');
-    });
-  });
 
   describe('handleCharacterClick', () => {
     it('sets activeCharacter to the clicked character (cloned)', async () => {
       const cloneDeep = (await import('lodash/cloneDeep')).default;
       const chars = [{ name: 'Gandalf' }, { name: 'Aragorn' }];
 
-      const { result } = renderHook(() => useCharacterManagement());
+      const { result } = renderHook(() => useCharacterManagement(undefined));
       act(() => {
         result.current.setCharacters(chars);
       });
@@ -75,7 +40,7 @@ describe('useCharacterManagement', () => {
 
   describe('handleInitiativeClick', () => {
     it('sets activeCharacter to null', () => {
-      const { result } = renderHook(() => useCharacterManagement());
+      const { result } = renderHook(() => useCharacterManagement(undefined));
 
       act(() => {
         result.current.handleInitiativeClick();
@@ -91,7 +56,7 @@ describe('useCharacterManagement', () => {
       const { default: Utils } = await import('../services/utils.js');
       const char = { name: 'Dark Lord' };
 
-      const { result } = renderHook(() => useCharacterManagement());
+      const { result } = renderHook(() => useCharacterManagement(undefined));
       act(() => {
         result.current.setActiveCharacter(char);
       });
@@ -112,7 +77,7 @@ describe('useCharacterManagement', () => {
 
   describe('handleUploadClick', () => {
     it('calls inputRef.current.click()', () => {
-      const { result } = renderHook(() => useCharacterManagement());
+      const { result } = renderHook(() => useCharacterManagement(undefined));
       const mockClick = vi.fn();
       result.current.inputRef.current = { click: mockClick };
 
@@ -163,7 +128,7 @@ describe('useCharacterManagement', () => {
       const uploaded = [{ name: 'Pippin', level: 5 }, { name: 'Legolas' }];
       const files = uploaded.map(c => createMockFile(`${c.name}.json`, JSON.stringify(c)));
 
-      const { result } = renderHook(() => useCharacterManagement());
+      const { result } = renderHook(() => useCharacterManagement(undefined));
       act(() => {
         result.current.setCharacters(existing);
        });
@@ -184,7 +149,7 @@ describe('useCharacterManagement', () => {
       const uploaded = [{ name: 'Boromir', alive: false }];
       const files = uploaded.map(c => createMockFile(`${c.name}.json`, JSON.stringify(c)));
 
-      const { result } = renderHook(() => useCharacterManagement());
+      const { result } = renderHook(() => useCharacterManagement(undefined));
       act(() => {
         result.current.setCharacters(existing);
        });
@@ -200,7 +165,7 @@ describe('useCharacterManagement', () => {
       const uploaded = [{ name: 'Eowyn' }];
       const files = uploaded.map(c => createMockFile(`${c.name}.json`, JSON.stringify(c)));
 
-      const { result } = renderHook(() => useCharacterManagement());
+      const { result } = renderHook(() => useCharacterManagement(undefined));
 
       await act(async () => {
         result.current.handleUploadChange(createMockEvent(files));
@@ -219,9 +184,8 @@ describe('useCharacterManagement', () => {
     it('deletes character and removes from state when confirmed', async () => {
       const { deleteCharacter } = await import('../services/campaign-service.js');
       const chars = [{ name: 'Frodo' }, { name: 'Sam' }];
-      window.sessionStorage.setItem('currentCampaign', 'test-campaign');
 
-      const { result } = renderHook(() => useCharacterManagement());
+      const { result } = renderHook(() => useCharacterManagement('test-campaign'));
       act(() => {
         result.current.setCharacters(chars);
       });
@@ -257,9 +221,8 @@ describe('useCharacterManagement', () => {
     it('switches activeCharacter to next character when deleting active', async () => {
       const cloneDeep = (await import('lodash/cloneDeep')).default;
       const chars = [{ name: 'Frodo' }, { name: 'Sam' }];
-      window.sessionStorage.setItem('currentCampaign', 'test-campaign');
 
-      const { result } = renderHook(() => useCharacterManagement());
+      const { result } = renderHook(() => useCharacterManagement('test-campaign'));
       act(() => {
         result.current.setCharacters(chars);
         result.current.setActiveCharacter(chars[0]);
@@ -276,9 +239,8 @@ describe('useCharacterManagement', () => {
 
     it('clears activeCharacter when deleting the last character', async () => {
       const chars = [{ name: 'Frodo' }];
-      window.sessionStorage.setItem('currentCampaign', 'test-campaign');
 
-      const { result } = renderHook(() => useCharacterManagement());
+      const { result } = renderHook(() => useCharacterManagement('test-campaign'));
       act(() => {
         result.current.setCharacters(chars);
         result.current.setActiveCharacter(chars[0]);
@@ -294,7 +256,6 @@ describe('useCharacterManagement', () => {
 
     it('throws error when no campaign is selected', async () => {
       const { deleteCharacter } = await import('../services/campaign-service.js');
-      window.sessionStorage.getItem = vi.fn(() => null);
 
       const { result } = renderHook(() => useCharacterManagement());
 
@@ -305,9 +266,8 @@ describe('useCharacterManagement', () => {
     it('throws error when server delete fails', async () => {
       const { deleteCharacter } = await import('../services/campaign-service.js');
       deleteCharacter.mockRejectedValueOnce(new Error('Server error'));
-      window.sessionStorage.setItem('currentCampaign', 'test-campaign');
 
-      const { result } = renderHook(() => useCharacterManagement());
+      const { result } = renderHook(() => useCharacterManagement('test-campaign'));
       act(() => {
         result.current.setCharacters([{ name: 'Frodo' }]);
       });
@@ -318,9 +278,8 @@ describe('useCharacterManagement', () => {
 
     it('builds filename with hyphens for spaces', async () => {
       const { deleteCharacter } = await import('../services/campaign-service.js');
-      window.sessionStorage.setItem('currentCampaign', 'test-campaign');
 
-      const { result } = renderHook(() => useCharacterManagement());
+      const { result } = renderHook(() => useCharacterManagement('test-campaign'));
       act(() => {
         result.current.setCharacters([{ name: 'Dark Lord' }]);
       });

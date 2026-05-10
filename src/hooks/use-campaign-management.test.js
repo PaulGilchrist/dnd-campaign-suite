@@ -2,28 +2,7 @@ import { renderHook, act } from '@testing-library/react';
 import useCampaignManagement from './use-campaign-management.js';
 
 describe('useCampaignManagement', () => {
-  let sessionStorageMock;
-
   beforeEach(() => {
-    sessionStorageMock = {
-      store: {},
-      getItem: vi.fn((key) => sessionStorageMock.store[key] ?? null),
-      setItem: vi.fn((key, value) => {
-        sessionStorageMock.store[key] = value;
-      }),
-      removeItem: vi.fn((key) => {
-        delete sessionStorageMock.store[key];
-      }),
-      clear: vi.fn(() => {
-        sessionStorageMock.store = {};
-      }),
-    };
-
-    Object.defineProperty(window, 'sessionStorage', {
-      value: sessionStorageMock,
-      writable: true,
-    });
-
     Object.defineProperty(window, 'location', {
       value: { hostname: 'localhost', reload: vi.fn() },
       writable: true,
@@ -46,19 +25,8 @@ describe('useCampaignManagement', () => {
     });
   });
 
-  describe('pre-loaded campaign from sessionStorage', () => {
-    it('sets showCampaignSelection to false and campaignName from session storage', () => {
-      sessionStorageMock.store.currentCampaign = 'My Campaign';
-
-      const { result } = renderHook(() => useCampaignManagement());
-
-      expect(result.current.showCampaignSelection).toBe(false);
-      expect(result.current.campaignName).toBe('My Campaign');
-    });
-  });
-
   describe('handleCampaignSelect', () => {
-    it('stores campaign in session storage, hides selection, and calls callback', () => {
+    it('hides selection, sets campaignName, and calls callback', () => {
       const callback = vi.fn();
       const { result } = renderHook(() => useCampaignManagement());
 
@@ -70,10 +38,6 @@ describe('useCampaignManagement', () => {
         result.current.handleCampaignSelect('Test Campaign', ['char1']);
       });
 
-      expect(sessionStorageMock.setItem).toHaveBeenCalledWith(
-        'currentCampaign',
-        'Test Campaign'
-      );
       expect(result.current.showCampaignSelection).toBe(false);
       expect(result.current.campaignName).toBe('Test Campaign');
       expect(callback).toHaveBeenCalledWith('Test Campaign', ['char1']);
@@ -94,8 +58,11 @@ describe('useCampaignManagement', () => {
 
   describe('handleBackToCampaigns', () => {
     it('sets showCampaignSelection to true', () => {
-      sessionStorageMock.store.currentCampaign = 'My Campaign';
       const { result } = renderHook(() => useCampaignManagement());
+
+      act(() => {
+        result.current.handleCampaignSelect('My Campaign');
+      });
 
       expect(result.current.showCampaignSelection).toBe(false);
 
@@ -108,8 +75,7 @@ describe('useCampaignManagement', () => {
   });
 
   describe('handleRenameCampaign', () => {
-    it('prompts for name, calls fetch PUT, updates session storage, and reloads', async () => {
-      sessionStorageMock.store.currentCampaign = 'Old Campaign';
+    it('prompts for name, calls fetch PUT, updates campaignName, and reloads', async () => {
       window.prompt = vi.fn().mockReturnValue('New Campaign');
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -117,6 +83,10 @@ describe('useCampaignManagement', () => {
       });
 
       const { result } = renderHook(() => useCampaignManagement());
+
+      act(() => {
+        result.current.handleCampaignSelect('Old Campaign');
+      });
 
       await act(async () => {
         await result.current.handleRenameCampaign();
@@ -134,10 +104,6 @@ describe('useCampaignManagement', () => {
           body: JSON.stringify({ newName: 'New Campaign' }),
          }
        );
-      expect(sessionStorageMock.setItem).toHaveBeenCalledWith(
-        'currentCampaign',
-        'New Campaign'
-      );
       expect(result.current.campaignName).toBe('New Campaign');
       expect(window.location.reload).toHaveBeenCalled();
     });
@@ -145,10 +111,13 @@ describe('useCampaignManagement', () => {
 
   describe('handleRenameCampaign cancelled', () => {
     it('early returns if prompt returns null', () => {
-      sessionStorageMock.store.currentCampaign = 'My Campaign';
       window.prompt = vi.fn().mockReturnValue(null);
 
       const { result } = renderHook(() => useCampaignManagement());
+
+      act(() => {
+        result.current.handleCampaignSelect('My Campaign');
+      });
 
       act(() => {
         result.current.handleRenameCampaign();
@@ -160,9 +129,12 @@ describe('useCampaignManagement', () => {
 
     it('early returns if prompt returns empty string', () => {
       window.prompt = vi.fn().mockReturnValue('');
-      sessionStorageMock.store.currentCampaign = 'My Campaign';
 
       const { result } = renderHook(() => useCampaignManagement());
+
+      act(() => {
+        result.current.handleCampaignSelect('My Campaign');
+      });
 
       act(() => {
         result.current.handleRenameCampaign();
@@ -173,9 +145,12 @@ describe('useCampaignManagement', () => {
 
     it('early returns if prompt returns whitespace-only string', () => {
       window.prompt = vi.fn().mockReturnValue('   ');
-      sessionStorageMock.store.currentCampaign = 'My Campaign';
 
       const { result } = renderHook(() => useCampaignManagement());
+
+      act(() => {
+        result.current.handleCampaignSelect('My Campaign');
+      });
 
       act(() => {
         result.current.handleRenameCampaign();
@@ -191,12 +166,15 @@ describe('useCampaignManagement', () => {
     });
 
     it('confirms delete, calls fetch DELETE, and triggers onDeleteCampaignCallback', async () => {
-      sessionStorageMock.store.currentCampaign = 'ToDelete';
       window.confirm = vi.fn().mockReturnValue(true);
       global.fetch = vi.fn().mockResolvedValue({ ok: true });
 
       const deleteCallback = vi.fn();
       const { result } = renderHook(() => useCampaignManagement());
+
+      act(() => {
+        result.current.handleCampaignSelect('ToDelete');
+      });
 
       act(() => {
         result.current.setDeleteCampaignCallback(deleteCallback);
@@ -232,7 +210,6 @@ describe('useCampaignManagement', () => {
 
   describe('handleDeleteCampaign error', () => {
     it('throws error on non-ok response', async () => {
-      sessionStorageMock.store.currentCampaign = 'My Campaign';
       window.confirm = vi.fn().mockReturnValue(true);
       global.fetch = vi.fn().mockResolvedValue({
         ok: false,
@@ -240,6 +217,10 @@ describe('useCampaignManagement', () => {
       });
 
       const { result } = renderHook(() => useCampaignManagement());
+
+      act(() => {
+        result.current.handleCampaignSelect('My Campaign');
+      });
 
       let thrownError;
       await act(async () => {

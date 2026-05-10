@@ -13,9 +13,9 @@ import { useCharacterWizard } from './hooks/use-character-wizard.js';
 
 function App() {
   const appData = useAppData();
-  const charMgmt = useCharacterManagement();
   const campaignMgmt = useCampaignManagement();
-  const wizard = useCharacterWizard();
+  const charMgmt = useCharacterManagement(campaignMgmt.campaignName);
+  const wizard = useCharacterWizard(campaignMgmt.campaignName);
 
   const charMgmtRef = useRef();
   const campaignRef = useRef();

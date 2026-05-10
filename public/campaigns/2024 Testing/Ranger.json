@@ -1,36 +1,98 @@
 {
-    "abilities": [
-        { "name": "Strength", "abilityImprovements": 0, "baseScore": 13, "miscBonus": 0 },
-        { "name": "Dexterity", "abilityImprovements": 0, "baseScore": 15, "miscBonus": 1 },
-        { "name": "Constitution", "abilityImprovements": 0, "baseScore": 15, "miscBonus": 1 },
-        { "name": "Intelligence", "abilityImprovements": 0, "baseScore": 8, "miscBonus": 0 },
-        { "name": "Wisdom", "abilityImprovements": 0, "baseScore": 12, "miscBonus": 0 },
-        { "name": "Charisma", "abilityImprovements": 0, "baseScore": 8, "miscBonus": 0 }
-    ],
-    "alignment": "Neutral Good",
-    "class": {
-        "name": "Ranger",
-        "fightingStyles": [
-            "Archery"
-        ],
-        "subclass": {
-            "name": "Beast Master"
-        }
+  "name": "Ranger",
+  "level": 20,
+  "alignment": "Neutral Good",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 13,
+      "abilityImprovements": 0,
+      "miscBonus": 0
     },
-    "immunities": ["Magical Sleep"],
-    "inventory": {
-        "backpack": ["Mess Kit", "Rations (5 days)", "Rope, Silk (50 feet)", "Tinderbox", "Torch", "Waterskin"],
-        "equipped": ["Arrows", "Studded Leather", "Longbow", "Scimitar", "Scimitar"],
-        "gold": 10
+    {
+      "name": "Dexterity",
+      "baseScore": 15,
+      "abilityImprovements": 0,
+      "miscBonus": 1
     },
-    "level": 20,
+    {
+      "name": "Constitution",
+      "baseScore": 15,
+      "abilityImprovements": 0,
+      "miscBonus": 1
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 12,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    }
+  ],
+  "background": "Guide",
+  "class": {
     "name": "Ranger",
-    "race": {
-        "name": "Goliath",
-        "subrace": {
-            "name": "Cloud's Jaunt (Cloud Giant)"
-        }
+    "subclass": {
+      "name": "Beast Master"
     },
-    "skillProficiencies": ["Animal Handling","Insight","Investigation","Nature","Perception","Stealth","Survival"],
-    "rules": "2024"
+    "fightingStyles": [
+      "Archery"
+    ]
+  },
+  "expertSkills": [],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Goliath",
+    "subrace": {
+      "name": "Cloud's Jaunt (Cloud Giant)"
+    }
+  },
+  "immunities": [
+    "Magical Sleep"
+  ],
+  "inventory": {
+    "backpack": [
+      "Mess Kit",
+      "Rations (5 days)",
+      "Rope, Silk (50 feet)",
+      "Tinderbox",
+      "Torch",
+      "Waterskin"
+    ],
+    "equipped": [
+      "Arrows",
+      "Studded Leather",
+      "Longbow",
+      "Scimitar",
+      "Scimitar"
+    ],
+    "gold": 10,
+    "magicItems": []
+  },
+  "languages": [],
+  "resistances": [],
+  "skillProficiencies": [
+    "Animal Handling",
+    "Insight",
+    "Investigation",
+    "Nature",
+    "Perception",
+    "Stealth",
+    "Survival"
+  ],
+  "specialActions": [],
+  "spells": [],
+  "rules": "2024"
 }

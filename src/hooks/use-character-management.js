@@ -1,30 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import cloneDeep from 'lodash/cloneDeep';
 import { saveAs } from 'file-saver';
 import * as campaignService from '../services/campaign-service.js';
 import utils from '../services/utils.js';
 
-function useCharacterManagement() {
+function useCharacterManagement(campaignName) {
   const [characters, setCharacters] = useState([]);
   const [activeCharacter, setActiveCharacter] = useState(null);
   const inputRef = useRef(null);
-
-  useEffect(() => {
-    const preloadedCharacters = sessionStorage.getItem('characters');
-    const currentCampaign = sessionStorage.getItem('currentCampaign');
-
-    if (preloadedCharacters) {
-      const loadedCharacters = JSON.parse(preloadedCharacters);
-      setCharacters(loadedCharacters);
-      sessionStorage.removeItem('characters');
-
-      if (loadedCharacters.length > 0) {
-        setActiveCharacter(cloneDeep(loadedCharacters[0]));
-      }
-    } else if (currentCampaign) {
-      // If campaign was previously selected but no characters preloaded
-    }
-  }, []);
 
   const handleCharacterClick = (character) => {
     setActiveCharacter(cloneDeep(character));
@@ -94,11 +77,10 @@ function useCharacterManagement() {
       return;
     }
 
-    const storedCampaign = sessionStorage.getItem('currentCampaign');
-    if (!storedCampaign) throw new Error('No campaign selected');
+    if (!campaignName) throw new Error('No campaign selected');
 
     const fileName = `${characterName.toLowerCase().replace(/\s+/g, '-')}.json`;
-    await campaignService.deleteCharacter(storedCampaign, fileName);
+    await campaignService.deleteCharacter(campaignName, fileName);
 
     setCharacters(prev => {
       const remaining = prev.filter(char => char.name !== characterName);

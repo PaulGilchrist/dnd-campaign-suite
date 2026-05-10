@@ -32,11 +32,6 @@ function CampaignSelection({ onCampaignSelect }) {
                   const characterFiles = await getCharacterFiles(campaign);
                   const characters = await loadCharacters(campaign, characterFiles);
         
-                   // Store campaign and characters in sessionStorage
-                   // Even if empty, allow navigation to char sheet
-                  sessionStorage.setItem('currentCampaign', campaign);
-                  sessionStorage.setItem('characters', JSON.stringify(characters));
-          
           // Notify parent to switch views
           if (onCampaignSelect) {
             onCampaignSelect(campaign, characters);
