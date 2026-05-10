@@ -34,3 +34,4 @@ coverage
 
 # Openclaw backups
 *openclaw-backup*.tar.gz
+characterChangeData.json
