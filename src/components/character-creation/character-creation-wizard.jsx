@@ -4,6 +4,7 @@ import { validateStep, validateFinalFormData } from './utils.js';
 import WizardHeader from './wizard-header.jsx';
 import WizardProgressBar from './wizard-progress-bar.jsx';
 import WizardFooter from './wizard-footer.jsx';
+import WizardSidebar from './wizard-sidebar.jsx';
 import { WIZARD_STEPS, getTotalSteps } from './steps-config.js';
 import useWizardForm from './use-wizard-form.js';
 import useWizardData from './use-wizard-data.js';
@@ -145,6 +146,8 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, characterDat
     navigateNext,
     navigatePrevious,
     goToStep,
+    getStepEnabled,
+    isSaveEnabled,
    } = useWizardNavigation(isEditing ? 2 : 1, formData, racesData, classSubtypes, ruleset);
 
   // Skills
@@ -376,8 +379,18 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, characterDat
           totalSteps={totalSteps}
           isEditing={isEditing}
           />
-          <div className="wizard-content">
-            {renderStep()}
+          <div className="wizard-body">
+            <WizardSidebar
+              currentStep={currentStep}
+              isEditing={isEditing}
+              getStepEnabled={getStepEnabled}
+              goToStep={goToStep}
+              isSaveEnabled={isSaveEnabled}
+              onSave={handleSubmit}
+            />
+            <div className="wizard-content">
+              {renderStep()}
+            </div>
           </div>
           <WizardFooter
           currentStep={currentStep}

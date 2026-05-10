@@ -76,6 +76,8 @@ vi.mock('./use-wizard-navigation.js', () => ({
     navigateNext: vi.fn(),
     navigatePrevious: vi.fn(),
     goToStep: vi.fn(),
+    getStepEnabled: vi.fn(() => true),
+    isSaveEnabled: true,
   })),
 }));
 
@@ -160,6 +162,12 @@ vi.mock('./wizard-footer.jsx', () => ({
         <button onClick={onCancel}>Cancel</button>
       </div>
     );
+  },
+}));
+
+vi.mock('./wizard-sidebar.jsx', () => ({
+  default: function WizardSidebarMock({ currentStep, isEditing, getStepEnabled, goToStep, isSaveEnabled, onSave }) {
+    return <div data-testid="wizard-sidebar">Sidebar</div>;
   },
 }));
 
@@ -254,6 +262,11 @@ describe('CharacterCreationWizard', () => {
   it('should render the wizard footer', () => {
     render(<CharacterCreationWizard {...defaultProps} />);
     expect(screen.getByTestId('wizard-footer')).toBeInTheDocument();
+  });
+
+  it('should render the wizard sidebar', () => {
+    render(<CharacterCreationWizard {...defaultProps} />);
+    expect(screen.getByTestId('wizard-sidebar')).toBeInTheDocument();
   });
 
   it('should render the wizard content area', () => {

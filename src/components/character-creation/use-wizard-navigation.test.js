@@ -44,6 +44,8 @@ describe('useWizardNavigation', () => {
     expect(result.current).toHaveProperty('navigatePrevious');
     expect(result.current).toHaveProperty('goToStep');
     expect(result.current).toHaveProperty('setCurrentStep');
+    expect(result.current).toHaveProperty('getStepEnabled');
+    expect(result.current).toHaveProperty('isSaveEnabled');
    });
 
   it('should navigate to next step when validation passes', async () => {
@@ -124,5 +126,107 @@ describe('useWizardNavigation', () => {
      });
 
     expect(result.current.isNextDisabled).toBe(false);
+   });
+
+  it('should return getStepEnabled function', () => {
+    const { result } = renderHook(() =>
+      useWizardNavigation(1, mockFormData, mockRacesData, mockClassSubtypes, mockRuleset)
+    );
+
+    expect(typeof result.current.getStepEnabled).toBe('function');
+   });
+
+  it('should return isSaveEnabled', () => {
+    const { result } = renderHook(() =>
+      useWizardNavigation(1, mockFormData, mockRacesData, mockClassSubtypes, mockRuleset)
+    );
+
+    expect(result.current).toHaveProperty('isSaveEnabled');
+   });
+
+  it('getStepEnabled should allow steps 1-3 regardless of validation', async () => {
+    // Make step 3 validation fail so step3Valid stays false
+    validateStep.mockImplementation((step) => {
+      if (step === 3) return Promise.resolve({ error: 'Invalid' });
+      return Promise.resolve({});
+    });
+
+    const { result } = renderHook(() =>
+      useWizardNavigation(1, mockFormData, mockRacesData, mockClassSubtypes, mockRuleset)
+    );
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.getStepEnabled(1)).toBe(true);
+    expect(result.current.getStepEnabled(2)).toBe(true);
+    expect(result.current.getStepEnabled(3)).toBe(true);
+   });
+
+  it('getStepEnabled should block steps 4+ when step 3 is invalid', async () => {
+    // Make step 3 validation fail so step3Valid stays false
+    validateStep.mockImplementation((step) => {
+      if (step === 3) return Promise.resolve({ error: 'Invalid' });
+      return Promise.resolve({});
+    });
+
+    const { result } = renderHook(() =>
+      useWizardNavigation(1, mockFormData, mockRacesData, mockClassSubtypes, mockRuleset)
+    );
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.getStepEnabled(4)).toBe(false);
+    expect(result.current.getStepEnabled(5)).toBe(false);
+    expect(result.current.getStepEnabled(12)).toBe(false);
+   });
+
+  it('getStepEnabled should allow steps 4+ when step 3 is valid', async () => {
+    // Default mock resolves with {} for all calls, so step3Valid becomes true
+    const { result } = renderHook(() =>
+      useWizardNavigation(1, mockFormData, mockRacesData, mockClassSubtypes, mockRuleset)
+    );
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.getStepEnabled(4)).toBe(true);
+    expect(result.current.getStepEnabled(5)).toBe(true);
+    expect(result.current.getStepEnabled(12)).toBe(true);
+   });
+
+  it('isSaveEnabled should be false when step 3 is invalid', async () => {
+    // Make step 3 validation fail so step3Valid stays false
+    validateStep.mockImplementation((step) => {
+      if (step === 3) return Promise.resolve({ error: 'Invalid' });
+      return Promise.resolve({});
+    });
+
+    const { result } = renderHook(() =>
+      useWizardNavigation(1, mockFormData, mockRacesData, mockClassSubtypes, mockRuleset)
+    );
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.isSaveEnabled).toBe(false);
+   });
+
+  it('isSaveEnabled should be true when step 3 is valid', async () => {
+    // Default mock resolves with {} for all calls, so step3Valid becomes true
+    const { result } = renderHook(() =>
+      useWizardNavigation(1, mockFormData, mockRacesData, mockClassSubtypes, mockRuleset)
+    );
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.isSaveEnabled).toBe(true);
    });
 });
