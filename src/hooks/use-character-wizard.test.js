@@ -1,4 +1,5 @@
 import { renderHook, act } from '@testing-library/react';
+import { useCharacterWizard } from './use-character-wizard.js';
 
 vi.mock('lodash/cloneDeep', () => ({ default: vi.fn(val => val) }));
 
@@ -14,28 +15,15 @@ afterEach(() => {
   window.alert = originalAlert;
 });
 
-function createMockSessionStorage(campaign = null) {
-  return {
-    getItem: vi.fn((key) => key === 'currentCampaign' ? campaign : null),
-    setItem: vi.fn(() => {}),
-    removeItem: vi.fn(() => {}),
-    clear: vi.fn(() => {}),
-  };
-}
-
-async function setup(campaign) {
-  vi.resetModules();
-  const mockStorage = createMockSessionStorage(campaign);
-  vi.stubGlobal('sessionStorage', mockStorage);
-  const { useCharacterWizard } = await import('./use-character-wizard.js');
-  return { useCharacterWizard, mockStorage };
+function setup(campaign) {
+  return { useCharacterWizard, campaign };
 }
 
 describe('useCharacterWizard', () => {
   describe('initial state', () => {
     it('sets showCharacterWizard and showEditCharacterWizard to false', async () => {
-      const { useCharacterWizard } = await setup(null);
-      const { result } = renderHook(() => useCharacterWizard());
+      const { useCharacterWizard, campaign } = setup(null);
+      const { result } = renderHook(() => useCharacterWizard(campaign));
 
       expect(result.current.showCharacterWizard).toBe(false);
       expect(result.current.showEditCharacterWizard).toBe(false);
@@ -44,8 +32,8 @@ describe('useCharacterWizard', () => {
 
   describe('handleAddCharacter', () => {
     it('sets showCharacterWizard to true', async () => {
-      const { useCharacterWizard } = await setup(null);
-      const { result } = renderHook(() => useCharacterWizard());
+      const { useCharacterWizard, campaign } = setup(null);
+      const { result } = renderHook(() => useCharacterWizard(campaign));
 
       act(() => {
         result.current.handleAddCharacter();
@@ -57,8 +45,8 @@ describe('useCharacterWizard', () => {
 
   describe('handleWizardCancel', () => {
     it('sets showCharacterWizard to false', async () => {
-      const { useCharacterWizard } = await setup(null);
-      const { result } = renderHook(() => useCharacterWizard());
+      const { useCharacterWizard, campaign } = setup(null);
+      const { result } = renderHook(() => useCharacterWizard(campaign));
 
       act(() => {
         result.current.handleAddCharacter();
@@ -76,8 +64,8 @@ describe('useCharacterWizard', () => {
 
   describe('handleEditCharacter', () => {
     it('sets showEditCharacterWizard to true', async () => {
-      const { useCharacterWizard } = await setup(null);
-      const { result } = renderHook(() => useCharacterWizard());
+      const { useCharacterWizard, campaign } = setup(null);
+      const { result } = renderHook(() => useCharacterWizard(campaign));
 
       act(() => {
         result.current.handleEditCharacter();
@@ -89,8 +77,8 @@ describe('useCharacterWizard', () => {
 
   describe('handleEditWizardCancel', () => {
     it('sets showEditCharacterWizard to false', async () => {
-      const { useCharacterWizard } = await setup(null);
-      const { result } = renderHook(() => useCharacterWizard());
+      const { useCharacterWizard, campaign } = setup(null);
+      const { result } = renderHook(() => useCharacterWizard(campaign));
 
       act(() => {
         result.current.handleEditCharacter();
@@ -110,8 +98,8 @@ describe('useCharacterWizard', () => {
     it('registers setCharacters and setActiveCharacter callbacks', async () => {
       const setCharacters = vi.fn();
       const setActiveCharacter = vi.fn();
-      const { useCharacterWizard } = await setup(null);
-      const { result } = renderHook(() => useCharacterWizard());
+      const { useCharacterWizard, campaign } = setup(null);
+      const { result } = renderHook(() => useCharacterWizard(campaign));
 
       act(() => {
         result.current.setCharacterCallbacks({ setCharacters, setActiveCharacter });
@@ -129,7 +117,7 @@ describe('useCharacterWizard', () => {
       const createdCharacter = { ...characterData, id: 'char-1' };
       const campaignName = 'TestCampaign';
 
-      const { useCharacterWizard } = await setup(campaignName);
+      const { useCharacterWizard, campaign } = setup(campaignName);
 
       global.fetch
         .mockResolvedValueOnce({
@@ -145,7 +133,7 @@ describe('useCharacterWizard', () => {
           json: async () => ({ ...createdCharacter, refreshed: true }),
         });
 
-      const { result } = renderHook(() => useCharacterWizard());
+      const { result } = renderHook(() => useCharacterWizard(campaign));
 
       act(() => {
         result.current.setCharacterCallbacks({ setCharacters, setActiveCharacter });
@@ -171,8 +159,8 @@ describe('useCharacterWizard', () => {
     it('shows alert when no campaign in session storage', async () => {
       const characterData = { name: 'TestChar' };
 
-      const { useCharacterWizard } = await setup(null);
-      const { result } = renderHook(() => useCharacterWizard());
+      const { useCharacterWizard, campaign } = setup(null);
+      const { result } = renderHook(() => useCharacterWizard(campaign));
 
       await act(async () => {
         result.current.handleWizardComplete(characterData);
@@ -187,14 +175,14 @@ describe('useCharacterWizard', () => {
       const characterData = { name: 'TestChar' };
       const campaignName = 'TestCampaign';
 
-      const { useCharacterWizard } = await setup(campaignName);
+      const { useCharacterWizard, campaign } = setup(campaignName);
       global.fetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
       });
 
-      const { result } = renderHook(() => useCharacterWizard());
+      const { result } = renderHook(() => useCharacterWizard(campaign));
 
       await act(async () => {
         result.current.handleWizardComplete(characterData);
@@ -212,13 +200,13 @@ describe('useCharacterWizard', () => {
       const fileName = 'test-char.json';
       const campaignName = 'TestCampaign';
 
-      const { useCharacterWizard } = await setup(campaignName);
+      const { useCharacterWizard, campaign } = setup(campaignName);
       global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => characterData,
       });
 
-      const { result } = renderHook(() => useCharacterWizard());
+      const { result } = renderHook(() => useCharacterWizard(campaign));
 
       act(() => {
         result.current.setCharacterCallbacks({ setCharacters, setActiveCharacter });
@@ -246,14 +234,14 @@ describe('useCharacterWizard', () => {
       const characterData = { name: 'TestChar' };
       const campaignName = 'TestCampaign';
 
-      const { useCharacterWizard } = await setup(campaignName);
+      const { useCharacterWizard, campaign } = setup(campaignName);
       global.fetch.mockResolvedValueOnce({
         ok: false,
         status: 400,
         statusText: 'Bad Request',
       });
 
-      const { result } = renderHook(() => useCharacterWizard());
+      const { result } = renderHook(() => useCharacterWizard(campaign));
 
       await act(async () => {
         result.current.handleEditWizardComplete(characterData);

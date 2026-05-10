@@ -210,17 +210,17 @@ describe('CharReactions', () => {
    });
 
   it('should render popup element container', () => {
-    const mockPopupElement = <div data-testid="popup">Popup Content</div>;
+    const mockPopupHtml = '<div>Popup Content</div>';
     useActionPopup.mockImplementation(() => ({
       showPopup: vi.fn(),
-      popupHtml: mockPopupElement,
+      popupHtml: mockPopupHtml,
      }));
 
     render(
        <CharReactions playerStats={mockPlayerStats} />
      );
 
-    expect(screen.getByTestId('popup')).toBeInTheDocument();
+    expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
    });
 
   it('should return null for feature without details', () => {

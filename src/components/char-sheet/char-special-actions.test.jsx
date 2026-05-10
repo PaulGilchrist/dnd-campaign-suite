@@ -309,17 +309,17 @@ describe('CharSpecialActions', () => {
        });
 
   it('should render popup element container', () => {
-    const mockPopupElement = <div data-testid="popup">Popup Content</div>;
+    const mockPopupHtml = '<div>Popup Content</div>';
     useActionPopup.mockImplementation(() => ({
       showPopup: vi.fn(),
-      popupHtml: mockPopupElement,
+      popupHtml: mockPopupHtml,
       }));
 
     render(
         <CharSpecialActions playerStats={mockPlayerStats} />
       );
 
-    expect(screen.getByTestId('popup')).toBeInTheDocument();
+    expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
     });
 
   it('should handle empty specialActions array', () => {

@@ -114,10 +114,10 @@ describe('CharCharacterAdvancement', () => {
   });
 
   it('should render popup element container', () => {
-    const mockPopupElement = <div data-testid="popup">Popup Content</div>;
+    const mockPopupHtml = '<div>Popup Content</div>';
     useActionPopup.mockImplementation(() => ({
       showPopup: vi.fn(),
-      popupHtml: mockPopupElement,
+      popupHtml: mockPopupHtml,
       setPopupHtml: vi.fn(),
     }));
 
@@ -125,7 +125,7 @@ describe('CharCharacterAdvancement', () => {
       <CharCharacterAdvancement playerStats={mockPlayerStats} />
     );
 
-    expect(screen.getByTestId('popup')).toBeInTheDocument();
+    expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
   });
 
   it('should apply clickable class to features with details', () => {

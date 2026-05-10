@@ -28,9 +28,19 @@ vi.mock('./char-reactions.jsx', () => ({
 }));
 
 vi.mock('./char-spells/char-spells.jsx', () => ({
-  default: vi.fn(() => (
-    <div data-testid="char-spells">Spells</div>
-  )),
+  default: vi.fn(({ playerStats, handleTogglePreparedSpells }) => {
+    const handleClick = () => {
+      if (handleTogglePreparedSpells && playerStats?.spellAbilities?.spells) {
+        const toggleable = playerStats.spellAbilities.spells.find(s => s.prepared === 'Prepared' || s.prepared === '');
+        if (toggleable) {
+          handleTogglePreparedSpells(toggleable.name);
+        }
+      }
+    };
+    return (
+      <div data-testid="char-spells" onClick={handleClick}>Spells</div>
+    );
+  }),
 }));
 
 vi.mock('./char-special-actions.jsx', () => ({
