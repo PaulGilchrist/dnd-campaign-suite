@@ -1,39 +1,24 @@
 {
-  "name": "Test-2024",
-  "level": 10,
-  "alignment": "Lawful Neutral",
-  "background": "Artisan",
-  "race": {
-    "name": "Dragonborn",
-    "subrace": {
-      "name": "Black",
-      "description": ""
-    }
-  },
-  "class": {
-    "name": "Cleric",
-    "subclass": {
-      "name": "Light Domain",
-      "type": ""
-    }
-  },
+  "name": "test-2024",
+  "level": 8,
+  "alignment": "Chaotic Good",
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 14,
-      "abilityImprovements": 0,
+      "baseScore": 13,
+      "abilityImprovements": 1,
       "miscBonus": 0
     },
     {
       "name": "Dexterity",
-      "baseScore": 10,
+      "baseScore": 12,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
     {
       "name": "Constitution",
-      "baseScore": 14,
-      "abilityImprovements": 0,
+      "baseScore": 13,
+      "abilityImprovements": 1,
       "miscBonus": 0
     },
     {
@@ -44,7 +29,7 @@
     },
     {
       "name": "Wisdom",
-      "baseScore": 16,
+      "baseScore": 15,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
@@ -55,10 +40,29 @@
       "miscBonus": 0
     }
   ],
-  "skillProficiencies": [
-    "Perception",
-    "Survival"
+  "background": "Sage",
+  "class": {
+    "name": "Cleric",
+    "subclass": {
+      "name": "Light Domain",
+      "type": ""
+    }
+  },
+  "expertSkills": [],
+  "feats": [
+    "Healer",
+    "Elemental Adept",
+    "Heavy Armor Master"
   ],
+  "fightingStyles": [],
+  "race": {
+    "name": "Elf",
+    "subrace": {
+      "name": "High Elves",
+      "description": ""
+    }
+  },
+  "immunities": [],
   "inventory": {
     "backpack": [
       "Rope, Silk",
@@ -66,52 +70,44 @@
     ],
     "equipped": [
       "Longsword",
-      "Longbow"
+      "Longbow",
+      "Plate"
     ],
     "gold": 10,
-    "magicItems": []
+    "magicItems": [
+      "Ring of Regeneration"
+    ]
   },
   "languages": [
     "Common",
-    "Abyssal",
-    "Draconic"
+    "Elvish"
   ],
-  "spells": [
-    "Commune",
-    "Contagion",
-    "Arcane Eye",
-    "Banishment",
-    "Control Water",
-    "Beacon of Hope",
-    "Bestow Curse",
-    "Clairvoyance",
-    "Augury",
-    "Blindness/Deafness",
-    "Calm Emotions",
-    "Bane",
-    "Bless",
-    "Command",
-    "Create or Destroy Water",
-    "Resistance",
-    "Sacred Flame",
-    "Spare the Dying",
-    "Thaumaturgy",
-    "Mending"
-  ],
-  "resistances": [
-    "Fire"
-  ],
-  "feats": [
-    "Crafter",
-    "Athlete",
-    "Actor"
-  ],
-  "magicItems": [
-    "Adamantine Armor",
-    "Adamantine Weapon"
-  ],
+  "resistances": [],
+  "skillProficiencies": [],
   "specialActions": [
     "None"
   ],
-  "rules": "2024"
+  "spells": [
+    "Guidance",
+    "Sacred Flame",
+    "Light",
+    "Mending",
+    "Bless",
+    "Command",
+    "Cure Wounds",
+    "Healing Word",
+    "Silence",
+    "Spiritual Weapon",
+    "Prayer of Healing",
+    "Mass Healing Word",
+    "Revivify",
+    "Spirit Guardians",
+    "Freedom of Movement",
+    "Guardian of Faith"
+  ],
+  "rules": "2024",
+  "magicItems": [
+    "Adamantine Armor",
+    "Adamantine Weapon"
+  ]
 }

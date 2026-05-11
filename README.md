@@ -61,9 +61,13 @@ Creating a character doesn't have to be overwhelming. The app guides you step by
 - **Backgrounds** — Choose your character's background (especially for 2024 Essentials)
 - **Rules validation** — The app checks your character against the rules and warns you if something doesn't match
 
+<img src="public/character-creation.png" alt="Character Creation" width="500" />
+
 ### 📊 **Your Character Sheet — Digital or Printed**
 
 Your character sheet works two ways:
+
+<img src="public/character-sheet.png" alt="Character Sheet" width="300" />
 
 **On Screen (Digital Mode):**
 Your sheet becomes a **living document** that updates as you play. Click to see details, track resources, and share everything in real time with your party.
@@ -140,6 +144,8 @@ When battle erupts, the app becomes your **tactical command center**:
 
 **Battle Notes:**
 - Add notes to any creature (track conditions, remember tactics, etc.)
+
+<img src="public/combat-tracking.jpeg" alt="Combat Tracking" width="600" />
 
 ### 🎨 **Designed for Gaming Tables — Digital or Printed**
 
