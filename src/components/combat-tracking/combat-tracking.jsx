@@ -5,21 +5,10 @@ import utils from '../../services/utils.js'
 import storage from '../../services/storage.js'
 import './combat-tracking.css'
 
-const npcColors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e', '#d35400', '#7f8c8d'];
-
-function getNpcColor(name) {
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-        hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return npcColors[Math.abs(hash) % npcColors.length];
-}
-
 function NpcAvatar({ name }) {
-    const color = getNpcColor(name);
     const initial = name ? name.charAt(0).toUpperCase() : '?';
     return (
-        <div className="npc-avatar" style={{ backgroundColor: color }}>
+        <div className="npc-avatar" style={{ backgroundColor: '#e74c3c' }}>
             <span>{initial}</span>
         </div>
     );
@@ -207,7 +196,7 @@ function CombatTracking({ characters }) {
                 {combatSummary?.creatures?.map((creature) => {
                     const isActive = creature.id === activeCreatureId;
                     return (
-                        <div key={creature.id} className={`creature-card ${isActive ? 'active' : ''}`}>
+                        <div key={creature.id} className={`creature-card ${creature.type} ${isActive ? 'active' : ''}`}>
                             <div className='creature-avatar'>
                                 {creature.type === 'player' ? (
                                     <AvatarImage name={creature.name} imagePath={creature.imagePath} />

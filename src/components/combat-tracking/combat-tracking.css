@@ -95,6 +95,14 @@
     background-color: rgba(255, 204, 0, 0.08);
 }
 
+.creature-card.player {
+    border: 2px solid #2ecc71;
+}
+
+.creature-card.npc {
+    border: 2px solid #e74c3c;
+}
+
 /* Avatars */
 .creature-avatar {
     display: flex;
