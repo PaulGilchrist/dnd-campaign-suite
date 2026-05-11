@@ -10,10 +10,22 @@ function WizardStepBasic({ formData, errors, backgrounds, ruleset, onInputChange
       .catch(error => console.error('Error loading alignments:', error));
   }, []);
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      onInputChange('image', event.target.result);
+      onInputChange('imageName', file.name);
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
      <div className="wizard-step">
        <h2>Step 2: Basic Information</h2>
-      
+       
        <div className="form-group">
          <label>Character Name *</label>
          <input
@@ -24,7 +36,7 @@ function WizardStepBasic({ formData, errors, backgrounds, ruleset, onInputChange
          />
          {errors.name && <span className="error-message">{errors.name}</span>}
        </div>
-      
+       
        <div className="form-group">
          <label>Level *</label>
          <input
@@ -37,7 +49,7 @@ function WizardStepBasic({ formData, errors, backgrounds, ruleset, onInputChange
          />
          {errors.level && <span className="error-message">{errors.level}</span>}
        </div>
-      
+       
        <div className="form-group">
          <label>Alignment *</label>
          <select
@@ -51,7 +63,39 @@ function WizardStepBasic({ formData, errors, backgrounds, ruleset, onInputChange
          </select>
          {errors.alignment && <span className="error-message">{errors.alignment}</span>}
        </div>
-      
+       
+        <div className="form-group">
+          <label>Character Picture</label>
+          <input
+           type="file"
+           id="character-image-upload"
+           accept="image/*"
+           className="image-upload-input"
+           onChange={handleImageUpload}
+          />
+          <div className="image-preview">
+            {formData.image ? (
+              <img src={formData.image} alt="Character" />
+            ) : formData.imagePath ? (
+              <img src={formData.imagePath} alt="Character" />
+            ) : (
+              <span>Click to upload</span>
+            )}
+          </div>
+          {(formData.image || formData.imagePath) && (
+            <button
+              type="button"
+              className="btn-remove-image"
+              onClick={() => {
+                onInputChange('image', '');
+                onInputChange('imagePath', '');
+              }}
+            >
+              Remove Image
+            </button>
+          )}
+        </div>
+       
       {ruleset === '2024' && (
         <div className="form-group">
           <label>Background (2024 Rules)</label>
