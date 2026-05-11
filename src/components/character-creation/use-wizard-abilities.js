@@ -39,7 +39,19 @@ function useWizardAbilities(formData, currentStep, setErrors, updateAbility) {
           abilityErrors.pointsExceeded = `You have spent ${totalPointsSpent} points. You only have 27 points to spend.`;
          }
 
-        setErrors(prev => ({ ...prev, ...abilityErrors }));
+        // Clear stale ability errors from previous validation
+        const abilityErrorKeys = formData.abilities.flatMap((_, index) => [
+          `ability_${index}_baseScore`,
+          `ability_${index}_abilityImprovements`,
+          `ability_${index}_miscBonus`,
+          `ability_${index}_totalScore`,
+        ]).concat('pointsExceeded');
+
+        setErrors(prev => {
+          const cleaned = { ...prev };
+          abilityErrorKeys.forEach(key => delete cleaned[key]);
+          return { ...cleaned, ...abilityErrors };
+        });
        }
      };
 
@@ -59,11 +71,8 @@ function useWizardAbilities(formData, currentStep, setErrors, updateAbility) {
 
   const onAbilityBaseScoreChange = useCallback(async (index, value) => {
     const newBaseScore = parseInt(value) || 8;
-    const total = await calculateTotalPointsSpent(formData.abilities, index, newBaseScore);
-    if (total <= 27) {
-      updateAbility(index, 'baseScore', newBaseScore);
-    }
-  }, [formData.abilities, calculateTotalPointsSpent, updateAbility]);
+    updateAbility(index, 'baseScore', newBaseScore);
+  }, [updateAbility]);
 
   const onAbilityImprovementChange = useCallback((index, value) => {
     const improvements = parseInt(value) || 0;
