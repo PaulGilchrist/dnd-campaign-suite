@@ -1,129 +1,186 @@
+/* Combat Tracking - Carousel Layout */
+
 .combat-tracking {
-    font-size: 1.0em;
-    padding: 10px;
+    width: 100%;
+    padding: 16px;
+    box-sizing: border-box;
 }
 
-.combat-tracking-buttons {
-    align-items: center;
-    display: grid;
-    grid-template-columns: 250px 185px 240px 240px;
-    max-width: 950px;
-}
-
-.combat-tracking button {
-    color: var(--color-header);
-    margin: 0;
-}
-
-.combat-tracking .clear-button {
-    width: 150px
-}
-
-.combat-tracking input {
-    font-size: 1.0em;
-    margin-top: 3px;
-}
-
-.combat-tracking header {
-    background-color: var(--background-color-header);
-    color: var(--color-header);
-}
-
-.combat-tracking header.initiative {
-    margin-left: -10px;
-}
-
-.combat-tracking>.creatures {
-    display: grid;
-    grid-template-columns: 200px 80px minmax(auto, 580px);
-}
-
-.combat-tracking-header {
+.combat-header {
     display: flex;
+    justify-content: space-between;
     align-items: center;
+    margin-bottom: 16px;
 }
 
-.combat-tracking-title {
-    color: var(--color-header);
-    font-size: 1.5em;
+.combat-header h4 {
+    margin: 0;
+    font-size: 1.25em;
     font-weight: 600;
 }
 
-.combat-tracking-subtitle {
-    font-size: 1.0em;
-    padding: 10px;
+.combat-controls {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
 }
 
-.combat-tracking .up-down {
-    margin-left: 20px;
+.combat-controls button {
+    padding: 6px 10px;
+    font-size: 0.85em;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
 }
 
-.combat-tracking .up-down button {
-    padding: 5px 7px;
-    margin-left: 2px;
+.combat-controls button.clear-button {
+    margin-right: 4px;
 }
 
-/* Active creature styling */
-@keyframes pulseGlow {
-    0%, 100% {
-        text-shadow: 0 0 5px rgba(255, 204, 0, 0.5), 0 0 10px rgba(255, 204, 0, 0.3);
-        box-shadow: 0 0 15px rgba(255, 204, 0, 0.4);
-    }
-    50% {
-        text-shadow: 0 0 15px rgba(255, 204, 0, 1), 0 0 25px rgba(255, 204, 0, 0.8), 0 0 35px rgba(255, 204, 0, 0.5);
-        box-shadow: 0 0 30px rgba(255, 204, 0, 0.8), inset 0 0 20px rgba(255, 204, 0, 0.4);
-    }
+/* Carousel container */
+.carousel-container {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    min-width: 0;
+    padding: 12px 4px 16px;
+    gap: 12px;
+    scroll-behavior: smooth;
 }
 
-.combat-tracking .active-text {
-    color: #ffcc00 !important;
-    font-weight: bold !important;
-    font-size: 1.5em !important;
-    animation: pulseGlow 2s ease-in-out infinite;
-    transition: color 0.4s ease-in-out, font-weight 0.4s ease-in-out, font-size 0.4s ease-in-out;
+.carousel-container::-webkit-scrollbar {
+    height: 6px;
 }
 
-.combat-tracking .active-row {
-    animation: pulseGlow 2s ease-in-out infinite;
+.carousel-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 3px;
 }
 
-.combat-tracking .active-row * {
-    color: #ffcc00 !important;
-    font-weight: bold !important;
-    font-size: 1.4em !important;
-    animation: pulseGlow 2s ease-in-out infinite;
-    transition: color 0.4s ease-in-out, font-weight 0.4s ease-in-out, font-size 0.4s ease-in-out;
+.carousel-container::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
 }
 
-.combat-tracking .active-row input {
-    border: 0;
-    background-color: rgba(255, 204, 0, 0.1);
-    animation: pulseGlow 2s ease-in-out infinite;
-    transition: background-color 0.4s ease-in-out;
+.carousel-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.35);
 }
 
-.combat-tracking .active-row input:focus {
-    border: 0;
-    background-color: rgba(255, 204, 0, 0.2);
+/* Creature card */
+.creature-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 120px;
+    padding: 12px 10px;
+    border-radius: 10px;
+    background-color: rgba(0, 0, 0, 0.04);
+    transform: scale(0.85);
+    opacity: 0.75;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease, opacity 0.3s ease;
+    cursor: pointer;
 }
 
-.combat-tracking .creatures > div:nth-child(2n) {
-    transition: all 0.3s ease-in-out;
+.creature-card:hover {
+    background-color: rgba(0, 0, 0, 0.07);
 }
 
-.combat-tracking .creatures > div:nth-child(2n):hover {
-    background-color: rgba(255, 204, 0, 0.05);
-    border: 1px solid rgba(255, 204, 0, 0.3);
+.creature-card.active {
+    transform: scale(1.15);
+    opacity: 1;
+    border: 2px solid #ffcc00;
+    box-shadow: 0 0 16px rgba(255, 204, 0, 0.5), 0 0 32px rgba(255, 204, 0, 0.25);
+    z-index: 10;
+    background-color: rgba(255, 204, 0, 0.08);
 }
 
-.combat-tracking .active-name input {
-    min-width: 200px;
+/* Avatars */
+.creature-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
 }
 
-.combat-tracking .active-initiative input {
-    min-width: 80px;
+.npc-avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 2.5em;
+    font-weight: bold;
+    text-transform: uppercase;
 }
 
-.combat-tracking .notes input {
-    min-width: 97%;
+.player-avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #d1d5db;
+    color: #374151;
+}
+
+.avatar-initial {
+    font-size: 2.5em;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.avatar-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+/* Creature name */
+.creature-name {
+    margin-top: 6px;
+    font-weight: 600;
+    font-size: 0.9em;
+    text-align: center;
+    min-height: 1.2em;
+}
+
+.npc-name-input {
+    border: none;
+    background-color: transparent;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.9em;
+    color: inherit;
+    width: 100%;
+    outline: none;
+    transition: background-color 0.2s ease;
+}
+
+.npc-name-input:focus {
+    background-color: rgba(0, 0, 0, 0.06);
+    border-radius: 4px;
+}
+
+/* Creature initiative */
+.creature-initiative {
+    margin-top: 6px;
+}
+
+.creature-initiative input[type="number"] {
+    width: 50px;
+    padding: 3px 4px;
+    text-align: center;
+    font-size: 0.85em;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+}
+
+.creature-initiative input[type="number"]:focus {
+    outline: 2px solid #ffcc00;
+    border-color: #ffcc00;
 }
