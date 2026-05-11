@@ -43,7 +43,7 @@
     flex-direction: row;
     overflow-x: auto;
     min-width: 0;
-    padding: 12px 4px 16px;
+    padding: 20px 4px;
     gap: 12px;
     scroll-behavior: smooth;
 }
