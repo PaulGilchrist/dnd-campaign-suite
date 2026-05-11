@@ -67,7 +67,7 @@ Creating a character doesn't have to be overwhelming. The app guides you step by
 
 Your character sheet works two ways:
 
-<img src="public/character-sheet.png" alt="Character Sheet" width="300" />
+<img src="public/character-sheet.png" alt="Character Sheet" width="400" />
 
 **On Screen (Digital Mode):**
 Your sheet becomes a **living document** that updates as you play. Click to see details, track resources, and share everything in real time with your party.
