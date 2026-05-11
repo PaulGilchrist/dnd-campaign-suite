@@ -1,119 +1,115 @@
 {
   "name": "Test-24",
-  "level": 1,
-  "alignment": "Neutral Good",
+  "level": 5,
+  "alignment": "Chaotic Good",
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 14,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "baseScore": 13,
+      "abilityImprovements": 2,
+      "miscBonus": 3
     },
     {
       "name": "Dexterity",
-      "baseScore": 16,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "baseScore": 15,
+      "abilityImprovements": 2,
+      "miscBonus": 1
     },
     {
       "name": "Constitution",
       "baseScore": 14,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "abilityImprovements": 2,
+      "miscBonus": 2
     },
     {
       "name": "Intelligence",
       "baseScore": 10,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "abilityImprovements": 4,
+      "miscBonus": 4
     },
     {
       "name": "Wisdom",
       "baseScore": 10,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "abilityImprovements": 5,
+      "miscBonus": 3
     },
     {
       "name": "Charisma",
       "baseScore": 10,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "abilityImprovements": 3,
+      "miscBonus": 5
     }
   ],
-  "background": "Soldier",
+  "background": "Sailor",
   "class": {
-    "name": "Fighter",
+    "name": "Paladin",
     "subclass": {
-      "name": "Champion",
+      "name": "Oath of Devotion",
       "type": ""
     },
     "fightingStyles": [
       "Archery"
-    ],
-    "expertise": [],
-    "favoredEnemies": [],
-    "favoredTerrain": []
+    ]
   },
   "expertSkills": [],
   "feats": [
-    "Boon Of Combat Prowess",
-    "Savage Attacker"
+    "Savage Attacker",
+    "Ability Score Improvement"
   ],
   "fightingStyles": [],
   "race": {
-    "name": "Human",
+    "name": "Dwarf",
     "subrace": {
-      "name": ""
+      "name": "Mountain",
+      "description": ""
     }
   },
-  "immunities": [
-    "Thunder",
-    "Slashing"
-  ],
+  "immunities": [],
   "inventory": {
     "backpack": [
-      "Greatsword",
-      "Half Plate"
+      "Ration",
+      "Rope",
+      "Hempen",
+      "Grappling hook"
     ],
     "equipped": [
       "Longbow",
-      "Longsword"
+      "Longsword",
+      "Plate"
     ],
     "gold": 10,
     "magicItems": [
-      "Alchemy Jug",
-      "Ammunition of Slaying"
+      "Adamantine Weapon",
+      "Adamantine Armor"
     ]
   },
   "languages": [
-    "Infernal",
-    "Primordial",
-    "Sylvan",
-    "Common"
+    "Common",
+    "Dwarvish"
   ],
   "resistances": [
-    "Thunder",
-    "Slashing"
+    "Poison"
   ],
   "skillProficiencies": [
-    "Performance",
-    "Sleight of Hand",
     "Athletics",
-    "Intimidation"
+    "Acrobatics"
   ],
   "specialActions": [
     {
-      "name": "Action test updated 2",
-      "description": "Tesing multiple actions",
-      "details": "Great details for one and for all"
-    },
-    {
-      "name": "Action test updated 3",
-      "description": "Can we add more than 1",
-      "details": "This is great"
+      "name": "Super Secret Magic Weapon",
+      "description": "Weapon of Secrecy",
+      "details": "Mass Invisibility once per long rest"
     }
   ],
-  "spells": [],
+  "spells": [
+    "Bless",
+    "Command",
+    "Compelled Duel",
+    "Cure Wounds",
+    "Aid",
+    "Branding Smite"
+  ],
   "rules": "2024",
-  "newSpecialAction": {}
+  "newSpecialAction": {},
+  "imagePath": "character-images/a3cb7085-12e6-3b54-fd81-ec89c88b796b.JPG"
 }

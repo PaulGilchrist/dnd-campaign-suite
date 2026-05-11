@@ -397,7 +397,7 @@
 .multi-select-container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 8px;
+    gap: 2px 8px;
     margin-top: 8px;
 }
 
@@ -438,7 +438,7 @@
 .multi-select-compact .multi-select-item {
     padding: 4px 8px;
     font-size: 0.85rem;
-    gap: 4px;
+    gap: 2px 4px;
 }
 
 .multi-select-compact .multi-select-container {
@@ -1264,9 +1264,9 @@
 
 .rule-info {
     background-color: var(--background-color-header);
-    padding: 0.75rem;
+    padding: 0.25rem 0.5rem;
     border-radius: 4px;
-    margin-bottom: 1rem;
+    margin-bottom: 0.1rem;
     font-size: 0.9em;
 }
 

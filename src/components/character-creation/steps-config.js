@@ -97,14 +97,14 @@ export const WIZARD_STEPS = [
     step: 7,
     title: 'Languages & Fighting Styles',
     component: WizardStepLanguages,
-    getProps: ({ formData, errors, onLanguageToggle, onFightingStyleToggle, languageLimits, fightingStyleLimits, warnings, preSelectedLanguages, preSelectedFightingStyles }) => ({
+    getProps: ({ formData, errors, onLanguageToggle, onFightingStyleToggle, languageLimits, fightingStyleLimits, languageWarnings, preSelectedLanguages, preSelectedFightingStyles }) => ({
       formData,
       errors,
       onLanguageToggle,
       onFightingStyleToggle,
       languageLimits,
       fightingStyleLimits,
-      warnings,
+      warnings: languageWarnings,
       preSelectedLanguages,
       preSelectedFightingStyles,
     }),
@@ -113,11 +113,11 @@ export const WIZARD_STEPS = [
     step: 8,
     title: 'Resistances & Immunities',
     component: WizardStepResistances,
-    getProps: ({ formData, onResistanceToggle, onImmunityToggle, warnings, preSelectedResistances, preSelectedImmunities }) => ({
+    getProps: ({ formData, onResistanceToggle, onImmunityToggle, resistanceWarnings, preSelectedResistances, preSelectedImmunities }) => ({
       formData,
       onResistanceToggle,
       onImmunityToggle,
-      warnings,
+      warnings: resistanceWarnings,
       preSelectedResistances,
       preSelectedImmunities,
     }),

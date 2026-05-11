@@ -51,20 +51,20 @@ function WizardStepLanguages({ formData, errors, onLanguageToggle, onFightingSty
        <h2>Step 7: Languages & Fighting Styles</h2>
 
        {/* Display language limits info */}
-       {languageLimits && (
-         <div className="rule-info">
-           <p><strong>Rules:</strong> {languageLimits.details}</p>
-             <p>You have selected {languages.length} of {languageLimits.allowed} allowed language(s).</p>
-         </div>
-       )}
+        {languageLimits && (
+          <div className="rule-info">
+            <p><strong>Rules:</strong> {languageLimits.details}</p>
+              <p>You have selected {languages.length} of {languageLimits.allowed} allowed language(s).</p>
+          </div>
+        )}
 
        {/* Display fighting style limits info */}
-       {fightingStyleLimits && (
-         <div className="rule-info">
-           <p><strong>Rules:</strong> {fightingStyleLimits.details}</p>
-           <p>You have selected {fightingStyles.length} of {fightingStyleLimits.allowed} allowed fighting style(s).</p>
-         </div>
-       )}
+        {fightingStyleLimits && (
+          <div className="rule-info">
+            <p><strong>Rules:</strong> {fightingStyleLimits.details}</p>
+            <p>You have selected {fightingStyles.length} of {fightingStyleLimits.allowed} allowed fighting style(s).</p>
+          </div>
+        )}
 
         {/* Display warnings if any */}
         {warnings && warnings.length > 0 && <WarningList warnings={warnings} />}
