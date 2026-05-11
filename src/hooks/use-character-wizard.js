@@ -6,6 +6,7 @@ export function useCharacterWizard(campaignName) {
   const [showCharacterWizard, setShowCharacterWizard] = useState(false);
   const [showEditCharacterWizard, setShowEditCharacterWizard] = useState(false);
   const callbacksRef = useRef({ setCharacters: null, setActiveCharacter: null });
+  const originalCharacterRef = useRef(null);
 
   const setCharacterCallbacks = useCallback(({ setCharacters, setActiveCharacter }) => {
     callbacksRef.current = { setCharacters, setActiveCharacter };
@@ -37,7 +38,8 @@ export function useCharacterWizard(campaignName) {
     }
   }, [campaignName]);
 
-  const handleEditCharacter = useCallback(() => {
+  const handleEditCharacter = useCallback((originalCharacter) => {
+    originalCharacterRef.current = originalCharacter;
     setShowEditCharacterWizard(true);
   }, []);
 
@@ -48,12 +50,14 @@ export function useCharacterWizard(campaignName) {
   const handleEditWizardComplete = useCallback(async (characterData) => {
     try {
       if (!campaignName) throw new Error('No campaign selected');
+      const originalCharacter = originalCharacterRef.current;
+      const originalFileName = `${originalCharacter.name.toLowerCase().replace(/\s+/g, '-')}.json`;
       const fileName = `${characterData.name.toLowerCase().replace(/\s+/g, '-')}.json`;
-      await campaignService.updateCharacter(campaignName, fileName, characterData);
+      await campaignService.updateCharacter(campaignName, fileName, characterData, originalFileName);
       callbacksRef.current.setActiveCharacter(cloneDeep(characterData));
       setShowEditCharacterWizard(false);
       const { setCharacters } = callbacksRef.current;
-      setCharacters(prev => prev.map(char => char.name === characterData.name ? characterData : char));
+      setCharacters(prev => prev.map(char => char.name === originalCharacter.name ? characterData : char));
     } catch (error) {
       console.error('Error updating character:', error);
       alert(`Failed to update character: ${error.message}`);

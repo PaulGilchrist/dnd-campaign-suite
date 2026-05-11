@@ -245,21 +245,46 @@ app.put('/api/campaigns/:campaign/:file', (req, res) => {
     const filePath = path.join(campaignDir, file);
     
     try {
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({ error: 'Character file not found' });
-        }
+        const isRename = character.originalFileName && character.originalFileName !== file;
+        
+        if (isRename) {
+            // Renaming: read from the original file path
+            const originalFilePath = path.join(campaignDir, character.originalFileName);
+            if (!fs.existsSync(originalFilePath)) {
+                return res.status(404).json({ error: 'Character file not found' });
+            }
 
-        // Read the original character file to get the original imagePath
-        const originalCharacter = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-        const originalImagePath = originalCharacter.imagePath;
+            // Read the original character to get the imagePath for image cleanup
+            const originalCharacter = JSON.parse(fs.readFileSync(originalFilePath, 'utf-8'));
+            const originalImagePath = originalCharacter.imagePath;
 
-        // If the user removed the image (imagePath is empty/null and original had one), delete the old image
-        if ((!character.imagePath || character.imagePath === '') && originalImagePath) {
-            deleteCharacterImage(originalImagePath);
-            character.imagePath = '';
-        } else if (character.image && character.imageName) {
-            // If the character has a new image, process the upload (passing originalImagePath to clean up old image)
-            processImageUpload(character, originalImagePath);
+            // Delete the original character file
+            fs.unlinkSync(originalFilePath);
+
+            // Handle image changes
+            if ((!character.imagePath || character.imagePath === '') && originalImagePath) {
+                deleteCharacterImage(originalImagePath);
+                character.imagePath = '';
+            } else if (character.image && character.imageName) {
+                processImageUpload(character, originalImagePath);
+            }
+        } else {
+            // Standard update: verify the file exists at the current path
+            if (!fs.existsSync(filePath)) {
+                return res.status(404).json({ error: 'Character file not found' });
+            }
+
+            // Read the original character to get the imagePath for image cleanup
+            const originalCharacter = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+            const originalImagePath = originalCharacter.imagePath;
+
+            // Handle image changes
+            if ((!character.imagePath || character.imagePath === '') && originalImagePath) {
+                deleteCharacterImage(originalImagePath);
+                character.imagePath = '';
+            } else if (character.image && character.imageName) {
+                processImageUpload(character, originalImagePath);
+            }
         }
         
         fs.writeFileSync(filePath, JSON.stringify(character, null, 2));

@@ -68,7 +68,7 @@ describe('useCharacterWizard', () => {
       const { result } = renderHook(() => useCharacterWizard(campaign));
 
       act(() => {
-        result.current.handleEditCharacter();
+        result.current.handleEditCharacter({ name: 'TestChar' });
       });
 
       expect(result.current.showEditCharacterWizard).toBe(true);
@@ -81,7 +81,7 @@ describe('useCharacterWizard', () => {
       const { result } = renderHook(() => useCharacterWizard(campaign));
 
       act(() => {
-        result.current.handleEditCharacter();
+        result.current.handleEditCharacter({ name: 'TestChar' });
       });
 
       expect(result.current.showEditCharacterWizard).toBe(true);
@@ -193,11 +193,10 @@ describe('useCharacterWizard', () => {
   });
 
   describe('handleEditWizardComplete', () => {
-    it('PUTs to correct URL and updates local character list', async () => {
+    it('PUTs to correct URL with originalFileName and updates local character list', async () => {
       const setCharacters = vi.fn();
       const setActiveCharacter = vi.fn();
-      const characterData = { name: 'Test Char', class: 'Wizard' };
-      const fileName = 'test-char.json';
+      const characterData = { name: 'TestChar', class: 'Wizard' };
       const campaignName = 'TestCampaign';
 
       const { useCharacterWizard, campaign } = setup(campaignName);
@@ -212,20 +211,68 @@ describe('useCharacterWizard', () => {
         result.current.setCharacterCallbacks({ setCharacters, setActiveCharacter });
       });
 
+      act(() => {
+        result.current.handleEditCharacter({ name: 'TestChar' });
+      });
+
       await act(async () => {
         result.current.handleEditWizardComplete(characterData);
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(fileName)}`,
+        `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent('testchar.json')}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(characterData),
+          body: JSON.stringify({ ...characterData, originalFileName: 'testchar.json' }),
         }
       );
       expect(setActiveCharacter).toHaveBeenCalledWith(characterData);
       expect(result.current.showEditCharacterWizard).toBe(false);
+    });
+
+    it('handles rename: PUTs to new file name with originalFileName, replaces by original name', async () => {
+      const existingCharacters = [{ name: 'Old Name', class: 'Wizard' }];
+      const setCharacters = vi.fn();
+      const setActiveCharacter = vi.fn();
+      const campaignName = 'TestCampaign';
+
+      const { useCharacterWizard, campaign } = setup(campaignName);
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ name: 'New Name', class: 'Wizard' }),
+      });
+
+      const { result } = renderHook(() => useCharacterWizard(campaign));
+
+      act(() => {
+        result.current.setCharacterCallbacks({ setCharacters, setActiveCharacter });
+      });
+
+      act(() => {
+        result.current.handleEditCharacter({ name: 'Old Name', class: 'Wizard' });
+      });
+
+      await act(async () => {
+        result.current.handleEditWizardComplete({ name: 'New Name', class: 'Wizard' });
+      });
+
+      // Verify the PUT goes to the NEW file name
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent('new-name.json')}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'New Name', class: 'Wizard', originalFileName: 'old-name.json' }),
+        }
+      );
+
+      // Verify setCharacters replaces by the ORIGINAL name
+      expect(setCharacters).toHaveBeenCalledWith(
+        expect.any(Function)
+      );
+      const newCharacters = setCharacters.mock.calls[0][0](existingCharacters);
+      expect(newCharacters).toEqual([{ name: 'New Name', class: 'Wizard' }]);
     });
   });
 
@@ -242,6 +289,10 @@ describe('useCharacterWizard', () => {
       });
 
       const { result } = renderHook(() => useCharacterWizard(campaign));
+
+      act(() => {
+        result.current.handleEditCharacter({ name: 'TestChar' });
+      });
 
       await act(async () => {
         result.current.handleEditWizardComplete(characterData);

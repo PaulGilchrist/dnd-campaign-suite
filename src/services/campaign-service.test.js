@@ -385,5 +385,24 @@ describe('campaignService', () => {
 
       await expect(updateCharacter('campaign1', 'char1.json', { name: 'Test' })).rejects.toThrow('Network error');
     });
+
+    it('should include originalFileName in body when renaming', async () => {
+      const characterData = { name: 'New Name', level: 5 };
+      const responseData = { character: characterData };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(responseData),
+      });
+
+      const result = await updateCharacter('campaign1', 'new-name.json', characterData, 'old-name.json');
+
+      expect(result).toEqual(responseData);
+      expect(mockFetch).toHaveBeenCalledWith('/api/campaigns/campaign1/new-name.json', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...characterData, originalFileName: 'old-name.json' }),
+      });
+    });
   });
 });

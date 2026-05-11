@@ -1,5 +1,5 @@
 {
-  "name": "test-2024",
+  "name": "Essil",
   "level": 8,
   "alignment": "Chaotic Good",
   "abilities": [
@@ -11,36 +11,36 @@
     },
     {
       "name": "Dexterity",
-      "baseScore": 12,
+      "baseScore": 14,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
     {
       "name": "Constitution",
-      "baseScore": 13,
+      "baseScore": 15,
       "abilityImprovements": 1,
       "miscBonus": 0
     },
     {
       "name": "Intelligence",
-      "baseScore": 10,
+      "baseScore": 8,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 15,
-      "abilityImprovements": 0,
+      "abilityImprovements": 2,
       "miscBonus": 0
     },
     {
       "name": "Charisma",
-      "baseScore": 10,
+      "baseScore": 8,
       "abilityImprovements": 0,
       "miscBonus": 0
     }
   ],
-  "background": "Sage",
+  "background": "Artisan",
   "class": {
     "name": "Cleric",
     "subclass": {
@@ -51,8 +51,8 @@
   "expertSkills": [],
   "feats": [
     "Healer",
-    "Elemental Adept",
-    "Heavy Armor Master"
+    "Ability Score Improvement",
+    "Heavily Armored"
   ],
   "fightingStyles": [],
   "race": {
@@ -89,25 +89,26 @@
   ],
   "spells": [
     "Guidance",
+    "Mending",
     "Sacred Flame",
     "Light",
-    "Mending",
     "Bless",
     "Command",
     "Cure Wounds",
     "Healing Word",
+    "Aid",
+    "Lesser Restoration",
     "Silence",
-    "Spiritual Weapon",
-    "Prayer of Healing",
     "Mass Healing Word",
     "Revivify",
     "Spirit Guardians",
-    "Freedom of Movement",
-    "Guardian of Faith"
+    "Guardian of Faith",
+    "Freedom of Movement"
   ],
   "rules": "2024",
   "magicItems": [
     "Adamantine Armor",
     "Adamantine Weapon"
-  ]
+  ],
+  "originalFileName": "test-2024.json"
 }

@@ -89,7 +89,7 @@ function App() {
       {combatTrackingActive && <CombatTracking characters={characters} />}
       <button className="clickable mutted no-print" onClick={handleBackToCampaigns}><i className="fas fa-arrow-left"></i> Campaigns</button>
       {characters.length > 0 && activeCharacter && <button className="clickable mutted no-print" onClick={handleInitiativeClick}><i className="fas fa-shield-alt"></i> Combat</button>}
-      {activeCharacter && <button className="clickable mutted no-print" onClick={handleEditCharacter}><i className="fas fa-pen"></i> Edit</button>}
+      {activeCharacter && <button className="clickable mutted no-print" onClick={() => handleEditCharacter(activeCharacter)}><i className="fas fa-pen"></i> Edit</button>}
       {activeCharacter && <button className="clickable mutted no-print" onClick={handleSaveClick}><i className="fas fa-arrow-down"></i> Download</button>}
       <br />
       {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allRaces={races} allRaces2024={races2024} allClasses={classes} allSpells={spells} allSpells2024={spells2024} />}

@@ -79,14 +79,14 @@ export const createCharacter = async (campaignName, characterData) => {
   }
 };
 
-export const updateCharacter = async (campaignName, fileName, characterData) => {
+export const updateCharacter = async (campaignName, fileName, characterData, originalFileName) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
     const encodedFileName = encodeURIComponent(fileName);
     const response = await fetch(`/api/campaigns/${encodedCampaign}/${encodedFileName}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(characterData),
+      body: JSON.stringify({ ...characterData, originalFileName }),
     });
     if (!response.ok) {
       throw new Error(`Failed to update character: ${response.statusText}`);
