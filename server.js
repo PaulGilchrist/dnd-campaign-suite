@@ -11,7 +11,8 @@ const persistDataDebounceMilliseconds = 1 * 60 * 1000; // 1 minute in millisecon
 
 const app = express();
 
-app.use(express.json({ limit: '100kb' }));
+// Increase JSON body limit to accommodate base64 image uploads
+app.use(express.json({ limit: '5mb' }));
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT');
@@ -61,7 +62,7 @@ app.listen(PORT, () => {
                 lanIP = iface.address;
      }
            }
-      }
+     }
 
     // Only show port and trailing slash if it's not the default (80)
     const portStr = PORT === 80 ? '' : `:${PORT}`;
@@ -74,6 +75,64 @@ app.listen(PORT, () => {
 
 // Serve static files from the public directory
 app.use(express.static(path.join(process.cwd(), 'public')));
+
+// Ensure the character-images directory exists
+const characterImagesDir = path.join(process.cwd(), 'public', 'character-images');
+if (!fs.existsSync(characterImagesDir)) {
+    fs.mkdirSync(characterImagesDir, { recursive: true });
+}
+
+// Helper function to process image uploads from character data
+// originalImagePath: the imagePath from the original character file (optional)
+const processImageUpload = (character, originalImagePath) => {
+    if (character.image && character.imageName) {
+        // Extract the file extension from imageName (e.g., "photo.jpg" -> ".jpg")
+        const extMatch = character.imageName.match(/\.[^.]+$/);
+        const ext = extMatch ? extMatch[0] : '.png';
+
+        // Generate a GUID-based filename
+        const guidValue = guid.create().value;
+        const imageFileName = `${guidValue}${ext}`;
+        const imageFilePath = path.join(characterImagesDir, imageFileName);
+
+        // Delete the old image if originalImagePath is provided and differs
+        if (originalImagePath) {
+            deleteCharacterImage(originalImagePath);
+        }
+
+        // Extract base64 data from data URL (e.g., "data:image/png;base64,iVBORw...")
+        const base64Data = character.image.replace(/^data:image\/[a-zA-Z]+;base64,/, '');
+
+        // Save the image file
+        fs.writeFileSync(imageFilePath, base64Data, 'base64');
+
+        // Set the relative path for the image
+        character.imagePath = `character-images/${imageFileName}`;
+
+        // Remove the temporary image and imageName fields from the character object
+        delete character.image;
+        delete character.imageName;
+
+        console.log(`Image saved: ${imageFilePath}`);
+    }
+};
+
+// Helper function to delete associated image file for a character
+const deleteCharacterImage = (imagePath) => {
+    try {
+        if (imagePath) {
+            // imagePath is relative like "character-images/{guid}.{ext}"
+            const imageFileName = path.basename(imagePath);
+            const imageFilePath = path.join(characterImagesDir, imageFileName);
+            if (fs.existsSync(imageFilePath)) {
+                fs.unlinkSync(imageFilePath);
+                console.log(`Deleted image: ${imageFilePath}`);
+            }
+        }
+    } catch (error) {
+        console.error('Error deleting character image:', error);
+    }
+};
 
 // API endpoint to list character folders
 app.get('/api/campaigns', (req, res) => {
@@ -189,6 +248,19 @@ app.put('/api/campaigns/:campaign/:file', (req, res) => {
         if (!fs.existsSync(filePath)) {
             return res.status(404).json({ error: 'Character file not found' });
         }
+
+        // Read the original character file to get the original imagePath
+        const originalCharacter = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        const originalImagePath = originalCharacter.imagePath;
+
+        // If the user removed the image (imagePath is empty/null and original had one), delete the old image
+        if ((!character.imagePath || character.imagePath === '') && originalImagePath) {
+            deleteCharacterImage(originalImagePath);
+            character.imagePath = '';
+        } else if (character.image && character.imageName) {
+            // If the character has a new image, process the upload (passing originalImagePath to clean up old image)
+            processImageUpload(character, originalImagePath);
+        }
         
         fs.writeFileSync(filePath, JSON.stringify(character, null, 2));
         
@@ -212,6 +284,10 @@ app.delete('/api/campaigns/:campaign/:file', (req, res) => {
         if (!fs.existsSync(filePath)) {
             return res.status(404).json({ error: 'Character file not found' });
          }
+
+        // Read the character file to check for an associated image
+        const characterData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        deleteCharacterImage(characterData.imagePath);
         
         fs.unlinkSync(filePath);
         
@@ -232,8 +308,18 @@ app.delete('/api/campaigns/:campaign', (req, res) => {
             return res.status(404).json({ error: 'Campaign not found' });
          }
         
-        // Remove all files in the campaign directory
+        // Before deleting the campaign dir, read all .json files and delete associated images
         const files = fs.readdirSync(campaignDir);
+        files.forEach(file => {
+            if (file.endsWith('.json')) {
+                const characterData = JSON.parse(fs.readFileSync(path.join(campaignDir, file), 'utf-8'));
+                if (characterData.imagePath) {
+                    deleteCharacterImage(characterData.imagePath);
+                }
+            }
+        });
+
+        // Remove all files in the campaign directory
         files.forEach(file => {
             fs.unlinkSync(path.join(campaignDir, file));
          });
@@ -258,7 +344,7 @@ app.put('/api/campaigns/:campaign', (req, res) => {
      }
     
     // Validate campaign name - only allow alphanumeric, spaces, hyphens, underscores, and periods
-    const campaignNamePattern = /^[a-zA-Z0-9 _.\\-]+$/;
+    const campaignNamePattern = /^[a-zA-Z0-9 _.\-]+$/;
     if (!campaignNamePattern.test(newName.trim())) {
         return res.status(400).json({ error: 'Campaign name can only contain letters, numbers, spaces, hyphens, underscores, and periods' });
       }
@@ -305,6 +391,9 @@ app.post('/api/campaigns/character', (req, res) => {
             console.error('Campaign directory does not exist:', campaignDir);
             return res.status(404).json({ error: 'Campaign not found' });
         }
+
+        // If the character has an image, process the upload
+        processImageUpload(character);
         
         // Generate a safe filename using only character name
         const charName = character.name || 'Character';
@@ -370,8 +459,8 @@ const keepAlive = () => {
     fetch(`http://localhost:${PORT}/health`)
         .then(() => {
          })
-         .catch((error) => {
-            console.error(`Error: ${error.message}`);
+          .catch((error) => {
+             console.error(`Error: ${error.message}`);
         });
 }
 setInterval(keepAlive, 60000); // 60 seconds
