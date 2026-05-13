@@ -3,9 +3,34 @@ import React from 'react'
 import { cloneDeep } from 'lodash';
 import utils from '../../services/utils.js'
 import storage from '../../services/storage.js'
+import { loadMonsters } from '../../services/data-loader.js'
 import './combat-tracking.css'
 
-function NpcAvatar({ name }) {
+let monstersCache = null;
+
+async function getMonsterImageUrl(npcName) {
+    if (!npcName) return null;
+    if (!monstersCache) {
+        monstersCache = await loadMonsters();
+    }
+    // Strip trailing number (e.g., "Goblin 1" -> "Goblin")
+    const baseName = npcName.replace(/\s+\d+$/, '');
+    // Case-insensitive lookup by name
+    const monster = monstersCache.find(m => m.name.toLowerCase() === baseName.toLowerCase());
+    if (monster && monster.image === true) {
+        return `https://paulgilchrist.github.io/dnd-tools/images/${monster.index}.jpg`;
+    }
+    return null;
+}
+
+function NpcAvatar({ name, imageUrl }) {
+    if (imageUrl) {
+        return (
+            <div className="player-avatar">
+                <img src={imageUrl} alt={name} className="avatar-image" />
+            </div>
+        );
+    }
     const initial = name ? name.charAt(0).toUpperCase() : '?';
     return (
         <div className="npc-avatar" style={{ backgroundColor: '#e74c3c' }}>
@@ -33,7 +58,26 @@ function CombatTracking({ characters }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
     const [numOfNpc, setNumOfNpc] = React.useState(5);
     const [activeCreatureId, setActiveCreatureId] = React.useState(null);
+    const [npcImages, setNpcImages] = React.useState({});
     const carouselRef = React.useRef(null);
+
+    React.useEffect(() => {
+        if (!combatSummary) return;
+        const npcIds = combatSummary.creatures.filter(c => c.type === 'npc').map(c => c.id);
+        const promises = npcIds.map(async (id) => {
+            const npc = combatSummary.creatures.find(c => c.id === id);
+            if (npc) {
+                const url = await getMonsterImageUrl(npc.name);
+                return { id, url };
+            }
+            return { id, url: null };
+        });
+        Promise.all(promises).then(results => {
+            const newImages = {};
+            results.forEach(({ id, url }) => { newImages[id] = url; });
+            setNpcImages(newImages);
+        });
+    }, [combatSummary]);
 
     const setupCreatures = React.useCallback(() => {
         const creatureList = characters.map((character) => { return { id: utils.guid(), name: utils.getFirstName(character.name), type: 'player', imagePath: character.imagePath || '', initiative: '' } });
@@ -187,6 +231,8 @@ function CombatTracking({ characters }) {
         combatSummary.creatures[index].name = value;
         storage.set('combatSummary', combatSummary);
         setCombatSummary(cloneDeep(combatSummary));
+        // Clear the cached image so it gets recomputed
+        setNpcImages(prev => ({ ...prev, [id]: null }));
     };
     if (!combatSummary) return null;
     return (
@@ -201,7 +247,7 @@ function CombatTracking({ characters }) {
                                 {creature.type === 'player' ? (
                                     <AvatarImage name={creature.name} imagePath={creature.imagePath} />
                                 ) : (
-                                    <NpcAvatar name={creature.name} />
+                                    <NpcAvatar name={creature.name} imageUrl={npcImages[creature.id]} />
                                 )}
                             </div>
                             <div className='creature-name'>

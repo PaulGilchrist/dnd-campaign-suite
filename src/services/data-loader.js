@@ -31,7 +31,8 @@ const sharedDataCache = {
     skills: null,
     abilityScores: null,
     passiveSkills: null,
-    equipment: null
+    equipment: null,
+    monsters: null
 };
 
 /**
@@ -268,6 +269,27 @@ export async function loadEquipment() {
 }
 
 /**
+  * Fetches monsters data (with caching) - version agnostic
+  * @returns {Promise<object[]>} - Array of monster data from /data/monsters.json
+  */
+export async function loadMonsters() {
+    if (sharedDataCache.monsters) {
+        return sharedDataCache.monsters;
+    }
+    try {
+        const response = await fetch('/data/monsters.json');
+        if (response.ok) {
+            const data = await response.json();
+            sharedDataCache.monsters = data;
+            return data;
+        }
+    } catch (error) {
+        console.error('Error loading monsters:', error);
+    }
+    return [];
+}
+
+/**
   * Fetches magic items data (with caching)
   * @param {string} version - '5e' or '2024'
   * @returns {Promise<object[]>} - Array of magic items data
@@ -413,6 +435,7 @@ export function clearDataCache() {
     sharedDataCache.abilityScores = null;
     sharedDataCache.passiveSkills = null;
     sharedDataCache.equipment = null;
+    sharedDataCache.monsters = null;
  }
 
 /**
