@@ -5,6 +5,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import guid from 'guid'
+import http from 'http';
 
 const PORT = process.env.PORT || 80;
 const persistDataDebounceMilliseconds = 1 * 60 * 1000; // 1 minute in milliseconds
@@ -42,6 +43,10 @@ app.get('/subscribe', (req, res) => {
         subscribers = subscribers.filter(client => client.id !== clientId);
      });
     console.log(`Current subscriber count = ${subscribers.length}`)
+});
+
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'Healthy' });
 });
 
 // React Router fallback — MUST be last
@@ -468,9 +473,6 @@ app.post('/api/:key', (req, res) => {
     }
     publish(key, data);
 });
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'Healthy' });
-});
 
 const publish = (key, data) => {
     const event = {
@@ -481,12 +483,13 @@ const publish = (key, data) => {
 }
 
 const keepAlive = () => {
-    fetch(`http://localhost:${PORT}/health`)
-        .then(() => {
-         })
-          .catch((error) => {
-             console.error(`Error: ${error.message}`);
-        });
+    http.get(`http://localhost:${PORT}/health`, (res) => {
+        if (res.statusCode === 200) {
+            console.log('Health check passed');
+        }
+    }).on('error', (error) => {
+        console.error(`Health check error: ${error.message}`);
+    });
 }
 setInterval(keepAlive, 60000); // 60 seconds
 
