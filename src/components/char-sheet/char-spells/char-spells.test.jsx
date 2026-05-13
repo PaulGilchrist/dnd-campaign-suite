@@ -565,7 +565,7 @@ describe('CharSpells', () => {
         ...mockPlayerStats.spellAbilities,
         maxPreparedSpells: undefined,
           },
-         };
+          };
 
     const { container } = render(
          <CharSpells
@@ -574,10 +574,127 @@ describe('CharSpells', () => {
            />
            );
 
-      // Check that "Max Prepared:" label exists
+       // Check that "Max Prepared:" label exists
     expect(screen.getByText(/Max Prepared:/)).toBeInTheDocument();
-      // Check that "All" is displayed in the spell-abilities section
+       // Check that "All" is displayed in the spell-abilities section
     const spellAbilitiesDiv = container.querySelector('.spell-abilities');
     expect(spellAbilitiesDiv.textContent).toContain('All');
      });
+});
+
+const mockPlayerStats2024 = {
+  name: 'Test Character',
+  rules: '2024',
+  spellAbilities: {
+    toHit: 5,
+    modifier: 3,
+    saveDc: 13,
+    cantrips_known: 3,
+    prepared_spells: 5,
+    maxPreparedSpells: 5,
+    spell_slots_level_1: 4,
+    spell_slots_level_2: 3,
+    spells: [
+      {
+        name: 'Fireball',
+        level: 3,
+        casting_time: '1 action',
+        range: '150 feet',
+        duration: 'Instantaneous',
+        components: ['V', 'S', 'M'],
+        damage: {
+          damage_at_slot_level: {
+               '3': '8d6',
+               },
+          damage_type: 'Fire',
+          },
+        prepared: 'Prepared',
+          },
+        {
+        name: 'Magic Missile',
+        level: 1,
+        casting_time: '1 action',
+        range: '120 feet',
+        duration: 'Instantaneous',
+        components: ['V', 'S'],
+        damage: {
+          damage_at_slot_level: {
+               '1': '1d4+1',
+               },
+          damage_type: 'Force',
+          },
+        prepared: 'Always',
+          },
+        {
+        name: 'Light',
+        level: 0,
+        casting_time: '1 action',
+        range: 'Touch',
+        duration: '10 minutes',
+        components: ['V', 'M'],
+        prepared: 'Always',
+      },
+       ],
+     },
+};
+
+describe('CharSpells - 2024 ruleset', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useActionPopup.mockImplementation(() => ({
+      showPopup: vi.fn(),
+      popupHtml: null,
+      setPopupHtml: vi.fn(),
+    }));
+  });
+
+  it('should hide the Prepared column header for 2024 characters', () => {
+    render(
+        <CharSpells playerStats={mockPlayerStats2024} />
+        );
+
+    expect(screen.queryByText('Prepared')).not.toBeInTheDocument();
+    });
+
+  it('should hide Prepared Spells and Max Prepared labels for 2024 characters', () => {
+    render(
+        <CharSpells playerStats={mockPlayerStats2024} />
+        );
+
+    expect(screen.queryByText(/Prepared Spells:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Max Prepared:/)).not.toBeInTheDocument();
+    });
+
+  it('should not show checkboxes for 2024 characters', () => {
+    render(
+        <CharSpells playerStats={mockPlayerStats2024} />
+        );
+
+    const checkboxes = screen.queryAllByRole('checkbox');
+    expect(checkboxes).toHaveLength(0);
+    });
+
+  it('should still render spell names for 2024 characters', () => {
+    render(
+        <CharSpells playerStats={mockPlayerStats2024} />
+        );
+
+    expect(screen.getByText('Fireball')).toBeInTheDocument();
+    expect(screen.getByText('Magic Missile')).toBeInTheDocument();
+    expect(screen.getByText('Light')).toBeInTheDocument();
+    });
+
+  it('should still render spell table headers except Prepared for 2024', () => {
+    render(
+        <CharSpells playerStats={mockPlayerStats2024} />
+        );
+
+    expect(screen.getByText('Spell')).toBeInTheDocument();
+    expect(screen.getByText('Level')).toBeInTheDocument();
+    expect(screen.getByText('Time')).toBeInTheDocument();
+    expect(screen.getByText('Range')).toBeInTheDocument();
+    expect(screen.getByText('Effect')).toBeInTheDocument();
+    expect(screen.getByText('Duration')).toBeInTheDocument();
+    expect(screen.getByText('Notes')).toBeInTheDocument();
+    });
 });

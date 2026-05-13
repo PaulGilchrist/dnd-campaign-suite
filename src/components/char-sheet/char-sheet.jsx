@@ -20,36 +20,38 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const [forceRefresh, setForceRefresh] = React.useState(0);
     React.useEffect(() => {
         const fetchData = async () => {
-            // Load prepared spells from localStorage
-            const storedData = localStorage.getItem(playerSummary.name);
-            let preparedSpells = null;
-
-            if (storedData) {
-                const parsedData = JSON.parse(storedData);
-                if (parsedData && parsedData.preparedSpells) {
-                    preparedSpells = parsedData.preparedSpells;
-                }
-            }
-
             // Use rules factory to get appropriate rules based on character's rules setting
             const spellData = playerSummary.rules === '2024' ? allSpells2024 : allSpells;
             const effectiveClasses = playerSummary.rules === '2024' ? allClasses2024 : allClasses;
             const effectiveRaces = playerSummary.rules === '2024' ? allRaces2024 : allRaces;
             const effectiveMagicItems = playerSummary.rules === '2024' ? allMagicItems2024 : allMagicItems;
-                        const stats = await rulesFactory.getPlayerStats(effectiveClasses, allEquipment, effectiveMagicItems, effectiveRaces, spellData, playerSummary);
+                const stats = await rulesFactory.getPlayerStats(effectiveClasses, allEquipment, effectiveMagicItems, effectiveRaces, spellData, playerSummary);
 
-            if (preparedSpells) {
-                stats.spellAbilities?.spells.forEach(spell => {
-                    if (preparedSpells.includes(spell.name)) {
-                        if (spell.prepared === '') {
-                            spell.prepared = 'Prepared';
-                        }
-                    } else {
-                        if (spell.prepared === 'Prepared') {
-                            spell.prepared = '';
-                        }
+            // Load prepared spells from localStorage (skip for 2024 ruleset where all spells are known/prepared)
+            if (playerSummary.rules !== '2024') {
+                const storedData = localStorage.getItem(playerSummary.name);
+                let preparedSpells = null;
+
+                if (storedData) {
+                    const parsedData = JSON.parse(storedData);
+                    if (parsedData && parsedData.preparedSpells) {
+                        preparedSpells = parsedData.preparedSpells;
                     }
-                });
+                }
+
+                if (preparedSpells) {
+                    stats.spellAbilities?.spells.forEach(spell => {
+                        if (preparedSpells.includes(spell.name)) {
+                            if (spell.prepared === '') {
+                                spell.prepared = 'Prepared';
+                            }
+                        } else {
+                            if (spell.prepared === 'Prepared') {
+                                spell.prepared = '';
+                            }
+                        }
+                    });
+                }
             }
             setPlayerStats(stats);
         };
@@ -94,7 +96,10 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             
             <CharActions playerStats={playerStats}></CharActions><hr />
             <CharReactions playerStats={playerStats}></CharReactions>
-            <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)}></CharSpells><hr />
+            {playerSummary.rules === '2024' 
+  ? <CharSpells playerStats={playerStats}></CharSpells>
+  : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)}></CharSpells>
+}<hr />
             <CharSpecialActions playerStats={playerStats}></CharSpecialActions><hr />
             <CharInventory playerStats={playerStats}></CharInventory><hr />
             <div className='no-print'><CharCharacterAdvancement playerStats={playerStats}></CharCharacterAdvancement></div>

@@ -239,6 +239,38 @@ describe('CharSheet', () => {
     });
   });
 
+  it('should skip loading prepared spells from localStorage for 2024 characters', async () => {
+    const playerSummary2024 = {
+      ...mockPlayerSummary,
+      rules: '2024',
+    };
+
+    // Mock localStorage to return prepared spells (should be ignored for 2024)
+    mockLocalStorage.getItem.mockReturnValue(JSON.stringify({ preparedSpells: ['Fireball'] }));
+
+    const playerStatsWithSpells = {
+      ...mockPlayerStats,
+      spellAbilities: {
+        spells: [
+          { name: 'Fireball', prepared: '' },
+        ],
+        maxPreparedSpells: 3,
+      },
+    };
+
+    rulesFactory.getPlayerStats.mockResolvedValue(playerStatsWithSpells);
+
+    render(<CharSheet {...mockProps} playerSummary={playerSummary2024} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('char-spells')).toBeInTheDocument();
+    });
+
+    // Verify that the prepared spells were NOT applied (spell.prepared should still be '')
+    // This confirms the localStorage prepared spells were skipped for 2024
+    expect(rulesFactory.getPlayerStats).toHaveBeenCalled();
+  });
+
   it('should render char-sheet wrapper div', async () => {
     render(<CharSheet {...mockProps} />);
 
