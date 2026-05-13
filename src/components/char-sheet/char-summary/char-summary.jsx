@@ -2,7 +2,7 @@
 import React from 'react'
 import './char-summary.css'
 
-import classRules from '../../../services/class-rules-2024.js'
+import rulesFactory from '../../../services/rules-factory.js'
 import CharGold from './char-gold.jsx'
 import CharHitPoints from './char-hit-points.jsx'
 import CharClassFeatures from './char-class-features.jsx'
@@ -40,8 +40,10 @@ function CharSummary({ playerStats, onDeleteCharacter }) {
 
     let speed = playerStats.race.subrace && playerStats.race.subrace.speed ? playerStats.race.subrace.speed : playerStats.race.speed;
     if (playerStats.class.name === 'Monk') {
-        const unarmoredMovementIncrease = classRules.getUnarmoredMovementIncrease(playerStats);
-        speed += unarmoredMovementIncrease;
+        const { classRules: cr } = rulesFactory.getRules(playerStats);
+        if (typeof cr.getUnarmoredMovementIncrease === 'function') {
+            speed += cr.getUnarmoredMovementIncrease(playerStats);
+        }
     }
         if (playerStats.class.name === 'Barbarian') {
         const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
