@@ -1,5 +1,5 @@
-import useWizardConfig from '../../hooks/useWizardConfig.js';
-import { validateSkills, getSkillLimits, getExpertiseLimits, getPreSelectedSkills } from '../../services/skill-validation.js';
+import useWizardConfig from './useWizardConfig.js';
+import { validateSkills, getSkillLimits, getExpertiseLimits, getPreSelectedSkills } from '../services/skill-validation.js';
 
 function useWizardSkills(formData, setFormData) {
   const configResult = useWizardConfig({

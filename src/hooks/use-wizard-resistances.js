@@ -1,5 +1,5 @@
-import useWizardConfig from '../../hooks/useWizardConfig.js';
-import { getPreSelectedResistances, validateResistances } from '../../services/resistances-validation.js';
+import useWizardConfig from './useWizardConfig.js';
+import { getPreSelectedResistances, validateResistances } from '../services/resistances-validation.js';
 
 function useWizardResistances(formData, setFormData) {
   const result = useWizardConfig({
@@ -48,8 +48,8 @@ function useWizardResistances(formData, setFormData) {
         f.rules
       ],
       stateKey: 'preSelectedResistancesList',
-        stateInitial: { resistances: [], immunities: [] }
-      }
+       stateInitial: { resistances: [], immunities: [] }
+     }
   });
 
   return {

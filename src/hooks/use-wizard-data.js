@@ -27,7 +27,7 @@ function useWizardData(ruleset) {
           className: cls.name,
           subtypes: cls.subclasses || cls.majors || []
          })));
-       });
+        });
       loadData('/data/2024/feats.json', setFeats);
       loadData('/data/2024/magic-items.json', setMagicItems);
      } else {
@@ -38,7 +38,7 @@ function useWizardData(ruleset) {
           className: cls.name,
           subtypes: cls.subclasses || []
          })));
-       });
+        });
       loadData('/data/feats.json', setFeats);
       loadData('/data/magic-items.json', setMagicItems);
      }

@@ -3,11 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardFeats from './use-wizard-feats.js';
 
 // Mock the feat validation service
-vi.mock('../../services/feat-validation.js', () => ({
+vi.mock('../services/feat-validation.js', () => ({
   getPreSelectedFeats: vi.fn()
 }));
 
-import { getPreSelectedFeats } from '../../services/feat-validation.js';
+import { getPreSelectedFeats } from '../services/feat-validation.js';
 
 describe('useWizardFeats', () => {
   const mockFormData = {
@@ -74,8 +74,8 @@ describe('useWizardFeats', () => {
         expect(result.current.preSelectedFeats.length).toBeGreaterThan(0);
              });
 
-             // setFormData is called but with an identity function that returns prev unchanged
-             // because all feats are already present
+              // setFormData is called but with an identity function that returns prev unchanged
+              // because all feats are already present
       expect(mockSetFormData).toHaveBeenCalled();
       const setFormDataCall = mockSetFormData.mock.calls[0][0];
       expect(typeof setFormDataCall).toBe('function');

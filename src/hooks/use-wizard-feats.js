@@ -1,5 +1,5 @@
-import useWizardConfig from '../../hooks/useWizardConfig.js';
-import { getPreSelectedFeats } from '../../services/feat-validation.js';
+import useWizardConfig from './useWizardConfig.js';
+import { getPreSelectedFeats } from '../services/feat-validation.js';
 
 function useWizardFeats(formData, setFormData) {
   const { preSelectedFeats } = useWizardConfig({

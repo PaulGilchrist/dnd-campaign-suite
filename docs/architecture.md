@@ -218,7 +218,7 @@ Services (pure logic, no UI):
 ### ADR-3: Declarative Wizard Configuration
 **Decision:** Character creation wizard steps are defined declaratively in `steps-config.js` (step number, title, component, props function).
 
-**Rationale:** Adding or reordering steps requires only editing the config, not the wizard orchestrator. Per-step hooks (`use-wizard-skills.js`, etc.) compose `useWizardConfig` with step-specific validation.
+**Rationale:** Adding or reordering steps requires only editing the config, not the wizard orchestrator. Per-step hooks (`src/hooks/use-wizard-skills.js`, etc.) compose `useWizardConfig` with step-specific validation.
 
 **Trade-off:** Slight indirection; understanding a step requires reading both the config and its component.
 

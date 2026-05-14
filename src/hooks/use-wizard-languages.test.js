@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardLanguages from './use-wizard-languages.js';
 
 // Mock the languages validation services
-vi.mock('../../services/languages-fightingstyles-validation.js', () => ({
+vi.mock('../services/languages-fightingstyles-validation.js', () => ({
   getLanguageLimits: vi.fn(),
   getFightingStyleLimits: vi.fn(),
   validateLanguagesAndFightingStyles: vi.fn()
@@ -13,7 +13,7 @@ import {
   getLanguageLimits,
   getFightingStyleLimits,
   validateLanguagesAndFightingStyles
-} from '../../services/languages-fightingstyles-validation.js';
+} from '../services/languages-fightingstyles-validation.js';
 
 describe('useWizardLanguages', () => {
   const mockFormData = {

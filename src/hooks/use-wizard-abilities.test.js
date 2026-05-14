@@ -3,11 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardAbilities from './use-wizard-abilities.js';
 
 // Mock the utils module
-vi.mock('../../config/utils.js', () => ({
+vi.mock('../config/utils.js', () => ({
   getPointBuyCosts: vi.fn()
 }));
 
-import { getPointBuyCosts } from '../../config/utils.js';
+import { getPointBuyCosts } from '../config/utils.js';
 
 describe('useWizardAbilities', () => {
   const mockFormData = {
@@ -102,8 +102,8 @@ describe('useWizardAbilities', () => {
       expect(mockSetErrors).toHaveBeenCalled();
         });
 
-          // Check that errors include the base score validation
-          // The setErrors is called with a function, so we need to call it to get the errors
+         // Check that errors include the base score validation
+         // The setErrors is called with a function, so we need to call it to get the errors
     const setErrorsCall = mockSetErrors.mock.calls[0][0];
     expect(typeof setErrorsCall).toBe('function');
     
@@ -129,8 +129,8 @@ describe('useWizardAbilities', () => {
       expect(mockSetErrors).toHaveBeenCalled();
         });
 
-          // Check that errors include the base score validation
-          // The setErrors is called with a function, so we need to call it to get the errors
+         // Check that errors include the base score validation
+         // The setErrors is called with a function, so we need to call it to get the errors
     const setErrorsCall = mockSetErrors.mock.calls[0][0];
     expect(typeof setErrorsCall).toBe('function');
     
@@ -187,8 +187,8 @@ describe('useWizardAbilities', () => {
       expect(mockSetErrors).toHaveBeenCalled();
         });
 
-          // Check that errors include the points exceeded validation
-          // The setErrors is called with a function, so we need to call it to get the errors
+         // Check that errors include the points exceeded validation
+         // The setErrors is called with a function, so we need to call it to get the errors
     const setErrorsCall = mockSetErrors.mock.calls[0][0];
     expect(typeof setErrorsCall).toBe('function');
     

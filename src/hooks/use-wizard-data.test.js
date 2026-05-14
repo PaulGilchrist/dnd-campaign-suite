@@ -42,7 +42,7 @@ describe('useWizardData', () => {
           ok: true,
           json: () => Promise.resolve([])
          });
-       }
+        }
       return Promise.resolve({ ok: false });
       });
 
@@ -90,7 +90,7 @@ describe('useWizardData', () => {
           ok: true,
           json: () => Promise.resolve([])
          });
-       }
+        }
       return Promise.resolve({ ok: false });
       });
 
@@ -143,12 +143,12 @@ describe('useWizardData', () => {
           ok: true,
           json: () => Promise.resolve([{ name: '2024 Data' }])
          });
-       } else {
+        } else {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve([{ name: '5e Data' }])
          });
-       }
+        }
       });
 
     global.fetch = mockFetch;

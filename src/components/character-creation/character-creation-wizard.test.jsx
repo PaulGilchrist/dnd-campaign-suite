@@ -43,7 +43,7 @@ vi.mock('lodash/merge.js', () => ({
 }));
 
 // Mock all the hooks with stable references
-vi.mock('./use-wizard-form.js', () => ({
+vi.mock('../../hooks/use-wizard-form.js', () => ({
   default: vi.fn(() => ({
     formData: mockFormData,
     errors: mockErrors,
@@ -58,7 +58,7 @@ vi.mock('./use-wizard-form.js', () => ({
   })),
 }));
 
-vi.mock('./use-wizard-data.js', () => ({
+vi.mock('../../hooks/use-wizard-data.js', () => ({
   default: vi.fn(() => ({
     backgrounds: [],
     racesData: [],
@@ -69,7 +69,7 @@ vi.mock('./use-wizard-data.js', () => ({
   })),
 }));
 
-vi.mock('./use-wizard-navigation.js', () => ({
+vi.mock('../../hooks/use-wizard-navigation.js', () => ({
   default: vi.fn(() => ({
     currentStep: 1,
     isNextDisabled: false,
@@ -81,7 +81,7 @@ vi.mock('./use-wizard-navigation.js', () => ({
   })),
 }));
 
-vi.mock('./use-wizard-skills.js', () => ({
+vi.mock('../../hooks/use-wizard-skills.js', () => ({
   default: vi.fn(() => ({
     skillLimits: null,
     expertiseLimits: null,
@@ -90,7 +90,7 @@ vi.mock('./use-wizard-skills.js', () => ({
   })),
 }));
 
-vi.mock('./use-wizard-languages.js', () => ({
+vi.mock('../../hooks/use-wizard-languages.js', () => ({
   default: vi.fn(() => ({
     languageLimits: null,
     fightingStyleLimits: null,
@@ -100,14 +100,14 @@ vi.mock('./use-wizard-languages.js', () => ({
   })),
 }));
 
-vi.mock('./use-wizard-resistances.js', () => ({
+vi.mock('../../hooks/use-wizard-resistances.js', () => ({
   default: vi.fn(() => ({
     resistanceWarnings: [],
     preSelectedResistancesList: { resistances: [], immunities: [] },
   })),
 }));
 
-vi.mock('./use-wizard-feats.js', () => ({
+vi.mock('../../hooks/use-wizard-feats.js', () => ({
   default: vi.fn(() => ({
     preSelectedFeats: [],
   })),
@@ -120,7 +120,7 @@ vi.mock('./use-wizard-inventory', () => ({
   })),
 }));
 
-vi.mock('./use-wizard-abilities.js', () => ({
+vi.mock('../../hooks/use-wizard-abilities.js', () => ({
   default: vi.fn(() => ({
     calculateTotalPointsSpent: vi.fn(),
     onAbilityBaseScoreChange: vi.fn(),
