@@ -1,7 +1,7 @@
 
 import React from 'react'
 import { cloneDeep, isEqual } from 'lodash';
-import useActionPopup from '../common/use-action-popup.jsx'
+import useActionPopup from '../../../hooks/use-action-popup.js'
 import Popup from '../../common/popup.jsx'
 import CharSpellSlots from './char-spell-slots.jsx'
 import './char-spells.css'

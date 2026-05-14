@@ -8,7 +8,7 @@ import CharHitPoints from './char-hit-points.jsx'
 import CharClassFeatures from './char-class-features.jsx'
 import CharFeats from '../char-feats/char-feats.jsx'
 import HiddenInput from '../../common/hidden-input.jsx'
-import usePopup from '../common/use-popup.jsx'
+import usePopup from '../../../hooks/use-popup.js'
 import Popup from '../../common/popup.jsx'
 import useTrackedResource from '../../../hooks/use-tracked-resource.js'
 

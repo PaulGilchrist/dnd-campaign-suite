@@ -1,6 +1,6 @@
  
 import React, { useState, useEffect } from 'react'
-import useActionPopup from './common/use-action-popup.jsx'
+import useActionPopup from '../../hooks/use-action-popup.js'
 import Popup from '../common/popup.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { parseMagicItemName } from '../../services/attack-calc.js';

@@ -29,7 +29,7 @@ vi.mock('../../common/hidden-input.jsx', () => ({
 
 const setPopupHtmlMock = vi.fn();
 
-vi.mock('../common/use-popup.jsx', () => ({
+vi.mock('../../../hooks/use-popup.js', () => ({
   default: vi.fn(() => ({
     popupHtml: null,
     setPopupHtml: setPopupHtmlMock,

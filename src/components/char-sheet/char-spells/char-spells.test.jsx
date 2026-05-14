@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpells from './char-spells.jsx';
 
 // Mock the usePopup hook
-vi.mock('../common/use-action-popup.jsx', () => ({
+vi.mock('../../../hooks/use-action-popup.js', () => ({
   default: vi.fn(),
 }));
 
@@ -19,7 +19,7 @@ vi.mock('lodash', () => ({
   cloneDeep: vi.fn(obj => JSON.parse(JSON.stringify(obj))),
 }));
 
-import useActionPopup from '../common/use-action-popup.jsx';
+import useActionPopup from '../../../hooks/use-action-popup.js';
 
 const mockPlayerStats = {
   name: 'Test Character',

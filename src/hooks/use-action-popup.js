@@ -1,5 +1,4 @@
- 
-import usePopup from './use-popup.jsx'
+import usePopup from './use-popup.js'
 
 export function buildFeatureDetailHtml(entity) {
     if (entity.details) {

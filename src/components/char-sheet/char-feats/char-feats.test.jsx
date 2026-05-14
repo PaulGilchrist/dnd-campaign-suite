@@ -8,11 +8,11 @@ vi.mock('../../../services/data-loader.js', () => ({
 }));
 
 // Mock the usePopup hook
-vi.mock('../common/use-popup.jsx', () => ({
+vi.mock('../../../hooks/use-popup.js', () => ({
   default: vi.fn(),
 }));
 
-import usePopup from '../common/use-popup.jsx';
+import usePopup from '../../../hooks/use-popup.js';
 import { loadFeatData } from '../../../services/data-loader.js';
 
 const mockPlayerStats = {

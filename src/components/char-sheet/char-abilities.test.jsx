@@ -3,13 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './char-abilities.jsx';
 
 // Mock the useActionPopup hook
-vi.mock('./common/use-action-popup.jsx', () => ({
+vi.mock('../../hooks/use-action-popup.js', () => ({
   default: vi.fn(),
   buildAbilityDetailHtml: vi.fn(),
 }));
 
-import useActionPopup from './common/use-action-popup.jsx';
-import { buildAbilityDetailHtml } from './common/use-action-popup.jsx';
+import useActionPopup from '../../hooks/use-action-popup.js';
+import { buildAbilityDetailHtml } from '../../hooks/use-action-popup.js';
 
 const mockPlayerStats = {
   abilities: [

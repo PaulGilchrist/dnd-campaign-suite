@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import usePopup from './use-popup.jsx';
+import usePopup from './use-popup.js';
 
 // Helper component to test the hook
 function TestComponent({ buildHtml }) {
