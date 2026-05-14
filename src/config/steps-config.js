@@ -1,15 +1,15 @@
-import WizardStepRules from './wizard-step-rules.jsx';
-import WizardStepBasic from './wizard-step-basic.jsx';
-import WizardStepRaceClass from './wizard-step-race-class.jsx';
-import WizardStepFeats from './wizard-step-feats.jsx';
-import WizardStepAbilities from './wizard-step-abilities.jsx';
-import WizardStepSkills from './wizard-step-skills.jsx';
-import WizardStepLanguages from './wizard-step-languages.jsx';
-import WizardStepResistances from './wizard-step-resistances.jsx';
-import WizardStepSpells from './wizard-step-spells.jsx';
-import WizardStepMagicItems from './wizard-step-magic-items.jsx';
-import WizardStepInventory from './wizard-step-inventory.jsx';
-import WizardStepSpecial from './wizard-step-special.jsx';
+import WizardStepRules from '../components/character-creation/wizard-step-rules.jsx';
+import WizardStepBasic from '../components/character-creation/wizard-step-basic.jsx';
+import WizardStepRaceClass from '../components/character-creation/wizard-step-race-class.jsx';
+import WizardStepFeats from '../components/character-creation/wizard-step-feats.jsx';
+import WizardStepAbilities from '../components/character-creation/wizard-step-abilities.jsx';
+import WizardStepSkills from '../components/character-creation/wizard-step-skills.jsx';
+import WizardStepLanguages from '../components/character-creation/wizard-step-languages.jsx';
+import WizardStepResistances from '../components/character-creation/wizard-step-resistances.jsx';
+import WizardStepSpells from '../components/character-creation/wizard-step-spells.jsx';
+import WizardStepMagicItems from '../components/character-creation/wizard-step-magic-items.jsx';
+import WizardStepInventory from '../components/character-creation/wizard-step-inventory.jsx';
+import WizardStepSpecial from '../components/character-creation/wizard-step-special.jsx';
 
 /**
  * Declarative configuration for wizard steps.

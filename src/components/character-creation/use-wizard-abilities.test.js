@@ -3,11 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardAbilities from './use-wizard-abilities.js';
 
 // Mock the utils module
-vi.mock('./utils.js', () => ({
+vi.mock('../../config/utils.js', () => ({
   getPointBuyCosts: vi.fn()
 }));
 
-import { getPointBuyCosts } from './utils.js';
+import { getPointBuyCosts } from '../../config/utils.js';
 
 describe('useWizardAbilities', () => {
   const mockFormData = {

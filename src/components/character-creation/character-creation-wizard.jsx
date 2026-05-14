@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import './character-creation-wizard.css';
-import { validateStep, validateFinalFormData } from './utils.js';
+import { validateStep, validateFinalFormData } from '../../config/utils.js';
 import WizardHeader from './wizard-header.jsx';
 import WizardProgressBar from './wizard-progress-bar.jsx';
 import WizardFooter from './wizard-footer.jsx';
 import WizardSidebar from './wizard-sidebar.jsx';
-import { WIZARD_STEPS, getTotalSteps } from './steps-config.js';
+import { WIZARD_STEPS, getTotalSteps } from '../../config/steps-config.js';
 import useWizardForm from './use-wizard-form.js';
 import useWizardData from './use-wizard-data.js';
 import useWizardNavigation from './use-wizard-navigation.js';

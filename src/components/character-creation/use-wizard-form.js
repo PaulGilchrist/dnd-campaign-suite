@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import merge from 'lodash/merge';
-import { DEFAULT_FORM_DATA } from './constants.js';
+import { DEFAULT_FORM_DATA } from '../../config/constants.js';
 
 function setNestedValue(obj, path, value) {
   const keys = path.split('.');

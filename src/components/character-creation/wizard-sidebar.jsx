@@ -1,4 +1,4 @@
-import { WIZARD_STEPS } from './steps-config.js';
+import { WIZARD_STEPS } from '../../config/steps-config.js';
 
 /**
  * Left sidebar navigation for the character creation wizard.
