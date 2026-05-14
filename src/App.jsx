@@ -4,12 +4,12 @@ import './App.css';
 import CharSheet from './components/char-sheet/CharSheet.jsx';
 import CombatTracking from './components/combat-tracking/combat-tracking.jsx';
 import CampaignSelection from './components/campaign-selection/CampaignSelection.jsx';
-import CharacterCreationWizard from './components/character-creation/character-creation-wizard.jsx';
+import CharacterCreationWizard from './components/character-creation/CharacterCreationWizard.jsx';
 import utils from './services/utils.js';
-import useAppData from './hooks/use-app-data.js';
-import useCharacterManagement from './hooks/use-character-management.js';
-import useCampaignManagement from './hooks/use-campaign-management.js';
-import { useCharacterWizard } from './hooks/use-character-wizard.js';
+import useAppData from './hooks/useAppData.js';
+import useCharacterManagement from './hooks/useCharacterManagement.js';
+import useCampaignManagement from './hooks/useCampaignManagement.js';
+import { useCharacterWizard } from './hooks/useCharacterWizard.js';
 
 function App() {
   const appData = useAppData();

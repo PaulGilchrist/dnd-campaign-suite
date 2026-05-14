@@ -1,7 +1,7 @@
  
 
-import useActionPopup from '../../hooks/use-action-popup.js'
-import Popup from '../common/popup.jsx'
+import useActionPopup from '../../hooks/useActionPopup.js'
+import Popup from '../common/Popup.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
 
 function CharReactions({ playerStats }) {

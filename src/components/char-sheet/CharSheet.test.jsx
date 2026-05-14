@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSheet from './CharSheet.jsx';
 
 // Mock all child components
-vi.mock('./char-summary/char-summary.jsx', () => ({
+vi.mock('./char-summary/CharSummary.jsx', () => ({
   default: vi.fn(() => (
     <div data-testid="char-summary">Summary</div>
   )),
@@ -27,7 +27,7 @@ vi.mock('./CharReactions.jsx', () => ({
   )),
 }));
 
-vi.mock('./char-spells/char-spells.jsx', () => ({
+vi.mock('./char-spells/CharSpells.jsx', () => ({
   default: vi.fn(({ playerStats, handleTogglePreparedSpells }) => {
     const handleClick = () => {
       if (handleTogglePreparedSpells && playerStats?.spellAbilities?.spells) {
@@ -43,13 +43,13 @@ vi.mock('./char-spells/char-spells.jsx', () => ({
   }),
 }));
 
-vi.mock('./char-special-actions.jsx', () => ({
+vi.mock('./CharSpecialActions.jsx', () => ({
   default: vi.fn(() => (
     <div data-testid="char-special-actions">Special Actions</div>
   )),
 }));
 
-vi.mock('./char-inventory.jsx', () => ({
+vi.mock('./CharInventory.jsx', () => ({
   default: vi.fn(() => (
     <div data-testid="char-inventory">Inventory</div>
   )),
@@ -61,14 +61,14 @@ vi.mock('./CharCharacterAdvancement.jsx', () => ({
   )),
 }));
 
-vi.mock('../common/subscriber.jsx', () => ({
+vi.mock('../common/Subscriber.jsx', () => ({
   default: vi.fn(({ handleEvent }) => {
     return <div data-testid="subscriber" data-handle-event={handleEvent}>Subscriber</div>;
   }),
 }));
 
 // Mock rulesFactory
-vi.mock('../../services/rules-factory.js', () => ({
+vi.mock('../../services/rulesFactory.js', () => ({
   default: {
     getPlayerStats: vi.fn(),
   },
@@ -102,7 +102,7 @@ Object.defineProperty(window, 'localStorage', {
   writable: true,
 });
 
-import rulesFactory from '../../services/rules-factory.js';
+import rulesFactory from '../../services/rulesFactory.js';
 import storage from '../../services/storage.js';
 import utils from '../../services/utils.js';
 

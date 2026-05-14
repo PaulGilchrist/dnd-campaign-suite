@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import Subscriber from './subscriber.jsx';
+import Subscriber from './Subscriber.jsx';
 
 // Mock EventSource
 class MockEventSource {

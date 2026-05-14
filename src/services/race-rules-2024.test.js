@@ -13,7 +13,7 @@ vi.mock('./utils.js', () => ({
       }
 }));
 
-vi.mock('./feature-categories-2024.js', () => ({
+vi.mock('./featureCategories2024.js', () => ({
   actions: [],
   bonusActions: [],
   reactions: [],
@@ -21,7 +21,7 @@ vi.mock('./feature-categories-2024.js', () => ({
   maintained: []
 }));
 
-vi.mock('./feature-categorization-utils.js', () => ({
+vi.mock('./featureCategorizationUtils.js', () => ({
   categorizeFeatures: vi.fn((features) => ({
     actions: features.filter(f => f.type === 'action'),
     bonusActions: features.filter(f => f.type === 'bonusAction'),

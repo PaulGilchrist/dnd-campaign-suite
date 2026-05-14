@@ -1,10 +1,10 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CharActions from './CharActions.jsx';
-import { buildFeatureDetailHtml } from '../../hooks/use-action-popup.js';
+import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js';
 
 // Mock the useActionPopup hook
-vi.mock('../../hooks/use-action-popup.js', async (importOriginal) => {
+vi.mock('../../hooks/useActionPopup.js', async (importOriginal) => {
   const actual = await importOriginal();
   return {
     default: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock('node-fetch', () => ({
   default: vi.fn(),
 }));
 
-import useActionPopup from '../../hooks/use-action-popup.js';
+import useActionPopup from '../../hooks/useActionPopup.js';
 
 const mockPlayerStats = {
   rules: '5e',

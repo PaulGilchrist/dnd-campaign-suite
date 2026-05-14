@@ -60,9 +60,9 @@ vi.mock('./components/combat-tracking/combat-tracking.jsx', () => ({ default: Mo
 
 vi.mock('./components/campaign-selection/CampaignSelection.jsx', () => ({ default: CampaignSelectionFn }));
 
-vi.mock('./components/character-creation/character-creation-wizard.jsx', () => ({ default: WizardFn }));
+vi.mock('./components/character-creation/CharacterCreationWizard.jsx', () => ({ default: WizardFn }));
 
-vi.mock('./services/data-loader.js', () => dataLoaderMocks);
+vi.mock('./services/dataLoader.js', () => dataLoaderMocks);
 
 beforeEach(() => {
   vi.clearAllMocks();

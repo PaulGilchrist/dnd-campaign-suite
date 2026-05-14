@@ -1,9 +1,9 @@
  
 import React, { useState, useEffect } from 'react'
-import useActionPopup from '../../hooks/use-action-popup.js'
-import Popup from '../common/popup.jsx'
+import useActionPopup from '../../hooks/useActionPopup.js'
+import Popup from '../common/Popup.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
-import { parseMagicItemName } from '../../services/attack-calc.js';
+import { parseMagicItemName } from '../../services/attackCalc.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';
 

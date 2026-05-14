@@ -1,18 +1,18 @@
 import { cloneDeep, uniqBy } from 'lodash';
-import classRules from './class-rules.js';
-import classRules2024 from './class-rules-2024.js';
+import classRules from './classRules.js';
+import classRules2024 from './classRules2024.js';
 import { rules5e } from './race-rules/index.js';
 import { rules2024 } from './race-rules/index.js';
 import utils from './utils.js';
-import { parseMagicItemName } from './attack-calc.js';
-import * as proficiencyUtils from './proficiency-utils.js';
-import * as proficiencyUtils2024 from './proficiency-utils-2024.js';
-import { getAbilities as getAbilities5e, getHitPoints as getHitPoints5e } from './ability-calc.js';
-import { getAbilities as getAbilities2024, getHitPoints as getHitPoints2024 } from './ability-calc-2024.js';
-import { getSpellAbilities as getSpellAbilities5e } from './spell-calc.js';
-import { getSpellAbilities as getSpellAbilities2024 } from './spell-calc-2024.js';
-import { getAttacks as getAttacks5e } from './attack-calc.js';
-import { getAttacks as getAttacks2024 } from './attack-calc-2024.js';
+import { parseMagicItemName } from './attackCalc.js';
+import * as proficiencyUtils from './proficiencyUtils.js';
+import * as proficiencyUtils2024 from './proficiencyUtils2024.js';
+import { getAbilities as getAbilities5e, getHitPoints as getHitPoints5e } from './abilityCalc.js';
+import { getAbilities as getAbilities2024, getHitPoints as getHitPoints2024 } from './abilityCalc2024.js';
+import { getSpellAbilities as getSpellAbilities5e } from './spellCalc.js';
+import { getSpellAbilities as getSpellAbilities2024 } from './spellCalc2024.js';
+import { getAttacks as getAttacks5e } from './attackCalc.js';
+import { getAttacks as getAttacks2024 } from './attackCalc2024.js';
 import { getSpellMaxLevel } from './shared/spell-utils.js';
 
 /**

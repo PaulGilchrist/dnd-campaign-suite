@@ -1,15 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
 
-// Mock data-loader before importing rules
-vi.mock('./data-loader.js', () => ({
+// Mock dataLoader before importing rules
+vi.mock('./dataLoader.js', () => ({
   loadSkills: vi.fn(),
   loadPassiveSkills: vi.fn()
 }));
 
 import rules from './rules.js';
-import classRules from './class-rules.js';
+import classRules from './classRules.js';
 import { rules5e as raceRules } from './race-rules/index.js';
-import * as dataLoader from './data-loader.js';
+import * as dataLoader from './dataLoader.js';
 
 // Mock dependencies
 vi.mock('./utils.js', () => ({
@@ -28,7 +28,7 @@ vi.mock('./utils.js', () => ({
           }
         }));
 
-vi.mock('./class-rules.js', () => ({
+vi.mock('./classRules.js', () => ({
   default: {
     getClass: vi.fn(),
     getFeatures: vi.fn(),

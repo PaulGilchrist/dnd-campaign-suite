@@ -3,7 +3,7 @@ import React from 'react'
 import { cloneDeep } from 'lodash';
 import utils from '../../services/utils.js'
 import storage from '../../services/storage.js'
-import { loadMonsters } from '../../services/data-loader.js'
+import { loadMonsters } from '../../services/dataLoader.js'
 import './combat-tracking.css'
 
 let monstersCache = null;

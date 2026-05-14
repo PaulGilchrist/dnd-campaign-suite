@@ -1,6 +1,6 @@
 import { cloneDeep } from 'lodash';
-import * as featureCategories from '../feature-categories-2024.js'
-import { categorizeFeatures, mergeCategorizedFeatures } from '../feature-categorization-utils.js'
+import * as featureCategories from '../featureCategories2024.js'
+import { categorizeFeatures, mergeCategorizedFeatures } from '../featureCategorizationUtils.js'
 import utils from '../utils.js';
 
 const raceRules = {

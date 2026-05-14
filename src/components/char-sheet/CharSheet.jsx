@@ -3,16 +3,16 @@ import React from 'react'
 import { cloneDeep, isEqual } from 'lodash';
 import storage from '../../services/storage.js'
 import utils from '../../services/utils.js'
-import rulesFactory from '../../services/rules-factory.js'
+import rulesFactory from '../../services/rulesFactory.js'
 import CharAbilities from './CharAbilities.jsx'
 import CharActions from './CharActions.jsx'
-import CharInventory from './char-inventory.jsx'
+import CharInventory from './CharInventory.jsx'
 import CharReactions from './CharReactions.jsx'
-import CharSpecialActions from './char-special-actions.jsx'
+import CharSpecialActions from './CharSpecialActions.jsx'
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx'
-import CharSpells from './char-spells/char-spells.jsx'
-import CharSummary from './char-summary/char-summary.jsx'
-import Subscriber from '../common/subscriber.jsx';
+import CharSpells from './char-spells/CharSpells.jsx'
+import CharSummary from './char-summary/CharSummary.jsx'
+import Subscriber from '../common/Subscriber.jsx';
 import './CharSheet.css'
 
 function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter }) {

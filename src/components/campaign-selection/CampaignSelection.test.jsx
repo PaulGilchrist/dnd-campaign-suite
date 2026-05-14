@@ -3,14 +3,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CampaignSelection from './CampaignSelection.jsx';
 
 // Mock the campaignService
-vi.mock('../../services/campaign-service.js', () => ({
+vi.mock('../../services/campaignService.js', () => ({
   getCharacterFolders: vi.fn(),
   getCharacterFiles: vi.fn(),
   loadCharacters: vi.fn(),
 }));
 
 // Import mocked functions
-import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaign-service.js';
+import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaignService.js';
 
 // Mock sessionStorage
 const mockSessionStorage = {
