@@ -23,7 +23,7 @@ function CharSummary({ playerStats, onDeleteCharacter }) {
         () => false,
         [playerStats]
     );
-    const handleToggleInspiraction = () => {
+    const handleToggleInspiration = () => {
         const newValue = !hasInspiration;
         setHasInspiration(newValue);
     };
@@ -89,7 +89,7 @@ function CharSummary({ playerStats, onDeleteCharacter }) {
                 <div>
                     <b>Proficiency: </b>+{playerStats.proficiency}<br />
                     <b>Initiative: </b>+{playerStats.initiative}<br />
-                    <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiraction} /><br />
+                    <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiration} /><br />
                     <div className="clickable" onClick={handleShortRestHitDiceToggle} onKeyDown={handleShortRestHitDiceToggle} tabIndex={0}>
                         <b>Short Rest Hit Dice:</b> {playerStats.level}/<HiddenInput handleInputToggle={handleShortRestHitDiceToggle} handleValueChange={(value) => handleShortRestHitDiceChange(value)} showInput={showInput} value={shortRestHitDice}></HiddenInput> <span className="text-muted">(max/cur)</span>
                     </div>
