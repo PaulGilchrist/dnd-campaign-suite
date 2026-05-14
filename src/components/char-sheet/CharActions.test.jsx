@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import CharActions from './char-actions.jsx';
+import CharActions from './CharActions.jsx';
 import { buildFeatureDetailHtml } from '../../hooks/use-action-popup.js';
 
 // Mock the useActionPopup hook

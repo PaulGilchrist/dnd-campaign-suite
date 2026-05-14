@@ -1,4 +1,4 @@
-import useWizardConfig from './useWizardConfig.js';
+import useWizardConfig from './use-wizard-config.js';
 import { validateSkills, getSkillLimits, getExpertiseLimits, getPreSelectedSkills } from '../services/skill-validation.js';
 
 function useWizardSkills(formData, setFormData) {

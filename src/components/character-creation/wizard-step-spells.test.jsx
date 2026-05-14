@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepSpells from './wizard-step-spells.jsx';
 
-vi.mock('./selectable-list.jsx', () => ({
+vi.mock('./SelectableList.jsx', () => ({
   default: vi.fn(({ title, resultLabel, renderSummary, items }) => (
      <div data-testid="selectable-list">
        <h2>{title}</h2>

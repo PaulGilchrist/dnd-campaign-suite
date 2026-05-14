@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CharCharacterAdvancement from './char-character-advancement.jsx';
+import CharCharacterAdvancement from './CharCharacterAdvancement.jsx';
 
 // Mock the useActionPopup hook
 vi.mock('../../hooks/use-action-popup.js', () => ({

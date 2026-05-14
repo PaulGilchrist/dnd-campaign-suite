@@ -1,4 +1,4 @@
-import useWizardConfig from './useWizardConfig.js';
+import useWizardConfig from './use-wizard-config.js';
 import { getPreSelectedFeats } from '../services/feat-validation.js';
 
 function useWizardFeats(formData, setFormData) {

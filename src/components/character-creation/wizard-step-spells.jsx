@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import SelectableList from './selectable-list.jsx';
+import SelectableList from './SelectableList.jsx';
 import WarningList from '../common/warning-list.jsx';
 import { getSpellLimits, validateSpellSelection } from '../../services/spell-limits.js';
 import { getSpellValidationInfo } from '../../services/spell-validation.js';

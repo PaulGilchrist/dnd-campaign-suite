@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepInventory from './wizard-step-inventory.jsx';
 
-vi.mock('../../hooks/useEquipmentSearch.js', () => ({
+vi.mock('../../hooks/use-equipment-search.js', () => ({
   useEquipmentSearch: vi.fn(),
 }));
 
@@ -13,7 +13,7 @@ vi.mock('./EquipmentSearchModal.jsx', () => ({
   },
 }));
 
-import { useEquipmentSearch } from '../../hooks/useEquipmentSearch.js';
+import { useEquipmentSearch } from '../../hooks/use-equipment-search.js';
 
 const createMockHookReturn = (overrides = {}) => ({
   searchQuery: '',

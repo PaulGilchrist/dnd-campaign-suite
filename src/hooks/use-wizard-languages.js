@@ -1,4 +1,4 @@
-import useWizardConfig from './useWizardConfig.js';
+import useWizardConfig from './use-wizard-config.js';
 import { getLanguageLimits, getFightingStyleLimits, validateLanguagesAndFightingStyles } from '../services/languages-fightingstyles-validation.js';
 
 function useWizardLanguages(formData) {

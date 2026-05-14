@@ -54,11 +54,11 @@ vi.mock('./services/utils.js', () => ({
 
 vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
 
-vi.mock('./components/char-sheet/char-sheet.jsx', () => ({ default: MockCharSheet }));
+vi.mock('./components/char-sheet/CharSheet.jsx', () => ({ default: MockCharSheet }));
 
 vi.mock('./components/combat-tracking/combat-tracking.jsx', () => ({ default: MockCombat }));
 
-vi.mock('./components/campaign-selection/campaign-selection.jsx', () => ({ default: CampaignSelectionFn }));
+vi.mock('./components/campaign-selection/CampaignSelection.jsx', () => ({ default: CampaignSelectionFn }));
 
 vi.mock('./components/character-creation/character-creation-wizard.jsx', () => ({ default: WizardFn }));
 

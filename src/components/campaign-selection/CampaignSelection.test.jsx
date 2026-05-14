@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import CampaignSelection from './campaign-selection.jsx';
+import CampaignSelection from './CampaignSelection.jsx';
 
 // Mock the campaignService
 vi.mock('../../services/campaign-service.js', () => ({

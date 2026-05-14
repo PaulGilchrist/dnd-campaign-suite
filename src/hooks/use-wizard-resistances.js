@@ -1,4 +1,4 @@
-import useWizardConfig from './useWizardConfig.js';
+import useWizardConfig from './use-wizard-config.js';
 import { getPreSelectedResistances, validateResistances } from '../services/resistances-validation.js';
 
 function useWizardResistances(formData, setFormData) {

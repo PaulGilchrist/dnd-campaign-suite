@@ -4,7 +4,7 @@ import useActionPopup from '../../hooks/use-action-popup.js'
 import Popup from '../common/popup.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { parseMagicItemName } from '../../services/attack-calc.js';
-import './char-actions.css'
+import './CharActions.css'
 import { isEqual } from 'lodash';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });

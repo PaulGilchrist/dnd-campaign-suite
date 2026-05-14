@@ -2,7 +2,7 @@
 
 import useActionPopup from '../../hooks/use-action-popup.js'
 import Popup from '../common/popup.jsx'
-import './char-abilities.css'
+import './CharAbilities.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 

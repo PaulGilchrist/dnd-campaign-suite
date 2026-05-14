@@ -1,6 +1,6 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import useWizardConfig from './useWizardConfig.js';
+import useWizardConfig from './use-wizard-config.js';
 
 describe('useWizardConfig', () => {
   const mockFormData = { class: { name: 'Fighter' }, race: { name: 'Human' } };

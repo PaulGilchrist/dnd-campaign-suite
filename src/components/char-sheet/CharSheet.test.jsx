@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CharSheet from './char-sheet.jsx';
+import CharSheet from './CharSheet.jsx';
 
 // Mock all child components
 vi.mock('./char-summary/char-summary.jsx', () => ({
@@ -9,19 +9,19 @@ vi.mock('./char-summary/char-summary.jsx', () => ({
   )),
 }));
 
-vi.mock('./char-abilities.jsx', () => ({
+vi.mock('./CharAbilities.jsx', () => ({
   default: vi.fn(() => (
     <div data-testid="char-abilities">Abilities</div>
   )),
 }));
 
-vi.mock('./char-actions.jsx', () => ({
+vi.mock('./CharActions.jsx', () => ({
   default: vi.fn(() => (
     <div data-testid="char-actions">Actions</div>
   )),
 }));
 
-vi.mock('./char-reactions.jsx', () => ({
+vi.mock('./CharReactions.jsx', () => ({
   default: vi.fn(() => (
     <div data-testid="char-reactions">Reactions</div>
   )),
@@ -55,7 +55,7 @@ vi.mock('./char-inventory.jsx', () => ({
   )),
 }));
 
-vi.mock('./char-character-advancement.jsx', () => ({
+vi.mock('./CharCharacterAdvancement.jsx', () => ({
   default: vi.fn(() => (
     <div data-testid="char-character-advancement">Character Advancement</div>
   )),

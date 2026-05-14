@@ -1,5 +1,5 @@
 import React from 'react';
-import SelectableList from './selectable-list.jsx';
+import SelectableList from './SelectableList.jsx';
 import WarningList from '../common/warning-list.jsx';
 import { validateFeats, getFeatLimits, normalizeFeatDescription } from '../../services/feat-validation.js';
 import { sanitizeHtml } from '../../services/sanitize.js';

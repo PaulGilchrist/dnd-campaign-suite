@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import SelectableList from './selectable-list.jsx';
+import SelectableList from './SelectableList.jsx';
 
 const mockItems = [
    { name: 'Item A', index: 'a', type: 'Type1', level: 1 },

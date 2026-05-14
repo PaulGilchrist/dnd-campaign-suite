@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getCharacterFolders, getCharacterFiles, loadCharacters } from '../../services/campaign-service.js';
-import './campaign-selection.css';
+import './CampaignSelection.css';
 
 function CampaignSelection({ onCampaignSelect }) {
   const [campaigns, setCampaigns] = useState([]);

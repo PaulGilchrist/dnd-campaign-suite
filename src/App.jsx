@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { cloneDeep } from 'lodash';
 import './App.css';
-import CharSheet from './components/char-sheet/char-sheet.jsx';
+import CharSheet from './components/char-sheet/CharSheet.jsx';
 import CombatTracking from './components/combat-tracking/combat-tracking.jsx';
-import CampaignSelection from './components/campaign-selection/campaign-selection.jsx';
+import CampaignSelection from './components/campaign-selection/CampaignSelection.jsx';
 import CharacterCreationWizard from './components/character-creation/character-creation-wizard.jsx';
 import utils from './services/utils.js';
 import useAppData from './hooks/use-app-data.js';

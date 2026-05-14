@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { useEquipmentSearch } from './useEquipmentSearch.js';
+import { useEquipmentSearch } from './use-equipment-search.js';
 import { loadEquipment } from '../services/data-loader.js';
 
 vi.mock('../services/data-loader.js', () => ({
