@@ -6,6 +6,7 @@ import './Positioning.css';
 import BarrelSVG from './BarrelSVG.jsx';
 import TableSVG from './TableSVG.jsx';
 import BedSVG from './BedSVG.jsx';
+import FirePitSVG from './FirePitSVG.jsx';
 
 const CELL_SIZE = 40;
 const RADIUS = 20;
@@ -575,6 +576,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                     <BarrelSVG id="barrel" />
                     <TableSVG id="table" />
                     <BedSVG id="bed" />
+                    <FirePitSVG id="firepit" />
                 </defs>
 
                 {/* Grid background */}
@@ -843,6 +845,55 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                     );
                 })}
 
+                {/* Placed items (fire pits) */}
+                {placedItems.filter(item => item.type === 'firepit').map((item) => {
+                    const cx = gridCenterX(item.gridX);
+                    const cy = gridCenterY(item.gridY);
+                    // On non-localhost, hide items marked as not visible
+                    if (!isLocalhost && !item.visible) return null;
+
+                    const isRepositioning = repositioningId === item.id;
+
+                    return (
+                        <g key={item.id} className="placed-item">
+                            <use
+                                href="#firepit"
+                                x={cx - 18}
+                                y={cy - 18}
+                                opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1}
+                            />
+                            {isLocalhost && !isRepositioning && (
+                                <rect
+                                    x={cx - 18}
+                                    y={cy - 18}
+                                    width={36}
+                                    height={36}
+                                    fill="transparent"
+                                    className="barrel-hit-area"
+                                    onPointerDown={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY });
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                />
+                            )}
+                            {isRepositioning && (
+                                <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={18}
+                                    fill="none"
+                                    className="reposition-highlight"
+                                />
+                            )}
+                        </g>
+                    );
+                })}
+
                 {/* Barrel context menu */}
                 {selectedBarrel && (
                     <g className="barrel-context-menu" onClick={(e) => e.stopPropagation()}>
@@ -851,37 +902,34 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                             const menuY = gridCenterY(selectedBarrel.gridY) + 10;
                             return (
                                 <g>
-                                    <rect x={menuX} y={menuY} width="120" height="120" rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
-                                    {(() => {
-                                        const barrel = placedItems.find(i => i.id === selectedBarrel.id);
-                                        const isVisible = barrel ? barrel.visible : true;
-                                        return (
-                                            <text x={menuX + 8} y={menuY + 20} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleToggleItemVisibility(selectedBarrel.id)}>
-                                                {isVisible ? 'Hide' : 'Show'}
-                                            </text>
-                                        );
-                                    })()}
-                                    <text x={menuX + 8} y={menuY + 42} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleDeleteBarrel(selectedBarrel.id)}>Delete</text>
                                     {(() => {
                                         const selectedItem = placedItems.find(i => i.id === selectedBarrel.id);
-                                        if (selectedItem && selectedItem.type === 'table') {
-                                            return (
-                                                <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRotateTable(selectedBarrel.id)}>
-                                                    Rotate
-                                                </text>
-                                            );
-                                        }
-                                        if (selectedItem && selectedItem.type === 'bed') {
-                                            return (
-                                                <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRotateBed(selectedBarrel.id)}>
-                                                    Rotate
-                                                </text>
-                                            );
-                                        }
-                                        return null;
+                                        const hasRotation = selectedItem && (selectedItem.type === 'table' || selectedItem.type === 'bed');
+                                        const menuHeight = hasRotation ? 120 : 100;
+                                        const repositionY = hasRotation ? menuY + 86 : menuY + 64;
+                                        return (
+                                            <g>
+                                                <rect x={menuX} y={menuY} width="120" height={menuHeight} rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
+                                                {(() => {
+                                                    const barrel = placedItems.find(i => i.id === selectedBarrel.id);
+                                                    const isVisible = barrel ? barrel.visible : true;
+                                                    return (
+                                                        <text x={menuX + 8} y={menuY + 20} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleToggleItemVisibility(selectedBarrel.id)}>
+                                                            {isVisible ? 'Hide' : 'Show'}
+                                                        </text>
+                                                    );
+                                                })()}
+                                                <text x={menuX + 8} y={menuY + 42} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleDeleteBarrel(selectedBarrel.id)}>Delete</text>
+                                                {hasRotation && (
+                                                    <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => (selectedItem.type === 'table' ? handleRotateTable : handleRotateBed)(selectedBarrel.id)}>
+                                                        Rotate
+                                                    </text>
+                                                )}
+                                                <text x={menuX + 8} y={repositionY} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRepositionBarrel(selectedBarrel.id)}>Reposition</text>
+                                                <text x={menuX + 108} y={menuY + 12} fill="#999" fontSize="10" className="menu-close" onClick={() => setSelectedBarrel(null)}>✕</text>
+                                            </g>
+                                        );
                                     })()}
-                                    <text x={menuX + 8} y={menuY + 86} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRepositionBarrel(selectedBarrel.id)}>Reposition</text>
-                                    <text x={menuX + 108} y={menuY + 12} fill="#999" fontSize="10" className="menu-close" onClick={() => setSelectedBarrel(null)}>✕</text>
                                 </g>
                             );
                         })()}
@@ -931,6 +979,18 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                 <BedSVG />
                             </svg>
                             <span>Bed</span>
+                        </div>
+                        <div
+                            className="items-panel-item"
+                            draggable
+                            onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', 'firepit');
+                            }}
+                        >
+                            <svg viewBox="0 0 36 36" width="36" height="36">
+                                <FirePitSVG />
+                            </svg>
+                            <span>Fire Pit</span>
                         </div>
                     </div>
                 </div>
