@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './Sidebar.css';
 
-function Sidebar({ characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onPositioningClick }) {
+function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onPositioningClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost }) {
   const [isExpanded, setIsExpanded] = useState(() => {
     try {
       const stored = localStorage.getItem('sidebar-characters-expanded');
@@ -21,6 +21,17 @@ function Sidebar({ characters, activeCharacter, onBackToCampaigns, onAddCharacte
 
   return (
     <nav className="sidebar no-print">
+      <div className="sidebar-header">
+        <span className="campaign-name">{campaignName}</span>
+        <div className="sidebar-header-buttons">
+          <button className="icon-button rename-campaign-btn" onClick={onRenameCampaign} disabled={!isLocalhost} title="Rename Campaign"><i className="fas fa-pen"></i></button>
+          <button className="icon-button delete-campaign-btn" onClick={onDeleteCampaign} disabled={characters.length > 0} title="Delete Campaign"><i className="fas fa-trash"></i></button>
+          <button className="icon-button theme-toggle-btn" onClick={toggleTheme} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+            <i className={`fas ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i>
+          </button>
+        </div>
+      </div>
+
       <button className="sidebar-section-header" onClick={onBackToCampaigns}>
         <i className="fa-solid fa-arrow-left"></i> Campaigns
       </button>

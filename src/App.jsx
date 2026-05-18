@@ -111,16 +111,9 @@ function App() {
   return (
     <div className="app">
       <input key={Date.now()} type="file" accept=".json" multiple ref={inputRef} onChange={handleUploadChange} hidden />
-      <div className="app-header no-print">
-        {campaignName}
-        <button className="icon-button rename-campaign-btn" onClick={handleRenameCampaign} disabled={!isLocalhost} title="Rename Campaign"><i className="fas fa-pen"></i></button>
-        <button className="icon-button delete-campaign-btn" onClick={handleDeleteCampaign} disabled={characters.length > 0} title="Delete Campaign"><i className="fas fa-trash"></i></button>
-        <button className="icon-button theme-toggle-btn" onClick={toggleTheme} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
-          <i className={`fas ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i>
-        </button>
-      </div>
       <div className="app-body">
         <Sidebar
+          campaignName={campaignName}
           characters={characters}
           activeCharacter={activeCharacter}
           onBackToCampaigns={handleBackToCampaigns}
@@ -128,6 +121,11 @@ function App() {
           onCharacterClick={handleCharacterClick}
           onInitiativeClick={handleInitiativeClick}
           onPositioningClick={handlePositioningClick}
+          onRenameCampaign={handleRenameCampaign}
+          onDeleteCampaign={handleDeleteCampaign}
+          theme={theme}
+          toggleTheme={toggleTheme}
+          isLocalhost={isLocalhost}
         />
         {activeCharacter && (
           <CharSheet

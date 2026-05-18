@@ -88,3 +88,28 @@
 .sidebar-link.add-character:hover {
   color: var(--color-hover);
 }
+
+/* Sidebar header */
+.sidebar-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 12px 6px 12px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--background-color-header-inner);
+  gap: 4px;
+}
+
+.sidebar-header .campaign-name {
+  color: var(--color-hover);
+  font-size: 1.1em;
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-header-buttons {
+  display: flex;
+  gap: 2px;
+}

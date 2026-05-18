@@ -2,33 +2,10 @@
     padding-bottom: 20px;
 }
 
-.app-header {
-    color: var(--color-hover);
-    font-size: 1.3em;
-    font-weight: bold;
-    padding: 10px 15px;
-    display: flex;
-    align-items: center;
-    line-height: 1;
-    border-bottom: 1px solid var(--border-color);
-    background-color: var(--background-color-header-inner);
-    margin: 0 10px 0 230px;
-}
-
 .app-body {
     display: flex;
     gap: 0;
     padding-left: 220px;
-}
-
-.campaign-name {
-    color: var(--color-hover);
-    font-size: 1.3em;
-    font-weight: bold;
-    margin: 0 10px;
-    display: flex;
-    align-items: center;
-    line-height: 1;
 }
 
 .icon-button {
