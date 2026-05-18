@@ -271,7 +271,7 @@ describe('App', () => {
     });
   });
 
-  it('should show combat tracking when characters exist but no active character', async () => {
+  it('should show initiative when characters exist but no active character', async () => {
     mockState.characters = [{ name: 'Char1' }, { name: 'Char2' }];
 
     render(<App />);
@@ -373,7 +373,7 @@ describe('App', () => {
     fireEvent.click(buttons[0]);
   });
 
-  it('should show combat tracking when no active character and characters exist', async () => {
+  it('should show initiative when no active character and characters exist', async () => {
     mockState.characters = [{ name: 'Character 1', level: 1 }];
 
     render(<App />);

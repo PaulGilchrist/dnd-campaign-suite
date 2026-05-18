@@ -12,7 +12,7 @@ D&D character sheet SPA for creating, managing, and playing D&D character sheets
 | File | Role |
 |------|------|
 | `src/main.jsx` | React root mount with StrictMode; renders `<App />` |
-| `src/App.jsx` | Top-level router: renders CampaignSelection, CharSheet, CombatTracking, or CharacterCreationWizard |
+| `src/App.jsx` | Top-level router: renders CampaignSelection, CharSheet, Initiative, or CharacterCreationWizard |
 | `server.js` | Express server: serves `dist/`, `public/`, REST API (`/api/*`), SSE (`/subscribe`) |
 ## Module Structure
 ### Hooks (`src/hooks/`) — Centralized state, no class components
@@ -29,7 +29,7 @@ D&D character sheet SPA for creating, managing, and playing D&D character sheets
 | `campaign-selection/` | `CampaignSelection` | List/create/rename/delete campaigns |
 | `character-creation/` | `CharacterCreationWizard` (12 steps) | Step-by-step character creation/editing wizard |
 | `char-sheet/` | `CharSheet` + 15+ sub-components | Full character sheet display |
-| `combat-tracking/` | `CombatTracking` | Initiative tracker, round counter, NPC management |
+| `initiative/` | `Initiative` | Initiative tracker, round counter, NPC management |
 | `common/` | `Popup`, `Subscriber`, `HiddenInput`, `WarningList` | Shared UI primitives |
 ### Character Creation Wizard (12 steps)
 1. **Ruleset** — Select 5e or 2024

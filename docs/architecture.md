@@ -12,7 +12,7 @@
 
 The application consists of:
 
-- A **React SPA** (Vite 8) providing the UI for character creation, sheet viewing, and combat tracking.
+- A **React SPA** (Vite 8) providing the UI for character creation, sheet viewing, and initiative.
 - An **Express 5 server** providing REST API endpoints for character/campaign CRUD, static file serving, and real-time multi-user sync via Server-Sent Events (SSE).
 
 The app is private (not published to npm), licensed under MIT, and authored by Paul Gilchrist.
@@ -26,7 +26,7 @@ The app is private (not published to npm), licensed under MIT, and authored by P
 | File | Role |
 |------|------|
 | `src/main.jsx` | React root mount with `StrictMode`; renders `<App />` |
-| `src/App.jsx` | Top-level router: renders `CampaignSelection`, `CharSheet`, `CombatTracking`, or `CharacterCreationWizard` based on app state |
+| `src/App.jsx` | Top-level router: renders `CampaignSelection`, `CharSheet`, `Initiative`, or `CharacterCreationWizard` based on app state |
 | `server.js` | Express server: serves `dist/` (production SPA), `public/` (static data), REST API (`/api/*`), and SSE (`/subscribe`) |
 
 ### 2.2 Frontend Layers
@@ -53,7 +53,7 @@ Centralized state management via custom hooks — no class components exist.
 | `campaign-selection/` | `CampaignSelection` | List/create/rename/delete campaigns |
 | `character-creation/` | `CharacterCreationWizard` (12 steps) | Step-by-step character creation/editing wizard |
 | `char-sheet/` | `CharSheet` + 15+ sub-components | Full character sheet display (abilities, actions, inventory, spells, feats, summary, combat) |
-| `combat-tracking/` | `CombatTracking` | Initiative tracker, round counter, NPC management |
+| `initiative/` | `Initiative` | Initiative tracker, round counter, NPC management |
 | `common/` | `Popup`, `Subscriber`, `HiddenInput`, `WarningList` | Shared UI primitives |
 
 #### Character Creation Wizard (12 steps)
@@ -166,7 +166,7 @@ main.jsx
        │    ├── CharCharacterAdvancement
        │    ├── CharFeats
        │    └── CharSpells (→ CharSpellSlots, CharSpellSlotLevel)
-       ├── CombatTracking
+        ├── Initiative
        └── CharacterCreationWizard (→ 12 wizard steps)
 
 Hooks (used by components):

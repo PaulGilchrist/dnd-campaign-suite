@@ -67,7 +67,7 @@ function App() {
     }
   };
 
-  const combatTrackingActive = characters.length > 0 && activeCharacter == null;
+  const initiativeActive = characters.length > 0 && activeCharacter == null;
 
   if (showCampaignSelection) return <CampaignSelection onCampaignSelect={handleCampaignSelect} />;
 
@@ -107,7 +107,7 @@ function App() {
             onSaveClick={handleSaveClick}
           />
         )}
-        {combatTrackingActive && <Initiative characters={characters} />}
+        {initiativeActive && <Initiative characters={characters} />}
         <br />
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allRaces={races} allRaces2024={races2024} allClasses={classes} allSpells={spells} allSpells2024={spells2024} />}
         {showEditCharacterWizard && <CharacterCreationWizard onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allRaces={races} allClasses={classes} allSpells={spells} allSpells2024={spells2024} characterData={activeCharacter} isEditing={true} />}
