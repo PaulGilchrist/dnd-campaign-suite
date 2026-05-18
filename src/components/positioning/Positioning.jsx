@@ -411,6 +411,11 @@ function Positioning({ campaignName, characters, isLocalhost }) {
             handleGridPointerDown(e);
             return;
         }
+        // Reposition mode takes priority over panning
+        if (repositioningId) {
+            handleGridPointerDown(e);
+            return;
+        }
         // Only pan when tool is 'none'
         // Only left mouse button (button 0)
         if (e.button !== 0) return;
@@ -429,7 +434,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
             startPanX: panX,
             startPanY: panY
         });
-    }, [tool, panX, panY, handleGridPointerDown]);
+    }, [tool, panX, panY, handleGridPointerDown, repositioningId]);
 
     const handlePanMove = useCallback((e) => {
         if (!panning) return;
@@ -704,7 +709,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                         <g key={item.id} className="placed-item">
                             {/* Centered barrel — offset by half its 36px size */}
                             <use href="#barrel" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1} />
-                            {isLocalhost && (
+                            {isLocalhost && !isRepositioning && (
                                 <circle
                                     cx={cx}
                                     cy={cy}
