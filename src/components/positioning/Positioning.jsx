@@ -21,6 +21,12 @@ function Positioning({ campaignName, characters }) {
     // Drag state
     const [dragging, setDragging] = useState(null); // { creatureId, offsetX, offsetY }
 
+    // Zoom/Pan state
+    const [zoom, setZoom] = useState(1);
+    const [panX, setPanX] = useState(0);
+    const [panY, setPanY] = useState(0);
+    const [panning, setPanning] = useState(null); // { startX, startY, startPanX, startPanY }
+
     // Load or initialize positioning data on mount
     useEffect(() => {
         if (isInitialized.current) return;
@@ -304,6 +310,94 @@ function Positioning({ campaignName, characters }) {
         }
     }, []);
 
+    // Zoom/Pan constants and helpers
+    const MIN_ZOOM = 0.25;
+    const MAX_ZOOM = 4;
+
+    const zoomIn = useCallback(() => {
+        setZoom((prev) => Math.min(MAX_ZOOM, prev * 1.25));
+    }, []);
+
+    const zoomOut = useCallback(() => {
+        setZoom((prev) => Math.max(MIN_ZOOM, prev * 0.8));
+    }, []);
+
+    const resetView = useCallback(() => {
+        setZoom(1);
+        setPanX(0);
+        setPanY(0);
+    }, []);
+
+    const handlePanStart = useCallback((e) => {
+        // Paint/erase take priority over panning
+        if (tool === 'paint' || tool === 'erase') {
+            handleGridPointerDown(e);
+            return;
+        }
+        // Only pan when tool is 'none'
+        // Only left mouse button (button 0)
+        if (e.button !== 0) return;
+        e.preventDefault();
+        const svg = svgRef.current;
+        if (!svg) return;
+
+        const rect = svg.getBoundingClientRect();
+        const vb = svg.viewBox.baseVal;
+        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
+        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
+
+        setPanning({
+            startX: svgX,
+            startY: svgY,
+            startPanX: panX,
+            startPanY: panY
+        });
+    }, [tool, panX, panY, handleGridPointerDown]);
+
+    const handlePanMove = useCallback((e) => {
+        if (!panning) return;
+        e.preventDefault();
+        const svg = svgRef.current;
+        if (!svg) return;
+
+        const rect = svg.getBoundingClientRect();
+        const vb = svg.viewBox.baseVal;
+        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
+        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
+
+        const dx = svgX - panning.startX;
+        const dy = svgY - panning.startY;
+
+        setPanX(panning.startPanX - dx);
+        setPanY(panning.startPanY - dy);
+    }, [panning]);
+
+    const handlePanEnd = useCallback(() => {
+        setPanning(null);
+    }, []);
+
+    const handleWheel = useCallback((e) => {
+        e.preventDefault();
+        const svg = svgRef.current;
+        if (!svg) return;
+
+        const rect = svg.getBoundingClientRect();
+        const vb = svg.viewBox.baseVal;
+        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
+        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
+
+        const factor = e.deltaY > 0 ? 0.9 : 1.1;
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * factor));
+
+        // Adjust pan so the point under the cursor stays in place
+        const newPanX = svgX - (svgX - panX) * (zoom / newZoom);
+        const newPanY = svgY - (svgY - panY) * (zoom / newZoom);
+
+        setZoom(newZoom);
+        setPanX(newPanX);
+        setPanY(newPanY);
+    }, [zoom, panX, panY]);
+
     if (!positioningData) return null;
 
     const { creatures, walls } = positioningData;
@@ -341,17 +435,28 @@ function Positioning({ campaignName, characters }) {
                     >
                         <i className="fa-solid fa-trash"></i> Clear Walls
                     </button>
+                    <button onClick={zoomIn}>
+                        <i className="fa-solid fa-magnifying-glass-plus"></i>
+                    </button>
+                    <button onClick={zoomOut}>
+                        <i className="fa-solid fa-magnifying-glass-minus"></i>
+                    </button>
+                    <button onClick={resetView}>
+                        <i className="fa-solid fa-rotate-left"></i> Reset View
+                    </button>
                 </div>
             </div>
             <Subscriber handleEvent={handleSSEEvent} />
             <svg
                 ref={svgRef}
-                viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}
+                viewBox={`${panX} ${panY} ${SVG_SIZE / zoom} ${SVG_SIZE / zoom}`}
                 className="grid-svg"
-                onPointerDown={handleGridPointerDown}
-                onPointerMove={(e) => { handlePointerMove(e); handleGridPointerMove(e); }}
-                onPointerUp={(e) => { handlePointerUp(e); handleGridPointerUp(e); }}
+                onPointerDown={handlePanStart}
+                onPointerMove={(e) => { handlePointerMove(e); handleGridPointerMove(e); handlePanMove(e); }}
+                onPointerUp={(e) => { handlePointerUp(e); handleGridPointerUp(e); handlePanEnd(e); }}
                 onPointerLeave={handleGridPointerLeave}
+                onWheel={handleWheel}
+                style={{ cursor: panning ? 'grabbing' : (tool === 'none' ? 'grab' : 'default') }}
             >
                 {/* Grid background */}
                 <rect x="0" y="0" width={SVG_SIZE} height={SVG_SIZE} className="grid-bg" />
