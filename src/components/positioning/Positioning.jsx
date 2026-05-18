@@ -14,6 +14,13 @@ function Positioning({ campaignName, characters }) {
     const svgRef = useRef(null);
     const isInitialized = useRef(false);
 
+    // Tool state: 'none' | 'paint' | 'erase'
+    const [tool, setTool] = useState('none');
+    // Paint state: tracks grid coords during active paint/erase
+    const [painting, setPainting] = useState(null);
+    // Drag state
+    const [dragging, setDragging] = useState(null); // { creatureId, offsetX, offsetY }
+
     // Load or initialize positioning data on mount
     useEffect(() => {
         if (isInitialized.current) return;
@@ -21,7 +28,11 @@ function Positioning({ campaignName, characters }) {
 
         const existing = storage.get('positioning-' + campaignName);
         if (existing && existing.creatures && existing.creatures.length > 0) {
-            setPositioningData(existing);
+            // Convert stored walls array back to Set
+            const walls = existing.walls
+                ? new Set(existing.walls)
+                : new Set();
+            setPositioningData({ ...existing, walls });
             return;
         }
 
@@ -47,7 +58,7 @@ function Positioning({ campaignName, characters }) {
             creature.gridY = gridY;
         });
 
-        const newData = { creatures };
+        const newData = { creatures, walls: new Set() };
         setPositioningData(newData);
         storage.set('positioning-' + campaignName, newData);
     }, [campaignName, characters]);
@@ -55,23 +66,94 @@ function Positioning({ campaignName, characters }) {
     // Save positioning data whenever it changes
     useEffect(() => {
         if (!positioningData) return;
-        storage.set('positioning-' + campaignName, positioningData);
+        // Convert walls Set to array for storage
+        const dataToSave = {
+            ...positioningData,
+            walls: Array.from(positioningData.walls || [])
+        };
+        storage.set('positioning-' + campaignName, dataToSave);
     }, [positioningData, campaignName]);
 
     // SSE handler for real-time updates from other clients
     const handleSSEEvent = useCallback((event) => {
-        if (!event || !event.creatures) return;
-        setPositioningData({ creatures: event.creatures });
+        if (!event) return;
+        setPositioningData((prev) => ({
+            creatures: event.creatures || prev?.creatures,
+            walls: event.walls ? new Set(event.walls) : prev?.walls
+        }));
     }, []);
 
     // Calculate center of a grid square
     const gridCenterX = useCallback((gridX) => gridX * CELL_SIZE + CELL_SIZE / 2, []);
     const gridCenterY = useCallback((gridY) => gridY * CELL_SIZE + CELL_SIZE / 2, []);
 
-    // Drag state
-    const [dragging, setDragging] = useState(null); // { creatureId, offsetX, offsetY }
+    // Convert SVG pointer position to grid coordinates
+    const getGridFromEvent = useCallback((e) => {
+        const svg = svgRef.current;
+        if (!svg) return null;
 
+        const rect = svg.getBoundingClientRect();
+        const svgX = (e.clientX - rect.left) / rect.width * SVG_SIZE;
+        const svgY = (e.clientY - rect.top) / rect.height * SVG_SIZE;
+
+        const gridX = Math.max(0, Math.min(GRID_SIZE - 1, Math.floor(svgX / CELL_SIZE)));
+        const gridY = Math.max(0, Math.min(GRID_SIZE - 1, Math.floor(svgY / CELL_SIZE)));
+
+        return { gridX, gridY };
+    }, []);
+
+    // Handle grid pointer down (paint/erase mode)
+    const handleGridPointerDown = useCallback((e) => {
+        if (tool === 'none') return;
+        e.preventDefault();
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+
+        const key = `${grid.gridX},${grid.gridY}`;
+        setPositioningData((prev) => {
+            const newWalls = new Set(prev.walls);
+            if (tool === 'paint') {
+                newWalls.add(key);
+            } else if (tool === 'erase') {
+                newWalls.delete(key);
+            }
+            return { ...prev, walls: newWalls };
+        });
+        setPainting(grid);
+    }, [tool, getGridFromEvent]);
+
+    // Handle grid pointer move (paint/erase drag)
+    const handleGridPointerMove = useCallback((e) => {
+        if (!painting || (tool !== 'paint' && tool !== 'erase')) return;
+        e.preventDefault();
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+
+        const key = `${grid.gridX},${grid.gridY}`;
+        setPositioningData((prev) => {
+            const newWalls = new Set(prev.walls);
+            if (tool === 'paint') {
+                newWalls.add(key);
+            } else if (tool === 'erase') {
+                newWalls.delete(key);
+            }
+            return { ...prev, walls: newWalls };
+        });
+    }, [painting, tool, getGridFromEvent]);
+
+    // Handle grid pointer up (end paint/erase)
+    const handleGridPointerUp = useCallback(() => {
+        setPainting(null);
+    }, []);
+
+    // Handle pointer leaving SVG during paint/erase
+    const handleGridPointerLeave = useCallback(() => {
+        setPainting(null);
+    }, []);
+
+    // Handle creature pointer down (drag)
     const handlePointerDown = useCallback((e, creatureId) => {
+        e.stopPropagation();
         e.preventDefault();
         const svg = svgRef.current;
         if (!svg) return;
@@ -205,21 +287,51 @@ function Positioning({ campaignName, characters }) {
         setDragging(null);
     }, []);
 
+    // Clear all walls and reset tool
+    const handleClearWalls = useCallback(() => {
+        if (window.confirm('Clear all painted walls?')) {
+            setPositioningData((prev) => ({ ...prev, walls: new Set() }));
+            setTool('none');
+        }
+    }, []);
+
     if (!positioningData) return null;
 
-    const { creatures } = positioningData;
+    const { creatures, walls } = positioningData;
 
     return (
         <div className="positioning">
-            <h4>Positioning / Marching Order</h4>
+            <div className="toolbar-row">
+                <h4>Positioning / Marching Order</h4>
+                <div className="toolbar">
+                    <button
+                        className={tool === 'paint' ? 'active' : ''}
+                        onClick={() => setTool(tool === 'paint' ? 'none' : 'paint')}
+                    >
+                        <i className="fa-solid fa-paint-brush"></i> Paint
+                    </button>
+                    <button
+                        className={tool === 'erase' ? 'active' : ''}
+                        onClick={() => setTool(tool === 'erase' ? 'none' : 'erase')}
+                    >
+                        <i className="fa-solid fa-eraser"></i> Erase
+                    </button>
+                    <button
+                        onClick={handleClearWalls}
+                    >
+                        <i className="fa-solid fa-trash"></i> Clear Walls
+                    </button>
+                </div>
+            </div>
             <Subscriber handleEvent={handleSSEEvent} />
             <svg
                 ref={svgRef}
                 viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}
                 className="grid-svg"
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerLeave={handlePointerLeave}
+                onPointerDown={handleGridPointerDown}
+                onPointerMove={(e) => { handlePointerMove(e); handleGridPointerMove(e); }}
+                onPointerUp={(e) => { handlePointerUp(e); handleGridPointerUp(e); }}
+                onPointerLeave={handleGridPointerLeave}
             >
                 {/* Grid background */}
                 <rect x="0" y="0" width={SVG_SIZE} height={SVG_SIZE} className="grid-bg" />
@@ -247,6 +359,21 @@ function Positioning({ campaignName, characters }) {
                         className="grid-line"
                     />
                 ))}
+
+                {/* Walls */}
+                {Array.from(walls).map((key) => {
+                    const [gx, gy] = key.split(',').map(Number);
+                    return (
+                        <rect
+                            key={key}
+                            x={gx * CELL_SIZE}
+                            y={gy * CELL_SIZE}
+                            width={CELL_SIZE}
+                            height={CELL_SIZE}
+                            className="wall-cell"
+                        />
+                    );
+                })}
 
                 {/* Characters */}
                 {creatures.map((creature) => {

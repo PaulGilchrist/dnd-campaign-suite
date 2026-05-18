@@ -6,12 +6,59 @@
     box-sizing: border-box;
 }
 
+/* Toolbar row */
+.positioning .toolbar-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
 .positioning h4 {
     margin: 0 0 12px 0;
     font-size: 1.25em;
     font-weight: 600;
 }
 
+/* Toolbar */
+.positioning .toolbar {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.positioning .toolbar button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #2a2a2a;
+    color: #ccc;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.positioning .toolbar button:hover {
+    background: #3a3a3a;
+    border-color: #555;
+}
+
+.positioning .toolbar button.active {
+    background: #4a90d9;
+    border-color: #2c5f8a;
+    color: #fff;
+}
+
+.positioning .toolbar button i {
+    font-size: 14px;
+}
+
+/* Grid SVG */
 .positioning .grid-svg {
     display: block;
     width: 100%;
@@ -31,6 +78,12 @@
 .positioning .grid-line {
     stroke: #333;
     stroke-width: 1;
+}
+
+/* Wall cells */
+.positioning .wall-cell {
+    fill: #696969;
+    opacity: 0.85;
 }
 
 /* Creature group */
@@ -107,6 +160,27 @@
     text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
 }
 
+[data-theme="light"] .positioning .toolbar button {
+    background: #e8e8e8;
+    border-color: #ccc;
+    color: #333;
+}
+
+[data-theme="light"] .positioning .toolbar button:hover {
+    background: #d8d8d8;
+    border-color: #aaa;
+}
+
+[data-theme="light"] .positioning .toolbar button.active {
+    background: #4a90d9;
+    border-color: #2c5f8a;
+    color: #fff;
+}
+
+[data-theme="light"] .positioning .wall-cell {
+    fill: #8a8a8a;
+}
+
 /* Fallback: system light mode when no explicit theme is set */
 @media (prefers-color-scheme: light) {
     .positioning .grid-bg {
@@ -130,5 +204,26 @@
     .positioning .creature-name {
         fill: #fff;
         text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
+    }
+
+    .positioning .toolbar button {
+        background: #e8e8e8;
+        border-color: #ccc;
+        color: #333;
+    }
+
+    .positioning .toolbar button:hover {
+        background: #d8d8d8;
+        border-color: #aaa;
+    }
+
+    .positioning .toolbar button.active {
+        background: #4a90d9;
+        border-color: #2c5f8a;
+        color: #fff;
+    }
+
+    .positioning .wall-cell {
+        fill: #8a8a8a;
     }
 }
