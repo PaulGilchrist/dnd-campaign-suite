@@ -7,6 +7,7 @@ import BarrelSVG from './BarrelSVG.jsx';
 import TableSVG from './TableSVG.jsx';
 import BedSVG from './BedSVG.jsx';
 import FirePitSVG from './FirePitSVG.jsx';
+import DoorSVG from './DoorSVG.jsx';
 
 const CELL_SIZE = 40;
 const RADIUS = 20;
@@ -406,6 +407,16 @@ function Positioning({ campaignName, characters, isLocalhost }) {
         setSelectedBarrel(null);
     }, []);
 
+    // Rotate a door (0 → 90 → 180 → 270 → 0 degrees)
+    const handleRotateDoor = useCallback((id) => {
+        setPlacedItems(prev => prev.map(item => {
+            if (item.id !== id) return item;
+            const currentRotation = item.rotation || 0;
+            const newRotation = (currentRotation + 90) % 360;
+            return { ...item, rotation: newRotation };
+        }));
+    }, []);
+
     // Close context menu and reposition mode
     const handleCloseMenu = useCallback(() => {
         setSelectedBarrel(null);
@@ -577,6 +588,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                     <TableSVG id="table" />
                     <BedSVG id="bed" />
                     <FirePitSVG id="firepit" />
+                    <DoorSVG id="door" />
                 </defs>
 
                 {/* Grid background */}
@@ -894,6 +906,57 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                     );
                 })}
 
+                {/* Placed items (doors) */}
+                {placedItems.filter(item => item.type === 'door').map((item) => {
+                    const cx = gridCenterX(item.gridX);
+                    const cy = gridCenterY(item.gridY);
+                    // On non-localhost, hide items marked as not visible
+                    if (!isLocalhost && !item.visible) return null;
+
+                    const isRepositioning = repositioningId === item.id;
+
+                    return (
+                        <g key={item.id} className="placed-item">
+                            <use
+                                href="#door"
+                                x={cx - 18}
+                                y={cy - 18}
+                                opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1}
+                                transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined}
+                            />
+                            {isLocalhost && !isRepositioning && (
+                                <rect
+                                    x={cx - 18}
+                                    y={cy - 18}
+                                    width={36}
+                                    height={36}
+                                    fill="transparent"
+                                    className="barrel-hit-area"
+                                    onPointerDown={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY });
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                />
+                            )}
+                            {isRepositioning && (
+                                <rect
+                                    x={cx - 18}
+                                    y={cy - 18}
+                                    width={36}
+                                    height={36}
+                                    fill="none"
+                                    className="reposition-highlight"
+                                />
+                            )}
+                        </g>
+                    );
+                })}
+
                 {/* Barrel context menu */}
                 {selectedBarrel && (
                     <g className="barrel-context-menu" onClick={(e) => e.stopPropagation()}>
@@ -904,7 +967,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                 <g>
                                     {(() => {
                                         const selectedItem = placedItems.find(i => i.id === selectedBarrel.id);
-                                        const hasRotation = selectedItem && (selectedItem.type === 'table' || selectedItem.type === 'bed');
+                                        const hasRotation = selectedItem && (selectedItem.type === 'table' || selectedItem.type === 'bed' || selectedItem.type === 'door');
                                         const menuHeight = hasRotation ? 120 : 100;
                                         const repositionY = hasRotation ? menuY + 86 : menuY + 64;
                                         return (
@@ -921,7 +984,11 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                                 })()}
                                                 <text x={menuX + 8} y={menuY + 42} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleDeleteBarrel(selectedBarrel.id)}>Delete</text>
                                                 {hasRotation && (
-                                                    <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => (selectedItem.type === 'table' ? handleRotateTable : handleRotateBed)(selectedBarrel.id)}>
+                                                    <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => {
+                                                        if (selectedItem.type === 'table') handleRotateTable(selectedBarrel.id);
+                                                        else if (selectedItem.type === 'bed') handleRotateBed(selectedBarrel.id);
+                                                        else if (selectedItem.type === 'door') handleRotateDoor(selectedBarrel.id);
+                                                    }}>
                                                         Rotate
                                                     </text>
                                                 )}
@@ -991,6 +1058,18 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                 <FirePitSVG />
                             </svg>
                             <span>Fire Pit</span>
+                        </div>
+                        <div
+                            className="items-panel-item"
+                            draggable
+                            onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', 'door');
+                            }}
+                        >
+                            <svg viewBox="0 0 36 36" width="36" height="36">
+                                <DoorSVG />
+                            </svg>
+                            <span>Door</span>
                         </div>
                     </div>
                 </div>
