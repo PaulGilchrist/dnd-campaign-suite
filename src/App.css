@@ -1,7 +1,24 @@
 .app {
-    max-width: 800px;
+    max-width: 1020px;
     margin: 0 auto;
     padding-bottom: 20px;
+}
+
+.app-header {
+    color: var(--color-hover);
+    font-size: 1.3em;
+    font-weight: bold;
+    padding: 10px 15px;
+    display: flex;
+    align-items: center;
+    line-height: 1;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--background-color-header-inner);
+}
+
+.app-body {
+    display: flex;
+    gap: 0;
 }
 
 .campaign-name {
@@ -60,41 +77,33 @@
     color: var(--color-header);
 }
 
-/* Character selector buttons */
-button.character-btn {
-    background-color: var(--background-color-card);
+/* Character summary button group */
+.char-btn-group {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.char-btn {
+    padding: 2px 6px;
+    font-size: 11px;
+    background-color: transparent;
     border: 1px solid var(--border-color);
     color: var(--color-text);
-    margin-left: 10px;
-    margin-top: 10px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+    white-space: nowrap;
 }
 
-button.character-btn:hover {
-    background-color: var(--background-color-card-hover);
+.char-btn:hover {
+    opacity: 1;
     border-color: var(--color-hover);
-}
-
-button.character-btn.active {
-    background-color: var(--color-primary);
-    border-color: var(--color-primary);
-    color: var(--color-text-inverse);
-}
-
-button.character-btn.active:hover {
-    background-color: var(--color-primary-hover);
-    border-color: var(--color-primary-hover);
 }
 
 button.download {
     background-color: darkgreen;
     color: #eee;
-}
-
-button.mutted {
-    background-color: grey;
-    color: #000;
-    margin-left: 10px;
-    margin-top: 10px;
 }
 
 /* Hidden buttons - kept for future use */

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CombatTracking from './combat-tracking.jsx';
+import Initiative from './initiative.jsx';
 
 vi.mock('../../services/storage.js', () => ({
   default: {
@@ -20,50 +20,50 @@ vi.mock('lodash', () => ({
   cloneDeep: vi.fn((obj) => JSON.parse(JSON.stringify(obj))),
 }));
 
-describe('CombatTracking', () => {
+describe('Initiative', () => {
   beforeEach(() => {
     Element.prototype.scrollIntoView = vi.fn();
   });
   it('renders without crashing with empty characters', () => {
-    render(<CombatTracking characters={[]} />);
-    expect(screen.getByText(/Combat Tracking/)).toBeInTheDocument();
+    render(<Initiative characters={[]} />);
+    expect(screen.getByText(/Initiative/)).toBeInTheDocument();
   });
 
   it('shows round number in header', () => {
-    render(<CombatTracking characters={[]} />);
-    expect(screen.getByText(/Combat Tracking \(round 1\)/)).toBeInTheDocument();
+    render(<Initiative characters={[]} />);
+    expect(screen.getByText(/Initiative \(round 1\)/)).toBeInTheDocument();
   });
 
   it('renders creature cards for each character', () => {
-    render(<CombatTracking characters={[{ name: 'Gandalf' }, { name: 'Bilbo' }]} />);
+    render(<Initiative characters={[{ name: 'Gandalf' }, { name: 'Bilbo' }]} />);
     const cards = document.querySelectorAll('.creature-card');
     expect(cards.length).toBeGreaterThan(2);
   });
 
   it('shows initiative number inputs', () => {
-    render(<CombatTracking characters={[{ name: 'Gandalf' }]} />);
+    render(<Initiative characters={[{ name: 'Gandalf' }]} />);
     const initiativeInputs = document.querySelectorAll('.creature-initiative input[type="number"]');
     expect(initiativeInputs.length).toBeGreaterThan(0);
   });
 
   it('shows NPC name text inputs', () => {
-    render(<CombatTracking characters={[]} />);
+    render(<Initiative characters={[]} />);
     const npcNameInputs = document.querySelectorAll('.npc-name-input');
     expect(npcNameInputs.length).toBeGreaterThan(0);
   });
 
   it('shows player names as spans', () => {
-    render(<CombatTracking characters={[{ name: 'Gandalf' }]} />);
+    render(<Initiative characters={[{ name: 'Gandalf' }]} />);
     expect(screen.getByText('Gandalf')).toBeInTheDocument();
   });
 
   it('shows avatar initials', () => {
-    render(<CombatTracking characters={[{ name: 'Gandalf' }]} />);
+    render(<Initiative characters={[{ name: 'Gandalf' }]} />);
     expect(screen.getByText('G')).toBeInTheDocument();
   });
 
   it('does NOT render notes inputs', () => {
-    render(<CombatTracking characters={[{ name: 'Gandalf' }]} />);
+    render(<Initiative characters={[{ name: 'Gandalf' }]} />);
     const cards = document.querySelectorAll('.creature-card');
     for (const card of cards) {
       const inputs = card.querySelectorAll('input');
@@ -74,7 +74,7 @@ describe('CombatTracking', () => {
   });
 
   it('renders combat control buttons', () => {
-    render(<CombatTracking characters={[]} />);
+    render(<Initiative characters={[]} />);
     expect(screen.getByText('Clear')).toBeInTheDocument();
     expect(screen.getByText('+ NPC')).toBeInTheDocument();
     expect(screen.getByText('- NPC')).toBeInTheDocument();

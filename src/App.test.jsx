@@ -25,8 +25,8 @@ const { MockCharSheet } = vi.hoisted(() => ({
   ))
 }));
 
-const { MockCombat } = vi.hoisted(() => ({
-  MockCombat: vi.fn(({ characters }) => <div data-testid="combat-tracking">{characters?.length || 0} chars</div>)
+const { MockInitiative } = vi.hoisted(() => ({
+  MockInitiative: vi.fn(({ characters }) => <div data-testid="initiative">{characters?.length || 0} chars</div>)
 }));
 
 const { CampaignSelectionFn } = vi.hoisted(() => ({
@@ -56,7 +56,7 @@ vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
 
 vi.mock('./components/char-sheet/CharSheet.jsx', () => ({ default: MockCharSheet }));
 
-vi.mock('./components/combat-tracking/combat-tracking.jsx', () => ({ default: MockCombat }));
+vi.mock('./components/initiative/initiative.jsx', () => ({ default: MockInitiative }));
 
 vi.mock('./components/campaign-selection/CampaignSelection.jsx', () => ({ default: CampaignSelectionFn }));
 
@@ -282,7 +282,7 @@ describe('App', () => {
     fireEvent.click(screen.getByText(/Combat/));
 
     await waitFor(() => {
-      expect(screen.getByTestId('combat-tracking')).toBeInTheDocument();
+      expect(screen.getByTestId('initiative')).toBeInTheDocument();
     });
   });
 
@@ -384,7 +384,7 @@ describe('App', () => {
     fireEvent.click(screen.getByText(/Combat/));
 
     await waitFor(() => {
-      expect(screen.getByTestId('combat-tracking')).toBeInTheDocument();
+      expect(screen.getByTestId('initiative')).toBeInTheDocument();
     });
   });
 
@@ -402,7 +402,7 @@ describe('App', () => {
     fireEvent.click(screen.getByText(/Combat/));
 
     await waitFor(() => {
-      expect(screen.getByTestId('combat-tracking')).toBeInTheDocument();
+      expect(screen.getByTestId('initiative')).toBeInTheDocument();
     });
   });
 

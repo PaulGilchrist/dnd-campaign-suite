@@ -2,9 +2,10 @@ import { useEffect, useRef } from 'react';
 import { cloneDeep } from 'lodash';
 import './App.css';
 import CharSheet from './components/char-sheet/CharSheet.jsx';
-import CombatTracking from './components/combat-tracking/combat-tracking.jsx';
+import Initiative from './components/initiative/initiative.jsx';
 import CampaignSelection from './components/campaign-selection/CampaignSelection.jsx';
 import CharacterCreationWizard from './components/character-creation/CharacterCreationWizard.jsx';
+import Sidebar from './components/sidebar/Sidebar.jsx';
 import utils from './services/utils.js';
 import useAppData from './hooks/useAppData.js';
 import useCharacterManagement from './hooks/useCharacterManagement.js';
@@ -73,27 +74,44 @@ function App() {
   return (
     <div className="app">
       <input key={Date.now()} type="file" accept=".json" multiple ref={inputRef} onChange={handleUploadChange} hidden />
-      <div className="campaign-name no-print">
+      <div className="app-header no-print">
         {campaignName}
         <button className="icon-button rename-campaign-btn" onClick={handleRenameCampaign} disabled={!isLocalhost} title="Rename Campaign"><i className="fas fa-pen"></i></button>
         <button className="icon-button delete-campaign-btn" onClick={handleDeleteCampaign} disabled={characters.length > 0} title="Delete Campaign"><i className="fas fa-trash"></i></button>
       </div>
-      {characters.map(character => (
-        <button key={utils.getFirstName(character.name)} className={`no-print character-btn ${activeCharacter && activeCharacter.name === character.name ? 'active' : ''}`} onClick={() => handleCharacterClick(character)}>{character.name}</button>
-      ))}
-      {showButton && <button className="clickable mutted no-print" onClick={handleAddCharacter}><i className="fas fa-plus"></i> Add</button>}
-      {showButton && <button className="clickable mutted no-print" onClick={handleUploadClick}><i className="fas fa-arrow-up"></i> Upload</button>}
-      {activeCharacter && (
-        <CharSheet allAbilityScores={abilityScores} allClasses={classes} allClasses2024={classes2024} allEquipment={equipment} allMagicItems={magicItems} allRaces={races} allSpells={spells} allSpells2024={spells2024} playerSummary={activeCharacter} allRaces2024={races2024} allMagicItems2024={magicItems2024} onDeleteCharacter={handleDeleteCharacter} />
-      )}
-      {combatTrackingActive && <CombatTracking characters={characters} />}
-      <button className="clickable mutted no-print" onClick={handleBackToCampaigns}><i className="fas fa-arrow-left"></i> Campaigns</button>
-      {characters.length > 0 && activeCharacter && <button className="clickable mutted no-print" onClick={handleInitiativeClick}><i className="fas fa-shield-alt"></i> Combat</button>}
-      {activeCharacter && <button className="clickable mutted no-print" onClick={() => handleEditCharacter(activeCharacter)}><i className="fas fa-pen"></i> Edit</button>}
-      {activeCharacter && <button className="clickable mutted no-print" onClick={handleSaveClick}><i className="fas fa-arrow-down"></i> Download</button>}
-      <br />
-      {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allRaces={races} allRaces2024={races2024} allClasses={classes} allSpells={spells} allSpells2024={spells2024} />}
-      {showEditCharacterWizard && <CharacterCreationWizard onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allRaces={races} allClasses={classes} allSpells={spells} allSpells2024={spells2024} characterData={activeCharacter} isEditing={true} />}
+      <div className="app-body">
+        <Sidebar
+          characters={characters}
+          activeCharacter={activeCharacter}
+          onBackToCampaigns={handleBackToCampaigns}
+          onAddCharacter={handleAddCharacter}
+          onCharacterClick={handleCharacterClick}
+          onInitiativeClick={handleInitiativeClick}
+        />
+        {activeCharacter && (
+          <CharSheet
+            allAbilityScores={abilityScores}
+            allClasses={classes}
+            allClasses2024={classes2024}
+            allEquipment={equipment}
+            allMagicItems={magicItems}
+            allRaces={races}
+            allSpells={spells}
+            allSpells2024={spells2024}
+            playerSummary={activeCharacter}
+            allRaces2024={races2024}
+            allMagicItems2024={magicItems2024}
+            onDeleteCharacter={handleDeleteCharacter}
+            onEditCharacter={() => handleEditCharacter(activeCharacter)}
+            onUploadClick={handleUploadClick}
+            onSaveClick={handleSaveClick}
+          />
+        )}
+        {combatTrackingActive && <Initiative characters={characters} />}
+        <br />
+        {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allRaces={races} allRaces2024={races2024} allClasses={classes} allSpells={spells} allSpells2024={spells2024} />}
+        {showEditCharacterWizard && <CharacterCreationWizard onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allRaces={races} allClasses={classes} allSpells={spells} allSpells2024={spells2024} characterData={activeCharacter} isEditing={true} />}
+      </div>
     </div>
   );
 }

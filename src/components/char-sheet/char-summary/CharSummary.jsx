@@ -12,7 +12,7 @@ import usePopup from '../../../hooks/usePopup.js'
 import Popup from '../../common/Popup.jsx'
 import useTrackedResource from '../../../hooks/useTrackedResource.js'
 
-function CharSummary({ playerStats, onDeleteCharacter }) {
+function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick }) {
     const { popupHtml, setPopupHtml } = usePopup(() => null);
     const [showInput, setShowInput] = React.useState(false);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -64,12 +64,15 @@ function CharSummary({ playerStats, onDeleteCharacter }) {
     return (
         <div>
               {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)} />}
-            <div className='name'>
-                {playerStats.name}
+            <div className='name-row'>
+                <span className='name'>{playerStats.name}</span>
                 {isLocalhost && (
-                    <button className="delete-character-btn" onClick={handleDeleteCharacter} title="Delete Character">
-                        <i className="fas fa-trash"></i>
-                    </button>
+                    <div className='char-btn-group no-print'>
+                        <button className="char-btn" onClick={onEditCharacter} title="Edit Character"><i className="fas fa-pen"></i> Edit</button>
+                        <button className="char-btn" onClick={handleDeleteCharacter} title="Delete Character">Delete</button>
+                        <button className="char-btn" onClick={onUploadClick} title="Upload Character"><i className="fas fa-arrow-up"></i> Upload</button>
+                        <button className="char-btn" onClick={onSaveClick} title="Download Character"><i className="fas fa-arrow-down"></i> Download</button>
+                    </div>
                 )}
             </div>
             <div className='summary'>

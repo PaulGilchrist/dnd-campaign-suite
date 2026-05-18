@@ -4,7 +4,7 @@ import { cloneDeep } from 'lodash';
 import utils from '../../services/utils.js'
 import storage from '../../services/storage.js'
 import { loadMonsters } from '../../services/dataLoader.js'
-import './combat-tracking.css'
+import './initiative.css'
 
 let monstersCache = null;
 
@@ -54,7 +54,7 @@ function AvatarImage({ name, imagePath }) {
     );
 }
 
-function CombatTracking({ characters }) {
+function Initiative({ characters }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
     const [numOfNpc, setNumOfNpc] = React.useState(5);
     const [activeCreatureId, setActiveCreatureId] = React.useState(null);
@@ -236,8 +236,8 @@ function CombatTracking({ characters }) {
     };
     if (!combatSummary) return null;
     return (
-        <div className='combat-tracking'>
-            <h4>Combat Tracking (round {combatSummary.round})</h4>
+        <div className='initiative'>
+            <h4>Initiative (round {combatSummary.round})</h4>
             <div className='carousel-container' ref={carouselRef}>
                 {combatSummary?.creatures?.map((creature) => {
                     const isActive = creature.id === activeCreatureId;
@@ -289,4 +289,4 @@ function CombatTracking({ characters }) {
     )
 }
 
-export default CombatTracking
+export default Initiative
