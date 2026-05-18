@@ -262,6 +262,11 @@ function Positioning({ campaignName, characters }) {
                             className="creature-group"
                             style={{ cursor: 'grab' }}
                         >
+                            <defs>
+                                <clipPath id={`creature-clip-${creature.id}`}>
+                                    <circle cx={cx} cy={cy} r={RADIUS} />
+                                </clipPath>
+                            </defs>
                             <circle
                                 cx={cx}
                                 cy={cy}
@@ -279,6 +284,7 @@ function Positioning({ campaignName, characters }) {
                                     width={RADIUS * 2 - 4}
                                     height={RADIUS * 2 - 4}
                                     preserveAspectRatio="xMidYMid slice"
+                                    clipPath={`url(#creature-clip-${creature.id})`}
                                     className="creature-image"
                                 />
                             ) : (
