@@ -12,7 +12,7 @@
     font-weight: 600;
 }
 
-.grid-svg {
+.positioning .grid-svg {
     display: block;
     width: 100%;
     aspect-ratio: 1;
@@ -23,46 +23,46 @@
 }
 
 /* Grid background */
-.grid-bg {
+.positioning .grid-bg {
     fill: #1a1a1a;
 }
 
 /* Grid lines */
-.grid-line {
+.positioning .grid-line {
     stroke: #333;
     stroke-width: 1;
 }
 
 /* Creature group */
-.creature-group {
+.positioning .creature-group {
     cursor: grab;
 }
 
-.creature-group:active {
+.positioning .creature-group:active {
     cursor: grabbing;
 }
 
 /* Creature circle */
-.creature-circle {
+.positioning .creature-circle {
     fill: #4a90d9;
     stroke: #2c5f8a;
     stroke-width: 2;
     transition: stroke-width 0.15s ease;
 }
 
-.creature-group:hover .creature-circle {
+.positioning .creature-group:hover .creature-circle {
     stroke-width: 3;
 }
 
 /* Dragging state */
-.creature-circle.dragging {
+.positioning .creature-circle.dragging {
     fill: #ff6b6b;
     stroke: #c0392b;
     stroke-width: 3;
 }
 
 /* Creature initial (no image) */
-.creature-initial {
+.positioning .creature-initial {
     pointer-events: none;
     user-select: none;
     fill: #fff;
@@ -71,12 +71,12 @@
 }
 
 /* Creature image */
-.creature-image {
+.positioning .creature-image {
     pointer-events: none;
 }
 
 /* Creature name */
-.creature-name {
+.positioning .creature-name {
     fill: #fff;
     font-size: 8;
     font-weight: bold;
@@ -84,50 +84,50 @@
 }
 
 /* Light theme (explicit toggle) */
-[data-theme="light"] .grid-bg {
+[data-theme="light"] .positioning .grid-bg {
     fill: #f5f5f5;
 }
 
-[data-theme="light"] .grid-line {
+[data-theme="light"] .positioning .grid-line {
     stroke: #d0d0d0;
 }
 
-[data-theme="light"] .creature-circle {
+[data-theme="light"] .positioning .creature-circle {
     fill: #4a90d9;
     stroke: #2c5f8a;
 }
 
-[data-theme="light"] .creature-circle.dragging {
+[data-theme="light"] .positioning .creature-circle.dragging {
     fill: #ff6b6b;
     stroke: #c0392b;
 }
 
-[data-theme="light"] .creature-name {
+[data-theme="light"] .positioning .creature-name {
     fill: #fff;
     text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
 }
 
 /* Fallback: system light mode when no explicit theme is set */
 @media (prefers-color-scheme: light) {
-    .grid-bg {
+    .positioning .grid-bg {
         fill: #f5f5f5;
     }
 
-    .grid-line {
+    .positioning .grid-line {
         stroke: #d0d0d0;
     }
 
-    .creature-circle {
+    .positioning .creature-circle {
         fill: #4a90d9;
         stroke: #2c5f8a;
     }
 
-    .creature-circle.dragging {
+    .positioning .creature-circle.dragging {
         fill: #ff6b6b;
         stroke: #c0392b;
     }
 
-    .creature-name {
+    .positioning .creature-name {
         fill: #fff;
         text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
     }
