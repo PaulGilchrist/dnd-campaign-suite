@@ -464,4 +464,8 @@ th {
     .no-print {
         display: none;
     }
+
+    .app-body {
+        padding-left: 0;
+    }
 }
