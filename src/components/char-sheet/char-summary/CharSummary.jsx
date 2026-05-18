@@ -65,7 +65,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         <div>
               {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)} />}
             <div className='name-row'>
-                <span className='name'>{playerStats.name}</span>
+                <span className='name'>{playerStats.name}</span>&nbsp;&nbsp;
                 {isLocalhost && (
                     <div className='char-btn-group no-print'>
                         <button className="char-btn" onClick={onEditCharacter} title="Edit Character"><i className="fas fa-pen"></i> Edit</button>

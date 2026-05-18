@@ -22,7 +22,7 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
   return (
     <nav className="sidebar no-print">
       <div className="sidebar-header">
-        <span className="campaign-name">{campaignName}</span>
+        <div className="campaign-name">{campaignName}</div>
         <div className="sidebar-header-buttons">
           <button className="icon-button rename-campaign-btn" onClick={onRenameCampaign} disabled={!isLocalhost} title="Rename Campaign"><i className="fas fa-pen"></i></button>
           <button className="icon-button delete-campaign-btn" onClick={onDeleteCampaign} disabled={characters.length > 0} title="Delete Campaign"><i className="fas fa-trash"></i></button>

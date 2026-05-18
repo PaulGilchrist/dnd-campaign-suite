@@ -111,5 +111,6 @@
 
 .sidebar-header-buttons {
   display: flex;
+  margin-left: 90px;
   gap: 2px;
 }
