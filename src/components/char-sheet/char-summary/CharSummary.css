@@ -1,7 +1,6 @@
 .name-row {
     display: flex;
     align-items: center;
-    margin-bottom: -10px;
 }
 .name {
     color: var(--color-header);
