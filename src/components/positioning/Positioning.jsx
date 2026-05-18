@@ -7,7 +7,7 @@ import './Positioning.css';
 const CELL_SIZE = 40;
 const RADIUS = 20;
 
-function Positioning({ campaignName, characters }) {
+function Positioning({ campaignName, characters, isLocalhost }) {
     const [gridSize, setGridSize] = useState(13);
     const SVG_SIZE = gridSize * CELL_SIZE;
     const [positioningData, setPositioningData] = useState(null);
@@ -27,6 +27,15 @@ function Positioning({ campaignName, characters }) {
     const [panY, setPanY] = useState(0);
     const [panning, setPanning] = useState(null); // { startX, startY, startPanX, startPanY }
 
+    // Items panel state
+    const [itemsPanelOpen, setItemsPanelOpen] = useState(false);
+    const [placedItems, setPlacedItems] = useState([]);
+
+    // Barrel context menu state
+    const [selectedBarrel, setSelectedBarrel] = useState(null); // { id, gridX, gridY }
+    // Reposition mode state
+    const [repositioningId, setRepositioningId] = useState(null);
+
     // Load or initialize positioning data on mount
     useEffect(() => {
         if (isInitialized.current) return;
@@ -40,6 +49,9 @@ function Positioning({ campaignName, characters }) {
                 : new Set();
             setPositioningData({ ...existing, walls });
             setGridSize(existing.gridSize || 13);
+            if (existing.placedItems) {
+                setPlacedItems(existing.placedItems);
+            }
             return;
         }
 
@@ -77,10 +89,11 @@ function Positioning({ campaignName, characters }) {
         const dataToSave = {
             ...positioningData,
             gridSize,
-            walls: Array.from(positioningData.walls || [])
+            walls: Array.from(positioningData.walls || []),
+            placedItems: placedItems
         };
         storage.set('positioning-' + campaignName, dataToSave);
-    }, [positioningData, campaignName, gridSize]);
+    }, [positioningData, campaignName, gridSize, placedItems]);
 
     // SSE handler for real-time updates from other clients
     const handleSSEEvent = useCallback((event) => {
@@ -92,6 +105,9 @@ function Positioning({ campaignName, characters }) {
             creatures: event.creatures || prev?.creatures,
             walls: event.walls ? new Set(event.walls) : prev?.walls
         }));
+        if (event.placedItems !== undefined) {
+            setPlacedItems(event.placedItems);
+        }
     }, []);
 
     // Calculate center of a grid square
@@ -116,10 +132,26 @@ function Positioning({ campaignName, characters }) {
 
     // Handle grid pointer down (paint/erase mode)
     const handleGridPointerDown = useCallback((e) => {
-        if (tool === 'none') return;
+        if (tool === 'none' && !repositioningId) return;
         e.preventDefault();
         const grid = getGridFromEvent(e);
         if (!grid) return;
+
+        // Reposition mode: move the barrel to the clicked grid square
+        if (repositioningId) {
+            const barrel = placedItems.find(item => item.id === repositioningId);
+            if (barrel) {
+                setPlacedItems(prev =>
+                    prev.map(item =>
+                        item.id === repositioningId
+                            ? { ...item, gridX: grid.gridX, gridY: grid.gridY }
+                            : item
+                    )
+                );
+            }
+            setRepositioningId(null);
+            return;
+        }
 
         const key = `${grid.gridX},${grid.gridY}`;
         setPositioningData((prev) => {
@@ -132,7 +164,7 @@ function Positioning({ campaignName, characters }) {
             return { ...prev, walls: newWalls };
         });
         setPainting(grid);
-    }, [tool, getGridFromEvent]);
+    }, [tool, getGridFromEvent, repositioningId, placedItems]);
 
     // Handle grid pointer move (paint/erase drag)
     const handleGridPointerMove = useCallback((e) => {
@@ -310,6 +342,51 @@ function Positioning({ campaignName, characters }) {
         }
     }, []);
 
+    // Handle drop from items panel onto grid
+    const handleDrop = useCallback((e) => {
+        e.preventDefault();
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+        const itemType = e.dataTransfer.getData('text/plain');
+        if (!itemType) return;
+
+        const newItem = {
+            id: utils.guid(),
+            type: itemType,
+            gridX: grid.gridX,
+            gridY: grid.gridY,
+            visible: isLocalhost
+        };
+        setPlacedItems(prev => [...prev, newItem]);
+    }, [getGridFromEvent, isLocalhost]);
+
+    // Toggle visibility of a placed item (localhost only)
+    const handleToggleItemVisibility = useCallback((itemId) => {
+        setPlacedItems(prev =>
+            prev.map(item =>
+                item.id === itemId ? { ...item, visible: !item.visible } : item
+            )
+        );
+    }, []);
+
+    // Delete a placed barrel (localhost only)
+    const handleDeleteBarrel = useCallback((itemId) => {
+        setPlacedItems(prev => prev.filter(item => item.id !== itemId));
+        setSelectedBarrel(null);
+    }, []);
+
+    // Enter reposition mode for a barrel
+    const handleRepositionBarrel = useCallback((itemId) => {
+        setRepositioningId(itemId);
+        setSelectedBarrel(null);
+    }, []);
+
+    // Close context menu and reposition mode
+    const handleCloseMenu = useCallback(() => {
+        setSelectedBarrel(null);
+        setRepositioningId(null);
+    }, []);
+
     // Zoom/Pan constants and helpers
     const MIN_ZOOM = 0.25;
     const MAX_ZOOM = 4;
@@ -436,6 +513,9 @@ function Positioning({ campaignName, characters }) {
                     >
                         <i className="fa-solid fa-trash"></i> Clear Walls
                     </button>
+                    <button onClick={() => setItemsPanelOpen(prev => !prev)}>
+                        <i className="fa-solid fa-box"></i> Items
+                    </button>
                     <button onClick={zoomIn}>
                         <i className="fa-solid fa-magnifying-glass-plus"></i>
                     </button>
@@ -457,8 +537,55 @@ function Positioning({ campaignName, characters }) {
                 onPointerUp={(e) => { handlePointerUp(e); handleGridPointerUp(e); handlePanEnd(e); }}
                 onPointerLeave={handleGridPointerLeave}
                 onWheel={handleWheel}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+                onClick={handleCloseMenu}
                 style={{ cursor: panning ? 'grabbing' : (tool === 'none' ? 'grab' : 'default') }}
             >
+                <defs>
+                    {/* Barrel SVG definition */}
+                    <g id="barrel">
+                        {/* Barrel body - curved shape wider in middle */}
+                        <path
+                            d="M 10 4 Q 6 18 10 32 L 26 32 Q 30 18 26 4 Z"
+                            fill="#A0652D"
+                            stroke="#6B3E1F"
+                            strokeWidth="0.8"
+                        />
+                        {/* Left side shading for depth */}
+                        <path
+                            d="M 10 4 Q 6 18 10 32 L 16 32 Q 12 18 16 4 Z"
+                            fill="#8B5524"
+                            opacity="0.5"
+                        />
+                        {/* Top rim */}
+                        <ellipse cx="18" cy="4" rx="8" ry="2.5" fill="#8B5524" stroke="#6B3E1F" strokeWidth="0.6" />
+                        {/* Bottom rim */}
+                        <ellipse cx="18" cy="32" rx="8" ry="2.5" fill="#8B5524" stroke="#6B3E1F" strokeWidth="0.6" />
+                        {/* Top opening */}
+                        <ellipse cx="18" cy="4" rx="6" ry="1.8" fill="#5C3317" stroke="#4A2810" strokeWidth="0.5" />
+                        {/* Metal band - top */}
+                        <rect x="9.5" y="10" width="17" height="2" fill="#555" rx="0.5" />
+                        <rect x="9.5" y="10" width="17" height="0.5" fill="#777" />
+                        {/* Metal band - middle */}
+                        <rect x="9" y="18" width="18" height="2" fill="#555" rx="0.5" />
+                        <rect x="9" y="18" width="18" height="0.5" fill="#777" />
+                        {/* Metal band - bottom */}
+                        <rect x="9.5" y="26" width="17" height="2" fill="#555" rx="0.5" />
+                        <rect x="9.5" y="26" width="17" height="0.5" fill="#777" />
+                        {/* Right side highlight */}
+                        <path
+                            d="M 26 4 Q 30 18 26 32 L 22 32 Q 26 18 22 4 Z"
+                            fill="#B87A3A"
+                            opacity="0.4"
+                        />
+                        {/* Wood grain lines */}
+                        <path d="M 14 8 Q 13 18 14 28" fill="none" stroke="#7A4E20" strokeWidth="0.4" opacity="0.6" />
+                        <path d="M 18 7 Q 17 18 18 29" fill="none" stroke="#7A4E20" strokeWidth="0.4" opacity="0.6" />
+                        <path d="M 22 8 Q 23 18 22 28" fill="none" stroke="#7A4E20" strokeWidth="0.4" opacity="0.6" />
+                    </g>
+                </defs>
+
                 {/* Grid background */}
                 <rect x="0" y="0" width={SVG_SIZE} height={SVG_SIZE} className="grid-bg" />
 
@@ -563,7 +690,139 @@ function Positioning({ campaignName, characters }) {
                         </g>
                     );
                 })}
+
+                {/* Placed items (barrels) */}
+                {placedItems.map((item) => {
+                    const cx = gridCenterX(item.gridX);
+                    const cy = gridCenterY(item.gridY);
+                    // On non-localhost, hide items marked as not visible
+                    if (!isLocalhost && !item.visible) return null;
+
+                    const isRepositioning = repositioningId === item.id;
+
+                    return (
+                        <g key={item.id} className="placed-item">
+                            {/* Centered barrel — offset by half its 36px size */}
+                            <use href="#barrel" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1} />
+                            {isLocalhost && (
+                                <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={RADIUS}
+                                    fill="transparent"
+                                    className="barrel-hit-area"
+                                    onPointerDown={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY });
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                />
+                            )}
+                            {/* Reposition mode highlight */}
+                            {isRepositioning && (
+                                <circle
+                                    cx={cx}
+                                    cy={cy}
+                                    r={RADIUS + 4}
+                                    fill="none"
+                                    className="reposition-highlight"
+                                />
+                            )}
+                        </g>
+                    );
+                })}
+
+                {/* Barrel context menu */}
+                {selectedBarrel && (
+                    <g className="barrel-context-menu" onClick={(e) => e.stopPropagation()}>
+                        {(() => {
+                            const menuX = gridCenterX(selectedBarrel.gridX) + 10;
+                            const menuY = gridCenterY(selectedBarrel.gridY) + 10;
+                            return (
+                                <g>
+                                    <rect x={menuX} y={menuY} width="120" height="100" rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
+                                    {(() => {
+                                        const barrel = placedItems.find(i => i.id === selectedBarrel.id);
+                                        const isVisible = barrel ? barrel.visible : true;
+                                        return (
+                                            <text x={menuX + 8} y={menuY + 20} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleToggleItemVisibility(selectedBarrel.id)}>
+                                                {isVisible ? 'Hide' : 'Show'}
+                                            </text>
+                                        );
+                                    })()}
+                                    <text x={menuX + 8} y={menuY + 42} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleDeleteBarrel(selectedBarrel.id)}>Delete</text>
+                                    <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRepositionBarrel(selectedBarrel.id)}>Reposition</text>
+                                    <text x={menuX + 108} y={menuY + 12} fill="#999" fontSize="10" className="menu-close" onClick={() => setSelectedBarrel(null)}>✕</text>
+                                </g>
+                            );
+                        })()}
+                    </g>
+                )}
             </svg>
+
+            {/* Items panel sidebar */}
+            {itemsPanelOpen && (
+                <div className="items-panel">
+                    <button className="items-panel-close" onClick={() => setItemsPanelOpen(false)}>
+                        <i className="fa-solid fa-times"></i>
+                    </button>
+                    <div className="items-panel-content">
+                        <div
+                            className="items-panel-item"
+                            draggable
+                            onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', 'barrel');
+                            }}
+                        >
+                            <svg viewBox="0 0 36 36" width="36" height="36">
+                                {/* Barrel body */}
+                                <path
+                                    d="M 10 4 Q 6 18 10 32 L 26 32 Q 30 18 26 4 Z"
+                                    fill="#A0652D"
+                                    stroke="#6B3E1F"
+                                    strokeWidth="0.8"
+                                />
+                                {/* Left side shading */}
+                                <path
+                                    d="M 10 4 Q 6 18 10 32 L 16 32 Q 12 18 16 4 Z"
+                                    fill="#8B5524"
+                                    opacity="0.5"
+                                />
+                                {/* Top rim */}
+                                <ellipse cx="18" cy="4" rx="8" ry="2.5" fill="#8B5524" stroke="#6B3E1F" strokeWidth="0.6" />
+                                {/* Bottom rim */}
+                                <ellipse cx="18" cy="32" rx="8" ry="2.5" fill="#8B5524" stroke="#6B3E1F" strokeWidth="0.6" />
+                                {/* Top opening */}
+                                <ellipse cx="18" cy="4" rx="6" ry="1.8" fill="#5C3317" stroke="#4A2810" strokeWidth="0.5" />
+                                {/* Metal band - top */}
+                                <rect x="9.5" y="10" width="17" height="2" fill="#555" rx="0.5" />
+                                <rect x="9.5" y="10" width="17" height="0.5" fill="#777" />
+                                {/* Metal band - middle */}
+                                <rect x="9" y="18" width="18" height="2" fill="#555" rx="0.5" />
+                                <rect x="9" y="18" width="18" height="0.5" fill="#777" />
+                                {/* Metal band - bottom */}
+                                <rect x="9.5" y="26" width="17" height="2" fill="#555" rx="0.5" />
+                                <rect x="9.5" y="26" width="17" height="0.5" fill="#777" />
+                                {/* Right side highlight */}
+                                <path
+                                    d="M 26 4 Q 30 18 26 32 L 22 32 Q 26 18 22 4 Z"
+                                    fill="#B87A3A"
+                                    opacity="0.4"
+                                />
+                                {/* Wood grain lines */}
+                                <path d="M 14 8 Q 13 18 14 28" fill="none" stroke="#7A4E20" strokeWidth="0.4" opacity="0.6" />
+                                <path d="M 18 7 Q 17 18 18 29" fill="none" stroke="#7A4E20" strokeWidth="0.4" opacity="0.6" />
+                                <path d="M 22 8 Q 23 18 22 28" fill="none" stroke="#7A4E20" strokeWidth="0.4" opacity="0.6" />
+                            </svg>
+                            <span>Barrel</span>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

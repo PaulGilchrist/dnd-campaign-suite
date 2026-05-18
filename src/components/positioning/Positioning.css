@@ -230,3 +230,169 @@
         fill: #8a8a8a;
     }
 }
+
+/* Items Panel */
+.positioning .items-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 200px;
+    height: 100%;
+    background: #2a2a2a;
+    border-left: 1px solid var(--border-color);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
+
+.positioning .items-panel-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: #ccc;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 8px;
+    z-index: 21;
+}
+
+.positioning .items-panel-close:hover {
+    color: #fff;
+}
+
+.positioning .items-panel-content {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.positioning .items-panel-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    cursor: grab;
+    user-select: none;
+    color: #ccc;
+    font-size: 13px;
+}
+
+.positioning .items-panel-item:hover {
+    background: #3a3a3a;
+    border-color: #555;
+}
+
+.positioning .items-panel-item:active {
+    cursor: grabbing;
+}
+
+/* Placed items on grid */
+.positioning .placed-item {
+    pointer-events: none;
+}
+
+/* Barrel hit area for context menu (localhost only) */
+.positioning .barrel-hit-area {
+    fill: transparent;
+    cursor: pointer;
+    pointer-events: all;
+}
+
+/* Reposition mode highlight */
+.positioning .reposition-highlight {
+    fill: none;
+    stroke: #4a90d9;
+    stroke-width: 2;
+    stroke-dasharray: 4 3;
+    animation: repositionPulse 1s ease-in-out infinite;
+}
+
+@keyframes repositionPulse {
+    0%, 100% { stroke-opacity: 1; }
+    50% { stroke-opacity: 0.4; }
+}
+
+/* Barrel context menu */
+.positioning .barrel-context-menu {
+    pointer-events: all;
+    cursor: default;
+}
+
+.positioning .barrel-context-menu rect {
+    rx: 4;
+}
+
+.positioning .menu-option {
+    cursor: pointer;
+    pointer-events: all;
+    user-select: none;
+    transition: fill 0.15s ease;
+}
+
+.positioning .menu-option:hover {
+    fill: #fff;
+}
+
+.positioning .menu-close {
+    cursor: pointer;
+    pointer-events: all;
+    user-select: none;
+    transition: fill 0.15s ease;
+}
+
+.positioning .menu-close:hover {
+    fill: #fff;
+}
+
+/* Light theme overrides for items panel */
+[data-theme="light"] .positioning .items-panel {
+    background: #e8e8e8;
+    border-left-color: #ccc;
+}
+
+[data-theme="light"] .positioning .items-panel-close {
+    color: #333;
+}
+
+[data-theme="light"] .positioning .items-panel-item {
+    border-color: #bbb;
+    color: #333;
+}
+
+[data-theme="light"] .positioning .items-panel-item:hover {
+    background: #d8d8d8;
+    border-color: #999;
+}
+
+/* System light mode */
+@media (prefers-color-scheme: light) {
+    .positioning .items-panel {
+        background: #e8e8e8;
+        border-left-color: #ccc;
+    }
+
+    .positioning .items-panel-close {
+        color: #333;
+    }
+
+    .positioning .items-panel-item {
+        border-color: #bbb;
+        color: #333;
+    }
+
+    .positioning .items-panel-item:hover {
+        background: #d8d8d8;
+        border-color: #999;
+    }
+}
