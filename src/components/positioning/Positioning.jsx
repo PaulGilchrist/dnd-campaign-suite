@@ -98,14 +98,15 @@ function Positioning({ campaignName, characters }) {
         if (!svg) return null;
 
         const rect = svg.getBoundingClientRect();
-        const svgX = (e.clientX - rect.left) / rect.width * SVG_SIZE;
-        const svgY = (e.clientY - rect.top) / rect.height * SVG_SIZE;
+        const vb = svg.viewBox.baseVal;
+        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
+        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
 
         const gridX = Math.max(0, Math.min(gridSize - 1, Math.floor(svgX / CELL_SIZE)));
         const gridY = Math.max(0, Math.min(gridSize - 1, Math.floor(svgY / CELL_SIZE)));
 
         return { gridX, gridY };
-    }, []);
+    }, [gridSize]);
 
     // Handle grid pointer down (paint/erase mode)
     const handleGridPointerDown = useCallback((e) => {
@@ -164,8 +165,9 @@ function Positioning({ campaignName, characters }) {
         if (!svg) return;
 
         const rect = svg.getBoundingClientRect();
-        const svgX = (e.clientX - rect.left) / rect.width * SVG_SIZE;
-        const svgY = (e.clientY - rect.top) / rect.height * SVG_SIZE;
+        const vb = svg.viewBox.baseVal;
+        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
+        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
 
         const creature = positioningData.creatures.find((c) => c.id === creatureId);
         if (!creature) return;
@@ -178,7 +180,7 @@ function Positioning({ campaignName, characters }) {
             offsetX: svgX - cx,
             offsetY: svgY - cy
         });
-    }, [positioningData]);
+    }, [positioningData, gridSize]);
 
     const handlePointerMove = useCallback((e) => {
         if (!dragging) return;
@@ -188,8 +190,9 @@ function Positioning({ campaignName, characters }) {
         if (!svg) return;
 
         const rect = svg.getBoundingClientRect();
-        const svgX = (e.clientX - rect.left) / rect.width * SVG_SIZE;
-        const svgY = (e.clientY - rect.top) / rect.height * SVG_SIZE;
+        const vb = svg.viewBox.baseVal;
+        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
+        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
 
         const creature = positioningData.creatures.find((c) => c.id === dragging.creatureId);
         if (!creature) return;
@@ -209,7 +212,7 @@ function Positioning({ campaignName, characters }) {
                 c.id === dragging.creatureId ? { ...c, gridX: clampedGridX, gridY: clampedGridY } : c
             )
         }));
-    }, [dragging, positioningData]);
+    }, [dragging, positioningData, gridSize]);
 
     const handlePointerUp = useCallback((e) => {
         if (!dragging) return;
@@ -219,8 +222,9 @@ function Positioning({ campaignName, characters }) {
         if (!svg) return;
 
         const rect = svg.getBoundingClientRect();
-        const svgX = (e.clientX - rect.left) / rect.width * SVG_SIZE;
-        const svgY = (e.clientY - rect.top) / rect.height * SVG_SIZE;
+        const vb = svg.viewBox.baseVal;
+        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
+        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
 
         const creature = positioningData.creatures.find((c) => c.id === dragging.creatureId);
         if (!creature) {
@@ -286,7 +290,7 @@ function Positioning({ campaignName, characters }) {
         }));
 
         setDragging(null);
-    }, [dragging, positioningData]);
+    }, [dragging, positioningData, gridSize]);
 
     const handlePointerLeave = useCallback(() => {
         setDragging(null);
