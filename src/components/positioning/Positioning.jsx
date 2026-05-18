@@ -5,6 +5,7 @@ import Subscriber from '../common/Subscriber.jsx';
 import './Positioning.css';
 import BarrelSVG from './BarrelSVG.jsx';
 import TableSVG from './TableSVG.jsx';
+import BedSVG from './BedSVG.jsx';
 
 const CELL_SIZE = 40;
 const RADIUS = 20;
@@ -358,7 +359,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
             gridX: grid.gridX,
             gridY: grid.gridY,
             visible: isLocalhost,
-            rotation: itemType === 'table' ? 0 : undefined
+            rotation: (itemType === 'table' || itemType === 'bed') ? 0 : undefined
         };
         setPlacedItems(prev => [...prev, newItem]);
     }, [getGridFromEvent, isLocalhost]);
@@ -389,6 +390,16 @@ function Positioning({ campaignName, characters, isLocalhost }) {
         setPlacedItems(prev =>
             prev.map(item =>
                 item.id === itemId ? { ...item, rotation: (item.rotation || 0) === 0 ? 90 : 0 } : item
+            )
+        );
+        setSelectedBarrel(null);
+    }, []);
+
+    // Rotate a bed (0 → 90 → 180 → 270 → 0 degrees)
+    const handleRotateBed = useCallback((itemId) => {
+        setPlacedItems(prev =>
+            prev.map(item =>
+                item.id === itemId ? { ...item, rotation: ((item.rotation || 0) + 90) % 360 } : item
             )
         );
         setSelectedBarrel(null);
@@ -563,6 +574,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                 <defs>
                     <BarrelSVG id="barrel" />
                     <TableSVG id="table" />
+                    <BedSVG id="bed" />
                 </defs>
 
                 {/* Grid background */}
@@ -773,6 +785,64 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                     );
                 })}
 
+                {/* Placed items (beds) */}
+                {placedItems.filter(item => item.type === 'bed').map((item) => {
+                    const isVertical = (item.rotation || 0) % 180 === 90;
+                    const cx = isVertical
+                        ? gridCenterX(item.gridX)
+                        : gridCenterX(item.gridX) + CELL_SIZE / 2;
+                    const cy = isVertical
+                        ? gridCenterY(item.gridY) + CELL_SIZE / 2
+                        : gridCenterY(item.gridY);
+                    // On non-localhost, hide items marked as not visible
+                    if (!isLocalhost && !item.visible) return null;
+
+                    const isRepositioning = repositioningId === item.id;
+                    const bedW = isVertical ? 36 : 72;
+                    const bedH = isVertical ? 72 : 36;
+
+                    return (
+                        <g key={item.id} className="placed-item">
+                            <use
+                                href="#bed"
+                                x={cx - 36}
+                                y={cy - 18}
+                                opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1}
+                                transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined}
+                            />
+                            {isLocalhost && !isRepositioning && (
+                                <rect
+                                    x={cx - bedW / 2}
+                                    y={cy - bedH / 2}
+                                    width={bedW}
+                                    height={bedH}
+                                    fill="transparent"
+                                    className="barrel-hit-area"
+                                    onPointerDown={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY });
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                />
+                            )}
+                            {isRepositioning && (
+                                <rect
+                                    x={cx - bedW / 2}
+                                    y={cy - bedH / 2}
+                                    width={bedW}
+                                    height={bedH}
+                                    fill="none"
+                                    className="reposition-highlight"
+                                />
+                            )}
+                        </g>
+                    );
+                })}
+
                 {/* Barrel context menu */}
                 {selectedBarrel && (
                     <g className="barrel-context-menu" onClick={(e) => e.stopPropagation()}>
@@ -797,7 +867,14 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                         if (selectedItem && selectedItem.type === 'table') {
                                             return (
                                                 <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRotateTable(selectedBarrel.id)}>
-                                                    Rotate {(selectedItem.rotation || 0) === 0 ? '90°' : '0°'}
+                                                    Rotate
+                                                </text>
+                                            );
+                                        }
+                                        if (selectedItem && selectedItem.type === 'bed') {
+                                            return (
+                                                <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRotateBed(selectedBarrel.id)}>
+                                                    Rotate
                                                 </text>
                                             );
                                         }
@@ -842,6 +919,18 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                 <TableSVG />
                             </svg>
                             <span>Table</span>
+                        </div>
+                        <div
+                            className="items-panel-item"
+                            draggable
+                            onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', 'bed');
+                            }}
+                        >
+                            <svg viewBox="0 0 72 36" width="72" height="36">
+                                <BedSVG />
+                            </svg>
+                            <span>Bed</span>
                         </div>
                     </div>
                 </div>
