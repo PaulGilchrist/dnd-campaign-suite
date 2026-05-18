@@ -4,12 +4,12 @@ import storage from '../../services/storage.js';
 import Subscriber from '../common/Subscriber.jsx';
 import './Positioning.css';
 
-const GRID_SIZE = 13;
 const CELL_SIZE = 40;
-const SVG_SIZE = GRID_SIZE * CELL_SIZE; // 520
 const RADIUS = 20;
 
 function Positioning({ campaignName, characters }) {
+    const [gridSize, setGridSize] = useState(13);
+    const SVG_SIZE = gridSize * CELL_SIZE;
     const [positioningData, setPositioningData] = useState(null);
     const svgRef = useRef(null);
     const isInitialized = useRef(false);
@@ -33,6 +33,7 @@ function Positioning({ campaignName, characters }) {
                 ? new Set(existing.walls)
                 : new Set();
             setPositioningData({ ...existing, walls });
+            setGridSize(existing.gridSize || 13);
             return;
         }
 
@@ -49,8 +50,8 @@ function Positioning({ campaignName, characters }) {
         creatures.forEach((creature) => {
             let gridX, gridY, key;
             do {
-                gridX = Math.floor(Math.random() * GRID_SIZE); // 0–12
-                gridY = Math.floor(Math.random() * GRID_SIZE); // 0–12
+                gridX = Math.floor(Math.random() * gridSize); // 0–12
+                gridY = Math.floor(Math.random() * gridSize); // 0–12
                 key = `${gridX},${gridY}`;
             } while (occupied.has(key));
             occupied.add(key);
@@ -69,14 +70,18 @@ function Positioning({ campaignName, characters }) {
         // Convert walls Set to array for storage
         const dataToSave = {
             ...positioningData,
+            gridSize,
             walls: Array.from(positioningData.walls || [])
         };
         storage.set('positioning-' + campaignName, dataToSave);
-    }, [positioningData, campaignName]);
+    }, [positioningData, campaignName, gridSize]);
 
     // SSE handler for real-time updates from other clients
     const handleSSEEvent = useCallback((event) => {
         if (!event) return;
+        if (event.gridSize !== undefined) {
+            setGridSize(event.gridSize);
+        }
         setPositioningData((prev) => ({
             creatures: event.creatures || prev?.creatures,
             walls: event.walls ? new Set(event.walls) : prev?.walls
@@ -96,8 +101,8 @@ function Positioning({ campaignName, characters }) {
         const svgX = (e.clientX - rect.left) / rect.width * SVG_SIZE;
         const svgY = (e.clientY - rect.top) / rect.height * SVG_SIZE;
 
-        const gridX = Math.max(0, Math.min(GRID_SIZE - 1, Math.floor(svgX / CELL_SIZE)));
-        const gridY = Math.max(0, Math.min(GRID_SIZE - 1, Math.floor(svgY / CELL_SIZE)));
+        const gridX = Math.max(0, Math.min(gridSize - 1, Math.floor(svgX / CELL_SIZE)));
+        const gridY = Math.max(0, Math.min(gridSize - 1, Math.floor(svgY / CELL_SIZE)));
 
         return { gridX, gridY };
     }, []);
@@ -195,8 +200,8 @@ function Positioning({ campaignName, characters }) {
         const gridX = Math.floor(cx / CELL_SIZE);
         const gridY = Math.floor(cy / CELL_SIZE);
 
-        const clampedGridX = Math.max(0, Math.min(GRID_SIZE - 1, gridX));
-        const clampedGridY = Math.max(0, Math.min(GRID_SIZE - 1, gridY));
+        const clampedGridX = Math.max(0, Math.min(gridSize - 1, gridX));
+        const clampedGridY = Math.max(0, Math.min(gridSize - 1, gridY));
 
         setPositioningData((prev) => ({
             ...prev,
@@ -229,8 +234,8 @@ function Positioning({ campaignName, characters }) {
         const gridX = Math.floor(cx / CELL_SIZE);
         const gridY = Math.floor(cy / CELL_SIZE);
 
-        const clampedGridX = Math.max(0, Math.min(GRID_SIZE - 1, gridX));
-        const clampedGridY = Math.max(0, Math.min(GRID_SIZE - 1, gridY));
+        const clampedGridX = Math.max(0, Math.min(gridSize - 1, gridX));
+        const clampedGridY = Math.max(0, Math.min(gridSize - 1, gridY));
 
         // Collision detection: find the nearest unoccupied grid square
         const occupiedSquares = new Set(
@@ -262,8 +267,8 @@ function Positioning({ campaignName, characters }) {
                 ];
                 for (const [nx, ny] of neighbors) {
                     const key = `${nx},${ny}`;
-                    const clampedNx = Math.max(0, Math.min(GRID_SIZE - 1, nx));
-                    const clampedNy = Math.max(0, Math.min(GRID_SIZE - 1, ny));
+                    const clampedNx = Math.max(0, Math.min(gridSize - 1, nx));
+                    const clampedNy = Math.max(0, Math.min(gridSize - 1, ny));
                     const clampedKey = `${clampedNx},${clampedNy}`;
                     if (!visited.has(clampedKey) && !occupiedSquares.has(clampedKey)) {
                         visited.add(clampedKey);
@@ -303,6 +308,17 @@ function Positioning({ campaignName, characters }) {
         <div className="positioning">
             <div className="toolbar-row">
                 <h4>Positioning / Marching Order</h4>
+                <label className="grid-size-label">
+                    Grid Size&nbsp;&nbsp;
+                    <input
+                        type="number"
+                        min="5"
+                        max="25"
+                        value={gridSize}
+                        onChange={(e) => setGridSize(Number(e.target.value))}
+                        className="grid-size-input"
+                    />
+                </label>
                 <div className="toolbar">
                     <button
                         className={tool === 'paint' ? 'active' : ''}
@@ -337,7 +353,7 @@ function Positioning({ campaignName, characters }) {
                 <rect x="0" y="0" width={SVG_SIZE} height={SVG_SIZE} className="grid-bg" />
 
                 {/* Vertical grid lines */}
-                {Array.from({ length: GRID_SIZE + 1 }, (_, i) => (
+                {Array.from({ length: gridSize + 1 }, (_, i) => (
                     <line
                         key={`v-${i}`}
                         x1={i * CELL_SIZE}
@@ -349,7 +365,7 @@ function Positioning({ campaignName, characters }) {
                 ))}
 
                 {/* Horizontal grid lines */}
-                {Array.from({ length: GRID_SIZE + 1 }, (_, i) => (
+                {Array.from({ length: gridSize + 1 }, (_, i) => (
                     <line
                         key={`h-${i}`}
                         x1="0"
