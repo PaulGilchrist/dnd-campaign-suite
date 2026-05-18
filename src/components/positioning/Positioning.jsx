@@ -377,6 +377,7 @@ function Positioning({ campaignName, characters }) {
     }, []);
 
     const handleWheel = useCallback((e) => {
+        if (!e.shiftKey) return;
         e.preventDefault();
         const svg = svgRef.current;
         if (!svg) return;
