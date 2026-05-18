@@ -130,14 +130,14 @@ function Positioning({ campaignName, characters, isLocalhost }) {
 
         const rect = svg.getBoundingClientRect();
         const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
+        const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
+        const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
 
         const gridX = Math.max(0, Math.min(gridSize - 1, Math.floor(svgX / CELL_SIZE)));
         const gridY = Math.max(0, Math.min(gridSize - 1, Math.floor(svgY / CELL_SIZE)));
 
         return { gridX, gridY };
-    }, [gridSize]);
+    }, [gridSize, panX, panY]);
 
     // Handle grid pointer down (paint/erase mode)
     const handleGridPointerDown = useCallback((e) => {
@@ -213,8 +213,8 @@ function Positioning({ campaignName, characters, isLocalhost }) {
 
         const rect = svg.getBoundingClientRect();
         const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
+        const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
+        const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
 
         const creature = positioningData.creatures.find((c) => c.id === creatureId);
         if (!creature) return;
@@ -227,7 +227,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
             offsetX: svgX - cx,
             offsetY: svgY - cy
         });
-    }, [positioningData, gridSize]);
+    }, [positioningData, gridSize, panX, panY]);
 
     const handlePointerMove = useCallback((e) => {
         if (!dragging) return;
@@ -238,8 +238,8 @@ function Positioning({ campaignName, characters, isLocalhost }) {
 
         const rect = svg.getBoundingClientRect();
         const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
+        const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
+        const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
 
         const creature = positioningData.creatures.find((c) => c.id === dragging.creatureId);
         if (!creature) return;
@@ -259,7 +259,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                 c.id === dragging.creatureId ? { ...c, gridX: clampedGridX, gridY: clampedGridY } : c
             )
         }));
-    }, [dragging, positioningData, gridSize]);
+    }, [dragging, positioningData, gridSize, panX, panY]);
 
     const handlePointerUp = useCallback((e) => {
         if (!dragging) return;
@@ -270,8 +270,8 @@ function Positioning({ campaignName, characters, isLocalhost }) {
 
         const rect = svg.getBoundingClientRect();
         const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
+        const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
+        const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
 
         const creature = positioningData.creatures.find((c) => c.id === dragging.creatureId);
         if (!creature) {
@@ -337,7 +337,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
         }));
 
         setDragging(null);
-    }, [dragging, positioningData, gridSize]);
+    }, [dragging, positioningData, gridSize, panX, panY]);
 
     const handlePointerLeave = useCallback(() => {
         setDragging(null);
@@ -736,7 +736,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                     return (
                         <g key={item.id} className="placed-item">
                             {/* Centered barrel — offset by half its 36px size */}
-                            <use href="#barrel" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1} />
+                            <use href="#barrel" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
                             {isLocalhost && !isRepositioning && (
                                 <circle
                                     cx={cx}
@@ -791,7 +791,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                 href="#table"
                                 x={cx - 36}
                                 y={cy - 18}
-                                opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1}
+                                opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
                                 transform={isRotated ? `rotate(90, ${cx}, ${cy})` : undefined}
                             />
                             {isLocalhost && !isRepositioning && (
@@ -849,7 +849,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                 href="#bed"
                                 x={cx - 36}
                                 y={cy - 18}
-                                opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1}
+                                opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
                                 transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined}
                             />
                             {isLocalhost && !isRepositioning && (
@@ -900,7 +900,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                 href="#firepit"
                                 x={cx - 18}
                                 y={cy - 18}
-                                opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1}
+                                opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
                             />
                             {isLocalhost && !isRepositioning && (
                                 <rect
@@ -949,7 +949,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                 href="#door"
                                 x={cx - 18}
                                 y={cy - 18}
-                                opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1}
+                                opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
                                 transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined}
                             />
                             {isLocalhost && !isRepositioning && (
@@ -1000,7 +1000,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                 href="#secretDoor"
                                 x={cx - 18}
                                 y={cy - 18}
-                                opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1}
+                                opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
                                 transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined}
                             />
                             {isLocalhost && !isRepositioning && (
@@ -1051,7 +1051,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                 href="#trap"
                                 x={cx - 18}
                                 y={cy - 18}
-                                opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1}
+                                opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
                             />
                             {isLocalhost && !isRepositioning && (
                                 <rect
@@ -1101,7 +1101,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                 href="#pillar"
                                 x={cx - 18}
                                 y={cy - 18}
-                                opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1}
+                                opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
                             />
                             {isLocalhost && !isRepositioning && (
                                 <rect
@@ -1151,7 +1151,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                 href="#stairs"
                                 x={cx - 18}
                                 y={cy - 18}
-                                opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1}
+                                opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
                                 transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined}
                             />
                             {isLocalhost && !isRepositioning && (
