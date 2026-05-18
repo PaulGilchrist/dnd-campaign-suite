@@ -23,6 +23,17 @@ function Positioning({ campaignName, characters, isLocalhost }) {
     const svgRef = useRef(null);
     const isInitialized = useRef(false);
 
+    // Zoom/Pan state
+    const [zoom, setZoom] = useState(1);
+    const [panX, setPanX] = useState(0);
+    const [panY, setPanY] = useState(0);
+
+    // Refs for zoom/pan state used by handleWheel (avoids stale closure)
+    const zoomValueRef = useRef(1);
+    const panXValueRef = useRef(0);
+    const panYValueRef = useRef(0);
+    // Accumulate deltaY for smooth zoom thresholding
+    const accumulatedDeltaRef = useRef(0);
     // Tool state: 'none' | 'paint' | 'erase'
     const [tool, setTool] = useState('none');
     // Paint state: tracks grid coords during active paint/erase
@@ -30,10 +41,6 @@ function Positioning({ campaignName, characters, isLocalhost }) {
     // Drag state
     const [dragging, setDragging] = useState(null); // { creatureId, offsetX, offsetY }
 
-    // Zoom/Pan state
-    const [zoom, setZoom] = useState(1);
-    const [panX, setPanX] = useState(0);
-    const [panY, setPanY] = useState(0);
     const [panning, setPanning] = useState(null); // { startX, startY, startPanX, startPanY }
 
     // Items panel state
@@ -447,6 +454,11 @@ function Positioning({ campaignName, characters, isLocalhost }) {
         setRepositioningId(null);
     }, []);
 
+    // Sync state to refs so handleWheel always reads latest values
+    useEffect(() => { zoomValueRef.current = zoom; }, [zoom]);
+    useEffect(() => { panXValueRef.current = panX; }, [panX]);
+    useEffect(() => { panYValueRef.current = panY; }, [panY]);
+
     // Zoom/Pan constants and helpers
     const MIN_ZOOM = 0.25;
     const MAX_ZOOM = 4;
@@ -519,7 +531,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
     }, []);
 
     const handleWheel = useCallback((e) => {
-        if (!e.shiftKey) return;
+        if (!e.metaKey) return;
         e.preventDefault();
         const svg = svgRef.current;
         if (!svg) return;
@@ -529,17 +541,30 @@ function Positioning({ campaignName, characters, isLocalhost }) {
         const svgX = (e.clientX - rect.left) / rect.width * vb.width;
         const svgY = (e.clientY - rect.top) / rect.height * vb.height;
 
-        const factor = e.deltaY > 0 ? 1.1 : 0.9;
-        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * factor));
+        const currentZoom = zoomValueRef.current;
+        const currentPanX = panXValueRef.current;
+        const currentPanY = panYValueRef.current;
 
-        // Adjust pan so the point under the cursor stays in place
-        const newPanX = svgX - (svgX - panX) * (zoom / newZoom);
-        const newPanY = svgY - (svgY - panY) * (zoom / newZoom);
+        accumulatedDeltaRef.current += e.deltaY;
+        const accumulated = accumulatedDeltaRef.current;
+        const ZOOM_THRESHOLD = 30;
+        let factor = 1;
+        if (accumulated < -ZOOM_THRESHOLD) {
+            factor = 1.025;
+            accumulatedDeltaRef.current = 0;
+        } else if (accumulated > ZOOM_THRESHOLD) {
+            factor = 0.975;
+            accumulatedDeltaRef.current = 0;
+        }
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, currentZoom * factor));
+
+        const newPanX = svgX - (svgX - currentPanX) * (currentZoom / newZoom);
+        const newPanY = svgY - (svgY - currentPanY) * (currentZoom / newZoom);
 
         setZoom(newZoom);
         setPanX(newPanX);
         setPanY(newPanY);
-    }, [zoom, panX, panY]);
+    }, []);
 
     if (!positioningData) return null;
 

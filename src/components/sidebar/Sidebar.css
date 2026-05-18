@@ -2,7 +2,7 @@
   position: fixed;
   top: 0;
   left: 0;
-  width: 220px;
+  width: 180px;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -111,6 +111,6 @@
 
 .sidebar-header-buttons {
   display: flex;
-  margin-left: 90px;
+  margin-left: 50px;
   gap: 2px;
 }
