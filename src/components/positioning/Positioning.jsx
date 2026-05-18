@@ -3,6 +3,8 @@ import utils from '../../services/utils.js';
 import storage from '../../services/storage.js';
 import Subscriber from '../common/Subscriber.jsx';
 import './Positioning.css';
+import BarrelSVG from './BarrelSVG.jsx';
+import TableSVG from './TableSVG.jsx';
 
 const CELL_SIZE = 40;
 const RADIUS = 20;
@@ -355,7 +357,8 @@ function Positioning({ campaignName, characters, isLocalhost }) {
             type: itemType,
             gridX: grid.gridX,
             gridY: grid.gridY,
-            visible: isLocalhost
+            visible: isLocalhost,
+            rotation: itemType === 'table' ? 0 : undefined
         };
         setPlacedItems(prev => [...prev, newItem]);
     }, [getGridFromEvent, isLocalhost]);
@@ -378,6 +381,16 @@ function Positioning({ campaignName, characters, isLocalhost }) {
     // Enter reposition mode for a barrel
     const handleRepositionBarrel = useCallback((itemId) => {
         setRepositioningId(itemId);
+        setSelectedBarrel(null);
+    }, []);
+
+    // Rotate a table (0 ↔ 90 degrees)
+    const handleRotateTable = useCallback((itemId) => {
+        setPlacedItems(prev =>
+            prev.map(item =>
+                item.id === itemId ? { ...item, rotation: (item.rotation || 0) === 0 ? 90 : 0 } : item
+            )
+        );
         setSelectedBarrel(null);
     }, []);
 
@@ -548,47 +561,8 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                 style={{ cursor: panning ? 'grabbing' : (tool === 'none' ? 'grab' : 'default') }}
             >
                 <defs>
-                    {/* Barrel SVG definition */}
-                    <g id="barrel">
-                        {/* Barrel body - curved shape wider in middle */}
-                        <path
-                            d="M 10 4 Q 6 18 10 32 L 26 32 Q 30 18 26 4 Z"
-                            fill="#A0652D"
-                            stroke="#6B3E1F"
-                            strokeWidth="0.8"
-                        />
-                        {/* Left side shading for depth */}
-                        <path
-                            d="M 10 4 Q 6 18 10 32 L 16 32 Q 12 18 16 4 Z"
-                            fill="#8B5524"
-                            opacity="0.5"
-                        />
-                        {/* Top rim */}
-                        <ellipse cx="18" cy="4" rx="8" ry="2.5" fill="#8B5524" stroke="#6B3E1F" strokeWidth="0.6" />
-                        {/* Bottom rim */}
-                        <ellipse cx="18" cy="32" rx="8" ry="2.5" fill="#8B5524" stroke="#6B3E1F" strokeWidth="0.6" />
-                        {/* Top opening */}
-                        <ellipse cx="18" cy="4" rx="6" ry="1.8" fill="#5C3317" stroke="#4A2810" strokeWidth="0.5" />
-                        {/* Metal band - top */}
-                        <rect x="9.5" y="10" width="17" height="2" fill="#555" rx="0.5" />
-                        <rect x="9.5" y="10" width="17" height="0.5" fill="#777" />
-                        {/* Metal band - middle */}
-                        <rect x="9" y="18" width="18" height="2" fill="#555" rx="0.5" />
-                        <rect x="9" y="18" width="18" height="0.5" fill="#777" />
-                        {/* Metal band - bottom */}
-                        <rect x="9.5" y="26" width="17" height="2" fill="#555" rx="0.5" />
-                        <rect x="9.5" y="26" width="17" height="0.5" fill="#777" />
-                        {/* Right side highlight */}
-                        <path
-                            d="M 26 4 Q 30 18 26 32 L 22 32 Q 26 18 22 4 Z"
-                            fill="#B87A3A"
-                            opacity="0.4"
-                        />
-                        {/* Wood grain lines */}
-                        <path d="M 14 8 Q 13 18 14 28" fill="none" stroke="#7A4E20" strokeWidth="0.4" opacity="0.6" />
-                        <path d="M 18 7 Q 17 18 18 29" fill="none" stroke="#7A4E20" strokeWidth="0.4" opacity="0.6" />
-                        <path d="M 22 8 Q 23 18 22 28" fill="none" stroke="#7A4E20" strokeWidth="0.4" opacity="0.6" />
-                    </g>
+                    <BarrelSVG id="barrel" />
+                    <TableSVG id="table" />
                 </defs>
 
                 {/* Grid background */}
@@ -697,7 +671,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                 })}
 
                 {/* Placed items (barrels) */}
-                {placedItems.map((item) => {
+                {placedItems.filter(item => item.type === 'barrel').map((item) => {
                     const cx = gridCenterX(item.gridX);
                     const cy = gridCenterY(item.gridY);
                     // On non-localhost, hide items marked as not visible
@@ -741,6 +715,64 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                     );
                 })}
 
+                {/* Placed items (tables) */}
+                {placedItems.filter(item => item.type === 'table').map((item) => {
+                    const isRotated = (item.rotation || 0) === 90;
+                    const cx = isRotated
+                        ? gridCenterX(item.gridX)
+                        : gridCenterX(item.gridX) + CELL_SIZE / 2;
+                    const cy = isRotated
+                        ? gridCenterY(item.gridY) + CELL_SIZE / 2
+                        : gridCenterY(item.gridY);
+                    // On non-localhost, hide items marked as not visible
+                    if (!isLocalhost && !item.visible) return null;
+
+                    const isRepositioning = repositioningId === item.id;
+                    const tableW = isRotated ? 36 : 72;
+                    const tableH = isRotated ? 72 : 36;
+
+                    return (
+                        <g key={item.id} className="placed-item">
+                            <use
+                                href="#table"
+                                x={cx - 36}
+                                y={cy - 18}
+                                opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1}
+                                transform={isRotated ? `rotate(90, ${cx}, ${cy})` : undefined}
+                            />
+                            {isLocalhost && !isRepositioning && (
+                                <rect
+                                    x={cx - tableW / 2}
+                                    y={cy - tableH / 2}
+                                    width={tableW}
+                                    height={tableH}
+                                    fill="transparent"
+                                    className="barrel-hit-area"
+                                    onPointerDown={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY });
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                />
+                            )}
+                            {isRepositioning && (
+                                <rect
+                                    x={cx - tableW / 2}
+                                    y={cy - tableH / 2}
+                                    width={tableW}
+                                    height={tableH}
+                                    fill="none"
+                                    className="reposition-highlight"
+                                />
+                            )}
+                        </g>
+                    );
+                })}
+
                 {/* Barrel context menu */}
                 {selectedBarrel && (
                     <g className="barrel-context-menu" onClick={(e) => e.stopPropagation()}>
@@ -749,7 +781,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                             const menuY = gridCenterY(selectedBarrel.gridY) + 10;
                             return (
                                 <g>
-                                    <rect x={menuX} y={menuY} width="120" height="100" rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
+                                    <rect x={menuX} y={menuY} width="120" height="120" rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
                                     {(() => {
                                         const barrel = placedItems.find(i => i.id === selectedBarrel.id);
                                         const isVisible = barrel ? barrel.visible : true;
@@ -760,7 +792,18 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                         );
                                     })()}
                                     <text x={menuX + 8} y={menuY + 42} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleDeleteBarrel(selectedBarrel.id)}>Delete</text>
-                                    <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRepositionBarrel(selectedBarrel.id)}>Reposition</text>
+                                    {(() => {
+                                        const selectedItem = placedItems.find(i => i.id === selectedBarrel.id);
+                                        if (selectedItem && selectedItem.type === 'table') {
+                                            return (
+                                                <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRotateTable(selectedBarrel.id)}>
+                                                    Rotate {(selectedItem.rotation || 0) === 0 ? '90°' : '0°'}
+                                                </text>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+                                    <text x={menuX + 8} y={menuY + 86} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRepositionBarrel(selectedBarrel.id)}>Reposition</text>
                                     <text x={menuX + 108} y={menuY + 12} fill="#999" fontSize="10" className="menu-close" onClick={() => setSelectedBarrel(null)}>✕</text>
                                 </g>
                             );
@@ -784,46 +827,21 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                             }}
                         >
                             <svg viewBox="0 0 36 36" width="36" height="36">
-                                {/* Barrel body */}
-                                <path
-                                    d="M 10 4 Q 6 18 10 32 L 26 32 Q 30 18 26 4 Z"
-                                    fill="#A0652D"
-                                    stroke="#6B3E1F"
-                                    strokeWidth="0.8"
-                                />
-                                {/* Left side shading */}
-                                <path
-                                    d="M 10 4 Q 6 18 10 32 L 16 32 Q 12 18 16 4 Z"
-                                    fill="#8B5524"
-                                    opacity="0.5"
-                                />
-                                {/* Top rim */}
-                                <ellipse cx="18" cy="4" rx="8" ry="2.5" fill="#8B5524" stroke="#6B3E1F" strokeWidth="0.6" />
-                                {/* Bottom rim */}
-                                <ellipse cx="18" cy="32" rx="8" ry="2.5" fill="#8B5524" stroke="#6B3E1F" strokeWidth="0.6" />
-                                {/* Top opening */}
-                                <ellipse cx="18" cy="4" rx="6" ry="1.8" fill="#5C3317" stroke="#4A2810" strokeWidth="0.5" />
-                                {/* Metal band - top */}
-                                <rect x="9.5" y="10" width="17" height="2" fill="#555" rx="0.5" />
-                                <rect x="9.5" y="10" width="17" height="0.5" fill="#777" />
-                                {/* Metal band - middle */}
-                                <rect x="9" y="18" width="18" height="2" fill="#555" rx="0.5" />
-                                <rect x="9" y="18" width="18" height="0.5" fill="#777" />
-                                {/* Metal band - bottom */}
-                                <rect x="9.5" y="26" width="17" height="2" fill="#555" rx="0.5" />
-                                <rect x="9.5" y="26" width="17" height="0.5" fill="#777" />
-                                {/* Right side highlight */}
-                                <path
-                                    d="M 26 4 Q 30 18 26 32 L 22 32 Q 26 18 22 4 Z"
-                                    fill="#B87A3A"
-                                    opacity="0.4"
-                                />
-                                {/* Wood grain lines */}
-                                <path d="M 14 8 Q 13 18 14 28" fill="none" stroke="#7A4E20" strokeWidth="0.4" opacity="0.6" />
-                                <path d="M 18 7 Q 17 18 18 29" fill="none" stroke="#7A4E20" strokeWidth="0.4" opacity="0.6" />
-                                <path d="M 22 8 Q 23 18 22 28" fill="none" stroke="#7A4E20" strokeWidth="0.4" opacity="0.6" />
+                                <BarrelSVG />
                             </svg>
                             <span>Barrel</span>
+                        </div>
+                        <div
+                            className="items-panel-item"
+                            draggable
+                            onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', 'table');
+                            }}
+                        >
+                            <svg viewBox="0 0 72 36" width="72" height="36">
+                                <TableSVG />
+                            </svg>
+                            <span>Table</span>
                         </div>
                     </div>
                 </div>
