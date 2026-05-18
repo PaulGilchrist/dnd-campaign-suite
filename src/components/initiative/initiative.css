@@ -55,8 +55,8 @@
     flex-direction: row;
     overflow-x: auto;
     min-width: 0;
-    padding: 20px 4px;
-    gap: 12px;
+    padding: 20px 32px 20px 0;
+    gap: 4px;
     scroll-behavior: smooth;
 }
 
@@ -80,6 +80,7 @@
 }
 
 .creature-card.active {
+    margin: 10px 25px;
     transform: scale(1.15);
     opacity: 1;
     border: 2px solid #ffcc00;
