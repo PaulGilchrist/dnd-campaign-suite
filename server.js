@@ -449,6 +449,35 @@ app.post('/api/campaigns/character', (req, res) => {
         res.status(500).json({ error: 'Failed to create character' });
     }
 });
+// API endpoint to get positioning data for a campaign
+app.get('/api/campaigns/:campaign/positioning', (req, res) => {
+    const { campaign } = req.params;
+    const key = `positioning-${campaign}`;
+    const storedData = characterChangeData[key];
+    if (storedData) {
+        res.status(200).json(storedData);
+    } else {
+        res.status(200).json({ creatures: [] });
+    }
+});
+
+// API endpoint to save positioning data for a campaign
+app.post('/api/campaigns/:campaign/positioning', (req, res) => {
+    const { campaign } = req.params;
+    const positioningData = req.body;
+    const key = `positioning-${campaign}`;
+    characterChangeData[key] = positioningData;
+    res.status(200).json({ message: 'Positioning data stored successfully' });
+    if (!saveTimer) {
+        saveTimer = setTimeout(() => {
+            saveFile();
+            clearTimeout(saveTimer);
+            saveTimer = null;
+        }, persistDataDebounceMilliseconds);
+    }
+    publish(key, positioningData);
+});
+
 // Wildcard routes for character data (must be AFTER /api/campaigns)
 app.get('/api/:key', (req, res) => {
     const { key } = req.params;

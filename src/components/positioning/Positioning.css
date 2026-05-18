@@ -1,0 +1,48 @@
+/* Positioning - Dungeon Grid */
+
+.positioning {
+    width: 100%;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.positioning h4 {
+    margin: 0 0 12px 0;
+    font-size: 1.25em;
+    font-weight: 600;
+}
+
+.grid-svg {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    border: 1px solid #c0c0c0;
+    border-radius: 4px;
+    cursor: default;
+    user-select: none;
+}
+
+.creature-group {
+    cursor: grab;
+}
+
+.creature-group:active {
+    cursor: grabbing;
+}
+
+.creature-circle {
+    transition: stroke-width 0.15s ease;
+}
+
+.creature-group:hover .creature-circle {
+    stroke-width: 3;
+}
+
+.creature-initial {
+    pointer-events: none;
+    user-select: none;
+}
+
+.creature-image {
+    pointer-events: none;
+}

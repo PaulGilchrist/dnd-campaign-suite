@@ -1,6 +1,4 @@
 .app {
-    max-width: 1020px;
-    margin: 0 auto;
     padding-bottom: 20px;
 }
 
@@ -14,11 +12,13 @@
     line-height: 1;
     border-bottom: 1px solid var(--border-color);
     background-color: var(--background-color-header-inner);
+    margin: 0 10px 0 230px;
 }
 
 .app-body {
     display: flex;
     gap: 0;
+    padding-left: 220px;
 }
 
 .campaign-name {

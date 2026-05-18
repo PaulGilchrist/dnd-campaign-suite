@@ -268,6 +268,39 @@
         "rules": {
             "type": "string",
             "description": "Rule system version used (e.g., '5e', '2024')"
+        },
+        "positioning": {
+            "type": "array",
+            "description": "Array of character positioning data for the grid map",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Unique identifier for the character or creature"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Name of the character or creature"
+                    },
+                    "gridX": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 12,
+                        "description": "Grid column position (0-12 for a 13-column grid)"
+                    },
+                    "gridY": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 12,
+                        "description": "Grid row position (0-12 for a 13-row grid)"
+                    },
+                    "imagePath": {
+                        "type": "string",
+                        "description": "Optional path to the character's image"
+                    }
+                }
+            }
         }
     }
 }

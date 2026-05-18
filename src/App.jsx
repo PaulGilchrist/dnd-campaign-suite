@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cloneDeep } from 'lodash';
 import './App.css';
 import CharSheet from './components/char-sheet/CharSheet.jsx';
@@ -6,6 +6,7 @@ import Initiative from './components/initiative/initiative.jsx';
 import CampaignSelection from './components/campaign-selection/CampaignSelection.jsx';
 import CharacterCreationWizard from './components/character-creation/CharacterCreationWizard.jsx';
 import Sidebar from './components/sidebar/Sidebar.jsx';
+import Positioning from './components/positioning/Positioning.jsx';
 import utils from './services/utils.js';
 import useAppData from './hooks/useAppData.js';
 import useCharacterManagement from './hooks/useCharacterManagement.js';
@@ -14,6 +15,7 @@ import { useCharacterWizard } from './hooks/useCharacterWizard.js';
 
 function App() {
   const appData = useAppData();
+  const { abilityScores, classes, classes2024, equipment, magicItems, magicItems2024, races, races2024, spells, spells2024 } = appData;
   const campaignMgmt = useCampaignManagement();
   const charMgmt = useCharacterManagement(campaignMgmt.campaignName);
   const wizard = useCharacterWizard(campaignMgmt.campaignName);
@@ -36,9 +38,20 @@ function App() {
   }, []);
 
   const { showCampaignSelection, campaignName, isLocalhost, handleCampaignSelect, handleRenameCampaign: handleRenameCampaignRaw, handleDeleteCampaign: handleDeleteCampaignRaw, handleBackToCampaigns } = campaignMgmt;
-  const { characters, activeCharacter, handleCharacterClick, handleInitiativeClick, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, inputRef } = charMgmt;
-  const { showButton, abilityScores, classes, classes2024, equipment, magicItems, magicItems2024, races, races2024, spells, spells2024 } = appData;
+  const { characters, activeCharacter, setActiveCharacter, handleInitiativeClick, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, inputRef } = charMgmt;
   const { showCharacterWizard, showEditCharacterWizard, handleAddCharacter, handleWizardComplete, handleWizardCancel, handleEditCharacter, handleEditWizardComplete, handleEditWizardCancel } = wizard;
+
+  const [showPositioning, setShowPositioning] = useState(false);
+
+  const handleCharacterClick = (character) => {
+    setActiveCharacter(cloneDeep(character));
+    setShowPositioning(false);
+  };
+
+  const handlePositioningClick = () => {
+    setActiveCharacter(null);
+    setShowPositioning(true);
+  };
 
   const handleRenameCampaign = async () => {
     try {
@@ -67,7 +80,7 @@ function App() {
     }
   };
 
-  const initiativeActive = characters.length > 0 && activeCharacter == null;
+  const initiativeActive = characters.length > 0 && activeCharacter == null && !showPositioning;
 
   if (showCampaignSelection) return <CampaignSelection onCampaignSelect={handleCampaignSelect} />;
 
@@ -87,6 +100,7 @@ function App() {
           onAddCharacter={handleAddCharacter}
           onCharacterClick={handleCharacterClick}
           onInitiativeClick={handleInitiativeClick}
+          onPositioningClick={handlePositioningClick}
         />
         {activeCharacter && (
           <CharSheet
@@ -108,6 +122,7 @@ function App() {
           />
         )}
         {initiativeActive && <Initiative characters={characters} />}
+        {showPositioning && <Positioning campaignName={campaignName} characters={characters} />}
         <br />
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allRaces={races} allRaces2024={races2024} allClasses={classes} allSpells={spells} allSpells2024={spells2024} />}
         {showEditCharacterWizard && <CharacterCreationWizard onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allRaces={races} allClasses={classes} allSpells={spells} allSpells2024={spells2024} characterData={activeCharacter} isEditing={true} />}
