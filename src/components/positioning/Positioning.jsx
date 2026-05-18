@@ -11,6 +11,7 @@ import DoorSVG from './DoorSVG.jsx';
 import SecretDoorSVG from './SecretDoorSVG.jsx';
 import TrapSVG from './TrapSVG.jsx';
 import PillarSVG from './PillarSVG.jsx';
+import StairsSVG from './StairsSVG.jsx';
 
 const CELL_SIZE = 40;
 const RADIUS = 20;
@@ -364,7 +365,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
             gridX: grid.gridX,
             gridY: grid.gridY,
             visible: isLocalhost,
-            rotation: (itemType === 'table' || itemType === 'bed') ? 0 : undefined
+            rotation: (itemType === 'table' || itemType === 'bed' || itemType === 'stairs') ? 0 : undefined
         };
         setPlacedItems(prev => [...prev, newItem]);
     }, [getGridFromEvent, isLocalhost]);
@@ -422,6 +423,16 @@ function Positioning({ campaignName, characters, isLocalhost }) {
 
     // Rotate a secret door (0 → 90 → 180 → 270 → 0 degrees)
     const handleRotateSecretDoor = useCallback((id) => {
+        setPlacedItems(prev => prev.map(item => {
+            if (item.id !== id) return item;
+            const currentRotation = item.rotation || 0;
+            const newRotation = (currentRotation + 90) % 360;
+            return { ...item, rotation: newRotation };
+        }));
+    }, []);
+
+    // Rotate stairs (0 → 90 → 180 → 270 → 0 degrees)
+    const handleRotateStairs = useCallback((id) => {
         setPlacedItems(prev => prev.map(item => {
             if (item.id !== id) return item;
             const currentRotation = item.rotation || 0;
@@ -605,6 +616,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                     <SecretDoorSVG id="secretDoor" />
                     <TrapSVG id="trap" />
                     <PillarSVG id="pillar" />
+                    <StairsSVG id="stairs" />
                 </defs>
 
                 {/* Grid background */}
@@ -1124,6 +1136,57 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                     );
                 })}
 
+                {/* Placed items (stairs) */}
+                {placedItems.filter(item => item.type === 'stairs').map((item) => {
+                    const cx = gridCenterX(item.gridX);
+                    const cy = gridCenterY(item.gridY);
+                    // On non-localhost, hide items marked as not visible
+                    if (!isLocalhost && !item.visible) return null;
+
+                    const isRepositioning = repositioningId === item.id;
+
+                    return (
+                        <g key={item.id} className="placed-item">
+                            <use
+                                href="#stairs"
+                                x={cx - 18}
+                                y={cy - 18}
+                                opacity={isLocalhost ? (item.visible ? 1 : 0.3) : 1}
+                                transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined}
+                            />
+                            {isLocalhost && !isRepositioning && (
+                                <rect
+                                    x={cx - 18}
+                                    y={cy - 18}
+                                    width={36}
+                                    height={36}
+                                    fill="transparent"
+                                    className="barrel-hit-area"
+                                    onPointerDown={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY });
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                />
+                            )}
+                            {isRepositioning && (
+                                <rect
+                                    x={cx - 18}
+                                    y={cy - 18}
+                                    width={36}
+                                    height={36}
+                                    fill="none"
+                                    className="reposition-highlight"
+                                />
+                            )}
+                        </g>
+                    );
+                })}
+
                 {/* Barrel context menu */}
                 {selectedBarrel && (
                     <g className="barrel-context-menu" onClick={(e) => e.stopPropagation()}>
@@ -1134,7 +1197,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                 <g>
                                     {(() => {
                                         const selectedItem = placedItems.find(i => i.id === selectedBarrel.id);
-                                        const hasRotation = selectedItem && (selectedItem.type === 'table' || selectedItem.type === 'bed' || selectedItem.type === 'door' || selectedItem.type === 'secretDoor');
+                                        const hasRotation = selectedItem && (selectedItem.type === 'table' || selectedItem.type === 'bed' || selectedItem.type === 'door' || selectedItem.type === 'secretDoor' || selectedItem.type === 'stairs');
                                         const menuHeight = hasRotation ? 120 : 100;
                                         const repositionY = hasRotation ? menuY + 86 : menuY + 64;
                                         return (
@@ -1156,6 +1219,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                                         else if (selectedItem.type === 'bed') handleRotateBed(selectedBarrel.id);
                                                         else if (selectedItem.type === 'door') handleRotateDoor(selectedBarrel.id);
                                                         else if (selectedItem.type === 'secretDoor') handleRotateSecretDoor(selectedBarrel.id);
+                                                        else if (selectedItem.type === 'stairs') handleRotateStairs(selectedBarrel.id);
                                                     }}>
                                                         Rotate
                                                     </text>
@@ -1195,18 +1259,6 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                             className="items-panel-item"
                             draggable
                             onDragStart={(e) => {
-                                e.dataTransfer.setData('text/plain', 'table');
-                            }}
-                        >
-                            <svg viewBox="0 0 72 36" width="72" height="36">
-                                <TableSVG />
-                            </svg>
-                            <span>Table</span>
-                        </div>
-                        <div
-                            className="items-panel-item"
-                            draggable
-                            onDragStart={(e) => {
                                 e.dataTransfer.setData('text/plain', 'bed');
                             }}
                         >
@@ -1214,18 +1266,6 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                 <BedSVG />
                             </svg>
                             <span>Bed</span>
-                        </div>
-                        <div
-                            className="items-panel-item"
-                            draggable
-                            onDragStart={(e) => {
-                                e.dataTransfer.setData('text/plain', 'firepit');
-                            }}
-                        >
-                            <svg viewBox="0 0 36 36" width="36" height="36">
-                                <FirePitSVG />
-                            </svg>
-                            <span>Fire Pit</span>
                         </div>
                         <div
                             className="items-panel-item"
@@ -1243,25 +1283,13 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                             className="items-panel-item"
                             draggable
                             onDragStart={(e) => {
-                                e.dataTransfer.setData('text/plain', 'secretDoor');
+                                e.dataTransfer.setData('text/plain', 'firepit');
                             }}
                         >
                             <svg viewBox="0 0 36 36" width="36" height="36">
-                                <SecretDoorSVG />
+                                <FirePitSVG />
                             </svg>
-                            <span>Secret Door</span>
-                        </div>
-                        <div
-                            className="items-panel-item"
-                            draggable
-                            onDragStart={(e) => {
-                                e.dataTransfer.setData('text/plain', 'trap');
-                            }}
-                        >
-                            <svg viewBox="0 0 36 36" width="36" height="36">
-                                <TrapSVG />
-                            </svg>
-                            <span>Trap</span>
+                            <span>Fire Pit</span>
                         </div>
                         <div
                             className="items-panel-item"
@@ -1274,6 +1302,54 @@ function Positioning({ campaignName, characters, isLocalhost }) {
                                 <PillarSVG />
                             </svg>
                             <span>Pillar</span>
+                        </div>
+                        <div
+                            className="items-panel-item"
+                            draggable
+                            onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', 'secretDoor');
+                            }}
+                        >
+                            <svg viewBox="0 0 36 36" width="36" height="36">
+                                <SecretDoorSVG />
+                            </svg>
+                            <span>Secret Door</span>
+                        </div>
+                        <div
+                            className="items-panel-item"
+                            draggable
+                            onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', 'stairs');
+                            }}
+                        >
+                            <svg viewBox="0 0 36 36" width="36" height="36">
+                                <StairsSVG />
+                            </svg>
+                            <span>Stairs</span>
+                        </div>
+                        <div
+                            className="items-panel-item"
+                            draggable
+                            onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', 'table');
+                            }}
+                        >
+                            <svg viewBox="0 0 72 36" width="72" height="36">
+                                <TableSVG />
+                            </svg>
+                            <span>Table</span>
+                        </div>
+                        <div
+                            className="items-panel-item"
+                            draggable
+                            onDragStart={(e) => {
+                                e.dataTransfer.setData('text/plain', 'trap');
+                            }}
+                        >
+                            <svg viewBox="0 0 36 36" width="36" height="36">
+                                <TrapSVG />
+                            </svg>
+                            <span>Trap</span>
                         </div>
                     </div>
                 </div>
