@@ -31,10 +31,18 @@
     border-radius: 4px;
     cursor: pointer;
     white-space: nowrap;
+    color: var(--color-text);
+    background-color: var(--background-color-button-secondary);
+}
+
+.combat-controls button:hover {
+    background-color: var(--background-color-button-secondary-hover);
 }
 
 .combat-controls button.clear-button {
     margin-right: 4px;
+    color: var(--color-text);
+    background-color: var(--background-color-button-secondary);
 }
 
 /* Carousel container */

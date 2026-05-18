@@ -38,7 +38,7 @@ function App() {
   }, []);
 
   const { showCampaignSelection, campaignName, isLocalhost, handleCampaignSelect, handleRenameCampaign: handleRenameCampaignRaw, handleDeleteCampaign: handleDeleteCampaignRaw, handleBackToCampaigns } = campaignMgmt;
-  const { characters, activeCharacter, setActiveCharacter, handleInitiativeClick, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, inputRef } = charMgmt;
+  const { characters, activeCharacter, setActiveCharacter, handleInitiativeClick: handleInitiativeClickRaw, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, inputRef } = charMgmt;
   const { showCharacterWizard, showEditCharacterWizard, handleAddCharacter, handleWizardComplete, handleWizardCancel, handleEditCharacter, handleEditWizardComplete, handleEditWizardCancel } = wizard;
 
   const [showPositioning, setShowPositioning] = useState(false);
@@ -70,6 +70,11 @@ function App() {
   const handlePositioningClick = () => {
     setActiveCharacter(null);
     setShowPositioning(true);
+  };
+
+  const handleInitiativeClick = () => {
+    handleInitiativeClickRaw();
+    setShowPositioning(false);
   };
 
   const handleRenameCampaign = async () => {
