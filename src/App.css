@@ -110,3 +110,8 @@ button.download {
 button.hidden {
     display: none;
 }
+
+/* Theme toggle - pushed to far right */
+.theme-toggle-btn {
+    margin-left: auto;
+}

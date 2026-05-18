@@ -211,7 +211,7 @@ function Positioning({ campaignName, characters }) {
 
     return (
         <div className="positioning">
-            <h4>Positioning</h4>
+            <h4>Positioning / Marching Order</h4>
             <Subscriber handleEvent={handleSSEEvent} />
             <svg
                 ref={svgRef}
@@ -222,7 +222,7 @@ function Positioning({ campaignName, characters }) {
                 onPointerLeave={handlePointerLeave}
             >
                 {/* Grid background */}
-                <rect x="0" y="0" width={SVG_SIZE} height={SVG_SIZE} fill="#f5f5f5" />
+                <rect x="0" y="0" width={SVG_SIZE} height={SVG_SIZE} className="grid-bg" />
 
                 {/* Vertical grid lines */}
                 {Array.from({ length: GRID_SIZE + 1 }, (_, i) => (
@@ -232,8 +232,7 @@ function Positioning({ campaignName, characters }) {
                         y1="0"
                         x2={i * CELL_SIZE}
                         y2={SVG_SIZE}
-                        stroke="#d0d0d0"
-                        strokeWidth="1"
+                        className="grid-line"
                     />
                 ))}
 
@@ -245,8 +244,7 @@ function Positioning({ campaignName, characters }) {
                         y1={i * CELL_SIZE}
                         x2={SVG_SIZE}
                         y2={i * CELL_SIZE}
-                        stroke="#d0d0d0"
-                        strokeWidth="1"
+                        className="grid-line"
                     />
                 ))}
 
@@ -271,10 +269,7 @@ function Positioning({ campaignName, characters }) {
                                 cx={cx}
                                 cy={cy}
                                 r={RADIUS}
-                                fill={dragging?.creatureId === creature.id ? '#ff6b6b' : '#4a90d9'}
-                                stroke={dragging?.creatureId === creature.id ? '#c0392b' : '#2c5f8a'}
-                                strokeWidth={dragging?.creatureId === creature.id ? 3 : 2}
-                                className="creature-circle"
+                                className={`creature-circle ${dragging?.creatureId === creature.id ? 'dragging' : ''}`}
                             />
                             {creature.imagePath ? (
                                 <image
@@ -301,6 +296,17 @@ function Positioning({ campaignName, characters }) {
                                     {creature.name.charAt(0).toUpperCase()}
                                 </text>
                             )}
+                            <text
+                                x={cx}
+                                y={cy + RADIUS - 4}
+                                textAnchor="middle"
+                                dominantBaseline="central"
+                                fontSize="8"
+                                fontWeight="bold"
+                                className="creature-name"
+                            >
+                                {creature.name}
+                            </text>
                         </g>
                     );
                 })}

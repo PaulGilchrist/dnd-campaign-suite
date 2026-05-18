@@ -33,7 +33,7 @@ function NpcAvatar({ name, imageUrl }) {
     }
     const initial = name ? name.charAt(0).toUpperCase() : '?';
     return (
-        <div className="npc-avatar" style={{ backgroundColor: '#e74c3c' }}>
+        <div className="npc-avatar">
             <span>{initial}</span>
         </div>
     );

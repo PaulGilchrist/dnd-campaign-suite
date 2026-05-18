@@ -16,12 +16,24 @@
     display: block;
     width: 100%;
     aspect-ratio: 1;
-    border: 1px solid #c0c0c0;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     cursor: default;
     user-select: none;
 }
 
+/* Grid background */
+.grid-bg {
+    fill: #1a1a1a;
+}
+
+/* Grid lines */
+.grid-line {
+    stroke: #333;
+    stroke-width: 1;
+}
+
+/* Creature group */
 .creature-group {
     cursor: grab;
 }
@@ -30,7 +42,11 @@
     cursor: grabbing;
 }
 
+/* Creature circle */
 .creature-circle {
+    fill: #4a90d9;
+    stroke: #2c5f8a;
+    stroke-width: 2;
     transition: stroke-width 0.15s ease;
 }
 
@@ -38,11 +54,81 @@
     stroke-width: 3;
 }
 
+/* Dragging state */
+.creature-circle.dragging {
+    fill: #ff6b6b;
+    stroke: #c0392b;
+    stroke-width: 3;
+}
+
+/* Creature initial (no image) */
 .creature-initial {
     pointer-events: none;
     user-select: none;
+    fill: #fff;
+    font-size: 16;
+    font-weight: bold;
 }
 
+/* Creature image */
 .creature-image {
     pointer-events: none;
+}
+
+/* Creature name */
+.creature-name {
+    fill: #fff;
+    font-size: 8;
+    font-weight: bold;
+    text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
+}
+
+/* Light theme (explicit toggle) */
+[data-theme="light"] .grid-bg {
+    fill: #f5f5f5;
+}
+
+[data-theme="light"] .grid-line {
+    stroke: #d0d0d0;
+}
+
+[data-theme="light"] .creature-circle {
+    fill: #4a90d9;
+    stroke: #2c5f8a;
+}
+
+[data-theme="light"] .creature-circle.dragging {
+    fill: #ff6b6b;
+    stroke: #c0392b;
+}
+
+[data-theme="light"] .creature-name {
+    fill: #fff;
+    text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
+}
+
+/* Fallback: system light mode when no explicit theme is set */
+@media (prefers-color-scheme: light) {
+    .grid-bg {
+        fill: #f5f5f5;
+    }
+
+    .grid-line {
+        stroke: #d0d0d0;
+    }
+
+    .creature-circle {
+        fill: #4a90d9;
+        stroke: #2c5f8a;
+    }
+
+    .creature-circle.dragging {
+        fill: #ff6b6b;
+        stroke: #c0392b;
+    }
+
+    .creature-name {
+        fill: #fff;
+        text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
+    }
 }

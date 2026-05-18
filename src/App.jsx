@@ -43,6 +43,25 @@ function App() {
 
   const [showPositioning, setShowPositioning] = useState(false);
 
+  const [theme, setTheme] = useState(() => {
+    try {
+      const stored = localStorage.getItem('theme');
+      return stored === 'light' ? 'light' : 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    try { localStorage.setItem('theme', newTheme); } catch {}
+  };
+
+  useEffect(() => {
+    document.body.setAttribute('data-theme', theme);
+  }, [theme]);
+
   const handleCharacterClick = (character) => {
     setActiveCharacter(cloneDeep(character));
     setShowPositioning(false);
@@ -91,6 +110,9 @@ function App() {
         {campaignName}
         <button className="icon-button rename-campaign-btn" onClick={handleRenameCampaign} disabled={!isLocalhost} title="Rename Campaign"><i className="fas fa-pen"></i></button>
         <button className="icon-button delete-campaign-btn" onClick={handleDeleteCampaign} disabled={characters.length > 0} title="Delete Campaign"><i className="fas fa-trash"></i></button>
+        <button className="icon-button theme-toggle-btn" onClick={toggleTheme} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+          <i className={`fas ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i>
+        </button>
       </div>
       <div className="app-body">
         <Sidebar
