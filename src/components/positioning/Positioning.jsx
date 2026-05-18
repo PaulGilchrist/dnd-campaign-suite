@@ -529,7 +529,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
         const svgX = (e.clientX - rect.left) / rect.width * vb.width;
         const svgY = (e.clientY - rect.top) / rect.height * vb.height;
 
-        const factor = e.deltaY > 0 ? 0.9 : 1.1;
+        const factor = e.deltaY > 0 ? 1.1 : 0.9;
         const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom * factor));
 
         // Adjust pan so the point under the cursor stays in place
