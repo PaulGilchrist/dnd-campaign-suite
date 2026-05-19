@@ -176,6 +176,278 @@ app.get('/api/campaigns/:campaign', (req, res) => {
     }
 });
 
+// ====== MAP CRUD ROUTES ======
+
+// Helper to sanitize map names to filenames
+const sanitizeMapName = (name) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '.json';
+
+// GET /api/campaigns/:campaign/maps - List all maps with active status
+app.get('/api/campaigns/:campaign/maps', (req, res) => {
+  const { campaign } = req.params;
+  const mapsDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps');
+  
+  try {
+    if (!fs.existsSync(mapsDir)) {
+      return res.json({ maps: [] });
+    }
+    
+    const items = fs.readdirSync(mapsDir, { withFileTypes: true });
+    const mapFiles = items
+      .filter(item => item.isFile() && item.name.endsWith('.json'))
+      .map(item => item.name)
+      .sort();
+    
+    // Read active map from meta file
+    let activeMap = null;
+    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps-meta.json');
+    if (fs.existsSync(metaPath)) {
+      try {
+        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+        activeMap = meta.activeMap || null;
+      } catch (e) {}
+    }
+    
+    const maps = mapFiles.map(f => ({
+      name: f.replace(/\.json$/, ''),
+      fileName: f,
+      isActive: f.replace(/\.json$/, '') === activeMap
+    }));
+    
+    res.json({ maps });
+  } catch (error) {
+    console.error('Error listing maps:', error);
+    res.status(500).json({ error: 'Failed to list maps' });
+  }
+});
+
+// POST /api/campaigns/:campaign/maps - Create a new map
+app.post('/api/campaigns/:campaign/maps', (req, res) => {
+  const { campaign } = req.params;
+  const { name } = req.body;
+  
+  if (!name || name.trim() === '') {
+    return res.status(400).json({ error: 'Map name is required' });
+  }
+  
+  const mapsDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps');
+  
+  try {
+    if (!fs.existsSync(mapsDir)) {
+      fs.mkdirSync(mapsDir, { recursive: true });
+    }
+    
+    const fileName = sanitizeMapName(name);
+    const filePath = path.join(mapsDir, fileName);
+    
+    if (fs.existsSync(filePath)) {
+      return res.status(400).json({ error: 'A map with this name already exists' });
+    }
+    
+    const defaultMapData = {
+      name: name.trim(),
+      gridSize: 13,
+      walls: [],
+      paintCells: [],
+      items: [],
+      creatures: [],
+      zoom: 1,
+      panX: 0,
+      panY: 0
+    };
+    
+    fs.writeFileSync(filePath, JSON.stringify(defaultMapData, null, 2));
+    
+    // Broadcast maps list change
+    publish(`maps-list-${campaign}`, { action: 'created', map: { name: name.trim(), fileName } });
+    
+    res.status(201).json({ message: 'Map created successfully', map: { name: name.trim(), fileName } });
+  } catch (error) {
+    console.error('Error creating map:', error);
+    res.status(500).json({ error: 'Failed to create map' });
+  }
+});
+
+// GET /api/campaigns/:campaign/maps/:mapname - Get map data
+app.get('/api/campaigns/:campaign/maps/:mapname', (req, res) => {
+  const { campaign, mapname } = req.params;
+  const mapsDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps');
+  const fileName = mapname.endsWith('.json') ? mapname : `${mapname}.json`;
+  const filePath = path.join(mapsDir, fileName);
+  
+  try {
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Map not found' });
+    }
+    
+    const mapData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    res.json(mapData);
+  } catch (error) {
+    console.error('Error reading map:', error);
+    res.status(500).json({ error: 'Failed to read map' });
+  }
+});
+
+// PUT /api/campaigns/:campaign/maps/:mapname - Save map data
+app.put('/api/campaigns/:campaign/maps/:mapname', (req, res) => {
+  const { campaign, mapname } = req.params;
+  const mapData = req.body;
+  const mapsDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps');
+  
+  try {
+    if (!fs.existsSync(mapsDir)) {
+      fs.mkdirSync(mapsDir, { recursive: true });
+    }
+    
+    const fileName = mapname.endsWith('.json') ? mapname : `${mapname}.json`;
+    const filePath = path.join(mapsDir, fileName);
+    
+    fs.writeFileSync(filePath, JSON.stringify(mapData, null, 2));
+    
+    // Broadcast map data change for real-time sync
+    const eventMapName = fileName.replace(/\.json$/, '');
+    publish(`map-data-${campaign}-${eventMapName}`, mapData);
+    
+    res.json({ message: 'Map saved successfully' });
+  } catch (error) {
+    console.error('Error saving map:', error);
+    res.status(500).json({ error: 'Failed to save map' });
+  }
+});
+
+// DELETE /api/campaigns/:campaign/maps/:mapname - Delete a map
+app.delete('/api/campaigns/:campaign/maps/:mapname', (req, res) => {
+  const { campaign, mapname } = req.params;
+  const mapsDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps');
+  const fileName = mapname.endsWith('.json') ? mapname : `${mapname}.json`;
+  const filePath = path.join(mapsDir, fileName);
+  
+  try {
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Map not found' });
+    }
+    
+    fs.unlinkSync(filePath);
+    
+    // If this was the active map, clear active map in meta
+    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps-meta.json');
+    if (fs.existsSync(metaPath)) {
+      try {
+        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+        const mapKey = fileName.replace(/\.json$/, '');
+        if (meta.activeMap === mapKey) {
+          delete meta.activeMap;
+          fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+        }
+      } catch (e) {}
+    }
+    
+    // Broadcast maps list change
+    const mapKey = fileName.replace(/\.json$/, '');
+    publish(`maps-list-${campaign}`, { action: 'deleted', map: mapKey });
+    
+    res.json({ message: 'Map deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting map:', error);
+    res.status(500).json({ error: 'Failed to delete map' });
+  }
+});
+
+// PUT /api/campaigns/:campaign/maps/:mapname/rename - Rename a map
+app.put('/api/campaigns/:campaign/maps/:mapname/rename', (req, res) => {
+  const { campaign, mapname } = req.params;
+  const { newName } = req.body;
+  
+  if (!newName || newName.trim() === '') {
+    return res.status(400).json({ error: 'New map name is required' });
+  }
+  
+  const mapsDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps');
+  const oldFileName = mapname.endsWith('.json') ? mapname : `${mapname}.json`;
+  const oldFilePath = path.join(mapsDir, oldFileName);
+  const newFileName = sanitizeMapName(newName.trim());
+  const newFilePath = path.join(mapsDir, newFileName);
+  
+  try {
+    if (!fs.existsSync(oldFilePath)) {
+      return res.status(404).json({ error: 'Map not found' });
+    }
+    
+    if (fs.existsSync(newFilePath) && oldFileName !== newFileName) {
+      return res.status(400).json({ error: 'A map with this name already exists' });
+    }
+    
+    // Read existing data and update name
+    const mapData = JSON.parse(fs.readFileSync(oldFilePath, 'utf-8'));
+    mapData.name = newName.trim();
+    
+    // Write with new name, delete old file
+    fs.writeFileSync(newFilePath, JSON.stringify(mapData, null, 2));
+    
+    if (oldFileName !== newFileName) {
+      fs.unlinkSync(oldFilePath);
+    }
+    
+    // Update maps-meta.json if this was the active map
+    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps-meta.json');
+    if (fs.existsSync(metaPath)) {
+      try {
+        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+        const oldKey = oldFileName.replace(/\.json$/, '');
+        const newKey = newFileName.replace(/\.json$/, '');
+        if (meta.activeMap === oldKey) {
+          meta.activeMap = newKey;
+          fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+        }
+      } catch (e) {}
+    }
+    
+    // Broadcast maps list change
+    publish(`maps-list-${campaign}`, { 
+      action: 'renamed', 
+      oldName: oldFileName.replace(/\.json$/, ''), 
+      newName: newFileName.replace(/\.json$/, '') 
+    });
+    
+    res.json({ 
+      message: 'Map renamed successfully', 
+      map: { name: newName.trim(), fileName: newFileName }
+    });
+  } catch (error) {
+    console.error('Error renaming map:', error);
+    res.status(500).json({ error: 'Failed to rename map' });
+  }
+});
+
+// PUT /api/campaigns/:campaign/maps/:mapname/activate - Activate a map
+app.put('/api/campaigns/:campaign/maps/:mapname/activate', (req, res) => {
+  const { campaign, mapname } = req.params;
+  const mapsDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps');
+  const fileName = mapname.endsWith('.json') ? mapname : `${mapname}.json`;
+  const filePath = path.join(mapsDir, fileName);
+  
+  try {
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Map not found' });
+    }
+    
+    const mapKey = fileName.replace(/\.json$/, '');
+    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps-meta.json');
+    const meta = { activeMap: mapKey };
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+    
+    // Broadcast activation change
+    publish(`map-activate-${campaign}`, { activeMap: mapKey });
+    publish(`maps-list-${campaign}`, { action: 'activated', activeMap: mapKey });
+    
+    res.json({ message: 'Map activated successfully', activeMap: mapKey });
+  } catch (error) {
+    console.error('Error activating map:', error);
+    res.status(500).json({ error: 'Failed to activate map' });
+  }
+});
+
+// ====== END MAP CRUD ROUTES ======
+
 // API endpoint to get a specific character file in a campaign
 app.get('/api/campaigns/:campaign/:file', (req, res) => {
     const { campaign, file } = req.params;
@@ -229,6 +501,8 @@ app.post('/api/campaigns', (req, res) => {
         }
         
         fs.mkdirSync(newCampaignDir);
+        // Create maps subdirectory for campaign map files
+        fs.mkdirSync(path.join(newCampaignDir, 'maps'), { recursive: true });
         
         res.status(201).json({ message: 'Campaign created successfully', campaignName: campaignName.trim() });
     } catch (error) {
@@ -349,9 +623,23 @@ app.delete('/api/campaigns/:campaign', (req, res) => {
             }
         });
 
+        // Delete maps directory and all map files recursively
+        const mapsDir = path.join(campaignDir, 'maps');
+        if (fs.existsSync(mapsDir)) {
+            const mapFiles = fs.readdirSync(mapsDir);
+            mapFiles.forEach(f => fs.unlinkSync(path.join(mapsDir, f)));
+            fs.rmdirSync(mapsDir);
+        }
+
+        // Also delete maps-meta.json if it exists
+        const metaFile = path.join(campaignDir, 'maps-meta.json');
+        if (fs.existsSync(metaFile)) fs.unlinkSync(metaFile);
+
         // Remove all files in the campaign directory
         files.forEach(file => {
-            fs.unlinkSync(path.join(campaignDir, file));
+            if (file !== 'maps') {
+                fs.unlinkSync(path.join(campaignDir, file));
+            }
          });
         
         // Remove the campaign directory

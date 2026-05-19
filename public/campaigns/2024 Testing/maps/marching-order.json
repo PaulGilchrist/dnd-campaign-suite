@@ -1,0 +1,154 @@
+{
+  "creatures": [
+    {
+      "id": "01f5d485-c7e2-4e88-bb38-459543318be8",
+      "name": "Barbarian",
+      "gridX": 4,
+      "gridY": 10,
+      "imagePath": "character-images/27bdf8a8-b805-312b-112f-f677eb3c5b6a.JPG"
+    },
+    {
+      "id": "a196c0e1-4823-4fa7-a95a-756257db6518",
+      "name": "Bard",
+      "gridX": 8,
+      "gridY": 5,
+      "imagePath": "character-images/0b6f6c9b-b829-3960-b1ef-beba2d25fb99.JPG"
+    },
+    {
+      "id": "dcfacfda-d85c-4127-b80c-201284a6317f",
+      "name": "Cleric",
+      "gridX": 6,
+      "gridY": 4,
+      "imagePath": "character-images/ebabc053-cb43-ce50-8970-d74733c901c6.JPG"
+    },
+    {
+      "id": "616798ad-25d4-4c82-9d1f-316eb70bdbb0",
+      "name": "Druid",
+      "gridX": 4,
+      "gridY": 3,
+      "imagePath": "character-images/ecabfa0c-a297-a0ab-e7cb-31c3020e9ec2.JPG"
+    },
+    {
+      "id": "85060eef-04b3-4d51-8fb1-a7677f9c5e75",
+      "name": "Fighter",
+      "gridX": 4,
+      "gridY": 5,
+      "imagePath": "character-images/f91b384f-4990-27c9-0cce-904ab5ac01e1.JPG"
+    },
+    {
+      "id": "e39db1d3-d2cd-4fc8-a45c-da436dd11edf",
+      "name": "Monk",
+      "gridX": 6,
+      "gridY": 7,
+      "imagePath": "character-images/953f33d2-7c0e-d579-17e3-6fded255c63d.JPG"
+    },
+    {
+      "id": "237ef4a4-c08a-477f-8530-8202ed49a006",
+      "name": "Paladin",
+      "gridX": 8,
+      "gridY": 3,
+      "imagePath": "character-images/37b5a680-b4c6-b77b-f061-64da1a4b3e1a.JPG"
+    },
+    {
+      "id": "7e69118a-3cc9-46c3-bd85-96bcd5c12928",
+      "name": "Ranger",
+      "gridX": 7,
+      "gridY": 11,
+      "imagePath": ""
+    },
+    {
+      "id": "89784ed0-ca5a-4d5f-9dc4-56beebc95e5e",
+      "name": "Rogue",
+      "gridX": 6,
+      "gridY": 1,
+      "imagePath": "character-images/0da8b878-8532-9362-ac0b-d899336312c8.JPG"
+    },
+    {
+      "id": "1df136af-93bc-463b-a18f-9fdabcd47014",
+      "name": "Sorcerer",
+      "gridX": 1,
+      "gridY": 11,
+      "imagePath": ""
+    },
+    {
+      "id": "2873c629-7501-42fe-85c7-7147d4b6d753",
+      "name": "Warlock",
+      "gridX": 5,
+      "gridY": 11,
+      "imagePath": ""
+    },
+    {
+      "id": "18aca0b7-6040-41d3-917f-925428374d96",
+      "name": "Wizard",
+      "gridX": 3,
+      "gridY": 11,
+      "imagePath": ""
+    }
+  ],
+  "walls": [
+    "0,0",
+    "0,1",
+    "0,2",
+    "0,3",
+    "0,4",
+    "0,5",
+    "0,6",
+    "0,7",
+    "0,8",
+    "3,8",
+    "2,8",
+    "1,8",
+    "1,0",
+    "2,0",
+    "3,0",
+    "4,0",
+    "5,0",
+    "6,0",
+    "7,0",
+    "8,0",
+    "9,0",
+    "10,0",
+    "11,0",
+    "11,1",
+    "11,2",
+    "11,3",
+    "11,4",
+    "11,5",
+    "11,6",
+    "11,7",
+    "11,8",
+    "10,8",
+    "9,8",
+    "8,8",
+    "7,8",
+    "4,8",
+    "7,10",
+    "6,10"
+  ],
+  "gridSize": 13,
+  "placedItems": [
+    {
+      "id": "45a89cd7-ab28-4e6d-bf4e-682241fd02c6",
+      "type": "door",
+      "gridX": 5,
+      "gridY": 8,
+      "visible": true,
+      "rotation": 90
+    },
+    {
+      "id": "0cf8187e-3de5-4dab-bf76-9739259d2d4b",
+      "type": "door",
+      "gridX": 6,
+      "gridY": 8,
+      "visible": true,
+      "rotation": 90
+    },
+    {
+      "id": "0fb3c244-20d6-4501-9baf-5b9874b5a98c",
+      "type": "firepit",
+      "gridX": 1,
+      "gridY": 1,
+      "visible": true
+    }
+  ]
+}

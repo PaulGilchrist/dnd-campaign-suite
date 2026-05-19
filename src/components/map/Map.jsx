@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import utils from '../../services/utils.js';
-import storage from '../../services/storage.js';
+import * as mapsService from '../../services/mapsService.js';
 import Subscriber from '../common/Subscriber.jsx';
-import './Positioning.css';
+import './Map.css';
 import BarrelSVG from './BarrelSVG.jsx';
 import TableSVG from './TableSVG.jsx';
 import BedSVG from './BedSVG.jsx';
@@ -16,7 +16,7 @@ import StairsSVG from './StairsSVG.jsx';
 const CELL_SIZE = 40;
 const RADIUS = 20;
 
-function Positioning({ campaignName, characters, isLocalhost }) {
+function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
     const [gridSize, setGridSize] = useState(13);
     const SVG_SIZE = gridSize * CELL_SIZE;
     const [positioningData, setPositioningData] = useState(null);
@@ -57,46 +57,61 @@ function Positioning({ campaignName, characters, isLocalhost }) {
         if (isInitialized.current) return;
         isInitialized.current = true;
 
-        const existing = storage.get('positioning-' + campaignName);
-        if (existing && existing.creatures && existing.creatures.length > 0) {
-            // Convert stored walls array back to Set
-            const walls = existing.walls
-                ? new Set(existing.walls)
-                : new Set();
-            setPositioningData({ ...existing, walls });
-            setGridSize(existing.gridSize || 13);
-            if (existing.placedItems) {
-                setPlacedItems(existing.placedItems);
+        const loadMap = async () => {
+            try {
+                const existing = await mapsService.loadMapData(campaignName, mapName);
+                if (existing && existing.creatures && existing.creatures.length > 0) {
+                    // Convert stored walls array back to Set
+                    const walls = existing.walls
+                        ? new Set(existing.walls)
+                        : new Set();
+                    setPositioningData({ ...existing, walls });
+                    setGridSize(existing.gridSize || 13);
+                    if (existing.placedItems) {
+                        setPlacedItems(existing.placedItems);
+                    }
+                    return;
+                }
+            } catch (err) {
+                console.log('Map data not found, initializing empty map');
             }
-            return;
-        }
 
-        // Generate random positions with no collisions
-        const creatures = characters.map((character) => ({
-            id: utils.guid(),
-            name: utils.getFirstName(character.name),
-            gridX: 0,
-            gridY: 0,
-            imagePath: character.imagePath || ''
-        }));
+            // Generate random positions with no collisions
+            const creatures = characters.map((character) => ({
+                id: utils.guid(),
+                name: utils.getFirstName(character.name),
+                gridX: 0,
+                gridY: 0,
+                imagePath: character.imagePath || ''
+            }));
 
-        const occupied = new Set();
-        creatures.forEach((creature) => {
-            let gridX, gridY, key;
-            do {
-                gridX = Math.floor(Math.random() * gridSize); // 0–12
-                gridY = Math.floor(Math.random() * gridSize); // 0–12
-                key = `${gridX},${gridY}`;
-            } while (occupied.has(key));
-            occupied.add(key);
-            creature.gridX = gridX;
-            creature.gridY = gridY;
-        });
+            const occupied = new Set();
+            creatures.forEach((creature) => {
+                let gridX, gridY, key;
+                do {
+                    gridX = Math.floor(Math.random() * gridSize); // 0–12
+                    gridY = Math.floor(Math.random() * gridSize); // 0–12
+                    key = `${gridX},${gridY}`;
+                } while (occupied.has(key));
+                occupied.add(key);
+                creature.gridX = gridX;
+                creature.gridY = gridY;
+            });
 
-        const newData = { creatures, walls: new Set() };
-        setPositioningData(newData);
-        storage.set('positioning-' + campaignName, newData);
-    }, [campaignName, characters]);
+            const newData = { creatures, walls: new Set() };
+            setPositioningData(newData);
+            // Save initial data
+            const dataToSave = {
+                ...newData,
+                gridSize,
+                walls: [],
+                placedItems: []
+            };
+            mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save initial map data:', err));
+        };
+
+        loadMap();
+    }, [campaignName, characters, mapName]);
 
     // Save positioning data whenever it changes
     useEffect(() => {
@@ -108,23 +123,29 @@ function Positioning({ campaignName, characters, isLocalhost }) {
             walls: Array.from(positioningData.walls || []),
             placedItems: placedItems
         };
-        storage.set('positioning-' + campaignName, dataToSave);
-    }, [positioningData, campaignName, gridSize, placedItems]);
+        mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save map data:', err));
+    }, [positioningData, campaignName, gridSize, placedItems, mapName]);
 
     // SSE handler for real-time updates from other clients
     const handleSSEEvent = useCallback((event) => {
-        if (!event) return;
-        if (event.gridSize !== undefined) {
-            setGridSize(event.gridSize);
+        if (!event || !event.data) return;
+        // Only process events for THIS map
+        const expectedKey = `map-data-${campaignName}-${mapName}`;
+        if (event.key !== expectedKey) return;
+
+        const data = event.data;
+        if (data.gridSize !== undefined) {
+            setGridSize(data.gridSize);
         }
         setPositioningData((prev) => ({
-            creatures: event.creatures || prev?.creatures,
-            walls: event.walls ? new Set(event.walls) : prev?.walls
+            ...prev,
+            creatures: data.creatures || prev?.creatures || [],
+            walls: data.walls ? new Set(data.walls) : (prev?.walls || new Set())
         }));
-        if (event.placedItems !== undefined) {
-            setPlacedItems(event.placedItems);
+        if (data.placedItems !== undefined) {
+            setPlacedItems(data.placedItems);
         }
-    }, []);
+    }, [campaignName, mapName]);
 
     // Calculate center of a grid square
     const gridCenterX = useCallback((gridX) => gridX * CELL_SIZE + CELL_SIZE / 2, []);
@@ -148,6 +169,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
 
     // Handle grid pointer down (paint/erase mode)
     const handleGridPointerDown = useCallback((e) => {
+        if (!isLocalhost) return;
         if (tool === 'none' && !repositioningId) return;
         e.preventDefault();
         const grid = getGridFromEvent(e);
@@ -184,6 +206,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
 
     // Handle grid pointer move (paint/erase drag)
     const handleGridPointerMove = useCallback((e) => {
+        if (!isLocalhost) return;
         if (!painting || (tool !== 'paint' && tool !== 'erase')) return;
         e.preventDefault();
         const grid = getGridFromEvent(e);
@@ -573,39 +596,50 @@ function Positioning({ campaignName, characters, isLocalhost }) {
     return (
         <div className="positioning">
             <div className="toolbar-row">
-                <h4>Positioning / Marching Order</h4>
-                <label className="grid-size-label">
-                    Grid Size&nbsp;&nbsp;
-                    <input
-                        type="number"
-                        min="5"
-                        max="25"
-                        value={gridSize}
-                        onChange={(e) => setGridSize(Number(e.target.value))}
-                        className="grid-size-input"
-                    />
-                </label>
+                <button className="back-button" onClick={onBack} title="Back">
+                    <i className="fa-solid fa-arrow-left"></i> Back
+                </button>
+                <h4>{mapName || 'Map'}</h4>
+                {isLocalhost && (
+                    <label className="grid-size-label">
+                        Grid Size&nbsp;&nbsp;
+                        <input
+                            type="number"
+                            min="5"
+                            max="25"
+                            value={gridSize}
+                            onChange={(e) => setGridSize(Number(e.target.value))}
+                            className="grid-size-input"
+                        />
+                    </label>
+                )}
                 <div className="toolbar">
-                    <button
-                        className={tool === 'paint' ? 'active' : ''}
-                        onClick={() => setTool(tool === 'paint' ? 'none' : 'paint')}
-                    >
-                        <i className="fa-solid fa-paint-brush"></i> Paint
-                    </button>
-                    <button
-                        className={tool === 'erase' ? 'active' : ''}
-                        onClick={() => setTool(tool === 'erase' ? 'none' : 'erase')}
-                    >
-                        <i className="fa-solid fa-eraser"></i> Erase
-                    </button>
-                    <button
-                        onClick={handleClearWalls}
-                    >
-                        <i className="fa-solid fa-trash"></i> Clear Walls
-                    </button>
-                    <button onClick={() => setItemsPanelOpen(prev => !prev)}>
-                        <i className="fa-solid fa-box"></i> Items
-                    </button>
+                    {isLocalhost && (
+                        <>
+                            <button
+                                className={tool === 'paint' ? 'active' : ''}
+                                onClick={() => setTool(tool === 'paint' ? 'none' : 'paint')}
+                            >
+                                <i className="fa-solid fa-paint-brush"></i> Paint
+                            </button>
+                            <button
+                                className={tool === 'erase' ? 'active' : ''}
+                                onClick={() => setTool(tool === 'erase' ? 'none' : 'erase')}
+                            >
+                                <i className="fa-solid fa-eraser"></i> Erase
+                            </button>
+                            <button
+                                onClick={handleClearWalls}
+                            >
+                                <i className="fa-solid fa-trash"></i> Clear Walls
+                            </button>
+                        </>
+                    )}
+                    {isLocalhost && (
+                        <button onClick={() => setItemsPanelOpen(prev => !prev)}>
+                            <i className="fa-solid fa-box"></i> Items
+                        </button>
+                    )}
                     <button onClick={zoomIn}>
                         <i className="fa-solid fa-magnifying-glass-plus"></i>
                     </button>
@@ -1262,7 +1296,7 @@ function Positioning({ campaignName, characters, isLocalhost }) {
             </svg>
 
             {/* Items panel sidebar */}
-            {itemsPanelOpen && (
+            {isLocalhost && itemsPanelOpen && (
                 <div className="items-panel">
                     <button className="items-panel-close" onClick={() => setItemsPanelOpen(false)}>
                         <i className="fa-solid fa-times"></i>
@@ -1383,4 +1417,4 @@ function Positioning({ campaignName, characters, isLocalhost }) {
     );
 }
 
-export default Positioning;
+export default Map;

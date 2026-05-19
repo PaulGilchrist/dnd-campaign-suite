@@ -6,7 +6,9 @@ import Initiative from './components/initiative/initiative.jsx';
 import CampaignSelection from './components/campaign-selection/CampaignSelection.jsx';
 import CharacterCreationWizard from './components/character-creation/CharacterCreationWizard.jsx';
 import Sidebar from './components/sidebar/Sidebar.jsx';
-import Positioning from './components/positioning/Positioning.jsx';
+import Map from './components/map/Map.jsx';
+import MapsManager from './components/maps-manager/MapsManager.jsx';
+import * as mapsService from './services/mapsService.js';
 import utils from './services/utils.js';
 import useAppData from './hooks/useAppData.js';
 import useCharacterManagement from './hooks/useCharacterManagement.js';
@@ -41,7 +43,9 @@ function App() {
   const { characters, activeCharacter, setActiveCharacter, handleInitiativeClick: handleInitiativeClickRaw, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, inputRef } = charMgmt;
   const { showCharacterWizard, showEditCharacterWizard, handleAddCharacter, handleWizardComplete, handleWizardCancel, handleEditCharacter, handleEditWizardComplete, handleEditWizardCancel } = wizard;
 
-  const [showPositioning, setShowPositioning] = useState(false);
+  const [mapsView, setMapsView] = useState({ type: 'none' });
+  // type: 'none' | 'manager' | 'map'
+  // When type is 'map', mapName holds the sanitized map filename (e.g. 'dungeon-level-1')
 
   const [theme, setTheme] = useState(() => {
     try {
@@ -62,19 +66,52 @@ function App() {
     document.body.setAttribute('data-theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    setMapsView({ type: 'none' });
+  }, [campaignName]);
+
   const handleCharacterClick = (character) => {
     setActiveCharacter(cloneDeep(character));
-    setShowPositioning(false);
+    setMapsView({ type: 'none' });
   };
 
-  const handlePositioningClick = () => {
+  const handleMapsClick = () => {
     setActiveCharacter(null);
-    setShowPositioning(true);
+    if (isLocalhost) {
+      // GM: toggle Maps Manager
+      setMapsView(prev => {
+        if (prev.type === 'manager') return { type: 'none' };
+        return { type: 'manager' };
+      });
+    } else {
+      // Player: toggle active map view
+      if (mapsView.type === 'map') {
+        setMapsView({ type: 'none' });
+      } else {
+        loadActiveMapAndOpen();
+      }
+    }
+  };
+
+  const loadActiveMapAndOpen = async () => {
+    try {
+      const result = await mapsService.loadMaps(campaignName);
+      const activeMap = result.maps.find(m => m.isActive);
+      if (activeMap) {
+        const mapName = activeMap.fileName.replace(/\.json$/, '');
+        setMapsView({ type: 'map', mapName });
+      } else {
+        alert('No map is currently active. Ask your Game Master to activate one.');
+      }
+    } catch (err) {
+      console.error('Error loading maps:', err);
+      alert('Failed to load map data.');
+    }
   };
 
   const handleInitiativeClick = () => {
     handleInitiativeClickRaw();
-    setShowPositioning(false);
+    setMapsView({ type: 'none' });
   };
 
   const handleRenameCampaign = async () => {
@@ -104,7 +141,7 @@ function App() {
     }
   };
 
-  const initiativeActive = characters.length > 0 && activeCharacter == null && !showPositioning;
+  const initiativeActive = characters.length > 0 && activeCharacter == null && mapsView.type === 'none';
 
   if (showCampaignSelection) return <CampaignSelection onCampaignSelect={handleCampaignSelect} />;
 
@@ -120,7 +157,7 @@ function App() {
           onAddCharacter={handleAddCharacter}
           onCharacterClick={handleCharacterClick}
           onInitiativeClick={handleInitiativeClick}
-          onPositioningClick={handlePositioningClick}
+          onMapsClick={handleMapsClick}
           onRenameCampaign={handleRenameCampaign}
           onDeleteCampaign={handleDeleteCampaign}
           theme={theme}
@@ -147,7 +184,22 @@ function App() {
           />
         )}
         {initiativeActive && <Initiative characters={characters} />}
-        {showPositioning && <Positioning campaignName={campaignName} characters={characters} isLocalhost={isLocalhost} />}
+        {mapsView.type === 'manager' && (
+          <MapsManager
+            campaignName={campaignName}
+            onOpenMap={(mapName) => setMapsView({ type: 'map', mapName })}
+            onBack={() => setMapsView({ type: 'none' })}
+          />
+        )}
+        {mapsView.type === 'map' && (
+          <Map
+            campaignName={campaignName}
+            characters={characters}
+            isLocalhost={isLocalhost}
+            mapName={mapsView.mapName}
+            onBack={() => setMapsView({ type: isLocalhost ? 'manager' : 'none' })}
+          />
+        )}
         <br />
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allRaces={races} allRaces2024={races2024} allClasses={classes} allSpells={spells} allSpells2024={spells2024} />}
         {showEditCharacterWizard && <CharacterCreationWizard onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allRaces={races} allClasses={classes} allSpells={spells} allSpells2024={spells2024} characterData={activeCharacter} isEditing={true} />}

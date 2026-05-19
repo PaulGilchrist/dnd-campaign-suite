@@ -1,0 +1,438 @@
+/* Maps Manager - Campaign map list view */
+
+.maps-manager {
+    width: 100%;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.maps-manager-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.maps-manager-header h2 {
+    margin: 0;
+    font-size: 1.5em;
+}
+
+.maps-manager-header .back-button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #2a2a2a;
+    color: #ccc;
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.maps-manager-header .back-button:hover {
+    background: #3a3a3a;
+    border-color: #555;
+}
+
+/* Create map input row */
+.maps-manager-create {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    align-items: center;
+}
+
+.maps-manager-create input {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 14px;
+    border: 1px solid var(--border-color-input);
+    border-radius: 4px;
+    background-color: var(--background-color-input);
+    color: var(--color-text);
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.maps-manager-create input:focus {
+    border-color: var(--border-color-focus);
+}
+
+.maps-manager-create button {
+    padding: 8px 16px;
+    font-size: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #2a2a2a;
+    color: #ccc;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.maps-manager-create button:hover:not(:disabled) {
+    background: #3a3a3a;
+    border-color: #555;
+}
+
+.maps-manager-create button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Error message */
+.maps-manager-error {
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    border: 1px solid var(--color-error-border);
+    border-radius: 4px;
+    background-color: var(--background-color-error);
+    color: var(--color-error-light);
+    font-size: 13px;
+}
+
+/* Loading state */
+.maps-manager-loading {
+    padding: 24px;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+}
+
+/* Empty state */
+.maps-manager-empty {
+    padding: 32px;
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: 15px;
+}
+
+/* Map list */
+.maps-manager-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.maps-manager-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: var(--background-color-card);
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.maps-manager-item:hover {
+    background-color: var(--background-color-card-hover);
+}
+
+.maps-manager-item.active {
+    border-color: var(--color-primary-dark);
+    background-color: var(--background-color-selected);
+}
+
+.maps-manager-item.active:hover {
+    background-color: var(--background-color-selected-hover);
+}
+
+.maps-manager-item-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.maps-manager-item-name {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.maps-manager-item-info input {
+    padding: 4px 8px;
+    font-size: 14px;
+    border: 1px solid var(--border-color-input);
+    border-radius: 4px;
+    background-color: var(--background-color-input);
+    color: var(--color-text);
+    outline: none;
+    width: 100%;
+    max-width: 280px;
+    transition: border-color 0.15s ease;
+}
+
+.maps-manager-item-info input:focus {
+    border-color: var(--border-color-focus);
+}
+
+.maps-manager-active-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 10px;
+    background-color: var(--color-primary);
+    color: var(--color-text-inverse);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.maps-manager-item-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.maps-manager-item-actions button {
+    padding: 4px 10px;
+    font-size: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #2a2a2a;
+    color: #ccc;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.maps-manager-item-actions button:hover {
+    background: #3a3a3a;
+    border-color: #555;
+}
+
+.maps-manager-item-actions .delete-btn {
+    border-color: var(--color-error-border);
+    color: var(--color-error-light);
+}
+
+.maps-manager-item-actions .delete-btn:hover {
+    background: var(--background-color-error);
+    border-color: var(--color-error);
+    color: var(--color-error);
+}
+
+/* Delete confirmation modal */
+.maps-manager-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--background-color-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.maps-manager-modal {
+    background-color: var(--background-color-modal);
+    padding: 24px;
+    border-radius: 12px;
+    min-width: 420px;
+    max-width: 500px;
+    box-shadow: 0 4px 24px var(--shadow-color);
+}
+
+.maps-manager-modal h3 {
+    margin: 0 0 16px 0;
+    color: var(--color-error-light);
+    font-size: 1.3em;
+}
+
+.maps-manager-modal p {
+    margin: 0 0 20px 0;
+    color: var(--color-text);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.maps-manager-modal p strong {
+    color: var(--color-header);
+}
+
+.maps-manager-modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.maps-manager-modal-actions button {
+    padding: 8px 18px;
+    font-size: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: #2a2a2a;
+    color: #ccc;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.maps-manager-modal-actions button:hover {
+    background: #3a3a3a;
+    border-color: #555;
+}
+
+.maps-manager-modal-actions .delete-confirm-btn {
+    background-color: var(--color-error);
+    border-color: var(--color-error);
+    color: var(--color-text-inverse);
+    font-weight: 600;
+}
+
+.maps-manager-modal-actions .delete-confirm-btn:hover {
+    background-color: var(--color-error-light);
+    border-color: var(--color-error-light);
+}
+
+/* ===== Light theme overrides ===== */
+
+[data-theme="light"] .maps-manager-header .back-button {
+    background: #e8e8e8;
+    border-color: #ccc;
+    color: #333;
+}
+
+[data-theme="light"] .maps-manager-header .back-button:hover {
+    background: #d8d8d8;
+    border-color: #aaa;
+}
+
+[data-theme="light"] .maps-manager-create button {
+    background: #e8e8e8;
+    border-color: #ccc;
+    color: #333;
+}
+
+[data-theme="light"] .maps-manager-create button:hover:not(:disabled) {
+    background: #d8d8d8;
+    border-color: #aaa;
+}
+
+[data-theme="light"] .maps-manager-item-actions button {
+    background: #e8e8e8;
+    border-color: #ccc;
+    color: #333;
+}
+
+[data-theme="light"] .maps-manager-item-actions button:hover {
+    background: #d8d8d8;
+    border-color: #aaa;
+}
+
+[data-theme="light"] .maps-manager-item-actions .delete-btn {
+    border-color: var(--color-error-border);
+    color: var(--color-error);
+}
+
+[data-theme="light"] .maps-manager-item-actions .delete-btn:hover {
+    background: var(--background-color-error);
+    border-color: var(--color-error);
+    color: var(--color-error);
+}
+
+[data-theme="light"] .maps-manager-modal-actions button {
+    background: #e8e8e8;
+    border-color: #ccc;
+    color: #333;
+}
+
+[data-theme="light"] .maps-manager-modal-actions button:hover {
+    background: #d8d8d8;
+    border-color: #aaa;
+}
+
+[data-theme="light"] .maps-manager-modal-actions .delete-confirm-btn {
+    background-color: var(--color-error);
+    border-color: var(--color-error);
+    color: var(--color-text-inverse);
+}
+
+[data-theme="light"] .maps-manager-modal-actions .delete-confirm-btn:hover {
+    background-color: var(--color-error-light);
+    border-color: var(--color-error-light);
+}
+
+/* ===== System light mode fallback ===== */
+
+@media (prefers-color-scheme: light) {
+    .maps-manager-header .back-button {
+        background: #e8e8e8;
+        border-color: #ccc;
+        color: #333;
+    }
+
+    .maps-manager-header .back-button:hover {
+        background: #d8d8d8;
+        border-color: #aaa;
+    }
+
+    .maps-manager-create button {
+        background: #e8e8e8;
+        border-color: #ccc;
+        color: #333;
+    }
+
+    .maps-manager-create button:hover:not(:disabled) {
+        background: #d8d8d8;
+        border-color: #aaa;
+    }
+
+    .maps-manager-item-actions button {
+        background: #e8e8e8;
+        border-color: #ccc;
+        color: #333;
+    }
+
+    .maps-manager-item-actions button:hover {
+        background: #d8d8d8;
+        border-color: #aaa;
+    }
+
+    .maps-manager-item-actions .delete-btn {
+        border-color: var(--color-error-border);
+        color: var(--color-error);
+    }
+
+    .maps-manager-item-actions .delete-btn:hover {
+        background: var(--background-color-error);
+        border-color: var(--color-error);
+        color: var(--color-error);
+    }
+
+    .maps-manager-modal-actions button {
+        background: #e8e8e8;
+        border-color: #ccc;
+        color: #333;
+    }
+
+    .maps-manager-modal-actions button:hover {
+        background: #d8d8d8;
+        border-color: #aaa;
+    }
+
+    .maps-manager-modal-actions .delete-confirm-btn {
+        background-color: var(--color-error);
+        border-color: var(--color-error);
+        color: var(--color-text-inverse);
+    }
+
+    .maps-manager-modal-actions .delete-confirm-btn:hover {
+        background-color: var(--color-error-light);
+        border-color: var(--color-error-light);
+    }
+}
