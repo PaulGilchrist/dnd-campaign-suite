@@ -49,9 +49,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
 
     // Fog of war: Set of "gridX,gridY" strings for cells that are fogged
     const [fog, setFog] = useState(null);
-    // Fog rectangle drag state: start/end grid coords during drag
-    const [fogDragStart, setFogDragStart] = useState(null); // { gridX, gridY } | null
-    const [fogDragEnd, setFogDragEnd] = useState(null);     // { gridX, gridY } | null
+    // Fog rectangle drag state: start/end grid coords during drag (refs to avoid stale closures)
+    const fogDragStart = useRef(null); // { gridX, gridY } | null
+    const fogDragEnd = useRef(null);   // { gridX, gridY } | null
 
     // Barrel context menu state
     const [selectedBarrel, setSelectedBarrel] = useState(null); // { id, gridX, gridY }
@@ -242,31 +242,33 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
         e.preventDefault();
         const grid = getGridFromEvent(e);
         if (!grid) return;
-        setFogDragStart(grid);
-        setFogDragEnd(grid);
+        fogDragStart.current = grid;
+        fogDragEnd.current = grid;
     }, [tool, getGridFromEvent, isLocalhost]);
 
     const handleFogPointerMove = useCallback((e) => {
         if (!isLocalhost) return;
-        if (!fogDragStart || (tool !== 'fog' && tool !== 'clearFog')) return;
+        if (!fogDragStart.current || (tool !== 'fog' && tool !== 'clearFog')) return;
         e.preventDefault();
         const grid = getGridFromEvent(e);
         if (!grid) return;
-        setFogDragEnd(grid);
-    }, [fogDragStart, tool, getGridFromEvent, isLocalhost]);
+        fogDragEnd.current = grid;
+    }, [tool, getGridFromEvent, isLocalhost]);
 
     const handleFogPointerUp = useCallback(() => {
-        if (!fogDragStart || !fogDragEnd) {
-            setFogDragStart(null);
-            setFogDragEnd(null);
+        const start = fogDragStart.current;
+        const end = fogDragEnd.current;
+        if (!start || !end) {
+            fogDragStart.current = null;
+            fogDragEnd.current = null;
             return;
         }
 
         // Calculate rectangle bounds regardless of drag direction
-        const minX = Math.min(fogDragStart.gridX, fogDragEnd.gridX);
-        const maxX = Math.max(fogDragStart.gridX, fogDragEnd.gridX);
-        const minY = Math.min(fogDragStart.gridY, fogDragEnd.gridY);
-        const maxY = Math.max(fogDragStart.gridY, fogDragEnd.gridY);
+        const minX = Math.min(start.gridX, end.gridX);
+        const maxX = Math.max(start.gridX, end.gridX);
+        const minY = Math.min(start.gridY, end.gridY);
+        const maxY = Math.max(start.gridY, end.gridY);
 
         setFog((prev) => {
             const newFog = new Set(prev);
@@ -283,9 +285,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
             return newFog;
         });
 
-        setFogDragStart(null);
-        setFogDragEnd(null);
-    }, [fogDragStart, fogDragEnd, tool]);
+        fogDragStart.current = null;
+        fogDragEnd.current = null;
+    }, [tool]);
 
     // Handle grid pointer down (paint/erase mode)
     const handleGridPointerDown = useCallback((e) => {
@@ -1398,11 +1400,11 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                 })}
 
                 {/* Fog drag selection rectangle preview */}
-                {isLocalhost && fogDragStart && fogDragEnd && (fogDragStart.gridX !== fogDragEnd.gridX || fogDragStart.gridY !== fogDragEnd.gridY) && (() => {
-                    const minX = Math.min(fogDragStart.gridX, fogDragEnd.gridX);
-                    const maxX = Math.max(fogDragStart.gridX, fogDragEnd.gridX);
-                    const minY = Math.min(fogDragStart.gridY, fogDragEnd.gridY);
-                    const maxY = Math.max(fogDragStart.gridY, fogDragEnd.gridY);
+                {isLocalhost && fogDragStart.current && fogDragEnd.current && (fogDragStart.current.gridX !== fogDragEnd.current.gridX || fogDragStart.current.gridY !== fogDragEnd.current.gridY) && (() => {
+                    const minX = Math.min(fogDragStart.current.gridX, fogDragEnd.current.gridX);
+                    const maxX = Math.max(fogDragStart.current.gridX, fogDragEnd.current.gridX);
+                    const minY = Math.min(fogDragStart.current.gridY, fogDragEnd.current.gridY);
+                    const maxY = Math.max(fogDragStart.current.gridY, fogDragEnd.current.gridY);
                     return (
                         <rect
                             x={minX * CELL_SIZE}
