@@ -134,7 +134,7 @@
 /* Creature name */
 .positioning .creature-name {
     fill: #fff;
-    font-size: 8;
+    font-size: 14px;
     font-weight: bold;
     text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
 }
@@ -556,7 +556,7 @@
 /* NPC name */
 .positioning .npc-name {
     fill: #fff;
-    font-size: 8;
+    font-size: 14px;
     font-weight: bold;
     text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
 }

@@ -144,7 +144,7 @@
 }
 
 /* Creature name */
-.creature-name {
+.initiative .creature-name {
     margin-top: 9px;
     font-weight: 600;
     font-size: 1.35em;
@@ -152,7 +152,7 @@
     min-height: 1.2em;
 }
 
-.npc-name-input {
+.initiative .npc-name-input {
     border: none;
     background-color: transparent;
     text-align: center;

@@ -390,14 +390,14 @@
     {
       "id": "creature-1-1779209589404",
       "name": "Bard",
-      "gridX": 3,
-      "gridY": 2,
+      "gridX": 2,
+      "gridY": 5,
       "imagePath": "character-images/0b6f6c9b-b829-3960-b1ef-beba2d25fb99.JPG"
     },
     {
       "id": "creature-2-1779209589404",
       "name": "Cleric",
-      "gridX": 5,
+      "gridX": 3,
       "gridY": 2,
       "imagePath": "character-images/ebabc053-cb43-ce50-8970-d74733c901c6.JPG"
     },
@@ -439,7 +439,7 @@
     {
       "id": "creature-8-1779209589404",
       "name": "Rogue",
-      "gridX": 15,
+      "gridX": 5,
       "gridY": 2,
       "imagePath": "character-images/0da8b878-8532-9362-ac0b-d899336312c8.JPG"
     },

@@ -949,7 +949,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                                 y={cy + RADIUS - 4}
                                 textAnchor="middle"
                                 dominantBaseline="central"
-                                fontSize="8"
+                                fontSize="18"
                                 fontWeight="bold"
                                 className="creature-name"
                             >
@@ -1021,7 +1021,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                                 y={cy + RADIUS - 4}
                                 textAnchor="middle"
                                 dominantBaseline="central"
-                                fontSize="8"
+                                fontSize="18"
                                 fontWeight="bold"
                                 className="npc-name"
                             >
