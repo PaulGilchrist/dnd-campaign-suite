@@ -1,13 +1,16 @@
  
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 const Subscriber = ({handleEvent}) => {
+    const handleEventRef = useRef(handleEvent);
+    handleEventRef.current = handleEvent;
+
     useEffect(() => {
         const fullUrl = `http://${window.location.hostname}/subscribe`;
         const eventSource = new EventSource(fullUrl);
         eventSource.onmessage = (e) => {
             const event = JSON.parse(e.data);
-            handleEvent(event);
+            handleEventRef.current(event);
         };
         eventSource.onerror = (error) => {
             console.error('Event subscription error:', error);
@@ -15,7 +18,7 @@ const Subscriber = ({handleEvent}) => {
         return () => {
             eventSource.close();
         };
-    }, [handleEvent]);
+    }, []);
     return (
         <React.Fragment></React.Fragment>
     );

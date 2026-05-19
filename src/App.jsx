@@ -44,6 +44,7 @@ function App() {
   const { showCharacterWizard, showEditCharacterWizard, handleAddCharacter, handleWizardComplete, handleWizardCancel, handleEditCharacter, handleEditWizardComplete, handleEditWizardCancel } = wizard;
 
   const [mapsView, setMapsView] = useState({ type: 'none' });
+  const [npcs, setNpcs] = useState([]);
   // type: 'none' | 'manager' | 'map'
   // When type is 'map', mapName holds the sanitized map filename (e.g. 'dungeon-level-1')
 
@@ -183,7 +184,7 @@ function App() {
             onSaveClick={handleSaveClick}
           />
         )}
-        {initiativeActive && <Initiative characters={characters} />}
+        {initiativeActive && <Initiative characters={characters} onNpcsChange={setNpcs} />}
         {mapsView.type === 'manager' && (
           <MapsManager
             campaignName={campaignName}
@@ -195,6 +196,7 @@ function App() {
           <Map
             campaignName={campaignName}
             characters={characters}
+            npcs={npcs}
             isLocalhost={isLocalhost}
             mapName={mapsView.mapName}
             onBack={() => setMapsView({ type: isLocalhost ? 'manager' : 'none' })}

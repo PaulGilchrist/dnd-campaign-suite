@@ -397,6 +397,176 @@
     }
 }
 
+/* NPC section in items panel */
+.positioning .items-panel-npc-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.positioning .items-panel-npc-title {
+    margin: 8px 0 4px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #e74c3c;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.positioning .items-panel-npc-title i {
+    font-size: 12px;
+}
+
+.positioning .items-panel-npc-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid #5a2a2a;
+    border-radius: 4px;
+    color: #e74c3c;
+    font-size: 13px;
+    user-select: none;
+}
+
+.positioning .items-panel-npc-item[draggable="true"] {
+    cursor: grab;
+}
+
+.positioning .items-panel-npc-item[draggable="true"]:hover {
+    background: #3a2a2a;
+    border-color: #e74c3c;
+}
+
+.positioning .items-panel-npc-item[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.positioning .items-panel-npc-placed {
+    border-color: #4a2a2a;
+    opacity: 0.85;
+}
+
+.positioning .items-panel-npc-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.positioning .items-panel-npc-toggle {
+    background: none;
+    border: none;
+    color: #e74c3c;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    transition: color 0.15s ease;
+}
+
+.positioning .items-panel-npc-toggle:hover {
+    color: #fff;
+}
+
+/* Light theme overrides for NPC section */
+[data-theme="light"] .positioning .items-panel-npc-title {
+    color: #c0392b;
+}
+
+[data-theme="light"] .positioning .items-panel-npc-item {
+    border-color: #d4a0a0;
+    color: #c0392b;
+}
+
+[data-theme="light"] .positioning .items-panel-npc-item[draggable="true"]:hover {
+    background: #f0e0e0;
+    border-color: #c0392b;
+}
+
+[data-theme="light"] .positioning .items-panel-npc-placed {
+    border-color: #c49090;
+}
+
+[data-theme="light"] .positioning .items-panel-npc-toggle {
+    color: #c0392b;
+}
+
+[data-theme="light"] .positioning .items-panel-npc-toggle:hover {
+    color: #333;
+}
+
+/* System light mode for NPC section */
+@media (prefers-color-scheme: light) {
+    .positioning .items-panel-npc-title {
+        color: #c0392b;
+    }
+
+    .positioning .items-panel-npc-item {
+        border-color: #d4a0e0a0;
+        color: #c0392b;
+    }
+
+    .positioning .items-panel-npc-item[draggable="true"]:hover {
+        background: #f0e0e0;
+        border-color: #c0392b;
+    }
+
+    .positioning .items-panel-npc-placed {
+        border-color: #c49090;
+    }
+
+    .positioning .items-panel-npc-toggle {
+        color: #c0392b;
+    }
+
+    .positioning .items-panel-npc-toggle:hover {
+        color: #333;
+    }
+}
+
+/* NPC group */
+.positioning .npc-group {
+    cursor: pointer;
+}
+
+/* NPC circle */
+.positioning .npc-circle {
+    fill: #c0392b;
+    stroke: #e74c3c;
+    stroke-width: 3;
+    transition: stroke-width 0.15s ease;
+}
+
+.positioning .npc-group:hover .npc-circle {
+    stroke-width: 4;
+}
+
+/* NPC initial (no image) */
+.positioning .npc-initial {
+    pointer-events: none;
+    user-select: none;
+    fill: #fff;
+    font-size: 16;
+    font-weight: bold;
+}
+
+/* NPC name */
+.positioning .npc-name {
+    fill: #fff;
+    font-size: 8;
+    font-weight: bold;
+    text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
+}
+
+/* NPC context menu */
+.positioning .npc-context-menu {
+    pointer-events: all;
+    cursor: default;
+}
+
 /* Fog of war cell — GM overlay */
 .positioning .fog-cell {
     fill: rgba(0, 0, 0, 0.45);

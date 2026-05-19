@@ -54,7 +54,7 @@ function AvatarImage({ name, imagePath }) {
     );
 }
 
-function Initiative({ characters }) {
+function Initiative({ characters, onNpcsChange }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
     const [numOfNpc, setNumOfNpc] = React.useState(5);
     const [activeCreatureId, setActiveCreatureId] = React.useState(null);
@@ -167,6 +167,14 @@ function Initiative({ characters }) {
         storage.set('activeCreatureId', firstId);
         setActiveCreatureId(firstId);
     }, [characters]);
+
+    React.useEffect(() => {
+        if (!combatSummary || !onNpcsChange) return;
+        const npcList = combatSummary.creatures
+            .filter(c => c.type === 'npc')
+            .map(c => ({ id: c.id, name: c.name, type: 'npc', imageUrl: npcImages[c.id] || null }));
+        onNpcsChange(npcList);
+    }, [combatSummary, onNpcsChange, npcImages]);
 
     React.useEffect(() => {
         if (!combatSummary) return;

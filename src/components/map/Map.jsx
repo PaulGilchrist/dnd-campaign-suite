@@ -16,7 +16,7 @@ import StairsSVG from './StairsSVG.jsx';
 const CELL_SIZE = 40;
 const RADIUS = 20;
 
-function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
+function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     const [gridSize, setGridSize] = useState(20);
     const SVG_SIZE = gridSize * CELL_SIZE;
     const [positioningData, setPositioningData] = useState(null);
@@ -57,6 +57,12 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
     const [selectedBarrel, setSelectedBarrel] = useState(null); // { id, gridX, gridY }
     // Reposition mode state
     const [repositioningId, setRepositioningId] = useState(null);
+    // NPC map positions state
+    const [npcMapPositions, setNpcMapPositions] = useState([]);
+    // NPC metadata (id, name, imageUrl) synced via map data so players can render NPCs
+    const [npcMetadata, setNpcMetadata] = useState([]);
+    // NPC context menu state
+    const [selectedNpc, setSelectedNpc] = useState(null); // { npcId, gridX, gridY }
 
     // Load or initialize positioning data on mount
     useEffect(() => {
@@ -74,6 +80,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                     setPositioningData({ ...existing, walls });
                     setGridSize(existing.gridSize || 20);
                     setPlacedItems(existing.placedItems || []);
+                    setNpcMapPositions(existing.npcMapPositions || []);
+                    setNpcMetadata(existing.npcMetadata || []);
 
                     // Load fog data: if no fog data or empty array, fog all cells
                     if (!existing.fog || existing.fog.length === 0) {
@@ -148,7 +156,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                 gridSize,
                 walls: [],
                 placedItems: [],
-                fog: Array.from(allFogged)
+                fog: Array.from(allFogged),
+                npcMapPositions: [],
+                npcMetadata: []
             };
             mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save initial map data:', err));
         };
@@ -165,10 +175,12 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
             gridSize,
             walls: Array.from(positioningData.walls || []),
             placedItems: placedItems,
-            fog: Array.from(fog || [])
+            fog: Array.from(fog || []),
+            npcMapPositions: npcMapPositions,
+            npcMetadata: npcMetadata
         };
         mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save map data:', err));
-    }, [positioningData, campaignName, gridSize, placedItems, mapName, fog]);
+    }, [positioningData, campaignName, gridSize, placedItems, mapName, fog, npcMapPositions, npcMetadata]);
 
     // SSE handler for real-time updates from other clients
     const handleSSEEvent = useCallback((event) => {
@@ -191,6 +203,12 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
         }
         if (data.fog !== undefined) {
             setFog(new Set(data.fog));
+        }
+        if (data.npcMapPositions !== undefined) {
+            setNpcMapPositions(data.npcMapPositions);
+        }
+        if (data.npcMetadata !== undefined) {
+            setNpcMetadata(data.npcMetadata);
         }
     }, [campaignName, mapName]);
 
@@ -481,24 +499,54 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
         }
     }, []);
 
+    // NPC helper functions
+    const getNpcPosition = useCallback((npcId) => {
+        return npcMapPositions.find(p => p.npcId === npcId);
+    }, [npcMapPositions]);
+
+    const setNpcPosition = useCallback((npcId, gridX, gridY) => {
+        setNpcMapPositions(prev => {
+            const existing = prev.find(p => p.npcId === npcId);
+            if (existing) {
+                return prev.map(p => p.npcId === npcId ? { ...p, gridX, gridY } : p);
+            }
+            return [...prev, { npcId, gridX, gridY, visible: false }];
+        });
+    }, []);
+
     // Handle drop from items panel onto grid
     const handleDrop = useCallback((e) => {
         e.preventDefault();
         const grid = getGridFromEvent(e);
         if (!grid) return;
-        const itemType = e.dataTransfer.getData('text/plain');
-        if (!itemType) return;
+        const dragData = e.dataTransfer.getData('text/plain');
+        if (!dragData) return;
+
+        // Check if it's an NPC drop (prefixed with "npc:")
+        if (dragData.startsWith('npc:')) {
+            const npcId = dragData.slice(4);
+            // Also store the NPC metadata from the npcs prop so it syncs via SSE
+            const npc = npcs?.find(n => n.id === npcId);
+            if (npc) {
+                setNpcMetadata(prev => {
+                    if (prev.find(n => n.id === npcId)) return prev;
+                    return [...prev, { id: npc.id, name: npc.name, imageUrl: npc.imageUrl }];
+                });
+            }
+            setNpcPosition(npcId, grid.gridX, grid.gridY);
+            return;
+        }
 
         const newItem = {
             id: utils.guid(),
-            type: itemType,
+            type: dragData,
             gridX: grid.gridX,
             gridY: grid.gridY,
             visible: isLocalhost,
-            rotation: (itemType === 'table' || itemType === 'bed' || itemType === 'stairs') ? 0 : undefined
+            rotation: (dragData === 'table' || dragData === 'bed' || dragData === 'stairs') ? 0 : undefined
         };
         setPlacedItems(prev => [...prev, newItem]);
-    }, [getGridFromEvent, isLocalhost]);
+    }, [getGridFromEvent, isLocalhost, setNpcPosition, setNpcMetadata]);
 
     // Toggle visibility of a placed item (localhost only)
     const handleToggleItemVisibility = useCallback((itemId) => {
@@ -574,7 +622,19 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
     // Close context menu and reposition mode
     const handleCloseMenu = useCallback(() => {
         setSelectedBarrel(null);
+        setSelectedNpc(null);
         setRepositioningId(null);
+    }, []);
+
+    const toggleNpcVisibility = useCallback((npcId) => {
+        setNpcMapPositions(prev =>
+            prev.map(p => p.npcId === npcId ? { ...p, visible: !p.visible } : p)
+        );
+    }, []);
+
+    const removeNpcFromMap = useCallback((npcId) => {
+        setNpcMapPositions(prev => prev.filter(p => p.npcId !== npcId));
+        setSelectedNpc(null);
     }, []);
 
     // Sync state to refs so handleWheel always reads latest values
@@ -894,6 +954,78 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                                 className="creature-name"
                             >
                                 {creature.name}
+                            </text>
+                        </g>
+                    );
+                })}
+
+                {/* NPCs */}
+                {npcMetadata && npcMetadata.map((npc) => {
+                    const npcPos = npcMapPositions.find(p => p.npcId === npc.id);
+                    // Only render if positioned and visible (or on localhost for GM)
+                    if (!npcPos || (!npcPos.visible && !isLocalhost)) return null;
+
+                    const cx = gridCenterX(npcPos.gridX);
+                    const cy = gridCenterY(npcPos.gridY);
+
+                    return (
+                        <g
+                            key={npc.id}
+                            className="npc-group"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (isLocalhost) {
+                                    setSelectedNpc({ npcId: npc.id, gridX: npcPos.gridX, gridY: npcPos.gridY });
+                                }
+                            }}
+                            style={{ cursor: isLocalhost ? 'pointer' : 'default' }}
+                        >
+                            <defs>
+                                <clipPath id={`npc-clip-${npc.id}`}>
+                                    <circle cx={cx} cy={cy} r={RADIUS} />
+                                </clipPath>
+                            </defs>
+                            <circle
+                                cx={cx}
+                                cy={cy}
+                                r={RADIUS}
+                                className="npc-circle"
+                            />
+                            {npc.imageUrl ? (
+                                <image
+                                    xlinkHref={npc.imageUrl}
+                                    x={cx - RADIUS + 2}
+                                    y={cy - RADIUS + 2}
+                                    width={RADIUS * 2 - 4}
+                                    height={RADIUS * 2 - 4}
+                                    preserveAspectRatio="xMidYMid slice"
+                                    clipPath={`url(#npc-clip-${npc.id})`}
+                                    className="creature-image"
+                                />
+                            ) : (
+                                <text
+                                    x={cx}
+                                    y={cy}
+                                    textAnchor="middle"
+                                    dominantBaseline="central"
+                                    fill="#fff"
+                                    fontSize="16"
+                                    fontWeight="bold"
+                                    className="npc-initial"
+                                >
+                                    {npc.name.charAt(0).toUpperCase()}
+                                </text>
+                            )}
+                            <text
+                                x={cx}
+                                y={cy + RADIUS - 4}
+                                textAnchor="middle"
+                                dominantBaseline="central"
+                                fontSize="8"
+                                fontWeight="bold"
+                                className="npc-name"
+                            >
+                                {npc.name}
                             </text>
                         </g>
                     );
@@ -1441,6 +1573,26 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                         })()}
                     </g>
                 )}
+
+                {/* NPC context menu */}
+                {selectedNpc && (
+                    <g className="npc-context-menu" onClick={(e) => e.stopPropagation()}>
+                        <g>
+                            <rect x={gridCenterX(selectedNpc.gridX) + 10} y={gridCenterY(selectedNpc.gridY) + 10} width="120" height="64" rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
+                            {(() => {
+                                const npcPos = npcMapPositions.find(p => p.npcId === selectedNpc.npcId);
+                                const isVisible = npcPos ? npcPos.visible : true;
+                                return (
+                                    <text x={gridCenterX(selectedNpc.gridX) + 18} y={gridCenterY(selectedNpc.gridY) + 30} fill="#ccc" fontSize="11" className="menu-option" onClick={() => toggleNpcVisibility(selectedNpc.npcId)}>
+                                        {isVisible ? 'Hide' : 'Show'}
+                                    </text>
+                                );
+                            })()}
+                            <text x={gridCenterX(selectedNpc.gridX) + 18} y={gridCenterY(selectedNpc.gridY) + 52} fill="#ccc" fontSize="11" className="menu-option" onClick={() => removeNpcFromMap(selectedNpc.npcId)}>Delete from map</text>
+                            <text x={gridCenterX(selectedNpc.gridX) + 118} y={gridCenterY(selectedNpc.gridY) + 22} fill="#999" fontSize="10" className="menu-close" onClick={() => setSelectedNpc(null)}>✕</text>
+                        </g>
+                    </g>
+                )}
             </svg>
 
             {/* Items panel sidebar */}
@@ -1558,6 +1710,52 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                             </svg>
                             <span>Trap</span>
                         </div>
+
+                        {/* NPC section */}
+                        {npcs && npcs.length > 0 && (
+                            <div className="items-panel-npc-section">
+                                <h5 className="items-panel-npc-title">
+                                    <i className="fa-solid fa-users"></i> NPCs
+                                </h5>
+
+                                {/* Unplaced NPCs (draggable) */}
+                                {npcs.filter(npc => !npcMapPositions.find(p => p.npcId === npc.id)).map((npc) => (
+                                    <div
+                                        key={npc.id}
+                                        className="items-panel-npc-item"
+                                        draggable
+                                        onDragStart={(e) => {
+                                            e.dataTransfer.setData('text/plain', `npc:${npc.id}`);
+                                        }}
+                                    >
+                                        <i className="fa-solid fa-user"></i>
+                                        <span className="items-panel-npc-name">{npc.name}</span>
+                                    </div>
+                                ))}
+
+                                {/* Placed NPCs (with visibility toggle) — use npcMetadata for name/image */}
+                                {npcMapPositions.map((npcPos) => {
+                                    const npc = npcMetadata?.find(n => n.id === npcPos.npcId);
+                                    if (!npc) return null;
+                                    return (
+                                        <div
+                                            key={npcPos.npcId}
+                                            className="items-panel-npc-item items-panel-npc-placed"
+                                        >
+                                            <i className="fa-solid fa-user"></i>
+                                            <span className="items-panel-npc-name">{npc.name}</span>
+                                            <button
+                                                className="items-panel-npc-toggle"
+                                                onClick={() => toggleNpcVisibility(npcPos.npcId)}
+                                                title={npcPos.visible ? 'Hide NPC' : 'Show NPC'}
+                                            >
+                                                <i className={`fa-solid ${npcPos.visible ? 'fa-eye' : 'fa-eye-slash'}`}></i>
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
