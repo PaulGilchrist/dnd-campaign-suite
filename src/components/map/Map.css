@@ -1,13 +1,13 @@
 /* Positioning - Dungeon Grid */
 
-.positioning {
+.map {
     width: 100%;
     padding: 16px;
     box-sizing: border-box;
 }
 
 /* Toolbar row */
-.positioning .toolbar-row {
+.map .toolbar-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -17,21 +17,21 @@
     z-index: 10;
 }
 
-.positioning h4 {
+.map h4 {
     margin: 0 0 12px 0;
     font-size: 1.25em;
     font-weight: 600;
 }
 
 /* Toolbar */
-.positioning .toolbar {
+.map .toolbar {
     display: flex;
     flex-direction: row;
     gap: 8px;
     margin-bottom: 12px;
 }
 
-.positioning .toolbar button {
+.map .toolbar button {
     display: flex;
     align-items: center;
     gap: 4px;
@@ -46,23 +46,23 @@
     transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.positioning .toolbar button:hover {
+.map .toolbar button:hover {
     background: #3a3a3a;
     border-color: #555;
 }
 
-.positioning .toolbar button.active {
+.map .toolbar button.active {
     background: #4a90d9;
     border-color: #2c5f8a;
     color: #fff;
 }
 
-.positioning .toolbar button i {
+.map .toolbar button i {
     font-size: 14px;
 }
 
 /* Grid SVG */
-.positioning .grid-svg {
+.map .grid-svg {
     display: block;
     width: 100%;
     aspect-ratio: 1;
@@ -73,52 +73,52 @@
 }
 
 /* Grid background */
-.positioning .grid-bg {
+.map .grid-bg {
     fill: #1a1a1a;
 }
 
 /* Grid lines */
-.positioning .grid-line {
+.map .grid-line {
     stroke: #333;
     stroke-width: 1;
 }
 
 /* Wall cells */
-.positioning .wall-cell {
+.map .wall-cell {
     fill: #696969;
     opacity: 0.85;
 }
 
 /* Creature group */
-.positioning .creature-group {
+.map .creature-group {
     cursor: grab;
 }
 
-.positioning .creature-group:active {
+.map .creature-group:active {
     cursor: grabbing;
 }
 
 /* Creature circle */
-.positioning .creature-circle {
+.map .creature-circle {
     fill: #4a90d9;
     stroke: #2c5f8a;
     stroke-width: 2;
     transition: stroke-width 0.15s ease;
 }
 
-.positioning .creature-group:hover .creature-circle {
+.map .creature-group:hover .creature-circle {
     stroke-width: 3;
 }
 
 /* Dragging state */
-.positioning .creature-circle.dragging {
+.map .creature-circle.dragging {
     fill: #ff6b6b;
     stroke: #c0392b;
     stroke-width: 3;
 }
 
 /* Creature initial (no image) */
-.positioning .creature-initial {
+.map .creature-initial {
     pointer-events: none;
     user-select: none;
     fill: #fff;
@@ -127,12 +127,12 @@
 }
 
 /* Creature image */
-.positioning .creature-image {
+.map .creature-image {
     pointer-events: none;
 }
 
 /* Creature name */
-.positioning .creature-name {
+.map .creature-name {
     fill: #fff;
     font-size: 14px;
     font-weight: bold;
@@ -140,99 +140,99 @@
 }
 
 /* Light theme (explicit toggle) */
-[data-theme="light"] .positioning .grid-bg {
+[data-theme="light"] .map .grid-bg {
     fill: #f5f5f5;
 }
 
-[data-theme="light"] .positioning .grid-line {
+[data-theme="light"] .map .grid-line {
     stroke: #d0d0d0;
 }
 
-[data-theme="light"] .positioning .creature-circle {
+[data-theme="light"] .map .creature-circle {
     fill: #4a90d9;
     stroke: #2c5f8a;
 }
 
-[data-theme="light"] .positioning .creature-circle.dragging {
+[data-theme="light"] .map .creature-circle.dragging {
     fill: #ff6b6b;
     stroke: #c0392b;
 }
 
-[data-theme="light"] .positioning .creature-name {
+[data-theme="light"] .map .creature-name {
     fill: #fff;
     text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
 }
 
-[data-theme="light"] .positioning .toolbar button {
+[data-theme="light"] .map .toolbar button {
     background: #e8e8e8;
     border-color: #ccc;
     color: #333;
 }
 
-[data-theme="light"] .positioning .toolbar button:hover {
+[data-theme="light"] .map .toolbar button:hover {
     background: #d8d8d8;
     border-color: #aaa;
 }
 
-[data-theme="light"] .positioning .toolbar button.active {
+[data-theme="light"] .map .toolbar button.active {
     background: #4a90d9;
     border-color: #2c5f8a;
     color: #fff;
 }
 
-[data-theme="light"] .positioning .wall-cell {
+[data-theme="light"] .map .wall-cell {
     fill: #8a8a8a;
 }
 
 /* Fallback: system light mode when no explicit theme is set */
 @media (prefers-color-scheme: light) {
-    .positioning .grid-bg {
+    .map .grid-bg {
         fill: #f5f5f5;
     }
 
-    .positioning .grid-line {
+    .map .grid-line {
         stroke: #d0d0d0;
     }
 
-    .positioning .creature-circle {
+    .map .creature-circle {
         fill: #4a90d9;
         stroke: #2c5f8a;
     }
 
-    .positioning .creature-circle.dragging {
+    .map .creature-circle.dragging {
         fill: #ff6b6b;
         stroke: #c0392b;
     }
 
-    .positioning .creature-name {
+    .map .creature-name {
         fill: #fff;
         text-shadow: 0 0 3px #000, 0 0 3px #000, 0 0 3px #000;
     }
 
-    .positioning .toolbar button {
+    .map .toolbar button {
         background: #e8e8e8;
         border-color: #ccc;
         color: #333;
     }
 
-    .positioning .toolbar button:hover {
+    .map .toolbar button:hover {
         background: #d8d8d8;
         border-color: #aaa;
     }
 
-    .positioning .toolbar button.active {
+    .map .toolbar button.active {
         background: #4a90d9;
         border-color: #2c5f8a;
         color: #fff;
     }
 
-    .positioning .wall-cell {
+    .map .wall-cell {
         fill: #8a8a8a;
     }
 }
 
 /* Items Panel */
-.positioning .items-panel {
+.map .items-panel {
     position: absolute;
     top: 0;
     right: 0;
@@ -251,7 +251,7 @@
     to { transform: translateX(0); }
 }
 
-.positioning .items-panel-close {
+.map .items-panel-close {
     position: absolute;
     top: 8px;
     right: 8px;
@@ -264,18 +264,18 @@
     z-index: 21;
 }
 
-.positioning .items-panel-close:hover {
+.map .items-panel-close:hover {
     color: #fff;
 }
 
-.positioning .items-panel-content {
+.map .items-panel-content {
     padding: 16px;
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
 
-.positioning .items-panel-item {
+.map .items-panel-item {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -288,29 +288,29 @@
     font-size: 13px;
 }
 
-.positioning .items-panel-item:hover {
+.map .items-panel-item:hover {
     background: #3a3a3a;
     border-color: #555;
 }
 
-.positioning .items-panel-item:active {
+.map .items-panel-item:active {
     cursor: grabbing;
 }
 
 /* Placed items on grid */
-.positioning .placed-item {
+.map .placed-item {
     pointer-events: none;
 }
 
 /* Barrel hit area for context menu (localhost only) */
-.positioning .barrel-hit-area {
+.map .barrel-hit-area {
     fill: transparent;
     cursor: pointer;
     pointer-events: all;
 }
 
 /* Reposition mode highlight */
-.positioning .reposition-highlight {
+.map .reposition-highlight {
     fill: none;
     stroke: #4a90d9;
     stroke-width: 2;
@@ -324,87 +324,87 @@
 }
 
 /* Barrel context menu */
-.positioning .barrel-context-menu {
+.map .barrel-context-menu {
     pointer-events: all;
     cursor: default;
 }
 
-.positioning .barrel-context-menu rect {
+.map .barrel-context-menu rect {
     rx: 4;
 }
 
-.positioning .menu-option {
+.map .menu-option {
     cursor: pointer;
     pointer-events: all;
     user-select: none;
     transition: fill 0.15s ease;
 }
 
-.positioning .menu-option:hover {
+.map .menu-option:hover {
     fill: #fff;
 }
 
-.positioning .menu-close {
+.map .menu-close {
     cursor: pointer;
     pointer-events: all;
     user-select: none;
     transition: fill 0.15s ease;
 }
 
-.positioning .menu-close:hover {
+.map .menu-close:hover {
     fill: #fff;
 }
 
 /* Light theme overrides for items panel */
-[data-theme="light"] .positioning .items-panel {
+[data-theme="light"] .map .items-panel {
     background: #e8e8e8;
     border-left-color: #ccc;
 }
 
-[data-theme="light"] .positioning .items-panel-close {
+[data-theme="light"] .map .items-panel-close {
     color: #333;
 }
 
-[data-theme="light"] .positioning .items-panel-item {
+[data-theme="light"] .map .items-panel-item {
     border-color: #bbb;
     color: #333;
 }
 
-[data-theme="light"] .positioning .items-panel-item:hover {
+[data-theme="light"] .map .items-panel-item:hover {
     background: #d8d8d8;
     border-color: #999;
 }
 
 /* System light mode */
 @media (prefers-color-scheme: light) {
-    .positioning .items-panel {
+    .map .items-panel {
         background: #e8e8e8;
         border-left-color: #ccc;
     }
 
-    .positioning .items-panel-close {
+    .map .items-panel-close {
         color: #333;
     }
 
-    .positioning .items-panel-item {
+    .map .items-panel-item {
         border-color: #bbb;
         color: #333;
     }
 
-    .positioning .items-panel-item:hover {
+    .map .items-panel-item:hover {
         background: #d8d8d8;
         border-color: #999;
     }
 }
 
 /* NPC section in items panel */
-.positioning .items-panel-npc-section {
+.map .items-panel-npc-section {
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-.positioning .items-panel-npc-title {
+.map .items-panel-npc-title {
     margin: 8px 0 4px 0;
     font-size: 13px;
     font-weight: 600;
@@ -414,11 +414,11 @@
     gap: 6px;
 }
 
-.positioning .items-panel-npc-title i {
+.map .items-panel-npc-title i {
     font-size: 12px;
 }
 
-.positioning .items-panel-npc-item {
+.map .items-panel-npc-item {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -430,32 +430,32 @@
     user-select: none;
 }
 
-.positioning .items-panel-npc-item[draggable="true"] {
+.map .items-panel-npc-item[draggable="true"] {
     cursor: grab;
 }
 
-.positioning .items-panel-npc-item[draggable="true"]:hover {
+.map .items-panel-npc-item[draggable="true"]:hover {
     background: #3a2a2a;
     border-color: #e74c3c;
 }
 
-.positioning .items-panel-npc-item[draggable="true"]:active {
+.map .items-panel-npc-item[draggable="true"]:active {
     cursor: grabbing;
 }
 
-.positioning .items-panel-npc-placed {
+.map .items-panel-npc-placed {
     border-color: #4a2a2a;
     opacity: 0.85;
 }
 
-.positioning .items-panel-npc-name {
+.map .items-panel-npc-name {
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.positioning .items-panel-npc-toggle {
+.map .items-panel-npc-toggle {
     background: none;
     border: none;
     color: #e74c3c;
@@ -467,85 +467,85 @@
     transition: color 0.15s ease;
 }
 
-.positioning .items-panel-npc-toggle:hover {
+.map .items-panel-npc-toggle:hover {
     color: #fff;
 }
 
 /* Light theme overrides for NPC section */
-[data-theme="light"] .positioning .items-panel-npc-title {
+[data-theme="light"] .map .items-panel-npc-title {
     color: #c0392b;
 }
 
-[data-theme="light"] .positioning .items-panel-npc-item {
+[data-theme="light"] .map .items-panel-npc-item {
     border-color: #d4a0a0;
     color: #c0392b;
 }
 
-[data-theme="light"] .positioning .items-panel-npc-item[draggable="true"]:hover {
+[data-theme="light"] .map .items-panel-npc-item[draggable="true"]:hover {
     background: #f0e0e0;
     border-color: #c0392b;
 }
 
-[data-theme="light"] .positioning .items-panel-npc-placed {
+[data-theme="light"] .map .items-panel-npc-placed {
     border-color: #c49090;
 }
 
-[data-theme="light"] .positioning .items-panel-npc-toggle {
+[data-theme="light"] .map .items-panel-npc-toggle {
     color: #c0392b;
 }
 
-[data-theme="light"] .positioning .items-panel-npc-toggle:hover {
+[data-theme="light"] .map .items-panel-npc-toggle:hover {
     color: #333;
 }
 
 /* System light mode for NPC section */
 @media (prefers-color-scheme: light) {
-    .positioning .items-panel-npc-title {
+    .map .items-panel-npc-title {
         color: #c0392b;
     }
 
-    .positioning .items-panel-npc-item {
+    .map .items-panel-npc-item {
         border-color: #d4a0e0a0;
         color: #c0392b;
     }
 
-    .positioning .items-panel-npc-item[draggable="true"]:hover {
+    .map .items-panel-npc-item[draggable="true"]:hover {
         background: #f0e0e0;
         border-color: #c0392b;
     }
 
-    .positioning .items-panel-npc-placed {
+    .map .items-panel-npc-placed {
         border-color: #c49090;
     }
 
-    .positioning .items-panel-npc-toggle {
+    .map .items-panel-npc-toggle {
         color: #c0392b;
     }
 
-    .positioning .items-panel-npc-toggle:hover {
+    .map .items-panel-npc-toggle:hover {
         color: #333;
     }
 }
 
 /* NPC group */
-.positioning .npc-group {
+.map .npc-group {
     cursor: pointer;
 }
 
 /* NPC circle */
-.positioning .npc-circle {
+.map .npc-circle {
     fill: #c0392b;
     stroke: #e74c3c;
     stroke-width: 3;
     transition: stroke-width 0.15s ease;
 }
 
-.positioning .npc-group:hover .npc-circle {
+.map .npc-group:hover .npc-circle {
     stroke-width: 4;
 }
 
 /* NPC initial (no image) */
-.positioning .npc-initial {
+.map .npc-initial {
     pointer-events: none;
     user-select: none;
     fill: #fff;
@@ -554,7 +554,7 @@
 }
 
 /* NPC name */
-.positioning .npc-name {
+.map .npc-name {
     fill: #fff;
     font-size: 14px;
     font-weight: bold;
@@ -562,20 +562,20 @@
 }
 
 /* NPC context menu */
-.positioning .npc-context-menu {
+.map .npc-context-menu {
     pointer-events: all;
     cursor: default;
 }
 
 /* Fog of war cell — GM overlay */
-.positioning .fog-cell {
+.map .fog-cell {
     fill: rgba(0, 0, 0, 0.45);
     pointer-events: none;
     user-select: none;
 }
 
 /* Fog drag selection rectangle preview */
-.positioning .fog-preview {
+.map .fog-preview {
     fill: rgba(74, 144, 217, 0.15);
     stroke: #4a90d9;
     stroke-width: 2;

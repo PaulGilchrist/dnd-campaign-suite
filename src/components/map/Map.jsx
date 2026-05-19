@@ -19,7 +19,7 @@ const RADIUS = 20;
 function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     const [gridSize, setGridSize] = useState(20);
     const SVG_SIZE = gridSize * CELL_SIZE;
-    const [positioningData, setPositioningData] = useState(null);
+    const [mapData, setMapData] = useState(null);
     const svgRef = useRef(null);
     const isInitialized = useRef(false);
 
@@ -64,7 +64,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     // NPC context menu state
     const [selectedNpc, setSelectedNpc] = useState(null); // { npcId, gridX, gridY }
 
-    // Load or initialize positioning data on mount
+    // Load or initialize map data on mount
     useEffect(() => {
         if (isInitialized.current) return;
         isInitialized.current = true;
@@ -77,7 +77,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     const walls = existing.walls
                         ? new Set(existing.walls)
                         : new Set();
-                    setPositioningData({ ...existing, walls });
+                    setMapData({ ...existing, walls });
                     setGridSize(existing.gridSize || 20);
                     setPlacedItems(existing.placedItems || []);
                     setNpcMapPositions(existing.npcMapPositions || []);
@@ -107,7 +107,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                             gridY: Math.min(1 + Math.floor((i * 2) / gs), gs - 1),
                             imagePath: character.imagePath || ''
                         }));
-                        setPositioningData(prev => ({ ...prev, creatures: initialCreatures }));
+                        setMapData(prev => ({ ...prev, creatures: initialCreatures }));
                     }
 
                     return;
@@ -148,7 +148,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                 }
             }
 
-            setPositioningData(newData);
+            setMapData(newData);
             setFog(allFogged);
             // Save initial data
             const dataToSave = {
@@ -166,21 +166,21 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         loadMap();
     }, [campaignName, characters, mapName]);
 
-    // Save positioning data whenever it changes
+    // Save map data whenever it changes
     useEffect(() => {
-        if (!positioningData) return;
+        if (!mapData) return;
         // Convert walls Set to array for storage
         const dataToSave = {
-            ...positioningData,
+            ...mapData,
             gridSize,
-            walls: Array.from(positioningData.walls || []),
+            walls: Array.from(mapData.walls || []),
             placedItems: placedItems,
             fog: Array.from(fog || []),
             npcMapPositions: npcMapPositions,
             npcMetadata: npcMetadata
         };
         mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save map data:', err));
-    }, [positioningData, campaignName, gridSize, placedItems, mapName, fog, npcMapPositions, npcMetadata]);
+    }, [mapData, campaignName, gridSize, placedItems, mapName, fog, npcMapPositions, npcMetadata]);
 
     // SSE handler for real-time updates from other clients
     const handleSSEEvent = useCallback((event) => {
@@ -193,7 +193,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         if (data.gridSize !== undefined) {
             setGridSize(data.gridSize);
         }
-        setPositioningData((prev) => ({
+        setMapData((prev) => ({
             ...prev,
             creatures: data.creatures || prev?.creatures || [],
             walls: data.walls ? new Set(data.walls) : (prev?.walls || new Set())
@@ -310,7 +310,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         }
 
         const key = `${grid.gridX},${grid.gridY}`;
-        setPositioningData((prev) => {
+        setMapData((prev) => {
             const newWalls = new Set(prev.walls);
             if (tool === 'paint') {
                 newWalls.add(key);
@@ -331,7 +331,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         if (!grid) return;
 
         const key = `${grid.gridX},${grid.gridY}`;
-        setPositioningData((prev) => {
+        setMapData((prev) => {
             const newWalls = new Set(prev.walls);
             if (tool === 'paint') {
                 newWalls.add(key);
@@ -364,7 +364,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
         const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
 
-        const creature = positioningData.creatures.find((c) => c.id === creatureId);
+        const creature = mapData.creatures.find((c) => c.id === creatureId);
         if (!creature) return;
 
         const cx = gridCenterX(creature.gridX);
@@ -375,7 +375,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
             offsetX: svgX - cx,
             offsetY: svgY - cy
         });
-    }, [positioningData, gridSize, panX, panY]);
+    }, [mapData, gridSize, panX, panY]);
 
     const handlePointerMove = useCallback((e) => {
         if (!dragging) return;
@@ -389,7 +389,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
         const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
 
-        const creature = positioningData.creatures.find((c) => c.id === dragging.creatureId);
+        const creature = mapData.creatures.find((c) => c.id === dragging.creatureId);
         if (!creature) return;
 
         const cx = svgX - dragging.offsetX;
@@ -401,13 +401,13 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         const clampedGridX = Math.max(0, Math.min(gridSize - 1, gridX));
         const clampedGridY = Math.max(0, Math.min(gridSize - 1, gridY));
 
-        setPositioningData((prev) => ({
+        setMapData((prev) => ({
             ...prev,
             creatures: prev.creatures.map((c) =>
                 c.id === dragging.creatureId ? { ...c, gridX: clampedGridX, gridY: clampedGridY } : c
             )
         }));
-    }, [dragging, positioningData, gridSize, panX, panY]);
+    }, [dragging, mapData, gridSize, panX, panY]);
 
     const handlePointerUp = useCallback((e) => {
         if (!dragging) return;
@@ -421,7 +421,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
         const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
 
-        const creature = positioningData.creatures.find((c) => c.id === dragging.creatureId);
+        const creature = mapData.creatures.find((c) => c.id === dragging.creatureId);
         if (!creature) {
             setDragging(null);
             return;
@@ -438,7 +438,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
 
         // Collision detection: find the nearest unoccupied grid square
         const occupiedSquares = new Set(
-            positioningData.creatures
+            mapData.creatures
                 .filter((c) => c.id !== dragging.creatureId)
                 .map((c) => `${c.gridX},${c.gridY}`)
         );
@@ -477,7 +477,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
             }
         }
 
-        setPositioningData((prev) => ({
+        setMapData((prev) => ({
             ...prev,
             creatures: prev.creatures.map((c) =>
                 c.id === dragging.creatureId ? { ...c, gridX: targetX, gridY: targetY } : c
@@ -485,7 +485,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         }));
 
         setDragging(null);
-    }, [dragging, positioningData, gridSize, panX, panY]);
+    }, [dragging, mapData, gridSize, panX, panY]);
 
     const handlePointerLeave = useCallback(() => {
         setDragging(null);
@@ -494,7 +494,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     // Clear all walls and reset tool
     const handleClearWalls = useCallback(() => {
         if (window.confirm('Clear all painted walls?')) {
-            setPositioningData((prev) => ({ ...prev, walls: new Set() }));
+            setMapData((prev) => ({ ...prev, walls: new Set() }));
             setTool('none');
         }
     }, []);
@@ -754,12 +754,12 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         setPanY(newPanY);
     }, []);
 
-    if (!positioningData) return null;
+    if (!mapData) return null;
 
-    const { creatures, walls } = positioningData;
+    const { creatures, walls } = mapData;
 
     return (
-        <div className="positioning">
+        <div className="map">
             <div className="toolbar-row">
                 <h4>{mapsService.formatMapName(mapName) || 'Map'}</h4>
                 {isLocalhost && (
