@@ -128,3 +128,12 @@ export const loadMapData = async (campaignName, mapName) => {
     throw error;
   }
 };
+
+export function formatMapName(name) {
+    if (!name) return '';
+    return name
+        .replace(/\.json$/i, '')
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}

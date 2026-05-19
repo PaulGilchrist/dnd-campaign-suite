@@ -599,7 +599,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                 <button className="back-button" onClick={onBack} title="Back">
                     <i className="fa-solid fa-arrow-left"></i> Back
                 </button>
-                <h4>{mapName || 'Map'}</h4>
+                <h4>{positioningData?.name || mapsService.formatMapName(mapName) || 'Map'}</h4>
                 {isLocalhost && (
                     <label className="grid-size-label">
                         Grid Size&nbsp;&nbsp;

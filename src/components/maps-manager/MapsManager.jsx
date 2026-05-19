@@ -170,7 +170,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                                 {renamingMap === map.fileName ? (
                                     <input
                                         type="text"
-                                        defaultValue={map.name}
+                                        defaultValue={mapsService.formatMapName(map.name)}
                                         value={renameValue}
                                         autoFocus
                                         onChange={(e) => setRenameValue(e.target.value)}
@@ -178,7 +178,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                                         onKeyDown={(e) => handleRenameKeyDown(e, map.fileName)}
                                     />
                                 ) : (
-                                    <span className="maps-manager-item-name">{map.name}</span>
+                                    <span className="maps-manager-item-name">{mapsService.formatMapName(map.name)}</span>
                                 )}
                                 {map.isActive && <span className="maps-manager-active-badge">Active</span>}
                             </div>
@@ -198,7 +198,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                     <div className="maps-manager-modal" onClick={e => e.stopPropagation()}>
                         <h3>Delete Map</h3>
                         <p>
-                            This will permanently delete the map '<strong>{deletingMapName}</strong>' and all its
+                            This will permanently delete the map '<strong>{mapsService.formatMapName(deletingMapName)}</strong>' and all its
                             contents (walls, items, creature positions). This <strong>cannot be undone</strong>.
                         </p>
                         <div className="maps-manager-modal-actions">

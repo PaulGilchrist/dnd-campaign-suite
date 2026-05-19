@@ -144,10 +144,17 @@
       "rotation": 90
     },
     {
-      "id": "0fb3c244-20d6-4501-9baf-5b9874b5a98c",
+      "id": "3d62262f-ded2-4114-b178-03e10a393f1f",
       "type": "firepit",
       "gridX": 1,
       "gridY": 1,
+      "visible": true
+    },
+    {
+      "id": "162b858b-c515-4e5a-84ce-ca6ab4a569ac",
+      "type": "trap",
+      "gridX": 1,
+      "gridY": 7,
       "visible": true
     }
   ]
