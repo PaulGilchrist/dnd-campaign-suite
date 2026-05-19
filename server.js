@@ -245,7 +245,7 @@ app.post('/api/campaigns/:campaign/maps', (req, res) => {
     
     const defaultMapData = {
       name: name.trim(),
-      gridSize: Math.max(5, Math.min(100, gridSize ?? 13)),
+      gridSize: Math.max(5, Math.min(100, gridSize ?? 20)),
       walls: walls ?? [],
       doors: doors ?? [],
       paintCells: [],

@@ -5,7 +5,7 @@ import './GenerateDungeonModal.css';
 
 function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCreated }) {
     const [mapName, setMapName] = useState(initialMapName || '');
-    const [gridSize, setGridSize] = useState(13);
+    const [gridSize, setGridSize] = useState(20);
     const [corridorWidth, setCorridorWidth] = useState(1);
     const [generateDoors, setGenerateDoors] = useState(true);
     const [generating, setGenerating] = useState(false);

@@ -17,7 +17,7 @@ const CELL_SIZE = 40;
 const RADIUS = 20;
 
 function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
-    const [gridSize, setGridSize] = useState(13);
+    const [gridSize, setGridSize] = useState(20);
     const SVG_SIZE = gridSize * CELL_SIZE;
     const [positioningData, setPositioningData] = useState(null);
     const svgRef = useRef(null);
@@ -72,7 +72,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                         ? new Set(existing.walls)
                         : new Set();
                     setPositioningData({ ...existing, walls });
-                    setGridSize(existing.gridSize || 13);
+                    setGridSize(existing.gridSize || 20);
                     setPlacedItems(existing.placedItems || []);
 
                     // Convert existing.doors (from dungeon generator) into placedItems
@@ -99,7 +99,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
 
                     // Load fog data: if no fog data or empty array, fog all cells
                     if (!existing.fog || existing.fog.length === 0) {
-                        const gs = existing.gridSize || 13;
+                        const gs = existing.gridSize ||20;
                         const allFogged = new Set();
                         for (let x = 0; x < gs; x++) {
                             for (let y = 0; y < gs; y++) {
@@ -113,7 +113,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
 
                     // If no creatures exist but characters are available, initialize creature positions
                     if ((!existing.creatures || existing.creatures.length === 0) && characters && characters.length > 0) {
-                        const gs = existing.gridSize || 13;
+                        const gs = existing.gridSize || 20;
                         const initialCreatures = characters.map((character, i) => ({
                             id: character.id || `creature-${i}-${Date.now()}`,
                             name: character.name || 'Unknown',
