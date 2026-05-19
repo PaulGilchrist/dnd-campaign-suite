@@ -436,3 +436,29 @@
         border-color: var(--color-error-light);
     }
 }
+
+.generate-dungeon-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-primary) !important;
+  color: var(--color-text-inverse) !important;
+  font-weight: 500 !important;
+  white-space: nowrap;
+}
+
+.generate-dungeon-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+[data-theme="light"] .generate-dungeon-btn {
+  background: #4a7db5 !important;
+  color: #fff !important;
+}
+
+@media (prefers-color-scheme: light) {
+  .generate-dungeon-btn {
+    background: #4a7db5 !important;
+    color: #fff !important;
+  }
+}

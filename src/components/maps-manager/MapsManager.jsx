@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as mapsService from '../../services/mapsService.js';
 import Subscriber from '../common/Subscriber.jsx';
+import GenerateDungeonModal from './GenerateDungeonModal.jsx';
 import './MapsManager.css';
 
 function MapsManager({ campaignName, onOpenMap, onBack }) {
@@ -11,6 +12,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
     const [renameValue, setRenameValue] = useState('');
     const [deletingMap, setDeletingMap] = useState(null);
     const [error, setError] = useState(null);
+    const [showGenerateModal, setShowGenerateModal] = useState(false);
 
     const loadMapsList = useCallback(async () => {
         try {
@@ -121,6 +123,11 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
         }
     };
 
+    const handleMapCreated = useCallback(async () => {
+        setError(null);
+        await loadMapsList();
+    }, [loadMapsList]);
+
     const deletingMapName = deletingMap
         ? (maps.find(m => m.fileName === deletingMap)?.name || deletingMap)
         : '';
@@ -151,6 +158,13 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                 />
                 <button onClick={handleCreate} disabled={!createName.trim()}>
                     Create Map
+                </button>
+                <button
+                    className="generate-dungeon-btn"
+                    onClick={() => setShowGenerateModal(true)}
+                    title="Generate a dungeon map with rooms, hallways, and doorways"
+                >
+                    <i className="fa-solid fa-wand-magic-sparkles"></i> Generate Dungeon
                 </button>
             </div>
 
@@ -209,6 +223,15 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {showGenerateModal && (
+                <GenerateDungeonModal
+                    campaignName={campaignName}
+                    initialMapName={createName}
+                    onClose={() => setShowGenerateModal(false)}
+                    onMapCreated={handleMapCreated}
+                />
             )}
         </div>
     );

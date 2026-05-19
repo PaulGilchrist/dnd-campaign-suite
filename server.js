@@ -223,7 +223,7 @@ app.get('/api/campaigns/:campaign/maps', (req, res) => {
 // POST /api/campaigns/:campaign/maps - Create a new map
 app.post('/api/campaigns/:campaign/maps', (req, res) => {
   const { campaign } = req.params;
-  const { name } = req.body;
+  const { name, gridSize, walls, doors } = req.body;
   
   if (!name || name.trim() === '') {
     return res.status(400).json({ error: 'Map name is required' });
@@ -245,8 +245,9 @@ app.post('/api/campaigns/:campaign/maps', (req, res) => {
     
     const defaultMapData = {
       name: name.trim(),
-      gridSize: 13,
-      walls: [],
+      gridSize: Math.max(5, Math.min(100, gridSize ?? 13)),
+      walls: walls ?? [],
+      doors: doors ?? [],
       paintCells: [],
       items: [],
       creatures: [],

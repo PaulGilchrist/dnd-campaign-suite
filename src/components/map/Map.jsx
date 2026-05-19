@@ -66,30 +66,64 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
         const loadMap = async () => {
             try {
                 const existing = await mapsService.loadMapData(campaignName, mapName);
-                if (existing && existing.creatures && existing.creatures.length > 0) {
-                    // Convert stored walls array back to Set
+                if (existing) {
+                    // LOAD PATH — entered for any existing map data (generated or hand-made)
                     const walls = existing.walls
                         ? new Set(existing.walls)
                         : new Set();
                     setPositioningData({ ...existing, walls });
                     setGridSize(existing.gridSize || 13);
-                    if (existing.placedItems) {
-                        setPlacedItems(existing.placedItems);
+                    setPlacedItems(existing.placedItems || []);
+
+                    // Convert existing.doors (from dungeon generator) into placedItems
+                    if (existing.doors && existing.doors.length > 0) {
+                        setPlacedItems(prev => {
+                            const existingDoorKeys = new Set(
+                                (prev || []).filter(item => item.type === 'door').map(item => `${item.gridX},${item.gridY}`)
+                            );
+                            const newDoors = existing.doors.filter(d => !existingDoorKeys.has(`${d.gridX},${d.gridY}`));
+                            if (newDoors.length === 0) return prev;
+                            return [
+                                ...(prev || []),
+                                ...newDoors.map(d => ({
+                                    gridX: d.gridX,
+                                    gridY: d.gridY,
+                                    type: d.type || 'door',
+                                    id: `door-${d.gridX}-${d.gridY}`,
+                                    visible: d.visible !== undefined ? d.visible : true,
+                                    rotation: d.rotation || 0
+                                }))
+                            ];
+                        });
                     }
-                    // Load fog data (backward-compatible: no fog field = all cells fogged initially)
-                    if (existing.fog) {
-                        setFog(new Set(existing.fog));
-                    } else {
-                        // Old map without fog data: fog all cells
+
+                    // Load fog data: if no fog data or empty array, fog all cells
+                    if (!existing.fog || existing.fog.length === 0) {
+                        const gs = existing.gridSize || 13;
                         const allFogged = new Set();
-                        const size = existing.gridSize || 13;
-                        for (let y = 0; y < size; y++) {
-                            for (let x = 0; x < size; x++) {
+                        for (let x = 0; x < gs; x++) {
+                            for (let y = 0; y < gs; y++) {
                                 allFogged.add(`${x},${y}`);
                             }
                         }
                         setFog(allFogged);
+                    } else {
+                        setFog(new Set(existing.fog));
                     }
+
+                    // If no creatures exist but characters are available, initialize creature positions
+                    if ((!existing.creatures || existing.creatures.length === 0) && characters && characters.length > 0) {
+                        const gs = existing.gridSize || 13;
+                        const initialCreatures = characters.map((character, i) => ({
+                            id: character.id || `creature-${i}-${Date.now()}`,
+                            name: character.name || 'Unknown',
+                            gridX: Math.min(1 + (i * 2) % gs, gs - 1),
+                            gridY: Math.min(1 + Math.floor((i * 2) / gs), gs - 1),
+                            imagePath: character.imagePath || ''
+                        }));
+                        setPositioningData(prev => ({ ...prev, creatures: initialCreatures }));
+                    }
+
                     return;
                 }
             } catch (err) {
@@ -694,7 +728,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                         <input
                             type="number"
                             min="5"
-                            max="25"
+                            max="100"
                             value={gridSize}
                             onChange={(e) => setGridSize(Number(e.target.value))}
                             className="grid-size-input"

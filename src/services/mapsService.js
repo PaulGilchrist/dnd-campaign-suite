@@ -15,12 +15,12 @@ export const loadMaps = async (campaignName) => {
   }
 };
 
-export const createMap = async (campaignName, mapName) => {
+export const createMap = async (campaignName, mapName, options = {}) => {
   try {
     const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/maps`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: mapName }),
+      body: JSON.stringify({ name: mapName, ...options }),
     });
     if (!response.ok) {
       const { error } = await response.json();
