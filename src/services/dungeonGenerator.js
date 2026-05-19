@@ -185,13 +185,13 @@ export function generateDungeon(gridSize, options = {}) {
         // Segment 1 is horizontal: from (ax, ay) to (bx, ay)
         if (bx > ax) {
           // Going RIGHT: exit through roomA's RIGHT edge
-          const edgeX = roomA.x + roomA.w; // one cell outside right edge
+          const edgeX = roomA.x + roomA.w - 1; // inside right edge
           if (edgeX < gridSize) {
             addDoorAtEdge(edgeX, ay, 'right', ay, corridorWidth);
           }
         } else if (bx < ax) {
           // Going LEFT: exit through roomA's LEFT edge
-          const edgeX = roomA.x - 1; // one cell outside left edge
+          const edgeX = roomA.x; // inside left edge
           if (edgeX >= 0) {
             addDoorAtEdge(edgeX, ay, 'left', ay, corridorWidth);
           }
@@ -201,7 +201,7 @@ export function generateDungeon(gridSize, options = {}) {
         // Segment 1 is vertical: from (ax, ay) to (ax, by)
         if (by > ay) {
           // Going DOWN: exit through roomA's BOTTOM edge
-          const edgeY = roomA.y + roomA.h; // one cell outside bottom edge
+          const edgeY = roomA.y + roomA.h - 1; // inside bottom edge
           if (edgeY < gridSize) {
             addDoorAtEdge(ax, edgeY, 'bottom', ax, corridorWidth);
           }
