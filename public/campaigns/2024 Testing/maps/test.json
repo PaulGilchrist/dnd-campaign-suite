@@ -204,7 +204,9 @@
     "4,16",
     "1,16",
     "0,16",
-    "9,23"
+    "9,23",
+    "9,24",
+    "8,22"
   ],
   "placedItems": [
     {
@@ -373,13 +375,6 @@
       "gridX": 8,
       "gridY": 22,
       "visible": false
-    },
-    {
-      "id": "a3dc4c85-191d-42d5-92bb-1b19d476380b",
-      "type": "firepit",
-      "gridX": 5,
-      "gridY": 3,
-      "visible": true
     }
   ],
   "paintCells": [],
@@ -389,55 +384,55 @@
       "id": "creature-0-1779209589404",
       "name": "Barbarian",
       "gridX": 1,
-      "gridY": 1,
+      "gridY": 2,
       "imagePath": "character-images/27bdf8a8-b805-312b-112f-f677eb3c5b6a.JPG"
     },
     {
       "id": "creature-1-1779209589404",
       "name": "Bard",
       "gridX": 3,
-      "gridY": 1,
+      "gridY": 2,
       "imagePath": "character-images/0b6f6c9b-b829-3960-b1ef-beba2d25fb99.JPG"
     },
     {
       "id": "creature-2-1779209589404",
       "name": "Cleric",
       "gridX": 5,
-      "gridY": 1,
+      "gridY": 2,
       "imagePath": "character-images/ebabc053-cb43-ce50-8970-d74733c901c6.JPG"
     },
     {
       "id": "creature-3-1779209589404",
       "name": "Druid",
       "gridX": 7,
-      "gridY": 1,
+      "gridY": 2,
       "imagePath": "character-images/ecabfa0c-a297-a0ab-e7cb-31c3020e9ec2.JPG"
     },
     {
       "id": "creature-4-1779209589404",
       "name": "Fighter",
       "gridX": 9,
-      "gridY": 1,
+      "gridY": 2,
       "imagePath": "character-images/f91b384f-4990-27c9-0cce-904ab5ac01e1.JPG"
     },
     {
       "id": "creature-5-1779209589404",
       "name": "Monk",
       "gridX": 11,
-      "gridY": 1,
+      "gridY": 2,
       "imagePath": "character-images/953f33d2-7c0e-d579-17e3-6fded255c63d.JPG"
     },
     {
       "id": "creature-6-1779209589404",
       "name": "Paladin",
       "gridX": 13,
-      "gridY": 1,
+      "gridY": 2,
       "imagePath": "character-images/37b5a680-b4c6-b77b-f061-64da1a4b3e1a.JPG"
     },
     {
       "id": "creature-7-1779209589404",
       "name": "Ranger",
-      "gridX": 4,
+      "gridX": 1,
       "gridY": 0,
       "imagePath": ""
     },
@@ -445,7 +440,7 @@
       "id": "creature-8-1779209589404",
       "name": "Rogue",
       "gridX": 15,
-      "gridY": 1,
+      "gridY": 2,
       "imagePath": "character-images/0da8b878-8532-9362-ac0b-d899336312c8.JPG"
     },
     {
@@ -466,13 +461,6 @@
       "id": "creature-11-1779209589404",
       "name": "Wizard",
       "gridX": 0,
-      "gridY": 0,
-      "imagePath": ""
-    },
-    {
-      "id": "creature-12-1779209589404",
-      "name": "Unknown",
-      "gridX": 1,
       "gridY": 0,
       "imagePath": ""
     }
