@@ -34,7 +34,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
     const panYValueRef = useRef(0);
     // Accumulate deltaY for smooth zoom thresholding
     const accumulatedDeltaRef = useRef(0);
-    // Tool state: 'none' | 'paint' | 'erase'
+    // Tool state: 'none' | 'paint' | 'erase' | 'fog' | 'clearFog'
     const [tool, setTool] = useState('none');
     // Paint state: tracks grid coords during active paint/erase
     const [painting, setPainting] = useState(null);
@@ -46,6 +46,12 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
     // Items panel state
     const [itemsPanelOpen, setItemsPanelOpen] = useState(false);
     const [placedItems, setPlacedItems] = useState([]);
+
+    // Fog of war: Set of "gridX,gridY" strings for cells that are fogged
+    const [fog, setFog] = useState(null);
+    // Fog rectangle drag state: start/end grid coords during drag
+    const [fogDragStart, setFogDragStart] = useState(null); // { gridX, gridY } | null
+    const [fogDragEnd, setFogDragEnd] = useState(null);     // { gridX, gridY } | null
 
     // Barrel context menu state
     const [selectedBarrel, setSelectedBarrel] = useState(null); // { id, gridX, gridY }
@@ -69,6 +75,20 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                     setGridSize(existing.gridSize || 13);
                     if (existing.placedItems) {
                         setPlacedItems(existing.placedItems);
+                    }
+                    // Load fog data (backward-compatible: no fog field = all cells fogged initially)
+                    if (existing.fog) {
+                        setFog(new Set(existing.fog));
+                    } else {
+                        // Old map without fog data: fog all cells
+                        const allFogged = new Set();
+                        const size = existing.gridSize || 13;
+                        for (let y = 0; y < size; y++) {
+                            for (let x = 0; x < size; x++) {
+                                allFogged.add(`${x},${y}`);
+                            }
+                        }
+                        setFog(allFogged);
                     }
                     return;
                 }
@@ -99,13 +119,24 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
             });
 
             const newData = { creatures, walls: new Set() };
+
+            // Fog all cells for new map
+            const allFogged = new Set();
+            for (let y = 0; y < gridSize; y++) {
+                for (let x = 0; x < gridSize; x++) {
+                    allFogged.add(`${x},${y}`);
+                }
+            }
+
             setPositioningData(newData);
+            setFog(allFogged);
             // Save initial data
             const dataToSave = {
                 ...newData,
                 gridSize,
                 walls: [],
-                placedItems: []
+                placedItems: [],
+                fog: Array.from(allFogged)
             };
             mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save initial map data:', err));
         };
@@ -121,10 +152,11 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
             ...positioningData,
             gridSize,
             walls: Array.from(positioningData.walls || []),
-            placedItems: placedItems
+            placedItems: placedItems,
+            fog: Array.from(fog || [])
         };
         mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save map data:', err));
-    }, [positioningData, campaignName, gridSize, placedItems, mapName]);
+    }, [positioningData, campaignName, gridSize, placedItems, mapName, fog]);
 
     // SSE handler for real-time updates from other clients
     const handleSSEEvent = useCallback((event) => {
@@ -144,6 +176,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
         }));
         if (data.placedItems !== undefined) {
             setPlacedItems(data.placedItems);
+        }
+        if (data.fog !== undefined) {
+            setFog(new Set(data.fog));
         }
     }, [campaignName, mapName]);
 
@@ -166,6 +201,57 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
 
         return { gridX, gridY };
     }, [gridSize, panX, panY]);
+
+    const handleFogPointerDown = useCallback((e) => {
+        if (!isLocalhost) return;
+        if (tool !== 'fog' && tool !== 'clearFog') return;
+        e.preventDefault();
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+        setFogDragStart(grid);
+        setFogDragEnd(grid);
+    }, [tool, getGridFromEvent, isLocalhost]);
+
+    const handleFogPointerMove = useCallback((e) => {
+        if (!isLocalhost) return;
+        if (!fogDragStart || (tool !== 'fog' && tool !== 'clearFog')) return;
+        e.preventDefault();
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+        setFogDragEnd(grid);
+    }, [fogDragStart, tool, getGridFromEvent, isLocalhost]);
+
+    const handleFogPointerUp = useCallback(() => {
+        if (!fogDragStart || !fogDragEnd) {
+            setFogDragStart(null);
+            setFogDragEnd(null);
+            return;
+        }
+
+        // Calculate rectangle bounds regardless of drag direction
+        const minX = Math.min(fogDragStart.gridX, fogDragEnd.gridX);
+        const maxX = Math.max(fogDragStart.gridX, fogDragEnd.gridX);
+        const minY = Math.min(fogDragStart.gridY, fogDragEnd.gridY);
+        const maxY = Math.max(fogDragStart.gridY, fogDragEnd.gridY);
+
+        setFog((prev) => {
+            const newFog = new Set(prev);
+            for (let y = minY; y <= maxY; y++) {
+                for (let x = minX; x <= maxX; x++) {
+                    const key = `${x},${y}`;
+                    if (tool === 'fog') {
+                        newFog.add(key);
+                    } else if (tool === 'clearFog') {
+                        newFog.delete(key);
+                    }
+                }
+            }
+            return newFog;
+        });
+
+        setFogDragStart(null);
+        setFogDragEnd(null);
+    }, [fogDragStart, fogDragEnd, tool]);
 
     // Handle grid pointer down (paint/erase mode)
     const handleGridPointerDown = useCallback((e) => {
@@ -506,6 +592,11 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
             handleGridPointerDown(e);
             return;
         }
+        // Fog/clearFog take priority over panning
+        if (tool === 'fog' || tool === 'clearFog') {
+            handleFogPointerDown(e);
+            return;
+        }
         // Reposition mode takes priority over panning
         if (repositioningId) {
             handleGridPointerDown(e);
@@ -633,6 +724,18 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                             >
                                 <i className="fa-solid fa-trash"></i> Clear Walls
                             </button>
+                            <button
+                                className={tool === 'fog' ? 'active' : ''}
+                                onClick={() => setTool(tool === 'fog' ? 'none' : 'fog')}
+                            >
+                                <i className="fa-solid fa-cloud"></i> Fog
+                            </button>
+                            <button
+                                className={tool === 'clearFog' ? 'active' : ''}
+                                onClick={() => setTool(tool === 'clearFog' ? 'none' : 'clearFog')}
+                            >
+                                <i className="fa-solid fa-sun"></i> Clear Fog
+                            </button>
                         </>
                     )}
                     {isLocalhost && (
@@ -657,9 +760,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                 viewBox={`${panX} ${panY} ${SVG_SIZE / zoom} ${SVG_SIZE / zoom}`}
                 className="grid-svg"
                 onPointerDown={handlePanStart}
-                onPointerMove={(e) => { handlePointerMove(e); handleGridPointerMove(e); handlePanMove(e); }}
-                onPointerUp={(e) => { handlePointerUp(e); handleGridPointerUp(e); handlePanEnd(e); }}
-                onPointerLeave={handleGridPointerLeave}
+                onPointerMove={(e) => { handlePointerMove(e); handleGridPointerMove(e); handleFogPointerMove(e); handlePanMove(e); }}
+                onPointerUp={(e) => { handlePointerUp(e); handleGridPointerUp(e); handleFogPointerUp(e); handlePanEnd(e); }}
+                onPointerLeave={(e) => { handleGridPointerLeave(e); handleFogPointerUp(); }}
                 onWheel={handleWheel}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
@@ -706,7 +809,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                 ))}
 
                 {/* Walls */}
-                {Array.from(walls).map((key) => {
+                {Array.from(walls).filter(key => isLocalhost || !fog?.has(key)).map((key) => {
                     const [gx, gy] = key.split(',').map(Number);
                     return (
                         <rect
@@ -724,6 +827,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                 {creatures.map((creature) => {
                     const cx = gridCenterX(creature.gridX);
                     const cy = gridCenterY(creature.gridY);
+                    // Hide creature from players if cell is fogged
+                    if (!isLocalhost && fog?.has(`${creature.gridX},${creature.gridY}`)) return null;
 
                     return (
                         <g
@@ -788,7 +893,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                     const cx = gridCenterX(item.gridX);
                     const cy = gridCenterY(item.gridY);
                     // On non-localhost, hide items marked as not visible
-                    if (!isLocalhost && !item.visible) return null;
+                    if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
 
                     const isRepositioning = repositioningId === item.id;
 
@@ -838,7 +943,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                         ? gridCenterY(item.gridY) + CELL_SIZE / 2
                         : gridCenterY(item.gridY);
                     // On non-localhost, hide items marked as not visible
-                    if (!isLocalhost && !item.visible) return null;
+                    if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
 
                     const isRepositioning = repositioningId === item.id;
                     const tableW = isRotated ? 36 : 72;
@@ -896,7 +1001,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                         ? gridCenterY(item.gridY) + CELL_SIZE / 2
                         : gridCenterY(item.gridY);
                     // On non-localhost, hide items marked as not visible
-                    if (!isLocalhost && !item.visible) return null;
+                    if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
 
                     const isRepositioning = repositioningId === item.id;
                     const bedW = isVertical ? 36 : 72;
@@ -949,7 +1054,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                     const cx = gridCenterX(item.gridX);
                     const cy = gridCenterY(item.gridY);
                     // On non-localhost, hide items marked as not visible
-                    if (!isLocalhost && !item.visible) return null;
+                    if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
 
                     const isRepositioning = repositioningId === item.id;
 
@@ -998,7 +1103,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                     const cx = gridCenterX(item.gridX);
                     const cy = gridCenterY(item.gridY);
                     // On non-localhost, hide items marked as not visible
-                    if (!isLocalhost && !item.visible) return null;
+                    if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
 
                     const isRepositioning = repositioningId === item.id;
 
@@ -1049,7 +1154,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                     const cx = gridCenterX(item.gridX);
                     const cy = gridCenterY(item.gridY);
                     // On non-localhost, hide items marked as not visible
-                    if (!isLocalhost && !item.visible) return null;
+                    if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
 
                     const isRepositioning = repositioningId === item.id;
 
@@ -1100,7 +1205,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                     const cx = gridCenterX(item.gridX);
                     const cy = gridCenterY(item.gridY);
                     // On non-localhost, hide items marked as not visible
-                    if (!isLocalhost && !item.visible) return null;
+                    if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
 
                     const isRepositioning = repositioningId === item.id;
 
@@ -1150,7 +1255,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                     const cx = gridCenterX(item.gridX);
                     const cy = gridCenterY(item.gridY);
                     // On non-localhost, hide items marked as not visible
-                    if (!isLocalhost && !item.visible) return null;
+                    if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
 
                     const isRepositioning = repositioningId === item.id;
 
@@ -1200,7 +1305,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                     const cx = gridCenterX(item.gridX);
                     const cy = gridCenterY(item.gridY);
                     // On non-localhost, hide items marked as not visible
-                    if (!isLocalhost && !item.visible) return null;
+                    if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
 
                     const isRepositioning = repositioningId === item.id;
 
@@ -1245,6 +1350,38 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                         </g>
                     );
                 })}
+
+                {/* Fog of War overlay — GM sees subtle fog, players see nothing here (filtered below) */}
+                {isLocalhost && fog && Array.from(fog).map((key) => {
+                    const [gx, gy] = key.split(',').map(Number);
+                    return (
+                        <rect
+                            key={`fog-${key}`}
+                            x={gx * CELL_SIZE}
+                            y={gy * CELL_SIZE}
+                            width={CELL_SIZE}
+                            height={CELL_SIZE}
+                            className="fog-cell"
+                        />
+                    );
+                })}
+
+                {/* Fog drag selection rectangle preview */}
+                {isLocalhost && fogDragStart && fogDragEnd && (fogDragStart.gridX !== fogDragEnd.gridX || fogDragStart.gridY !== fogDragEnd.gridY) && (() => {
+                    const minX = Math.min(fogDragStart.gridX, fogDragEnd.gridX);
+                    const maxX = Math.max(fogDragStart.gridX, fogDragEnd.gridX);
+                    const minY = Math.min(fogDragStart.gridY, fogDragEnd.gridY);
+                    const maxY = Math.max(fogDragStart.gridY, fogDragEnd.gridY);
+                    return (
+                        <rect
+                            x={minX * CELL_SIZE}
+                            y={minY * CELL_SIZE}
+                            width={(maxX - minX + 1) * CELL_SIZE}
+                            height={(maxY - minY + 1) * CELL_SIZE}
+                            className="fog-preview"
+                        />
+                    );
+                })()}
 
                 {/* Barrel context menu */}
                 {selectedBarrel && (

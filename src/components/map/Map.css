@@ -396,3 +396,19 @@
         border-color: #999;
     }
 }
+
+/* Fog of war cell — GM overlay */
+.positioning .fog-cell {
+    fill: rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Fog drag selection rectangle preview */
+.positioning .fog-preview {
+    fill: rgba(74, 144, 217, 0.15);
+    stroke: #4a90d9;
+    stroke-width: 2;
+    stroke-dasharray: 6 3;
+    pointer-events: none;
+}
