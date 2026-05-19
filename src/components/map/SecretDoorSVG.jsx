@@ -4,27 +4,54 @@ const SecretDoorSVG = React.forwardRef(({ id, className, ...rest }, ref) => (
     <g ref={ref} id={id} className={className} {...rest}>
         {/* Main board body — dark red */}
         <rect
-            x="15"
+            x="0"
             y="0"
-            width="6"
+            width="36"
             height="36"
             fill="#8B1A1A"
         />
 
         {/* Wood grain lines (subtle darker streaks) */}
         <line
-            x1="16.5"
+            x1="6"
             y1="0"
-            x2="16.5"
+            x2="6"
             y2="36"
             stroke="#5C1010"
             strokeWidth="0.3"
             opacity="0.5"
         />
         <line
-            x1="19.5"
+            x1="12"
             y1="0"
-            x2="19.5"
+            x2="12"
+            y2="36"
+            stroke="#5C1010"
+            strokeWidth="0.3"
+            opacity="0.5"
+        />
+        <line
+            x1="18"
+            y1="0"
+            x2="18"
+            y2="36"
+            stroke="#5C1010"
+            strokeWidth="0.3"
+            opacity="0.5"
+        />
+        <line
+            x1="24"
+            y1="0"
+            x2="24"
+            y2="36"
+            stroke="#5C1010"
+            strokeWidth="0.3"
+            opacity="0.5"
+        />
+        <line
+            x1="30"
+            y1="0"
+            x2="30"
             y2="36"
             stroke="#5C1010"
             strokeWidth="0.3"
@@ -33,7 +60,7 @@ const SecretDoorSVG = React.forwardRef(({ id, className, ...rest }, ref) => (
 
         {/* Highlight edge (lighter side for subtle 3D) */}
         <rect
-            x="15"
+            x="0"
             y="0"
             width="0.5"
             height="36"
