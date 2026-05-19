@@ -75,28 +75,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack }) {
                     setGridSize(existing.gridSize || 20);
                     setPlacedItems(existing.placedItems || []);
 
-                    // Convert existing.doors (from dungeon generator) into placedItems
-                    if (existing.doors && existing.doors.length > 0) {
-                        setPlacedItems(prev => {
-                            const existingDoorKeys = new Set(
-                                (prev || []).filter(item => item.type === 'door').map(item => `${item.gridX},${item.gridY}`)
-                            );
-                            const newDoors = existing.doors.filter(d => !existingDoorKeys.has(`${d.gridX},${d.gridY}`));
-                            if (newDoors.length === 0) return prev;
-                            return [
-                                ...(prev || []),
-                                ...newDoors.map(d => ({
-                                    gridX: d.gridX,
-                                    gridY: d.gridY,
-                                    type: d.type || 'door',
-                                    id: `door-${d.gridX}-${d.gridY}`,
-                                    visible: d.visible !== undefined ? d.visible : true,
-                                    rotation: d.rotation || 0
-                                }))
-                            ];
-                        });
-                    }
-
                     // Load fog data: if no fog data or empty array, fog all cells
                     if (!existing.fog || existing.fog.length === 0) {
                         const gs = existing.gridSize ||20;

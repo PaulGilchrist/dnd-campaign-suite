@@ -264,10 +264,17 @@ export function generateDungeon(gridSize, options = {}) {
 
   for (const key of doorKeys) {
     const [gx, gy] = key.split(',').map(Number);
-    doors.push({ gridX: gx, gridY: gy, type: 'door' });
+    doors.push({
+      id: `door-${gx}-${gy}`,
+      gridX: gx,
+      gridY: gy,
+      type: 'door',
+      visible: true,
+      rotation: 0
+    });
   }
 
-  return { walls, doors };
+  return { walls, placedItems: doors };
 }
 
 // ---------------------------------------------------------------------------

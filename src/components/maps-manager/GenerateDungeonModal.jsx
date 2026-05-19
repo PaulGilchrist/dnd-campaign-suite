@@ -36,7 +36,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
             await mapsService.createMap(campaignName, name, {
                 gridSize: safeGridSize,
                 walls: result.walls,
-                doors: result.doors,
+                placedItems: result.placedItems,
             });
 
             onMapCreated();
