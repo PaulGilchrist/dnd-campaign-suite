@@ -46,9 +46,9 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
             <button className="sidebar-link add-character" onClick={onAddCharacter}>
               <i className="fa-solid fa-plus"></i> Add Character
             </button>
-            {characters.map((char) => (
+            {characters.map((char, index) => (
               <button
-                key={char.name}
+                key={`${char.name}-${index}`}
                 className={`sidebar-link${activeCharacter && activeCharacter.name === char.name ? ' active' : ''}`}
                 onClick={() => onCharacterClick(char)}
               >
