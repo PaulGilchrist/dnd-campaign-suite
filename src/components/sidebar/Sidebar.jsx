@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link, useMatch } from 'react-router';
 import './Sidebar.css';
 
 function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onMapsClick, onNotesClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost }) {
@@ -19,6 +20,8 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
     });
   };
 
+  const isActive = (path) => !!useMatch(`/campaign/${campaignName}${path}/*`);
+
   return (
     <nav className="sidebar no-print">
       <div className="sidebar-header">
@@ -32,9 +35,9 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
         </div>
       </div>
 
-      <button className="sidebar-section-header" onClick={onBackToCampaigns}>
+      <Link className="sidebar-section-header" to="/campaigns">
         <i className="fa-solid fa-arrow-left"></i> Campaigns
-      </button>
+      </Link>
 
       <div className="sidebar-section">
         <button className="sidebar-section-header" onClick={toggleCharactersExpanded}>
@@ -47,33 +50,33 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
               <i className="fa-solid fa-plus"></i> Add Character
             </button>
             {characters.map((char, index) => (
-              <button
+              <Link
                 key={`${char.name}-${index}`}
-                className={`sidebar-link${activeCharacter && activeCharacter.name === char.name ? ' active' : ''}`}
-                onClick={() => onCharacterClick(char)}
+                className={`sidebar-link${activeCharacter && activeCharacter.name === char.name ? ' active' : ''}${isActive(`/characters/${char.name}`) ? ' active' : ''}`}
+                to={`/campaign/${campaignName}/characters/${char.name}`}
               >
                 {char.name}
-              </button>
+              </Link>
             ))}
           </div>
         )}
       </div>
 
-      <button className="sidebar-section-header" onClick={onEncounterClick}>
+      <Link className={`sidebar-section-header${isActive('/encounters') ? ' active' : ''}`} to={`/campaign/${campaignName}/encounters`}>
         <i className="fa-solid fa-dragon"></i> Encounters
-      </button>
+      </Link>
 
-      <button className="sidebar-section-header" onClick={onInitiativeClick}>
+      <Link className={`sidebar-section-header${isActive('/initiative') ? ' active' : ''}`} to={`/campaign/${campaignName}/initiative`}>
         <i className="fa-solid fa-shield-alt"></i> Initiative
-      </button>
+      </Link>
 
-      <button className="sidebar-section-header" onClick={onMapsClick}>
+      <Link className={`sidebar-section-header${isActive('/maps') ? ' active' : ''}`} to={`/campaign/${campaignName}/maps`}>
         <i className="fa-solid fa-map"></i> {isLocalhost ? 'Maps' : 'Map'}
-      </button>
+      </Link>
 
-      <button className="sidebar-section-header" onClick={onNotesClick}>
+      <Link className={`sidebar-section-header${isActive('/notes') ? ' active' : ''}`} to={`/campaign/${campaignName}/notes`}>
         <i className="fa-solid fa-book"></i> Notes
-      </button>
+      </Link>
     </nav>
   );
 }
