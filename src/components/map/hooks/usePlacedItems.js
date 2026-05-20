@@ -85,13 +85,13 @@ function usePlacedItems(setPlacedItems, setSelectedBarrel) {
         setSelectedBarrel(null);
     };
 
-    const handleRotateBookshelf = (itemId) => {
-        setPlacedItems(prev =>
-            prev.map(item =>
-                item.id === itemId ? { ...item, rotation: (item.rotation || 0) === 0 ? 90 : 0 } : item
-            )
-        );
-        setSelectedBarrel(null);
+    const handleRotateBookshelf = (id) => {
+        setPlacedItems(prev => prev.map(item => {
+            if (item.id !== id) return item;
+            const currentRotation = item.rotation || 0;
+            const newRotation = (currentRotation + 90) % 360;
+            return { ...item, rotation: newRotation };
+        }));
     };
 
     return {

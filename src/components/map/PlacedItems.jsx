@@ -259,25 +259,26 @@ function PlacedItems({
     };
 
     const renderBookshelf = (item) => {
-        const isRotated = (item.rotation || 0) === 90;
-        const cx = isRotated ? gridCenterX(item.gridX) : gridCenterX(item.gridX) + CELL_SIZE / 2;
-        const cy = isRotated ? gridCenterY(item.gridY) + CELL_SIZE / 2 : gridCenterY(item.gridY);
+        const rotation = item.rotation || 0;
+        const isVertical = rotation % 180 === 90;
+        const cx = isVertical ? gridCenterX(item.gridX) : gridCenterX(item.gridX) + CELL_SIZE / 2;
+        const cy = isVertical ? gridCenterY(item.gridY) + CELL_SIZE / 2 : gridCenterY(item.gridY);
         if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
-        const bookshelfW = isRotated ? 36 : 72;
-        const bookshelfH = isRotated ? 72 : 36;
+        const w = isVertical ? 36 : 72;
+        const h = isVertical ? 72 : 36;
         return (
             <g key={item.id} className="placed-item">
                 <use href="#bookshelf" x={cx - 36} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
-                    transform={isRotated ? `rotate(90, ${cx}, ${cy})` : undefined} />
+                    transform={rotation ? `rotate(${rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
                     <>
-                        <rect x={cx - bookshelfW / 2} y={cy - bookshelfH / 2} width={bookshelfW} height={bookshelfH} fill="transparent"
+                        <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} fill="transparent"
                             className="barrel-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
                             onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
-                            <rect x={cx - bookshelfW / 2} y={cy - bookshelfH / 2} width={bookshelfW} height={bookshelfH} fill="none" className="reposition-highlight" />
+                            <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} fill="none" className="reposition-highlight" />
                         )}
                     </>
                 )}
