@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './Sidebar.css';
 
-function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onMapsClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost }) {
+function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onMapsClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost }) {
   const [isExpanded, setIsExpanded] = useState(() => {
     try {
       const stored = localStorage.getItem('sidebar-characters-expanded');
@@ -61,6 +61,10 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
 
       <button className="sidebar-section-header" onClick={onInitiativeClick}>
         <i className="fa-solid fa-shield-alt"></i> Initiative
+      </button>
+
+      <button className="sidebar-section-header" onClick={onEncounterClick}>
+        <i className="fa-solid fa-dragon"></i> Encounter
       </button>
 
       <button className="sidebar-section-header" onClick={onMapsClick}>

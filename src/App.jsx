@@ -8,6 +8,7 @@ import CharacterCreationWizard from './components/character-creation/CharacterCr
 import Sidebar from './components/sidebar/Sidebar.jsx';
 import Map from './components/map/Map.jsx';
 import MapsManager from './components/maps-manager/MapsManager.jsx';
+import EncounterBuilder from './components/encounter/EncounterBuilder.jsx';
 import * as mapsService from './services/mapsService.js';
 import utils from './services/utils.js';
 import useAppData from './hooks/useAppData.js';
@@ -45,6 +46,7 @@ function App() {
 
   const [mapsView, setMapsView] = useState({ type: 'none' });
   const [npcs, setNpcs] = useState([]);
+  const [showEncounter, setShowEncounter] = useState(false);
   // type: 'none' | 'manager' | 'map'
   // When type is 'map', mapName holds the sanitized map filename (e.g. 'dungeon-level-1')
 
@@ -74,10 +76,12 @@ function App() {
   const handleCharacterClick = (character) => {
     setActiveCharacter(cloneDeep(character));
     setMapsView({ type: 'none' });
+    setShowEncounter(false);
   };
 
   const handleMapsClick = () => {
     setActiveCharacter(null);
+    setShowEncounter(false);
     if (isLocalhost) {
       // GM: toggle Maps Manager
       setMapsView(prev => {
@@ -92,6 +96,12 @@ function App() {
         loadActiveMapAndOpen();
       }
     }
+  };
+
+  const handleEncounterClick = () => {
+    setActiveCharacter(null);
+    setMapsView({ type: 'none' });
+    setShowEncounter(prev => !prev);
   };
 
   const loadActiveMapAndOpen = async () => {
@@ -113,6 +123,7 @@ function App() {
   const handleInitiativeClick = () => {
     handleInitiativeClickRaw();
     setMapsView({ type: 'none' });
+    setShowEncounter(false);
   };
 
   const handleRenameCampaign = async () => {
@@ -142,7 +153,7 @@ function App() {
     }
   };
 
-  const initiativeActive = characters.length > 0 && activeCharacter == null && mapsView.type === 'none';
+  const initiativeActive = characters.length > 0 && activeCharacter == null && mapsView.type === 'none' && !showEncounter;
 
   if (showCampaignSelection) return <CampaignSelection onCampaignSelect={handleCampaignSelect} />;
 
@@ -159,6 +170,7 @@ function App() {
           onCharacterClick={handleCharacterClick}
           onInitiativeClick={handleInitiativeClick}
           onMapsClick={handleMapsClick}
+          onEncounterClick={handleEncounterClick}
           onRenameCampaign={handleRenameCampaign}
           onDeleteCampaign={handleDeleteCampaign}
           theme={theme}
@@ -201,6 +213,9 @@ function App() {
             mapName={mapsView.mapName}
             onBack={() => setMapsView({ type: isLocalhost ? 'manager' : 'none' })}
           />
+        )}
+        {showEncounter && (
+          <EncounterBuilder characters={characters} campaignName={campaignName} />
         )}
         <br />
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allRaces={races} allRaces2024={races2024} allClasses={classes} allSpells={spells} allSpells2024={spells2024} />}
