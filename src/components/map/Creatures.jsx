@@ -2,7 +2,7 @@ import React from 'react';
 
 const RADIUS = 20;
 
-const Creatures = ({ creatures, gridCenterX, gridCenterY, isLocalhost, fog, dragging }) => {
+const Creatures = ({ creatures, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown }) => {
     return (
         <>
             {creatures.map((creature) => {
@@ -14,6 +14,7 @@ const Creatures = ({ creatures, gridCenterX, gridCenterY, isLocalhost, fog, drag
                 return (
                     <g
                         key={creature.id}
+                        onPointerDown={(e) => handlePointerDown(e, creature.id)}
                         className="creature-group"
                         style={{ cursor: 'grab' }}
                     >

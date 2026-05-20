@@ -14,6 +14,7 @@ import TrapSVG from './TrapSVG.jsx';
 import PillarSVG from './PillarSVG.jsx';
 import StairsSVG from './StairsSVG.jsx';
 import PlacedItems from './PlacedItems.jsx';
+import GridAndWalls from './GridAndWalls.jsx';
 import Creatures from './Creatures.jsx';
 import usePlacedItems from './hooks/usePlacedItems.js';
 import { getMonsterImageUrl } from '../../services/monsterUtils.js';
@@ -780,47 +781,12 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     <StairsSVG id="stairs" />
                 </defs>
 
-                {/* Grid background */}
-                <rect x="0" y="0" width={SVG_SIZE} height={SVG_SIZE} className="grid-bg" />
-
-                {/* Vertical grid lines */}
-                {Array.from({ length: gridSize + 1 }, (_, i) => (
-                    <line
-                        key={`v-${i}`}
-                        x1={i * CELL_SIZE}
-                        y1="0"
-                        x2={i * CELL_SIZE}
-                        y2={SVG_SIZE}
-                        className="grid-line"
-                    />
-                ))}
-
-                {/* Horizontal grid lines */}
-                {Array.from({ length: gridSize + 1 }, (_, i) => (
-                    <line
-                        key={`h-${i}`}
-                        x1="0"
-                        y1={i * CELL_SIZE}
-                        x2={SVG_SIZE}
-                        y2={i * CELL_SIZE}
-                        className="grid-line"
-                    />
-                ))}
-
-                {/* Walls */}
-                {Array.from(walls).filter(key => isLocalhost || !fog?.has(key)).map((key) => {
-                    const [gx, gy] = key.split(',').map(Number);
-                    return (
-                        <rect
-                            key={key}
-                            x={gx * CELL_SIZE}
-                            y={gy * CELL_SIZE}
-                            width={CELL_SIZE}
-                            height={CELL_SIZE}
-                            className="wall-cell"
-                        />
-                    );
-                })}
+                <GridAndWalls
+                    gridSize={gridSize}
+                    walls={walls}
+                    isLocalhost={isLocalhost}
+                    fog={fog}
+                />
 
                 {/* Characters */}
                 <Creatures
@@ -830,6 +796,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     isLocalhost={isLocalhost}
                     fog={fog}
                     dragging={dragging}
+                    handlePointerDown={handlePointerDown}
                 />
 
                 {/* Placed items */}
