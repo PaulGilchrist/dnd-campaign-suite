@@ -16,6 +16,7 @@ import useCharacterManagement from './hooks/useCharacterManagement.js';
 import useCampaignManagement from './hooks/useCampaignManagement.js';
 import { useCharacterWizard } from './hooks/useCharacterWizard.js';
 import Notes from './components/notes/Notes.jsx';
+import NPCs from './components/npcs/NPCs.jsx';
 
 function App() {
   const appData = useAppData();
@@ -49,6 +50,8 @@ function App() {
   const [npcs, setNpcs] = useState([]);
   const [showEncounter, setShowEncounter] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  const [showNPCs, setShowNPCs] = useState(false);
+  const [activeView, setActiveView] = useState(null);
   // type: 'none' | 'manager' | 'map'
   // When type is 'map', mapName holds the sanitized map filename (e.g. 'dungeon-level-1')
 
@@ -87,6 +90,7 @@ function App() {
 
   const handleMapsClick = () => {
     setActiveCharacter(null);
+    setShowNPCs(false);
     setShowEncounter(false);
     if (isLocalhost) {
       // GM: toggle Maps Manager
@@ -106,6 +110,7 @@ function App() {
 
   const handleEncounterClick = () => {
     setActiveCharacter(null);
+    setShowNPCs(false);
     setMapsView({ type: 'none' });
     setShowEncounter(prev => !prev);
   };
@@ -130,13 +135,28 @@ function App() {
     handleInitiativeClickRaw();
     setMapsView({ type: 'none' });
     setShowEncounter(false);
+    setShowNPCs(false);
   };
 
   const handleNotesClick = () => {
     setActiveCharacter(null);
     setMapsView({ type: 'none' });
     setShowEncounter(false);
+    setShowNPCs(false);
     setShowNotes(prev => !prev);
+  };
+
+  const handleNPCsClick = () => {
+    setActiveCharacter(null);
+    setMapsView({ type: 'none' });
+    setShowEncounter(false);
+    setShowNotes(false);
+    setShowNPCs(true);
+    setActiveView({ type: 'npcs' });
+  };
+
+  const handleBackFromNPCs = () => {
+    setShowNPCs(false);
   };
 
   const handleRenameCampaign = async () => {
@@ -166,7 +186,7 @@ function App() {
     }
   };
 
-  const initiativeActive = characters.length > 0 && activeCharacter == null && mapsView.type === 'none' && !showEncounter && !showNotes;
+  const initiativeActive = characters.length > 0 && activeCharacter == null && mapsView.type === 'none' && !showEncounter && !showNotes && !showNPCs;
 
   if (showCampaignSelection) return <CampaignSelection onCampaignSelect={handleCampaignSelect} />;
 
@@ -190,6 +210,8 @@ function App() {
           theme={theme}
           toggleTheme={toggleTheme}
           isLocalhost={isLocalhost}
+          onNPCsClick={handleNPCsClick}
+          activeView={activeView}
         />
         {activeCharacter && (
           <CharSheet
@@ -237,6 +259,13 @@ function App() {
             characters={characters}
             isLocalhost={isLocalhost}
             onBack={() => setShowNotes(false)}
+          />
+        )}
+        {showNPCs && (
+          <NPCs
+            campaignName={campaignName}
+            characters={characters}
+            onBack={handleBackFromNPCs}
           />
         )}
         <br />

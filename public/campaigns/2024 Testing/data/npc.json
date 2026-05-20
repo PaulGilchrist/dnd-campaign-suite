@@ -1,0 +1,15 @@
+[
+  {
+    "id": "62b162bc-7b1f-4e59-a0c8-9520700b2610",
+    "name": "Test NPC",
+    "race": "Human",
+    "classRole": "Armor Smith",
+    "appearance": "",
+    "personality": "",
+    "goals": "A fair wage for quality work",
+    "secrets": "",
+    "notes": "",
+    "tags": "",
+    "attitude": "neutral"
+  }
+]
