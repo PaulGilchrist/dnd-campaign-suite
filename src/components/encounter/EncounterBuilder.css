@@ -7,9 +7,16 @@
   width: 100%;
 }
 
+.encounter-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
 .encounter-title {
-  text-align: center;
-  margin-bottom: 16px;
+  margin: 0;
   color: var(--color-header);
   font-size: 1.6em;
 }
@@ -452,9 +459,9 @@
 /* ============ Ruleset Toggle ============ */
 .ruleset-toggle {
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 6px;
-  margin-bottom: 16px;
+  margin: 0;
 }
 
 .ruleset-btn {

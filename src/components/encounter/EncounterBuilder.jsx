@@ -260,7 +260,10 @@ function EncounterBuilder({ characters, campaignName }) {
   if (loading) {
     return (
       <div className="encounter-builder">
-        <h2 className="encounter-title">Encounter Builder</h2>
+        <div className="encounter-header-row">
+          <h2 className="encounter-title">Encounter Builder</h2>
+          <div className="ruleset-toggle"></div>
+        </div>
         <div className="encounter-loading">
           <i className="fa-solid fa-spinner fa-spin"></i>&nbsp; Loading monsters...
         </div>
@@ -270,24 +273,26 @@ function EncounterBuilder({ characters, campaignName }) {
 
   return (
     <div className="encounter-builder">
-      <h2 className="encounter-title">
-        <i className="fa-solid fa-dragon"></i>&nbsp; Encounter Builder
-      </h2>
+      <div className="encounter-header-row">
+        <h2 className="encounter-title">
+          <i className="fa-solid fa-dragon"></i>&nbsp; Encounter Builder
+        </h2>
 
-      {/* Ruleset Toggle */}
-      <div className="ruleset-toggle">
-        <button
-          className={`ruleset-btn${rulesVersion === '5e' ? ' ruleset-btn-active' : ''}`}
-          onClick={() => handleRulesVersionChange('5e')}
-        >
-          5e
-        </button>
-        <button
-          className={`ruleset-btn${rulesVersion === '2024' ? ' ruleset-btn-active' : ''}`}
-          onClick={() => handleRulesVersionChange('2024')}
-        >
-          2024
-        </button>
+        {/* Ruleset Toggle */}
+        <div className="ruleset-toggle">
+          <button
+            className={`ruleset-btn${rulesVersion === '5e' ? ' ruleset-btn-active' : ''}`}
+            onClick={() => handleRulesVersionChange('5e')}
+          >
+            5e
+          </button>
+          <button
+            className={`ruleset-btn${rulesVersion === '2024' ? ' ruleset-btn-active' : ''}`}
+            onClick={() => handleRulesVersionChange('2024')}
+          >
+            2024
+          </button>
+        </div>
       </div>
 
       {/* Party Composition Summary */}
