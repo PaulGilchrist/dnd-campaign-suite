@@ -379,7 +379,7 @@
     {
       "id": "1ad6c057-eb80-4e19-8a7b-2a4abb7174c4",
       "type": "bed",
-      "gridX": 19,
+      "gridX": 18,
       "gridY": 11,
       "visible": true,
       "rotation": 270
@@ -387,10 +387,88 @@
     {
       "id": "8570f2e2-5ebc-4ea6-8d67-d3eff935185a",
       "type": "bed",
-      "gridX": 17,
+      "gridX": 16,
       "gridY": 11,
       "visible": true,
       "rotation": 270
+    },
+    {
+      "id": "fc65bb4a-2a78-451a-b423-45b0022cf8ec",
+      "type": "bed",
+      "gridX": 14,
+      "gridY": 11,
+      "visible": true,
+      "rotation": 270
+    },
+    {
+      "id": "7d92d456-2dc8-4e12-8411-9f8b16c46158",
+      "type": "bed",
+      "gridX": 12,
+      "gridY": 11,
+      "visible": true,
+      "rotation": 270
+    },
+    {
+      "id": "dff01caa-af81-48cf-9c7b-59abdb2def04",
+      "type": "bed",
+      "gridX": 10,
+      "gridY": 11,
+      "visible": true,
+      "rotation": 270
+    },
+    {
+      "id": "d1f55748-b232-4821-b00a-defa1ebaf0a6",
+      "type": "firepit",
+      "gridX": 20,
+      "gridY": 12,
+      "visible": true
+    },
+    {
+      "id": "3c038f58-938f-4853-a7a0-562da0b9ca19",
+      "type": "firepit",
+      "gridX": 9,
+      "gridY": 7,
+      "visible": true
+    },
+    {
+      "id": "94089991-ebdf-4be2-827c-575db83d2659",
+      "type": "bed",
+      "gridX": 19,
+      "gridY": 7,
+      "visible": true,
+      "rotation": 90
+    },
+    {
+      "id": "d3b342ba-9206-4c30-a70d-be04122e9fd8",
+      "type": "bed",
+      "gridX": 17,
+      "gridY": 7,
+      "visible": true,
+      "rotation": 90
+    },
+    {
+      "id": "ea230ad4-1fee-4047-bde8-ab762ee41557",
+      "type": "bed",
+      "gridX": 15,
+      "gridY": 7,
+      "visible": true,
+      "rotation": 90
+    },
+    {
+      "id": "c10de734-a657-4073-b0e4-ccf66dfc31c6",
+      "type": "bed",
+      "gridX": 13,
+      "gridY": 7,
+      "visible": true,
+      "rotation": 90
+    },
+    {
+      "id": "63715baf-be28-4b6a-9c9b-8e9e552ac95a",
+      "type": "bed",
+      "gridX": 11,
+      "gridY": 7,
+      "visible": true,
+      "rotation": 90
     }
   ],
   "paintCells": [],
@@ -1240,6 +1318,12 @@
       "gridX": 2,
       "gridY": 5,
       "visible": true
+    },
+    {
+      "npcId": "53d284fd-b757-46c4-ac5b-26544d8a2e36",
+      "gridX": 2,
+      "gridY": 7,
+      "visible": false
     }
   ],
   "npcMetadata": [
@@ -1247,6 +1331,11 @@
       "id": "4b9b9e78-166e-44e1-a1d7-93fc0fe090b7",
       "name": "Goblin",
       "imageUrl": "https://paulgilchrist.github.io/dnd-tools/images/goblin.jpg"
+    },
+    {
+      "id": "53d284fd-b757-46c4-ac5b-26544d8a2e36",
+      "name": "Kobold 3",
+      "imageUrl": "https://paulgilchrist.github.io/dnd-tools/images/kobold.jpg"
     }
   ]
 }
