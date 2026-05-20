@@ -8,7 +8,9 @@ function useCampaignManagement() {
 
   const isLocalhost =
     window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1';
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === '::1' ||
+    /^127\./.test(window.location.hostname);
 
 
 

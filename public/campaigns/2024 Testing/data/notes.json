@@ -1,0 +1,20 @@
+[
+  {
+    "id": "864a7366-24f4-4c7a-903e-a581b60efe5b",
+    "description": "Test private note",
+    "isPrivate": true,
+    "dateCreated": "2026-05-20T17:00:23.840Z",
+    "dateModified": "2026-05-20T17:03:18.259Z",
+    "partyLevel": 20,
+    "partyLocation": ""
+  },
+  {
+    "id": "218f7b23-fd0a-4e14-9cdb-3aff4bf18767",
+    "description": "Test of a public note\n",
+    "isPrivate": false,
+    "dateCreated": "2026-05-20T17:00:48.087Z",
+    "dateModified": "2026-05-20T17:00:56.158Z",
+    "partyLevel": 20,
+    "partyLocation": ""
+  }
+]

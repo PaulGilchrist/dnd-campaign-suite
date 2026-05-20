@@ -15,6 +15,7 @@ import useAppData from './hooks/useAppData.js';
 import useCharacterManagement from './hooks/useCharacterManagement.js';
 import useCampaignManagement from './hooks/useCampaignManagement.js';
 import { useCharacterWizard } from './hooks/useCharacterWizard.js';
+import Notes from './components/notes/Notes.jsx';
 
 function App() {
   const appData = useAppData();
@@ -47,6 +48,7 @@ function App() {
   const [mapsView, setMapsView] = useState({ type: 'none' });
   const [npcs, setNpcs] = useState([]);
   const [showEncounter, setShowEncounter] = useState(false);
+  const [showNotes, setShowNotes] = useState(false);
   // type: 'none' | 'manager' | 'map'
   // When type is 'map', mapName holds the sanitized map filename (e.g. 'dungeon-level-1')
 
@@ -71,6 +73,10 @@ function App() {
 
   useEffect(() => {
     setMapsView({ type: 'none' });
+  }, [campaignName]);
+
+  useEffect(() => {
+    setShowNotes(false);
   }, [campaignName]);
 
   const handleCharacterClick = (character) => {
@@ -126,6 +132,13 @@ function App() {
     setShowEncounter(false);
   };
 
+  const handleNotesClick = () => {
+    setActiveCharacter(null);
+    setMapsView({ type: 'none' });
+    setShowEncounter(false);
+    setShowNotes(prev => !prev);
+  };
+
   const handleRenameCampaign = async () => {
     try {
       await handleRenameCampaignRaw();
@@ -153,7 +166,7 @@ function App() {
     }
   };
 
-  const initiativeActive = characters.length > 0 && activeCharacter == null && mapsView.type === 'none' && !showEncounter;
+  const initiativeActive = characters.length > 0 && activeCharacter == null && mapsView.type === 'none' && !showEncounter && !showNotes;
 
   if (showCampaignSelection) return <CampaignSelection onCampaignSelect={handleCampaignSelect} />;
 
@@ -170,6 +183,7 @@ function App() {
           onCharacterClick={handleCharacterClick}
           onInitiativeClick={handleInitiativeClick}
           onMapsClick={handleMapsClick}
+          onNotesClick={handleNotesClick}
           onEncounterClick={handleEncounterClick}
           onRenameCampaign={handleRenameCampaign}
           onDeleteCampaign={handleDeleteCampaign}
@@ -216,6 +230,14 @@ function App() {
         )}
         {showEncounter && (
           <EncounterBuilder characters={characters} campaignName={campaignName} />
+        )}
+        {showNotes && (
+          <Notes
+            campaignName={campaignName}
+            characters={characters}
+            isLocalhost={isLocalhost}
+            onBack={() => setShowNotes(false)}
+          />
         )}
         <br />
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allRaces={races} allRaces2024={races2024} allClasses={classes} allSpells={spells} allSpells2024={spells2024} />}
