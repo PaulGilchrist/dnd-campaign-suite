@@ -96,21 +96,21 @@
 }
 
 .player-levels {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
 }
 
 .player-level-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .player-level-label {
   font-size: 0.8rem;
   font-weight: 500;
-  min-width: 40px;
+  min-width: 30px;
   color: var(--color-text);
 }
 
