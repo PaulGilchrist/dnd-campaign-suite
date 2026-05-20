@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import utils from '../../services/utils.js';
 import * as mapsService from '../../services/mapsService.js';
 import Subscriber from '../common/Subscriber.jsx';
+import MapToolbar from './MapToolbar.jsx';
 import './Map.css';
 import ItemsPanel from './ItemsPanel.jsx';
 import BarrelSVG from './BarrelSVG.jsx';
@@ -688,71 +689,20 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
 
     return (
         <div className="map">
-            <div className="toolbar-row">
-                <h4>{mapsService.formatMapName(mapName) || 'Map'}</h4>
-                {isLocalhost && (
-                    <label className="grid-size-label">
-                        Grid Size&nbsp;&nbsp;
-                        <input
-                            type="number"
-                            min="5"
-                            max="100"
-                            value={gridSize}
-                            onChange={(e) => setGridSize(Number(e.target.value))}
-                            className="grid-size-input"
-                        />
-                    </label>
-                )}
-                <div className="toolbar">
-                    {isLocalhost && (
-                        <>
-                            <button
-                                className={tool === 'paint' ? 'active' : ''}
-                                onClick={() => setTool(tool === 'paint' ? 'none' : 'paint')}
-                            >
-                                <i className="fa-solid fa-paint-brush"></i> Paint
-                            </button>
-                            <button
-                                className={tool === 'erase' ? 'active' : ''}
-                                onClick={() => setTool(tool === 'erase' ? 'none' : 'erase')}
-                            >
-                                <i className="fa-solid fa-eraser"></i> Erase
-                            </button>
-                            <button
-                                onClick={handleClearWalls}
-                            >
-                                <i className="fa-solid fa-trash"></i> Clear Walls
-                            </button>
-                            <button
-                                className={tool === 'fog' ? 'active' : ''}
-                                onClick={() => setTool(tool === 'fog' ? 'none' : 'fog')}
-                            >
-                                <i className="fa-solid fa-cloud"></i> Fog
-                            </button>
-                            <button
-                                className={tool === 'clearFog' ? 'active' : ''}
-                                onClick={() => setTool(tool === 'clearFog' ? 'none' : 'clearFog')}
-                            >
-                                <i className="fa-solid fa-sun"></i> Clear Fog
-                            </button>
-                        </>
-                    )}
-                    {isLocalhost && (
-                        <button onClick={() => setItemsPanelOpen(prev => !prev)}>
-                            <i className="fa-solid fa-box"></i> Items
-                        </button>
-                    )}
-                    <button onClick={zoomIn}>
-                        <i className="fa-solid fa-magnifying-glass-plus"></i>
-                    </button>
-                    <button onClick={zoomOut}>
-                        <i className="fa-solid fa-magnifying-glass-minus"></i>
-                    </button>
-                    <button onClick={resetView}>
-                        <i className="fa-solid fa-rotate-left"></i> Reset View
-                    </button>
-                </div>
-            </div>
+            <MapToolbar
+                mapName={mapName}
+                isLocalhost={isLocalhost}
+                tool={tool}
+                setTool={setTool}
+                gridSize={gridSize}
+                setGridSize={setGridSize}
+                itemsPanelOpen={itemsPanelOpen}
+                setItemsPanelOpen={setItemsPanelOpen}
+                handleClearWalls={handleClearWalls}
+                zoomIn={zoomIn}
+                zoomOut={zoomOut}
+                resetView={resetView}
+            />
             <Subscriber handleEvent={handleSSEEvent} />
             <svg
                 ref={svgRef}

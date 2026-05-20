@@ -516,14 +516,6 @@
       "gridY": 24,
       "visible": true,
       "name": "Hobgoblin 1"
-    },
-    {
-      "id": "36e33b50-6d3f-4d89-b812-efed15997796",
-      "type": "npc",
-      "gridX": 3,
-      "gridY": 6,
-      "visible": true,
-      "name": "NPC"
     }
   ],
   "paintCells": [],
