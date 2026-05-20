@@ -1,31 +1,31 @@
 /* Generate Dungeon Modal */
 
-.dungeon-gen-modal h3 {
+.maps-manager-modal-overlay .dungeon-gen-modal h3 {
     color: var(--color-header);
 }
 
-.dungeon-gen-form {
+.maps-manager-modal-overlay .dungeon-gen-form {
     display: flex;
     flex-direction: column;
     gap: 16px;
     margin: 16px 0;
 }
 
-.dungeon-gen-field {
+.maps-manager-modal-overlay .dungeon-gen-field {
     display: flex;
     flex-direction: column;
     gap: 4px;
     font-size: 14px;
 }
 
-.dungeon-gen-field > span {
+.maps-manager-modal-overlay .dungeon-gen-field > span {
     font-weight: 500;
     color: var(--color-header);
     margin-bottom: 2px;
 }
 
-.dungeon-gen-field input[type="text"],
-.dungeon-gen-field input[type="number"] {
+.maps-manager-modal-overlay .dungeon-gen-field input[type="text"],
+.maps-manager-modal-overlay .dungeon-gen-field input[type="number"] {
     padding: 8px 12px;
     border: 1px solid var(--border-color-input);
     border-radius: 6px;
@@ -35,30 +35,30 @@
     max-width: 120px;
 }
 
-.dungeon-gen-field input[type="text"] {
+.maps-manager-modal-overlay .dungeon-gen-field input[type="text"] {
     max-width: 100%;
     width: 100%;
     box-sizing: border-box;
 }
 
-.dungeon-gen-field input:focus {
+.maps-manager-modal-overlay .dungeon-gen-field input:focus {
     outline: none;
     border-color: var(--border-color-focus);
 }
 
-.dungeon-gen-hint {
+.maps-manager-modal-overlay .dungeon-gen-hint {
     font-size: 12px;
     color: var(--color-text-secondary);
     margin-top: 2px;
 }
 
-.dungeon-gen-toggle {
+.maps-manager-modal-overlay .dungeon-gen-toggle {
     display: flex;
     gap: 8px;
     margin-top: 4px;
 }
 
-.dungeon-gen-option {
+.maps-manager-modal-overlay .dungeon-gen-option {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -72,53 +72,53 @@
     transition: border-color 0.15s, background 0.15s;
 }
 
-.dungeon-gen-option.active {
+.maps-manager-modal-overlay .dungeon-gen-option.active {
     border-color: var(--color-primary);
     background: var(--background-color-selected);
 }
 
-.dungeon-gen-option input[type="radio"] {
+.maps-manager-modal-overlay .dungeon-gen-option input[type="radio"] {
     display: none;
 }
 
-.dungeon-gen-checkbox {
+.maps-manager-modal-overlay .dungeon-gen-checkbox {
     flex-direction: row !important;
     align-items: center;
     gap: 8px !important;
     cursor: pointer;
 }
 
-.dungeon-gen-checkbox input[type="checkbox"] {
+.maps-manager-modal-overlay .dungeon-gen-checkbox input[type="checkbox"] {
     width: 16px;
     height: 16px;
     accent-color: var(--color-primary);
     cursor: pointer;
 }
 
-.dungeon-gen-generate-btn {
+.maps-manager-modal-overlay .dungeon-gen-generate-btn {
     background: var(--color-primary) !important;
     color: var(--color-text-inverse) !important;
     font-weight: 600 !important;
 }
 
-.dungeon-gen-generate-btn:disabled {
+.maps-manager-modal-overlay .dungeon-gen-generate-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-.dungeon-gen-generate-btn:hover:not(:disabled) {
+.maps-manager-modal-overlay .dungeon-gen-generate-btn:hover:not(:disabled) {
     opacity: 0.9;
 }
 
 /* ===== Light theme overrides ===== */
 
-[data-theme="light"] .dungeon-gen-generate-btn {
+[data-theme="light"] .maps-manager-modal-overlay .dungeon-gen-generate-btn {
     background: #4a7db5 !important;
     color: #fff !important;
 }
 
 @media (prefers-color-scheme: light) {
-    .dungeon-gen-generate-btn {
+    .maps-manager-modal-overlay .dungeon-gen-generate-btn {
         background: #4a7db5 !important;
         color: #fff !important;
     }
