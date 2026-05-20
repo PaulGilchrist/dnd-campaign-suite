@@ -182,10 +182,9 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                         <li key={map.fileName} className={`maps-manager-item ${map.isActive ? 'active' : ''}`}>
                             <div className="maps-manager-item-info">
                                 {renamingMap === map.fileName ? (
-                                    <input
-                                        type="text"
-                                        defaultValue={mapsService.formatMapName(map.name)}
-                                        value={renameValue}
+                                <input
+                                    type="text"
+                                    value={renameValue}
                                         autoFocus
                                         onChange={(e) => setRenameValue(e.target.value)}
                                         onBlur={() => handleRenameSave(map.fileName)}

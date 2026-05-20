@@ -3,6 +3,7 @@ import utils from '../../services/utils.js';
 import * as mapsService from '../../services/mapsService.js';
 import Subscriber from '../common/Subscriber.jsx';
 import './Map.css';
+import ItemsPanel from './ItemsPanel.jsx';
 import BarrelSVG from './BarrelSVG.jsx';
 import TableSVG from './TableSVG.jsx';
 import BedSVG from './BedSVG.jsx';
@@ -12,6 +13,7 @@ import SecretDoorSVG from './SecretDoorSVG.jsx';
 import TrapSVG from './TrapSVG.jsx';
 import PillarSVG from './PillarSVG.jsx';
 import StairsSVG from './StairsSVG.jsx';
+import usePlacedItems from './hooks/usePlacedItems.js';
 
 const CELL_SIZE = 40;
 const RADIUS = 20;
@@ -548,76 +550,16 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         setPlacedItems(prev => [...prev, newItem]);
     }, [getGridFromEvent, isLocalhost, setNpcPosition, setNpcMetadata]);
 
-    // Toggle visibility of a placed item (localhost only)
-    const handleToggleItemVisibility = useCallback((itemId) => {
-        setPlacedItems(prev =>
-            prev.map(item =>
-                item.id === itemId ? { ...item, visible: !item.visible } : item
-            )
-        );
-    }, []);
-
-    // Delete a placed barrel (localhost only)
-    const handleDeleteBarrel = useCallback((itemId) => {
-        setPlacedItems(prev => prev.filter(item => item.id !== itemId));
-        setSelectedBarrel(null);
-    }, []);
-
-    // Enter reposition mode for a barrel
-    const handleRepositionBarrel = useCallback((itemId) => {
-        setRepositioningId(itemId);
-        setSelectedBarrel(null);
-    }, []);
-
-    // Rotate a table (0 ↔ 90 degrees)
-    const handleRotateTable = useCallback((itemId) => {
-        setPlacedItems(prev =>
-            prev.map(item =>
-                item.id === itemId ? { ...item, rotation: (item.rotation || 0) === 0 ? 90 : 0 } : item
-            )
-        );
-        setSelectedBarrel(null);
-    }, []);
-
-    // Rotate a bed (0 → 90 → 180 → 270 → 0 degrees)
-    const handleRotateBed = useCallback((itemId) => {
-        setPlacedItems(prev =>
-            prev.map(item =>
-                item.id === itemId ? { ...item, rotation: ((item.rotation || 0) + 90) % 360 } : item
-            )
-        );
-        setSelectedBarrel(null);
-    }, []);
-
-    // Rotate a door (0 → 90 → 180 → 270 → 0 degrees)
-    const handleRotateDoor = useCallback((id) => {
-        setPlacedItems(prev => prev.map(item => {
-            if (item.id !== id) return item;
-            const currentRotation = item.rotation || 0;
-            const newRotation = (currentRotation + 90) % 360;
-            return { ...item, rotation: newRotation };
-        }));
-    }, []);
-
-    // Rotate a secret door (0 → 90 → 180 → 270 → 0 degrees)
-    const handleRotateSecretDoor = useCallback((id) => {
-        setPlacedItems(prev => prev.map(item => {
-            if (item.id !== id) return item;
-            const currentRotation = item.rotation || 0;
-            const newRotation = (currentRotation + 90) % 360;
-            return { ...item, rotation: newRotation };
-        }));
-    }, []);
-
-    // Rotate stairs (0 → 90 → 180 → 270 → 0 degrees)
-    const handleRotateStairs = useCallback((id) => {
-        setPlacedItems(prev => prev.map(item => {
-            if (item.id !== id) return item;
-            const currentRotation = item.rotation || 0;
-            const newRotation = (currentRotation + 90) % 360;
-            return { ...item, rotation: newRotation };
-        }));
-    }, []);
+    const {
+        handleToggleItemVisibility,
+        handleDeleteBarrel,
+        handleRepositionBarrel,
+        handleRotateTable,
+        handleRotateBed,
+        handleRotateDoor,
+        handleRotateSecretDoor,
+        handleRotateStairs,
+    } = usePlacedItems(setPlacedItems, setSelectedBarrel, setRepositioningId);
 
     // Close context menu and reposition mode
     const handleCloseMenu = useCallback(() => {
@@ -1597,167 +1539,14 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
 
             {/* Items panel sidebar */}
             {isLocalhost && itemsPanelOpen && (
-                <div className="items-panel">
-                    <button className="items-panel-close" onClick={() => setItemsPanelOpen(false)}>
-                        <i className="fa-solid fa-times"></i>
-                    </button>
-                    <div className="items-panel-content">
-                        <div
-                            className="items-panel-item"
-                            draggable
-                            onDragStart={(e) => {
-                                e.dataTransfer.setData('text/plain', 'barrel');
-                            }}
-                        >
-                            <svg viewBox="0 0 36 36" width="36" height="36">
-                                <BarrelSVG />
-                            </svg>
-                            <span>Barrel</span>
-                        </div>
-                        <div
-                            className="items-panel-item"
-                            draggable
-                            onDragStart={(e) => {
-                                e.dataTransfer.setData('text/plain', 'bed');
-                            }}
-                        >
-                            <svg viewBox="0 0 72 36" width="72" height="36">
-                                <BedSVG />
-                            </svg>
-                            <span>Bed</span>
-                        </div>
-                        <div
-                            className="items-panel-item"
-                            draggable
-                            onDragStart={(e) => {
-                                e.dataTransfer.setData('text/plain', 'door');
-                            }}
-                        >
-                            <svg viewBox="0 0 36 36" width="36" height="36">
-                                <DoorSVG />
-                            </svg>
-                            <span>Door</span>
-                        </div>
-                        <div
-                            className="items-panel-item"
-                            draggable
-                            onDragStart={(e) => {
-                                e.dataTransfer.setData('text/plain', 'firepit');
-                            }}
-                        >
-                            <svg viewBox="0 0 36 36" width="36" height="36">
-                                <FirePitSVG />
-                            </svg>
-                            <span>Fire Pit</span>
-                        </div>
-                        <div
-                            className="items-panel-item"
-                            draggable
-                            onDragStart={(e) => {
-                                e.dataTransfer.setData('text/plain', 'pillar');
-                            }}
-                        >
-                            <svg viewBox="0 0 36 36" width="36" height="36">
-                                <PillarSVG />
-                            </svg>
-                            <span>Pillar</span>
-                        </div>
-                        <div
-                            className="items-panel-item"
-                            draggable
-                            onDragStart={(e) => {
-                                e.dataTransfer.setData('text/plain', 'secretDoor');
-                            }}
-                        >
-                            <svg viewBox="0 0 36 36" width="36" height="36">
-                                <SecretDoorSVG />
-                            </svg>
-                            <span>Secret Door</span>
-                        </div>
-                        <div
-                            className="items-panel-item"
-                            draggable
-                            onDragStart={(e) => {
-                                e.dataTransfer.setData('text/plain', 'stairs');
-                            }}
-                        >
-                            <svg viewBox="0 0 36 36" width="36" height="36">
-                                <StairsSVG />
-                            </svg>
-                            <span>Stairs</span>
-                        </div>
-                        <div
-                            className="items-panel-item"
-                            draggable
-                            onDragStart={(e) => {
-                                e.dataTransfer.setData('text/plain', 'table');
-                            }}
-                        >
-                            <svg viewBox="0 0 72 36" width="72" height="36">
-                                <TableSVG />
-                            </svg>
-                            <span>Table</span>
-                        </div>
-                        <div
-                            className="items-panel-item"
-                            draggable
-                            onDragStart={(e) => {
-                                e.dataTransfer.setData('text/plain', 'trap');
-                            }}
-                        >
-                            <svg viewBox="0 0 36 36" width="36" height="36">
-                                <TrapSVG />
-                            </svg>
-                            <span>Trap</span>
-                        </div>
-
-                        {/* NPC section */}
-                        {npcs && npcs.length > 0 && (
-                            <div className="items-panel-npc-section">
-                                <h5 className="items-panel-npc-title">
-                                    <i className="fa-solid fa-users"></i> NPCs
-                                </h5>
-
-                                {/* Unplaced NPCs (draggable) */}
-                                {npcs.filter(npc => !npcMapPositions.find(p => p.npcId === npc.id)).map((npc) => (
-                                    <div
-                                        key={npc.id}
-                                        className="items-panel-npc-item"
-                                        draggable
-                                        onDragStart={(e) => {
-                                            e.dataTransfer.setData('text/plain', `npc:${npc.id}`);
-                                        }}
-                                    >
-                                        <i className="fa-solid fa-user"></i>
-                                        <span className="items-panel-npc-name">{npc.name}</span>
-                                    </div>
-                                ))}
-
-                                {/* Placed NPCs (with visibility toggle) — use npcMetadata for name/image */}
-                                {npcMapPositions.map((npcPos) => {
-                                    const npc = npcMetadata?.find(n => n.id === npcPos.npcId);
-                                    if (!npc) return null;
-                                    return (
-                                        <div
-                                            key={npcPos.npcId}
-                                            className="items-panel-npc-item items-panel-npc-placed"
-                                        >
-                                            <i className="fa-solid fa-user"></i>
-                                            <span className="items-panel-npc-name">{npc.name}</span>
-                                            <button
-                                                className="items-panel-npc-toggle"
-                                                onClick={() => toggleNpcVisibility(npcPos.npcId)}
-                                                title={npcPos.visible ? 'Hide NPC' : 'Show NPC'}
-                                            >
-                                                <i className={`fa-solid ${npcPos.visible ? 'fa-eye' : 'fa-eye-slash'}`}></i>
-                                            </button>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <ItemsPanel
+                    itemsPanelOpen={true}
+                    npcs={npcs}
+                    npcMapPositions={npcMapPositions}
+                    npcMetadata={npcMetadata}
+                    toggleNpcVisibility={toggleNpcVisibility}
+                    onClose={() => setItemsPanelOpen(false)}
+                />
             )}
         </div>
     );
