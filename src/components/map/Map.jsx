@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import utils from '../../services/utils.js';
 import * as mapsService from '../../services/mapsService.js';
 import Subscriber from '../common/Subscriber.jsx';
+import MapToolbar from './MapToolbar.jsx';
 import './Map.css';
 import ItemsPanel from './ItemsPanel.jsx';
 import BarrelSVG from './BarrelSVG.jsx';
@@ -65,8 +66,119 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     const [showRename, setShowRename] = useState(null);
     // Reposition mode state
     const [repositioningItemId, setRepositioningItemId] = useState(null);
-    // NPC image cache
-    const [npcImages, setNpcImages] = useState({});
+
+    // Zoom/Pan helpers
+    const gridCenterX = useCallback((gridX) => gridX * CELL_SIZE + CELL_SIZE / 2, []);
+    const gridCenterY = useCallback((gridY) => gridY * CELL_SIZE + CELL_SIZE / 2, []);
+
+    const getGridFromEvent = useCallback((e) => {
+        const svg = svgRef.current;
+        if (!svg) return null;
+        const rect = svg.getBoundingClientRect();
+        const vb = svg.viewBox.baseVal;
+        const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
+        const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
+        const gridX = Math.max(0, Math.min(gridSize - 1, Math.floor(svgX / CELL_SIZE)));
+        const gridY = Math.max(0, Math.min(gridSize - 1, Math.floor(svgY / CELL_SIZE)));
+        return { gridX, gridY };
+    }, [gridSize, panX, panY]);
+
+    const MIN_ZOOM = 0.25;
+    const MAX_ZOOM = 4;
+
+    const zoomIn = useCallback(() => {
+        setZoom((prev) => Math.min(MAX_ZOOM, prev * 1.25));
+    }, []);
+
+    const zoomOut = useCallback(() => {
+        setZoom((prev) => Math.max(MIN_ZOOM, prev * 0.8));
+    }, []);
+
+    const resetView = useCallback(() => {
+        setZoom(1);
+        setPanX(0);
+        setPanY(0);
+    }, []);
+
+    const handlePanStart = useCallback((e) => {
+        if (tool === 'paint' || tool === 'erase') {
+            handleGridPointerDown(e);
+            return;
+        }
+        if (tool === 'fog' || tool === 'clearFog') {
+            handleFogPointerDown(e);
+            return;
+        }
+        if (repositioningItemId) {
+            handleGridPointerDown(e);
+            return;
+        }
+        if (e.button !== 0) return;
+        e.preventDefault();
+        const svg = svgRef.current;
+        if (!svg) return;
+        const rect = svg.getBoundingClientRect();
+        const vb = svg.viewBox.baseVal;
+        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
+        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
+        setPanning({
+            startX: svgX,
+            startY: svgY,
+            startPanX: panX,
+            startPanY: panY
+        });
+    }, [tool, panX, panY, repositioningItemId]);
+
+    const handlePanMove = useCallback((e) => {
+        if (!panning) return;
+        e.preventDefault();
+        const svg = svgRef.current;
+        if (!svg) return;
+        const rect = svg.getBoundingClientRect();
+        const vb = svg.viewBox.baseVal;
+        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
+        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
+        const dx = svgX - panning.startX;
+        const dy = svgY - panning.startY;
+        setPanX(panning.startPanX - dx);
+        setPanY(panning.startPanY - dy);
+    }, [panning]);
+
+    const handlePanEnd = useCallback(() => {
+        setPanning(null);
+    }, []);
+
+    const handleWheel = useCallback((e) => {
+        if (!e.metaKey) return;
+        e.preventDefault();
+        const svg = svgRef.current;
+        if (!svg) return;
+        const rect = svg.getBoundingClientRect();
+        const vb = svg.viewBox.baseVal;
+        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
+        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
+        const currentZoom = zoomValueRef.current;
+        const currentPanX = panXValueRef.current;
+        const currentPanY = panYValueRef.current;
+        accumulatedDeltaRef.current += e.deltaY;
+        const accumulated = accumulatedDeltaRef.current;
+        const ZOOM_THRESHOLD = 30;
+        let factor = 1;
+        if (accumulated < -ZOOM_THRESHOLD) {
+            factor = 1.025;
+            accumulatedDeltaRef.current = 0;
+        } else if (accumulated > ZOOM_THRESHOLD) {
+            factor = 0.975;
+            accumulatedDeltaRef.current = 0;
+        }
+        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, currentZoom * factor));
+        const newPanX = svgX - (svgX - currentPanX) * (currentZoom / newZoom);
+        const newPanY = svgY - (svgY - currentPanY) * (currentZoom / newZoom);
+        setZoom(newZoom);
+        setPanX(newPanX);
+        setPanY(newPanY);
+    }, []);
+
     // Load or initialize map data on mount
     useEffect(() => {
         if (isInitialized.current) return;
@@ -203,27 +315,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         }
     }, [campaignName, mapName]);
 
-    // Calculate center of a grid square
-    const gridCenterX = useCallback((gridX) => gridX * CELL_SIZE + CELL_SIZE / 2, []);
-    const gridCenterY = useCallback((gridY) => gridY * CELL_SIZE + CELL_SIZE / 2, []);
-
-    // Convert SVG pointer position to grid coordinates
-    const getGridFromEvent = useCallback((e) => {
-        const svg = svgRef.current;
-        if (!svg) return null;
-
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
-
-        const gridX = Math.max(0, Math.min(gridSize - 1, Math.floor(svgX / CELL_SIZE)));
-        const gridY = Math.max(0, Math.min(gridSize - 1, Math.floor(svgY / CELL_SIZE)));
-
-        return { gridX, gridY };
-    }, [gridSize, panX, panY]);
-
-    const handleFogPointerDown = useCallback((e) => {
+    function handleFogPointerDown(e) {
         if (!isLocalhost) return;
         if (tool !== 'fog' && tool !== 'clearFog') return;
         e.preventDefault();
@@ -231,7 +323,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         if (!grid) return;
         setFogDragStart(grid);
         setFogDragEnd(grid);
-    }, [tool, getGridFromEvent, isLocalhost]);
+    }
 
     const handleFogPointerMove = useCallback((e) => {
         if (!isLocalhost) return;
@@ -240,7 +332,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         const grid = getGridFromEvent(e);
         if (!grid) return;
         setFogDragEnd(grid);
-    }, [tool, getGridFromEvent, isLocalhost, fogDragStart]);
+    }, [tool, isLocalhost, fogDragStart, getGridFromEvent]);
 
     const handleFogPointerUp = useCallback(() => {
         if (!fogDragStart || !fogDragEnd) {
@@ -275,11 +367,22 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     }, [tool, fogDragStart, fogDragEnd]);
 
     // Handle grid pointer down (paint/erase mode)
-    const handleGridPointerDown = useCallback((e) => {
+    function handleGridPointerDown(e) {
         if (!isLocalhost) return;
         if (tool === 'none' && !repositioningItemId) return;
         e.preventDefault();
-        const grid = getGridFromEvent(e);
+        const svg = svgRef.current;
+        let grid = null;
+        if (svg) {
+            const rect = svg.getBoundingClientRect();
+            const vb = svg.viewBox.baseVal;
+            const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
+            const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
+            grid = {
+                gridX: Math.max(0, Math.min(gridSize - 1, Math.floor(svgX / CELL_SIZE))),
+                gridY: Math.max(0, Math.min(gridSize - 1, Math.floor(svgY / CELL_SIZE)))
+            };
+        }
         if (!grid) return;
 
         // Reposition mode: move the item to the clicked grid square
@@ -309,14 +412,25 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
             return { ...prev, walls: newWalls };
         });
         setPainting(grid);
-    }, [tool, getGridFromEvent, repositioningItemId, placedItems]);
+    }
 
     // Handle grid pointer move (paint/erase drag)
     const handleGridPointerMove = useCallback((e) => {
         if (!isLocalhost) return;
         if (!painting || (tool !== 'paint' && tool !== 'erase')) return;
         e.preventDefault();
-        const grid = getGridFromEvent(e);
+        const svg = svgRef.current;
+        let grid = null;
+        if (svg) {
+            const rect = svg.getBoundingClientRect();
+            const vb = svg.viewBox.baseVal;
+            const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
+            const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
+            grid = {
+                gridX: Math.max(0, Math.min(gridSize - 1, Math.floor(svgX / CELL_SIZE))),
+                gridY: Math.max(0, Math.min(gridSize - 1, Math.floor(svgY / CELL_SIZE)))
+            };
+        }
         if (!grid) return;
 
         const key = `${grid.gridX},${grid.gridY}`;
@@ -329,7 +443,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
             }
             return { ...prev, walls: newWalls };
         });
-    }, [painting, tool, getGridFromEvent]);
+    }, [painting, tool, isLocalhost, gridSize]);
 
     // Handle grid pointer up (end paint/erase)
     const handleGridPointerUp = useCallback(() => {
@@ -491,7 +605,18 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     // Handle drop from items panel onto grid
     const handleDrop = useCallback((e) => {
         e.preventDefault();
-        const grid = getGridFromEvent(e);
+        const svg = svgRef.current;
+        let grid = null;
+        if (svg) {
+            const rect = svg.getBoundingClientRect();
+            const vb = svg.viewBox.baseVal;
+            const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
+            const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
+            grid = {
+                gridX: Math.max(0, Math.min(gridSize - 1, Math.floor(svgX / CELL_SIZE))),
+                gridY: Math.max(0, Math.min(gridSize - 1, Math.floor(svgY / CELL_SIZE)))
+            };
+        }
         if (!grid) return;
         const dragData = e.dataTransfer.getData('text/plain');
         if (!dragData) return;
@@ -519,7 +644,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
             rotation: (dragData === 'table' || dragData === 'bed' || dragData === 'stairs') ? 0 : undefined
         };
         setPlacedItems(prev => [...prev, newItem]);
-    }, [getGridFromEvent, isLocalhost]);
+    }, [isLocalhost, gridSize]);
 
     const handleRenameItem = useCallback((itemId, newName) => {
         if (!newName || !newName.trim()) return;
@@ -551,6 +676,9 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         setRepositioningItemId(null);
     }, []);
 
+    // NPC image cache
+    const [npcImages, setNpcImages] = useState({});
+
     // Fetch NPC images when placedItems change
     useEffect(() => {
         const npcItems = placedItems.filter(item => item.type === 'npc');
@@ -570,117 +698,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     useEffect(() => { panXValueRef.current = panX; }, [panX]);
     useEffect(() => { panYValueRef.current = panY; }, [panY]);
 
-    // Zoom/Pan constants and helpers
-    const MIN_ZOOM = 0.25;
-    const MAX_ZOOM = 4;
 
-    const zoomIn = useCallback(() => {
-        setZoom((prev) => Math.min(MAX_ZOOM, prev * 1.25));
-    }, []);
-
-    const zoomOut = useCallback(() => {
-        setZoom((prev) => Math.max(MIN_ZOOM, prev * 0.8));
-    }, []);
-
-    const resetView = useCallback(() => {
-        setZoom(1);
-        setPanX(0);
-        setPanY(0);
-    }, []);
-
-    const handlePanStart = useCallback((e) => {
-        // Paint/erase take priority over panning
-        if (tool === 'paint' || tool === 'erase') {
-            handleGridPointerDown(e);
-            return;
-        }
-        // Fog/clearFog take priority over panning
-        if (tool === 'fog' || tool === 'clearFog') {
-            handleFogPointerDown(e);
-            return;
-        }
-        // Reposition mode takes priority over panning
-        if (repositioningItemId) {
-            handleGridPointerDown(e);
-            return;
-        }
-        // Only pan when tool is 'none'
-        // Only left mouse button (button 0)
-        if (e.button !== 0) return;
-        e.preventDefault();
-        const svg = svgRef.current;
-        if (!svg) return;
-
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
-
-        setPanning({
-            startX: svgX,
-            startY: svgY,
-            startPanX: panX,
-            startPanY: panY
-        });
-    }, [tool, panX, panY, handleGridPointerDown, repositioningItemId]);
-
-    const handlePanMove = useCallback((e) => {
-        if (!panning) return;
-        e.preventDefault();
-        const svg = svgRef.current;
-        if (!svg) return;
-
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
-
-        const dx = svgX - panning.startX;
-        const dy = svgY - panning.startY;
-
-        setPanX(panning.startPanX - dx);
-        setPanY(panning.startPanY - dy);
-    }, [panning]);
-
-    const handlePanEnd = useCallback(() => {
-        setPanning(null);
-    }, []);
-
-    const handleWheel = useCallback((e) => {
-        if (!e.metaKey) return;
-        e.preventDefault();
-        const svg = svgRef.current;
-        if (!svg) return;
-
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
-
-        const currentZoom = zoomValueRef.current;
-        const currentPanX = panXValueRef.current;
-        const currentPanY = panYValueRef.current;
-
-        accumulatedDeltaRef.current += e.deltaY;
-        const accumulated = accumulatedDeltaRef.current;
-        const ZOOM_THRESHOLD = 30;
-        let factor = 1;
-        if (accumulated < -ZOOM_THRESHOLD) {
-            factor = 1.025;
-            accumulatedDeltaRef.current = 0;
-        } else if (accumulated > ZOOM_THRESHOLD) {
-            factor = 0.975;
-            accumulatedDeltaRef.current = 0;
-        }
-        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, currentZoom * factor));
-
-        const newPanX = svgX - (svgX - currentPanX) * (currentZoom / newZoom);
-        const newPanY = svgY - (svgY - currentPanY) * (currentZoom / newZoom);
-
-        setZoom(newZoom);
-        setPanX(newPanX);
-        setPanY(newPanY);
-    }, []);
 
     if (!mapData) return null;
 
@@ -688,71 +706,20 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
 
     return (
         <div className="map">
-            <div className="toolbar-row">
-                <h4>{mapsService.formatMapName(mapName) || 'Map'}</h4>
-                {isLocalhost && (
-                    <label className="grid-size-label">
-                        Grid Size&nbsp;&nbsp;
-                        <input
-                            type="number"
-                            min="5"
-                            max="100"
-                            value={gridSize}
-                            onChange={(e) => setGridSize(Number(e.target.value))}
-                            className="grid-size-input"
-                        />
-                    </label>
-                )}
-                <div className="toolbar">
-                    {isLocalhost && (
-                        <>
-                            <button
-                                className={tool === 'paint' ? 'active' : ''}
-                                onClick={() => setTool(tool === 'paint' ? 'none' : 'paint')}
-                            >
-                                <i className="fa-solid fa-paint-brush"></i> Paint
-                            </button>
-                            <button
-                                className={tool === 'erase' ? 'active' : ''}
-                                onClick={() => setTool(tool === 'erase' ? 'none' : 'erase')}
-                            >
-                                <i className="fa-solid fa-eraser"></i> Erase
-                            </button>
-                            <button
-                                onClick={handleClearWalls}
-                            >
-                                <i className="fa-solid fa-trash"></i> Clear Walls
-                            </button>
-                            <button
-                                className={tool === 'fog' ? 'active' : ''}
-                                onClick={() => setTool(tool === 'fog' ? 'none' : 'fog')}
-                            >
-                                <i className="fa-solid fa-cloud"></i> Fog
-                            </button>
-                            <button
-                                className={tool === 'clearFog' ? 'active' : ''}
-                                onClick={() => setTool(tool === 'clearFog' ? 'none' : 'clearFog')}
-                            >
-                                <i className="fa-solid fa-sun"></i> Clear Fog
-                            </button>
-                        </>
-                    )}
-                    {isLocalhost && (
-                        <button onClick={() => setItemsPanelOpen(prev => !prev)}>
-                            <i className="fa-solid fa-box"></i> Items
-                        </button>
-                    )}
-                    <button onClick={zoomIn}>
-                        <i className="fa-solid fa-magnifying-glass-plus"></i>
-                    </button>
-                    <button onClick={zoomOut}>
-                        <i className="fa-solid fa-magnifying-glass-minus"></i>
-                    </button>
-                    <button onClick={resetView}>
-                        <i className="fa-solid fa-rotate-left"></i> Reset View
-                    </button>
-                </div>
-            </div>
+            <MapToolbar
+                mapName={mapName}
+                isLocalhost={isLocalhost}
+                tool={tool}
+                setTool={setTool}
+                gridSize={gridSize}
+                setGridSize={setGridSize}
+                itemsPanelOpen={itemsPanelOpen}
+                setItemsPanelOpen={setItemsPanelOpen}
+                handleClearWalls={handleClearWalls}
+                zoomIn={zoomIn}
+                zoomOut={zoomOut}
+                resetView={resetView}
+            />
             <Subscriber handleEvent={handleSSEEvent} />
             <svg
                 ref={svgRef}
