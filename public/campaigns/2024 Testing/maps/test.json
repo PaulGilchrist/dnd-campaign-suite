@@ -491,7 +491,7 @@
       "gridX": 19,
       "gridY": 24,
       "visible": true,
-      "name": "Bugbear"
+      "name": "Bugbear 1"
     },
     {
       "id": "97f2e3a4-f3b4-4c5d-9281-b97ff4b47242",
@@ -499,7 +499,7 @@
       "gridX": 9,
       "gridY": 27,
       "visible": true,
-      "name": "Hobgoblin"
+      "name": "Hobgoblin 2"
     },
     {
       "id": "93654b7f-9084-4ea1-964a-b1365f73094c",
@@ -507,7 +507,7 @@
       "gridX": 19,
       "gridY": 27,
       "visible": true,
-      "name": "Bugbear"
+      "name": "Bugbear 2"
     },
     {
       "id": "85700325-a211-4d0d-a779-3e77453a9cca",
@@ -515,7 +515,7 @@
       "gridX": 9,
       "gridY": 24,
       "visible": true,
-      "name": "NPC"
+      "name": "Hobgoblin 1"
     }
   ],
   "paintCells": [],
