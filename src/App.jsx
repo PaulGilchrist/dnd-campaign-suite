@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router';
 import { cloneDeep } from 'lodash';
 import './App.css';
 import CharSheet from './components/char-sheet/CharSheet.jsx';
@@ -10,23 +9,13 @@ import Sidebar from './components/sidebar/Sidebar.jsx';
 import Map from './components/map/Map.jsx';
 import MapsManager from './components/maps-manager/MapsManager.jsx';
 import EncounterBuilder from './components/encounter/EncounterBuilder.jsx';
-import Notes from './components/notes/Notes.jsx';
 import * as mapsService from './services/mapsService.js';
 import utils from './services/utils.js';
 import useAppData from './hooks/useAppData.js';
 import useCharacterManagement from './hooks/useCharacterManagement.js';
 import useCampaignManagement from './hooks/useCampaignManagement.js';
 import { useCharacterWizard } from './hooks/useCharacterWizard.js';
-import Root from './routes/root';
-import Campaigns from './routes/campaigns';
-import CampaignLayout from './routes/campaigns.$name';
-import CampaignIndex from './routes/campaigns.$name.index';
-import CharacterSheet from './routes/campaigns.$name.characters.$charId';
-import InitiativeRoute from './routes/campaigns.$name.initiative';
-import MapsRoute from './routes/campaigns.$name.maps';
-import MapRoute from './routes/campaigns.$name.maps.$mapName';
-import EncountersRoute from './routes/campaigns.$name.encounters';
-import NotesRoute from './routes/campaigns.$name.notes';
+import Notes from './components/notes/Notes.jsx';
 
 function App() {
   const appData = useAppData();
@@ -60,6 +49,8 @@ function App() {
   const [npcs, setNpcs] = useState([]);
   const [showEncounter, setShowEncounter] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  // type: 'none' | 'manager' | 'map'
+  // When type is 'map', mapName holds the sanitized map filename (e.g. 'dungeon-level-1')
 
   const [theme, setTheme] = useState(() => {
     try {
@@ -98,11 +89,13 @@ function App() {
     setActiveCharacter(null);
     setShowEncounter(false);
     if (isLocalhost) {
+      // GM: toggle Maps Manager
       setMapsView(prev => {
         if (prev.type === 'manager') return { type: 'none' };
         return { type: 'manager' };
       });
     } else {
+      // Player: toggle active map view
       if (mapsView.type === 'map') {
         setMapsView({ type: 'none' });
       } else {
@@ -181,20 +174,74 @@ function App() {
     <div className="app">
       <input key={Date.now()} type="file" accept=".json" multiple ref={inputRef} onChange={handleUploadChange} hidden />
       <div className="app-body">
-        <Routes>
-          <Route path="/" element={<Root />}>
-            <Route path="campaigns" element={<Campaigns />} />
-            <Route path="campaign/:name" element={<CampaignLayout />}>
-              <Route index element={<CampaignIndex />} />
-              <Route path="characters/:charId" element={<CharacterSheet />} />
-              <Route path="initiative" element={<InitiativeRoute />} />
-              <Route path="maps" element={<MapsRoute />} />
-              <Route path="maps/:mapName" element={<MapRoute />} />
-              <Route path="encounters" element={<EncountersRoute />} />
-              <Route path="notes" element={<NotesRoute />} />
-            </Route>
-          </Route>
-        </Routes>
+        <Sidebar
+          campaignName={campaignName}
+          characters={characters}
+          activeCharacter={activeCharacter}
+          onBackToCampaigns={handleBackToCampaigns}
+          onAddCharacter={handleAddCharacter}
+          onCharacterClick={handleCharacterClick}
+          onInitiativeClick={handleInitiativeClick}
+          onMapsClick={handleMapsClick}
+          onNotesClick={handleNotesClick}
+          onEncounterClick={handleEncounterClick}
+          onRenameCampaign={handleRenameCampaign}
+          onDeleteCampaign={handleDeleteCampaign}
+          theme={theme}
+          toggleTheme={toggleTheme}
+          isLocalhost={isLocalhost}
+        />
+        {activeCharacter && (
+          <CharSheet
+            allAbilityScores={abilityScores}
+            allClasses={classes}
+            allClasses2024={classes2024}
+            allEquipment={equipment}
+            allMagicItems={magicItems}
+            allRaces={races}
+            allSpells={spells}
+            allSpells2024={spells2024}
+            playerSummary={activeCharacter}
+            allRaces2024={races2024}
+            allMagicItems2024={magicItems2024}
+            onDeleteCharacter={handleDeleteCharacter}
+            onEditCharacter={() => handleEditCharacter(activeCharacter)}
+            onUploadClick={handleUploadClick}
+            onSaveClick={handleSaveClick}
+          />
+        )}
+        {initiativeActive && <Initiative characters={characters} onNpcsChange={setNpcs} />}
+        {mapsView.type === 'manager' && (
+          <MapsManager
+            campaignName={campaignName}
+            onOpenMap={(mapName) => setMapsView({ type: 'map', mapName })}
+            onBack={() => setMapsView({ type: 'none' })}
+          />
+        )}
+        {mapsView.type === 'map' && (
+          <Map
+            campaignName={campaignName}
+            characters={characters}
+            npcs={npcs}
+            isLocalhost={isLocalhost}
+            mapName={mapsView.mapName}
+            onBack={() => setMapsView({ type: isLocalhost ? 'manager' : 'none' })}
+          />
+        )}
+        {showEncounter && (
+          <EncounterBuilder characters={characters} campaignName={campaignName} />
+        )}
+        {showNotes && (
+          <Notes
+            campaignName={campaignName}
+            characters={characters}
+            isLocalhost={isLocalhost}
+            onBack={() => setShowNotes(false)}
+          />
+        )}
+        <br />
+        {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allRaces={races} allRaces2024={races2024} allClasses={classes} allSpells={spells} allSpells2024={spells2024} />}
+        {showEditCharacterWizard && <CharacterCreationWizard onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allRaces={races} allClasses={classes} allSpells={spells} allSpells2024={spells2024} characterData={activeCharacter} isEditing={true} />}
       </div>
     </div>
   );
