@@ -1,19 +1,19 @@
 /* ===== Ability Scores Grid Layout ===== */
-.ability-scores-grid {
+.wizard-step .ability-scores-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 15px;
   margin-top: 15px;
 }
 
-.ability-score-card {
+.wizard-step .ability-score-card {
   background-color: var(--background-color-card);
   padding: 12px;
   border-radius: 6px;
   border: 1px solid var(--border-color);
 }
 
-.ability-score-card h4 {
+.wizard-step .ability-score-card h4 {
   margin: 0 0 10px 0;
   color: var(--color-text);
   font-size: 1rem;
@@ -21,14 +21,14 @@
   padding-bottom: 6px;
 }
 
-.ability-score-card .form-group {
+.wizard-step .ability-score-card .form-group {
   margin-bottom: 8px;
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.ability-score-card .form-group label {
+.wizard-step .ability-score-card .form-group label {
   font-size: 0.85rem;
   color: var(--color-text-secondary);
   flex-shrink: 0;
@@ -36,7 +36,7 @@
   white-space: nowrap;
 }
 
-.ability-score-card .form-group input {
+.wizard-step .ability-score-card .form-group input {
   max-width: 60px;
   padding: 6px 8px;
   border: 1px solid var(--border-color-input);
@@ -48,12 +48,12 @@
   color: var(--color-text);
 }
 
-.ability-score-card .form-group input.error {
+.wizard-step .ability-score-card .form-group input.error {
   border-color: var(--color-error-border);
   background-color: var(--background-color-input-error);
 }
 
-.point-cost {
+.wizard-step .point-cost {
   display: inline-block;
   margin-left: 8px;
   font-size: 0.75rem;
@@ -64,7 +64,7 @@
   border-radius: 3px;
 }
 
-.total-score {
+.wizard-step .total-score {
   margin-top: 8px;
   padding: 6px 10px;
   border-radius: 4px;
@@ -73,13 +73,13 @@
   text-align: center;
 }
 
-.total-score.error {
+.wizard-step .total-score.error {
   background-color: var(--background-color-error);
   color: var(--color-error-light);
   border: 1px solid var(--border-color-error);
 }
 
-.total-score:not(.error) {
+.wizard-step .total-score:not(.error) {
   background-color: var(--background-color-success);
   color: var(--color-success);
   border: 1px solid var(--border-color-success);
@@ -87,11 +87,11 @@
 
 /* Responsive adjustments for abilities */
 @media (max-width: 768px) {
-  .ability-scores-grid {
+  .wizard-step .ability-scores-grid {
     grid-template-columns: 1fr;
   }
   
-  .ability-score-card .form-group input {
+  .wizard-step .ability-score-card .form-group input {
     max-width: 60px;
   }
 }

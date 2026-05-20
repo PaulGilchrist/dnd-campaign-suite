@@ -1,4 +1,4 @@
-.spell-abilities {
+.char-spells .spell-abilities {
     align-items: center;
     background-color: var(--background-color-body);
     display: grid;
@@ -6,13 +6,13 @@
     padding-bottom: 5px;
     margin-top: -5px;
 }
-.spell-popup-parent {
+.char-spells .spell-popup-parent {
     overflow: visible;
 }
-.spell-name {
+.char-spells .spell-name {
     cursor: pointer;
 }
-.table-spells {
+.char-spells .table-spells {
     border-collapse: collapse;
     text-align: center;
     width: 100%;

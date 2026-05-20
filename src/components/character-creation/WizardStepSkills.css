@@ -3,12 +3,12 @@
    ============================================ */
 
 /* Skill Expert Styling */
-.skill-expert-label {
+.wizard-step .skill-expert-label {
   font-weight: 600;
   color: var(--color-success);
 }
 
-.expertise-indicator {
+.wizard-step .expertise-indicator {
   margin-left: 4px;
   font-size: 0.85rem;
   color: var(--color-success);
@@ -16,7 +16,7 @@
 }
 
 /* Expertise Toggle Button */
-.expertise-toggle-btn {
+.wizard-step .expertise-toggle-btn {
   padding: 4px 10px;
   margin-left: 8px;
   border: 1px solid var(--color-primary);
@@ -29,18 +29,18 @@
   white-space: nowrap;
 }
 
-.expertise-toggle-btn:hover:not(:disabled) {
+.wizard-step .expertise-toggle-btn:hover:not(:disabled) {
   background-color: var(--color-primary);
   color: var(--color-text-inverse);
 }
 
-.expertise-toggle-btn.active {
+.wizard-step .expertise-toggle-btn.active {
   background-color: var(--background-color-selected);
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
 
-.expertise-toggle-btn:disabled {
+.wizard-step .expertise-toggle-btn:disabled {
   border-color: var(--border-color);
   background-color: var(--background-color-disabled);
   color: var(--color-text-muted);
@@ -48,7 +48,7 @@
 }
 
 /* Expertise Feedback Message */
-.expertise-feedback {
+.wizard-step .expertise-feedback {
   margin-top: 10px;
   padding: 10px 15px;
   border-radius: 4px;
@@ -57,13 +57,13 @@
   animation: slideIn 0.3s ease-out;
 }
 
-.expertise-feedback.error {
+.wizard-step .expertise-feedback.error {
   background-color: var(--background-color-error);
   color: var(--color-error-light);
   border: 1px solid var(--border-color-error);
 }
 
-.expertise-feedback.success {
+.wizard-step .expertise-feedback.success {
   background-color: var(--background-color-success);
   color: var(--color-success);
   border: 1px solid var(--border-color-success);

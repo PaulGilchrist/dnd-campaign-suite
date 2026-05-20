@@ -8,7 +8,7 @@ function CharSpellSlots({ playerStats }) {
     let spellMaxLevel = rules.getSpellMaxLevel(playerStats.spellAbilities);
     return (
         <React.Fragment>
-            { playerStats.spellAbilities && <div className='levels'>
+            { playerStats.spellAbilities && <div className='char-spell-slots levels'>
                 <div className='header'><b>Spell Slots</b></div>
                 {spellMaxLevel && spellMaxLevel > 0 && <CharSpellSlotLevel level={1} totalSlots={playerStats.spellAbilities.spell_slots_level_1} playerStats={playerStats}></CharSpellSlotLevel>}
                 {spellMaxLevel && spellMaxLevel > 1 && <CharSpellSlotLevel level={2} totalSlots={playerStats.spellAbilities.spell_slots_level_2} playerStats={playerStats}></CharSpellSlotLevel>}

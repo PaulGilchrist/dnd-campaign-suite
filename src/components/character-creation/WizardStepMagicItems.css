@@ -3,7 +3,7 @@
    ============================================ */
 
 /* Magic Items Search Input */
-.magic-item-search-input {
+.wizard-step-magic-items .magic-item-search-input {
     padding: 0.5rem;
     border: 1px solid var(--border-color-input);
     border-radius: 4px;
@@ -14,7 +14,7 @@
 }
 
 /* Magic Items Type Filter */
-.magic-item-type-filter {
+.wizard-step-magic-items .magic-item-type-filter {
     padding: 0.5rem;
     border: 1px solid var(--border-color-input);
     border-radius: 4px;
@@ -25,7 +25,7 @@
 }
 
 /* Magic Item Type Badge */
-.magic-item-type {
+.wizard-step-magic-items .magic-item-type {
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-size: 0.8rem;
@@ -36,7 +36,7 @@
 }
 
 /* Magic Item Rarity Badge */
-.magic-item-rarity {
+.wizard-step-magic-items .magic-item-rarity {
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-size: 0.8rem;
@@ -48,7 +48,7 @@
 }
 
 /* Magic Item Description */
-.magic-item-description {
+.wizard-step-magic-items .magic-item-description {
     font-size: 0.9rem;
     color: var(--color-text);
     line-height: 1.5;
@@ -56,7 +56,7 @@
     margin-bottom: 0.5rem;
 }
 
-.magic-item-more-description {
+.wizard-step-magic-items .magic-item-more-description {
     font-size: 0.9rem;
     color: var(--color-text);
     line-height: 1.5;
@@ -64,7 +64,7 @@
 }
 
 /* Magic Item Results Header */
-.magic-item-results-header {
+.wizard-step-magic-items .magic-item-results-header {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--border-color);
     background-color: var(--background-color-card);
@@ -77,7 +77,7 @@
 }
 
 /* Magic Item Results List */
-.magic-item-results-list {
+.wizard-step-magic-items .magic-item-results-list {
     padding: 0.5rem;
     flex: 1;
     overflow-x: hidden;
@@ -87,7 +87,7 @@
 }
 
 /* Magic Item Item Styles */
-.magic-item {
+.wizard-step-magic-items .magic-item {
     padding: 0.75rem;
     margin-bottom: 0.25rem;
     border: 1px solid var(--border-color);
@@ -99,12 +99,12 @@
     color: var(--color-text);
 }
 
-.magic-item:hover {
+.wizard-step-magic-items .magic-item:hover {
     border-color: var(--color-primary);
     background-color: var(--background-color-card-hover);
 }
 
-.magic-item.selected {
+.wizard-step-magic-items .magic-item.selected {
     border-color: var(--color-primary);
     background-color: var(--background-color-selected);
 }
@@ -114,8 +114,8 @@
    ============================================ */
 
 @media (max-width: 768px) {
-     .magic-item-type,
-     .magic-item-rarity {
+     .wizard-step-magic-items .magic-item-type,
+     .wizard-step-magic-items .magic-item-rarity {
         display: inline-block;
         margin-right: 0.5rem;
         margin-left: 0;

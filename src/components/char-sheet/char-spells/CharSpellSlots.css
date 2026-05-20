@@ -1,8 +1,8 @@
-.levels > .header {
+.char-spell-slots.levels > .header {
     margin-right: 15px;
     margin-top: 0px;
 }
-.levels {
+.char-spell-slots.levels {
     justify-content: flex-end;
     align-items: center;
     display: flex;

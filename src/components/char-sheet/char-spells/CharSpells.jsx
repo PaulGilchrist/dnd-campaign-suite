@@ -49,7 +49,7 @@ const CharSpells = React.memo(function CharSpells({ playerStats, handleTogglePre
         setSpells(spells);
     }
     return (
-        <div>
+        <div className="char-spells">
             {(playerStats.spellAbilities && playerStats.spellAbilities.spells.length > 0) && <div className="spell-popup-parent">
                   {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
             <hr />
