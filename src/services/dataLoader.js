@@ -59,6 +59,11 @@ async function loadData(dataType, version = '5e', optional = false) {
   const cacheKey = dataType;
   const versionCache = dataCache[version];
 
+  // Guard against invalid/missing version (e.g., undefined during wizard step 1)
+  if (!versionCache) {
+    return loadData(dataType, '5e', optional);
+  }
+
   // Return cached data if available
   if (versionCache[cacheKey]) {
     return versionCache[cacheKey];

@@ -17,7 +17,6 @@ import useCampaignManagement from './hooks/useCampaignManagement.js';
 import { useCharacterWizard } from './hooks/useCharacterWizard.js';
 import Notes from './components/notes/Notes.jsx';
 import NPCs from './components/npcs/NPCs.jsx';
-import { CLEAR_RULES } from './routes/config.js';
 
 function App() {
   const appData = useAppData();
@@ -38,7 +37,12 @@ function App() {
   useEffect(() => {
     campaignRef.current.setCampaignSelectCallback((_, loaded) => {
       charMgmtRef.current.setCharacters(loaded);
-      loaded.length > 0 ? charMgmtRef.current.setActiveCharacter(cloneDeep(loaded[0])) : wizardRef.current.handleAddCharacter();
+      if (loaded.length > 0) {
+        charMgmtRef.current.setActiveCharacter(cloneDeep(loaded[0]));
+        setActiveView('charSheet');
+      } else {
+        wizardRef.current.handleAddCharacter();
+      }
     });
     campaignRef.current.setDeleteCampaignCallback(() => { charMgmtRef.current.setCharacters([]); charMgmtRef.current.setActiveCharacter(null); });
   }, []);
@@ -49,10 +53,8 @@ function App() {
 
   const [mapsView, setMapsView] = useState({ type: 'none' });
   const [npcs, setNpcs] = useState([]);
-  const [showEncounter, setShowEncounter] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
-  const [showNPCs, setShowNPCs] = useState(false);
-  const [showInitiative, setShowInitiative] = useState(false);
+  const [activeView, setActiveView] = useState(null);
+  // activeView: null | 'charSheet' | 'mapsManager' | 'encounter' | 'notes' | 'npcs' | 'initiative'
   // type: 'none' | 'manager' | 'map'
   // When type is 'map', mapName holds the sanitized map filename (e.g. 'dungeon-level-1')
 
@@ -79,49 +81,23 @@ function App() {
     setMapsView({ type: 'none' });
   }, [campaignName]);
 
-  useEffect(() => {
-    setShowNotes(false);
-  }, [campaignName]);
-
-  // Clear all views listed in CLEAR_RULES for a given view name
-  const clearViews = (viewName) => {
-    (CLEAR_RULES[viewName] || []).forEach(view => {
-      if (view === 'mapsManager' || view === 'map') setMapsView({ type: 'none' });
-      if (view === 'encounter') setShowEncounter(false);
-      if (view === 'notes') setShowNotes(false);
-      if (view === 'npcs') setShowNPCs(false);
-      if (view === 'initiative') setShowInitiative(false);
-      if (view === 'charSheet') setActiveCharacter(null);
-    });
-  };
-
   const handleCharacterClick = (character) => {
-    setShowMapsManager(false);
-    setShowEncounter(false);
-    setShowNotes(false);
-    setShowNPCs(false);
-    setShowInitiative(false);
-    setMapsView({ type: 'none' });
     setActiveCharacter(cloneDeep(character));
+    setActiveView('charSheet');
   };
 
   const handleMapsClick = () => {
-    // Always clear per CLEAR_RULES (matches original unconditional clearing)
-    clearViews('mapsManager');
-    if (mapsView.type === 'none') {
+    if (activeView === 'mapsManager') {
+      setMapsView({ type: 'none' });
+      setActiveView(null);
+    } else {
+      setActiveView('mapsManager');
       if (isLocalhost) {
         setMapsView({ type: 'manager' });
       } else {
         loadActiveMapAndOpen();
       }
-    } else {
-      setMapsView({ type: 'none' });
     }
-  };
-
-  const handleEncounterClick = () => {
-    clearViews('encounter');
-    setShowEncounter(prev => !prev);
   };
 
   const loadActiveMapAndOpen = async () => {
@@ -141,21 +117,23 @@ function App() {
   };
 
   const handleInitiativeClick = () => {
-    setShowInitiative(prev => !prev);
+    setActiveView(prev => prev === 'initiative' ? null : 'initiative');
+  };
+
+  const handleEncounterClick = () => {
+    setActiveView(prev => prev === 'encounter' ? null : 'encounter');
   };
 
   const handleNotesClick = () => {
-    clearViews('notes');
-    setShowNotes(prev => !prev);
+    setActiveView(prev => prev === 'notes' ? null : 'notes');
   };
 
   const handleNPCsClick = () => {
-    clearViews('npcs');
-    setShowNPCs(true);
+    setActiveView(prev => prev === 'npcs' ? null : 'npcs');
   };
 
   const handleBackFromNPCs = () => {
-    setShowNPCs(false);
+    setActiveView(null);
   };
 
   const handleRenameCampaign = async () => {
@@ -209,7 +187,7 @@ function App() {
           isLocalhost={isLocalhost}
           onNPCsClick={handleNPCsClick}
         />
-        {activeCharacter && (
+        {activeView === 'charSheet' && activeCharacter && (
           <CharSheet
             allAbilityScores={abilityScores}
             allClasses={classes}
@@ -228,15 +206,15 @@ function App() {
             onSaveClick={handleSaveClick}
           />
         )}
-        {showInitiative && <Initiative characters={characters} onNpcsChange={setNpcs} />}
-        {mapsView.type === 'manager' && (
+        {activeView === 'initiative' && <Initiative characters={characters} onNpcsChange={setNpcs} />}
+        {activeView === 'mapsManager' && mapsView.type === 'manager' && (
           <MapsManager
             campaignName={campaignName}
             onOpenMap={(mapName) => setMapsView({ type: 'map', mapName })}
             onBack={() => setMapsView({ type: 'none' })}
           />
         )}
-        {mapsView.type === 'map' && (
+        {activeView === 'mapsManager' && mapsView.type === 'map' && (
           <Map
             campaignName={campaignName}
             characters={characters}
@@ -246,18 +224,18 @@ function App() {
             onBack={() => setMapsView({ type: isLocalhost ? 'manager' : 'none' })}
           />
         )}
-        {showEncounter && (
+        {activeView === 'encounter' && (
           <EncounterBuilder characters={characters} campaignName={campaignName} />
         )}
-        {showNotes && (
+        {activeView === 'notes' && (
           <Notes
             campaignName={campaignName}
             characters={characters}
             isLocalhost={isLocalhost}
-            onBack={() => setShowNotes(false)}
+            onBack={() => setActiveView(null)}
           />
         )}
-        {showNPCs && (
+        {activeView === 'npcs' && (
           <NPCs
             campaignName={campaignName}
             characters={characters}
