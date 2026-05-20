@@ -2,59 +2,76 @@ import React from "react";
 
 const SkeletonSVG = React.forwardRef(({ id, className, ...rest }, ref) => (
     <g ref={ref} id={id} className={className} {...rest}>
-        {/* Skull dome */}
+        {/* ===== SKULL (top-down oval) ===== */}
+        <ellipse cx="18" cy="7" rx="6.5" ry="5.5" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.6" />
+        {/* Skull top highlight */}
+        <path d="M 12 5 Q 18 2 24 5" fill="none" stroke="#F5F0E8" strokeWidth="0.5" opacity="0.6" />
+
+        {/* Eye sockets (dark pits) */}
+        <ellipse cx="15.5" cy="6" rx="1.5" ry="1.8" fill="#333" />
+        <ellipse cx="20.5" cy="6" rx="1.5" ry="1.8" fill="#333" />
+
+        {/* Nose cavity */}
+        <path d="M 17.5 8.5 L 18 10 L 18.5 8.5 Z" fill="#333" />
+
+        {/* Jaw hinge lines */}
+        <path d="M 12 8.5 Q 13 10.5 15 10" fill="none" stroke="#C4B898" strokeWidth="0.4" />
+        <path d="M 24 8.5 Q 23 10.5 21 10" fill="none" stroke="#C4B898" strokeWidth="0.4" />
+
+        {/* ===== RIBCAGE ===== */}
+        <ellipse cx="18" cy="14" rx="6" ry="4" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.6" />
+
+        {/* Rib lines (curved horizontals) */}
+        <path d="M 13 12.5 Q 18 10.5 23 12.5" fill="none" stroke="#D5C4A1" strokeWidth="0.4" />
+        <path d="M 13 14 Q 18 12 23 14" fill="none" stroke="#D5C4A1" strokeWidth="0.4" />
+        <path d="M 13.5 15.5 Q 18 13.5 22.5 15.5" fill="none" stroke="#D5C4A1" strokeWidth="0.4" />
+
+        {/* Sternum (vertical center line) */}
+        <line x1="18" y1="11" x2="18" y2="17" stroke="#D5C4A1" strokeWidth="0.4" />
+
+        {/* ===== ARMS (humerus bones) ===== */}
+        {/* Left arm — angled up-left */}
+        <line x1="12" y1="12" x2="5" y2="7" stroke="#E8DCC8" strokeWidth="3" strokeLinecap="round" />
+        <line x1="12" y1="12" x2="5" y2="7" stroke="#D5C4A1" strokeWidth="1.8" strokeLinecap="round" />
+
+        {/* Right arm — angled up-right */}
+        <line x1="24" y1="12" x2="31" y2="7" stroke="#E8DCC8" strokeWidth="3" strokeLinecap="round" />
+        <line x1="24" y1="12" x2="31" y2="7" stroke="#D5C4A1" strokeWidth="1.8" strokeLinecap="round" />
+
+        {/* Arm bone end knobs (shoulders) */}
+        <circle cx="12" cy="12" r="1.8" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.3" />
+        <circle cx="24" cy="12" r="1.8" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.3" />
+
+        {/* Arm bone end knobs (hands/wrists) */}
+        <circle cx="5" cy="7" r="1.5" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.3" />
+        <circle cx="31" cy="7" r="1.5" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.3" />
+
+        {/* ===== PELVIS (heart/butterfly shape) ===== */}
         <path
-            d="M 12 12 Q 12 5 18 5 Q 24 5 24 12 L 24 18 L 22 20 L 22 24 L 14 24 L 14 20 L 12 18 Z"
+            d="M 18 18 C 14 18, 12 19.5, 14 21.5 C 15 23, 17 22.5, 18 21.5 C 19 22.5, 21 23, 22 21.5 C 24 19.5, 22 18, 18 18 Z"
             fill="#E8DCC8"
             stroke="#D5C4A1"
-            strokeWidth="0.8"
+            strokeWidth="0.5"
         />
-        {/* Skull top highlight */}
-        <path
-            d="M 14 9 Q 14 6 18 6 Q 22 6 22 9"
-            fill="none"
-            stroke="#F5F0E8"
-            strokeWidth="0.6"
-        />
-        {/* Left eye socket */}
-        <ellipse cx="15" cy="14" rx="2.5" ry="2.8" fill="#333" />
-        {/* Right eye socket */}
-        <ellipse cx="21" cy="14" rx="2.5" ry="2.8" fill="#333" />
-        {/* Nose cavity */}
-        <path d="M 17 17 L 18 19.5 L 19 17 Z" fill="#333" />
-        {/* Mouth gap */}
-        <rect x="14" y="21" width="8" height="1.5" fill="#333" rx="0.3" />
-        {/* Teeth - upper */}
-        <rect x="15" y="21" width="1.2" height="1.8" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.2" />
-        <rect x="16.6" y="21" width="1.2" height="1.8" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.2" />
-        <rect x="18.2" y="21" width="1.2" height="1.8" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.2" />
-        <rect x="19.8" y="21" width="1.2" height="1.8" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.2" />
-        {/* Jaw outline */}
-        <path d="M 14 24 L 22 24" stroke="#D5C4A1" strokeWidth="0.5" />
-        {/* Cheekbone shadows */}
-        <path d="M 12 16 Q 14 18 14 20" fill="none" stroke="#C4B898" strokeWidth="0.5" />
-        <path d="M 24 16 Q 22 18 22 20" fill="none" stroke="#C4B898" strokeWidth="0.5" />
 
-        {/* Crossbones - left (diagonal) */}
-        <line x1="8" y1="30" x2="16" y2="26" stroke="#E8DCC8" strokeWidth="3.5" strokeLinecap="round" />
-        <line x1="8" y1="30" x2="16" y2="26" stroke="#D5C4A1" strokeWidth="2" strokeLinecap="round" />
-        {/* Crossbones - right (diagonal) */}
-        <line x1="20" y1="26" x2="28" y2="30" stroke="#E8DCC8" strokeWidth="3.5" strokeLinecap="round" />
-        <line x1="20" y1="26" x2="28" y2="30" stroke="#D5C4A1" strokeWidth="2" strokeLinecap="round" />
-        {/* Bone end knobs - left pair */}
-        <circle cx="8" cy="30" r="2" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.4" />
-        <circle cx="16" cy="26" r="2" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.4" />
-        {/* Bone end knobs - right pair */}
-        <circle cx="20" cy="26" r="2" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.4" />
-        <circle cx="28" cy="30" r="2" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.4" />
-        {/* Bone center highlights */}
-        <circle cx="8" cy="30" r="0.8" fill="#F5F0E8" opacity="0.5" />
-        <circle cx="16" cy="26" r="0.8" fill="#F5F0E8" opacity="0.5" />
-        <circle cx="20" cy="26" r="0.8" fill="#F5F0E8" opacity="0.5" />
-        <circle cx="28" cy="30" r="0.8" fill="#F5F0E8" opacity="0.5" />
+        {/* ===== LEGS (femur bones) ===== */}
+        {/* Left femur — angled slightly down-left */}
+        <line x1="15.5" y1="21" x2="11" y2="29" stroke="#E8DCC8" strokeWidth="2.8" strokeLinecap="round" />
+        <line x1="15.5" y1="21" x2="11" y2="29" stroke="#D5C4A1" strokeWidth="1.6" strokeLinecap="round" />
+
+        {/* Right femur — angled slightly down-right */}
+        <line x1="20.5" y1="21" x2="25" y2="29" stroke="#E8DCC8" strokeWidth="2.8" strokeLinecap="round" />
+        <line x1="20.5" y1="21" x2="25" y2="29" stroke="#D5C4A1" strokeWidth="1.6" strokeLinecap="round" />
+
+        {/* Leg bone end knobs (hips) */}
+        <circle cx="15.5" cy="21" r="1.5" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.3" />
+        <circle cx="20.5" cy="21" r="1.5" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.3" />
+
+        {/* Leg bone end knobs (knees) */}
+        <circle cx="11" cy="29" r="1.5" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.3" />
+        <circle cx="25" cy="29" r="1.5" fill="#E8DCC8" stroke="#D5C4A1" strokeWidth="0.3" />
     </g>
 ));
 
 SkeletonSVG.displayName = "SkeletonSVG";
-
 export default SkeletonSVG;

@@ -253,8 +253,8 @@
 
 .map .items-panel-close {
     position: absolute;
-    top: 8px;
-    right: 8px;
+    top: 0;
+    right: 0;
     background: none;
     border: none;
     color: #ccc;
@@ -272,7 +272,7 @@
     padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 2px;
     flex: 1;
     overflow-y: auto;
 }
@@ -281,7 +281,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px;
+    padding: 2px 8px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
     cursor: grab;

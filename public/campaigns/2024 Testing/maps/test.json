@@ -528,8 +528,9 @@
       "id": "fc23c9b4-e4bd-4d06-8012-2d74b8e4086b",
       "type": "torch",
       "gridX": 27,
-      "gridY": 11,
-      "visible": true
+      "gridY": 9,
+      "visible": true,
+      "rotation": 180
     },
     {
       "id": "2fae3edd-9a79-4972-8708-c2b8d07ac9ca",
@@ -543,28 +544,32 @@
       "type": "torch",
       "gridX": 5,
       "gridY": 11,
-      "visible": true
+      "visible": true,
+      "rotation": 90
     },
     {
       "id": "daad7400-23d4-4fcd-951d-102df4da59da",
       "type": "torch",
       "gridX": 1,
       "gridY": 11,
-      "visible": true
+      "visible": true,
+      "rotation": 90
     },
     {
       "id": "fee22dcb-d260-4b11-b6af-8e2c666fff06",
       "type": "torch",
       "gridX": 5,
       "gridY": 15,
-      "visible": true
+      "visible": true,
+      "rotation": 270
     },
     {
       "id": "ae22fcdc-bfcc-4e8d-b4d0-bdc4025e537f",
       "type": "torch",
       "gridX": 1,
       "gridY": 15,
-      "visible": true
+      "visible": true,
+      "rotation": 270
     },
     {
       "id": "9e58d08d-4c14-4b90-9d1b-b37a35c28768",
@@ -686,38 +691,42 @@
     {
       "id": "8d3fe330-43a7-40ef-8c8c-d4563eff0cec",
       "type": "altar",
-      "gridX": 23,
-      "gridY": 26,
+      "gridX": 25,
+      "gridY": 25,
       "visible": true,
-      "rotation": 0
+      "rotation": 90
     },
     {
       "id": "ad636d8b-06ca-4aa8-a901-b03865119970",
       "type": "chair",
       "gridX": 13,
       "gridY": 19,
-      "visible": true
+      "visible": true,
+      "rotation": 90
     },
     {
       "id": "4af98b94-f63f-4d69-a1b1-73ff2e0d2abb",
       "type": "chair",
       "gridX": 9,
       "gridY": 19,
-      "visible": true
+      "visible": true,
+      "rotation": 270
     },
     {
       "id": "c25b1610-ee48-4ec1-9e0a-7d9b174e65b4",
       "type": "chair",
       "gridX": 9,
       "gridY": 20,
-      "visible": true
+      "visible": true,
+      "rotation": 270
     },
     {
       "id": "8bfedece-a42f-40e5-b1d0-ec0dfe7cbc4a",
       "type": "chair",
       "gridX": 13,
       "gridY": 20,
-      "visible": true
+      "visible": true,
+      "rotation": 90
     },
     {
       "id": "9ffbc065-0c00-4ab9-a4b2-75274c5b3580",
@@ -738,14 +747,16 @@
       "type": "chair",
       "gridX": 10,
       "gridY": 21,
-      "visible": true
+      "visible": true,
+      "rotation": 180
     },
     {
       "id": "9a9358ef-2cb3-4e23-8e1a-61b92c740603",
       "type": "chair",
       "gridX": 12,
       "gridY": 21,
-      "visible": true
+      "visible": true,
+      "rotation": 180
     },
     {
       "id": "d3c88b45-ed79-4b37-ba88-0d2a83a78f44",
@@ -777,7 +788,7 @@
       "gridX": 15,
       "gridY": 20,
       "visible": true,
-      "rotation": 0
+      "rotation": 90
     },
     {
       "id": "494a6c72-63a5-4be8-9461-96b37eb4374d",
@@ -814,6 +825,46 @@
       "gridY": 18,
       "visible": false,
       "name": "Giant Spider"
+    },
+    {
+      "id": "fe8325e8-a931-4a38-a871-42a7c39dd4bd",
+      "type": "torch",
+      "gridX": 25,
+      "gridY": 15,
+      "visible": true,
+      "rotation": 270
+    },
+    {
+      "id": "81f74d72-90a8-420e-b577-fd81231d3e06",
+      "type": "torch",
+      "gridX": 5,
+      "gridY": 27,
+      "visible": true,
+      "rotation": 270
+    },
+    {
+      "id": "b37156da-84df-4308-a914-f5335337695f",
+      "type": "bookshelf",
+      "gridX": 15,
+      "gridY": 18,
+      "visible": true,
+      "rotation": 90
+    },
+    {
+      "id": "124ba23a-aaaf-47a1-bd6c-ed24d1a20bdf",
+      "type": "torch",
+      "gridX": 23,
+      "gridY": 27,
+      "visible": true,
+      "rotation": 270
+    },
+    {
+      "id": "f22b9eac-5f73-4264-ac49-0446a7c7db33",
+      "type": "torch",
+      "gridX": 25,
+      "gridY": 20,
+      "visible": true,
+      "rotation": 180
     }
   ],
   "paintCells": [],

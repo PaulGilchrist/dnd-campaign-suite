@@ -58,6 +58,24 @@ function usePlacedItems(setPlacedItems, setSelectedBarrel) {
         }));
     };
 
+    const handleRotateTorch = (id) => {
+        setPlacedItems(prev => prev.map(item => {
+            if (item.id !== id) return item;
+            const currentRotation = item.rotation || 0;
+            const newRotation = (currentRotation + 90) % 360;
+            return { ...item, rotation: newRotation };
+        }));
+    };
+
+    const handleRotateChair = (id) => {
+        setPlacedItems(prev => prev.map(item => {
+            if (item.id !== id) return item;
+            const currentRotation = item.rotation || 0;
+            const newRotation = (currentRotation + 90) % 360;
+            return { ...item, rotation: newRotation };
+        }));
+    };
+
     const handleRotateAltar = (itemId) => {
         setPlacedItems(prev =>
             prev.map(item =>
@@ -85,6 +103,8 @@ function usePlacedItems(setPlacedItems, setSelectedBarrel) {
         handleRotateDoor,
         handleRotateSecretDoor,
         handleRotateStairs,
+        handleRotateTorch,
+        handleRotateChair,
         handleRotateAltar,
         handleRotateBookshelf,
     };

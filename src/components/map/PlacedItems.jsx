@@ -291,7 +291,8 @@ function PlacedItems({
         if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#chair" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                <use href="#chair" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
+                    transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
@@ -429,7 +430,8 @@ function PlacedItems({
         if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
         return (
             <g key={item.id} className="placed-item">
-                <use href="#torch" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                <use href="#torch" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
+                    transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"

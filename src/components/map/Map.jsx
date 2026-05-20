@@ -463,7 +463,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
             gridX: grid.gridX,
             gridY: grid.gridY,
             visible: isLocalhost,
-            rotation: (dragData === 'table' || dragData === 'bed' || dragData === 'stairs' || dragData === 'altar' || dragData === 'bookshelf') ? 0 : undefined
+            rotation: (dragData === 'table' || dragData === 'bed' || dragData === 'stairs' || dragData === 'altar' || dragData === 'bookshelf' || dragData === 'torch' || dragData === 'chair') ? 0 : undefined
         };
         setPlacedItems(prev => [...prev, newItem]);
     }, [isLocalhost, gridSize]);
@@ -489,6 +489,10 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         handleRotateDoor,
         handleRotateSecretDoor,
         handleRotateStairs,
+        handleRotateAltar,
+        handleRotateBookshelf,
+        handleRotateTorch,
+        handleRotateChair,
     } = usePlacedItems(setPlacedItems, setSelectedBarrel);
 
     // Close context menu
@@ -615,6 +619,10 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     handleRotateDoor={handleRotateDoor}
                     handleRotateSecretDoor={handleRotateSecretDoor}
                     handleRotateStairs={handleRotateStairs}
+                    handleRotateAltar={handleRotateAltar}
+                    handleRotateBookshelf={handleRotateBookshelf}
+                    handleRotateTorch={handleRotateTorch}
+                    handleRotateChair={handleRotateChair}
                     handleRenameItem={handleRenameItem}
                     setShowRename={setShowRename}
                     setSelectedBarrel={setSelectedBarrel}
