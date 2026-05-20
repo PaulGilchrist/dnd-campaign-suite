@@ -325,15 +325,10 @@ Services (pure logic, no UI):
 
 ## 7. Recommended Future Improvements
 
-1. **TypeScript migration:** Add type safety to services and hooks to catch ruleset mismatches at compile time.
-2. **Horizontal scaling:** Replace in-memory SSE subscribers with a pub/sub system (Redis, etc.) for multi-server deployments.
-3. **Concurrent edit protection:** Implement optimistic locking or operational transforms for simultaneous character edits.
-4. **Coverage thresholds:** Set non-zero coverage thresholds in `vite.config.js` to prevent test regressions.
+1. **Coverage thresholds:** Set non-zero coverage thresholds in `vite.config.js` to prevent test regressions.
 5. **Data validation pipeline:** Add a CI step that validates all JSON data files against their schemas and cross-references (e.g., spell levels match class spell lists).
 6. **PWA support:** Add service worker for offline character sheet access.
-7. **Export formats:** Add PDF export and D&D Beyond import.
-8. **Server hardening:** Add rate limiting and input validation to all API endpoints.
-9. **Schema validation for campaign tools:** Add JSON Schema validation for encounter, NPC, notes, and map data files.
+7. **Schema validation for campaign tools:** Add JSON Schema validation for encounter, NPC, notes, and map data files.
 10. **Dungeon generator testing:** The `dungeonGenerator.js` service lacks a paired test file — add comprehensive tests.
 
 ---
