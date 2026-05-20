@@ -16,6 +16,7 @@ import StairsSVG from './StairsSVG.jsx';
 import PlacedItems from './PlacedItems.jsx';
 import GridAndWalls from './GridAndWalls.jsx';
 import Creatures from './Creatures.jsx';
+import FogOverlay from './FogOverlay.jsx';
 import usePlacedItems from './hooks/usePlacedItems.js';
 import { getMonsterImageUrl } from '../../services/monsterUtils.js';
 
@@ -55,9 +56,9 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
 
     // Fog of war: Set of "gridX,gridY" strings for cells that are fogged
     const [fog, setFog] = useState(null);
-    // Fog rectangle drag state: start/end grid coords during drag (refs to avoid stale closures)
-    const fogDragStart = useRef(null); // { gridX, gridY } | null
-    const fogDragEnd = useRef(null);   // { gridX, gridY } | null
+    // Fog rectangle drag state: start/end grid coords during drag
+    const [fogDragStart, setFogDragStart] = useState(null); // { gridX, gridY } | null
+    const [fogDragEnd, setFogDragEnd] = useState(null);     // { gridX, gridY } | null
 
     // Barrel context menu state
     const [selectedBarrel, setSelectedBarrel] = useState(null); // { id, gridX, gridY }
@@ -228,33 +229,31 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         e.preventDefault();
         const grid = getGridFromEvent(e);
         if (!grid) return;
-        fogDragStart.current = grid;
-        fogDragEnd.current = grid;
+        setFogDragStart(grid);
+        setFogDragEnd(grid);
     }, [tool, getGridFromEvent, isLocalhost]);
 
     const handleFogPointerMove = useCallback((e) => {
         if (!isLocalhost) return;
-        if (!fogDragStart.current || (tool !== 'fog' && tool !== 'clearFog')) return;
+        if (!fogDragStart || (tool !== 'fog' && tool !== 'clearFog')) return;
         e.preventDefault();
         const grid = getGridFromEvent(e);
         if (!grid) return;
-        fogDragEnd.current = grid;
-    }, [tool, getGridFromEvent, isLocalhost]);
+        setFogDragEnd(grid);
+    }, [tool, getGridFromEvent, isLocalhost, fogDragStart]);
 
     const handleFogPointerUp = useCallback(() => {
-        const start = fogDragStart.current;
-        const end = fogDragEnd.current;
-        if (!start || !end) {
-            fogDragStart.current = null;
-            fogDragEnd.current = null;
+        if (!fogDragStart || !fogDragEnd) {
+            setFogDragStart(null);
+            setFogDragEnd(null);
             return;
         }
 
         // Calculate rectangle bounds regardless of drag direction
-        const minX = Math.min(start.gridX, end.gridX);
-        const maxX = Math.max(start.gridX, end.gridX);
-        const minY = Math.min(start.gridY, end.gridY);
-        const maxY = Math.max(start.gridY, end.gridY);
+        const minX = Math.min(fogDragStart.gridX, fogDragEnd.gridX);
+        const maxX = Math.max(fogDragStart.gridX, fogDragEnd.gridX);
+        const minY = Math.min(fogDragStart.gridY, fogDragEnd.gridY);
+        const maxY = Math.max(fogDragStart.gridY, fogDragEnd.gridY);
 
         setFog((prev) => {
             const newFog = new Set(prev);
@@ -271,9 +270,9 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
             return newFog;
         });
 
-        fogDragStart.current = null;
-        fogDragEnd.current = null;
-    }, [tool]);
+        setFogDragStart(null);
+        setFogDragEnd(null);
+    }, [tool, fogDragStart, fogDragEnd]);
 
     // Handle grid pointer down (paint/erase mode)
     const handleGridPointerDown = useCallback((e) => {
@@ -811,37 +810,12 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     npcImages={npcImages}
                 />
 
-                {/* Fog of War overlay — GM sees subtle fog, players see nothing here (filtered below) */}
-                {isLocalhost && fog && Array.from(fog).map((key) => {
-                    const [gx, gy] = key.split(',').map(Number);
-                    return (
-                        <rect
-                            key={`fog-${key}`}
-                            x={gx * CELL_SIZE}
-                            y={gy * CELL_SIZE}
-                            width={CELL_SIZE}
-                            height={CELL_SIZE}
-                            className="fog-cell"
-                        />
-                    );
-                })}
-
-                {/* Fog drag selection rectangle preview */}
-                {isLocalhost && fogDragStart.current && fogDragEnd.current && (fogDragStart.current.gridX !== fogDragEnd.current.gridX || fogDragStart.current.gridY !== fogDragEnd.current.gridY) && (() => {
-                    const minX = Math.min(fogDragStart.current.gridX, fogDragEnd.current.gridX);
-                    const maxX = Math.max(fogDragStart.current.gridX, fogDragEnd.current.gridX);
-                    const minY = Math.min(fogDragStart.current.gridY, fogDragEnd.current.gridY);
-                    const maxY = Math.max(fogDragStart.current.gridY, fogDragEnd.current.gridY);
-                    return (
-                        <rect
-                            x={minX * CELL_SIZE}
-                            y={minY * CELL_SIZE}
-                            width={(maxX - minX + 1) * CELL_SIZE}
-                            height={(maxY - minY + 1) * CELL_SIZE}
-                            className="fog-preview"
-                        />
-                    );
-                })()}
+                <FogOverlay
+                    fog={fog}
+                    isLocalhost={isLocalhost}
+                    fogDragStart={fogDragStart}
+                    fogDragEnd={fogDragEnd}
+                />
 
                 {/* Item context menu */}
                 {selectedBarrel && (
@@ -853,46 +827,51 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                                 <g>
                                     {(() => {
                                         const selectedItem = placedItems.find(i => i.id === selectedBarrel.id);
-                                        const hasRotation = selectedItem && (selectedItem.type === 'table' || selectedItem.type === 'bed' || selectedItem.type === 'door' || selectedItem.type === 'secretDoor' || selectedItem.type === 'stairs');
                                         const isNpc = selectedItem && selectedItem.type === 'npc';
-                                        const menuHeight = hasRotation ? 120 : (isNpc ? 100 : 80);
-                                        const repositionY = hasRotation ? menuY + 106 : (isNpc ? menuY + 86 : menuY + 64);
+                                        const hasRotation = selectedItem && (selectedItem.type === 'table' || selectedItem.type === 'bed' || selectedItem.type === 'door' || selectedItem.type === 'secretDoor' || selectedItem.type === 'stairs');
+                                        const showRenameOption = isNpc;
+                                        const hasExtra = showRenameOption || hasRotation;
+                                        const menuHeight = hasExtra ? 102 : 80;
                                         return (
                                             <g>
                                                 <rect x={menuX} y={menuY} width="120" height={menuHeight} rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
-                                                {(() => {
-                                                    const barrel = placedItems.find(i => i.id === selectedBarrel.id);
-                                                    const isVisible = barrel ? barrel.visible : true;
-                                                    return (
-                                                        <text x={menuX + 8} y={menuY + 20} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleToggleItemVisibility(selectedBarrel.id)}>
-                                                            {isVisible ? 'Hide' : 'Show'}
-                                                        </text>
-                                                    );
-                                                })()}
-                                                <text x={menuX + 8} y={menuY + 42} fill="#ccc" fontSize="11" className="menu-option" onClick={() => setShowRename(selectedBarrel.id)}>
-                                                    Rename
+                                                {/* Show/Hide */}
+                                                <text x={menuX + 8} y={menuY + 20} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleToggleItemVisibility(selectedBarrel.id)}>
+                                                    {selectedItem?.visible !== false ? 'Hide' : 'Show'}
                                                 </text>
-                                                {showRename === selectedBarrel.id ? (
-                                                    <foreignObject x={menuX + 4} y={menuY + 50} width="112" height="28">
-                                                        <input
-                                                            type="text"
-                                                            defaultValue={selectedItem?.name || 'NPC'}
-                                                            className="context-menu-input"
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === 'Enter') {
-                                                                    handleRenameItem(selectedBarrel.id, e.target.value);
-                                                                }
-                                                            }}
-                                                            onBlur={(e) => {
-                                                                handleRenameItem(selectedBarrel.id, e.target.value);
-                                                            }}
-                                                            autoFocus
-                                                        />
-                                                    </foreignObject>
-                                                ) : null}
-                                                <text x={menuX + 8} y={menuY + (showRename === selectedBarrel.id ? 86 : 64)} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleDeleteItem(selectedBarrel.id)}>Delete</text>
+                                                {/* Delete */}
+                                                <text x={menuX + 8} y={menuY + 42} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleDeleteItem(selectedBarrel.id)}>Delete</text>
+                                                {/* Reposition */}
+                                                <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRepositionItem(selectedBarrel.id)}>Reposition</text>
+                                                {/* Rename (NPC only) */}
+                                                {showRenameOption && (
+                                                    <>
+                                                        <text x={menuX + 8} y={menuY + 86} fill="#ccc" fontSize="11" className="menu-option" onClick={() => setShowRename(selectedBarrel.id)}>
+                                                            Rename
+                                                        </text>
+                                                        {showRename === selectedBarrel.id ? (
+                                                            <foreignObject x={menuX + 4} y={menuY + 94} width="112" height="28">
+                                                                <input
+                                                                    type="text"
+                                                                    defaultValue={selectedItem?.name || 'NPC'}
+                                                                    className="context-menu-input"
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') {
+                                                                            handleRenameItem(selectedBarrel.id, e.target.value);
+                                                                        }
+                                                                    }}
+                                                                    onBlur={(e) => {
+                                                                        handleRenameItem(selectedBarrel.id, e.target.value);
+                                                                    }}
+                                                                    autoFocus
+                                                                />
+                                                            </foreignObject>
+                                                        ) : null}
+                                                    </>
+                                                )}
+                                                {/* Rotate (rotatable items only) */}
                                                 {hasRotation && (
-                                                    <text x={menuX + 8} y={menuY + (showRename === selectedBarrel.id ? 108 : 86)} fill="#ccc" fontSize="11" className="menu-option" onClick={() => {
+                                                    <text x={menuX + 8} y={menuY + 86} fill="#ccc" fontSize="11" className="menu-option" onClick={() => {
                                                         if (selectedItem.type === 'table') handleRotateTable(selectedBarrel.id);
                                                         else if (selectedItem.type === 'bed') handleRotateBed(selectedBarrel.id);
                                                         else if (selectedItem.type === 'door') handleRotateDoor(selectedBarrel.id);
@@ -902,7 +881,6 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                                                         Rotate
                                                     </text>
                                                 )}
-                                                <text x={menuX + 8} y={repositionY} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRepositionItem(selectedBarrel.id)}>Reposition</text>
                                                 <text x={menuX + 108} y={menuY + 12} fill="#999" fontSize="10" className="menu-close" onClick={() => { setSelectedBarrel(null); setShowRename(null); }}>✕</text>
                                             </g>
                                         );

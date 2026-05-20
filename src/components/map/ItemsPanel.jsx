@@ -23,6 +23,23 @@ function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClo
                     draggable
                     onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', 'barrel');
+                        // Create a custom drag ghost image
+                        const ghost = document.createElement('div');
+                        ghost.style.width = '40px';
+                        ghost.style.height = '40px';
+                        ghost.style.background = '#555';
+                        ghost.style.borderRadius = '4px';
+                        ghost.style.border = '2px solid #888';
+                        ghost.style.display = 'flex';
+                        ghost.style.alignItems = 'center';
+                        ghost.style.justifyContent = 'center';
+                        ghost.style.color = '#fff';
+                        ghost.style.fontSize = '16px';
+                        ghost.style.fontWeight = 'bold';
+                        ghost.textContent = '🛢';
+                        document.body.appendChild(ghost);
+                        e.dataTransfer.setDragImage(ghost, 20, 20);
+                        setTimeout(() => document.body.removeChild(ghost), 0);
                     }}
                 >
                     <svg viewBox="0 0 36 36" width="36" height="36">
@@ -35,6 +52,23 @@ function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClo
                     draggable
                     onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', 'bed');
+                        // Create a custom drag ghost image
+                        const ghost = document.createElement('div');
+                        ghost.style.width = '40px';
+                        ghost.style.height = '40px';
+                        ghost.style.background = '#555';
+                        ghost.style.borderRadius = '4px';
+                        ghost.style.border = '2px solid #888';
+                        ghost.style.display = 'flex';
+                        ghost.style.alignItems = 'center';
+                        ghost.style.justifyContent = 'center';
+                        ghost.style.color = '#fff';
+                        ghost.style.fontSize = '16px';
+                        ghost.style.fontWeight = 'bold';
+                        ghost.textContent = '🛏';
+                        document.body.appendChild(ghost);
+                        e.dataTransfer.setDragImage(ghost, 20, 20);
+                        setTimeout(() => document.body.removeChild(ghost), 0);
                     }}
                 >
                     <svg viewBox="0 0 72 36" width="72" height="36">
@@ -47,6 +81,23 @@ function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClo
                     draggable
                     onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', 'door');
+                        // Create a custom drag ghost image
+                        const ghost = document.createElement('div');
+                        ghost.style.width = '40px';
+                        ghost.style.height = '40px';
+                        ghost.style.background = '#555';
+                        ghost.style.borderRadius = '4px';
+                        ghost.style.border = '2px solid #888';
+                        ghost.style.display = 'flex';
+                        ghost.style.alignItems = 'center';
+                        ghost.style.justifyContent = 'center';
+                        ghost.style.color = '#fff';
+                        ghost.style.fontSize = '16px';
+                        ghost.style.fontWeight = 'bold';
+                        ghost.textContent = '🚪';
+                        document.body.appendChild(ghost);
+                        e.dataTransfer.setDragImage(ghost, 20, 20);
+                        setTimeout(() => document.body.removeChild(ghost), 0);
                     }}
                 >
                     <svg viewBox="0 0 36 36" width="36" height="36">
@@ -59,6 +110,23 @@ function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClo
                     draggable
                     onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', 'firepit');
+                        // Create a custom drag ghost image
+                        const ghost = document.createElement('div');
+                        ghost.style.width = '40px';
+                        ghost.style.height = '40px';
+                        ghost.style.background = '#555';
+                        ghost.style.borderRadius = '4px';
+                        ghost.style.border = '2px solid #888';
+                        ghost.style.display = 'flex';
+                        ghost.style.alignItems = 'center';
+                        ghost.style.justifyContent = 'center';
+                        ghost.style.color = '#fff';
+                        ghost.style.fontSize = '16px';
+                        ghost.style.fontWeight = 'bold';
+                        ghost.textContent = '🔥';
+                        document.body.appendChild(ghost);
+                        e.dataTransfer.setDragImage(ghost, 20, 20);
+                        setTimeout(() => document.body.removeChild(ghost), 0);
                     }}
                 >
                     <svg viewBox="0 0 36 36" width="36" height="36">
@@ -71,6 +139,23 @@ function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClo
                     draggable
                     onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', 'pillar');
+                        // Create a custom drag ghost image
+                        const ghost = document.createElement('div');
+                        ghost.style.width = '40px';
+                        ghost.style.height = '40px';
+                        ghost.style.background = '#555';
+                        ghost.style.borderRadius = '4px';
+                        ghost.style.border = '2px solid #888';
+                        ghost.style.display = 'flex';
+                        ghost.style.alignItems = 'center';
+                        ghost.style.justifyContent = 'center';
+                        ghost.style.color = '#fff';
+                        ghost.style.fontSize = '16px';
+                        ghost.style.fontWeight = 'bold';
+                        ghost.textContent = '🏛';
+                        document.body.appendChild(ghost);
+                        e.dataTransfer.setDragImage(ghost, 20, 20);
+                        setTimeout(() => document.body.removeChild(ghost), 0);
                     }}
                 >
                     <svg viewBox="0 0 36 36" width="36" height="36">
@@ -83,6 +168,23 @@ function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClo
                     draggable
                     onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', 'secretDoor');
+                        // Create a custom drag ghost image
+                        const ghost = document.createElement('div');
+                        ghost.style.width = '40px';
+                        ghost.style.height = '40px';
+                        ghost.style.background = '#555';
+                        ghost.style.borderRadius = '4px';
+                        ghost.style.border = '2px solid #888';
+                        ghost.style.display = 'flex';
+                        ghost.style.alignItems = 'center';
+                        ghost.style.justifyContent = 'center';
+                        ghost.style.color = '#fff';
+                        ghost.style.fontSize = '16px';
+                        ghost.style.fontWeight = 'bold';
+                        ghost.textContent = '🚪';
+                        document.body.appendChild(ghost);
+                        e.dataTransfer.setDragImage(ghost, 20, 20);
+                        setTimeout(() => document.body.removeChild(ghost), 0);
                     }}
                 >
                     <svg viewBox="0 0 36 36" width="36" height="36">
@@ -95,6 +197,23 @@ function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClo
                     draggable
                     onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', 'stairs');
+                        // Create a custom drag ghost image
+                        const ghost = document.createElement('div');
+                        ghost.style.width = '40px';
+                        ghost.style.height = '40px';
+                        ghost.style.background = '#555';
+                        ghost.style.borderRadius = '4px';
+                        ghost.style.border = '2px solid #888';
+                        ghost.style.display = 'flex';
+                        ghost.style.alignItems = 'center';
+                        ghost.style.justifyContent = 'center';
+                        ghost.style.color = '#fff';
+                        ghost.style.fontSize = '16px';
+                        ghost.style.fontWeight = 'bold';
+                        ghost.textContent = '🪜';
+                        document.body.appendChild(ghost);
+                        e.dataTransfer.setDragImage(ghost, 20, 20);
+                        setTimeout(() => document.body.removeChild(ghost), 0);
                     }}
                 >
                     <svg viewBox="0 0 36 36" width="36" height="36">
@@ -107,6 +226,23 @@ function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClo
                     draggable
                     onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', 'table');
+                        // Create a custom drag ghost image
+                        const ghost = document.createElement('div');
+                        ghost.style.width = '40px';
+                        ghost.style.height = '40px';
+                        ghost.style.background = '#555';
+                        ghost.style.borderRadius = '4px';
+                        ghost.style.border = '2px solid #888';
+                        ghost.style.display = 'flex';
+                        ghost.style.alignItems = 'center';
+                        ghost.style.justifyContent = 'center';
+                        ghost.style.color = '#fff';
+                        ghost.style.fontSize = '16px';
+                        ghost.style.fontWeight = 'bold';
+                        ghost.textContent = '🪑';
+                        document.body.appendChild(ghost);
+                        e.dataTransfer.setDragImage(ghost, 20, 20);
+                        setTimeout(() => document.body.removeChild(ghost), 0);
                     }}
                 >
                     <svg viewBox="0 0 72 36" width="72" height="36">
@@ -119,6 +255,23 @@ function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClo
                     draggable
                     onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', 'trap');
+                        // Create a custom drag ghost image
+                        const ghost = document.createElement('div');
+                        ghost.style.width = '40px';
+                        ghost.style.height = '40px';
+                        ghost.style.background = '#555';
+                        ghost.style.borderRadius = '4px';
+                        ghost.style.border = '2px solid #888';
+                        ghost.style.display = 'flex';
+                        ghost.style.alignItems = 'center';
+                        ghost.style.justifyContent = 'center';
+                        ghost.style.color = '#fff';
+                        ghost.style.fontSize = '16px';
+                        ghost.style.fontWeight = 'bold';
+                        ghost.textContent = '⚠';
+                        document.body.appendChild(ghost);
+                        e.dataTransfer.setDragImage(ghost, 20, 20);
+                        setTimeout(() => document.body.removeChild(ghost), 0);
                     }}
                 >
                     <svg viewBox="0 0 36 36" width="36" height="36">
@@ -133,6 +286,23 @@ function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClo
                     draggable
                     onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', 'npc');
+                        // Create a custom drag ghost image
+                        const ghost = document.createElement('div');
+                        ghost.style.width = '40px';
+                        ghost.style.height = '40px';
+                        ghost.style.background = '#555';
+                        ghost.style.borderRadius = '4px';
+                        ghost.style.border = '2px solid #888';
+                        ghost.style.display = 'flex';
+                        ghost.style.alignItems = 'center';
+                        ghost.style.justifyContent = 'center';
+                        ghost.style.color = '#fff';
+                        ghost.style.fontSize = '16px';
+                        ghost.style.fontWeight = 'bold';
+                        ghost.textContent = '👤';
+                        document.body.appendChild(ghost);
+                        e.dataTransfer.setDragImage(ghost, 20, 20);
+                        setTimeout(() => document.body.removeChild(ghost), 0);
                     }}
                 >
                     <svg viewBox="0 0 36 36" width="36" height="36">
