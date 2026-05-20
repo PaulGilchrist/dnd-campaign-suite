@@ -47,6 +47,13 @@ export const VIEWS = {
     component: 'EncounterBuilder',
     description: 'Encounter builder'
   },
+  FACTIONS: {
+    name: 'factions',
+    stateVar: 'activeView',
+    type: 'string',
+    component: 'Factions',
+    description: 'Faction management'
+  },
   NOTES: {
     name: 'notes',
     stateVar: 'activeView',
@@ -94,14 +101,15 @@ export const VIEWS = {
  */
 export const SIDEBAR_BUTTONS = [
   { label: 'Character', icon: 'fa-user', view: 'charSheet' },
+  { label: 'Encounter', icon: 'fa-skull-crossbones', view: 'encounter' },
+  { label: 'Factions', icon: 'fa-handshake', view: 'factions' },
   { label: 'Initiative', icon: 'fa-gavel', view: 'initiative' },
   { label: 'Maps', icon: 'fa-map', view: 'mapsManager' },
   { label: 'Notes', icon: 'fa-sticky-note', view: 'notes' },
-  { label: 'Encounter', icon: 'fa-skull-crossbones', view: 'encounter' },
   { label: 'NPCs', icon: 'fa-users', view: 'npcs' }
 ];
 
 /**
  * All sidebar views — mutually exclusive via single activeView variable.
  */
-export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'notes', 'npcs'];
+export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'npcs'];

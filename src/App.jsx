@@ -17,6 +17,7 @@ import useCampaignManagement from './hooks/useCampaignManagement.js';
 import { useCharacterWizard } from './hooks/useCharacterWizard.js';
 import Notes from './components/notes/Notes.jsx';
 import NPCs from './components/npcs/NPCs.jsx';
+import Factions from './components/factions/Factions.jsx';
 
 function App() {
   const appData = useAppData();
@@ -136,6 +137,10 @@ function App() {
     setActiveView(null);
   };
 
+  const handleFactionsClick = () => {
+    setActiveView(prev => prev === 'factions' ? null : 'factions');
+  };
+
   const handleRenameCampaign = async () => {
     try {
       await handleRenameCampaignRaw();
@@ -186,6 +191,7 @@ function App() {
           toggleTheme={toggleTheme}
           isLocalhost={isLocalhost}
           onNPCsClick={handleNPCsClick}
+          onFactionsClick={handleFactionsClick}
         />
         {activeView === 'charSheet' && activeCharacter && (
           <CharSheet
@@ -240,6 +246,14 @@ function App() {
             campaignName={campaignName}
             characters={characters}
             onBack={handleBackFromNPCs}
+          />
+        )}
+        {activeView === 'factions' && (
+          <Factions
+            campaignName={campaignName}
+            characters={characters}
+            isLocalhost={isLocalhost}
+            onBack={() => setActiveView(null)}
           />
         )}
         <br />

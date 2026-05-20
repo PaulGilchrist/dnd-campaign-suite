@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './Sidebar.css';
 
-function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onMapsClick, onNotesClick, onNPCsClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost, activeView }) {
+function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onNPCsClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost, activeView }) {
   const [isExpanded, setIsExpanded] = useState(() => {
     try {
       const stored = localStorage.getItem('sidebar-characters-expanded');
@@ -65,12 +65,25 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
         </button>
       )}
 
+      {isLocalhost && (
+        <button
+          className={`sidebar-section-header${activeView?.type === 'factions' ? ' active' : ''}`}
+          onClick={onFactionsClick}
+        >
+          <i className="fa-solid fa-handshake"></i> Factions
+        </button>
+      )}
+
       <button className="sidebar-section-header" onClick={onInitiativeClick}>
         <i className="fa-solid fa-shield-alt"></i> Initiative
       </button>
 
       <button className="sidebar-section-header" onClick={onMapsClick}>
         <i className="fa-solid fa-map"></i> {isLocalhost ? 'Maps' : 'Map'}
+      </button>
+
+      <button className="sidebar-section-header" onClick={onNotesClick}>
+        <i className="fa-solid fa-book"></i> Notes
       </button>
 
       {isLocalhost && (
@@ -81,10 +94,6 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
           <i className="fa-solid fa-users"></i> NPCs
         </button>
       )}
-
-      <button className="sidebar-section-header" onClick={onNotesClick}>
-        <i className="fa-solid fa-book"></i> Notes
-      </button>
     </nav>
   );
 }
