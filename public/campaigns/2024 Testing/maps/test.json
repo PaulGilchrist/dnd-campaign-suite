@@ -375,6 +375,22 @@
       "gridX": 8,
       "gridY": 22,
       "visible": false
+    },
+    {
+      "id": "1ad6c057-eb80-4e19-8a7b-2a4abb7174c4",
+      "type": "bed",
+      "gridX": 19,
+      "gridY": 11,
+      "visible": true,
+      "rotation": 270
+    },
+    {
+      "id": "8570f2e2-5ebc-4ea6-8d67-d3eff935185a",
+      "type": "bed",
+      "gridX": 17,
+      "gridY": 11,
+      "visible": true,
+      "rotation": 270
     }
   ],
   "paintCells": [],
