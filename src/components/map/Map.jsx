@@ -21,6 +21,7 @@ import FogOverlay from './FogOverlay.jsx';
 import BarrelContextMenu from './BarrelContextMenu.jsx';
 import usePlacedItems from './hooks/usePlacedItems.js';
 import useCreatureDragging from './hooks/useCreatureDragging';
+import useItemDragging from './hooks/useItemDragging';
 import useNpcImageCache from './hooks/useNpcImageCache';
 import useSSESync from './hooks/useSSESync';
 
@@ -63,8 +64,6 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     // Barrel context menu state
     const [selectedBarrel, setSelectedBarrel] = useState(null); // { id, gridX, gridY }
     const [showRename, setShowRename] = useState(null);
-    // Reposition mode state
-    const [repositioningItemId, setRepositioningItemId] = useState(null);
 
     // Zoom/Pan helpers
     const gridCenterX = useCallback((gridX) => gridX * CELL_SIZE + CELL_SIZE / 2, []);
@@ -108,10 +107,6 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
             handleFogPointerDown(e);
             return;
         }
-        if (repositioningItemId) {
-            handleGridPointerDown(e);
-            return;
-        }
         if (e.button !== 0) return;
         e.preventDefault();
         const svg = svgRef.current;
@@ -126,7 +121,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
             startPanX: panX,
             startPanY: panY
         });
-    }, [tool, panX, panY, repositioningItemId]);
+    }, [tool, panX, panY]);
 
     const handlePanMove = useCallback((e) => {
         if (!panning) return;
@@ -354,26 +349,10 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     // Handle grid pointer down (paint/erase mode)
     function handleGridPointerDown(e) {
         if (!isLocalhost) return;
-        if (tool === 'none' && !repositioningItemId) return;
+        if (tool === 'none') return;
         e.preventDefault();
         const grid = getGridFromEvent(e);
         if (!grid) return;
-
-        // Reposition mode: move the item to the clicked grid square
-        if (repositioningItemId) {
-            const item = placedItems.find(i => i.id === repositioningItemId);
-            if (item) {
-                setPlacedItems(prev =>
-                    prev.map(i =>
-                        i.id === repositioningItemId
-                            ? { ...i, gridX: grid.gridX, gridY: grid.gridY }
-                            : i
-                    )
-                );
-            }
-            setRepositioningItemId(null);
-            return;
-        }
 
         const key = `${grid.gridX},${grid.gridY}`;
         setMapData((prev) => {
@@ -425,6 +404,15 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         panX,
         panY,
         setMapData,
+        gridCenterX,
+        gridCenterY,
+    });
+
+    const { itemDragging, handleItemPointerDown, handleItemPointerMove, handleItemPointerUp: handleItemPointerUpHook, handleItemPointerLeave } = useItemDragging({
+        svgRef,
+        placedItems,
+        setPlacedItems,
+        gridSize,
         gridCenterX,
         gridCenterY,
     });
@@ -486,18 +474,16 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     const {
         handleToggleItemVisibility,
         handleDeleteItem,
-        handleRepositionItem,
         handleRotateTable,
         handleRotateBed,
         handleRotateDoor,
         handleRotateSecretDoor,
         handleRotateStairs,
-    } = usePlacedItems(setPlacedItems, setSelectedBarrel, setRepositioningItemId);
+    } = usePlacedItems(setPlacedItems, setSelectedBarrel);
 
-    // Close context menu and reposition mode
+    // Close context menu
     const handleCloseMenu = useCallback(() => {
         setSelectedBarrel(null);
-        setRepositioningItemId(null);
     }, []);
 
     const { npcImages, setNpcImages } = useNpcImageCache(placedItems);
@@ -535,10 +521,11 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                 viewBox={`${panX} ${panY} ${SVG_SIZE / zoom} ${SVG_SIZE / zoom}`}
                 className="grid-svg"
                 onPointerDown={handlePanStart}
-                onPointerMove={(e) => { handlePointerMove(e); handleGridPointerMove(e); handleFogPointerMove(e); handlePanMove(e); }}
-                onPointerUp={(e) => { handlePointerUp(e); handleGridPointerUp(e); handleFogPointerUp(e); handlePanEnd(e); }}
-                onPointerLeave={(e) => { handleGridPointerLeave(e); handleFogPointerUp(); }}
+                onPointerMove={(e) => { handlePointerMove(e); handleItemPointerMove(e); handleGridPointerMove(e); handleFogPointerMove(e); handlePanMove(e); }}
+                onPointerUp={(e) => { handlePointerUp(e); handleItemPointerUpHook(e); handleGridPointerUp(e); handleFogPointerUp(e); handlePanEnd(e); }}
+                onPointerLeave={(e) => { handleItemPointerLeave(); handleGridPointerLeave(e); handleFogPointerUp(); }}
                 onWheel={handleWheel}
+                onContextMenu={(e) => e.preventDefault()}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
                 onClick={handleCloseMenu}
@@ -579,11 +566,12 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     placedItems={placedItems}
                     isLocalhost={isLocalhost}
                     fog={fog}
-                    repositioningItemId={repositioningItemId}
                     gridCenterX={gridCenterX}
                     gridCenterY={gridCenterY}
                     setSelectedBarrel={setSelectedBarrel}
                     npcImages={npcImages}
+                    itemDragging={itemDragging}
+                    handleItemPointerDown={handleItemPointerDown}
                 />
 
                 <FogOverlay
@@ -602,7 +590,6 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     gridCenterY={gridCenterY}
                     handleToggleItemVisibility={handleToggleItemVisibility}
                     handleDeleteItem={handleDeleteItem}
-                    handleRepositionItem={handleRepositionItem}
                     handleRotateTable={handleRotateTable}
                     handleRotateBed={handleRotateBed}
                     handleRotateDoor={handleRotateDoor}

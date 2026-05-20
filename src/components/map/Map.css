@@ -325,6 +325,11 @@
     50% { stroke-opacity: 0.4; }
 }
 
+/* Active drag cursor for item hit areas */
+.map .barrel-hit-area:active {
+    cursor: grabbing;
+}
+
 /* Barrel context menu */
 .map .barrel-context-menu {
     pointer-events: all;

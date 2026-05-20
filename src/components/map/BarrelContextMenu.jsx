@@ -8,7 +8,6 @@ function BarrelContextMenu({
     gridCenterY,
     handleToggleItemVisibility,
     handleDeleteItem,
-    handleRepositionItem,
     handleRotateTable,
     handleRotateBed,
     handleRotateDoor,
@@ -27,7 +26,7 @@ function BarrelContextMenu({
     const hasRotation = selectedItem && (selectedItem.type === 'table' || selectedItem.type === 'bed' || selectedItem.type === 'door' || selectedItem.type === 'secretDoor' || selectedItem.type === 'stairs');
     const showRenameOption = isNpc;
     const hasExtra = showRenameOption || hasRotation;
-    const menuHeight = hasExtra ? 102 : 80;
+    const menuHeight = hasExtra ? 80 : 58;
 
     return (
         <g className="barrel-context-menu" onClick={(e) => e.stopPropagation()}>
@@ -37,10 +36,9 @@ function BarrelContextMenu({
                     {selectedItem?.visible !== false ? 'Hide' : 'Show'}
                 </text>
                 <text x={menuX + 8} y={menuY + 42} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleDeleteItem(selectedBarrel.id)}>Delete</text>
-                <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRepositionItem(selectedBarrel.id)}>Reposition</text>
                 {showRenameOption && (
                     <>
-                        <text x={menuX + 8} y={menuY + 86} fill="#ccc" fontSize="11" className="menu-option" onClick={() => setShowRename(selectedBarrel.id)}>
+                        <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => setShowRename(selectedBarrel.id)}>
                             Rename
                         </text>
                         {showRename === selectedBarrel.id ? (
@@ -64,7 +62,7 @@ function BarrelContextMenu({
                     </>
                 )}
                 {hasRotation && (
-                    <text x={menuX + 8} y={menuY + 86} fill="#ccc" fontSize="11" className="menu-option" onClick={() => {
+                    <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => {
                         if (selectedItem.type === 'table') handleRotateTable(selectedBarrel.id);
                         else if (selectedItem.type === 'bed') handleRotateBed(selectedBarrel.id);
                         else if (selectedItem.type === 'door') handleRotateDoor(selectedBarrel.id);

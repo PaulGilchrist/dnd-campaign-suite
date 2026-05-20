@@ -1,4 +1,4 @@
-function usePlacedItems(setPlacedItems, setSelectedBarrel, setRepositioningItemId) {
+function usePlacedItems(setPlacedItems, setSelectedBarrel) {
     const handleToggleItemVisibility = (itemId) => {
         setPlacedItems(prev =>
             prev.map(item =>
@@ -12,10 +12,6 @@ function usePlacedItems(setPlacedItems, setSelectedBarrel, setRepositioningItemI
         setSelectedBarrel(null);
     };
 
-    const handleRepositionItem = (itemId) => {
-        setRepositioningItemId(itemId);
-        setSelectedBarrel(null);
-    };
 
     const handleRotateTable = (itemId) => {
         setPlacedItems(prev =>
@@ -65,7 +61,7 @@ function usePlacedItems(setPlacedItems, setSelectedBarrel, setRepositioningItemI
     return {
         handleToggleItemVisibility,
         handleDeleteItem,
-        handleRepositionItem,
+
         handleRotateTable,
         handleRotateBed,
         handleRotateDoor,
