@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 function useCampaignManagement() {
+  const [showCampaignSelection, setShowCampaignSelection] = useState(true);
   const [campaignName, setCampaignName] = useState(null);
+  const onCampaignSelectRef = useRef(null);
+  const onDeleteCampaignRef = useRef(null);
 
   const isLocalhost =
     window.location.hostname === 'localhost' ||
@@ -9,8 +12,14 @@ function useCampaignManagement() {
     window.location.hostname === '::1' ||
     /^127\./.test(window.location.hostname);
 
-  const handleCampaignSelect = (campaign) => {
+
+
+  const handleCampaignSelect = (campaign, characters) => {
     setCampaignName(campaign);
+    setShowCampaignSelection(false);
+    if (onCampaignSelectRef.current) {
+      onCampaignSelectRef.current(campaign, characters);
+    }
   };
 
   const handleRenameCampaign = async () => {
@@ -48,14 +57,34 @@ function useCampaignManagement() {
       const { error } = await response.json();
       throw new Error(error || 'Failed to delete campaign');
     }
+
+    if (onDeleteCampaignRef.current) {
+      onDeleteCampaignRef.current();
+    }
+  };
+
+  const handleBackToCampaigns = () => {
+    setShowCampaignSelection(true);
+  };
+
+  const setCampaignSelectCallback = (callback) => {
+    onCampaignSelectRef.current = callback;
+  };
+
+  const setDeleteCampaignCallback = (callback) => {
+    onDeleteCampaignRef.current = callback;
   };
 
   return {
+    showCampaignSelection,
     isLocalhost,
     campaignName,
     handleCampaignSelect,
     handleRenameCampaign,
     handleDeleteCampaign,
+    handleBackToCampaigns,
+    setCampaignSelectCallback,
+    setDeleteCampaignCallback,
   };
 }
 
