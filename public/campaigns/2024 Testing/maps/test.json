@@ -469,6 +469,14 @@
       "gridY": 7,
       "visible": true,
       "rotation": 90
+    },
+    {
+      "id": "86f20205-6fc6-466d-881b-70c0a6ac4c8f",
+      "type": "npc",
+      "gridX": 26,
+      "gridY": 2,
+      "visible": true,
+      "name": "Goblin 1"
     }
   ],
   "paintCells": [],
@@ -484,8 +492,8 @@
     {
       "id": "creature-1-1779209589404",
       "name": "Bard",
-      "gridX": 2,
-      "gridY": 5,
+      "gridX": 15,
+      "gridY": 2,
       "imagePath": "character-images/0b6f6c9b-b829-3960-b1ef-beba2d25fb99.JPG"
     },
     {
@@ -1305,37 +1313,5 @@
     "29,27",
     "29,28",
     "29,29"
-  ],
-  "npcMapPositions": [
-    {
-      "npcId": "ab310df4-e053-46c8-a534-c745099dcccc",
-      "gridX": 3,
-      "gridY": 5,
-      "visible": false
-    },
-    {
-      "npcId": "4b9b9e78-166e-44e1-a1d7-93fc0fe090b7",
-      "gridX": 2,
-      "gridY": 5,
-      "visible": true
-    },
-    {
-      "npcId": "53d284fd-b757-46c4-ac5b-26544d8a2e36",
-      "gridX": 2,
-      "gridY": 7,
-      "visible": false
-    }
-  ],
-  "npcMetadata": [
-    {
-      "id": "4b9b9e78-166e-44e1-a1d7-93fc0fe090b7",
-      "name": "Goblin",
-      "imageUrl": "https://paulgilchrist.github.io/dnd-tools/images/goblin.jpg"
-    },
-    {
-      "id": "53d284fd-b757-46c4-ac5b-26544d8a2e36",
-      "name": "Kobold 3",
-      "imageUrl": "https://paulgilchrist.github.io/dnd-tools/images/kobold.jpg"
-    }
   ]
 }

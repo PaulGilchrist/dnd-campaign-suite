@@ -273,6 +273,8 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    flex: 1;
+    overflow-y: auto;
 }
 
 .map .items-panel-item {
@@ -353,6 +355,18 @@
 
 .map .menu-close:hover {
     fill: #fff;
+}
+
+.context-menu-input {
+    width: 100%;
+    height: 100%;
+    background: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 2px;
+    padding: 2px 4px;
+    font-size: 11px;
+    outline: none;
 }
 
 /* Light theme overrides for items panel */

@@ -9,7 +9,7 @@ import TrapSVG from './TrapSVG.jsx';
 import PillarSVG from './PillarSVG.jsx';
 import StairsSVG from './StairsSVG.jsx';
 
-function ItemsPanel({ itemsPanelOpen, npcs, npcMapPositions, npcMetadata, toggleNpcVisibility, onClose }) {
+function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClose }) {
     if (!itemsPanelOpen) return null;
 
     return (
@@ -127,51 +127,20 @@ function ItemsPanel({ itemsPanelOpen, npcs, npcMapPositions, npcMetadata, toggle
                     <span>Trap</span>
                 </div>
 
-                {/* NPC section */}
-                {npcs && npcs.length > 0 && (
-                    <div className="items-panel-npc-section">
-                        <h5 className="items-panel-npc-title">
-                            <i className="fa-solid fa-users"></i> NPCs
-                        </h5>
-
-                        {/* Unplaced NPCs (draggable) */}
-                        {npcs.filter(npc => !npcMapPositions.find(p => p.npcId === npc.id)).map((npc) => (
-                            <div
-                                key={npc.id}
-                                className="items-panel-npc-item"
-                                draggable
-                                onDragStart={(e) => {
-                                    e.dataTransfer.setData('text/plain', `npc:${npc.id}`);
-                                }}
-                            >
-                                <i className="fa-solid fa-user"></i>
-                                <span className="items-panel-npc-name">{npc.name}</span>
-                            </div>
-                        ))}
-
-                        {/* Placed NPCs (with visibility toggle) */}
-                        {npcMapPositions.map((npcPos) => {
-                            const npc = npcMetadata?.find(n => n.id === npcPos.npcId);
-                            if (!npc) return null;
-                            return (
-                                <div
-                                    key={npcPos.npcId}
-                                    className="items-panel-npc-item items-panel-npc-placed"
-                                >
-                                    <i className="fa-solid fa-user"></i>
-                                    <span className="items-panel-npc-name">{npc.name}</span>
-                                    <button
-                                        className="items-panel-npc-toggle"
-                                        onClick={() => toggleNpcVisibility(npcPos.npcId)}
-                                        title={npcPos.visible ? 'Hide NPC' : 'Show NPC'}
-                                    >
-                                        <i className={`fa-solid ${npcPos.visible ? 'fa-eye' : 'fa-eye-slash'}`}></i>
-                                    </button>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
+                {/* NPC - single draggable icon */}
+                <div
+                    className="items-panel-item"
+                    draggable
+                    onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plain', 'npc');
+                    }}
+                >
+                    <svg viewBox="0 0 36 36" width="36" height="36">
+                        <circle cx="18" cy="18" r="16" fill="#c0392b" stroke="#e74c3c" strokeWidth="2" />
+                        <text x="18" y="23" textAnchor="middle" fill="#fff" fontSize="16" fontWeight="bold">N</text>
+                    </svg>
+                    <span>NPC</span>
+                </div>
             </div>
         </div>
     );
