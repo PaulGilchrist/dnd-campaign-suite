@@ -10,6 +10,9 @@ function EncounterMonsterTable({
   onRemoveMonster,
   searchQuery,
   onSearchQueryChange,
+  onSort,
+  sortField,
+  sortDirection,
 }) {
   const isSelected = (monsterIndex) => {
     return selectedMonsters.some((m) => m.index === monsterIndex);
@@ -42,9 +45,42 @@ function EncounterMonsterTable({
             <thead>
               <tr>
                 <th className="col-check">Sel</th>
-                <th className="col-name">Monster</th>
-                <th className="col-cr">CR</th>
-                <th className="col-xp">XP</th>
+                <th
+                  className="col-name sortable"
+                  onClick={() => onSort('name')}
+                  aria-label="Sort by monster name"
+                  role="button"
+                  tabIndex={0}
+                >
+                  Monster
+                  <span className="sort-indicator">
+                    {sortField === 'name' ? (sortDirection === 'asc' ? ' \u25B2' : ' \u25BC') : ''}
+                  </span>
+                </th>
+                <th
+                  className="col-cr sortable"
+                  onClick={() => onSort('cr')}
+                  aria-label="Sort by challenge rating"
+                  role="button"
+                  tabIndex={0}
+                >
+                  CR
+                  <span className="sort-indicator">
+                    {sortField === 'cr' ? (sortDirection === 'asc' ? ' \u25B2' : ' \u25BC') : ''}
+                  </span>
+                </th>
+                <th
+                  className="col-xp sortable"
+                  onClick={() => onSort('xp')}
+                  aria-label="Sort by XP"
+                  role="button"
+                  tabIndex={0}
+                >
+                  XP
+                  <span className="sort-indicator">
+                    {sortField === 'xp' ? (sortDirection === 'asc' ? ' \u25B2' : ' \u25BC') : ''}
+                  </span>
+                </th>
                 <th className="col-qty">Qty</th>
                 <th className="col-remove" />
               </tr>

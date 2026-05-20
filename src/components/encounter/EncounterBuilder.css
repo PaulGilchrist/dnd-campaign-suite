@@ -311,6 +311,27 @@
 .col-qty { width: 90px; text-align: center; }
 .col-remove { width: 30px; text-align: center; }
 
+/* ============ Sortable Columns ============ */
+.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.sortable:hover {
+  color: var(--color-text);
+}
+
+.sort-indicator {
+  margin-left: 4px;
+  font-size: 0.7rem;
+  opacity: 0.4;
+}
+
+.sortable .sort-indicator {
+  opacity: 1;
+}
+
 .qty-controls {
   display: inline-flex;
   align-items: center;

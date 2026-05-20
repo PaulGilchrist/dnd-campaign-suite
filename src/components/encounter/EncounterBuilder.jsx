@@ -61,11 +61,17 @@ function calculateMonsterCount(selectedMonsters) {
   return selectedMonsters.reduce((sum, m) => sum + (m.qty || 1), 0);
 }
 
-function filterMonsters(monsters, searchQuery, playerLevels, difficultyIndex) {
+function filterMonsters(monsters, searchQuery, playerLevels, difficultyIndex, totalThreshold) {
   if (!monsters) return [];
   const maxXP = calculateMaxXP(playerLevels, difficultyIndex);
+  const avgLevel = playerLevels.reduce((sum, l) => sum + l, 0) / playerLevels.length;
+  const minCRMultipliers = [0.25, 0.35, 0.45, 0.55];
+  const minCR = avgLevel * (minCRMultipliers[difficultyIndex] ?? 0.25);
+  const minXP = totalThreshold * 0.2;
   return monsters.filter(m => {
     if (m.xp > maxXP) return false;
+    if (m.xp < minXP) return false;
+    if ((m.challenge_rating ?? 0) < minCR) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return m.name.toLowerCase().includes(q)
@@ -81,7 +87,7 @@ function toggleMonster(selected, monster) {
   if (existing) {
     return selected.map(m =>
       m.index === monster.index ? { ...m, qty: (m.qty || 1) - 1 } : m
-    ).filter(m => (m.qty || 1) > 0);
+    ).filter(m => m.qty > 0);
   }
   return [...selected, { ...monster, qty: 1 }];
 }
@@ -89,7 +95,7 @@ function toggleMonster(selected, monster) {
 function updateQty(selected, index, delta) {
   return selected.map(m =>
     m.index === index ? { ...m, qty: (m.qty || 1) + delta } : m
-  ).filter(m => (m.qty || 1) > 0);
+  ).filter(m => m.qty > 0);
 }
 
 // --- Determine majority ruleset from characters ---
@@ -163,10 +169,23 @@ function EncounterBuilder({ characters, campaignName }) {
   const [selectedMonsters, setSelectedMonsters] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Sort state for monster table
+  const [sortField, setSortField] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
+
   useEffect(() => {
     setSelectedMonsters([]);
     setSearchQuery('');
   }, [rulesVersion]);
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
 
   // --- Derived values ---
   const totalThreshold = useMemo(
@@ -197,8 +216,34 @@ function EncounterBuilder({ characters, campaignName }) {
   );
 
   const filteredMonsters = useMemo(
-    () => filterMonsters(monsters, searchQuery, filter.playerLevels, filter.difficulty),
-    [monsters, searchQuery, filter.playerLevels, filter.difficulty]
+    () => {
+      const result = filterMonsters(monsters, searchQuery, filter.playerLevels, filter.difficulty, totalThreshold);
+      result.sort((a, b) => {
+        let valA, valB;
+        switch (sortField) {
+          case 'name':
+            valA = a.name.toLowerCase();
+            valB = b.name.toLowerCase();
+            break;
+          case 'cr':
+            valA = a.challenge_rating || 0;
+            valB = b.challenge_rating || 0;
+            break;
+          case 'xp':
+            valA = a.xp || 0;
+            valB = b.xp || 0;
+            break;
+          default:
+            valA = a.name.toLowerCase();
+            valB = b.name.toLowerCase();
+        }
+        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+      return result;
+    },
+    [monsters, searchQuery, filter.playerLevels, filter.difficulty, totalThreshold, sortField, sortDirection]
   );
 
   // --- Handlers ---
@@ -353,6 +398,9 @@ function EncounterBuilder({ characters, campaignName }) {
         onRemoveMonster={handleRemoveMonster}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
+        onSort={handleSort}
+        sortField={sortField}
+        sortDirection={sortDirection}
       />
 
       {/* Selected Monsters Detail */}
