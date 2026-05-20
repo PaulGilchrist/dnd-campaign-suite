@@ -18,12 +18,13 @@ import PlacedItems from './PlacedItems.jsx';
 import GridAndWalls from './GridAndWalls.jsx';
 import Creatures from './Creatures.jsx';
 import FogOverlay from './FogOverlay.jsx';
+import BarrelContextMenu from './BarrelContextMenu.jsx';
 import usePlacedItems from './hooks/usePlacedItems.js';
 import useCreatureDragging from './hooks/useCreatureDragging';
-import { getMonsterImageUrl } from '../../services/monsterUtils.js';
+import useNpcImageCache from './hooks/useNpcImageCache';
+import useSSESync from './hooks/useSSESync';
 
 const CELL_SIZE = 40;
-const RADIUS = 20;
 
 function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     const [gridSize, setGridSize] = useState(20);
@@ -290,28 +291,14 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     }, [mapData, campaignName, gridSize, placedItems, mapName, fog]);
 
     // SSE handler for real-time updates from other clients
-    const handleSSEEvent = useCallback((event) => {
-        if (!event || !event.data) return;
-        // Only process events for THIS map
-        const expectedKey = `map-data-${campaignName}-${mapName}`;
-        if (event.key !== expectedKey) return;
-
-        const data = event.data;
-        if (data.gridSize !== undefined) {
-            setGridSize(data.gridSize);
-        }
-        setMapData((prev) => ({
-            ...prev,
-            creatures: data.creatures || prev?.creatures || [],
-            walls: data.walls ? new Set(data.walls) : (prev?.walls || new Set())
-        }));
-        if (data.placedItems !== undefined) {
-            setPlacedItems(data.placedItems);
-        }
-        if (data.fog !== undefined) {
-            setFog(new Set(data.fog));
-        }
-    }, [campaignName, mapName]);
+    const { handleSSEEvent } = useSSESync({
+        campaignName,
+        mapName,
+        setGridSize,
+        setMapData,
+        setPlacedItems,
+        setFog,
+    });
 
     function handleFogPointerDown(e) {
         if (!isLocalhost) return;
@@ -369,18 +356,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         if (!isLocalhost) return;
         if (tool === 'none' && !repositioningItemId) return;
         e.preventDefault();
-        const svg = svgRef.current;
-        let grid = null;
-        if (svg) {
-            const rect = svg.getBoundingClientRect();
-            const vb = svg.viewBox.baseVal;
-            const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
-            const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
-            grid = {
-                gridX: Math.max(0, Math.min(gridSize - 1, Math.floor(svgX / CELL_SIZE))),
-                gridY: Math.max(0, Math.min(gridSize - 1, Math.floor(svgY / CELL_SIZE)))
-            };
-        }
+        const grid = getGridFromEvent(e);
         if (!grid) return;
 
         // Reposition mode: move the item to the clicked grid square
@@ -417,18 +393,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         if (!isLocalhost) return;
         if (!painting || (tool !== 'paint' && tool !== 'erase')) return;
         e.preventDefault();
-        const svg = svgRef.current;
-        let grid = null;
-        if (svg) {
-            const rect = svg.getBoundingClientRect();
-            const vb = svg.viewBox.baseVal;
-            const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
-            const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
-            grid = {
-                gridX: Math.max(0, Math.min(gridSize - 1, Math.floor(svgX / CELL_SIZE))),
-                gridY: Math.max(0, Math.min(gridSize - 1, Math.floor(svgY / CELL_SIZE)))
-            };
-        }
+        const grid = getGridFromEvent(e);
         if (!grid) return;
 
         const key = `${grid.gridX},${grid.gridY}`;
@@ -475,18 +440,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     // Handle drop from items panel onto grid
     const handleDrop = useCallback((e) => {
         e.preventDefault();
-        const svg = svgRef.current;
-        let grid = null;
-        if (svg) {
-            const rect = svg.getBoundingClientRect();
-            const vb = svg.viewBox.baseVal;
-            const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
-            const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
-            grid = {
-                gridX: Math.max(0, Math.min(gridSize - 1, Math.floor(svgX / CELL_SIZE))),
-                gridY: Math.max(0, Math.min(gridSize - 1, Math.floor(svgY / CELL_SIZE)))
-            };
-        }
+        const grid = getGridFromEvent(e);
         if (!grid) return;
         const dragData = e.dataTransfer.getData('text/plain');
         if (!dragData) return;
@@ -546,22 +500,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         setRepositioningItemId(null);
     }, []);
 
-    // NPC image cache
-    const [npcImages, setNpcImages] = useState({});
-
-    // Fetch NPC images when placedItems change
-    useEffect(() => {
-        const npcItems = placedItems.filter(item => item.type === 'npc');
-        const promises = npcItems.map(async (item) => {
-            const url = await getMonsterImageUrl(item.name);
-            return { id: item.id, url };
-        });
-        Promise.all(promises).then(results => {
-            const newImages = {};
-            results.forEach(({ id, url }) => { newImages[id] = url; });
-            setNpcImages(newImages);
-        });
-    }, [placedItems]);
+    const { npcImages, setNpcImages } = useNpcImageCache(placedItems);
 
     // Sync state to refs so handleWheel always reads latest values
     useEffect(() => { zoomValueRef.current = zoom; }, [zoom]);
@@ -655,78 +594,24 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                 />
 
                 {/* Item context menu */}
-                {selectedBarrel && (
-                    <g className="barrel-context-menu" onClick={(e) => e.stopPropagation()}>
-                        {(() => {
-                            const menuX = gridCenterX(selectedBarrel.gridX) + 10;
-                            const menuY = gridCenterY(selectedBarrel.gridY) + 10;
-                            return (
-                                <g>
-                                    {(() => {
-                                        const selectedItem = placedItems.find(i => i.id === selectedBarrel.id);
-                                        const isNpc = selectedItem && selectedItem.type === 'npc';
-                                        const hasRotation = selectedItem && (selectedItem.type === 'table' || selectedItem.type === 'bed' || selectedItem.type === 'door' || selectedItem.type === 'secretDoor' || selectedItem.type === 'stairs');
-                                        const showRenameOption = isNpc;
-                                        const hasExtra = showRenameOption || hasRotation;
-                                        const menuHeight = hasExtra ? 102 : 80;
-                                        return (
-                                            <g>
-                                                <rect x={menuX} y={menuY} width="120" height={menuHeight} rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
-                                                {/* Show/Hide */}
-                                                <text x={menuX + 8} y={menuY + 20} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleToggleItemVisibility(selectedBarrel.id)}>
-                                                    {selectedItem?.visible !== false ? 'Hide' : 'Show'}
-                                                </text>
-                                                {/* Delete */}
-                                                <text x={menuX + 8} y={menuY + 42} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleDeleteItem(selectedBarrel.id)}>Delete</text>
-                                                {/* Reposition */}
-                                                <text x={menuX + 8} y={menuY + 64} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRepositionItem(selectedBarrel.id)}>Reposition</text>
-                                                {/* Rename (NPC only) */}
-                                                {showRenameOption && (
-                                                    <>
-                                                        <text x={menuX + 8} y={menuY + 86} fill="#ccc" fontSize="11" className="menu-option" onClick={() => setShowRename(selectedBarrel.id)}>
-                                                            Rename
-                                                        </text>
-                                                        {showRename === selectedBarrel.id ? (
-                                                            <foreignObject x={menuX + 4} y={menuY + 94} width="112" height="28">
-                                                                <input
-                                                                    type="text"
-                                                                    defaultValue={selectedItem?.name || 'NPC'}
-                                                                    className="context-menu-input"
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === 'Enter') {
-                                                                            handleRenameItem(selectedBarrel.id, e.target.value);
-                                                                        }
-                                                                    }}
-                                                                    onBlur={(e) => {
-                                                                        handleRenameItem(selectedBarrel.id, e.target.value);
-                                                                    }}
-                                                                    autoFocus
-                                                                />
-                                                            </foreignObject>
-                                                        ) : null}
-                                                    </>
-                                                )}
-                                                {/* Rotate (rotatable items only) */}
-                                                {hasRotation && (
-                                                    <text x={menuX + 8} y={menuY + 86} fill="#ccc" fontSize="11" className="menu-option" onClick={() => {
-                                                        if (selectedItem.type === 'table') handleRotateTable(selectedBarrel.id);
-                                                        else if (selectedItem.type === 'bed') handleRotateBed(selectedBarrel.id);
-                                                        else if (selectedItem.type === 'door') handleRotateDoor(selectedBarrel.id);
-                                                        else if (selectedItem.type === 'secretDoor') handleRotateSecretDoor(selectedBarrel.id);
-                                                        else if (selectedItem.type === 'stairs') handleRotateStairs(selectedBarrel.id);
-                                                    }}>
-                                                        Rotate
-                                                    </text>
-                                                )}
-                                                <text x={menuX + 108} y={menuY + 12} fill="#999" fontSize="10" className="menu-close" onClick={() => { setSelectedBarrel(null); setShowRename(null); }}>✕</text>
-                                            </g>
-                                        );
-                                    })()}
-                                </g>
-                            );
-                        })()}
-                    </g>
-                )}
+                <BarrelContextMenu
+                    selectedBarrel={selectedBarrel}
+                    showRename={showRename}
+                    placedItems={placedItems}
+                    gridCenterX={gridCenterX}
+                    gridCenterY={gridCenterY}
+                    handleToggleItemVisibility={handleToggleItemVisibility}
+                    handleDeleteItem={handleDeleteItem}
+                    handleRepositionItem={handleRepositionItem}
+                    handleRotateTable={handleRotateTable}
+                    handleRotateBed={handleRotateBed}
+                    handleRotateDoor={handleRotateDoor}
+                    handleRotateSecretDoor={handleRotateSecretDoor}
+                    handleRotateStairs={handleRotateStairs}
+                    handleRenameItem={handleRenameItem}
+                    setShowRename={setShowRename}
+                    setSelectedBarrel={setSelectedBarrel}
+                />
             </svg>
 
             {/* Items panel sidebar */}
