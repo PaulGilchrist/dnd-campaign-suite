@@ -17,6 +17,7 @@ import useCampaignManagement from './hooks/useCampaignManagement.js';
 import { useCharacterWizard } from './hooks/useCharacterWizard.js';
 import Notes from './components/notes/Notes.jsx';
 import NPCs from './components/npcs/NPCs.jsx';
+import { CLEAR_RULES } from './routes/config.js';
 
 function App() {
   const appData = useAppData();
@@ -51,7 +52,7 @@ function App() {
   const [showEncounter, setShowEncounter] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   const [showNPCs, setShowNPCs] = useState(false);
-  const [activeView, setActiveView] = useState(null);
+  const [showInitiative, setShowInitiative] = useState(false);
   // type: 'none' | 'manager' | 'map'
   // When type is 'map', mapName holds the sanitized map filename (e.g. 'dungeon-level-1')
 
@@ -82,36 +83,44 @@ function App() {
     setShowNotes(false);
   }, [campaignName]);
 
+  // Clear all views listed in CLEAR_RULES for a given view name
+  const clearViews = (viewName) => {
+    (CLEAR_RULES[viewName] || []).forEach(view => {
+      if (view === 'mapsManager' || view === 'map') setMapsView({ type: 'none' });
+      if (view === 'encounter') setShowEncounter(false);
+      if (view === 'notes') setShowNotes(false);
+      if (view === 'npcs') setShowNPCs(false);
+      if (view === 'initiative') setShowInitiative(false);
+      if (view === 'charSheet') setActiveCharacter(null);
+    });
+  };
+
   const handleCharacterClick = (character) => {
-    setActiveCharacter(cloneDeep(character));
-    setMapsView({ type: 'none' });
+    setShowMapsManager(false);
     setShowEncounter(false);
+    setShowNotes(false);
+    setShowNPCs(false);
+    setShowInitiative(false);
+    setMapsView({ type: 'none' });
+    setActiveCharacter(cloneDeep(character));
   };
 
   const handleMapsClick = () => {
-    setActiveCharacter(null);
-    setShowNPCs(false);
-    setShowEncounter(false);
-    if (isLocalhost) {
-      // GM: toggle Maps Manager
-      setMapsView(prev => {
-        if (prev.type === 'manager') return { type: 'none' };
-        return { type: 'manager' };
-      });
-    } else {
-      // Player: toggle active map view
-      if (mapsView.type === 'map') {
-        setMapsView({ type: 'none' });
+    // Always clear per CLEAR_RULES (matches original unconditional clearing)
+    clearViews('mapsManager');
+    if (mapsView.type === 'none') {
+      if (isLocalhost) {
+        setMapsView({ type: 'manager' });
       } else {
         loadActiveMapAndOpen();
       }
+    } else {
+      setMapsView({ type: 'none' });
     }
   };
 
   const handleEncounterClick = () => {
-    setActiveCharacter(null);
-    setShowNPCs(false);
-    setMapsView({ type: 'none' });
+    clearViews('encounter');
     setShowEncounter(prev => !prev);
   };
 
@@ -132,27 +141,17 @@ function App() {
   };
 
   const handleInitiativeClick = () => {
-    handleInitiativeClickRaw();
-    setMapsView({ type: 'none' });
-    setShowEncounter(false);
-    setShowNPCs(false);
+    setShowInitiative(prev => !prev);
   };
 
   const handleNotesClick = () => {
-    setActiveCharacter(null);
-    setMapsView({ type: 'none' });
-    setShowEncounter(false);
-    setShowNPCs(false);
+    clearViews('notes');
     setShowNotes(prev => !prev);
   };
 
   const handleNPCsClick = () => {
-    setActiveCharacter(null);
-    setMapsView({ type: 'none' });
-    setShowEncounter(false);
-    setShowNotes(false);
+    clearViews('npcs');
     setShowNPCs(true);
-    setActiveView({ type: 'npcs' });
   };
 
   const handleBackFromNPCs = () => {
@@ -186,8 +185,6 @@ function App() {
     }
   };
 
-  const initiativeActive = characters.length > 0 && activeCharacter == null && mapsView.type === 'none' && !showEncounter && !showNotes && !showNPCs;
-
   if (showCampaignSelection) return <CampaignSelection onCampaignSelect={handleCampaignSelect} />;
 
   return (
@@ -211,7 +208,6 @@ function App() {
           toggleTheme={toggleTheme}
           isLocalhost={isLocalhost}
           onNPCsClick={handleNPCsClick}
-          activeView={activeView}
         />
         {activeCharacter && (
           <CharSheet
@@ -232,7 +228,7 @@ function App() {
             onSaveClick={handleSaveClick}
           />
         )}
-        {initiativeActive && <Initiative characters={characters} onNpcsChange={setNpcs} />}
+        {showInitiative && <Initiative characters={characters} onNpcsChange={setNpcs} />}
         {mapsView.type === 'manager' && (
           <MapsManager
             campaignName={campaignName}
