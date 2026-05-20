@@ -168,6 +168,8 @@ The app includes powerful tools for Dungeon Masters to manage their campaigns:
 - Drag-and-drop creatures and items
 - 20+ SVG furniture and prop types (barrels, chests, tables, doors, traps, torches, and more)
 
+  <img src="public/map-example.jpg" alt="Map Example" width="600" />
+
 **🏚️ Procedural Dungeon Generator**
 - Generate random dungeon maps with configurable grid size, corridor width, and door placement — perfect for inspiration or quick sessions
 
@@ -179,8 +181,6 @@ The app includes powerful tools for Dungeon Masters to manage their campaigns:
 
 **🗂️ Map Management**
 - Create, rename, activate, and delete maps — multiple maps per campaign
-
-<img src="public/map-example.jpeg" alt="Map Example" width="600" />
 
 ### 🎨 **Designed for Gaming Tables**
 
