@@ -27,7 +27,7 @@
 }
 
 /* ===== Header & Progress ===== */
-.wizard-header {
+.character-creation-wizard .wizard-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -35,12 +35,12 @@
     border-bottom: 1px solid var(--border-color);
 }
 
-.wizard-header h2 {
+.character-creation-wizard .wizard-header h2 {
     margin: 0;
     color: var(--color-text);
 }
 
-.close-btn {
+.character-creation-wizard .close-btn {
     background: none;
     border: none;
     font-size: 28px;
@@ -49,17 +49,17 @@
     line-height: 1;
 }
 
-.close-btn:hover {
+.character-creation-wizard .close-btn:hover {
     color: var(--color-text);
 }
 
-.progress-bar {
+.character-creation-wizard .progress-bar {
     height: 4px;
     background-color: var(--border-color);
     width: 100%;
 }
 
-.progress-fill {
+.character-creation-wizard .progress-fill {
     height: 100%;
     width: var(--progress-width, 0%);
     background-color: var(--color-primary);
@@ -67,7 +67,7 @@
 }
 
 /* ===== Content Area ===== */
-.wizard-content {
+.character-creation-wizard .wizard-content {
     padding: 10px 20px 0 20px;
     display: flex;
     flex-direction: column;
@@ -77,7 +77,7 @@
     min-width: 0;
 }
 
-.wizard-step {
+.character-creation-wizard .wizard-step {
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -88,7 +88,7 @@
     box-sizing: border-box;
 }
 
-.wizard-step h2 {
+.character-creation-wizard .wizard-step h2 {
     margin-bottom: 1rem;
     padding-bottom: 0.5rem;
     border-bottom: 2px solid var(--color-primary);
@@ -96,21 +96,21 @@
     font-size: 1.5rem;
 }
 
-.step-description {
+.character-creation-wizard .step-description {
     color: var(--color-text-secondary);
     font-size: 0.9rem;
     margin-bottom: 0;
 }
 
 /* ===== Body Layout (Sidebar + Content) ===== */
-.wizard-body {
+.character-creation-wizard .wizard-body {
     display: flex;
     flex: 1;
     overflow: hidden;
     min-height: 0;
 }
 
-.wizard-sidebar {
+.character-creation-wizard .wizard-sidebar {
     width: 220px;
     min-width: 220px;
     background-color: var(--background-color-card);
@@ -122,7 +122,7 @@
     overflow-y: auto;
 }
 
-.sidebar-tab {
+.character-creation-wizard .sidebar-tab {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -138,23 +138,23 @@
     transition: all 0.2s ease;
 }
 
-.sidebar-tab:hover:not(.disabled) {
+.character-creation-wizard .sidebar-tab:hover:not(.disabled) {
     background-color: var(--background-color-card-hover);
     color: var(--color-text);
 }
 
-.sidebar-tab.active {
+.character-creation-wizard .sidebar-tab.active {
     background-color: var(--color-primary);
     color: var(--color-text-inverse);
     font-weight: 600;
 }
 
-.sidebar-tab.disabled {
+.character-creation-wizard .sidebar-tab.disabled {
     opacity: 0.4;
     cursor: not-allowed;
 }
 
-.sidebar-tab-number {
+.character-creation-wizard .sidebar-tab-number {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -167,18 +167,18 @@
     flex-shrink: 0;
 }
 
-.sidebar-tab.active .sidebar-tab-number {
+.character-creation-wizard .sidebar-tab.active .sidebar-tab-number {
     background-color: var(--color-text-inverse);
     color: var(--color-primary);
 }
 
-.sidebar-tab-title {
+.character-creation-wizard .sidebar-tab-title {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.sidebar-save {
+.character-creation-wizard .sidebar-save {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -196,41 +196,41 @@
     transition: all 0.2s ease;
 }
 
-.sidebar-save:hover:not(.disabled) {
+.character-creation-wizard .sidebar-save:hover:not(.disabled) {
     background-color: var(--background-color-success);
     border-color: var(--border-color-success);
 }
 
-.sidebar-save.disabled {
+.character-creation-wizard .sidebar-save.disabled {
     opacity: 0.4;
     cursor: not-allowed;
 }
 
-.sidebar-save .sidebar-tab-number {
+.character-creation-wizard .sidebar-save .sidebar-tab-number {
     background-color: var(--background-color-success);
     color: var(--color-success);
 }
 
-.sidebar-save:not(.disabled) .sidebar-tab-number {
+.character-creation-wizard .sidebar-save:not(.disabled) .sidebar-tab-number {
     background-color: var(--color-success);
     color: var(--color-text-inverse);
 }
 
 /* ===== Form Elements ===== */
-.form-group {
+.character-creation-wizard .form-group {
     margin-bottom: 20px;
 }
 
-.form-group label {
+.character-creation-wizard .form-group label {
     display: block;
     margin-bottom: 8px;
     font-weight: 600;
     color: var(--color-text-secondary);
 }
 
-.form-group input,
-.form-group select,
-.form-group textarea {
+.character-creation-wizard .form-group input,
+.character-creation-wizard .form-group select,
+.character-creation-wizard .form-group textarea {
     height: 36px;
     width: 100%;
     padding: 10px;
@@ -242,35 +242,35 @@
     color: var(--color-text);
 }
 
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
+.character-creation-wizard .form-group input:focus,
+.character-creation-wizard .form-group select:focus,
+.character-creation-wizard .form-group textarea:focus {
     outline: none;
     border-color: var(--color-primary);
     box-shadow: 0 0 5px var(--shadow-focus);
 }
 
-.form-group input.error,
-.form-group select.error,
-.form-group textarea.error {
+.character-creation-wizard .form-group input.error,
+.character-creation-wizard .form-group select.error,
+.character-creation-wizard .form-group textarea.error {
     border-color: var(--color-error-border);
 }
 
-.error-message {
+.character-creation-wizard .error-message {
     color: var(--color-error-light);
     font-size: 0.85rem;
     margin-top: 5px;
     display: block;
 }
 
-.field-description {
+.character-creation-wizard .field-description {
     color: var(--color-text-secondary);
     font-size: 0.85rem;
     margin-top: 5px;
 }
 
 /* ===== Footer & Buttons ===== */
-.wizard-footer {
+.character-creation-wizard .wizard-footer {
     display: flex;
     justify-content: space-between;
     padding: 10px 20px 20px 20px;
@@ -278,7 +278,7 @@
     gap: 10px;
 }
 
-.btn {
+.character-creation-wizard .btn {
     padding: 10px 24px;
     border: none;
     border-radius: 4px;
@@ -287,40 +287,40 @@
     transition: background-color 0.2s;
 }
 
-.btn-primary,
-.btn-success {
+.character-creation-wizard .btn-primary,
+.character-creation-wizard .btn-success {
     background-color: var(--color-primary);
     color: var(--color-text-inverse);
 }
 
-.btn-primary:hover,
-.btn-success:hover {
+.character-creation-wizard .btn-primary:hover,
+.character-creation-wizard .btn-success:hover {
     background-color: var(--color-primary-hover);
 }
 
-.btn-secondary {
+.character-creation-wizard .btn-secondary {
     background-color: var(--background-color-button-secondary);
     color: var(--color-text);
 }
 
-.btn-secondary:hover {
+.character-creation-wizard .btn-secondary:hover {
     background-color: var(--background-color-button-secondary-hover);
 }
 
-.btn:disabled {
+.character-creation-wizard .btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
 /* ===== Rules Selection Screen ===== */
-.rules-selection-container {
+.character-creation-wizard .rules-selection-container {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 20px;
     margin-top: 20px;
 }
 
-.rules-option {
+.character-creation-wizard .rules-option {
     border: 2px solid var(--border-color);
     border-radius: 8px;
     padding: 20px;
@@ -329,32 +329,32 @@
     background-color: var(--background-color-card);
 }
 
-.rules-option:hover {
+.character-creation-wizard .rules-option:hover {
     border-color: var(--color-primary);
     background-color: var(--background-color-card-hover);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px var(--color-primary-lighter);
 }
 
-.rules-option.selected {
+.character-creation-wizard .rules-option.selected {
     border-color: var(--color-primary);
     background-color: var(--background-color-selected);
     box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
-.rules-option-icon {
+.character-creation-wizard .rules-option-icon {
     font-size: 3rem;
     text-align: center;
     margin-bottom: 15px;
 }
 
-.rules-option h3 {
+.character-creation-wizard .rules-option h3 {
     margin: 10px 0;
     color: var(--color-text);
     text-align: center;
 }
 
-.rules-option p {
+.character-creation-wizard .rules-option p {
     color: var(--color-text-secondary);
     font-size: 0.9rem;
     line-height: 1.5;
@@ -362,14 +362,14 @@
     margin-bottom: 15px;
 }
 
-.rules-features {
+.character-creation-wizard .rules-features {
     list-style: none;
     padding: 0;
     margin: 0;
     text-align: left;
 }
 
-.rules-features li {
+.character-creation-wizard .rules-features li {
     padding: 5px 0;
     color: var(--color-text-secondary);
     font-size: 0.9rem;
@@ -377,7 +377,7 @@
     align-items: center;
 }
 
-.rules-features li::before {
+.character-creation-wizard .rules-features li::before {
     content: "✓";
     color: var(--color-primary);
     font-weight: bold;
@@ -385,7 +385,7 @@
 }
 
 /* ===== Point Buy System ===== */
-.points-remaining {
+.character-creation-wizard .points-remaining {
     color: var(--color-primary);
     font-size: 1.3em;
     font-weight: 900;
@@ -394,14 +394,14 @@
 /* Note: .point-cost, .total-score, and related styles are in wizard-step-abilities.css */
 
 /* ===== Multi-Select Pattern (Skills, Languages, Resistances) ===== */
-.multi-select-container {
+.character-creation-wizard .multi-select-container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 2px 8px;
     margin-top: 8px;
 }
 
-.multi-select-item {
+.character-creation-wizard .multi-select-item {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -415,18 +415,18 @@
     color: var(--color-text-secondary);
 }
 
-.multi-select-item:hover {
+.character-creation-wizard .multi-select-item:hover {
     background-color: var(--background-color-card-hover);
 }
 
-.multi-select-item input[type="checkbox"] {
+.character-creation-wizard .multi-select-item input[type="checkbox"] {
     margin: 0;
     cursor: pointer;
     width: 16px;
     height: 16px;
 }
 
-.multi-select-item.selected {
+.character-creation-wizard .multi-select-item.selected {
     background-color: var(--color-primary);
     color: var(--color-text-inverse);
     border: 2px solid var(--color-primary);
@@ -435,13 +435,13 @@
 }
 
 /* Compact variant for skills */
-.multi-select-compact .multi-select-item {
+.character-creation-wizard .multi-select-compact .multi-select-item {
     padding: 4px 8px;
     font-size: 0.85rem;
     gap: 2px 4px;
 }
 
-.multi-select-compact .multi-select-container {
+.character-creation-wizard .multi-select-compact .multi-select-container {
     gap: 6px;
     margin-top: 6px;
 }
@@ -449,7 +449,7 @@
 /* ===== List Results Pattern (Shared for Spells, Feats, Magic Items) ===== */
 
 /* Common container styles */
-.list-filter-container {
+.character-creation-wizard .list-filter-container {
     color: var(--color-text);
     display: flex;
     flex-wrap: wrap;
@@ -462,7 +462,7 @@
 }
 
 /* Shared container for all list results (spells, feats, magic items) */
-.list-results-container {
+.character-creation-wizard .list-results-container {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -477,7 +477,7 @@
 }
 
 /* Shared header for all list results */
-.list-results-header {
+.character-creation-wizard .list-results-header {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--border-color);
     background-color: var(--background-color-card);
@@ -489,13 +489,13 @@
     justify-content: space-between;
 }
 
-.result-count {
+.character-creation-wizard .result-count {
     color: var(--color-text);
     font-weight: 500;
 }
 
 /* Shared list container for all list results */
-.list-results-list {
+.character-creation-wizard .list-results-list {
     padding: 0.5rem;
     flex: 1;
     overflow-x: hidden;
@@ -506,25 +506,25 @@
 
 /* Spell/feat/magic-item variants extend shared list-results classes */
 /* These classes are kept for semantic clarity in JSX but inherit from shared styles */
-.spell-results-container,
-.feat-results-container,
-.magic-item-results-container {
+.character-creation-wizard .spell-results-container,
+.character-creation-wizard .feat-results-container,
+.character-creation-wizard .magic-item-results-container {
     /* inherits from .list-results-container */
 }
 
-.spell-results-header,
-.feat-results-header,
-.magic-item-results-header {
+.character-creation-wizard .spell-results-header,
+.character-creation-wizard .feat-results-header,
+.character-creation-wizard .magic-item-results-header {
     /* inherits from .list-results-header */
 }
 
-.spell-results-list,
-.feat-results-list,
-.magic-item-results-list {
+.character-creation-wizard .spell-results-list,
+.character-creation-wizard .feat-results-list,
+.character-creation-wizard .magic-item-results-list {
     /* inherits from .list-results-list */
 }
 
-.no-results-found {
+.character-creation-wizard .no-results-found {
     padding: 2rem;
     text-align: center;
     color: var(--color-text-muted);
@@ -533,9 +533,9 @@
 }
 
 /* Wizard Step Specific Container Styles */
-.wizard-step-spells,
-.wizard-step-feats,
-.wizard-step-magic-items {
+.character-creation-wizard .wizard-step-spells,
+.character-creation-wizard .wizard-step-feats,
+.character-creation-wizard .wizard-step-magic-items {
     display: flex;
     flex-direction: column;
     gap: 0.2rem 1rem;
@@ -543,75 +543,7 @@
 }
 
 /* Pre-selected Styling */
-.multi-select-item.pre-selected {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+.character-creation-wizard .multi-select-item.pre-selected {
 
 
   cursor: not-allowed;
@@ -619,12 +551,12 @@
 }
 
 
-.multi-select-item.pre-selected input[type="checkbox"] {
+.character-creation-wizard .multi-select-item.pre-selected input[type="checkbox"] {
   cursor: not-allowed;
 }
 
 /* Common item styles for spells and feats */
-.list-item {
+.character-creation-wizard .list-item {
     padding: 0.75rem;
     margin-bottom: 0.25rem;
     border: 1px solid var(--border-color);
@@ -635,40 +567,40 @@
     background-color: var(--background-color-card);
 }
 
-.list-item:hover {
+.character-creation-wizard .list-item:hover {
     border-color: var(--color-primary);
     background-color: var(--background-color-card-hover);
 }
 
-.list-item.selected {
+.character-creation-wizard .list-item.selected {
     border-color: var(--color-primary);
     background-color: var(--background-color-selected);
 }
 
-.list-item.pre-selected {
+.character-creation-wizard .list-item.pre-selected {
     cursor: not-allowed;
     opacity: 0.7;
 }
 
-.list-item.pre-selected.selected {
+.character-creation-wizard .list-item.pre-selected.selected {
     opacity: 0.7;
 }
 
-.list-item-header {
+.character-creation-wizard .list-item-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 0.5rem;
 }
 
-.list-item-name {
+.character-creation-wizard .list-item-name {
     font-weight: 600;
     font-size: 1rem;
     color: var(--color-text);
     flex: 1;
 }
 
-.list-item-checkbox {
+.character-creation-wizard .list-item-checkbox {
     width: 24px;
     height: 24px;
     border: 2px solid var(--border-color);
@@ -681,19 +613,19 @@
     transition: all 0.2s ease;
 }
 
-.list-item-checkbox.checked {
+.character-creation-wizard .list-item-checkbox.checked {
     background-color: var(--color-primary);
     border-color: var(--color-primary);
     color: var(--color-text-inverse);
 }
 
-.list-item-details {
+.character-creation-wizard .list-item-details {
     margin-top: 0.5rem;
     padding-top: 0.5rem;
     border-top: 1px solid var(--border-color);
 }
 
-.list-item-full-details {
+.character-creation-wizard .list-item-full-details {
     margin-top: 0.5rem;
     padding-top: 0.1rem;
     border-top: 1px dashed var(--border-color);
@@ -702,7 +634,7 @@
     line-height: 1.4;
 }
 
-.toggle-details-btn {
+.character-creation-wizard .toggle-details-btn {
     background: none;
     border: none;
     color: var(--color-primary);
@@ -713,7 +645,7 @@
 }
 
 /* Spell-specific styles */
-.spell-level {
+.character-creation-wizard .spell-level {
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-size: 0.8rem;
@@ -721,38 +653,38 @@
     margin-right: 0.5rem;
 }
 
-.spell-level.cantrip {
+.character-creation-wizard .spell-level.cantrip {
     background-color: var(--background-color-spell-level-cantrip);
     color: var(--color-text-inverse);
 }
 
-.spell-level.low {
+.character-creation-wizard .spell-level.low {
     background-color: var(--background-color-spell-level-low);
     color: var(--color-text-inverse);
 }
 
-.spell-level.mid {
+.character-creation-wizard .spell-level.mid {
     background-color: var(--background-color-spell-level-mid);
     color: #1a1a1a;
 }
 
-.spell-level.high {
+.character-creation-wizard .spell-level.high {
     background-color: var(--background-color-spell-level-high);
     color: var(--color-text-inverse);
 }
 
-.spell-meta {
+.character-creation-wizard .spell-meta {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
     margin-bottom: 0.5rem;
 }
 
-.spell-school,
-.spell-ritual,
-.spell-concentration,
-.spell-duration,
-.spell-casting-time {
+.character-creation-wizard .spell-school,
+.character-creation-wizard .spell-ritual,
+.character-creation-wizard .spell-concentration,
+.character-creation-wizard .spell-duration,
+.character-creation-wizard .spell-casting-time {
     font-size: 0.8rem;
     padding: 0.15rem 0.4rem;
     border-radius: 3px;
@@ -761,26 +693,26 @@
     font-weight: 500;
 }
 
-.spell-ritual,
-.spell-concentration {
+.character-creation-wizard .spell-ritual,
+.character-creation-wizard .spell-concentration {
     font-weight: 600;
     color: var(--color-primary);
 }
 
-.spell-description {
+.character-creation-wizard .spell-description {
     font-size: 0.9rem;
     color: var(--color-text);
     line-height: 1.5;
     font-weight: 500;
 }
 
-.spell-higher-level,
-.spell-components,
-.spell-damage {
+.character-creation-wizard .spell-higher-level,
+.character-creation-wizard .spell-components,
+.character-creation-wizard .spell-damage {
     margin-top: 0.25rem;
 }
 
-.spell-material {
+.character-creation-wizard .spell-material {
     margin-top: 0.25rem;
     font-style: italic;
     color: var(--color-text-secondary);
@@ -788,7 +720,7 @@
 }
 
 /* Feat-specific styles */
-.feat-type {
+.character-creation-wizard .feat-type {
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-size: 0.8rem;
@@ -798,20 +730,20 @@
     color: var(--color-text-inverse);
 }
 
-.feat-prerequisites,
-.feat-description,
-.feat-more-description {
+.character-creation-wizard .feat-prerequisites,
+.character-creation-wizard .feat-description,
+.character-creation-wizard .feat-more-description {
     margin-top: 0.5rem;
 }
 
-.feat-description {
+.character-creation-wizard .feat-description {
     font-size: 0.9rem;
     color: var(--color-text);
     line-height: 1.5;
     font-weight: 500;
 }
 
-.level-summary-item {
+.character-creation-wizard .level-summary-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -820,13 +752,13 @@
     background-color: var(--background-color-card);
 }
 
-.level-label {
+.character-creation-wizard .level-label {
     font-weight: 600;
     color: var(--color-text-secondary);
     font-size: 0.9rem;
 }
 
-.level-count {
+.character-creation-wizard .level-count {
     font-weight: 700;
     color: var(--color-text);
     font-size: 0.95rem;
@@ -837,15 +769,15 @@
     text-align: center;
 }
 
-.level-count.exceeded {
+.character-creation-wizard .level-count.exceeded {
     background-color: var(--background-color-level-count-exceeded);
     color: var(--color-error-light);
     border: 1px solid var(--border-color-error);
 }
 
 /* Spell & Feat Search Inputs */
-.spell-search-input,
-.feat-search-input {
+.character-creation-wizard .spell-search-input,
+.character-creation-wizard .feat-search-input {
     padding: 0.5rem;
     border: 1px solid var(--border-color-input);
     border-radius: 4px;
@@ -855,9 +787,9 @@
     background-color: var(--background-color-input);
 }
 
-.level-filter,
-.class-filter,
-.type-filter {
+.character-creation-wizard .level-filter,
+.character-creation-wizard .class-filter,
+.character-creation-wizard .type-filter {
     padding: 0.5rem;
     border: 1px solid var(--border-color-input);
     border-radius: 4px;
@@ -868,7 +800,7 @@
 }
 
 /* ===== Validation Messages ===== */
-.validation-message {
+.character-creation-wizard .validation-message {
     padding: 0.75rem 1rem;
     border-radius: 6px;
     margin-top: 1rem;
@@ -879,26 +811,26 @@
     gap: 0.5rem;
 }
 
-.validation-message.error {
+.character-creation-wizard .validation-message.error {
     background-color: var(--background-color-error);
     color: var(--color-error-light);
     border: 1px solid var(--border-color-error);
 }
 
-.validation-message.success {
+.character-creation-wizard .validation-message.success {
     background-color: var(--background-color-success);
     color: var(--color-success);
     border: 1px solid var(--border-color-success);
 }
 
-.validation-message.warning {
+.character-creation-wizard .validation-message.warning {
     background-color: var(--background-color-warning);
     color: var(--color-warning);
     border: 1px solid var(--border-color-warning);
 }
 
 /* ===== Equipment Search Modal ===== */
-.equipment-search-modal-overlay {
+.character-creation-wizard .equipment-search-modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -911,7 +843,7 @@
     z-index: 1000;
 }
 
-.equipment-search-modal {
+.character-creation-wizard .equipment-search-modal {
     background-color: var(--background-color-modal);
     border-radius: 8px;
     width: 90%;
@@ -923,7 +855,7 @@
     box-shadow: 0 4px 20px var(--shadow-color);
 }
 
-.search-modal-header {
+.character-creation-wizard .search-modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -932,13 +864,13 @@
     background-color: var(--background-color-card);
 }
 
-.search-modal-header h3 {
+.character-creation-wizard .search-modal-header h3 {
     margin: 0;
     font-size: 1.25rem;
     color: var(--color-text);
 }
 
-.close-modal-btn {
+.character-creation-wizard .close-modal-btn {
     background: none;
     border: none;
     font-size: 1.5rem;
@@ -948,24 +880,24 @@
     line-height: 1;
 }
 
-.close-modal-btn:hover {
+.character-creation-wizard .close-modal-btn:hover {
     color: var(--color-text);
 }
 
-.search-modal-body {
+.character-creation-wizard .search-modal-body {
     padding: 1.5rem;
     overflow-y: auto;
     flex: 1;
 }
 
-.category-filters {
+.character-creation-wizard .category-filters {
     display: flex;
     gap: 0.5rem;
     margin-bottom: 1rem;
     flex-wrap: wrap;
 }
 
-.category-filter-btn {
+.character-creation-wizard .category-filter-btn {
     padding: 0.5rem 1rem;
     background-color: var(--background-color-category-filter);
     border: 1px solid var(--border-color);
@@ -976,21 +908,21 @@
     color: var(--color-text-secondary);
 }
 
-.category-filter-btn:hover {
+.character-creation-wizard .category-filter-btn:hover {
     background-color: var(--background-color-category-filter-hover);
 }
 
-.category-filter-btn.active {
+.character-creation-wizard .category-filter-btn.active {
     background-color: var(--background-color-category-filter-active);
     color: var(--color-text-inverse);
     border-color: var(--background-color-category-filter-active);
 }
 
-.search-input-container {
+.character-creation-wizard .search-input-container {
     margin-bottom: 1rem;
 }
 
-.search-input {
+.character-creation-wizard .search-input {
     width: 100%;
     padding: 0.75rem 1rem;
     border: 1px solid var(--border-color-input);
@@ -1000,13 +932,13 @@
     color: var(--color-text);
 }
 
-.search-input:focus {
+.character-creation-wizard .search-input:focus {
     outline: none;
     border-color: var(--color-info);
     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
-.equipment-results {
+.character-creation-wizard .equipment-results {
     max-height: 300px;
     overflow-y: auto;
     border: 1px solid var(--border-color);
@@ -1014,28 +946,28 @@
     margin-bottom: 1rem;
 }
 
-.equipment-item {
+.character-creation-wizard .equipment-item {
     padding: 1rem;
     border-bottom: 1px solid var(--border-color);
     cursor: pointer;
     transition: background-color 0.2s;
 }
 
-.equipment-item:last-child {
+.character-creation-wizard .equipment-item:last-child {
     border-bottom: none;
 }
 
-.equipment-item:hover {
+.character-creation-wizard .equipment-item:hover {
     background-color: var(--background-color-card-hover);
 }
 
-.equipment-item-name {
+.character-creation-wizard .equipment-item-name {
     font-weight: 600;
     color: var(--color-text);
     margin-bottom: 0.5rem;
 }
 
-.equipment-item-details {
+.character-creation-wizard .equipment-item-details {
     display: flex;
     gap: 1rem;
     flex-wrap: wrap;
@@ -1043,23 +975,23 @@
     color: var(--color-text-secondary);
 }
 
-.equipment-item-category {
+.character-creation-wizard .equipment-item-category {
     background-color: var(--background-color-tag);
     padding: 0.25rem 0.5rem;
     border-radius: 3px;
     color: var(--color-text-secondary);
 }
 
-.equipment-item-cost {
+.character-creation-wizard .equipment-item-cost {
     color: var(--color-success);
     font-weight: 500;
 }
 
-.equipment-item-weight {
+.character-creation-wizard .equipment-item-weight {
     color: var(--color-text-secondary);
 }
 
-.search-modal-footer {
+.character-creation-wizard .search-modal-footer {
     display: flex;
     justify-content: flex-end;
     gap: 0.5rem;
@@ -1067,7 +999,7 @@
     border-top: 1px solid var(--border-color);
 }
 
-.add-custom-btn {
+.character-creation-wizard .add-custom-btn {
     padding: 0.75rem 1.5rem;
     background-color: var(--color-primary);
     color: var(--color-text-inverse);
@@ -1078,17 +1010,17 @@
     transition: background-color 0.2s;
 }
 
-.add-custom-btn:hover {
+.character-creation-wizard .add-custom-btn:hover {
     background-color: var(--color-primary-hover);
 }
 
-.add-custom-btn:disabled {
+.character-creation-wizard .add-custom-btn:disabled {
     background-color: var(--background-color-button-disabled);
     cursor: not-allowed;
     color: var(--color-text-secondary);
 }
 
-.cancel-btn {
+.character-creation-wizard .cancel-btn {
     padding: 0.75rem 1.5rem;
     background-color: var(--background-color-button-cancel);
     color: var(--color-text-inverse);
@@ -1099,19 +1031,19 @@
     transition: background-color 0.2s;
 }
 
-.cancel-btn:hover {
+.character-creation-wizard .cancel-btn:hover {
     background-color: var(--background-color-button-cancel-hover);
 }
 
 /* ===== Inventory Specific Styles ===== */
-.searchable-input-container {
+.character-creation-wizard .searchable-input-container {
     position: relative;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
 }
 
-.inventory-textarea {
+.character-creation-wizard .inventory-textarea {
     min-height: 100px;
     width: 100%;
     padding: 0.75rem;
@@ -1124,19 +1056,19 @@
     color: var(--color-text);
 }
 
-.inventory-textarea:focus {
+.character-creation-wizard .inventory-textarea:focus {
     outline: none;
     border-color: var(--color-info);
     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
-.searchable-input-controls {
+.character-creation-wizard .searchable-input-controls {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
 }
 
-.search-equipment-btn {
+.character-creation-wizard .search-equipment-btn {
     padding: 0.5rem 1rem;
     background-color: var(--color-info);
     color: var(--color-text-inverse);
@@ -1147,11 +1079,11 @@
     transition: background-color 0.2s;
 }
 
-.search-equipment-btn:hover {
+.character-creation-wizard .search-equipment-btn:hover {
     background-color: var(--color-info-hover);
 }
 
-.inventory-items-preview {
+.character-creation-wizard .inventory-items-preview {
     margin-top: 0.5rem;
     padding: 0.75rem;
     background-color: var(--background-color-card);
@@ -1159,20 +1091,20 @@
     border: 1px solid var(--border-color);
 }
 
-.items-count {
+.character-creation-wizard .items-count {
     font-size: 0.85rem;
     color: var(--color-text-secondary);
     margin-bottom: 0.5rem;
     display: block;
 }
 
-.items-list {
+.character-creation-wizard .items-list {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
 }
 
-.item-tag {
+.character-creation-wizard .item-tag {
     padding: 0.25rem 0.5rem;
     background-color: var(--background-color-tag);
     border-radius: 12px;
@@ -1180,7 +1112,7 @@
     color: var(--color-text-secondary);
 }
 
-.item-tag.more-items {
+.character-creation-wizard .item-tag.more-items {
     background-color: var(--background-color-item-tag-more);
     color: var(--color-text-inverse);
 }
@@ -1192,15 +1124,15 @@
         max-width: 700px;
     }
 
-    .wizard-body {
+    .character-creation-wizard .wizard-body {
         flex-direction: column;
     }
 
-    .wizard-sidebar {
+    .character-creation-wizard .wizard-sidebar {
         display: none;
     }
 
-    .wizard-footer {
+    .character-creation-wizard .wizard-footer {
         flex-direction: column;
     }
 
@@ -1208,53 +1140,53 @@
         width: 100%;
     }
 
-    .rules-selection-container {
+    .character-creation-wizard .rules-selection-container {
         grid-template-columns: 1fr;
     }
 
-    .magic-items-filters,
-    .spells-filters,
-    .feats-filters {
+    .character-creation-wizard .magic-items-filters,
+    .character-creation-wizard .spells-filters,
+    .character-creation-wizard .feats-filters {
         flex-direction: column;
     }
 
-    .filter-group {
+    .character-creation-wizard .filter-group {
         width: 100%;
     }
 
-    .list-item-header {
+    .character-creation-wizard .list-item-header {
         flex-direction: column;
         align-items: flex-start;
         gap: 0.5rem;
     }
 
-    .spell-level,
-    .feat-type {
+    .character-creation-wizard .spell-level,
+    .character-creation-wizard .feat-type {
         margin-right: 0;
     }
 }
 
 @media (max-width: 600px) {
-    .multi-select-container {
+    .character-creation-wizard .multi-select-container {
         grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
         gap: 6px;
     }
 
-    .multi-select-compact .multi-select-container {
+    .character-creation-wizard .multi-select-compact .multi-select-container {
         gap: 4px;
     }
 
-    .multi-select-compact .multi-select-item {
+    .character-creation-wizard .multi-select-compact .multi-select-item {
         padding: 3px 6px;
         font-size: 0.8rem;
     }
 
-    .equipment-search-modal {
+    .character-creation-wizard .equipment-search-modal {
         width: 95%;
         max-height: 90vh;
     }
 
-    .category-filters {
+    .character-creation-wizard .category-filters {
         overflow-x: auto;
         padding-bottom: 0.5rem;
     }
@@ -1262,7 +1194,7 @@
 
 /* ===== Rule Info and Warning Styles ===== */
 
-.rule-info {
+.character-creation-wizard .rule-info {
     background-color: var(--background-color-header);
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
@@ -1270,40 +1202,40 @@
     font-size: 0.9em;
 }
 
-.rule-info p {
+.character-creation-wizard .rule-info p {
     margin: 0.25rem 0;
 }
 
-.warning-container {
+.character-creation-wizard .warning-container {
     margin-bottom: 1rem;
 }
 
-.warning-message {
+.character-creation-wizard .warning-message {
     padding: 0.5rem 0.75rem;
     border-radius: 4px;
     margin-bottom: 0.5rem;
     font-size: 0.9em;
 }
 
-.warning-message.warning {
+.character-creation-wizard .warning-message.warning {
     background-color: rgba(255, 165, 0, 0.2);
     border-left: 3px solid var(--color-warning);
     color: var(--color-warning);
 }
 
-.warning-message.info {
+.character-creation-wizard .warning-message.info {
     background-color: rgba(100, 108, 255, 0.2);
     border-left: 3px solid var(--color-hover);
     color: var(--color-hover);
 }
 
 /* ===== Character Image Upload ===== */
-.image-upload-input {
+.character-creation-wizard .image-upload-input {
     max-width: 200px;
     font-size: 0.85rem;
 }
 
-.image-preview {
+.character-creation-wizard .image-preview {
     margin-top: 10px;
     padding: 10px;
     border: 2px dashed var(--border-color);
@@ -1315,19 +1247,19 @@
     background-color: var(--background-color-card);
 }
 
-.image-preview img {
+.character-creation-wizard .image-preview img {
     max-width: 150px;
     max-height: 150px;
     object-fit: cover;
     border-radius: 4px;
 }
 
-.image-preview span {
+.character-creation-wizard .image-preview span {
     color: var(--color-text-secondary);
     font-size: 0.9rem;
 }
 
-.btn-remove-image {
+.character-creation-wizard .btn-remove-image {
     margin-top: 8px;
     padding: 6px 12px;
     background-color: var(--background-color-button-cancel);
@@ -1339,6 +1271,6 @@
     transition: background-color 0.2s;
 }
 
-.btn-remove-image:hover {
+.character-creation-wizard .btn-remove-image:hover {
     background-color: var(--background-color-button-cancel-hover);
 }
