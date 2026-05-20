@@ -59,12 +59,12 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
         )}
       </div>
 
-      <button className="sidebar-section-header" onClick={onInitiativeClick}>
-        <i className="fa-solid fa-shield-alt"></i> Initiative
+      <button className="sidebar-section-header" onClick={onEncounterClick}>
+        <i className="fa-solid fa-dragon"></i> Encounters
       </button>
 
-      <button className="sidebar-section-header" onClick={onEncounterClick}>
-        <i className="fa-solid fa-dragon"></i> Encounter
+      <button className="sidebar-section-header" onClick={onInitiativeClick}>
+        <i className="fa-solid fa-shield-alt"></i> Initiative
       </button>
 
       <button className="sidebar-section-header" onClick={onMapsClick}>
