@@ -437,7 +437,7 @@
     }
 }
 
-.generate-dungeon-btn {
+.maps-manager .generate-dungeon-btn {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -447,17 +447,17 @@
   white-space: nowrap;
 }
 
-.generate-dungeon-btn:hover:not(:disabled) {
+.maps-manager .generate-dungeon-btn:hover:not(:disabled) {
   opacity: 0.9;
 }
 
-[data-theme="light"] .generate-dungeon-btn {
+[data-theme="light"] .maps-manager .generate-dungeon-btn {
   background: #4a7db5 !important;
   color: #fff !important;
 }
 
 @media (prefers-color-scheme: light) {
-  .generate-dungeon-btn {
+  .maps-manager .generate-dungeon-btn {
     background: #4a7db5 !important;
     color: #fff !important;
   }
