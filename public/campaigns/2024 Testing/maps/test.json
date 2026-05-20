@@ -205,7 +205,6 @@
     "1,16",
     "0,16",
     "9,23",
-    "9,24",
     "8,22"
   ],
   "placedItems": [
@@ -477,6 +476,46 @@
       "gridY": 2,
       "visible": true,
       "name": "Goblin 1"
+    },
+    {
+      "id": "b5f61afc-bfc5-4425-9537-6ae3ce69cff5",
+      "type": "npc",
+      "gridX": 23,
+      "gridY": 5,
+      "visible": true,
+      "name": "Goblin 2"
+    },
+    {
+      "id": "f0db492c-cb6a-4d1c-b945-2924feb707ee",
+      "type": "npc",
+      "gridX": 19,
+      "gridY": 24,
+      "visible": true,
+      "name": "Bugbear"
+    },
+    {
+      "id": "97f2e3a4-f3b4-4c5d-9281-b97ff4b47242",
+      "type": "npc",
+      "gridX": 9,
+      "gridY": 27,
+      "visible": true,
+      "name": "Hobgoblin"
+    },
+    {
+      "id": "93654b7f-9084-4ea1-964a-b1365f73094c",
+      "type": "npc",
+      "gridX": 19,
+      "gridY": 27,
+      "visible": true,
+      "name": "Bugbear"
+    },
+    {
+      "id": "85700325-a211-4d0d-a779-3e77453a9cca",
+      "type": "npc",
+      "gridX": 9,
+      "gridY": 24,
+      "visible": true,
+      "name": "NPC"
     }
   ],
   "paintCells": [],

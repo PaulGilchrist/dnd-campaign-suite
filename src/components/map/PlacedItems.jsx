@@ -11,6 +11,7 @@ function PlacedItems({
     gridCenterX,
     gridCenterY,
     setSelectedBarrel,
+    npcImages,
 }) {
     const renderBarrel = (item) => {
         const cx = gridCenterX(item.gridX);
@@ -237,9 +238,9 @@ function PlacedItems({
                 {isRepositioning && (
                     <circle cx={cx} cy={cy} r={24} className="reposition-highlight" fill="none" />
                 )}
-                {item.imageUrl ? (
+                {(npcImages[item.id] || item.imageUrl) ? (
                     <image
-                        xlinkHref={item.imageUrl}
+                        xlinkHref={npcImages[item.id] || item.imageUrl}
                         x={cx - 18}
                         y={cy - 18}
                         width={36}

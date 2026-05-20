@@ -3,25 +3,8 @@ import React from 'react'
 import { cloneDeep } from 'lodash';
 import utils from '../../services/utils.js'
 import storage from '../../services/storage.js'
-import { loadMonsters } from '../../services/dataLoader.js'
+import { getMonsterImageUrl } from '../../services/monsterUtils.js';
 import './initiative.css'
-
-let monstersCache = null;
-
-async function getMonsterImageUrl(npcName) {
-    if (!npcName) return null;
-    if (!monstersCache) {
-        monstersCache = await loadMonsters();
-    }
-    // Strip trailing number (e.g., "Goblin 1" -> "Goblin")
-    const baseName = npcName.replace(/\s+\d+$/, '');
-    // Case-insensitive lookup by name
-    const monster = monstersCache.find(m => m.name.toLowerCase() === baseName.toLowerCase());
-    if (monster && monster.image === true) {
-        return `https://paulgilchrist.github.io/dnd-tools/images/${monster.index}.jpg`;
-    }
-    return null;
-}
 
 function NpcAvatar({ name, imageUrl }) {
     if (imageUrl) {

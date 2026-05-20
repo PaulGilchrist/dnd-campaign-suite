@@ -15,6 +15,7 @@ import PillarSVG from './PillarSVG.jsx';
 import StairsSVG from './StairsSVG.jsx';
 import PlacedItems from './PlacedItems.jsx';
 import usePlacedItems from './hooks/usePlacedItems.js';
+import { getMonsterImageUrl } from '../../services/monsterUtils.js';
 
 const CELL_SIZE = 40;
 const RADIUS = 20;
@@ -61,6 +62,8 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     const [showRename, setShowRename] = useState(null);
     // Reposition mode state
     const [repositioningItemId, setRepositioningItemId] = useState(null);
+    // NPC image cache
+    const [npcImages, setNpcImages] = useState({});
     // Load or initialize map data on mount
     useEffect(() => {
         if (isInitialized.current) return;
@@ -526,6 +529,8 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         );
         setShowRename(null);
         setSelectedBarrel(null);
+        // Clear the cached image so it gets recomputed
+        setNpcImages(prev => ({ ...prev, [itemId]: null }));
     }, []);
 
     const {
@@ -544,6 +549,20 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         setSelectedBarrel(null);
         setRepositioningItemId(null);
     }, []);
+
+    // Fetch NPC images when placedItems change
+    useEffect(() => {
+        const npcItems = placedItems.filter(item => item.type === 'npc');
+        const promises = npcItems.map(async (item) => {
+            const url = await getMonsterImageUrl(item.name);
+            return { id: item.id, url };
+        });
+        Promise.all(promises).then(results => {
+            const newImages = {};
+            results.forEach(({ id, url }) => { newImages[id] = url; });
+            setNpcImages(newImages);
+        });
+    }, [placedItems]);
 
     // Sync state to refs so handleWheel always reads latest values
     useEffect(() => { zoomValueRef.current = zoom; }, [zoom]);
@@ -876,6 +895,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     gridCenterX={gridCenterX}
                     gridCenterY={gridCenterY}
                     setSelectedBarrel={setSelectedBarrel}
+                    npcImages={npcImages}
                 />
 
                 {/* Fog of War overlay — GM sees subtle fog, players see nothing here (filtered below) */}
