@@ -31,7 +31,7 @@
   margin: 1rem 0;
 }
 
-.campaign-list {
+.campaign-selection .campaign-list {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;

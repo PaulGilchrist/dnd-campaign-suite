@@ -1,4 +1,4 @@
-.spells-summary {
+.wizard-step-spells .spells-summary {
     padding: 0.25rem 1rem 0.1rem 1rem;
     background-color: var(--background-color-card);
     border-radius: 8px;
@@ -7,11 +7,11 @@
     overflow: visible;
 }
 
-.spells-summary h4 {
+.wizard-step-spells .spells-summary h4 {
     color: var(--color-text);
 }
 
-.spell-levels-summary {
+.wizard-step-spells .spell-levels-summary {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 0.75rem;

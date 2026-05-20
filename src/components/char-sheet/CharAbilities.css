@@ -1,9 +1,9 @@
-.abilities {
+.abilities-popup-parent .abilities {
     display: grid;
     grid-template-columns: 85px 60px 60px 50px auto;
     text-align: center;
 }
-.abilities > div {
+.abilities-popup-parent .abilities > div {
     padding-right: 10px;
 }
 .abilities-popup-parent {
