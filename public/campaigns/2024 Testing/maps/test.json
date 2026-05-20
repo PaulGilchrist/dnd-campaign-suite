@@ -516,6 +516,20 @@
       "gridY": 24,
       "visible": true,
       "name": "Hobgoblin 1"
+    },
+    {
+      "id": "a6843ab5-0681-49e6-99dc-46c47039897e",
+      "type": "torch",
+      "gridX": 22,
+      "gridY": 11,
+      "visible": true
+    },
+    {
+      "id": "fc23c9b4-e4bd-4d06-8012-2d74b8e4086b",
+      "type": "torch",
+      "gridX": 27,
+      "gridY": 11,
+      "visible": true
     }
   ],
   "paintCells": [],

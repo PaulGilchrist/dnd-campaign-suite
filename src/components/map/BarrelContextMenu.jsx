@@ -13,6 +13,8 @@ function BarrelContextMenu({
     handleRotateDoor,
     handleRotateSecretDoor,
     handleRotateStairs,
+    handleRotateAltar,
+    handleRotateBookshelf,
     handleRenameItem,
     setShowRename,
     setSelectedBarrel,
@@ -23,7 +25,7 @@ function BarrelContextMenu({
     const menuY = gridCenterY(selectedBarrel.gridY) + 10;
     const selectedItem = placedItems.find(i => i.id === selectedBarrel.id);
     const isNpc = selectedItem && selectedItem.type === 'npc';
-    const hasRotation = selectedItem && (selectedItem.type === 'table' || selectedItem.type === 'bed' || selectedItem.type === 'door' || selectedItem.type === 'secretDoor' || selectedItem.type === 'stairs');
+    const hasRotation = selectedItem && (selectedItem.type === 'table' || selectedItem.type === 'bed' || selectedItem.type === 'door' || selectedItem.type === 'secretDoor' || selectedItem.type === 'stairs' || selectedItem.type === 'altar' || selectedItem.type === 'bookshelf');
     const showRenameOption = isNpc;
     const hasExtra = showRenameOption || hasRotation;
     const menuHeight = hasExtra ? 80 : 58;
@@ -68,6 +70,8 @@ function BarrelContextMenu({
                         else if (selectedItem.type === 'door') handleRotateDoor(selectedBarrel.id);
                         else if (selectedItem.type === 'secretDoor') handleRotateSecretDoor(selectedBarrel.id);
                         else if (selectedItem.type === 'stairs') handleRotateStairs(selectedBarrel.id);
+                        else if (selectedItem.type === 'altar') handleRotateAltar(selectedBarrel.id);
+                        else if (selectedItem.type === 'bookshelf') handleRotateBookshelf(selectedBarrel.id);
                     }}>
                         Rotate
                     </text>

@@ -58,6 +58,24 @@ function usePlacedItems(setPlacedItems, setSelectedBarrel) {
         }));
     };
 
+    const handleRotateAltar = (itemId) => {
+        setPlacedItems(prev =>
+            prev.map(item =>
+                item.id === itemId ? { ...item, rotation: (item.rotation || 0) === 0 ? 90 : 0 } : item
+            )
+        );
+        setSelectedBarrel(null);
+    };
+
+    const handleRotateBookshelf = (itemId) => {
+        setPlacedItems(prev =>
+            prev.map(item =>
+                item.id === itemId ? { ...item, rotation: (item.rotation || 0) === 0 ? 90 : 0 } : item
+            )
+        );
+        setSelectedBarrel(null);
+    };
+
     return {
         handleToggleItemVisibility,
         handleDeleteItem,
@@ -67,6 +85,8 @@ function usePlacedItems(setPlacedItems, setSelectedBarrel) {
         handleRotateDoor,
         handleRotateSecretDoor,
         handleRotateStairs,
+        handleRotateAltar,
+        handleRotateBookshelf,
     };
 }
 

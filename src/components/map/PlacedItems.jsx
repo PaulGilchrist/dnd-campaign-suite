@@ -231,6 +231,244 @@ function PlacedItems({
         );
     };
 
+    const renderAltar = (item) => {
+        const isRotated = (item.rotation || 0) === 90;
+        const cx = isRotated ? gridCenterX(item.gridX) : gridCenterX(item.gridX) + CELL_SIZE / 2;
+        const cy = isRotated ? gridCenterY(item.gridY) + CELL_SIZE / 2 : gridCenterY(item.gridY);
+        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        const altarW = isRotated ? 36 : 72;
+        const altarH = isRotated ? 72 : 36;
+        return (
+            <g key={item.id} className="placed-item">
+                <use href="#altar" x={cx - 36} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
+                    transform={isRotated ? `rotate(90, ${cx}, ${cy})` : undefined} />
+                {isLocalhost && (
+                    <>
+                        <rect x={cx - altarW / 2} y={cy - altarH / 2} width={altarW} height={altarH} fill="transparent"
+                            className="barrel-hit-area"
+                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            style={{ cursor: 'grab' }} />
+                        {itemDragging?.itemId === item.id && (
+                            <rect x={cx - altarW / 2} y={cy - altarH / 2} width={altarW} height={altarH} fill="none" className="reposition-highlight" />
+                        )}
+                    </>
+                )}
+            </g>
+        );
+    };
+
+    const renderBookshelf = (item) => {
+        const isRotated = (item.rotation || 0) === 90;
+        const cx = isRotated ? gridCenterX(item.gridX) : gridCenterX(item.gridX) + CELL_SIZE / 2;
+        const cy = isRotated ? gridCenterY(item.gridY) + CELL_SIZE / 2 : gridCenterY(item.gridY);
+        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        const bookshelfW = isRotated ? 36 : 72;
+        const bookshelfH = isRotated ? 72 : 36;
+        return (
+            <g key={item.id} className="placed-item">
+                <use href="#bookshelf" x={cx - 36} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
+                    transform={isRotated ? `rotate(90, ${cx}, ${cy})` : undefined} />
+                {isLocalhost && (
+                    <>
+                        <rect x={cx - bookshelfW / 2} y={cy - bookshelfH / 2} width={bookshelfW} height={bookshelfH} fill="transparent"
+                            className="barrel-hit-area"
+                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            style={{ cursor: 'grab' }} />
+                        {itemDragging?.itemId === item.id && (
+                            <rect x={cx - bookshelfW / 2} y={cy - bookshelfH / 2} width={bookshelfW} height={bookshelfH} fill="none" className="reposition-highlight" />
+                        )}
+                    </>
+                )}
+            </g>
+        );
+    };
+
+    const renderChair = (item) => {
+        const cx = gridCenterX(item.gridX);
+        const cy = gridCenterY(item.gridY);
+        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        return (
+            <g key={item.id} className="placed-item">
+                <use href="#chair" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                {isLocalhost && (
+                    <>
+                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
+                            className="barrel-hit-area"
+                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            style={{ cursor: 'grab' }} />
+                        {itemDragging?.itemId === item.id && (
+                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
+                        )}
+                    </>
+                )}
+            </g>
+        );
+    };
+
+    const renderChest = (item) => {
+        const cx = gridCenterX(item.gridX);
+        const cy = gridCenterY(item.gridY);
+        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        return (
+            <g key={item.id} className="placed-item">
+                <use href="#chest" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                {isLocalhost && (
+                    <>
+                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
+                            className="barrel-hit-area"
+                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            style={{ cursor: 'grab' }} />
+                        {itemDragging?.itemId === item.id && (
+                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
+                        )}
+                    </>
+                )}
+            </g>
+        );
+    };
+
+    const renderCrate = (item) => {
+        const cx = gridCenterX(item.gridX);
+        const cy = gridCenterY(item.gridY);
+        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        return (
+            <g key={item.id} className="placed-item">
+                <use href="#crate" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                {isLocalhost && (
+                    <>
+                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
+                            className="barrel-hit-area"
+                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            style={{ cursor: 'grab' }} />
+                        {itemDragging?.itemId === item.id && (
+                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
+                        )}
+                    </>
+                )}
+            </g>
+        );
+    };
+
+    const renderFountain = (item) => {
+        const cx = gridCenterX(item.gridX);
+        const cy = gridCenterY(item.gridY);
+        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        return (
+            <g key={item.id} className="placed-item">
+                <use href="#fountain" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                {isLocalhost && (
+                    <>
+                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
+                            className="barrel-hit-area"
+                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            style={{ cursor: 'grab' }} />
+                        {itemDragging?.itemId === item.id && (
+                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
+                        )}
+                    </>
+                )}
+            </g>
+        );
+    };
+
+    const renderSkeleton = (item) => {
+        const cx = gridCenterX(item.gridX);
+        const cy = gridCenterY(item.gridY);
+        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        return (
+            <g key={item.id} className="placed-item">
+                <use href="#skeleton" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                {isLocalhost && (
+                    <>
+                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
+                            className="barrel-hit-area"
+                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            style={{ cursor: 'grab' }} />
+                        {itemDragging?.itemId === item.id && (
+                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
+                        )}
+                    </>
+                )}
+            </g>
+        );
+    };
+
+    const renderStatue = (item) => {
+        const cx = gridCenterX(item.gridX);
+        const cy = gridCenterY(item.gridY);
+        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        return (
+            <g key={item.id} className="placed-item">
+                <use href="#statue" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                {isLocalhost && (
+                    <>
+                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
+                            className="barrel-hit-area"
+                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            style={{ cursor: 'grab' }} />
+                        {itemDragging?.itemId === item.id && (
+                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
+                        )}
+                    </>
+                )}
+            </g>
+        );
+    };
+
+    const renderTorch = (item) => {
+        const cx = gridCenterX(item.gridX);
+        const cy = gridCenterY(item.gridY);
+        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        return (
+            <g key={item.id} className="placed-item">
+                <use href="#torch" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                {isLocalhost && (
+                    <>
+                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
+                            className="barrel-hit-area"
+                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            style={{ cursor: 'grab' }} />
+                        {itemDragging?.itemId === item.id && (
+                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
+                        )}
+                    </>
+                )}
+            </g>
+        );
+    };
+
+    const renderWeb = (item) => {
+        const cx = gridCenterX(item.gridX);
+        const cy = gridCenterY(item.gridY);
+        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        return (
+            <g key={item.id} className="placed-item">
+                <use href="#web" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                {isLocalhost && (
+                    <>
+                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
+                            className="barrel-hit-area"
+                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            style={{ cursor: 'grab' }} />
+                        {itemDragging?.itemId === item.id && (
+                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
+                        )}
+                    </>
+                )}
+            </g>
+        );
+    };
+
     const renderNpc = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
@@ -306,16 +544,26 @@ function PlacedItems({
 
     return (
         <>
+            {placedItems.filter(item => item.type === 'altar').map(renderAltar)}
             {placedItems.filter(item => item.type === 'barrel').map(renderBarrel)}
-            {placedItems.filter(item => item.type === 'table').map(renderTable)}
             {placedItems.filter(item => item.type === 'bed').map(renderBed)}
-            {placedItems.filter(item => item.type === 'firepit').map(renderFirepit)}
+            {placedItems.filter(item => item.type === 'bookshelf').map(renderBookshelf)}
+            {placedItems.filter(item => item.type === 'chair').map(renderChair)}
+            {placedItems.filter(item => item.type === 'chest').map(renderChest)}
+            {placedItems.filter(item => item.type === 'crate').map(renderCrate)}
             {placedItems.filter(item => item.type === 'door').map(renderDoor)}
-            {placedItems.filter(item => item.type === 'secretDoor').map(renderSecretDoor)}
-            {placedItems.filter(item => item.type === 'trap').map(renderTrap)}
-            {placedItems.filter(item => item.type === 'pillar').map(renderPillar)}
-            {placedItems.filter(item => item.type === 'stairs').map(renderStairs)}
+            {placedItems.filter(item => item.type === 'firepit').map(renderFirepit)}
+            {placedItems.filter(item => item.type === 'fountain').map(renderFountain)}
             {placedItems.filter(item => item.type === 'npc').map(renderNpc)}
+            {placedItems.filter(item => item.type === 'pillar').map(renderPillar)}
+            {placedItems.filter(item => item.type === 'secretDoor').map(renderSecretDoor)}
+            {placedItems.filter(item => item.type === 'skeleton').map(renderSkeleton)}
+            {placedItems.filter(item => item.type === 'stairs').map(renderStairs)}
+            {placedItems.filter(item => item.type === 'statue').map(renderStatue)}
+            {placedItems.filter(item => item.type === 'table').map(renderTable)}
+            {placedItems.filter(item => item.type === 'torch').map(renderTorch)}
+            {placedItems.filter(item => item.type === 'trap').map(renderTrap)}
+            {placedItems.filter(item => item.type === 'web').map(renderWeb)}
         </>
     );
 }

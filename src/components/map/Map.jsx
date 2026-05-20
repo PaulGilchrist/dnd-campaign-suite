@@ -14,6 +14,16 @@ import SecretDoorSVG from './SecretDoorSVG.jsx';
 import TrapSVG from './TrapSVG.jsx';
 import PillarSVG from './PillarSVG.jsx';
 import StairsSVG from './StairsSVG.jsx';
+import AltarSVG from './AltarSVG.jsx';
+import BookshelfSVG from './BookshelfSVG.jsx';
+import ChairSVG from './ChairSVG.jsx';
+import ChestSVG from './ChestSVG.jsx';
+import CrateSVG from './CrateSVG.jsx';
+import FountainSVG from './FountainSVG.jsx';
+import SkeletonSVG from './SkeletonSVG.jsx';
+import StatueSVG from './StatueSVG.jsx';
+import TorchSVG from './TorchSVG.jsx';
+import WebSVG from './WebSVG.jsx';
 import PlacedItems from './PlacedItems.jsx';
 import GridAndWalls from './GridAndWalls.jsx';
 import Creatures from './Creatures.jsx';
@@ -453,7 +463,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
             gridX: grid.gridX,
             gridY: grid.gridY,
             visible: isLocalhost,
-            rotation: (dragData === 'table' || dragData === 'bed' || dragData === 'stairs') ? 0 : undefined
+            rotation: (dragData === 'table' || dragData === 'bed' || dragData === 'stairs' || dragData === 'altar' || dragData === 'bookshelf') ? 0 : undefined
         };
         setPlacedItems(prev => [...prev, newItem]);
     }, [isLocalhost, gridSize]);
@@ -541,6 +551,16 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     <TrapSVG id="trap" />
                     <PillarSVG id="pillar" />
                     <StairsSVG id="stairs" />
+                    <AltarSVG id="altar" />
+                    <BookshelfSVG id="bookshelf" />
+                    <ChairSVG id="chair" />
+                    <ChestSVG id="chest" />
+                    <CrateSVG id="crate" />
+                    <FountainSVG id="fountain" />
+                    <SkeletonSVG id="skeleton" />
+                    <StatueSVG id="statue" />
+                    <TorchSVG id="torch" />
+                    <WebSVG id="web" />
                 </defs>
 
                 <GridAndWalls
