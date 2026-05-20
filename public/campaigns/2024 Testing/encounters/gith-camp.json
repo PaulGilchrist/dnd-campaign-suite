@@ -1,0 +1,133 @@
+{
+  "name": "Gith Camp",
+  "savedAt": "2026-05-20T16:19:26.137Z",
+  "rulesVersion": "2024",
+  "difficulty": 1,
+  "playerLevels": [
+    20,
+    20,
+    20,
+    20,
+    20,
+    20,
+    20,
+    20,
+    20,
+    20,
+    20,
+    20
+  ],
+  "selectedMonsters": [
+    {
+      "index": "githyanki-dracomancer",
+      "name": "Githyanki Dracomancer",
+      "size": "Medium",
+      "type": "Aberration",
+      "subtype": "Gith",
+      "alignment": "Lawful Evil",
+      "initiative": 8,
+      "initiative_details": "+8 (18)",
+      "armor_class": 18,
+      "armor_class_details": "18",
+      "armor_class_options": [],
+      "hit_points": 255,
+      "hit_dice": "30d8 + 120",
+      "speed": {
+        "walk": "30 ft.",
+        "fly": "30 ft. (hover)"
+      },
+      "ability_scores": {
+        "str": 10,
+        "dex": 16,
+        "con": 18,
+        "int": 20,
+        "wis": 16,
+        "cha": 18
+      },
+      "ability_score_modifiers": {
+        "str": 0,
+        "dex": 3,
+        "con": 4,
+        "int": 5,
+        "wis": 3,
+        "cha": 4
+      },
+      "saving_throws": {},
+      "skills": {
+        "Arcana": {
+          "modifier": 10,
+          "bonus": 10
+        },
+        "Perception": {
+          "modifier": 8,
+          "bonus": 8
+        }
+      },
+      "senses": {
+        "blindsight": 30,
+        "passive_perception": 18
+      },
+      "languages": "Common, Draconic, Gith",
+      "challenge_rating": "16",
+      "xp": 15000,
+      "proficiency_bonus": 5,
+      "traits": [],
+      "actions": [
+        {
+          "name": "Multiattack",
+          "description": "The githyanki makes three Draconic Strike attacks."
+        },
+        {
+          "name": "Draconic Strike",
+          "description": "Melee or Ranged Attack Roll: +10, reach 10 ft. or range 120 ft. Hit: 12 (2d6 + 5) Slashing damage plus 17 (5d6) Fire damage, and the target has the <strong>Frightened</strong> condition until the start of the githyanki's next turn.",
+          "attack_bonus": 10,
+          "reach": "10 ft.",
+          "range": "120 ft.",
+          "damage": "12 (2d6 + 5) Slashing damage plus 17 (5d6) Fire damage",
+          "damage_dice": "2d6 + 5 or 5d6",
+          "damage_bonus": 5
+        },
+        {
+          "name": "Conjured Dragon's Breath",
+          "description": "Dexterity Saving Throw: DC 18, each creature in a 90-foot <strong>Cone</strong>. Failure: 27 (6d8) Fire damage plus 27 (6d8) Force damage. Success: Half damage.",
+          "save_dc": 18,
+          "save_type": "Dexterity",
+          "damage": "27 (6d8) Fire damage plus 27 (6d8) Force damage (half on success)",
+          "damage_dice": "6d8 or 6d8",
+          "range": "90-foot Cone",
+          "save_effect": "Half damage",
+          "recharge": "5-6"
+        },
+        {
+          "name": "Spellcasting",
+          "description": "The githyanki casts one of the following spells, requiring no spell components and using Intelligence as the spellcasting ability (spell save DC 18, +10 to hit with spell attacks):\n<strong>At Will:</strong> <strong>Mage Hand</strong> (the hand is <strong>Invisible</strong>)\n<strong>2/Day Each:</strong> <strong>Nondetection</strong> (self only), <strong>Plane Shift</strong>, <strong>Tongues</strong>",
+          "spell_save_dc": 18,
+          "spell_attack_bonus": 10,
+          "spellcasting_ability": "Intelligence"
+        }
+      ],
+      "bonus_actions": [
+        {
+          "name": "Misty Step",
+          "description": "The githyanki casts <strong>Misty Step</strong>, requiring no spell components and using the same spellcasting ability as Spellcasting.",
+          "spellcasting_ability": "Intelligence",
+          "uses": "3/Day"
+        }
+      ],
+      "reactions": [],
+      "legendary_actions": [],
+      "lair_actions": [],
+      "book": "",
+      "page": null,
+      "legendary_resistance": null,
+      "immunities": [],
+      "vulnerabilities": [],
+      "resistances": [],
+      "equipment": [],
+      "habitat": "",
+      "treasure": "",
+      "artist": "",
+      "qty": 5
+    }
+  ]
+}

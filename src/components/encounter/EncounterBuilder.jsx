@@ -1,9 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useMonstersData } from '../../hooks/useMonstersData.js';
+import useEncounterManagement from '../../hooks/useEncounterManagement.js';
 import EncounterFilterPanel from './EncounterFilterPanel.jsx';
 import EncounterSummaryPanel from './EncounterSummaryPanel.jsx';
 import EncounterMonsterTable from './EncounterMonsterTable.jsx';
 import EncounterSelectedMonsters from './EncounterSelectedMonsters.jsx';
+import EncounterModal from './EncounterModal.jsx';
+import { formatEncounterName } from '../../services/encountersService.js';
 import './EncounterBuilder.css';
 
 // XP thresholds per level [Easy, Medium, Hard, Deadly] for levels 0-20
@@ -169,6 +172,27 @@ function EncounterBuilder({ characters, campaignName }) {
   const [selectedMonsters, setSelectedMonsters] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Encounter save/load
+  const {
+    modalOpen,
+    modalMode,
+    encounters,
+    loading: encounterLoading,
+    loadEncounterList,
+    openSaveModal,
+    openLoadModal,
+    closeModal,
+    saveEncounter,
+    updateEncounter,
+    loadEncounterData,
+    deleteEncounterAction,
+    renameEncounterAction,
+  } = useEncounterManagement(campaignName);
+
+  const [pendingEncounterData, setPendingEncounterData] = useState(null);
+  const [encounterTitle, setEncounterTitle] = useState('Encounter Builder');
+  const [currentEncounterName, setCurrentEncounterName] = useState(null);
+
   // Sort state for monster table
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
@@ -267,6 +291,81 @@ function EncounterBuilder({ characters, campaignName }) {
     setSelectedMonsters([]);
   };
 
+  const handleSaveEncounter = () => {
+    if (currentEncounterName) {
+      // Update existing encounter — no modal needed
+      const data = {
+        rulesVersion,
+        difficulty: filter.difficulty,
+        playerLevels: filter.playerLevels,
+        selectedMonsters,
+      };
+      updateEncounter(currentEncounterName, data);
+    } else {
+      // New encounter — prompt for name
+      const data = {
+        rulesVersion,
+        difficulty: filter.difficulty,
+        playerLevels: filter.playerLevels,
+        selectedMonsters,
+      };
+      setPendingEncounterData(data);
+      openSaveModal();
+    }
+  };
+
+  const handleModalSave = async (name) => {
+    if (pendingEncounterData) {
+      await saveEncounter(name, pendingEncounterData);
+      setCurrentEncounterName(name);
+      setEncounterTitle(formatEncounterName(name));
+      setPendingEncounterData(null);
+    }
+  };
+
+  const handleLoadEncounter = async (name) => {
+    try {
+      const data = await loadEncounterData(name);
+      if (data) {
+        setEncounterTitle(formatEncounterName(name));
+        setCurrentEncounterName(name);
+        setRulesVersion(data.rulesVersion || '5e');
+        setFilter({
+          difficulty: data.difficulty ?? 2,
+          playerLevels: data.playerLevels || [1],
+        });
+        setSelectedMonsters(data.selectedMonsters || []);
+      }
+    } catch (error) {
+      console.error('Failed to load encounter:', error);
+    }
+  };
+
+  const handleReset = () => {
+    setEncounterTitle('Encounter Builder');
+    setCurrentEncounterName(null);
+    setPendingEncounterData(null);
+    setRulesVersion(inferRuleset(characters));
+    setFilter({
+      difficulty: 2,
+      playerLevels: (characters && characters.length > 0)
+        ? characters.map(c => c.level || 1)
+        : [1],
+    });
+    setSelectedMonsters([]);
+    setSearchQuery('');
+  };
+
+  const handleDeleteEncounter = async (name) => {
+    if (window.confirm(`Delete "${name}"?`)) {
+      await deleteEncounterAction(name);
+    }
+  };
+
+  const handleRenameEncounter = async (oldName, newName) => {
+    await renameEncounterAction(oldName, newName);
+  };
+
   const handleDifficultyChange = (e) => {
     setFilter(prev => ({ ...prev, difficulty: parseInt(e.target.value, 10) }));
   };
@@ -320,8 +419,38 @@ function EncounterBuilder({ characters, campaignName }) {
     <div className="encounter-builder">
       <div className="encounter-header-row">
         <h2 className="encounter-title">
-          <i className="fa-solid fa-dragon"></i>&nbsp; Encounter Builder
+          <i className="fa-solid fa-dragon"></i>&nbsp; {encounterTitle}
         </h2>
+
+        {/* Save/Load/Reset Buttons */}
+        <div className="encounter-actions">
+          <button
+            className="encounter-btn encounter-btn-secondary"
+            onClick={handleSaveEncounter}
+            aria-label="Save encounter"
+            title={currentEncounterName ? 'Update encounter' : 'Save encounter'}
+          >
+            <i className="fa-solid fa-floppy-disk" /> {currentEncounterName ? 'Update' : 'Save'}
+          </button>
+          <button
+            className="encounter-btn encounter-btn-secondary"
+            onClick={openLoadModal}
+            aria-label="Load encounter"
+            title="Load encounter"
+          >
+            <i className="fa-solid fa-folder-open" /> Load
+          </button>
+          {currentEncounterName && (
+            <button
+              className="encounter-btn encounter-btn-secondary"
+              onClick={handleReset}
+              aria-label="Reset encounter"
+              title="Reset to blank"
+            >
+              <i className="fa-solid fa-rotate-left" /> Reset
+            </button>
+          )}
+        </div>
 
         {/* Ruleset Toggle */}
         <div className="ruleset-toggle">
@@ -407,6 +536,19 @@ function EncounterBuilder({ characters, campaignName }) {
       <EncounterSelectedMonsters
         selectedMonsters={selectedMonsters}
         onRemoveMonster={handleRemoveMonster}
+      />
+
+      {/* Encounter Save/Load Modal */}
+      <EncounterModal
+        isOpen={modalOpen}
+        onClose={closeModal}
+        mode={modalMode}
+        onSave={handleModalSave}
+        onLoad={handleLoadEncounter}
+        onDelete={handleDeleteEncounter}
+        onRename={handleRenameEncounter}
+        encounters={encounters}
+        loading={encounterLoading}
       />
     </div>
   );

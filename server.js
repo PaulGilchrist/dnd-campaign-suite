@@ -449,6 +449,314 @@ app.put('/api/campaigns/:campaign/maps/:mapname/activate', (req, res) => {
 
 // ====== END MAP CRUD ROUTES ======
 
+// ====== ENCOUNTER CRUD ROUTES ======
+
+// Helper to sanitize encounter names to filenames
+const sanitizeEncounterName = (name) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '.json';
+
+// GET /api/campaigns/:campaign/encounters - List all encounters
+app.get('/api/campaigns/:campaign/encounters', (req, res) => {
+  const { campaign } = req.params;
+  const encountersDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'encounters');
+  
+  try {
+    if (!fs.existsSync(encountersDir)) {
+      return res.json({ encounters: [] });
+    }
+    
+    const items = fs.readdirSync(encountersDir, { withFileTypes: true });
+    const encounterFiles = items
+      .filter(item => item.isFile() && item.name.endsWith('.json'))
+      .map(item => item.name)
+      .sort();
+    
+    const encounters = encounterFiles.map(f => ({
+      name: f.replace(/\.json$/, ''),
+      fileName: f,
+    }));
+    
+    res.json({ encounters });
+  } catch (error) {
+    console.error('Error listing encounters:', error);
+    res.status(500).json({ error: 'Failed to list encounters' });
+  }
+});
+
+// POST /api/campaigns/:campaign/encounters - Create a new encounter
+app.post('/api/campaigns/:campaign/encounters', (req, res) => {
+  const { campaign } = req.params;
+  const { name, data } = req.body;
+  
+  if (!name || name.trim() === '') {
+    return res.status(400).json({ error: 'Encounter name is required' });
+  }
+  
+  const encountersDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'encounters');
+  
+  try {
+    if (!fs.existsSync(encountersDir)) {
+      fs.mkdirSync(encountersDir, { recursive: true });
+    }
+    
+    const fileName = sanitizeEncounterName(name);
+    const filePath = path.join(encountersDir, fileName);
+    
+    if (fs.existsSync(filePath)) {
+      return res.status(400).json({ error: 'An encounter with this name already exists' });
+    }
+    
+    const encounterData = {
+      name: name.trim(),
+      savedAt: new Date().toISOString(),
+      ...data,
+    };
+    
+    fs.writeFileSync(filePath, JSON.stringify(encounterData, null, 2));
+    
+    // Broadcast encounters list change
+    publish(`encounters-list-${campaign}`, { action: 'created', encounter: { name: name.trim(), fileName } });
+    
+    res.status(201).json({ message: 'Encounter saved successfully', encounter: { name: name.trim(), fileName } });
+  } catch (error) {
+    console.error('Error saving encounter:', error);
+    res.status(500).json({ error: 'Failed to save encounter' });
+  }
+});
+
+// GET /api/campaigns/:campaign/encounters/:encountername - Get encounter data
+app.get('/api/campaigns/:campaign/encounters/:encountername', (req, res) => {
+  const { campaign, encountername } = req.params;
+  const encountersDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'encounters');
+  const fileName = encountername.endsWith('.json') ? encountername : `${encountername}.json`;
+  const filePath = path.join(encountersDir, fileName);
+  
+  try {
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Encounter not found' });
+    }
+    
+    const encounterData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    res.json(encounterData);
+  } catch (error) {
+    console.error('Error reading encounter:', error);
+    res.status(500).json({ error: 'Failed to read encounter' });
+  }
+});
+
+// PUT /api/campaigns/:campaign/encounters/:encountername - Update encounter data
+app.put('/api/campaigns/:campaign/encounters/:encountername', (req, res) => {
+  const { campaign, encountername } = req.params;
+  const encounterData = req.body;
+  const encountersDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'encounters');
+  
+  try {
+    if (!fs.existsSync(encountersDir)) {
+      fs.mkdirSync(encountersDir, { recursive: true });
+    }
+    
+    const fileName = encountername.endsWith('.json') ? encountername : `${encountername}.json`;
+    const filePath = path.join(encountersDir, fileName);
+    
+    fs.writeFileSync(filePath, JSON.stringify(encounterData, null, 2));
+    
+    // Broadcast encounter data change
+    const eventEncounterName = fileName.replace(/\.json$/, '');
+    publish(`encounter-data-${campaign}-${eventEncounterName}`, encounterData);
+    
+    res.json({ message: 'Encounter updated successfully' });
+  } catch (error) {
+    console.error('Error saving encounter:', error);
+    res.status(500).json({ error: 'Failed to save encounter' });
+  }
+});
+
+// DELETE /api/campaigns/:campaign/encounters/:encountername - Delete an encounter
+app.delete('/api/campaigns/:campaign/encounters/:encountername', (req, res) => {
+  const { campaign, encountername } = req.params;
+  const encountersDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'encounters');
+  const fileName = encountername.endsWith('.json') ? encountername : `${encountername}.json`;
+  const filePath = path.join(encountersDir, fileName);
+  
+  try {
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Encounter not found' });
+    }
+    
+    fs.unlinkSync(filePath);
+    
+    // Broadcast encounters list change
+    const encounterKey = fileName.replace(/\.json$/, '');
+    publish(`encounters-list-${campaign}`, { action: 'deleted', encounter: encounterKey });
+    
+    res.json({ message: 'Encounter deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting encounter:', error);
+    res.status(500).json({ error: 'Failed to delete encounter' });
+  }
+});
+
+// PUT /api/campaigns/:campaign/encounters/:encountername/rename - Rename an encounter
+app.put('/api/campaigns/:campaign/encounters/:encountername/rename', (req, res) => {
+  const { campaign, encountername } = req.params;
+  const { newName } = req.body;
+  
+  if (!newName || newName.trim() === '') {
+    return res.status(400).json({ error: 'New encounter name is required' });
+  }
+  
+  const encountersDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'encounters');
+  const oldFileName = encountername.endsWith('.json') ? encountername : `${encountername}.json`;
+  const oldFilePath = path.join(encountersDir, oldFileName);
+  const newFileName = sanitizeEncounterName(newName.trim());
+  const newFilePath = path.join(encountersDir, newFileName);
+  
+  try {
+    if (!fs.existsSync(oldFilePath)) {
+      return res.status(404).json({ error: 'Encounter not found' });
+    }
+    
+    if (fs.existsSync(newFilePath) && oldFileName !== newFileName) {
+      return res.status(400).json({ error: 'An encounter with this name already exists' });
+    }
+    
+    // Read existing data and update name
+    const encounterData = JSON.parse(fs.readFileSync(oldFilePath, 'utf-8'));
+    encounterData.name = newName.trim();
+    
+    // Write with new name, delete old file
+    fs.writeFileSync(newFilePath, JSON.stringify(encounterData, null, 2));
+    
+    if (oldFileName !== newFileName) {
+      fs.unlinkSync(oldFilePath);
+    }
+    
+    // Broadcast encounters list change
+    publish(`encounters-list-${campaign}`, { 
+      action: 'renamed', 
+      oldName: oldFileName.replace(/\.json$/, ''), 
+      newName: newFileName.replace(/\.json$/, '') 
+    });
+    
+    res.json({ 
+      message: 'Encounter renamed successfully', 
+      encounter: { name: newName.trim(), fileName: newFileName }
+    });
+  } catch (error) {
+    console.error('Error renaming encounter:', error);
+    res.status(500).json({ error: 'Failed to rename encounter' });
+  }
+});
+
+// ====== END ENCOUNTER CRUD ROUTES ======
+
+// ====== NOTES ROUTES ======
+
+// GET /api/campaigns/:campaign/notes - List all notes
+app.get('/api/campaigns/:campaign/notes', (req, res) => {
+  const { campaign } = req.params;
+  const notesPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'notes.json');
+  const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+
+  try {
+    if (!fs.existsSync(notesPath)) {
+      // Create data directory and empty notes file if it doesn't exist
+      const dataDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data');
+      fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(notesPath, JSON.stringify([], null, 2));
+      return res.json({ notes: [] });
+    }
+
+    const notesData = JSON.parse(fs.readFileSync(notesPath, 'utf-8'));
+    const notes = Array.isArray(notesData) ? notesData : [];
+
+    // Filter out private notes for non-localhost users
+    if (!isLocalhost) {
+      const filteredNotes = notes.filter(note => !note.isPrivate);
+      return res.json({ notes: filteredNotes });
+    }
+
+    res.json({ notes });
+  } catch (error) {
+    console.error('Error reading notes:', error);
+    res.status(500).json({ error: 'Failed to read notes' });
+  }
+});
+
+// POST /api/campaigns/:campaign/notes - Save all notes (full array write)
+app.post('/api/campaigns/:campaign/notes', (req, res) => {
+  const { campaign } = req.params;
+  const { notes } = req.body;
+  const notesPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'notes.json');
+
+  try {
+    const dataDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data');
+    fs.mkdirSync(dataDir, { recursive: true });
+
+    fs.writeFileSync(notesPath, JSON.stringify(notes, null, 2));
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error saving notes:', error);
+    res.status(500).json({ error: 'Failed to save notes' });
+  }
+});
+
+// GET /api/campaigns/:campaign/notes/:noteId - Get a specific note
+app.get('/api/campaigns/:campaign/notes/:noteId', (req, res) => {
+  const { campaign, noteId } = req.params;
+  const notesPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'notes.json');
+  const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+
+  try {
+    if (!fs.existsSync(notesPath)) {
+      return res.status(404).json({ error: 'Note not found' });
+    }
+
+    const notesData = JSON.parse(fs.readFileSync(notesPath, 'utf-8'));
+    const notes = Array.isArray(notesData) ? notesData : [];
+    const note = notes.find(n => n.id === noteId);
+
+    if (!note) {
+      return res.status(404).json({ error: 'Note not found' });
+    }
+
+    // Check if note is private and user is not localhost
+    if (!isLocalhost && note.isPrivate) {
+      return res.status(403).json({ error: 'Access denied: private note' });
+    }
+
+    res.json({ note });
+  } catch (error) {
+    console.error('Error reading note:', error);
+    res.status(500).json({ error: 'Failed to read note' });
+  }
+});
+
+// DELETE /api/campaigns/:campaign/notes/:noteId - Delete a specific note
+app.delete('/api/campaigns/:campaign/notes/:noteId', (req, res) => {
+  const { campaign, noteId } = req.params;
+  const notesPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'notes.json');
+
+  try {
+    if (!fs.existsSync(notesPath)) {
+      return res.status(404).json({ error: 'Note not found' });
+    }
+
+    const notesData = JSON.parse(fs.readFileSync(notesPath, 'utf-8'));
+    const notes = Array.isArray(notesData) ? notesData : [];
+    const updatedNotes = notes.filter(n => n.id !== noteId);
+
+    fs.writeFileSync(notesPath, JSON.stringify(updatedNotes, null, 2));
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting note:', error);
+    res.status(500).json({ error: 'Failed to delete note' });
+  }
+});
+
+// ====== END NOTES ROUTES ======
+
 // API endpoint to get a specific character file in a campaign
 app.get('/api/campaigns/:campaign/:file', (req, res) => {
     const { campaign, file } = req.params;
