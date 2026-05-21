@@ -34,6 +34,8 @@ import useCreatureDragging from './hooks/useCreatureDragging';
 import useItemDragging from './hooks/useItemDragging';
 import useNpcImageCache from './hooks/useNpcImageCache';
 import useSSESync from './hooks/useSSESync';
+import HexMap from '../hex-map/HexMap';
+import '../hex-map/HexMap.css';
 
 const CELL_SIZE = 40;
 
@@ -510,6 +512,11 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
 
 
     if (!mapData) return null;
+
+    // Outdoor map dispatcher — render HexMap for outdoor terrain maps
+    if (mapData?.type === 'outdoor') {
+        return <HexMap campaignName={campaignName} mapName={mapName} onBack={onBack} />;
+    }
 
     const { creatures, walls } = mapData;
 

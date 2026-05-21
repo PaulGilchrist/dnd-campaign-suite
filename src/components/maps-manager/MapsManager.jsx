@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import * as mapsService from '../../services/mapsService.js';
 import Subscriber from '../common/Subscriber.jsx';
 import GenerateDungeonModal from './GenerateDungeonModal.jsx';
+import GenerateTerrainModal from './GenerateTerrainModal.jsx';
 import './MapsManager.css';
 
 function MapsManager({ campaignName, onOpenMap, onBack }) {
@@ -12,7 +13,9 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
     const [renameValue, setRenameValue] = useState('');
     const [deletingMap, setDeletingMap] = useState(null);
     const [error, setError] = useState(null);
+    const [mapType, setMapType] = useState('indoor'); // 'indoor' | 'outdoor'
     const [showGenerateModal, setShowGenerateModal] = useState(false);
+    const [showTerrainModal, setShowTerrainModal] = useState(false);
 
     const loadMapsList = useCallback(async () => {
         try {
@@ -52,7 +55,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
         }
         try {
             setError(null);
-            await mapsService.createMap(campaignName, name);
+            await mapsService.createMap(campaignName, name, { type: mapType });
             setCreateName('');
             await loadMapsList();
         } catch (err) {
@@ -156,16 +159,38 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                         }
                     }}
                 />
+                <div className="map-type-selector">
+                    <label className={`map-type-option ${mapType === 'indoor' ? 'active' : ''}`}>
+                        <input type="radio" name="mapType" value="indoor" checked={mapType === 'indoor'}
+                            onChange={() => setMapType('indoor')} />
+                        <i className="fa-solid fa-dungeon"></i> Indoor
+                    </label>
+                    <label className={`map-type-option ${mapType === 'outdoor' ? 'active' : ''}`}>
+                        <input type="radio" name="mapType" value="outdoor" checked={mapType === 'outdoor'}
+                            onChange={() => setMapType('outdoor')} />
+                        <i className="fa-solid fa-tree"></i> Outdoor
+                    </label>
+                </div>
                 <button onClick={handleCreate} disabled={!createName.trim()}>
                     Create Map
                 </button>
-                <button
-                    className="generate-dungeon-btn"
-                    onClick={() => setShowGenerateModal(true)}
-                    title="Generate a dungeon map with rooms, hallways, and doorways"
-                >
-                    <i className="fa-solid fa-wand-magic-sparkles"></i> Generate Dungeon
-                </button>
+                {mapType === 'indoor' ? (
+                    <button
+                        className="generate-dungeon-btn"
+                        onClick={() => setShowGenerateModal(true)}
+                        title="Generate a dungeon map with rooms, hallways, and doorways"
+                    >
+                        <i className="fa-solid fa-wand-magic-sparkles"></i> Generate Dungeon
+                    </button>
+                ) : (
+                    <button
+                        className="generate-dungeon-btn"
+                        onClick={() => setShowTerrainModal(true)}
+                        title="Generate a terrain map with biomes"
+                    >
+                        <i className="fa-solid fa-mountain"></i> Generate Terrain
+                    </button>
+                )}
             </div>
 
             {error && <div className="maps-manager-error">{error}</div>}
@@ -191,7 +216,14 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                                         onKeyDown={(e) => handleRenameKeyDown(e, map.fileName)}
                                     />
                                 ) : (
-                                    <span className="maps-manager-item-name">{mapsService.formatMapName(map.name)}</span>
+                                    <span className="maps-manager-item-name">
+                                        {mapsService.formatMapName(map.name)}
+                                        {map.type && (
+                                            <span className={`map-type-badge ${map.type === 'outdoor' ? 'outdoor' : 'indoor'}`}>
+                                                {map.type === 'outdoor' ? 'Outdoor' : 'Indoor'}
+                                            </span>
+                                        )}
+                                    </span>
                                 )}
                                 {map.isActive && <span className="maps-manager-active-badge">Active</span>}
                             </div>
@@ -230,6 +262,15 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                     initialMapName={createName}
                     onClose={() => setShowGenerateModal(false)}
                     onMapCreated={handleMapCreated}
+                />
+            )}
+
+            {showTerrainModal && (
+                <GenerateTerrainModal
+                    campaignName={campaignName}
+                    initialMapName={createName}
+                    onClose={() => setShowTerrainModal(false)}
+                    onMapCreated={loadMapsList}
                 />
             )}
         </div>

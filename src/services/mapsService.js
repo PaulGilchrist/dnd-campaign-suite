@@ -20,7 +20,7 @@ export const createMap = async (campaignName, mapName, options = {}) => {
     const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/maps`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: mapName, ...options }),
+      body: JSON.stringify({ name: mapName, type: 'indoor', ...options }),
     });
     if (!response.ok) {
       const { error } = await response.json();

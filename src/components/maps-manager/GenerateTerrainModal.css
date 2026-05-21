@@ -1,0 +1,103 @@
+/* Generate Terrain Modal */
+
+.maps-manager-modal-overlay .terrain-gen-modal h3 {
+    color: var(--color-header);
+}
+
+.maps-manager-modal-overlay .terrain-gen-modal .dungeon-gen-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 16px 0;
+}
+
+.maps-manager-modal-overlay .terrain-gen-modal .dungeon-gen-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 14px;
+}
+
+.maps-manager-modal-overlay .terrain-gen-modal .dungeon-gen-field > span {
+    font-weight: 500;
+    color: var(--color-header);
+    margin-bottom: 2px;
+}
+
+.maps-manager-modal-overlay .terrain-gen-modal .dungeon-gen-field input[type="text"],
+.maps-manager-modal-overlay .terrain-gen-modal .dungeon-gen-field input[type="number"] {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color-input);
+    border-radius: 6px;
+    background: var(--background-color-input);
+    color: var(--color-text);
+    font-size: 14px;
+    max-width: 120px;
+}
+
+.maps-manager-modal-overlay .terrain-gen-modal .dungeon-gen-field input[type="text"] {
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.maps-manager-modal-overlay .terrain-gen-modal .dungeon-gen-field input:focus {
+    outline: none;
+    border-color: var(--border-color-focus);
+}
+
+.maps-manager-modal-overlay .terrain-gen-modal .dungeon-gen-hint {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-top: 2px;
+}
+
+.maps-manager-modal-overlay .dungeon-gen-note {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin: 12px 0;
+    line-height: 1.5;
+}
+
+.maps-manager-modal-overlay .terrain-gen-modal .dungeon-gen-checkbox {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 8px !important;
+    cursor: pointer;
+}
+
+.maps-manager-modal-overlay .terrain-gen-modal .dungeon-gen-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+}
+
+.maps-manager-modal-overlay .terrain-gen-modal .dungeon-gen-generate-btn {
+    background: var(--color-primary) !important;
+    color: var(--color-text-inverse) !important;
+    font-weight: 600 !important;
+}
+
+.maps-manager-modal-overlay .terrain-gen-modal .dungeon-gen-generate-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.maps-manager-modal-overlay .terrain-gen-modal .dungeon-gen-generate-btn:hover:not(:disabled) {
+    opacity: 0.9;
+}
+
+/* ===== Light theme overrides ===== */
+
+[data-theme="light"] .maps-manager-modal-overlay .terrain-gen-modal .dungeon-gen-generate-btn {
+    background: #4a7db5 !important;
+    color: #fff !important;
+}
+
+@media (prefers-color-scheme: light) {
+    .maps-manager-modal-overlay .terrain-gen-modal .dungeon-gen-generate-btn {
+        background: #4a7db5 !important;
+        color: #fff !important;
+    }
+}

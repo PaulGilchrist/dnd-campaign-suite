@@ -207,11 +207,21 @@ app.get('/api/campaigns/:campaign/maps', (req, res) => {
       } catch (e) {}
     }
     
-    const maps = mapFiles.map(f => ({
-      name: f.replace(/\.json$/, ''),
-      fileName: f,
-      isActive: f.replace(/\.json$/, '') === activeMap
-    }));
+    const maps = mapFiles.map(f => {
+      // Read the type field from the map file
+      let mapType = 'indoor';
+      try {
+        const mapContent = JSON.parse(fs.readFileSync(path.join(mapsDir, f), 'utf-8'));
+        mapType = mapContent.type || 'indoor';
+      } catch (e) { /* ignore - default to indoor */ }
+
+      return {
+        name: f.replace(/\.json$/, ''),
+        fileName: f,
+        type: mapType,
+        isActive: f.replace(/\.json$/, '') === activeMap
+      };
+    });
     
     res.json({ maps });
   } catch (error) {
@@ -223,7 +233,7 @@ app.get('/api/campaigns/:campaign/maps', (req, res) => {
 // POST /api/campaigns/:campaign/maps - Create a new map
 app.post('/api/campaigns/:campaign/maps', (req, res) => {
   const { campaign } = req.params;
-  const { name, gridSize, walls, placedItems } = req.body;
+  const { name, gridSize, walls, placedItems, paintCells, items, creatures, type = 'indoor', terrain = {}, pois = [] } = req.body;
   
   if (!name || name.trim() === '') {
     return res.status(400).json({ error: 'Map name is required' });
@@ -245,12 +255,15 @@ app.post('/api/campaigns/:campaign/maps', (req, res) => {
     
     const defaultMapData = {
       name: name.trim(),
+      type,
       gridSize: Math.max(5, Math.min(100, gridSize ?? 20)),
       walls: walls ?? [],
       placedItems: placedItems ?? [],
-      paintCells: [],
-      items: [],
-      creatures: [],
+      paintCells: paintCells ?? [],
+      items: items ?? [],
+      creatures: creatures ?? [],
+      terrain,
+      pois,
       zoom: 1,
       panX: 0,
       panY: 0

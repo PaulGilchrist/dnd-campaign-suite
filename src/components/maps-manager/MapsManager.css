@@ -437,6 +437,61 @@
     }
 }
 
+/* Map type selector */
+.map-type-selector {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0;
+}
+
+.map-type-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border-color-input);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--color-text);
+  background: var(--background-color-input);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.map-type-option.active {
+  border-color: var(--color-primary);
+  background: var(--background-color-selected);
+}
+
+.map-type-option input[type="radio"] {
+  display: none;
+}
+
+.map-type-option i {
+  font-size: 14px;
+}
+
+/* Map type badge in list */
+.map-type-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: 6px;
+  vertical-align: middle;
+  font-weight: 500;
+}
+
+.map-type-badge.indoor {
+  background: #4a6fa5;
+  color: #fff;
+}
+
+.map-type-badge.outdoor {
+  background: #4a8c5c;
+  color: #fff;
+}
+
 .maps-manager .generate-dungeon-btn {
   display: flex;
   align-items: center;
