@@ -2,24 +2,24 @@ import React from 'react';
 
 const RADIUS = 20;
 
-const Creatures = ({ creatures, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown }) => {
+const Players = ({ players, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown }) => {
     return (
         <>
-            {creatures.map((creature) => {
-                const cx = gridCenterX(creature.gridX);
-                const cy = gridCenterY(creature.gridY);
+            {players.map((player) => {
+                const cx = gridCenterX(player.gridX);
+                const cy = gridCenterY(player.gridY);
                 // Hide creature from players if cell is fogged
-                if (!isLocalhost && fog?.has(`${creature.gridX},${creature.gridY}`)) return null;
+                if (!isLocalhost && fog?.has(`${player.gridX},${player.gridY}`)) return null;
 
                 return (
                     <g
-                        key={creature.id}
-                        onPointerDown={(e) => handlePointerDown(e, creature.id)}
+                        key={player.id}
+                        onPointerDown={(e) => handlePointerDown(e, player.id)}
                         className="creature-group"
                         style={{ cursor: 'grab' }}
                     >
                         <defs>
-                            <clipPath id={`creature-clip-${creature.id}`}>
+                            <clipPath id={`creature-clip-${player.id}`}>
                                 <circle cx={cx} cy={cy} r={RADIUS} />
                             </clipPath>
                         </defs>
@@ -27,17 +27,17 @@ const Creatures = ({ creatures, gridCenterX, gridCenterY, isLocalhost, fog, drag
                             cx={cx}
                             cy={cy}
                             r={RADIUS}
-                            className={`creature-circle ${dragging?.creatureId === creature.id ? 'dragging' : ''}`}
+                            className={`creature-circle ${dragging?.creatureId === player.id ? 'dragging' : ''}`}
                         />
-                        {creature.imagePath ? (
+                        {player.imagePath ? (
                             <image
-                                xlinkHref={creature.imagePath}
+                                xlinkHref={player.imagePath}
                                 x={cx - RADIUS + 2}
                                 y={cy - RADIUS + 2}
                                 width={RADIUS * 2 - 4}
                                 height={RADIUS * 2 - 4}
                                 preserveAspectRatio="xMidYMid slice"
-                                clipPath={`url(#creature-clip-${creature.id})`}
+                                clipPath={`url(#creature-clip-${player.id})`}
                                 className="creature-image"
                             />
                         ) : (
@@ -51,7 +51,7 @@ const Creatures = ({ creatures, gridCenterX, gridCenterY, isLocalhost, fog, drag
                                 fontWeight="bold"
                                 className="creature-initial"
                             >
-                                {creature.name.charAt(0).toUpperCase()}
+                                {player.name.charAt(0).toUpperCase()}
                             </text>
                         )}
                         <text
@@ -63,7 +63,7 @@ const Creatures = ({ creatures, gridCenterX, gridCenterY, isLocalhost, fog, drag
                             fontWeight="bold"
                             className="creature-name"
                         >
-                            {creature.name}
+                            {player.name}
                         </text>
                     </g>
                 );
@@ -72,4 +72,4 @@ const Creatures = ({ creatures, gridCenterX, gridCenterY, isLocalhost, fog, drag
     );
 };
 
-export default Creatures;
+export default Players;

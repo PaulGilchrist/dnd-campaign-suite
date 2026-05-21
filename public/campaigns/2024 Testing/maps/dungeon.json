@@ -869,7 +869,7 @@
   ],
   "paintCells": [],
   "items": [],
-  "creatures": [
+  "players": [
     {
       "id": "creature-0-1779209589404",
       "name": "Barbarian",

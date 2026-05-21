@@ -230,7 +230,7 @@ app.get('/api/campaigns/:campaign/maps', (req, res) => {
 // POST /api/campaigns/:campaign/maps - Create a new map
 app.post('/api/campaigns/:campaign/maps', (req, res) => {
   const { campaign } = req.params;
-  const { name, gridSize, walls, placedItems, paintCells, items, creatures, type = 'indoor', terrain = {}, pois = [] } = req.body;
+  const { name, gridSize, walls, placedItems, paintCells, items, players, type = 'indoor', terrain = {}, pois = [] } = req.body;
   
   if (!name || name.trim() === '') {
     return res.status(400).json({ error: 'Map name is required' });
@@ -258,7 +258,7 @@ app.post('/api/campaigns/:campaign/maps', (req, res) => {
       placedItems: placedItems ?? [],
       paintCells: paintCells ?? [],
       items: items ?? [],
-      creatures: creatures ?? [],
+      players: players ?? [],
       terrain,
       pois,
       zoom: 1,
@@ -1398,7 +1398,7 @@ app.get('/api/campaigns/:campaign/positioning', (req, res) => {
     if (storedData) {
         res.status(200).json(storedData);
     } else {
-        res.status(200).json({ creatures: [] });
+        res.status(200).json({ players: [] });
     }
 });
 

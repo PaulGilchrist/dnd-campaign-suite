@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 
 const CELL_SIZE = 40;
 
-export default function useCreatureDragging({
+export default function usePlayerDragging({
     svgRef,
     mapData,
     gridSize,
@@ -14,7 +14,7 @@ export default function useCreatureDragging({
 }) {
     const [dragging, setDragging] = useState(null);
 
-    const handlePointerDown = useCallback((e, creatureId) => {
+    const handlePointerDown = useCallback((e, playerId) => {
         e.stopPropagation();
         e.preventDefault();
         const svg = svgRef.current;
@@ -25,14 +25,14 @@ export default function useCreatureDragging({
         const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
         const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
 
-        const creature = mapData.creatures.find((c) => c.id === creatureId);
-        if (!creature) return;
+        const player = mapData.players.find((c) => c.id === playerId);
+        if (!player) return;
 
-        const cx = gridCenterX(creature.gridX);
-        const cy = gridCenterY(creature.gridY);
+        const cx = gridCenterX(player.gridX);
+        const cy = gridCenterY(player.gridY);
 
         setDragging({
-            creatureId,
+            playerId,
             offsetX: svgX - cx,
             offsetY: svgY - cy
         });
@@ -50,8 +50,8 @@ export default function useCreatureDragging({
         const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
         const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
 
-        const creature = mapData.creatures.find((c) => c.id === dragging.creatureId);
-        if (!creature) return;
+        const player = mapData.players.find((c) => c.id === dragging.playerId);
+        if (!player) return;
 
         const cx = svgX - dragging.offsetX;
         const cy = svgY - dragging.offsetY;
@@ -64,8 +64,8 @@ export default function useCreatureDragging({
 
         setMapData((prev) => ({
             ...prev,
-            creatures: prev.creatures.map((c) =>
-                c.id === dragging.creatureId ? { ...c, gridX: clampedGridX, gridY: clampedGridY } : c
+            players: prev.players.map((c) =>
+                c.id === dragging.playerId ? { ...c, gridX: clampedGridX, gridY: clampedGridY } : c
             )
         }));
     }, [dragging, mapData, gridSize, panX, panY]);
@@ -82,8 +82,8 @@ export default function useCreatureDragging({
         const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
         const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
 
-        const creature = mapData.creatures.find((c) => c.id === dragging.creatureId);
-        if (!creature) {
+        const player = mapData.players.find((c) => c.id === dragging.playerId);
+        if (!player) {
             setDragging(null);
             return;
         }
@@ -99,8 +99,8 @@ export default function useCreatureDragging({
 
         // Collision detection: find the nearest unoccupied grid square
         const occupiedSquares = new Set(
-            mapData.creatures
-                .filter((c) => c.id !== dragging.creatureId)
+            mapData.players
+                .filter((c) => c.id !== dragging.playerId)
                 .map((c) => `${c.gridX},${c.gridY}`)
         );
 
@@ -140,8 +140,8 @@ export default function useCreatureDragging({
 
         setMapData((prev) => ({
             ...prev,
-            creatures: prev.creatures.map((c) =>
-                c.id === dragging.creatureId ? { ...c, gridX: targetX, gridY: targetY } : c
+            players: prev.players.map((c) =>
+                c.id === dragging.playerId ? { ...c, gridX: targetX, gridY: targetY } : c
             )
         }));
 

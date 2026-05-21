@@ -12,7 +12,7 @@ function useSSESync({ campaignName, mapName, setGridSize, setMapData, setPlacedI
         }
         setMapData((prev) => ({
             ...prev,
-            creatures: data.creatures || prev?.creatures || [],
+            players: data.players || prev?.players || [],
             walls: data.walls ? new Set(data.walls) : (prev?.walls || new Set())
         }));
         if (data.placedItems !== undefined) {

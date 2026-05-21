@@ -1538,7 +1538,7 @@
   "panY": 0,
   "npcMapPositions": [],
   "npcMetadata": [],
-  "creatures": [
+  "players": [
     {
       "id": "creature-0-1779386454881",
       "name": "Barbarian",

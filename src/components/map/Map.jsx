@@ -26,11 +26,11 @@ import TorchSVG from './TorchSVG.jsx';
 import WebSVG from './WebSVG.jsx';
 import PlacedItems from './PlacedItems.jsx';
 import GridAndWalls from './GridAndWalls.jsx';
-import Creatures from './Creatures.jsx';
+import Players from './Players.jsx';
 import FogOverlay from './FogOverlay.jsx';
 import BarrelContextMenu from './BarrelContextMenu.jsx';
 import usePlacedItems from './hooks/usePlacedItems.js';
-import useCreatureDragging from './hooks/useCreatureDragging';
+import usePlayerDragging from './hooks/usePlayerDragging';
 import useItemDragging from './hooks/useItemDragging';
 import useNpcImageCache from './hooks/useNpcImageCache';
 import useSSESync from './hooks/useSSESync';
@@ -216,17 +216,17 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                         setFog(new Set(existing.fog));
                     }
 
-                    // If no creatures exist but characters are available, initialize creature positions
-                    if ((!existing.creatures || existing.creatures.length === 0) && characters && characters.length > 0) {
+                    // If no players exist but characters are available, initialize player positions
+                    if ((!existing.players || existing.players.length === 0) && characters && characters.length > 0) {
                         const gs = existing.gridSize || 20;
-                        const initialCreatures = characters.map((character, i) => ({
-                            id: character.id || `creature-${i}-${Date.now()}`,
+                        const initialPlayers = characters.map((character, i) => ({
+                            id: character.id || `player-${i}-${Date.now()}`,
                             name: character.name || 'Unknown',
                             gridX: Math.min(1 + (i * 2) % gs, gs - 1),
                             gridY: Math.min(1 + Math.floor((i * 2) / gs), gs - 1),
                             imagePath: character.imagePath || ''
                         }));
-                        setMapData(prev => ({ ...prev, creatures: initialCreatures }));
+                        setMapData(prev => ({ ...prev, players: initialPlayers }));
                     }
 
                     return;
@@ -236,7 +236,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
             }
 
             // Generate random positions with no collisions
-            const creatures = characters.map((character) => ({
+            const players = characters.map((character) => ({
                 id: utils.guid(),
                 name: utils.getFirstName(character.name),
                 gridX: 0,
@@ -245,7 +245,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
             }));
 
             const occupied = new Set();
-            creatures.forEach((creature) => {
+            players.forEach((player) => {
                 let gridX, gridY, key;
                 do {
                     gridX = Math.floor(Math.random() * gridSize); // 0–12
@@ -253,11 +253,11 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     key = `${gridX},${gridY}`;
                 } while (occupied.has(key));
                 occupied.add(key);
-                creature.gridX = gridX;
-                creature.gridY = gridY;
+                player.gridX = gridX;
+                player.gridY = gridY;
             });
 
-            const newData = { creatures, walls: new Set() };
+            const newData = { players, walls: new Set() };
 
             // Fog all cells for new map
             const allFogged = new Set();
@@ -409,7 +409,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         setPainting(null);
     }, []);
 
-    const { dragging, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerLeave } = useCreatureDragging({
+    const { dragging, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerLeave } = usePlayerDragging({
         svgRef,
         mapData,
         gridSize,
@@ -518,7 +518,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         return <HexMap campaignName={campaignName} mapName={mapName} onBack={onBack} />;
     }
 
-    const { creatures, walls } = mapData;
+    const { players, walls } = mapData;
 
     return (
         <div className="map">
@@ -582,8 +582,8 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                 />
 
                 {/* Characters */}
-                <Creatures
-                    creatures={creatures}
+                <Players
+                    players={players}
                     gridCenterX={gridCenterX}
                     gridCenterY={gridCenterY}
                     isLocalhost={isLocalhost}
