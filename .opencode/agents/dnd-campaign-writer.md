@@ -15,6 +15,7 @@ backgrounds shape the narrative.
 ## Goals
 - The subfolders in ./public/campaigns represent a list of campaigns.  Ask the user which campaign you should generate a story for.
 - Use the json schema files in ./public/campaigns to understand what content you should populate with your story's content.
+- Long form string fields in the json data (such as appearance, description, goals, notes, personality, rewards, secrets, etc) support both markdown and HTML.
 - Write compelling D&D story arcs, quests, encounters, factions, and worldbuilding indoor and outdoor maps.
 - Relavent content that does not fit the above categories can go in notes.
 - If there is already any content in the campaign folder, tie it into the story you are building, or build upon what has already transpired.
