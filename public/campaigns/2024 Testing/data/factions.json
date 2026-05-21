@@ -1,10 +1,26 @@
 [
   {
-    "id": "976d2ae2-9f9f-4801-9565-362c9e17f7a0",
-    "name": "Thieves Guild",
-    "description": "",
-    "goals": "",
-    "influence": 1,
-    "notes": ""
+    "id": "f1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6",
+    "name": "The Serpent's Coil",
+    "description": "A yuan-ti cult operating in the Chult jungle, this faction consists of yuan-ti purebloods, half-breeds, and human followers who have been seduced by promises of power and immortality. They dwell in the sunken temple of Omu, which they have partially unearthed and fortified.",
+    "goals": "Complete the ancient ritual to awaken the avatar of a serpent god, using the life force of intruders and sacrificed villagers. Establish a permanent foothold in Chult to expand their influence across the jungle region.",
+    "influence": 7,
+    "notes": "The cult has been secretly infiltrating nearby villages for years, replacing key figures with yuan-ti infiltrators. Their leader Kethis was once a chulan hero who made a dark pact. The ritual requires four components: a blood moon, four willing sacrifices, an ancient artifact, and the blood of a fallen hero."
+  },
+  {
+    "id": "a2b3c4d5-e6f7-a8b9-c0d1-e2f3a4b5c6d7",
+    "name": "The Village of Mezro's Outpost",
+    "description": "A small frontier settlement on the edge of Chult's jungle, populated by human and halfling settlers who trade with the hidden city of Mezro. The village serves as a gateway for adventurers entering the jungle and a refuge for those fleeing yuan-ti raids.",
+    "goals": "Survive in the dangerous jungle, maintain trade relations with Mezro, and protect their families from yuan-ti raids and jungle predators. They desperately need help but cannot spare fighters to assist the party.",
+    "influence": 4,
+    "notes": "The village elder, Kito, has been receiving threats from the yuan-ti cult demanding tribute. Several villagers have gone missing over the past moon. The village has a small militia of 6 fighters and a healer who knows some herbal remedies. They revere the ancient chulan civilization and fear the sunken temple."
+  },
+  {
+    "id": "b3c4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8",
+    "name": "The Jungle Hunters' Guild",
+    "description": "A loose association of jungle guides, trackers, and monster hunters who operate in Chult. They provide services to adventurers and settlements, knowledge of the jungle's dangers, and information about ancient ruins.",
+    "goals": "Maintain safe passage through the jungle, document ancient chulan ruins, and protect settlers from jungle threats. They have a vested interest in stopping the yuan-ti cult, as the cult's activities make the jungle more dangerous for everyone.",
+    "influence": 5,
+    "notes": "Led by Dr. Thornwood, a half-elven naturalist and explorer who has spent decades studying Chult's ecology and ancient history. The guild has 12 members, including guides, trackers, and veteran hunters. They know the location of several ancient ruins but fear the sunken temple of Omu. They can provide the party with jungle survival gear and local knowledge."
   }
 ]

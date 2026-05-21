@@ -1,10 +1,42 @@
 [
   {
-    "id": "5f62dcf1-6778-4db3-93b4-6bb53c2bb649",
-    "name": "Test Quest",
+    "id": "q1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6",
+    "name": "The Sunken Temple of Omu",
     "status": "active",
-    "description": "",
-    "rewards": "",
-    "notes": ""
+    "description": "The party must infiltrate the sunken temple of Omu, stop the yuan-ti cult's ritual, and defeat their leader Kethis before he awakens an ancient serpent god's avatar. The ritual requires four components: a blood moon (naturally occurring tonight), four willing sacrifices (villagers already captured), an ancient chulan artifact (the Serpent's Heart), and the blood of a fallen hero (Kethis himself). The party must navigate through jungle predators, temple traps, and cultist guards to reach Kethis in the inner sanctum.",
+    "rewards": "Gold pieces from the temple's treasure vault (200 gp split among the party), an uncommon magic item (see treasure table), the gratitude of the village of Mezro's Outpost, and the knowledge that they have prevented a catastrophic event. If they rescue the captured villagers, they gain additional favor with the village.",
+    "notes": "This is the main quest of the one-shot. The party should encounter all five encounters in sequence. The temple collapse provides a natural time limit and exciting conclusion. If the party takes too long, the ritual completes and the DM should introduce the serpent god's avatar as a final challenge (use Yuan-ti Abomination stats but with additional legendary actions)."
+  },
+  {
+    "id": "q2b3c4d5-e6f7-a8b9-c0d1-e2f3a4b5c6d7",
+    "name": "The Missing Villagers",
+    "status": "active",
+    "description": "Several villagers have gone missing over the past moon, taken by the yuan-ti cult as sacrifices for their ritual. The party must locate and rescue the captured villagers from the temple before the ritual begins. The villagers are held in cells in the temple's lower chambers.",
+    "rewards": "100 gp reward from Elder Kito, the villagers' gratitude, and potential allies if any are skilled fighters or craftsmen who wish to join the village militia.",
+    "notes": "This quest runs parallel to the main quest. The captured villagers are held in the inner chambers, near where Vexia is kept. The party can rescue them during their infiltration of the temple. If the villagers are rescued, they can help during the escape by providing light sources and clearing debris."
+  },
+  {
+    "id": "q3c4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8",
+    "name": "The Serpent's Heart Artifact",
+    "status": "active",
+    "description": "The ancient chulan artifact known as the Serpent's Heart is one of the four components needed for the ritual. It is a jade serpent statue imbued with powerful magic. The party must decide whether to destroy it, take it for themselves, or use it to disrupt the ritual. The artifact is kept in the temple's treasure vault, guarded by traps and yuan-ti cultists.",
+    "rewards": "If the party takes the Serpent's Heart, it becomes a rare magic item (jade serpent statue that grants advantage on saves against poison and disease, and can be used once per day to cast suggestion). If they destroy it, the ritual is disrupted and Kethis loses some of his power. If they use it to disrupt the ritual, they gain a significant advantage in the final battle.",
+    "notes": "The Serpent's Heart is a key plot device. The party can interact with it in multiple ways. Destroying it requires a successful DC 15 Strength check or using a spell like disintegrate. Taking it triggers a curse that gives the bearer disadvantage on saves against yuan-ti charm effects until the curse is removed by remove curse or greater restoration."
+  },
+  {
+    "id": "q4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8f9",
+    "name": "Vexia's Betrayal",
+    "status": "active",
+    "description": "Vexia, the yuan-ti half-breed captive, offers to help the party in exchange for her freedom. However, she has her own agenda and may betray the party if she senses an opportunity to save herself. The party must decide whether to trust her and what precautions to take.",
+    "rewards": "If the party trusts Vexia and she does not betray them, she provides crucial information about Kethis's weaknesses and the temple's layout. She can guide them to the ritual components and the sanctum. If she betrays them, the party gains information through interrogation or by capturing her.",
+    "notes": "Vexia's loyalty is to herself above all else. She will attempt to steal magic items or lead the party into traps if she thinks she can survive. The party can detect her deception with a DC 15 Insight check. If captured, she will reveal information under threat of death, but she will try to poison anyone who shows mercy."
+  },
+  {
+    "id": "q5e6f7-a8b9-c0d1-e2f3-a4b5c6d7e8f9",
+    "name": "The Jungle Hunters' Alliance",
+    "status": "active",
+    "description": "Dr. Thornwood offers to form an alliance between the party and the Jungle Hunters' Guild. If the party helps stop the yuan-ti cult, the guild will provide ongoing support, including guides, supplies, and information about other ancient ruins in Chult. This quest sets up potential future adventures.",
+    "rewards": "Access to the Jungle Hunters' Guild resources, including jungle survival gear, local guides, and information about other dungeons and ruins. Thornwood may join the party as a companion for future adventures. The party gains a reputation as heroes in the Chult region.",
+    "notes": "This quest is primarily for setting up future campaigns. Thornwood can provide valuable resources and information. The Jungle Hunters' Guild has knowledge of several other ancient ruins in Chult, including a lost city, a dragon lair, and a drow underground city. This quest can be abandoned if the party has no interest in returning to Chult."
   }
 ]

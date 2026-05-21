@@ -1,58 +1,63 @@
 {
   "encounters": [
     {
-      "name": "Goblin Ambush",
-      "savedAt": "2026-05-20T16:02:08.274Z",
-      "rulesVersion": "2024",
-      "difficulty": 0,
-      "playerLevels": [
-        20,
-        20,
-        20,
-        20,
-        20,
-        20,
-        20,
-        20,
-        20,
-        20,
-        20,
-        20
-      ],
-      "selectedMonsters": [
-        {
-          "index": "adult-black-dragon",
-          "name": "Adult Black Dragon",
-          "qty": 1
-        }
-      ],
-      "description": "Test description"
-    },
-    {
-      "name": "Gith Camp",
-      "savedAt": "2026-05-20T16:19:26.137Z",
+      "name": "Jungle Ambush",
+      "description": "The party pushes through dense Chult jungle when the canopy darkens. Giant spiders drop from above while constrictor snakes slither from the undergrowth. The yuan-ti cult has been using the jungle predators to thin out intruders before they reach the temple.",
+      "savedAt": "2026-05-21T00:00:00Z",
       "rulesVersion": "2024",
       "difficulty": 1,
-      "playerLevels": [
-        20,
-        20,
-        20,
-        20,
-        20,
-        20,
-        20,
-        20,
-        20,
-        20,
-        20,
-        20
-      ],
+      "playerLevels": [5, 5, 5, 5],
       "selectedMonsters": [
-        {
-          "index": "githyanki-dracomancer",
-          "name": "Githyanki Dracomancer",
-          "qty": 5
-        }
+        { "index": "giant-spider", "name": "Giant Spider", "qty": 4 },
+        { "index": "giant-constrictor-snake", "name": "Giant Constrictor Snake", "qty": 2 }
+      ]
+    },
+    {
+      "name": "Temple Entrance",
+      "description": "The party finds the sunken temple half-buried in jungle earth, its stone steps leading down into darkness. Giant scorpions patrol the entrance while yuan-ti infiltrators in disguise attempt to trick the party into lowering their guard.",
+      "savedAt": "2026-05-21T00:00:00Z",
+      "rulesVersion": "2024",
+      "difficulty": 1,
+      "playerLevels": [5, 5, 5, 5],
+      "selectedMonsters": [
+        { "index": "giant-scorpion", "name": "Giant Scorpion", "qty": 3 },
+        { "index": "yuan-ti-infiltrator", "name": "Yuan-ti Infiltrator", "qty": 2 }
+      ]
+    },
+    {
+      "name": "Inner Chambers",
+      "description": "Deep within the temple, the party discovers ancient chambers filled with poison gas traps and yuan-ti cultists performing a ritual. A yuan-ti malison leads the ceremony, its serpentine magic twisting the air itself.",
+      "savedAt": "2026-05-21T00:00:00Z",
+      "rulesVersion": "2024",
+      "difficulty": 2,
+      "playerLevels": [5, 5, 5, 5],
+      "selectedMonsters": [
+        { "index": "yuan-ti-malison", "name": "Yuan-ti Malison", "qty": 1 },
+        { "index": "yuan-ti-infiltrator", "name": "Yuan-ti Infiltrator", "qty": 3 }
+      ]
+    },
+    {
+      "name": "The Serpent's Heart",
+      "description": "The cult's leader, a yuan-ti abomination named Kethis, awaits in the temple's inner sanctum. Ancient murals depict Kethis as a fallen chultan hero who made a pact with serpentine gods. The party must stop Kethis from completing the ritual that will awaken an ancient serpent god's avatar.",
+      "savedAt": "2026-05-21T00:00:00Z",
+      "rulesVersion": "2024",
+      "difficulty": 2,
+      "playerLevels": [5, 5, 5, 5],
+      "selectedMonsters": [
+        { "index": "yuan-ti-abomination", "name": "Yuan-ti Abomination", "qty": 1 },
+        { "index": "yuan-ti-infiltrator", "name": "Yuan-ti Infiltrator", "qty": 4 }
+      ]
+    },
+    {
+      "name": "Temple Collapse",
+      "description": "With Kethis defeated, the temple begins to collapse. The party must navigate crumbling corridors, rising floodwaters, and collapsing ceilings as they escape. The yuan-ti cult's ritual has destabilized the ancient structure.",
+      "savedAt": "2026-05-21T00:00:00Z",
+      "rulesVersion": "2024",
+      "difficulty": 1,
+      "playerLevels": [5, 5, 5, 5],
+      "selectedMonsters": [
+        { "index": "giant-spider", "name": "Giant Spider", "qty": 2 },
+        { "index": "giant-constrictor-snake", "name": "Giant Constrictor Snake", "qty": 1 }
       ]
     }
   ]

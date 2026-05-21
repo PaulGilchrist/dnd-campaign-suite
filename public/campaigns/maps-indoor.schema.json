@@ -12,9 +12,7 @@
         "zoom",
         "panX",
         "panY",
-        "fog",
-        "npcMapPositions",
-        "npcMetadata"
+        "fog"
     ],
     "properties": {
         "name": {
@@ -105,20 +103,6 @@
             },
             "description": "Array of placed map tokens"
         },
-        "paintCells": {
-            "type": "array",
-            "items": {
-                "type": "string"
-            },
-            "description": "Array of painted cells"
-        },
-        "items": {
-            "type": "array",
-            "items": {
-                "type": "object"
-            },
-            "description": "Array of map items"
-        },
         "players": {
             "type": "array",
             "items": {
@@ -174,20 +158,6 @@
                 "pattern": "^\\d+,\\d+$"
             },
             "description": "Array of 'x,y' strings for fog-of-war cells"
-        },
-        "npcMapPositions": {
-            "type": "array",
-            "items": {
-                "type": "object"
-            },
-            "description": "Array of NPC map positions"
-        },
-        "npcMetadata": {
-            "type": "array",
-            "items": {
-                "type": "object"
-            },
-            "description": "Array of NPC metadata"
         }
     }
 }
