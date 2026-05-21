@@ -4,9 +4,6 @@ description: Create a full end-to-end Dungeons & Dragons campaign and store all 
 agent: dnd-campaign-writer
 permission:
   skill:
-    "obsidian-bases": "allow"
-    "obsidian-cli": "allow"
-    "obsidian-markdown": "allow"
     "dnd-tools-browser": "allow"
 ---
 

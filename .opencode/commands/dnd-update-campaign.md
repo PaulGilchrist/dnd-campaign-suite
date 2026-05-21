@@ -4,9 +4,6 @@ description: Takes an existing D&D campaign and the party current level, then fl
 agent: dnd-campaign-writer
 permission:
   skill:
-    "obsidian-bases": "allow"
-    "obsidian-cli": "allow"
-    "obsidian-markdown": "allow"
     "dnd-tools-browser": "allow"
 ---
 
