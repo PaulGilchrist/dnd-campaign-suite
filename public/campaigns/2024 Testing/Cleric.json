@@ -52,10 +52,7 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Elf",
-    "subrace": {
-      "name": "Wood Elf"
-    }
+    "name": "Aasimar"
   },
   "immunities": [
     "Magical Sleep"
@@ -83,7 +80,9 @@
   },
   "languages": [],
   "resistances": [
-    "Poison"
+    "Poison",
+    "Necrotic",
+    "Radiant"
   ],
   "skillProficiencies": [
     "Insight",
@@ -102,5 +101,6 @@
     "Spare the Dying"
   ],
   "rules": "2024",
-  "imagePath": "campaigns/2024 Testing/images/Cleric.JPG"
+  "imagePath": "campaigns/2024 Testing/images/Cleric.png",
+  "originalFileName": "cleric.json"
 }

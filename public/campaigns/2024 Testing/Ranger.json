@@ -54,9 +54,10 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Goliath",
+    "name": "Dwarf",
     "subrace": {
-      "name": "Cloud's Jaunt (Cloud Giant)"
+      "name": "Hill Dwarf",
+      "description": ""
     }
   },
   "immunities": [
@@ -82,7 +83,9 @@
     "magicItems": []
   },
   "languages": [],
-  "resistances": [],
+  "resistances": [
+    "Poison"
+  ],
   "skillProficiencies": [
     "Animal Handling",
     "Insight",
@@ -94,5 +97,7 @@
   ],
   "specialActions": [],
   "spells": [],
-  "rules": "2024"
+  "rules": "2024",
+  "originalFileName": "ranger.json",
+  "imagePath": "campaigns/2024 Testing/images/Ranger.png"
 }

@@ -52,10 +52,7 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Dwarf",
-    "subrace": {
-      "name": "Hill Dwarf"
-    }
+    "name": "Halfling"
   },
   "immunities": [],
   "inventory": {
@@ -83,7 +80,9 @@
   "languages": [
     "Sylvan"
   ],
-  "resistances": [],
+  "resistances": [
+    "Poison"
+  ],
   "skillProficiencies": [
     "Animal Handling",
     "Insight",
@@ -99,5 +98,6 @@
     "Shocking Grasp"
   ],
   "rules": "2024",
-  "imagePath": "campaigns/2024 Testing/images/Druid.JPG"
+  "imagePath": "campaigns/2024 Testing/images/Druid.png",
+  "originalFileName": "druid.json"
 }

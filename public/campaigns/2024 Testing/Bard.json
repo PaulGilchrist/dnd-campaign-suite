@@ -56,9 +56,10 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Dragonborn",
+    "name": "Gnome",
     "subrace": {
-      "name": "Black Dragonborn"
+      "name": "Forest Gnome",
+      "description": ""
     }
   },
   "immunities": [],
@@ -103,5 +104,6 @@
     "Sleep"
   ],
   "rules": "2024",
-  "imagePath": "campaigns/2024 Testing/images/Bard.JPG"
+  "imagePath": "campaigns/2024 Testing/images/Bard.png",
+  "originalFileName": "bard.json"
 }

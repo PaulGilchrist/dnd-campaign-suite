@@ -100,5 +100,6 @@
   "magicItems": [
     "Adamantine Armor"
   ],
-  "imagePath": "campaigns/2024 Testing/images/Barbarian.JPG"
+  "imagePath": "campaigns/2024 Testing/images/Barbarian.png",
+  "originalFileName": "barbarian.json"
 }

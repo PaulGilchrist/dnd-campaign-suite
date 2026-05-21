@@ -52,9 +52,10 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Orc",
+    "name": "Elf",
     "subrace": {
-      "name": ""
+      "name": "Wood Elf",
+      "description": ""
     }
   },
   "immunities": [],
@@ -99,5 +100,7 @@
     "Shield",
     "Shocking Grasp"
   ],
-  "rules": "2024"
+  "rules": "2024",
+  "originalFileName": "sorcerer.json",
+  "imagePath": "campaigns/2024 Testing/images/Sorcerer.png"
 }

@@ -55,9 +55,10 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Human",
+    "name": "Tiefling",
     "subrace": {
-      "name": ""
+      "name": "Infernal Tiefling",
+      "description": ""
     }
   },
   "immunities": [],
@@ -100,5 +101,6 @@
   "specialActions": [],
   "spells": [],
   "rules": "2024",
-  "imagePath": "campaigns/2024 Testing/images/Rogue.JPG"
+  "imagePath": "campaigns/2024 Testing/images/Rogue.png",
+  "originalFileName": "rogue.json"
 }

@@ -60,9 +60,10 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Tiefling",
+    "name": "Gnome",
     "subrace": {
-      "name": "Abyssal Tiefling"
+      "name": "Rock Gnome",
+      "description": ""
     }
   },
   "immunities": [],
@@ -105,5 +106,7 @@
     "Hellish Rebuke",
     "Mage Hand"
   ],
-  "rules": "2024"
+  "rules": "2024",
+  "originalFileName": "warlock.json",
+  "imagePath": "campaigns/2024 Testing/images/Warlock.png"
 }

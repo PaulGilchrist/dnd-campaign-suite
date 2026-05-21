@@ -52,10 +52,7 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Goliath",
-    "subrace": {
-      "name": "Cloud's Jaunt (Cloud Giant)"
-    }
+    "name": "Human"
   },
   "immunities": [],
   "inventory": {
@@ -90,5 +87,6 @@
   "specialActions": [],
   "spells": [],
   "rules": "2024",
-  "imagePath": "campaigns/2024 Testing/images/Monk.JPG"
+  "imagePath": "campaigns/2024 Testing/images/Monk.png",
+  "originalFileName": "monk.json"
 }

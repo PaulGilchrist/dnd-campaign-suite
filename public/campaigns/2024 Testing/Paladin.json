@@ -55,9 +55,10 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Halfling",
+    "name": "Dragonborn",
     "subrace": {
-      "name": ""
+      "name": "Black Dragonborn",
+      "description": ""
     }
   },
   "immunities": [],
@@ -95,5 +96,6 @@
   "specialActions": [],
   "spells": [],
   "rules": "2024",
-  "imagePath": "campaigns/2024 Testing/images/Paladin.JPG"
+  "imagePath": "campaigns/2024 Testing/images/Paladin.png",
+  "originalFileName": "paladin.json"
 }
