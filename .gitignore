@@ -1,4 +1,5 @@
 characterChangeData.json
+*maps-meta.json
 
 # Logs
 logs
@@ -35,3 +36,4 @@ coverage
 # Openclaw backups
 *openclaw-backup*.tar.gz
 characterChangeData.json
+
