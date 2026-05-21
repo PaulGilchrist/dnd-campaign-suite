@@ -30,6 +30,7 @@ For each of Levels 1-3, update the data files with:
 - Encounters: Combat, social, and skill challenges with tactics
 - Side Quests: Optional adventures with rewards
 - Treasure: Gold and magic items appropriate to the current player level
+- Indoor and outdoor maps used for quests and encounters
 - Foreshadowing: Hints of the greater story and antagonist
 - Level-Up Reward: What the party gains upon completion
 - DM Notes: Tips for running the level

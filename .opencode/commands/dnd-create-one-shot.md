@@ -20,6 +20,7 @@ permission:
   - Main and side quests
   - Level-appropriate encounters (combat, social, skill challenges)
   - Treasure and magic items
+  - Zero or more indoor and/or outdoor maps used for quests or encounters
 - Players do not level during the one-shot.
 - Save each adventure component in the appropriate json files in the campaign's folder using their schema definitions for guidance"
 
