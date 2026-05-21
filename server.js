@@ -338,7 +338,6 @@ app.delete('/api/campaigns/:campaign/maps/:mapname', (req, res) => {
     }
     
     // Broadcast maps list change
-    const mapKey = fileName.replace(/\.json$/, '');
     publish(`maps-list-${campaign}`, { action: 'deleted', map: mapKey });
     
     res.json({ message: 'Map deleted successfully' });
