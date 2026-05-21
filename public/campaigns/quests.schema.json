@@ -1,0 +1,45 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Quest Schema",
+    "description": "Schema for D&D campaign quest data",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "required": [
+            "id",
+            "name"
+        ],
+        "properties": {
+            "id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Unique identifier for the quest"
+            },
+            "name": {
+                "type": "string",
+                "description": "The name of the quest"
+            },
+            "status": {
+                "type": "string",
+                "enum": [
+                    "active",
+                    "completed",
+                    "abandoned"
+                ],
+                "description": "The current status of the quest"
+            },
+            "description": {
+                "type": "string",
+                "description": "Detailed description of the quest objectives and context"
+            },
+            "rewards": {
+                "type": "string",
+                "description": "Rewards offered for completing the quest (e.g., gold, items, experience)"
+            },
+            "notes": {
+                "type": "string",
+                "description": "Additional notes or reminders about the quest"
+            }
+        }
+    }
+}

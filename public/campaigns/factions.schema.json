@@ -1,0 +1,42 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Faction Schema",
+    "description": "Schema for D&D 5e faction data",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "required": [
+            "id",
+            "name"
+        ],
+        "properties": {
+            "id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Unique identifier for the faction"
+            },
+            "name": {
+                "type": "string",
+                "description": "The faction's name"
+            },
+            "description": {
+                "type": "string",
+                "description": "A description of the faction"
+            },
+            "goals": {
+                "type": "string",
+                "description": "The faction's goals and objectives"
+            },
+            "influence": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10,
+                "description": "Numeric influence score (1-10)"
+            },
+            "notes": {
+                "type": "string",
+                "description": "Additional notes about the faction"
+            }
+        }
+    }
+}

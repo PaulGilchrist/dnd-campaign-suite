@@ -1,0 +1,15 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Maps Meta Schema",
+    "description": "Schema for maps meta data",
+    "type": "object",
+    "required": [
+        "activeMap"
+    ],
+    "properties": {
+        "activeMap": {
+            "type": "string",
+            "description": "The filename (without .json) of the currently active map"
+        }
+    }
+}

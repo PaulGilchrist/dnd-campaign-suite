@@ -1,0 +1,189 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Indoor Map Schema",
+    "description": "Schema for D&D indoor map data",
+    "type": "object",
+    "required": [
+        "name",
+        "gridSize",
+        "walls",
+        "placedItems",
+        "creatures",
+        "zoom",
+        "panX",
+        "panY",
+        "fog",
+        "npcMapPositions",
+        "npcMetadata"
+    ],
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": "The map name"
+        },
+        "gridSize": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 100,
+            "description": "Grid dimension in cells"
+        },
+        "walls": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "pattern": "^\\d+,\\d+$"
+            },
+            "description": "Array of 'x,y' coordinate strings for wall cells"
+        },
+        "placedItems": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "gridX",
+                    "gridY",
+                    "type",
+                    "visible"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Unique identifier for the placed item"
+                    },
+                    "gridX": {
+                        "type": "integer",
+                        "description": "Grid column position"
+                    },
+                    "gridY": {
+                        "type": "integer",
+                        "description": "Grid row position"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "door",
+                            "stairs",
+                            "trap",
+                            "secretDoor",
+                            "bed",
+                            "firepit",
+                            "npc",
+                            "torch",
+                            "chest",
+                            "web",
+                            "skeleton",
+                            "table",
+                            "statue",
+                            "fountain",
+                            "bookshelf",
+                            "altar",
+                            "chair",
+                            "pillar",
+                            "crate"
+                        ],
+                        "description": "The type of placed item"
+                    },
+                    "visible": {
+                        "type": "boolean",
+                        "description": "Whether the item is visible"
+                    },
+                    "rotation": {
+                        "type": "integer",
+                        "enum": [0, 90, 180, 270],
+                        "description": "Rotation in degrees"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Display name for NPC tokens"
+                    }
+                }
+            },
+            "description": "Array of placed map tokens"
+        },
+        "paintCells": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Array of painted cells"
+        },
+        "items": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            },
+            "description": "Array of map items"
+        },
+        "creatures": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "gridX",
+                    "gridY",
+                    "imagePath"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Unique identifier for the creature"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Creature name"
+                    },
+                    "gridX": {
+                        "type": "integer",
+                        "description": "Grid column position"
+                    },
+                    "gridY": {
+                        "type": "integer",
+                        "description": "Grid row position"
+                    },
+                    "imagePath": {
+                        "type": "string",
+                        "description": "Path to creature image"
+                    }
+                }
+            },
+            "description": "Array of creature tokens"
+        },
+        "zoom": {
+            "type": "number",
+            "description": "Zoom level"
+        },
+        "panX": {
+            "type": "number",
+            "description": "Horizontal pan offset"
+        },
+        "panY": {
+            "type": "number",
+            "description": "Vertical pan offset"
+        },
+        "fog": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "pattern": "^\\d+,\\d+$"
+            },
+            "description": "Array of 'x,y' strings for fog-of-war cells"
+        },
+        "npcMapPositions": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            },
+            "description": "Array of NPC map positions"
+        },
+        "npcMetadata": {
+            "type": "array",
+            "items": {
+                "type": "object"
+            },
+            "description": "Array of NPC metadata"
+        }
+    }
+}

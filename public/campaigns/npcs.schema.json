@@ -1,0 +1,67 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "NPC Schema",
+    "description": "Schema for D&D 5e NPC data",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "required": [
+            "id",
+            "name"
+        ],
+        "properties": {
+            "id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Unique identifier for the NPC"
+            },
+            "name": {
+                "type": "string",
+                "description": "The NPC's name"
+            },
+            "race": {
+                "type": "string",
+                "description": "The NPC's race (e.g., 'Human', 'Elf', 'Dwarf', 'Halfling')"
+            },
+            "classRole": {
+                "type": "string",
+                "description": "The NPC's class or role (e.g., 'Armor Smith', 'Blacksmith', 'Innkeeper')"
+            },
+            "appearance": {
+                "type": "string",
+                "description": "Physical description of the NPC"
+            },
+            "personality": {
+                "type": "string",
+                "description": "Personality traits, ideals, bonds, and flaws"
+            },
+            "goals": {
+                "type": "string",
+                "description": "What the NPC wants or strives for"
+            },
+            "secrets": {
+                "type": "string",
+                "description": "Hidden truths about the NPC"
+            },
+            "notes": {
+                "type": "string",
+                "description": "Additional notes about the NPC"
+            },
+            "tags": {
+                "type": "string",
+                "description": "Comma-separated tags for categorization"
+            },
+            "attitude": {
+                "type": "string",
+                "enum": [
+                    "deep bonds",
+                    "positive",
+                    "neutral",
+                    "negative",
+                    "extreme opposition"
+                ],
+                "description": "The NPC's attitude toward the character"
+            }
+        }
+    }
+}
