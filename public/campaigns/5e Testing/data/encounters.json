@@ -1,0 +1,42 @@
+{
+  "encounters": [
+    {
+      "name": "Ambush at the Mine Entrance",
+      "description": "As the party descends into Irondeep Hold, the mine entrance becomes a killing zone. Four skeleton miners, once the townsfolk they now haunt, rise from the shadows with pickaxes raised. Two zombie miners lumber behind them, slow but relentless. A spectral mine cart, driven by unseen forces, careens down the tracks toward the party — a deadly reminder of the collapse that sealed dozens underground.",
+      "savedAt": "2026-05-21T00:00:00Z",
+      "rulesVersion": "5e",
+      "difficulty": 1,
+      "playerLevels": [10, 10, 10, 10],
+      "selectedMonsters": [
+        { "index": "skeleton", "name": "Skeleton", "qty": 4 },
+        { "index": "zombie", "name": "Zombie", "qty": 2 }
+      ]
+    },
+    {
+      "name": "The Armory Skirmish",
+      "description": "Thorgar sends his elite guard to stop the party in the dwarven armory. Lieutenant Varn, a death knight of terrible power, leads the assault alongside two wights and four skeleton elites. The armory is filled with ancient weapons on racks — characters can grab weapons as bonus actions, turning the environment into an advantage. The battle is tactical and dangerous, testing the party's coordination and resource management.",
+      "savedAt": "2026-05-21T00:00:00Z",
+      "rulesVersion": "5e",
+      "difficulty": 2,
+      "playerLevels": [10, 10, 10, 10],
+      "selectedMonsters": [
+        { "index": "death-knight", "name": "Death Knight", "qty": 1 },
+        { "index": "wight", "name": "Wight", "qty": 2 },
+        { "index": "skeleton", "name": "Skeleton", "qty": 4 }
+      ]
+    },
+    {
+      "name": "The Inner Sanctum",
+      "description": "Thorgar Ironfist awaits in the inner sanctum of the ancient tomb, flanked by four wights and two wraiths. The sanctum is a chamber of molten metal pools and crumbling pillars — environmental hazards that add danger to every round. The Clan Heart glows at the chamber's center, powering Thorgar's undeath. Destroying it requires a DC 15 Strength check or a spell like disintegrate. During the battle, Thorgar recognizes the Mountain Dwarf Ranger's clan bloodline and offers them a choice that could change the course of the fight.",
+      "savedAt": "2026-05-21T00:00:00Z",
+      "rulesVersion": "5e",
+      "difficulty": 3,
+      "playerLevels": [10, 10, 10, 10],
+      "selectedMonsters": [
+        { "index": "death-knight", "name": "Death Knight", "qty": 1 },
+        { "index": "wight", "name": "Wight", "qty": 4 },
+        { "index": "wraith", "name": "Wraith", "qty": 2 }
+      ]
+    }
+  ]
+}

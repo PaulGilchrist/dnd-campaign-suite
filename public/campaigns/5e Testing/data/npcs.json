@@ -1,0 +1,67 @@
+[
+  {
+    "id": "n1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6",
+    "name": "Mayor Brunnilda Stonebeard",
+    "race": "Human",
+    "classRole": "Mayor of Ironhaven",
+    "appearance": "A stout woman in her late fifties with graying brown hair pulled back severely, sharp dwarven-featured eyes, and a face lined by years of worry. She wears practical woolen dresses in muted browns and grays, a heavy iron keyring at her belt, and a dwarven clan signet ring on a chain around her neck — the last remnant of her family's marriage into the Stonebeard dwarven clan generations ago.",
+    "personality": "Pragmatic and desperate, Brunnilda carries the weight of a dying town on her shoulders. She is no-nonsense, direct, and has little patience for empty promises. Beneath her hardened exterior lies a woman who genuinely cares for her people and blames herself for not doing more to protect the miners. She respects courage and competence above all else.",
+    "goals": "Save what remains of Ironhaven, find out what happened to the missing miners, and stop whatever horror has taken root in the deep mine. She will offer anything — gold, information, alliances — to anyone willing to descend into the dark.",
+    "secrets": "Brunnilda knows more dwarven history than she lets on. Her family's signet ring grants her limited access to sealed dwarven chambers in the mountain — a fact she has kept hidden because she fears what might be sealed down there. She has heard the sounds from the deep and knows it is not natural.",
+    "notes": "Brunnilda can provide the party with information about the mine layout, the town's resources, and dwarven history. She offers 500 gp total for the party's services. She cannot leave the town herself but can provide supplies, maps of the upper mine levels, and the clan signet ring if the party earns her trust.",
+    "tags": "quest giver, town leader, dwarven heritage, information source",
+    "attitude": "positive"
+  },
+  {
+    "id": "n2b3c4d5-e6f7-a8b9-c0d1-e2f3a4b5c6d7",
+    "name": "Thorgar Ironfist",
+    "race": "Dwarf (Undead — Death Knight)",
+    "classRole": "Fallen Champion of Clan Ironfist",
+    "appearance": "A towering dwarven death knight clad in ancient dwarven plate armor engraved with glowing Moradin runes that flicker between gold and sickly green. His beard is long, braided, and matted with the dust of centuries. His eyes burn with cold blue fire. He wields a massive warhammer — the Anvil of Judgment — that drips with molten metal. His armor bears the crest of Clan Ironfist, now tarnished and cracked.",
+    "personality": "Thorgar speaks in a deep, resonant voice that seems to vibrate through stone. He believes himself to be the last true defender of dwarven honor, purging the surface world of those who would desecrate his clan's legacy. He is not mindless — he remembers his life, his oath to Moradin, and his betrayal. But his memory is fractured, and he cannot fully recall the truth of why his own clan sealed him in the tomb. He is honorable in his own twisted way, offering the Ranger a chance to join him before attacking.",
+    "goals": "Purge the surface world of the living who have desecrated his clan's resting place. Raise an undead dwarven army to reclaim Irondeep Hold and restore Clan Ironfist's glory. He believes he is doing Moradin's work, even as his undeath corrupts his purpose.",
+    "secrets": "Thorgar was betrayed by his own clan. He had been blessed by Moradin with unnatural strength and durability — a gift that his clan mistook for corruption. Out of fear, they sealed him alive in the ancient tomb. He does not fully remember this truth; his memory has been clouded by centuries of undeath and the corruption of the runes he once protected. The Clan Heart is not just powering his undeath — it is the source of his connection to Moradin's blessing.",
+    "notes": "Thorgar is the final boss of the adventure. He awaits in the inner sanctum of the ancient tomb, flanked by wights and wraiths. His Undead Bastion legendary action allows him to regenerate 10 HP each turn. The party must destroy the Clan Heart to make him vulnerable. During the battle, he recognizes the Mountain Dwarf Ranger's clan bloodline and offers them a choice. He is immune to magical sleep and has resistance to nonmagical weapon damage. Destroying the Clan Heart requires a DC 15 Strength check or a spell like disintegrate.",
+    "tags": "final boss, death knight, fallen champion, undead leader, tragic antagonist",
+    "attitude": "extreme opposition"
+  },
+  {
+    "id": "n3c4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8",
+    "name": "Kelda",
+    "race": "Human",
+    "classRole": "Captive and Survivor",
+    "appearance": "A young woman in her mid-twenties with dark hair streaked with gray from weeks of terror, hollow eyes, and thin from starvation. She wears the tattered remains of a miner's daughter's practical clothing, stained with dust and dried blood. Her hands are bound with iron chains that glow faintly with corrupted dwarven runes — Thorgar's binding magic.",
+    "personality": "Terrified but brave, Kelda has endured weeks of captivity and still clings to hope. She is desperate to escape but has learned to read Thorgar's patterns and weaknesses. She is fiercely protective of her brother Brom and blames herself for not being able to save him. If rescued, she becomes a valuable ally with intimate knowledge of the sanctum.",
+    "goals": "Survive, escape the tomb, and reunite with her brother Brom. She wants to expose the truth about what happened in the mine and ensure no one else suffers Thorgar's wrath.",
+    "secrets": "Kelda has been forced to stand near the Runes of Binding, and the corrupted magic has left her with faint visions of Thorgar's past. She can describe the sanctum layout in detail and knows that the runes weaken Thorgar's power when disrupted. She also knows that Thorgar's warhammer, the Anvil of Judgment, can shatter stone and is his most dangerous weapon.",
+    "notes": "Kelda is held in the tomb's inner chambers, used as a living sacrifice to power Thorgar's undead army. The party can rescue her through stealth, combat, or negotiation (DC 15 Charisma (Persuasion) check). If rescued, she provides crucial information about the sanctum layout, the Runes of Binding, and Thorgar's patterns. She can guide the party through the escape during the mountain collapse.",
+    "tags": "captive, survivor, informant, Brom's sister, potential ally",
+    "attitude": "positive"
+  },
+  {
+    "id": "n4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8f9",
+    "name": "Brom",
+    "race": "Human",
+    "classRole": "Surviving Miner",
+    "appearance": "A man in his early thirties with a stocky miner's build, soot-stained face, and trembling hands. His left arm is bandaged from a mining accident, and his eyes are wide with guilt and fear. He wears a miner's helmet (cracked), a leather apron, and carries a pickaxe he refuses to put down.",
+    "personality": "Guilt-ridden and desperate, Brom is consumed by the knowledge that he accidentally breached the ancient tomb. He is terrified of Thorgar but more terrified of the consequences of his mistake. He is loyal to his sister Kelda and will do anything to save her. He is not a fighter but is resourceful and knows the mine's layout better than anyone.",
+    "goals": "Atone for his mistake by helping the party defeat Thorgar. Rescue his sister Kelda. Ensure that no one else dies because of his error.",
+    "secrets": "Brom was expanding the mine to reach a new vein of iron ore when his pickaxe struck a hidden wall. Behind it was the sealed entrance to the ancient tomb. He tried to seal it back up, but the collapse had already begun. He has been hiding in the deep mines ever since, too terrified to return to the surface.",
+    "notes": "Brom is found trapped behind a collapsed wall in the deep mines (Hour 2). He begs for forgiveness and offers to guide the party to Thorgar's chamber if they save his companions. He can navigate safe paths through the collapsed tunnels and knows where the mine cart tracks still reach. He is not combat-capable but can provide valuable information.",
+    "tags": "survivor, guilt-ridden, guide, Brom's brother, quest giver",
+    "attitude": "positive"
+  },
+  {
+    "id": "n5e6f7-a8b9-c0d1-e2f3-a4b5c6d7e8f9",
+    "name": "Lieutenant Varn",
+    "race": "Dwarf (Undead — Death Knight)",
+    "classRole": "Thorgar's Second-in-Command",
+    "appearance": "A dwarven death knight slightly smaller than Thorgar but no less menacing. His armor is darker, forged from black iron, and bears the scars of centuries of battle. His beard is shorter, braided with iron rings, and his eyes burn with a colder, more calculating blue fire. He wields a +1 longsword and carries a tower shield engraved with dwarven runes of warding.",
+    "personality": "Cold, calculating, and utterly loyal to Thorgar. Varn was Thorgar's closest friend and fellow champion in life. He shares Thorgar's belief in dwarven supremacy but lacks Thorgar's tragic nobility — Varn embraced undeath willingly, seeing it as the ultimate expression of dwarven endurance. He is a tactician who prefers to overwhelm opponents with coordinated strikes.",
+    "goals": "Serve Thorgar and help him purge the surface world. Ensure that the undead army grows stronger with each living soul it claims. Protect the Clan Heart at all costs.",
+    "secrets": "Varn remembers more of the truth than Thorgar does. He knows that the clan betrayed Thorgar out of fear, not justice. But he chose undeath anyway, believing that the living had proven unworthy of dwarven trust. He resents Thorgar's hesitation and wants to destroy the surface world without mercy.",
+    "notes": "Lieutenant Varn leads the elite guard in the dwarven armory (Hour 2, Encounter 2). He uses Death Knight stats but with half HP (approximately 150 HP instead of 300). He is a tactical fighter who coordinates with wights and skeleton elites. He can be targeted first to weaken Thorgar's command structure. If defeated, the remaining undead suffer disadvantage on Wisdom saves for 1 minute as their coordination breaks down.",
+    "tags": "lieutenant, death knight, undead commander, Thorgar's second, tactical fighter",
+    "attitude": "extreme opposition"
+  }
+]

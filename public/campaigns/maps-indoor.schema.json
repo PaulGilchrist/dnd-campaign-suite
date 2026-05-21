@@ -74,7 +74,6 @@
                             "torch",
                             "chest",
                             "web",
-                            "skeleton",
                             "table",
                             "statue",
                             "fountain",
@@ -84,7 +83,7 @@
                             "pillar",
                             "crate"
                         ],
-                        "description": "The type of placed item"
+                        "description": "The type of placed item.  Note: npc represents a monster of other non-player character type and should have name property set to exactly match the name in the Monster Manual for proper image lookup"
                     },
                     "visible": {
                         "type": "boolean",
@@ -133,7 +132,7 @@
                     },
                     "imagePath": {
                         "type": "string",
-                        "description": "Path to player image"
+                        "description": "Will always be in the format `campaigns/{campaign name}/images/{player name}.png"
                     }
                 }
             },

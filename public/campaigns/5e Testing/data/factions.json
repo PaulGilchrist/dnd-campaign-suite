@@ -1,0 +1,26 @@
+[
+  {
+    "id": "f1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6",
+    "name": "The Survivors of Ironhaven",
+    "description": "The remaining townsfolk of Ironhaven, mostly humans who married into the dwarven Stonebeard clan generations ago. They are terrified, starving, and desperate. The town, once a thriving dwarven mining community, is now a shadow of itself — half the population perished in the collapse, and the rest huddle behind barricaded doors, listening to the strange sounds echoing from the deep mine.",
+    "goals": "Survive the immediate threat, find out what happened to the missing miners, and stop whatever horror has taken root in Irondeep Hold. They control the surface resources and can provide supplies, information, and gold to the party.",
+    "influence": 6,
+    "notes": "The Survivors are led by Mayor Brunnilda Stonebeard. They have limited supplies — enough food for a few more days, mining tools, and some basic adventuring gear. They revere the ancient dwarven clan and fear what lies beneath the mountain. If the party rescues Kelda and the surviving miners, the town's morale improves significantly, and the rescued survivors can help with the escape during the mountain collapse."
+  },
+  {
+    "id": "f2b3c4d5-e6f7-a8b9-c0d1-e2f3a4b5c6d7",
+    "name": "The Ironfist Undead",
+    "description": "Thorgar Ironfist's undead army, consisting of skeletons, zombies, wights, and wraiths bound to his will. Once the honored dead of Clan Ironfist, they have been corrupted by centuries of undeath and Thorgar's corrupted runes. They move with mechanical precision, their blue-fire eyes scanning for living targets. The army grows as Thorgar's magic reanimates the fallen.",
+    "goals": "Purge the surface world of the living. Defend the ancient tomb and the Clan Heart. Expand Thorgar's undead army by reanimating the dead. They are bound to Thorgar's will and cannot act independently of his commands.",
+    "influence": 8,
+    "notes": "The Ironfist Undead are growing in number as Thorgar's power increases. They are found throughout the upper mines and the ancient tomb. Lieutenant Varn commands the elite guard. The undead are immune to magical sleep and are vulnerable to radiant damage and turning. Destroying the Clan Heart weakens their bond to Thorgar, causing some to collapse into inanimate dust."
+  },
+  {
+    "id": "f3c4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8",
+    "name": "The Deep Dwellers",
+    "description": "Two duergar who have been living in the deepest levels of Irondeep Hold, hiding from Thorgar's undead army. They are gray-skinned, hardy, and deeply suspicious of surface dwellers. They have survived for months in the dark by mining their own tunnels and setting traps. They know the mountain's secret passages and weak points.",
+    "goals": "Survive Thorgar's expanding undead army. Find a way to escape the mountain or destroy Thorgar once and for all. They are neutral but will help the party if convinced that Thorgar is a threat to them too.",
+    "influence": 3,
+    "notes": "The Deep Dwellers are found in the deepest levels of the Ancient Tomb map, hidden behind a secret passage. They are cautious and distrustful. A DC 14 Charisma (Persuasion) or Wisdom (Insight) check is needed to convince them to help. If convinced, they join the final battle and reveal the secret duergar escape tunnel. They possess +1 pickaxes and knowledge of the mountain's structural weak points."
+  }
+]

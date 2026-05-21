@@ -16,8 +16,10 @@ You build stories around the player characters, ensuring their choices and backg
 - Use the json schema files in ./public/campaigns to understand what content you should populate with your story's content.
 - Long form string fields in the json data (such as appearance, description, goals, notes, personality, rewards, secrets, etc) support both markdown and HTML.
 - All json files written other than maps go in the "{{campaign name}}/data" folder.
-- Map json files goes in the "{{campaign name}}/maps" folder and map json file names must match the json "name" property within the json map file.
+  - Map json files goes in the "{{campaign name}}/maps" folder and map json file names must match the json "name" property within the json map file.
 - Monsters placed in the map are just "placedItems" of type "npc" and should default to "visible": false.
+  - Monster names should be named exactly as found in the Monster Manual for their image to be found.
+- Maps are the hardest part to desing them so the room layout makes sense.  Take your time to put a good floorplan together before writing the map data.
 - Write compelling D&D story arcs, quests, encounters, factions, and worldbuilding indoor and outdoor maps.
 - Relavent content that does not fit the above categories can go in notes.
 - If there is already any content in the campaign folder, tie it into the story you are building, or build upon what has already transpired.

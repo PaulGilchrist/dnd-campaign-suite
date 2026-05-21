@@ -1,0 +1,34 @@
+[
+  {
+    "id": "q1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6",
+    "name": "Stop Thorgar Ironfist",
+    "status": "active",
+    "description": "The party must descend into Irondeep Hold, the collapsed dwarven mine beneath Ironhaven, defeat the death knight Thorgar Ironfist, and stop his undead army from emerging into the surface world. Thorgar believes the living have desecrated his clan's ancient tomb and seeks to purge the surface. The party must navigate through undead-haunted mining tunnels, rescue trapped survivors, discover the truth of Thorgar's fall, and destroy the Clan Heart — the dwarven artifact powering his undeath — before he leads his army out of the mountain.",
+    "rewards": "500 gp from Mayor Brunnilda Stonebeard, the Clan Heart artifact (see treasure), and the lasting gratitude of Ironhaven. If the party rescues Kelda and the surviving miners, they gain additional allies in the region. The truth of Ironfist may also grant the Mountain Dwarf Ranger a powerful connection to their ancestral heritage.",
+    "notes": "This is the main quest of the one-shot. The party should progress through all four encounters in sequence. The mountain collapse after Thorgar's defeat provides a natural time limit and exciting conclusion. If the party takes too long, Thorgar's influence spreads — more undead are created, and the town above begins to fall."
+  },
+  {
+    "id": "q2b3c4d5-e6f7-a8b9-c0d1-e2f3a4b5c6d7",
+    "name": "Rescue the Survivors",
+    "status": "active",
+    "description": "Dozens of miners are trapped beneath Irondeep Hold following the collapse three weeks ago. The party must find and rescue the surviving miners, including Brom (who accidentally breached the ancient tomb) and Kelda (who has been captured by Thorgar and used as a living sacrifice). The survivors are scattered across the deep mines and the ancient tomb's inner chambers.",
+    "rewards": "Kelda's knowledge of the sanctum layout and Thorgar's patterns, the miners' gratitude, and a dwarven heirloom each (50 gp value per survivor rescued). If Kelda is rescued, she provides crucial information about the Runes of Binding and the sanctum's defenses.",
+    "notes": "This quest runs parallel to the main quest. The trapped miners are found behind a collapsed wall in the deep mines (Hour 2). Kelda is held in the tomb's inner chambers (Hour 3). If the survivors are rescued, they help clear debris during the escape, giving the party advantage on Dexterity saves during the mountain collapse."
+  },
+  {
+    "id": "q3c4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8",
+    "name": "The Truth of Ironfist",
+    "status": "active",
+    "description": "The ancient dwarven tomb of Clan Ironfist holds murals and lore revealing the truth behind Thorgar's fall. Thorgar was not corrupted — he was betrayed. Blessed by Moradin with unnatural strength and durability, his own clan sealed him in the tomb out of fear. The party must discover this truth through History and Religion checks, which may sway Thorgar's resolve during the final battle and reveal his weakness.",
+    "rewards": "Understanding of Thorgar's weakness (the Clan Heart must be destroyed), potential to sway the Mountain Dwarf Ranger character through Thorgar's revelation of their shared bloodline, and a dwarven history scroll valuable to scholars (100 gp to collectors). If the Ranger accepts their heritage, Thorgar offers them a role in his new dwarven empire.",
+    "notes": "The tomb's murals are in the Ancient Tomb map. A DC 15 Intelligence (History) check reveals the betrayal. The Ranger character's connection to Thorgar is the most personal element of this quest — it should be played as a dramatic roleplaying moment, not just a skill check."
+  },
+  {
+    "id": "q4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8f9",
+    "name": "The Deep Dwellers' Alliance",
+    "status": "active",
+    "description": "Two duergar have been hiding in the deepest levels of Irondeep Hold, fleeing Thorgar's undead army. The party must find them and convince them to ally against the common threat. The duergar know secret tunnels through the mountain that could provide an escape route during the final collapse.",
+    "rewards": "Two duergar allies who can help in the final battle (they provide distraction and cover), and access to duergar underground tunnels as an alternative escape route. The duergar also possess a +1 pickaxe each and knowledge of the mountain's weak points.",
+    "notes": "The duergar are found in the deepest levels of the Ancient Tomb map, hidden behind a secret passage. They are cautious and distrustful of surface dwellers. A DC 14 Charisma (Persuasion) or Wisdom (Insight) check is needed to convince them to help. If convinced, they join the final battle and reveal the secret escape tunnel."
+  }
+]
