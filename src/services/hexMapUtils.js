@@ -174,16 +174,33 @@ export function getAllHexes(width, height) {
 }
 
 /**
- * Returns the total pixel dimensions of a full hex grid.
+ * Returns the total pixel dimensions and offsets of a full hex grid.
+ * For axial coordinates (q in 0..width-1, r in 0..height-1) with pointy-top hexes:
+ *   Leftmost point: left corner of hex (0, 0) = -size * sqrt(3) / 2
+ *   Rightmost point: right corner of hex (width-1, height-1)
+ *     = size * sqrt(3) * ((width-1) + (height-1)/2 + 0.5)
+ *   Topmost point: top corner of hex (0, 0) = -size
+ *   Bottommost point: bottom corner of hex (0, height-1)
+ *     = size * (1.5 * (height-1) + 1)
  * @param {number} width - number of columns
  * @param {number} height - number of rows
  * @param {number} size - hex radius in SVG pixels
- * @returns {{ width: number, height: number }}
+ * @returns {{ width: number, height: number, offsetX: number, offsetY: number, centerX: number, centerY: number }}
  */
 export function getHexGridPixelDimensions(width, height, size) {
-  const totalWidth = size * Math.sqrt(3) * (width + 0.5);
-  const totalHeight = size * 3 / 2 * height + size / 2;
-  return { width: totalWidth, height: totalHeight };
+  const xMin = -size * Math.sqrt(3) / 2;
+  const xMax = size * Math.sqrt(3) * ((width - 1) + (height - 1) / 2 + 0.5);
+  const yMin = -size;
+  const yMax = size * (1.5 * (height - 1) + 1);
+
+  return {
+    width: xMax - xMin,
+    height: yMax - yMin,
+    offsetX: xMin,
+    offsetY: yMin,
+    centerX: (xMin + xMax) / 2,
+    centerY: (yMin + yMax) / 2,
+  };
 }
 
 /**

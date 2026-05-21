@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import * as mapsService from '../../services/mapsService.js';
 import {
     HEX_SIZE, DEFAULT_GRID_SIZE, DEFAULT_TERRAIN, MIN_ZOOM, MAX_ZOOM,
@@ -55,9 +55,24 @@ function HexMap({ campaignName, mapName, onBack }) {
     const isInitialized = useRef(false);
     const hasLoaded = useRef(false);
 
-    // Computed SVG dimensions
-    const svgWidth = HEX_SIZE * Math.sqrt(3) * (gridSize + 0.5);
-    const svgHeight = HEX_SIZE * 3 / 2 * gridSize + HEX_SIZE / 2;
+    // Computed SVG dimensions — corrected to account for full axial extent + hex shape
+    const gridPixelBounds = useMemo(() => {
+        const xMin = -HEX_SIZE * Math.sqrt(3) / 2;
+        const xMax = HEX_SIZE * Math.sqrt(3) * ((gridSize - 1) + (gridSize - 1) / 2 + 0.5);
+        const yMin = -HEX_SIZE;
+        const yMax = HEX_SIZE * (1.5 * (gridSize - 1) + 1);
+        return {
+            width: xMax - xMin,
+            height: yMax - yMin,
+            offsetX: xMin,
+            offsetY: yMin,
+            centerX: (xMin + xMax) / 2,
+            centerY: (yMin + yMax) / 2,
+        };
+    }, [gridSize]);
+
+    const svgWidth = gridPixelBounds.width;
+    const svgHeight = gridPixelBounds.height;
 
     // ─── Zoom/Pan helpers ────────────────────────────────────────────────
 
@@ -71,8 +86,8 @@ function HexMap({ campaignName, mapName, onBack }) {
 
     const resetView = useCallback(() => {
         setZoom(1);
-        setPanX(0);
-        setPanY(0);
+        setPanX(-(HEX_SIZE * Math.sqrt(3) / 2));
+        setPanY(-HEX_SIZE);
     }, []);
 
     const handlePanStart = useCallback((e) => {
@@ -125,13 +140,13 @@ function HexMap({ campaignName, mapName, onBack }) {
         const currentPanY = panYValueRef.current;
         accumulatedDeltaRef.current += e.deltaY;
         const accumulated = accumulatedDeltaRef.current;
-        const ZOOM_THRESHOLD = 30;
+        const ZOOM_THRESHOLD = 20;
         let factor = 1;
         if (accumulated < -ZOOM_THRESHOLD) {
-            factor = 1.025;
+            factor = 1.05;
             accumulatedDeltaRef.current = 0;
         } else if (accumulated > ZOOM_THRESHOLD) {
-            factor = 0.975;
+            factor = 0.95;
             accumulatedDeltaRef.current = 0;
         }
         const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, currentZoom * factor));
@@ -310,8 +325,10 @@ function HexMap({ campaignName, mapName, onBack }) {
                     const loadedPois = existing.pois || [];
                     const loadedGridSize = existing.gridSize || DEFAULT_GRID_SIZE;
                     const loadedZoom = existing.zoom != null ? existing.zoom : 1;
-                    const loadedPanX = existing.panX != null ? existing.panX : 0;
-                    const loadedPanY = existing.panY != null ? existing.panY : 0;
+                    // Migrate old broken default (panX=0, panY=0) to centering values
+                    const isOldDefault = existing.panX === 0 && existing.panY === 0;
+                    const loadedPanX = (!isOldDefault && existing.panX != null) ? existing.panX : -(HEX_SIZE * Math.sqrt(3) / 2);
+                    const loadedPanY = (!isOldDefault && existing.panY != null) ? existing.panY : -HEX_SIZE;
 
                     // Set default type for backward compat
                     if (!existing.type) {
@@ -347,8 +364,8 @@ function HexMap({ campaignName, mapName, onBack }) {
                 terrain: initialTerrain,
                 pois: [],
                 zoom: 1,
-                panX: 0,
-                panY: 0
+                panX: -(HEX_SIZE * Math.sqrt(3) / 2),
+                panY: -HEX_SIZE
             };
 
             setMapData(newData);

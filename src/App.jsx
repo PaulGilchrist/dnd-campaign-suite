@@ -88,10 +88,15 @@ function App() {
   };
 
   const handleMapsClick = () => {
-    if (activeView === 'mapsManager') {
+    if (mapsView.type === 'map') {
+      // Already viewing a map — go back to the manager listing
+      setMapsView({ type: 'manager' });
+    } else if (activeView === 'mapsManager') {
+      // Already on the manager listing — toggle off
       setMapsView({ type: 'none' });
       setActiveView(null);
     } else {
+      // Not on maps at all — open the manager
       setActiveView('mapsManager');
       if (isLocalhost) {
         setMapsView({ type: 'manager' });

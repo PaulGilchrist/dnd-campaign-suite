@@ -903,8 +903,73 @@
     "28,29": "water",
     "29,29": "water"
   },
-  "pois": [],
-  "zoom": 1,
-  "panX": -17.652290353576575,
-  "panY": -21.72603530587321
+  "pois": [
+    {
+      "id": "poi-1779365689152-b0zunk",
+      "type": "settlement",
+      "q": 18,
+      "r": 10,
+      "visible": true,
+      "label": "Settlement"
+    },
+    {
+      "id": "poi-1779365694777-egnd4k",
+      "type": "dungeon",
+      "q": 22,
+      "r": 14,
+      "visible": true,
+      "label": "Dungeon"
+    },
+    {
+      "id": "poi-1779365701406-kfwuhz",
+      "type": "camp",
+      "q": 22,
+      "r": 10,
+      "visible": true,
+      "label": "Camp"
+    },
+    {
+      "id": "poi-1779365704016-myujvy",
+      "type": "tower",
+      "q": 15,
+      "r": 10,
+      "visible": true,
+      "label": "Tower"
+    },
+    {
+      "id": "poi-1779365707916-2bew97",
+      "type": "loreSite",
+      "q": 12,
+      "r": 16,
+      "visible": true,
+      "label": "Lore Site"
+    },
+    {
+      "id": "poi-1779365711359-9gk5ov",
+      "type": "naturalWonder",
+      "q": 17,
+      "r": 16,
+      "visible": true,
+      "label": "Natural Wonder"
+    },
+    {
+      "id": "poi-1779365714659-292jew",
+      "type": "landmark",
+      "q": 21,
+      "r": 7,
+      "visible": true,
+      "label": "Landmark"
+    },
+    {
+      "id": "poi-1779365731677-9fjvic",
+      "type": "hazard",
+      "q": 26,
+      "r": 8,
+      "visible": true,
+      "label": "Hazard"
+    }
+  ],
+  "zoom": 2.208200830950501,
+  "panX": 650.378722867817,
+  "panY": 163.73244915150846
 }

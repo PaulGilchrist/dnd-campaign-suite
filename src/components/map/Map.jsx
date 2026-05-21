@@ -168,13 +168,13 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         const currentPanY = panYValueRef.current;
         accumulatedDeltaRef.current += e.deltaY;
         const accumulated = accumulatedDeltaRef.current;
-        const ZOOM_THRESHOLD = 30;
+        const ZOOM_THRESHOLD = 20;
         let factor = 1;
         if (accumulated < -ZOOM_THRESHOLD) {
-            factor = 1.025;
+            factor = 1.05;
             accumulatedDeltaRef.current = 0;
         } else if (accumulated > ZOOM_THRESHOLD) {
-            factor = 0.975;
+            factor = 0.95;
             accumulatedDeltaRef.current = 0;
         }
         const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, currentZoom * factor));
