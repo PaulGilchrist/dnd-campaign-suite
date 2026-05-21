@@ -871,84 +871,28 @@
   "items": [],
   "players": [
     {
-      "id": "creature-0-1779209589404",
-      "name": "Barbarian",
-      "gridX": 1,
-      "gridY": 2,
-      "imagePath": "campaigns/2024 Testing/images/Barbarian.png"
-    },
-    {
-      "id": "creature-1-1779209589404",
-      "name": "Bard",
-      "gridX": 3,
-      "gridY": 2,
-      "imagePath": "campaigns/2024 Testing/images/Bard.png"
-    },
-    {
-      "id": "creature-2-1779209589404",
+      "id": "player-2-1779209589404",
       "name": "Cleric",
       "gridX": 5,
       "gridY": 2,
       "imagePath": "campaigns/2024 Testing/images/Cleric.png"
     },
     {
-      "id": "creature-3-1779209589404",
-      "name": "Druid",
-      "gridX": 7,
-      "gridY": 2,
-      "imagePath": "campaigns/2024 Testing/images/Druid.png"
-    },
-    {
-      "id": "creature-4-1779209589404",
+      "id": "player-4-1779209589404",
       "name": "Fighter",
       "gridX": 9,
       "gridY": 2,
       "imagePath": "campaigns/2024 Testing/images/Fighter.png"
     },
     {
-      "id": "creature-5-1779209589404",
-      "name": "Monk",
-      "gridX": 11,
-      "gridY": 2,
-      "imagePath": "campaigns/2024 Testing/images/Monk.png"
-    },
-    {
-      "id": "creature-6-1779209589404",
-      "name": "Paladin",
-      "gridX": 13,
-      "gridY": 2,
-      "imagePath": "campaigns/2024 Testing/images/Paladin.png"
-    },
-    {
-      "id": "creature-7-1779209589404",
-      "name": "Ranger",
-      "gridX": 2,
-      "gridY": 4,
-      "imagePath": "campaigns/2024 Testing/images/Ranger.png"
-    },
-    {
-      "id": "creature-8-1779209589404",
+      "id": "player-8-1779209589404",
       "name": "Rogue",
       "gridX": 4,
       "gridY": 4,
       "imagePath": "campaigns/2024 Testing/images/Rogue.png"
     },
     {
-      "id": "creature-9-1779209589404",
-      "name": "Sorcerer",
-      "gridX": 6,
-      "gridY": 4,
-      "imagePath": "campaigns/2024 Testing/images/Sorcerer.png"
-    },
-    {
-      "id": "creature-10-1779209589404",
-      "name": "Warlock",
-      "gridX": 8,
-      "gridY": 4,
-      "imagePath": "campaigns/2024 Testing/images/Warlock.png"
-    },
-    {
-      "id": "creature-11-1779209589404",
+      "id": "player-11-1779209589404",
       "name": "Wizard",
       "gridX": 10,
       "gridY": 4,

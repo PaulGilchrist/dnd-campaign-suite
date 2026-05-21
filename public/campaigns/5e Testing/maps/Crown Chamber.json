@@ -1540,28 +1540,28 @@
   "npcMetadata": [],
   "players": [
     {
-      "id": "creature-0-1779386454881",
+      "id": "player-0-1779386454881",
       "name": "Barbarian",
       "gridX": 15,
       "gridY": 26,
       "imagePath": "campaigns/5e Testing/images/Barbarian.png"
     },
     {
-      "id": "creature-1-1779386454881",
+      "id": "player-1-1779386454881",
       "name": "Bard",
       "gridX": 16,
       "gridY": 28,
       "imagePath": "campaigns/5e Testing/images/Bard.png"
     },
     {
-      "id": "creature-2-1779386454881",
+      "id": "player-2-1779386454881",
       "name": "Druid",
       "gridX": 15,
       "gridY": 28,
       "imagePath": "campaigns/5e Testing/images/Druid.png"
     },
     {
-      "id": "creature-3-1779386454881",
+      "id": "player-3-1779386454881",
       "name": "Ranger",
       "gridX": 16,
       "gridY": 26,
