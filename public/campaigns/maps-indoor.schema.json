@@ -21,6 +21,10 @@
             "type": "string",
             "description": "The map name"
         },
+        "description": {
+            "type": "string",
+            "description": "Markdown description of the map"
+        },
         "gridSize": {
             "type": "integer",
             "minimum": 5,

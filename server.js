@@ -457,6 +457,33 @@ app.put('/api/campaigns/:campaign/maps/:mapname/activate', (req, res) => {
   }
 });
 
+// PUT /api/campaigns/:campaign/maps/:mapname/description - Update map description
+app.put('/api/campaigns/:campaign/maps/:mapname/description', (req, res) => {
+  const { campaign, mapname } = req.params;
+  const { description } = req.body;
+  const mapsDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps');
+  const fileName = mapname.endsWith('.json') ? mapname : `${mapname}.json`;
+  const filePath = path.join(mapsDir, fileName);
+  
+  try {
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Map not found' });
+    }
+    
+    const mapData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    mapData.description = description || '';
+    fs.writeFileSync(filePath, JSON.stringify(mapData, null, 2));
+    
+    // Broadcast updated map data
+    publish(`map-data-${campaign}-${fileName.replace(/\.json$/, '')}`, mapData);
+    
+    res.json({ message: 'Map description updated successfully' });
+  } catch (error) {
+    console.error('Error updating map description:', error);
+    res.status(500).json({ error: 'Failed to update map description' });
+  }
+});
+
 // ====== END MAP CRUD ROUTES ======
 
 // ====== ENCOUNTER CRUD ROUTES ======

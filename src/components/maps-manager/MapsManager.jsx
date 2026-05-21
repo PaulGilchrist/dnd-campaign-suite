@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as mapsService from '../../services/mapsService.js';
+import PreviewToggle from '../common/PreviewToggle.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import GenerateDungeonModal from './GenerateDungeonModal.jsx';
 import GenerateTerrainModal from './GenerateTerrainModal.jsx';
@@ -16,6 +17,11 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
     const [mapType, setMapType] = useState('indoor'); // 'indoor' | 'outdoor'
     const [showGenerateModal, setShowGenerateModal] = useState(false);
     const [showTerrainModal, setShowTerrainModal] = useState(false);
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [editingMap, setEditingMap] = useState(null);
+    const [editDescription, setEditDescription] = useState('');
+    const [loadingMapData, setLoadingMapData] = useState(false);
+    const [savingDescription, setSavingDescription] = useState(false);
 
     const loadMapsList = useCallback(async () => {
         try {
@@ -131,6 +137,42 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
         await loadMapsList();
     }, [loadMapsList]);
 
+    const handleEditDescription = async (map) => {
+        try {
+            setLoadingMapData(true);
+            const mapData = await mapsService.loadMapData(campaignName, map.fileName);
+            setEditDescription(mapData.description || '');
+            setEditingMap(map);
+            setEditModalOpen(true);
+        } catch (err) {
+            setError(err.message || 'Failed to load map data');
+        } finally {
+            setLoadingMapData(false);
+        }
+    };
+
+    const handleSaveDescription = async () => {
+        if (!editingMap) return;
+
+        setSavingDescription(true);
+        try {
+            await mapsService.updateMapDescription(campaignName, editingMap.fileName, editDescription);
+            setEditModalOpen(false);
+            setEditingMap(null);
+            setEditDescription('');
+        } catch (err) {
+            setError(err.message || 'Failed to save map description');
+        } finally {
+            setSavingDescription(false);
+        }
+    };
+
+    const handleCancelDescription = () => {
+        setEditModalOpen(false);
+        setEditingMap(null);
+        setEditDescription('');
+    };
+
     const deletingMapName = deletingMap
         ? (maps.find(m => m.fileName === deletingMap)?.name || deletingMap)
         : '';
@@ -231,6 +273,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                                 <button onClick={() => onOpenMap(map.fileName)}>Open</button>
                                 {!map.isActive && <button onClick={() => handleActivate(map.fileName)}>Activate</button>}
                                 <button onClick={() => handleStartRename(map.fileName, map.name)}>Rename</button>
+                                <button className="edit-desc-btn" onClick={() => handleEditDescription(map)} title="Edit description"><i className="fa-solid fa-pen"></i></button>
                                 <button className="delete-btn" onClick={() => setDeletingMap(map.fileName)}>Delete</button>
                             </div>
                         </li>
@@ -272,6 +315,56 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                     onClose={() => setShowTerrainModal(false)}
                     onMapCreated={loadMapsList}
                 />
+            )}
+
+            {editModalOpen && editingMap && (
+                <div className="maps-manager-modal-overlay" onClick={(e) => {
+                    if (e.target === e.currentTarget) handleCancelDescription();
+                }}>
+                    <div className="maps-manager-modal" onClick={e => e.stopPropagation()}>
+                        <div className="ct-modal-header">
+                            <h3>Edit Description — {mapsService.formatMapName(editingMap.name)}</h3>
+                            <button className="ct-modal-close" onClick={handleCancelDescription} aria-label="Close">
+                                &times;
+                            </button>
+                        </div>
+
+                        <div className="ct-modal-body">
+                            {loadingMapData ? (
+                                <div className="maps-manager-loading">Loading map data…</div>
+                            ) : (
+                                <PreviewToggle
+                                    id="map-description"
+                                    value={editDescription}
+                                    onChange={setEditDescription}
+                                    placeholder="Describe this map… (supports Markdown)"
+                                    label="Map Description"
+                                    minHeight="200px"
+                                />
+                            )}
+                        </div>
+
+                        <div className="ct-modal-footer">
+                            <div className="ct-modal-buttons">
+                                <button
+                                    className="ct-btn ct-btn-secondary"
+                                    onClick={handleCancelDescription}
+                                    disabled={savingDescription}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    className="ct-btn ct-btn-primary"
+                                    onClick={handleSaveDescription}
+                                    disabled={savingDescription}
+                                >
+                                    <i className="fa-solid fa-floppy-disk" />{' '}
+                                    {savingDescription ? 'Saving…' : 'Save'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

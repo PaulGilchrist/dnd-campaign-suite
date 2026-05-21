@@ -20,6 +20,10 @@
             ],
             "description": "Map type identifier"
         },
+        "description": {
+            "type": "string",
+            "description": "Markdown description of the map"
+        },
         "gridSize": {
             "type": "integer",
             "minimum": 5,

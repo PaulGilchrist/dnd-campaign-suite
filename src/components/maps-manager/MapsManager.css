@@ -299,6 +299,18 @@
     border-color: var(--color-error-light);
 }
 
+/* Edit description button */
+.maps-manager-item-actions .edit-desc-btn {
+    border-color: var(--border-color);
+    color: var(--color-text-muted);
+}
+
+.maps-manager-item-actions .edit-desc-btn:hover {
+    background: #3a3a3a;
+    border-color: #555;
+    color: var(--color-text);
+}
+
 /* ===== Light theme overrides ===== */
 
 [data-theme="light"] .maps-manager-header .back-button {
@@ -365,6 +377,17 @@
 [data-theme="light"] .maps-manager-modal-actions .delete-confirm-btn:hover {
     background-color: var(--color-error-light);
     border-color: var(--color-error-light);
+}
+
+[data-theme="light"] .maps-manager-item-actions .edit-desc-btn {
+    border-color: #ccc;
+    color: #666;
+}
+
+[data-theme="light"] .maps-manager-item-actions .edit-desc-btn:hover {
+    background: #d8d8d8;
+    border-color: #aaa;
+    color: #333;
 }
 
 /* ===== System light mode fallback ===== */

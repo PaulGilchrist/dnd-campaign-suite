@@ -129,6 +129,26 @@ export const loadMapData = async (campaignName, mapName) => {
   }
 };
 
+export const updateMapDescription = async (campaignName, mapName, description) => {
+  try {
+    const encodedCampaign = encodeURIComponent(campaignName);
+    const encodedMapName = encodeURIComponent(mapName);
+    const response = await fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}/description`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description }),
+    });
+    if (!response.ok) {
+      const { error } = await response.json();
+      throw new Error(error || 'Failed to update map description');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating map description:', error);
+    throw error;
+  }
+};
+
 export function formatMapName(name) {
     if (!name) return '';
     return name
