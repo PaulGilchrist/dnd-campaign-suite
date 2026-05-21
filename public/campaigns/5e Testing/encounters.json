@@ -1,0 +1,105 @@
+{
+  "encounters": [
+    {
+      "name": "The Death Knight Ambush",
+      "savedAt": "2026-05-21T00:00:00Z",
+      "rulesVersion": "5e",
+      "difficulty": 3,
+      "playerLevels": [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+      "selectedMonsters": [
+        { "index": "death-knight", "name": "Death Knight", "qty": 6 },
+        { "index": "marilith", "name": "Marilith", "qty": 1 },
+        { "index": "specter", "name": "Specter", "qty": 8 },
+        { "index": "ghost", "name": "Ghost", "qty": 4 }
+      ]
+    },
+    {
+      "name": "The Balor's Descent",
+      "savedAt": "2026-05-21T00:00:00Z",
+      "rulesVersion": "5e",
+      "difficulty": 3,
+      "playerLevels": [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+      "selectedMonsters": [
+        { "index": "balor", "name": "Balor", "qty": 2 },
+        { "index": "erutuki", "name": "Erutuki", "qty": 4 },
+        { "index": "fire-newt", "name": "Fire Newt", "qty": 12 }
+      ]
+    },
+    {
+      "name": "The Dragon and the Worm",
+      "savedAt": "2026-05-21T00:00:00Z",
+      "rulesVersion": "5e",
+      "difficulty": 3,
+      "playerLevels": [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+      "selectedMonsters": [
+        { "index": "adult-red-dragon", "name": "Adult Red Dragon", "qty": 1 },
+        { "index": "purple-worm", "name": "Purple Worm", "qty": 1 },
+        { "index": "magma-mephit", "name": "Magma Mephit", "qty": 6 }
+      ]
+    },
+    {
+      "name": "The Aboleth's Domain",
+      "savedAt": "2026-05-21T00:00:00Z",
+      "rulesVersion": "5e",
+      "difficulty": 2,
+      "playerLevels": [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+      "selectedMonsters": [
+        { "index": "aboleth", "name": "Aboleth", "qty": 2 },
+        { "index": "kuo-toa", "name": "Kuo-toa", "qty": 10 },
+        { "index": "kuo-toa-whip", "name": "Kuo-toa Whip", "qty": 3 },
+        { "index": "chuul", "name": "Chuul", "qty": 2 }
+      ]
+    },
+    {
+      "name": "The Demilich's Vault",
+      "savedAt": "2026-05-21T00:00:00Z",
+      "rulesVersion": "5e",
+      "difficulty": 3,
+      "playerLevels": [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+      "selectedMonsters": [
+        { "index": "demilich", "name": "Demilich", "qty": 1 },
+        { "index": "wight", "name": "Wight", "qty": 6 },
+        { "index": "mummy", "name": "Mummy", "qty": 4 },
+        { "index": "specter", "name": "Specter", "qty": 10 }
+      ]
+    },
+    {
+      "name": "The Androsphinx's Trial",
+      "savedAt": "2026-05-21T00:00:00Z",
+      "rulesVersion": "5e",
+      "difficulty": 2,
+      "playerLevels": [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+      "selectedMonsters": [
+        { "index": "androsphinx", "name": "Androsphinx", "qty": 1 },
+        { "index": "stone-golem", "name": "Stone Golem", "qty": 2 }
+      ]
+    },
+    {
+      "name": "The Final Confrontation — Valandril's Last Stand",
+      "savedAt": "2026-05-21T00:00:00Z",
+      "rulesVersion": "5e",
+      "difficulty": 3,
+      "playerLevels": [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+      "selectedMonsters": [
+        { "index": "lich", "name": "Lich", "qty": 1 },
+        { "index": "death-knight", "name": "Death Knight", "qty": 3 },
+        { "index": "marilith", "name": "Marilith", "qty": 1 },
+        { "index": "ancient-red-dragon", "name": "Ancient Red Dragon", "qty": 1 },
+        { "index": "specter", "name": "Specter", "qty": 12 },
+        { "index": "ghost", "name": "Ghost", "qty": 6 }
+      ]
+    },
+    {
+      "name": "The Tarrasque Awakens — Optional Finale",
+      "savedAt": "2026-05-21T00:00:00Z",
+      "rulesVersion": "5e",
+      "difficulty": 3,
+      "playerLevels": [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+      "selectedMonsters": [
+        { "index": "tarrasque", "name": "Tarrasque", "qty": 1 },
+        { "index": "erutuki", "name": "Erutuki", "qty": 6 },
+        { "index": "fire-newt", "name": "Fire Newt", "qty": 20 }
+      ]
+    }
+  ]
+}

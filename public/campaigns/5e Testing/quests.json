@@ -1,0 +1,26 @@
+[
+  {
+    "id": "q1-main-shattered-crown",
+    "name": "The Shattered Crown of Netheril",
+    "status": "active",
+    "description": "The legendary Crown of Netheril — an artifact capable of reshaping reality — has been shattered into seven fragments. All seven fragments have begun converging on the ancient Netherese ruins buried beneath Waterdeep. The cult known as the Order of the Shattered Crown seeks to reassemble the crown and claim its power. The party must reach the ruins first, confront the cult, and decide the fate of the crown — destroy it, seal it, or claim it for themselves.\n\nThe crown's fragments have been subtly influencing the party members' dreams and visions, drawing them to Waterdeep. Each fragment resonates with a different class's core abilities, making the pull personal to every member of the party.",
+    "rewards": "The party gains access to the Vault of the Archwizards (indoor map), confronts the lich lord Valandril, and must choose the crown's fate. Depending on their choice, they may gain a powerful artifact, earn the gratitude of multiple factions, or make enemies of powerful forces.",
+    "notes": "This is the main quest. Track which fragment each party member encounters — tie it to their class abilities and backstory. The crown's reassembly should feel like a ticking clock. If the party takes too long, the cult completes the reassembly and the final encounter changes dramatically."
+  },
+  {
+    "id": "q2-side-waterdeep-investigation",
+    "name": "Shadows Beneath Waterdeep",
+    "status": "active",
+    "description": "Before descending into the Netherese ruins, the party must gather intelligence about the Order of the Shattered Crown and locate the entrance to the underground complex. Various factions in Waterdeep have information — but they all want something in return.\n\nThe party can investigate through:\n- The Watchful Order of Magists and Protectors (they've detected massive arcane disturbances)\n- The Harpers (they've been tracking the cult for decades)\n- The Iron Throne mercenaries (they have a contract to eliminate the cult but need the party to find them first)\n- Underground information brokers in the Dock Ward\n\nSkill challenges involving Arcana, History, Investigation, and Persuasion determine how much information the party gathers and how quickly they find the entrance.",
+    "rewards": "Each successful skill challenge reveals a clue about the ruins, a weakness of the cult, or a hidden shortcut. Gathering enough intelligence grants the party advantage on their first encounter in the ruins and reveals a secret entrance that bypasses the outer tunnels.",
+    "notes": "This is a social/investigation side quest. Use it to pace the adventure and let roleplay shine before the combat-heavy encounters. Tie faction interactions to the party members' backgrounds and alignments."
+  },
+  {
+    "id": "q3-side-fragment-collection",
+    "name": "The Seven Fragments",
+    "status": "active",
+    "description": "Before the final confrontation, each of the seven crown fragments has been hidden in a different location around Waterdeep and its surroundings. The fragments are guarded by powerful creatures and arcane traps. The party doesn't need to collect all seven — but each fragment they bring to the final chamber weakens the cult's ability to reassemble the crown.\n\nThe fragments are hidden at:\n1. The Undermountain approach — guarded by a purple worm\n2. The Sea of Swords coast — guarded by a kraken cult\n3. The Mount Waterdeep summit — guarded by an ancient dragon's spirit\n4. The Chasm of the Maelstrom — guarded by an aboleth\n5. The ancient elven ruins of Sschindylryn — guarded by drow nobility\n6. The ruins of Myth Drannor — guarded by a demilich\n7. The Astral Plane echo — guarded by an androsphinx\n\nThe party can choose which fragments to pursue based on their interests and abilities.",
+    "rewards": "Each fragment collected reduces the cult's power in the final encounter. For every two fragments the party collects, the lich lord Valandril arrives with one fewer ally, and the reassembled crown has one fewer charge. Collecting all seven allows the party to reassemble the crown themselves rather than the cult.",
+    "notes": "This side quest gives the party agency over pacing. If they rush to the ruins, they face the full force of the cult. If they spend time collecting fragments, they face a weakened enemy but risk the cult completing the reassembly anyway. The fragments should resonate with specific class abilities — e.g., the fragment in Undermountain might enhance barbarian rage, the one in Myth Drannor might enhance wizard spellcasting."
+  }
+]

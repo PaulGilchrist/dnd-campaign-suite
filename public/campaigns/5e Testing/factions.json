@@ -1,0 +1,42 @@
+[
+  {
+    "id": "faction-order-shattered-crown",
+    "name": "Order of the Shattered Crown",
+    "description": "A cult of Netherese liches, arcanists, and devoted followers who seek to reassemble the Crown of Netheril and restore the floating empire to the skies. Led by the lich lord Valandril, the Order has been operating in secret for centuries, gathering the crown fragments and preparing for the Great Restoration. Their ranks include spellcasters of all disciplines, undead warriors, and mortal devotees who believe that Netherese supremacy is the only path to saving Faerûn.",
+    "goals": "To reassemble the Crown of Netheril, restore the floating empire of Netheril to Faerûn, and establish Valandril as the supreme archwizard of the new age. They believe the current era is one of decay and that only Netherese order can prevent greater catastrophes.",
+    "influence": 7,
+    "notes": "The primary antagonistic faction. They are intelligent, well-organized, and have resources that match the party's power level. The Order is not monolithic — internal power struggles between Valandril and Myranda create opportunities for the party to exploit. Some cult members may be willing to defect if approached correctly."
+  },
+  {
+    "id": "faction-harper-cell-waterdeep",
+    "name": "Waterdeep Harper Cell",
+    "description": "The Harper network has an active cell in Waterdeep dedicated to monitoring arcane disturbances and preventing any single power from dominating the city. Led by the information broker Aldan Quickfinger (publicly) and an unnamed Harper agent (secretly), the cell has been tracking the Order of the Shattered Crown for decades. They operate through a network of informants, safe houses, and covert operatives throughout the city.",
+    "goals": "To prevent the Order from obtaining the crown fragments and to protect Waterdeep from the devastation that would follow. The Harpers believe the crown's power is too dangerous for any mortal to wield and want it destroyed or sealed away permanently.",
+    "influence": 6,
+    "notes": "The Harpers are the party's primary allies in Waterdeep. They provide intelligence, safe houses, and moral support. Aldan can be a valuable contact for the party, especially bard characters. The Harpers respect the party's power but are wary of their intentions — they will be watching to see how the party handles the crown."
+  },
+  {
+    "id": "faction-watchful-order-magists",
+    "name": "Watchful Order of Magists and Protectors",
+    "description": "The official arcane regulatory body of Waterdeep, responsible for monitoring and regulating magical activity in the city. Led by the Open Lord's appointed archmage, the Order has detected massive arcane disturbances emanating from beneath Waterdeep and is increasingly concerned about the Order of the Shattered Crown's activities. They have limited resources to devote to the underground threat but are coordinating with other factions.",
+    "goals": "To regulate magical activity in Waterdeep and prevent any arcane catastrophe. The Watchful Order wants to contain the situation beneath the city and ensure that no unauthorized magical experiments threaten the city's population.",
+    "influence": 8,
+    "notes": "The Watchful Order is a bureaucratic but powerful faction. They can provide the party with arcane research, magical supplies, and official clearance to operate in certain areas. However, their bureaucracy can also be an obstacle — they may try to restrict the party's actions if they perceive them as a threat to public safety."
+  },
+  {
+    "id": "faction-iron-throne-waterdeep",
+    "name": "Iron Throne — Waterdeep Branch",
+    "description": "One of the most powerful mercantile organizations in Faerûn, the Iron Throne has a significant presence in Waterdeep. Their Waterdeep branch has been hired by an anonymous patron to eliminate the Order of the Shattered Crown, but they lack the intelligence needed to locate the cult's underground complex. They are willing to contract with the party to provide the necessary reconnaissance.",
+    "goals": "To fulfill their contract and eliminate the Order of the Shattered Crown, thereby securing their reputation and payment. The Iron Throne also wants to ensure that the crown fragments do not fall into the hands of their competitors.",
+    "influence": 9,
+    "notes": "The Iron Throne provides a mercenary/financial angle to the adventure. They can fund the party's operations, provide equipment, and offer protection. However, their contract comes with strings attached — they expect a share of any treasure found and may try to claim the crown fragments for themselves."
+  },
+  {
+    "id": "faction-temple-moradin-waterdeep",
+    "name": "Temple of Moradin — Waterdeep",
+    "description": "The temple of Moradin in Waterdeep is a center of dwarven culture and divine power in the city. Led by High Priest Thornak Ironfist, the temple has been having visions of a great catastrophe — the awakening of the Tarrasque — and believes that the crown fragments are a test from the gods. The temple has resources, divine magic, and a network of dwarven allies throughout Faerûn.",
+    "goals": "To protect Waterdeep and its inhabitants from all threats, including the Order of the Shattered Crown and the awakening Tarrasque. The temple believes the crown fragments are a divine test and that the party has been chosen as champions to prevent catastrophe.",
+    "influence": 5,
+    "notes": "The Temple of Moradin provides the divine/spiritual angle to the adventure. They can offer healing, protection from undead, and guidance to paladin and cleric characters. Their visions of the Tarrasque tie into the larger threat and set up potential future campaigns."
+  }
+]
