@@ -1,35 +1,105 @@
 {
-    "abilities": [
-        {"name": "Strength","abilityImprovements": 0,"baseScore": 8,"miscBonus": 0},
-        {"name": "Dexterity","abilityImprovements": 0,"baseScore": 13,"miscBonus": 0},
-        {"name": "Constitution","abilityImprovements": 0,"baseScore": 14,"miscBonus": 0},
-        {"name": "Intelligence","abilityImprovements": 0,"baseScore": 10,"miscBonus": 0},
-        {"name": "Wisdom","abilityImprovements": 0,"baseScore": 15,"miscBonus": 0},
-        {"name": "Charisma","abilityImprovements": 0,"baseScore": 12,"miscBonus": 0}
-    ],
-    "alignment": "Neutral Good",
-    "class": {
-        "name": "Druid",
-        "subclass": {
-            "name": "Land",
-            "type": "Forest"
-        }
+  "name": "Druid",
+  "level": 5,
+  "alignment": "Neutral Good",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
     },
-    "inventory": {
-        "backpack": ["Mess Kit","Playing Card Set","Rations (5 days)","Rope, Silk (50 feet)","Small Knife","Tinderbox","Torch","Totem","Waterskin"],
-        "equipped": ["Cloak of Elvenkind","Leather","Longbow","Scimitar","Dagger"],
-        "gold": 30
+    {
+      "name": "Dexterity",
+      "baseScore": 13,
+      "abilityImprovements": 0,
+      "miscBonus": 0
     },
-    "languages": ["Sylvan"],
-    "level": 20,
+    {
+      "name": "Constitution",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 10,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 15,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 12,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    }
+  ],
+  "background": "",
+  "class": {
     "name": "Druid",
-    "race": {
-        "name": "Elf",
-        "subrace": {
-            "name": "High Elf"
-        }
-    },
-    "skillProficiencies": ["Animal Handling","Insight","Nature","Nature","Stealth"],
-    "spells": ["Guidance","Mending","Produce Flame","Shocking Grasp"],
-    "rules": "5e"
+    "subclass": {
+      "name": "Land",
+      "type": "Forest"
+    }
+  },
+  "expertSkills": [],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Halfling",
+    "subrace": {
+      "name": "Lightfoot Halfling",
+      "description": ""
+    }
+  },
+  "immunities": [],
+  "inventory": {
+    "backpack": [
+      "Mess Kit",
+      "Playing Card Set",
+      "Rations (5 days)",
+      "Rope, Silk (50 feet)",
+      "Small Knife",
+      "Tinderbox",
+      "Torch",
+      "Totem",
+      "Waterskin"
+    ],
+    "equipped": [
+      "Cloak of Elvenkind",
+      "Leather",
+      "Longbow",
+      "Scimitar",
+      "Dagger"
+    ],
+    "gold": 30,
+    "magicItems": []
+  },
+  "languages": [
+    "Sylvan"
+  ],
+  "resistances": [],
+  "skillProficiencies": [
+    "Animal Handling",
+    "Insight",
+    "Nature",
+    "Nature",
+    "Stealth"
+  ],
+  "specialActions": [],
+  "spells": [
+    "Guidance",
+    "Mending",
+    "Produce Flame",
+    "Shocking Grasp"
+  ],
+  "rules": "5e",
+  "originalFileName": "druid.json",
+  "imagePath": "campaigns/5e Testing/images/Druid.png"
 }

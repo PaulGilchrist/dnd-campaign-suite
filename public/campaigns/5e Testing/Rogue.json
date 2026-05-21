@@ -1,30 +1,105 @@
 {
-    "abilities": [
-        {"name": "Strength","abilityImprovements": 0,"baseScore": 10,"miscBonus": 0},
-        {"name": "Dexterity","abilityImprovements": 0,"baseScore": 15,"miscBonus": 1},
-        {"name": "Constitution","abilityImprovements": 0,"baseScore": 14,"miscBonus": 0},
-        {"name": "Intelligence","abilityImprovements": 0,"baseScore": 12,"miscBonus": 0},
-        {"name": "Wisdom","abilityImprovements": 0,"baseScore": 13,"miscBonus": 1},
-        {"name": "Charisma","abilityImprovements": 0,"baseScore": 8,"miscBonus": 0}
-    ],
-    "alignment": "Chaotic Good",
-    "class": {
-        "name": "Rogue",
-        "expertise": ["Sleight of Hand","Thieves' Tools"],
-        "subclass": {
-            "name": "Thief"
-        }
+  "name": "Rogue",
+  "level": 5,
+  "alignment": "Chaotic Good",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 10,
+      "abilityImprovements": 0,
+      "miscBonus": 0
     },
-    "inventory": {
-        "backpack": ["Crowbar","Dice Set","Playing Card Set","Forgery Kit","Piton","Rations (5 days)","Thieves' Tools","Tinderbox","Torch","Waterskin"],
-        "equipped": ["Arrows","Studded Leather","Crossbow, hand","Shortsword","Shortsword","Thieves' Tools"],
-        "gold": 10
+    {
+      "name": "Dexterity",
+      "baseScore": 15,
+      "abilityImprovements": 0,
+      "miscBonus": 1
     },
-    "level": 20,
+    {
+      "name": "Constitution",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 12,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 13,
+      "abilityImprovements": 0,
+      "miscBonus": 1
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    }
+  ],
+  "background": "",
+  "class": {
     "name": "Rogue",
-    "race": {
-        "name": "Human"
+    "subclass": {
+      "name": "Thief"
     },
-    "skillProficiencies": ["Acrobatics","Athletics","Deception","Insight","Investigation","Perception","Sleight of Hand","Stealth"],
-    "rules": "5e"
+    "expertise": [
+      "Sleight of Hand",
+      "Thieves' Tools"
+    ]
+  },
+  "expertSkills": [],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Tiefling",
+    "subrace": {
+      "name": ""
+    }
+  },
+  "immunities": [],
+  "inventory": {
+    "backpack": [
+      "Crowbar",
+      "Dice Set",
+      "Playing Card Set",
+      "Forgery Kit",
+      "Piton",
+      "Rations (5 days)",
+      "Thieves' Tools",
+      "Tinderbox",
+      "Torch",
+      "Waterskin"
+    ],
+    "equipped": [
+      "Arrows",
+      "Studded Leather",
+      "Crossbow, hand",
+      "Shortsword",
+      "Shortsword",
+      "Thieves' Tools"
+    ],
+    "gold": 10,
+    "magicItems": []
+  },
+  "languages": [],
+  "resistances": [],
+  "skillProficiencies": [
+    "Acrobatics",
+    "Athletics",
+    "Deception",
+    "Insight",
+    "Investigation",
+    "Perception",
+    "Sleight of Hand",
+    "Stealth"
+  ],
+  "specialActions": [],
+  "spells": [],
+  "rules": "5e",
+  "originalFileName": "rogue.json",
+  "imagePath": "campaigns/5e Testing/images/Rogue.png"
 }

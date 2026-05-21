@@ -1,6 +1,6 @@
 {
   "name": "Fighter",
-  "level": 20,
+  "level": 5,
   "alignment": "Neutral Good",
   "abilities": [
     {
@@ -59,7 +59,10 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Orc"
+    "name": "Orc",
+    "subrace": {
+      "name": ""
+    }
   },
   "immunities": [],
   "inventory": {

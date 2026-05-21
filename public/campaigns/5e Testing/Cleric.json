@@ -1,34 +1,104 @@
 {
-    "abilities": [
-        { "name": "Strength", "abilityImprovements": 0, "baseScore": 14, "miscBonus": 0 },
-        { "name": "Dexterity", "abilityImprovements": 0, "baseScore": 8, "miscBonus": 0 },
-        { "name": "Constitution", "abilityImprovements": 0, "baseScore": 14, "miscBonus": 0 },
-        { "name": "Intelligence", "abilityImprovements": 0, "baseScore": 10, "miscBonus": 0 },
-        { "name": "Wisdom", "abilityImprovements": 0, "baseScore": 15, "miscBonus": 0 },
-        { "name": "Charisma", "abilityImprovements": 0, "baseScore": 10, "miscBonus": 0 }
-    ],
-    "alignment": "Neutral Good",
-    "class": {
-        "name": "Cleric",
-        "subclass": {
-            "name": "Life"
-        }
+  "name": "Cleric",
+  "level": 5,
+  "alignment": "Neutral Good",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
     },
-    "immunities": ["Magical Sleep"],
-    "inventory": {
-        "backpack": ["Mess Kit","Playing Card Set","Rations (5 days)","Rope, Silk (50 feet)","Tinderbox","Torch","Waterskin"],
-        "equipped": ["Arrows","Chain Mail","Holy Symbol","Longbow","Longsword","Shield"],
-        "gold": 10
+    {
+      "name": "Dexterity",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
     },
-    "level": 20,
+    {
+      "name": "Constitution",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 10,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 15,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 10,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    }
+  ],
+  "background": "",
+  "class": {
     "name": "Cleric",
-    "race": {
-        "name": "Dwarf",
-        "subrace": {
-            "name": "Hill"
-        }
-    },
-    "skillProficiencies": ["Insight","Medicine","Religion","Survival"],
-    "spells": ["Detect Magic","Guidance","Guiding Bolt","Healing Word","Inflict Wounds","Sacred Flame","Spare the Dying"],
-    "rules": "5e"
+    "subclass": {
+      "name": "Life"
+    }
+  },
+  "expertSkills": [],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Half-Elf",
+    "subrace": {
+      "name": ""
+    }
+  },
+  "immunities": [
+    "Magical Sleep"
+  ],
+  "inventory": {
+    "backpack": [
+      "Mess Kit",
+      "Playing Card Set",
+      "Rations (5 days)",
+      "Rope, Silk (50 feet)",
+      "Tinderbox",
+      "Torch",
+      "Waterskin"
+    ],
+    "equipped": [
+      "Arrows",
+      "Chain Mail",
+      "Holy Symbol",
+      "Longbow",
+      "Longsword",
+      "Shield"
+    ],
+    "gold": 10,
+    "magicItems": []
+  },
+  "languages": [],
+  "resistances": [],
+  "skillProficiencies": [
+    "Insight",
+    "Medicine",
+    "Religion",
+    "Survival"
+  ],
+  "specialActions": [],
+  "spells": [
+    "Detect Magic",
+    "Guidance",
+    "Guiding Bolt",
+    "Healing Word",
+    "Inflict Wounds",
+    "Sacred Flame",
+    "Spare the Dying"
+  ],
+  "rules": "5e",
+  "originalFileName": "cleric.json",
+  "imagePath": "campaigns/5e Testing/images/Cleric.png"
 }

@@ -1,33 +1,111 @@
 {
-    "abilities": [
-        { "name": "Strength", "abilityImprovements": 0, "baseScore": 8, "miscBonus": 0 },
-        { "name": "Dexterity", "abilityImprovements": 0, "baseScore": 12, "miscBonus": 0 },
-        { "name": "Constitution", "abilityImprovements": 0, "baseScore": 15, "miscBonus": 1 },
-        { "name": "Intelligence", "abilityImprovements": 0, "baseScore": 10, "miscBonus": 0 },
-        { "name": "Wisdom", "abilityImprovements": 0, "baseScore": 13, "miscBonus": 1 },
-        { "name": "Charisma", "abilityImprovements": 0, "baseScore": 14, "miscBonus": 0 }
-    ],
-    "alignment": "Neutral Good",
-    "class": {
-        "name": "Warlock",
-        "subclass": {
-            "name": "The Archfey"
-        },
-        "arcanums": ["Conjure Fey"],
-        "invocations": ["Agonizing Blast","Mask of Many Faces"],
-        "pactBoon": "Tome"
+  "name": "Warlock",
+  "level": 5,
+  "alignment": "Neutral Good",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
     },
-    "inventory": {
-        "backpack": ["Blanket","Case,Map or Scroll","Fishing Tackle","Grappling Hook","Ink (4, 1 oz bottles)","Ink Pens (2)","Parchment (20 sheets)","Playing Card Set","Rations (5 days)","Rope, Silk (50 feet)","String","Waterskin"],
-        "equipped": ["Quarterstaff","Dagger"],
-        "gold": 10
+    {
+      "name": "Dexterity",
+      "baseScore": 12,
+      "abilityImprovements": 0,
+      "miscBonus": 0
     },
-    "level": 20,
+    {
+      "name": "Constitution",
+      "baseScore": 15,
+      "abilityImprovements": 0,
+      "miscBonus": 1
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 10,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 13,
+      "abilityImprovements": 0,
+      "miscBonus": 1
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    }
+  ],
+  "background": "",
+  "class": {
     "name": "Warlock",
-    "race": {
-        "name": "Tiefling"
+    "subclass": {
+      "name": "The Archfey"
     },
-    "skillProficiencies": ["Arcana","Insight","Investigation","Perception","Nature","Survival"],
-    "spells": ["Charm Person","Eldritch Blast","Hellish Rebuke","Mage Hand"],
-    "rules": "5e"
+    "arcanums": [
+      "Conjure Fey"
+    ],
+    "invocations": [
+      "Agonizing Blast",
+      "Mask of Many Faces"
+    ],
+    "pactBoon": "Tome"
+  },
+  "expertSkills": [],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Gnome",
+    "subrace": {
+      "name": "Forest Gnome",
+      "description": ""
+    }
+  },
+  "immunities": [],
+  "inventory": {
+    "backpack": [
+      "Blanket",
+      "Case,Map or Scroll",
+      "Fishing Tackle",
+      "Grappling Hook",
+      "Ink (4, 1 oz bottles)",
+      "Ink Pens (2)",
+      "Parchment (20 sheets)",
+      "Playing Card Set",
+      "Rations (5 days)",
+      "Rope, Silk (50 feet)",
+      "String",
+      "Waterskin"
+    ],
+    "equipped": [
+      "Quarterstaff",
+      "Dagger"
+    ],
+    "gold": 10,
+    "magicItems": []
+  },
+  "languages": [],
+  "resistances": [],
+  "skillProficiencies": [
+    "Arcana",
+    "Insight",
+    "Investigation",
+    "Perception",
+    "Nature",
+    "Survival"
+  ],
+  "specialActions": [],
+  "spells": [
+    "Charm Person",
+    "Eldritch Blast",
+    "Hellish Rebuke",
+    "Mage Hand"
+  ],
+  "rules": "5e",
+  "originalFileName": "warlock.json",
+  "imagePath": "campaigns/5e Testing/images/Warlock.png"
 }
