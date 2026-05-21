@@ -1,4 +1,5 @@
 import DOMPurify from 'dompurify';
+import { marked } from 'marked';
 
 /**
  * Sanitizes HTML content to prevent XSS attacks while allowing safe HTML elements
@@ -52,5 +53,46 @@ export function sanitizeHtml(html) {
          // Allow data attributes
         ADD_ATTR: ['data-*'],
     });
+}
+
+/**
+ * Converts markdown to safe HTML.
+ * Parses markdown using `marked.parse()`, then sanitizes the result.
+ *
+ * @param {string} markdown - The markdown string to convert
+ * @returns {string} The safe HTML string, or empty string for invalid input or on error
+ */
+export function renderMarkdown(markdown) {
+    if (!markdown || typeof markdown !== 'string') {
+        return '';
+    }
+
+    try {
+        const html = marked.parse(markdown);
+        return sanitizeHtml(html);
+    } catch {
+        return '';
+    }
+}
+
+/**
+ * Converts inline markdown to safe HTML, without block-level wrappers like <p>.
+ * Uses `marked.parseInline()` for inline rendering (bold, italic, links, etc.).
+ * Useful for rendering markdown inline with surrounding text (e.g., next to a name label).
+ *
+ * @param {string} markdown - The inline markdown string to convert
+ * @returns {string} The safe HTML string, or empty string for invalid input or on error
+ */
+export function renderMarkdownInline(markdown) {
+    if (!markdown || typeof markdown !== 'string') {
+        return '';
+    }
+
+    try {
+        const html = marked.parseInline(markdown);
+        return sanitizeHtml(html);
+    } catch {
+        return '';
+    }
 }
 

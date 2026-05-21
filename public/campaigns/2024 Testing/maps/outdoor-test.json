@@ -915,16 +915,16 @@
     {
       "id": "poi-1779365694777-egnd4k",
       "type": "dungeon",
-      "q": 22,
-      "r": 14,
+      "q": 8,
+      "r": 13,
       "visible": true,
       "label": "Dungeon"
     },
     {
       "id": "poi-1779365701406-kfwuhz",
       "type": "camp",
-      "q": 22,
-      "r": 10,
+      "q": 20,
+      "r": 12,
       "visible": true,
       "label": "Camp"
     },
@@ -955,7 +955,7 @@
     {
       "id": "poi-1779365714659-292jew",
       "type": "landmark",
-      "q": 21,
+      "q": 15,
       "r": 7,
       "visible": true,
       "label": "Landmark"
@@ -963,13 +963,13 @@
     {
       "id": "poi-1779365731677-9fjvic",
       "type": "hazard",
-      "q": 26,
-      "r": 8,
+      "q": 10,
+      "r": 9,
       "visible": true,
       "label": "Hazard"
     }
   ],
   "zoom": 2.208200830950501,
-  "panX": 650.378722867817,
-  "panY": 163.73244915150846
+  "panX": 459.9223205359774,
+  "panY": 178.42583240721714
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import useFactionsManagement from '../../hooks/useFactionsManagement.js';
+import PreviewToggle from '../common/PreviewToggle.jsx';
 import './Factions.css';
 
 const INFLUENCE_COLORS = {
@@ -265,27 +266,21 @@ function Factions({ campaignName, onBack }) {
               />
 
               {/* Description */}
-              <label htmlFor="faction-description" className="factions-label">
-                Description
-              </label>
-              <textarea
+              <PreviewToggle
                 id="faction-description"
-                className="factions-textarea"
                 value={formData.description}
-                onChange={(e) => handleFormChange('description', e.target.value)}
+                onChange={(value) => handleFormChange('description', value)}
                 placeholder="What is this faction about?"
+                label="Description"
               />
 
               {/* Goals */}
-              <label htmlFor="faction-goals" className="factions-label">
-                Goals
-              </label>
-              <textarea
+              <PreviewToggle
                 id="faction-goals"
-                className="factions-textarea"
                 value={formData.goals}
-                onChange={(e) => handleFormChange('goals', e.target.value)}
+                onChange={(value) => handleFormChange('goals', value)}
                 placeholder="What does this faction want to achieve?"
+                label="Goals"
               />
 
               {/* Influence Level */}
@@ -310,15 +305,12 @@ function Factions({ campaignName, onBack }) {
               </div>
 
               {/* Notes */}
-              <label htmlFor="faction-notes" className="factions-label">
-                Notes
-              </label>
-              <textarea
+              <PreviewToggle
                 id="faction-notes"
-                className="factions-textarea"
                 value={formData.notes}
-                onChange={(e) => handleFormChange('notes', e.target.value)}
+                onChange={(value) => handleFormChange('notes', value)}
                 placeholder="Additional notes…"
+                label="Notes"
               />
             </div>
 

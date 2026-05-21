@@ -161,17 +161,19 @@ The app includes powerful tools for Dungeon Masters to manage their campaigns:
 **👾 Encounter Builder**
 - Select monsters from the compendium, adjust quantities, calculate XP thresholds, assess difficulty, and save/load encounters for quick battle setup
 
-**🗺️ Interactive Maps**
+**🗺️ Indoor and Outdoor Interactive Maps**
 - Grid-based maps with zoom and pan
 - Paint and erase walls
 - Fog of war support
 - Drag-and-drop creatures and items
 - 20+ SVG furniture and prop types (barrels, chests, tables, doors, traps, torches, and more)
 
-  <img src="public/map-example.jpg" alt="Map Example" width="600" />
+  <img src="public/map-outdoor-example.jpg" alt="Map Example" width="600" />
 
 **🏚️ Procedural Dungeon Generator**
 - Generate random dungeon maps with configurable grid size, corridor width, and door placement — perfect for inspiration or quick sessions
+
+   <img src="public/map-example.jpg" alt="Map Example" width="600" />
 
 **📝 Campaign Notes**
 - Record story details, clues, and important information for your campaign

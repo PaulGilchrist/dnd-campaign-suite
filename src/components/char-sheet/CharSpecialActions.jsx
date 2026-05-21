@@ -2,7 +2,7 @@
 
 import useActionPopup from '../../hooks/useActionPopup.js'
 import Popup from '../common/Popup.jsx'
-import { sanitizeHtml } from '../../services/sanitize.js';
+import { renderMarkdownInline } from '../../services/sanitize.js';
 
 function CharSpecialActions({ playerStats }) {
     const { showPopup, popupHtml, setPopupHtml } = useActionPopup('feature')
@@ -37,7 +37,7 @@ function CharSpecialActions({ playerStats }) {
             {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
                {uniqueActions.map((specialAction, index) => {
                 return <div key={specialAction.name || `special-action-${index}`}>
-                        <b className={specialAction.details ? "clickable" : ""} onClick={() => showPopup(specialAction)}>{specialAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(specialAction.description) }}></span>
+                        <b className={specialAction.details ? "clickable" : ""} onClick={() => showPopup(specialAction)}>{specialAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: renderMarkdownInline(specialAction.description) }}></span>
                     </div>
                 })}
            </div>

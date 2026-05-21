@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeHtml } from './sanitize.js';
+import { sanitizeHtml, renderMarkdown, renderMarkdownInline } from './sanitize.js';
 
 describe('sanitizeHtml', () => {
   it('should return empty string for null input', () => {
@@ -77,5 +77,87 @@ describe('sanitizeHtml', () => {
 
     expect(result).toContain('class="safe"');
     expect(result).not.toContain('onclick');
+  });
+});
+
+describe('renderMarkdown', () => {
+  it('should return empty string for null input', () => {
+    expect(renderMarkdown(null)).toBe('');
+  });
+
+  it('should return empty string for undefined input', () => {
+    expect(renderMarkdown(undefined)).toBe('');
+  });
+
+  it('should return empty string for non-string input', () => {
+    expect(renderMarkdown(123)).toBe('');
+  });
+
+  it('should convert bold markdown to HTML', () => {
+    const result = renderMarkdown('**bold text**');
+    expect(result).toContain('<strong>bold text</strong>');
+  });
+
+  it('should convert italic markdown to HTML', () => {
+    const result = renderMarkdown('*italic text*');
+    expect(result).toContain('<em>italic text</em>');
+  });
+
+  it('should convert a list to HTML', () => {
+    const result = renderMarkdown('- Item 1\n- Item 2');
+    expect(result).toContain('<li>Item 1</li>');
+    expect(result).toContain('<li>Item 2</li>');
+  });
+
+  it('should convert a table to HTML', () => {
+    const result = renderMarkdown('| H1 | H2 |\n|----|----|\n| C1 | C2 |');
+    expect(result).toContain('<table>');
+    expect(result).toContain('<th>H1</th>');
+    expect(result).toContain('<td>C1</td>');
+  });
+
+  it('should sanitize dangerous content in markdown', () => {
+    const result = renderMarkdown('text [click](javascript:alert("xss"))');
+    expect(result).not.toContain('javascript');
+  });
+
+  it('should handle empty string input', () => {
+    expect(renderMarkdown('')).toBe('');
+  });
+});
+
+describe('renderMarkdownInline', () => {
+  it('should return empty string for null input', () => {
+    expect(renderMarkdownInline(null)).toBe('');
+  });
+
+  it('should return empty string for undefined input', () => {
+    expect(renderMarkdownInline(undefined)).toBe('');
+  });
+
+  it('should return empty string for non-string input', () => {
+    expect(renderMarkdownInline(123)).toBe('');
+  });
+
+  it('should convert bold inline markdown without wrapping in <p>', () => {
+    const result = renderMarkdownInline('**bold text**');
+    expect(result).toContain('<strong>bold text</strong>');
+    expect(result).not.toContain('<p>');
+  });
+
+  it('should convert italic inline markdown without <p>', () => {
+    const result = renderMarkdownInline('*italic text*');
+    expect(result).toContain('<em>italic text</em>');
+    expect(result).not.toContain('<p>');
+  });
+
+  it('should handle empty string', () => {
+    expect(renderMarkdownInline('')).toBe('');
+  });
+
+  it('should handle plain text without adding <p>', () => {
+    const result = renderMarkdownInline('just plain text');
+    expect(result).not.toContain('<p>');
+    expect(result).toContain('just plain text');
   });
 });

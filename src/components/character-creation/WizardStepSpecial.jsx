@@ -1,5 +1,7 @@
 // No component-specific CSS needed - uses shared wizard styles
 
+import PreviewToggle from '../common/PreviewToggle.jsx';
+
 function WizardStepSpecial({ formData, onArrayFieldChange }) {
   // Normalize special actions to ensure they're objects with name/description/details
   const normalizedActions = (formData.specialActions || []).map(action => 
@@ -54,18 +56,16 @@ function WizardStepSpecial({ formData, onArrayFieldChange }) {
           placeholder="Action name (required)"
           className="wizard-input"
         />
-        <textarea
+        <PreviewToggle
           value={newActionDescription}
-          onChange={(e) => updateNewActionField('description', e.target.value)}
+          onChange={(value) => updateNewActionField('description', value)}
           placeholder="Description"
-          className="wizard-textarea"
           rows={2}
         />
-        <textarea
+        <PreviewToggle
           value={newActionDetails}
-          onChange={(e) => updateNewActionField('details', e.target.value)}
+          onChange={(value) => updateNewActionField('details', value)}
           placeholder="Additional details (optional)"
-          className="wizard-textarea"
           rows={2}
         />
         <button type="button" onClick={addAction} className="btn btn-primary">

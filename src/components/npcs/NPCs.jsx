@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import useNPCsManagement from '../../hooks/useNPCsManagement.js';
+import PreviewToggle from '../common/PreviewToggle.jsx';
 import './NPCs.css';
 
 const ATTITUDE_OPTIONS = [
@@ -327,63 +328,48 @@ function NPCs({ campaignName, characters, onBack }) {
               </select>
 
               {/* Appearance */}
-              <label htmlFor="npc-appearance" className="npcs-label">
-                Appearance
-              </label>
-              <textarea
+              <PreviewToggle
                 id="npc-appearance"
-                className="npcs-textarea"
                 value={formData.appearance}
-                onChange={(e) => handleFormChange('appearance', e.target.value)}
+                onChange={(value) => handleFormChange('appearance', value)}
                 placeholder="Physical description…"
+                label="Appearance"
               />
 
               {/* Personality */}
-              <label htmlFor="npc-personality" className="npcs-label">
-                Personality
-              </label>
-              <textarea
+              <PreviewToggle
                 id="npc-personality"
-                className="npcs-textarea"
                 value={formData.personality}
-                onChange={(e) => handleFormChange('personality', e.target.value)}
+                onChange={(value) => handleFormChange('personality', value)}
                 placeholder="Personality traits, ideals, bonds, flaws…"
+                label="Personality"
               />
 
               {/* Goals */}
-              <label htmlFor="npc-goals" className="npcs-label">
-                Goals
-              </label>
-              <textarea
+              <PreviewToggle
                 id="npc-goals"
-                className="npcs-textarea"
                 value={formData.goals}
-                onChange={(e) => handleFormChange('goals', e.target.value)}
+                onChange={(value) => handleFormChange('goals', value)}
                 placeholder="What does this NPC want?"
+                label="Goals"
               />
 
               {/* Secrets */}
-              <label htmlFor="npc-secrets" className="npcs-label">
-                Secrets
-              </label>
-              <textarea
+              <PreviewToggle
                 id="npc-secrets"
-                className="npcs-textarea"
                 value={formData.secrets}
-                onChange={(e) => handleFormChange('secrets', e.target.value)}
+                onChange={(value) => handleFormChange('secrets', value)}
                 placeholder="Hidden truths about this NPC…"
+                label="Secrets"
               />
 
               {/* Notes */}
-              <label htmlFor="npc-notes" className="npcs-label">
-                Notes
-              </label>
-              <textarea
+              <PreviewToggle
                 id="npc-notes"
-                className="npcs-textarea"
                 value={formData.notes}
-                onChange={(e) => handleFormChange('notes', e.target.value)}
+                onChange={(value) => handleFormChange('notes', value)}
                 placeholder="Additional notes…"
+                label="Notes"
               />
 
               {/* Tags */}

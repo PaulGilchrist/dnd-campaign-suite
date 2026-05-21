@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import useNotesManagement from '../../hooks/useNotesManagement.js';
+import PreviewToggle from '../common/PreviewToggle.jsx';
 import './Notes.css';
 
 function Notes({ campaignName, characters, isLocalhost, onBack }) {
@@ -250,16 +251,13 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
 
             <div className="notes-modal-body">
               {/* Description (largest input) */}
-              <label htmlFor="note-description" className="notes-label">
-                Description
-              </label>
-              <textarea
+              <PreviewToggle
                 id="note-description"
-                className="notes-textarea"
                 value={formData.description}
-                onChange={(e) => handleFormChange('description', e.target.value)}
+                onChange={(value) => handleFormChange('description', value)}
                 placeholder="Write your note here…"
-                autoFocus
+                label="Description"
+                minHeight="200px"
               />
 
               {/* Party Location */}
