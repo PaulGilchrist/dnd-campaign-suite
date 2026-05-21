@@ -597,7 +597,11 @@ app.put('/api/campaigns/:campaign/encounters/:encountername', (req, res) => {
       return res.status(404).json({ error: 'Encounter not found' });
     }
 
-    data.encounters[index] = encounterData;
+    data.encounters[index] = {
+      name: encountername,
+      savedAt: data.encounters[index].savedAt,
+      ...encounterData,
+    };
     writeEncounters(campaign, data);
 
     // Broadcast encounter data change

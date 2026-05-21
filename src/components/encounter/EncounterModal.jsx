@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatEncounterName } from '../../services/encountersService.js';
+import MarkdownPreview from '../common/MarkdownPreview.jsx';
 import './EncounterBuilder.css';
 
 function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRename, encounters, loading }) {
@@ -122,6 +123,11 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                           <span className="encounter-list-date">
                             {new Date(enc.savedAt).toLocaleDateString()} {new Date(enc.savedAt).toLocaleTimeString()}
                           </span>
+                        )}
+                        {enc.description && (
+                          <div className="encounter-list-description">
+                            <MarkdownPreview text={enc.description} />
+                          </div>
                         )}
                       </div>
                       <div className="encounter-list-actions">

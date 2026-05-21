@@ -25,7 +25,8 @@
           "name": "Adult Black Dragon",
           "qty": 1
         }
-      ]
+      ],
+      "description": "Test description"
     },
     {
       "name": "Gith Camp",

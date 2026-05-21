@@ -6,6 +6,7 @@ import EncounterSummaryPanel from './EncounterSummaryPanel.jsx';
 import EncounterMonsterTable from './EncounterMonsterTable.jsx';
 import EncounterSelectedMonsters from './EncounterSelectedMonsters.jsx';
 import EncounterModal from './EncounterModal.jsx';
+import PreviewToggle from '../common/PreviewToggle.jsx';
 import { formatEncounterName } from '../../services/encountersService.js';
 import './EncounterBuilder.css';
 
@@ -200,6 +201,7 @@ function EncounterBuilder({ characters, campaignName }) {
   const [pendingEncounterData, setPendingEncounterData] = useState(null);
   const [encounterTitle, setEncounterTitle] = useState('Encounter Builder');
   const [currentEncounterName, setCurrentEncounterName] = useState(null);
+  const [description, setDescription] = useState('');
 
   // Sort state for monster table
   const [sortField, setSortField] = useState('name');
@@ -305,6 +307,7 @@ function EncounterBuilder({ characters, campaignName }) {
       difficulty: filter.difficulty,
       playerLevels: filter.playerLevels,
       selectedMonsters: stripMonsters(selectedMonsters),
+      description: description,
     };
     if (currentEncounterName) {
       // Update existing encounter — no modal needed
@@ -339,6 +342,7 @@ function EncounterBuilder({ characters, campaignName }) {
           difficulty: data.difficulty ?? 2,
           playerLevels: data.playerLevels || [1],
         });
+        setDescription(data.description || '');
 
         // Re-populate full monster objects from the catalog using index
         const monsterRefs = data.selectedMonsters || [];
@@ -374,6 +378,7 @@ function EncounterBuilder({ characters, campaignName }) {
     });
     setSelectedMonsters([]);
     setSearchQuery('');
+    setDescription('');
   };
 
   const handleDeleteEncounter = async (name) => {
@@ -508,6 +513,18 @@ function EncounterBuilder({ characters, campaignName }) {
           No characters in this campaign. Add characters to auto-populate party levels.
         </div>
       )}
+
+      {/* Encounter Description */}
+      <div className="encounter-description-section">
+        <PreviewToggle
+          id="encounter-description"
+          value={description}
+          onChange={setDescription}
+          placeholder="Describe this encounter..."
+          label="Description"
+          minHeight="100px"
+        />
+      </div>
 
       {/* Top Row: Filters + Summary */}
       <div className="encounter-top-row">

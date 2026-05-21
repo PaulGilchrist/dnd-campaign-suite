@@ -709,3 +709,30 @@
 .encounter-builder .encounter-btn-secondary:hover {
   background: var(--background-color-button-secondary-hover);
 }
+
+/* ============ Encounter Description ============ */
+.encounter-builder .encounter-description-section {
+  margin-bottom: 16px;
+}
+
+/* Encounter list description preview */
+.encounter-builder .encounter-list-description {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  max-height: 3em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.encounter-builder .encounter-list-description h1,
+.encounter-builder .encounter-list-description h2,
+.encounter-builder .encounter-list-description h3 {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.encounter-builder .encounter-list-description p {
+  margin: 0;
+  line-height: 1.4;
+}

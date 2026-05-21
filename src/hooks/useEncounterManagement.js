@@ -103,7 +103,7 @@ function useEncounterManagement(campaignName) {
     openLoadModal,
     closeModal,
     saveEncounter,
-    updateEncounter,
+    updateEncounter: updateExistingEncounter,
     loadEncounterData: handleLoad,
     deleteEncounterAction: handleDelete,
     renameEncounterAction: handleRename,
