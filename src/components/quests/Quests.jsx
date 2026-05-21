@@ -82,39 +82,60 @@ function Quests({ campaignName, isLocalhost, onBack }) {
     <div className="quests-container">
       <div className="quests-header">
         <button className="quests-back-btn" onClick={onBack}>
-          <i className="fa-solid fa-arrow-left"></i>
+          <i className="fa-solid fa-arrow-left" /> Back
         </button>
-        <h2 className="quests-title"><i className="fa-solid fa-scroll"></i> Quests</h2>
+        <h2 className="quests-title">
+          <i className="fa-solid fa-scroll" /> Quests
+        </h2>
         <button className="quests-new-btn" onClick={handleNewQuest}>
-          <i className="fa-solid fa-plus"></i> New Quest
+          <i className="fa-solid fa-plus" /> New Quest
         </button>
       </div>
 
       <div className="quests-search-row">
-        <i className="fa-solid fa-search quests-search-icon"></i>
+        <i className="fa-solid fa-magnifying-glass quests-search-icon" />
         <input
-          className="quests-search-input"
           type="text"
-          placeholder="Search quests..."
+          className="quests-search-input"
+          placeholder="Search Quests\u2026"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          aria-label="Search Quests"
         />
         {searchQuery && (
-          <button className="quests-search-clear" onClick={() => setSearchQuery('')}>
-            <i className="fa-solid fa-times"></i>
+          <button
+            className="quests-search-clear"
+            onClick={() => setSearchQuery('')}
+            aria-label="Clear search"
+          >
+            <i className="fa-solid fa-xmark" />
           </button>
         )}
       </div>
 
-      {loading ? (
+      {loading && (
         <div className="quests-empty-state">
-          <i className="fa-solid fa-spinner fa-spin"></i> Loading quests...
+          <i className="fa-solid fa-spinner fa-spin" /> Loading quests\u2026
         </div>
-      ) : filteredQuests.length === 0 ? (
+      )}
+
+      {!loading && filteredQuests.length === 0 && (
         <div className="quests-empty-state">
-          {searchQuery ? 'No quests match your search.' : 'No quests yet. Click "New Quest" to create one.'}
+          {searchQuery ? (
+            <>
+              <i className="fa-solid fa-search" />
+              No quests found matching &ldquo;{searchQuery}&rdquo;
+            </>
+          ) : (
+            <>
+              <i className="fa-solid fa-scroll" />
+              No quests yet. Click &ldquo;New Quest&rdquo; to create one.
+            </>
+          )}
         </div>
-      ) : (
+      )}
+
+      {!loading && filteredQuests.length > 0 && (
         <ul className="quests-list">
           {filteredQuests.map(quest => {
             const statusColor = STATUS_COLORS[quest.status] || STATUS_COLORS.active;
@@ -125,25 +146,30 @@ function Quests({ campaignName, isLocalhost, onBack }) {
                 onClick={() => handleEditQuest(quest)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleEditQuest(quest); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    handleEditQuest(quest);
+                  }
+                }}
                 aria-label={`Edit quest: ${quest.name}`}
               >
                 <div className="quests-list-item-header">
                   <span className="quests-list-name">{quest.name}</span>
-                  <span
-                    className="quests-list-status"
-                    style={{
-                      backgroundColor: statusColor.bg,
-                      color: statusColor.color,
-                      borderColor: statusColor.border
-                    }}
-                  >
-                    {quest.status}
-                  </span>
+                  <div className="quests-list-meta">
+                    <span
+                      className="quests-list-status"
+                      style={statusColor}
+                      title={quest.status}
+                    >
+                      {quest.status}
+                    </span>
+                  </div>
                 </div>
                 {quest.description && (
-                  <div className="quests-list-description">
-                    {quest.description.length > 100 ? quest.description.substring(0, 100) + '...' : quest.description}
+                  <div className="quests-list-details">
+                    <span className="quests-list-subtitle">
+                      {quest.description.length > 100 ? quest.description.substring(0, 100) + '...' : quest.description}
+                    </span>
                   </div>
                 )}
               </li>
@@ -152,90 +178,103 @@ function Quests({ campaignName, isLocalhost, onBack }) {
         </ul>
       )}
 
-      {modalOpen && (
-        <div className="quests-modal-overlay" onClick={handleCloseModal}>
-          <div className="quests-modal" onClick={(e) => e.stopPropagation()}>
+      {modalOpen && formData && (
+        <div className="quests-modal-overlay" onClick={(e) => {
+          if (e.target === e.currentTarget) handleCloseModal();
+        }}>
+          <div className="quests-modal">
             <div className="quests-modal-header">
               <h3>{editingQuest ? 'Edit Quest' : 'New Quest'}</h3>
-              <button className="quests-modal-close" onClick={handleCloseModal}>
-                <i className="fa-solid fa-times"></i>
+              <button
+                className="quests-modal-close"
+                onClick={handleCloseModal}
+                aria-label="Close"
+              >
+                &times;
               </button>
             </div>
+
             <div className="quests-modal-body">
-              <div className="quests-form-row">
-                <label className="quests-label">
-                  Quest Name <span className="quests-required">*</span>
-                </label>
-                <input
-                  className="quests-input"
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => handleFormChange('name', e.target.value)}
-                  autoFocus
-                  placeholder="Enter quest name"
-                />
-              </div>
-              <div className="quests-form-row">
-                <label className="quests-label">Status</label>
-                <select
-                  className="quests-select"
-                  value={formData.status}
-                  onChange={(e) => handleFormChange('status', e.target.value)}
-                >
-                  {STATUS_OPTIONS.map(status => (
-                    <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="quests-form-row">
-                <PreviewToggle
-                  id="quest-description"
-                  label="Description"
-                  value={formData.description}
-                  onChange={(val) => handleFormChange('description', val)}
-                  placeholder="Describe the quest..."
-                  rows={4}
-                />
-              </div>
-              <div className="quests-form-row">
-                <PreviewToggle
-                  id="quest-rewards"
-                  label="Rewards"
-                  value={formData.rewards}
-                  onChange={(val) => handleFormChange('rewards', val)}
-                  placeholder="Describe rewards..."
-                  rows={4}
-                />
-              </div>
-              <div className="quests-form-row">
-                <PreviewToggle
-                  id="quest-notes"
-                  label="Notes"
-                  value={formData.notes}
-                  onChange={(val) => handleFormChange('notes', val)}
-                  placeholder="Additional notes..."
-                  rows={4}
-                />
-              </div>
+              <label htmlFor="quest-name" className="quests-label">
+                Name <span className="quests-required">*</span>
+              </label>
+              <input
+                id="quest-name"
+                type="text"
+                className="quests-input"
+                value={formData.name}
+                onChange={(e) => handleFormChange('name', e.target.value)}
+                placeholder="Quest name"
+                autoFocus
+              />
+
+              <label htmlFor="quest-status" className="quests-label">
+                Status
+              </label>
+              <select
+                id="quest-status"
+                className="quests-select"
+                value={formData.status}
+                onChange={(e) => handleFormChange('status', e.target.value)}
+              >
+                {STATUS_OPTIONS.map(status => (
+                  <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+                ))}
+              </select>
+
+              <PreviewToggle
+                id="quest-description"
+                value={formData.description}
+                onChange={(value) => handleFormChange('description', value)}
+                placeholder="Describe the quest\u2026"
+                label="Description"
+              />
+
+              <PreviewToggle
+                id="quest-rewards"
+                value={formData.rewards}
+                onChange={(value) => handleFormChange('rewards', value)}
+                placeholder="Describe rewards\u2026"
+                label="Rewards"
+              />
+
+              <PreviewToggle
+                id="quest-notes"
+                value={formData.notes}
+                onChange={(value) => handleFormChange('notes', value)}
+                placeholder="Additional notes\u2026"
+                label="Notes"
+              />
             </div>
+
             <div className="quests-modal-footer">
               <div className="quests-modal-actions">
                 {editingQuest && (
                   <button
                     className="quests-btn quests-btn-danger"
                     onClick={() => handleDelete(editingQuest)}
-                    disabled={deleting === editingQuest.id}
+                    disabled={deleting}
                   >
-                    <i className="fa-solid fa-trash"></i> {deleting === editingQuest.id ? 'Deleting...' : 'Delete'}
+                    <i className="fa-solid fa-trash-can" />{' '}
+                    {deleting ? 'Deleting\u2026' : 'Delete'}
                   </button>
                 )}
               </div>
               <div className="quests-modal-buttons">
-                <button className="quests-btn quests-btn-secondary" onClick={handleCloseModal}>
+                <button
+                  className="quests-btn quests-btn-secondary"
+                  onClick={handleCloseModal}
+                  disabled={saving}
+                >
                   Cancel
                 </button>
-                <button className="quests-btn quests-btn-primary" onClick={handleSave} disabled={saving || !formData.name?.trim()}>
-                  {saving ? 'Saving...' : 'Save'}
+                <button
+                  className="quests-btn quests-btn-primary"
+                  onClick={handleSave}
+                  disabled={saving || !formData.name.trim()}
+                >
+                  <i className="fa-solid fa-floppy-disk" />{' '}
+                  {saving ? 'Saving\u2026' : 'Save'}
                 </button>
               </div>
             </div>
