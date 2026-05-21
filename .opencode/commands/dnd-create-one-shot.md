@@ -4,9 +4,6 @@ description: Create a single-session Dungeons & Dragons adventure and store all 
 agent: dnd-campaign-writer
 permission:
   skill:
-    "obsidian-bases": "allow"
-    "obsidian-cli": "allow"
-    "obsidian-markdown": "allow"
     "dnd-tools-browser": "allow"
 ---
 
@@ -15,8 +12,8 @@ permission:
 - **party_size** (number, required)
 
 ## Behavior
-- Before writing, use the obsidian-cli skill to read the existing one-shots in "Games/D&D/One Shots" in your default Obsidian vault. Review their themes, settings, hooks, and key NPCs. Ensure the new one-shot has distinct elements (e.g., different location, different primary antagonist type, different core mystery) and is not too similar to what already exists.
-- Confirm party level and size.
+- Before writing, look at all the content from the other campaigns. Review their encounters, factions, NPCs, quests, and notes. Ensure the new one-shot has distinct elements (e.g., different location, different primary antagonist type, different core mystery) and is not too similar to what already exists.
+- Confirm party level and size by looking at the characters in the campaign folder, or if no characters exist, ask the user to list party size and level.
 - Create a 4-hour adventure with:
   - A clear goal
   - Key NPCs with combat stats
@@ -24,17 +21,7 @@ permission:
   - Level-appropriate encounters (combat, social, skill challenges)
   - Treasure and magic items
 - Players do not level during the one-shot.
-- Use the obsidian-cli skill to save each adventure component as a note in your default Obsidian vault under "Games/D&D/One Shots/{one-shot-name}/"
-
-## CRITICAL: Truncation Protection
-The obsidian-cli create command has a content length limit. For each note:
-- For long notes (main adventure file):
-  - First, use create to write the frontmatter, hook, and main quest sections
-  - Then, use append to add the NPCs and encounters sections
-  - Then, use append to add the remaining sections (side quests, treasure, DM notes)
-  - After creating each note, use read to verify the full content was written
-  - If the read output shows truncation (content cuts off mid-sentence), delete the note and recreate it using create + append in smaller chunks
-- For shorter notes (NPCs, locations, artifacts), create should be sufficient, but still verify with read
+- Save each adventure component in the appropriate json files in the campaign's folder using their schema definitions for guidance"
 
 ## Assumptions
 - Unless the user states otherwise, the story will take place in the world of Toril on the continent of Faerun.
@@ -45,7 +32,4 @@ The obsidian-cli create command has a content length limit. For each note:
 - @dnd-campaign-writer
 
 ## Skills
-- obsidian-bases
-- obsidian-cli
-- obsidian-markdown
 - dnd-tools-browser
