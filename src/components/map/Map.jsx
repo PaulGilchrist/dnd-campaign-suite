@@ -220,7 +220,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     if ((!existing.players || existing.players.length === 0) && characters && characters.length > 0) {
                         const gs = existing.gridSize || 20;
                         const initialPlayers = characters.map((character, i) => ({
-                            id: character.id || `player-${i}-${Date.now()}`,
+                            id: (character.name || 'Unknown').toLowerCase(),
                             name: character.name || 'Unknown',
                             gridX: Math.min(1 + (i * 2) % gs, gs - 1),
                             gridY: Math.min(1 + Math.floor((i * 2) / gs), gs - 1)
@@ -234,9 +234,9 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                 console.log('Map data not found, initializing empty map');
             }
 
-            // Generate random positions with no collisions
+            // Generate random positions with no collision
             const players = characters.map((character) => ({
-                id: utils.guid(),
+                id: (character.name || 'Unknown').toLowerCase(),
                 name: utils.getFirstName(character.name),
                 gridX: 0,
                 gridY: 0

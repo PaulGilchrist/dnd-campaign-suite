@@ -5,7 +5,7 @@ const RADIUS = 20;
 const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown }) => {
     const getPlayerImage = (player, characters) => {
         if (!characters || !player) return null;
-        const character = characters.find((c) => c.id === player.id);
+        const character = characters.find((c) => c.name === player.name);
         return character?.imagePath || null;
     };
 
