@@ -81,26 +81,24 @@ app.listen(PORT, () => {
 // Serve static files from the public directory
 app.use(express.static(path.join(process.cwd(), 'public')));
 
-// Ensure the character-images directory exists
-const characterImagesDir = path.join(process.cwd(), 'public', 'character-images');
-if (!fs.existsSync(characterImagesDir)) {
-    fs.mkdirSync(characterImagesDir, { recursive: true });
-}
-
 // Helper function to process image uploads from character data
 // originalImagePath: the imagePath from the original character file (optional)
-const processImageUpload = (character, originalImagePath) => {
+const processImageUpload = (campaignName, characterName, character, originalImagePath) => {
     if (character.image && character.imageName) {
         // Extract the file extension from imageName (e.g., "photo.jpg" -> ".jpg")
         const extMatch = character.imageName.match(/\.[^.]+$/);
         const ext = extMatch ? extMatch[0] : '.png';
 
-        // Generate a GUID-based filename
-        const guidValue = guid.create().value;
-        const imageFileName = `${guidValue}${ext}`;
-        const imageFilePath = path.join(characterImagesDir, imageFileName);
+        const campaignImagesDir = path.join(process.cwd(), 'public', 'campaigns', campaignName, 'images');
+        if (!fs.existsSync(campaignImagesDir)) {
+            fs.mkdirSync(campaignImagesDir, { recursive: true });
+        }
 
-        // Delete the old image if originalImagePath is provided and differs
+        // Use character name as filename
+        const imageFileName = `${characterName}${ext}`;
+        const imageFilePath = path.join(campaignImagesDir, imageFileName);
+
+        // Delete old image if provided
         if (originalImagePath) {
             deleteCharacterImage(originalImagePath);
         }
@@ -111,8 +109,8 @@ const processImageUpload = (character, originalImagePath) => {
         // Save the image file
         fs.writeFileSync(imageFilePath, base64Data, 'base64');
 
-        // Set the relative path for the image
-        character.imagePath = `character-images/${imageFileName}`;
+        // Set the relative path from public/
+        character.imagePath = path.join('campaigns', campaignName, 'images', imageFileName);
 
         // Remove the temporary image and imageName fields from the character object
         delete character.image;
@@ -126,12 +124,11 @@ const processImageUpload = (character, originalImagePath) => {
 const deleteCharacterImage = (imagePath) => {
     try {
         if (imagePath) {
-            // imagePath is relative like "character-images/{guid}.{ext}"
-            const imageFileName = path.basename(imagePath);
-            const imageFilePath = path.join(characterImagesDir, imageFileName);
-            if (fs.existsSync(imageFilePath)) {
-                fs.unlinkSync(imageFilePath);
-                console.log(`Deleted image: ${imageFilePath}`);
+            // imagePath is relative to public/ e.g. "campaigns/<campaign>/images/<name>.<ext>"
+            const fullPath = path.join(process.cwd(), 'public', imagePath);
+            if (fs.existsSync(fullPath)) {
+                fs.unlinkSync(fullPath);
+                console.log(`Deleted image: ${fullPath}`);
             }
         }
     } catch (error) {
@@ -464,30 +461,39 @@ app.put('/api/campaigns/:campaign/maps/:mapname/activate', (req, res) => {
 
 // ====== ENCOUNTER CRUD ROUTES ======
 
-// Helper to sanitize encounter names to filenames
-const sanitizeEncounterName = (name) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '.json';
+// Helper to get the encounters file path
+const getEncountersFilePath = (campaign) => path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'encounters.json');
+
+// Helper to read encounters from single file
+const readEncounters = (campaign) => {
+  const filePath = getEncountersFilePath(campaign);
+  try {
+    if (!fs.existsSync(filePath)) {
+      return { encounters: [] };
+    }
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  } catch (error) {
+    console.error('Error reading encounters file:', error);
+    return { encounters: [] };
+  }
+};
+
+// Helper to write encounters to single file
+const writeEncounters = (campaign, data) => {
+  const filePath = getEncountersFilePath(campaign);
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+};
 
 // GET /api/campaigns/:campaign/encounters - List all encounters
 app.get('/api/campaigns/:campaign/encounters', (req, res) => {
   const { campaign } = req.params;
-  const encountersDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'encounters');
-  
   try {
-    if (!fs.existsSync(encountersDir)) {
-      return res.json({ encounters: [] });
-    }
-    
-    const items = fs.readdirSync(encountersDir, { withFileTypes: true });
-    const encounterFiles = items
-      .filter(item => item.isFile() && item.name.endsWith('.json'))
-      .map(item => item.name)
-      .sort();
-    
-    const encounters = encounterFiles.map(f => ({
-      name: f.replace(/\.json$/, ''),
-      fileName: f,
-    }));
-    
+    const data = readEncounters(campaign);
+    const encounters = data.encounters.map(e => ({ name: e.name, savedAt: e.savedAt }));
     res.json({ encounters });
   } catch (error) {
     console.error('Error listing encounters:', error);
@@ -498,38 +504,38 @@ app.get('/api/campaigns/:campaign/encounters', (req, res) => {
 // POST /api/campaigns/:campaign/encounters - Create a new encounter
 app.post('/api/campaigns/:campaign/encounters', (req, res) => {
   const { campaign } = req.params;
-  const { name, data } = req.body;
-  
+  const { name, data: encounterData } = req.body;
+
   if (!name || name.trim() === '') {
     return res.status(400).json({ error: 'Encounter name is required' });
   }
-  
-  const encountersDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'encounters');
-  
+
   try {
-    if (!fs.existsSync(encountersDir)) {
-      fs.mkdirSync(encountersDir, { recursive: true });
-    }
-    
-    const fileName = sanitizeEncounterName(name);
-    const filePath = path.join(encountersDir, fileName);
-    
-    if (fs.existsSync(filePath)) {
+    const data = readEncounters(campaign);
+
+    const trimmedName = name.trim();
+    if (data.encounters.some(e => e.name === trimmedName)) {
       return res.status(400).json({ error: 'An encounter with this name already exists' });
     }
-    
-    const encounterData = {
-      name: name.trim(),
+
+    const newEncounter = {
+      name: trimmedName,
       savedAt: new Date().toISOString(),
-      ...data,
+      ...encounterData,
+      selectedMonsters: (encounterData?.selectedMonsters || []).map(m => ({
+        index: m.index,
+        name: m.name,
+        qty: m.qty
+      }))
     };
-    
-    fs.writeFileSync(filePath, JSON.stringify(encounterData, null, 2));
-    
+
+    data.encounters.push(newEncounter);
+    writeEncounters(campaign, data);
+
     // Broadcast encounters list change
-    publish(`encounters-list-${campaign}`, { action: 'created', encounter: { name: name.trim(), fileName } });
-    
-    res.status(201).json({ message: 'Encounter saved successfully', encounter: { name: name.trim(), fileName } });
+    publish(`encounters-list-${campaign}`, { action: 'created', encounter: { name: trimmedName } });
+
+    res.status(201).json({ message: 'Encounter saved successfully', encounter: { name: trimmedName } });
   } catch (error) {
     console.error('Error saving encounter:', error);
     res.status(500).json({ error: 'Failed to save encounter' });
@@ -539,17 +545,13 @@ app.post('/api/campaigns/:campaign/encounters', (req, res) => {
 // GET /api/campaigns/:campaign/encounters/:encountername - Get encounter data
 app.get('/api/campaigns/:campaign/encounters/:encountername', (req, res) => {
   const { campaign, encountername } = req.params;
-  const encountersDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'encounters');
-  const fileName = encountername.endsWith('.json') ? encountername : `${encountername}.json`;
-  const filePath = path.join(encountersDir, fileName);
-  
   try {
-    if (!fs.existsSync(filePath)) {
+    const data = readEncounters(campaign);
+    const encounter = data.encounters.find(e => e.name === encountername);
+    if (!encounter) {
       return res.status(404).json({ error: 'Encounter not found' });
     }
-    
-    const encounterData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    res.json(encounterData);
+    res.json(encounter);
   } catch (error) {
     console.error('Error reading encounter:', error);
     res.status(500).json({ error: 'Failed to read encounter' });
@@ -560,22 +562,20 @@ app.get('/api/campaigns/:campaign/encounters/:encountername', (req, res) => {
 app.put('/api/campaigns/:campaign/encounters/:encountername', (req, res) => {
   const { campaign, encountername } = req.params;
   const encounterData = req.body;
-  const encountersDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'encounters');
-  
+
   try {
-    if (!fs.existsSync(encountersDir)) {
-      fs.mkdirSync(encountersDir, { recursive: true });
+    const data = readEncounters(campaign);
+    const index = data.encounters.findIndex(e => e.name === encountername);
+    if (index === -1) {
+      return res.status(404).json({ error: 'Encounter not found' });
     }
-    
-    const fileName = encountername.endsWith('.json') ? encountername : `${encountername}.json`;
-    const filePath = path.join(encountersDir, fileName);
-    
-    fs.writeFileSync(filePath, JSON.stringify(encounterData, null, 2));
-    
+
+    data.encounters[index] = encounterData;
+    writeEncounters(campaign, data);
+
     // Broadcast encounter data change
-    const eventEncounterName = fileName.replace(/\.json$/, '');
-    publish(`encounter-data-${campaign}-${eventEncounterName}`, encounterData);
-    
+    publish(`encounter-data-${campaign}-${encountername}`, encounterData);
+
     res.json({ message: 'Encounter updated successfully' });
   } catch (error) {
     console.error('Error saving encounter:', error);
@@ -586,21 +586,20 @@ app.put('/api/campaigns/:campaign/encounters/:encountername', (req, res) => {
 // DELETE /api/campaigns/:campaign/encounters/:encountername - Delete an encounter
 app.delete('/api/campaigns/:campaign/encounters/:encountername', (req, res) => {
   const { campaign, encountername } = req.params;
-  const encountersDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'encounters');
-  const fileName = encountername.endsWith('.json') ? encountername : `${encountername}.json`;
-  const filePath = path.join(encountersDir, fileName);
-  
+
   try {
-    if (!fs.existsSync(filePath)) {
+    const data = readEncounters(campaign);
+    const index = data.encounters.findIndex(e => e.name === encountername);
+    if (index === -1) {
       return res.status(404).json({ error: 'Encounter not found' });
     }
-    
-    fs.unlinkSync(filePath);
-    
+
+    data.encounters.splice(index, 1);
+    writeEncounters(campaign, data);
+
     // Broadcast encounters list change
-    const encounterKey = fileName.replace(/\.json$/, '');
-    publish(`encounters-list-${campaign}`, { action: 'deleted', encounter: encounterKey });
-    
+    publish(`encounters-list-${campaign}`, { action: 'deleted', encounter: encountername });
+
     res.json({ message: 'Encounter deleted successfully' });
   } catch (error) {
     console.error('Error deleting encounter:', error);
@@ -612,48 +611,35 @@ app.delete('/api/campaigns/:campaign/encounters/:encountername', (req, res) => {
 app.put('/api/campaigns/:campaign/encounters/:encountername/rename', (req, res) => {
   const { campaign, encountername } = req.params;
   const { newName } = req.body;
-  
+
   if (!newName || newName.trim() === '') {
     return res.status(400).json({ error: 'New encounter name is required' });
   }
-  
-  const encountersDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'encounters');
-  const oldFileName = encountername.endsWith('.json') ? encountername : `${encountername}.json`;
-  const oldFilePath = path.join(encountersDir, oldFileName);
-  const newFileName = sanitizeEncounterName(newName.trim());
-  const newFilePath = path.join(encountersDir, newFileName);
-  
+
   try {
-    if (!fs.existsSync(oldFilePath)) {
+    const data = readEncounters(campaign);
+    const index = data.encounters.findIndex(e => e.name === encountername);
+    if (index === -1) {
       return res.status(404).json({ error: 'Encounter not found' });
     }
-    
-    if (fs.existsSync(newFilePath) && oldFileName !== newFileName) {
+
+    const trimmedNewName = newName.trim();
+    // Check new name doesn't conflict with another encounter
+    if (data.encounters.some((e, i) => i !== index && e.name === trimmedNewName)) {
       return res.status(400).json({ error: 'An encounter with this name already exists' });
     }
-    
-    // Read existing data and update name
-    const encounterData = JSON.parse(fs.readFileSync(oldFilePath, 'utf-8'));
-    encounterData.name = newName.trim();
-    
-    // Write with new name, delete old file
-    fs.writeFileSync(newFilePath, JSON.stringify(encounterData, null, 2));
-    
-    if (oldFileName !== newFileName) {
-      fs.unlinkSync(oldFilePath);
-    }
-    
+
+    data.encounters[index].name = trimmedNewName;
+    writeEncounters(campaign, data);
+
     // Broadcast encounters list change
-    publish(`encounters-list-${campaign}`, { 
-      action: 'renamed', 
-      oldName: oldFileName.replace(/\.json$/, ''), 
-      newName: newFileName.replace(/\.json$/, '') 
+    publish(`encounters-list-${campaign}`, {
+      action: 'renamed',
+      oldName: encountername,
+      newName: trimmedNewName
     });
-    
-    res.json({ 
-      message: 'Encounter renamed successfully', 
-      encounter: { name: newName.trim(), fileName: newFileName }
-    });
+
+    res.json({ message: 'Encounter renamed successfully', encounter: { name: trimmedNewName } });
   } catch (error) {
     console.error('Error renaming encounter:', error);
     res.status(500).json({ error: 'Failed to rename encounter' });
@@ -1013,6 +999,8 @@ app.post('/api/campaigns', (req, res) => {
         fs.mkdirSync(newCampaignDir);
         // Create maps subdirectory for campaign map files
         fs.mkdirSync(path.join(newCampaignDir, 'maps'), { recursive: true });
+        // Create images subdirectory for character images
+        fs.mkdirSync(path.join(newCampaignDir, 'images'), { recursive: true });
         
         res.status(201).json({ message: 'Campaign created successfully', campaignName: campaignName.trim() });
     } catch (error) {
@@ -1052,10 +1040,26 @@ app.put('/api/campaigns/:campaign/:file', (req, res) => {
 
             // Handle image changes
             if ((!character.imagePath || character.imagePath === '') && originalImagePath) {
+                // Image was cleared
                 deleteCharacterImage(originalImagePath);
                 character.imagePath = '';
             } else if (character.image && character.imageName) {
-                processImageUpload(character, originalImagePath);
+                // New image uploaded
+                processImageUpload(campaign, character.name, character, originalImagePath);
+            } else if (originalImagePath) {
+                // Image unchanged but character renamed — rename the image file
+                const oldImageFullPath = path.join(process.cwd(), 'public', originalImagePath);
+                if (fs.existsSync(oldImageFullPath)) {
+                    const ext = path.extname(oldImageFullPath);
+                    const newImageFileName = `${character.name}${ext}`;
+                    const newCampaignImagesDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'images');
+                    const newImageFullPath = path.join(newCampaignImagesDir, newImageFileName);
+
+                    if (oldImageFullPath !== newImageFullPath) {
+                        fs.renameSync(oldImageFullPath, newImageFullPath);
+                        character.imagePath = path.join('campaigns', campaign, 'images', newImageFileName);
+                    }
+                }
             }
         } else {
             // Standard update: verify the file exists at the current path
@@ -1072,7 +1076,7 @@ app.put('/api/campaigns/:campaign/:file', (req, res) => {
                 deleteCharacterImage(originalImagePath);
                 character.imagePath = '';
             } else if (character.image && character.imageName) {
-                processImageUpload(character, originalImagePath);
+                processImageUpload(campaign, character.name, character, originalImagePath);
             }
         }
         
@@ -1141,13 +1145,15 @@ app.delete('/api/campaigns/:campaign', (req, res) => {
             fs.rmdirSync(mapsDir);
         }
 
-        // Also delete maps-meta.json if it exists
-        const metaFile = path.join(campaignDir, 'maps', 'maps-meta.json');
-        if (fs.existsSync(metaFile)) fs.unlinkSync(metaFile);
+        // Delete images directory and all image files recursively
+        const imagesDir = path.join(campaignDir, 'images');
+        if (fs.existsSync(imagesDir)) {
+            fs.rmSync(imagesDir, { recursive: true, force: true });
+        }
 
         // Remove all files in the campaign directory
         files.forEach(file => {
-            if (file !== 'maps') {
+            if (file !== 'maps' && file !== 'images') {
                 fs.unlinkSync(path.join(campaignDir, file));
             }
          });
@@ -1221,7 +1227,7 @@ app.post('/api/campaigns/character', (req, res) => {
         }
 
         // If the character has an image, process the upload
-        processImageUpload(character);
+        processImageUpload(campaignName, character.name, character);
         
         // Generate a safe filename using only character name
         const charName = character.name || 'Character';

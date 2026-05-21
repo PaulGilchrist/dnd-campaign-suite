@@ -1,0 +1,58 @@
+{
+  "encounters": [
+    {
+      "name": "Goblin Ambush",
+      "savedAt": "2026-05-20T16:02:08.274Z",
+      "rulesVersion": "2024",
+      "difficulty": 0,
+      "playerLevels": [
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "selectedMonsters": [
+        {
+          "index": "adult-black-dragon",
+          "name": "Adult Black Dragon",
+          "qty": 1
+        }
+      ]
+    },
+    {
+      "name": "Gith Camp",
+      "savedAt": "2026-05-20T16:19:26.137Z",
+      "rulesVersion": "2024",
+      "difficulty": 1,
+      "playerLevels": [
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20,
+        20
+      ],
+      "selectedMonsters": [
+        {
+          "index": "githyanki-dracomancer",
+          "name": "Githyanki Dracomancer",
+          "qty": 5
+        }
+      ]
+    }
+  ]
+}

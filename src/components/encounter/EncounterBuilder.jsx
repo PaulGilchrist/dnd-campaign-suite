@@ -134,6 +134,14 @@ function saveFilter(filter, rulesVersion) {
   } catch { /* storage full, ignore */ }
 }
 
+function stripMonsters(monsters) {
+  return monsters.map(m => ({
+    index: m.index,
+    name: m.name,
+    qty: m.qty || 1,
+  }));
+}
+
 function EncounterBuilder({ characters, campaignName }) {
   // Infer initial ruleset from characters
   const [rulesVersion, setRulesVersion] = useState(() => inferRuleset(characters));
@@ -292,23 +300,17 @@ function EncounterBuilder({ characters, campaignName }) {
   };
 
   const handleSaveEncounter = () => {
+    const data = {
+      rulesVersion,
+      difficulty: filter.difficulty,
+      playerLevels: filter.playerLevels,
+      selectedMonsters: stripMonsters(selectedMonsters),
+    };
     if (currentEncounterName) {
       // Update existing encounter — no modal needed
-      const data = {
-        rulesVersion,
-        difficulty: filter.difficulty,
-        playerLevels: filter.playerLevels,
-        selectedMonsters,
-      };
       updateEncounter(currentEncounterName, data);
     } else {
       // New encounter — prompt for name
-      const data = {
-        rulesVersion,
-        difficulty: filter.difficulty,
-        playerLevels: filter.playerLevels,
-        selectedMonsters,
-      };
       setPendingEncounterData(data);
       openSaveModal();
     }
@@ -329,12 +331,30 @@ function EncounterBuilder({ characters, campaignName }) {
       if (data) {
         setEncounterTitle(formatEncounterName(name));
         setCurrentEncounterName(name);
+
+        // Set rulesVersion first — this triggers the useEffect that clears
+        // selectedMonsters, so we defer monster population with setTimeout(0)
         setRulesVersion(data.rulesVersion || '5e');
         setFilter({
           difficulty: data.difficulty ?? 2,
           playerLevels: data.playerLevels || [1],
         });
-        setSelectedMonsters(data.selectedMonsters || []);
+
+        // Re-populate full monster objects from the catalog using index
+        const monsterRefs = data.selectedMonsters || [];
+        const resolvedMonsters = monsterRefs.map(ref => {
+          const fullMonster = (monsters || []).find(m => m.index === ref.index);
+          if (fullMonster) {
+            return { ...fullMonster, qty: ref.qty || 1 };
+          }
+          // Fallback: keep at least name and index
+          return { ...ref, qty: ref.qty || 1 };
+        });
+
+        // Defer to let the rulesVersion useEffect clear happen first
+        setTimeout(() => {
+          setSelectedMonsters(resolvedMonsters);
+        }, 0);
       }
     } catch (error) {
       console.error('Failed to load encounter:', error);
