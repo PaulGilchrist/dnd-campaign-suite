@@ -59,9 +59,9 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Goliath",
+    "name": "Dwarf",
     "subrace": {
-      "name": "Cloud's Jaunt (Cloud Giant)",
+      "name": "Mountain",
       "description": ""
     }
   },

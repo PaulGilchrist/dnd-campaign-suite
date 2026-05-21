@@ -52,9 +52,9 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Dwarf",
+    "name": "Elf",
     "subrace": {
-      "name": "Hill"
+      "name": "Wood Elf"
     }
   },
   "immunities": [
