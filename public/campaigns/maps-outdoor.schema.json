@@ -36,11 +36,11 @@
             "additionalProperties": {
                 "type": "string",
                 "enum": [
-                    "plains",
-                    "hills",
-                    "forest",
-                    "mountains",
                     "desert",
+                    "forest",
+                    "hills",
+                    "mountains",
+                    "plains",
                     "swamp",
                     "tundra",
                     "water"
@@ -71,14 +71,14 @@
                     "type": {
                         "type": "string",
                         "enum": [
-                            "settlement",
-                            "dungeon",
                             "camp",
-                            "tower",
-                            "loreSite",
+                            "dungeon",
                             "hazard",
+                            "landmark",
+                            "loreSite",
                             "naturalWonder",
-                            "landmark"
+                            "settlement",
+                            "tower"
                         ],
                         "description": "Category of the point of interest"
                     },

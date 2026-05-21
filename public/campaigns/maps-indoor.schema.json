@@ -64,24 +64,24 @@
                     "type": {
                         "type": "string",
                         "enum": [
-                            "door",
-                            "stairs",
-                            "trap",
-                            "secretDoor",
-                            "bed",
-                            "firepit",
-                            "npc",
-                            "torch",
-                            "chest",
-                            "web",
-                            "table",
-                            "statue",
-                            "fountain",
-                            "bookshelf",
                             "altar",
+                            "bed",
+                            "bookshelf",
                             "chair",
+                            "chest",
+                            "crate",
+                            "door",
+                            "firepit",
+                            "fountain",
+                            "npc",
                             "pillar",
-                            "crate"
+                            "secretDoor",
+                            "stairs",
+                            "statue",
+                            "table",
+                            "torch",
+                            "trap",
+                            "web"
                         ],
                         "description": "The type of placed item.  Note: npc represents a monster of other non-player character type and should have name property set to exactly match the name in the Monster Manual for proper image lookup"
                     },
@@ -91,7 +91,12 @@
                     },
                     "rotation": {
                         "type": "integer",
-                        "enum": [0, 90, 180, 270],
+                        "enum": [
+                            0,
+                            90,
+                            180,
+                            270
+                        ],
                         "description": "Rotation in degrees"
                     },
                     "name": {
