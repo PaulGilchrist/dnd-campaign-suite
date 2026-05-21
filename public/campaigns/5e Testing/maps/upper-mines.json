@@ -437,29 +437,25 @@
       "id": "barbarian",
       "name": "Barbarian",
       "gridX": 12,
-      "gridY": 2,
-      "imagePath": "campaigns/5e Testing/images/Barbarian.png"
+      "gridY": 2
     },
     {
       "id": "bard",
       "name": "Bard",
       "gridX": 11,
-      "gridY": 2,
-      "imagePath": "campaigns/5e Testing/images/Bard.png"
+      "gridY": 2
     },
     {
       "id": "druid",
       "name": "Druid",
       "gridX": 13,
-      "gridY": 2,
-      "imagePath": "campaigns/5e Testing/images/Druid.png"
+      "gridY": 2
     },
     {
       "id": "ranger",
       "name": "Ranger",
       "gridX": 12,
-      "gridY": 1,
-      "imagePath": "campaigns/5e Testing/images/Ranger.png"
+      "gridY": 1
     }
   ],
   "zoom": 1,

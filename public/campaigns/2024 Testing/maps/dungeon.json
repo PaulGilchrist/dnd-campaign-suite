@@ -872,29 +872,25 @@
             "id": "player-2-1779209589404",
             "name": "Cleric",
             "gridX": 5,
-            "gridY": 2,
-            "imagePath": "campaigns/2024 Testing/images/Cleric.png"
+            "gridY": 2
         },
         {
             "id": "player-4-1779209589404",
             "name": "Fighter",
             "gridX": 9,
-            "gridY": 2,
-            "imagePath": "campaigns/2024 Testing/images/Fighter.png"
+            "gridY": 2
         },
         {
             "id": "player-8-1779209589404",
             "name": "Rogue",
             "gridX": 4,
-            "gridY": 4,
-            "imagePath": "campaigns/2024 Testing/images/Rogue.png"
+            "gridY": 4
         },
         {
             "id": "player-11-1779209589404",
             "name": "Wizard",
             "gridX": 10,
-            "gridY": 4,
-            "imagePath": "campaigns/2024 Testing/images/Wizard.png"
+            "gridY": 4
         }
     ],
     "zoom": 1,

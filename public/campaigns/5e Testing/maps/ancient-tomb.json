@@ -536,16 +536,16 @@
     },
     {
       "id": "duergar-npc1",
-      "gridX": 25,
-      "gridY": 25,
+      "gridX": 23,
+      "gridY": 26,
       "type": "npc",
       "visible": false,
       "name": "Duergar Miner"
     },
     {
       "id": "duergar-npc2",
-      "gridX": 25,
-      "gridY": 27,
+      "gridX": 26,
+      "gridY": 26,
       "type": "npc",
       "visible": false,
       "name": "Duergar Scout"
@@ -642,29 +642,25 @@
       "id": "barbarian",
       "name": "Barbarian",
       "gridX": 14,
-      "gridY": 2,
-      "imagePath": "campaigns/5e Testing/images/Barbarian.png"
+      "gridY": 2
     },
     {
       "id": "bard",
       "name": "Bard",
       "gridX": 13,
-      "gridY": 1,
-      "imagePath": "campaigns/5e Testing/images/Bard.png"
+      "gridY": 1
     },
     {
       "id": "druid",
       "name": "Druid",
       "gridX": 15,
-      "gridY": 1,
-      "imagePath": "campaigns/5e Testing/images/Druid.png"
+      "gridY": 1
     },
     {
       "id": "ranger",
       "name": "Ranger",
       "gridX": 14,
-      "gridY": 1,
-      "imagePath": "campaigns/5e Testing/images/Ranger.png"
+      "gridY": 1
     }
   ],
   "zoom": 1,

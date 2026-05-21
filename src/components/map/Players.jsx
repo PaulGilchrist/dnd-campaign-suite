@@ -2,12 +2,19 @@ import React from 'react';
 
 const RADIUS = 20;
 
-const Players = ({ players, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown }) => {
+const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown }) => {
+    const getPlayerImage = (player, characters) => {
+        if (!characters || !player) return null;
+        const character = characters.find((c) => c.id === player.id);
+        return character?.imagePath || null;
+    };
+
     return (
         <>
             {players.map((player) => {
                 const cx = gridCenterX(player.gridX);
                 const cy = gridCenterY(player.gridY);
+                const img = getPlayerImage(player, characters);
                 // Hide creature from players if cell is fogged
                 if (!isLocalhost && fog?.has(`${player.gridX},${player.gridY}`)) return null;
 
@@ -29,9 +36,9 @@ const Players = ({ players, gridCenterX, gridCenterY, isLocalhost, fog, dragging
                             r={RADIUS}
                             className={`creature-circle ${dragging?.creatureId === player.id ? 'dragging' : ''}`}
                         />
-                        {player.imagePath ? (
+                        {img ? (
                             <image
-                                xlinkHref={player.imagePath}
+                                xlinkHref={img}
                                 x={cx - RADIUS + 2}
                                 y={cy - RADIUS + 2}
                                 width={RADIUS * 2 - 4}

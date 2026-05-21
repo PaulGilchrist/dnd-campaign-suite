@@ -223,8 +223,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                             id: character.id || `player-${i}-${Date.now()}`,
                             name: character.name || 'Unknown',
                             gridX: Math.min(1 + (i * 2) % gs, gs - 1),
-                            gridY: Math.min(1 + Math.floor((i * 2) / gs), gs - 1),
-                            imagePath: character.imagePath || ''
+                            gridY: Math.min(1 + Math.floor((i * 2) / gs), gs - 1)
                         }));
                         setMapData(prev => ({ ...prev, players: initialPlayers }));
                     }
@@ -240,8 +239,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                 id: utils.guid(),
                 name: utils.getFirstName(character.name),
                 gridX: 0,
-                gridY: 0,
-                imagePath: character.imagePath || ''
+                gridY: 0
             }));
 
             const occupied = new Set();
@@ -584,6 +582,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                 {/* Characters */}
                 <Players
                     players={players}
+                    characters={characters}
                     gridCenterX={gridCenterX}
                     gridCenterY={gridCenterY}
                     isLocalhost={isLocalhost}

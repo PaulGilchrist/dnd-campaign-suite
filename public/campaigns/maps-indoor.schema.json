@@ -110,8 +110,7 @@
                     "id",
                     "name",
                     "gridX",
-                    "gridY",
-                    "imagePath"
+                    "gridY"
                 ],
                 "properties": {
                     "id": {
@@ -129,10 +128,6 @@
                     "gridY": {
                         "type": "integer",
                         "description": "Grid row position"
-                    },
-                    "imagePath": {
-                        "type": "string",
-                        "description": "Will always be in the format `campaigns/{campaign name}/images/{player name}.png"
                     }
                 }
             },

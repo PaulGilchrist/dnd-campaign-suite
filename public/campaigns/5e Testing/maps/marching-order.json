@@ -9,29 +9,25 @@
             "id": "player-0-1779389602005",
             "name": "Barbarian",
             "gridX": 3,
-            "gridY": 2,
-            "imagePath": "campaigns/5e Testing/images/Barbarian.png"
+            "gridY": 2
         },
         {
             "id": "player-1-1779389602005",
             "name": "Bard",
             "gridX": 3,
-            "gridY": 6,
-            "imagePath": "campaigns/5e Testing/images/Bard.png"
+            "gridY": 6
         },
         {
             "id": "player-2-1779389602005",
             "name": "Druid",
             "gridX": 3,
-            "gridY": 4,
-            "imagePath": "campaigns/5e Testing/images/Druid.png"
+            "gridY": 4
         },
         {
             "id": "player-3-1779389602005",
             "name": "Ranger",
             "gridX": 3,
-            "gridY": 0,
-            "imagePath": "campaigns/5e Testing/images/Ranger.png"
+            "gridY": 0
         }
     ],
     "terrain": {},
