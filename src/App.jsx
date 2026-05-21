@@ -217,13 +217,14 @@ function App() {
             playerSummary={activeCharacter}
             allRaces2024={races2024}
             allMagicItems2024={magicItems2024}
+            campaignName={campaignName}
             onDeleteCharacter={handleDeleteCharacter}
             onEditCharacter={() => handleEditCharacter(activeCharacter)}
             onUploadClick={handleUploadClick}
             onSaveClick={handleSaveClick}
           />
         )}
-        {activeView === 'initiative' && <Initiative characters={characters} onNpcsChange={setNpcs} />}
+        {activeView === 'initiative' && <Initiative characters={characters} campaignName={campaignName} onNpcsChange={setNpcs} />}
         {activeView === 'mapsManager' && mapsView.type === 'manager' && (
           <MapsManager
             campaignName={campaignName}

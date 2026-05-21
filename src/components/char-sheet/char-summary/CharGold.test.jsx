@@ -89,7 +89,7 @@ describe('CharGold', () => {
      const input = screen.getByTestId('hidden-input');
      fireEvent.change(input, { target: { value: '1000' } });
      
-     expect(storage.setProperty).toHaveBeenCalledWith('Test Character', 'gold', '1000');
+      expect(storage.setProperty).toHaveBeenCalledWith('Test Character', 'gold', '1000', undefined);
     });
 
    it('should have tabIndex for accessibility', () => {

@@ -48,9 +48,10 @@ describe('CharSpellSlotLevel', () => {
 
     expect(storage.getProperty).toHaveBeenCalledWith(
         'Test Character',
-        'spell_slots_level_1'
+        'spell_slots_level_1',
+        undefined
        );
-     });
+      });
 
   it('should use totalSlots as default when storage value is null', () => {
     storage.getProperty.mockReturnValue(null);
@@ -65,9 +66,10 @@ describe('CharSpellSlotLevel', () => {
 
     expect(storage.getProperty).toHaveBeenCalledWith(
         'Test Character',
-        'spell_slots_level_2'
+        'spell_slots_level_2',
+        undefined
        );
-     });
+      });
 
   it('should decrement available slots on click when slots are available', () => {
     storage.getProperty.mockReturnValue(3);
@@ -86,9 +88,10 @@ describe('CharSpellSlotLevel', () => {
     expect(storage.setProperty).toHaveBeenCalledWith(
         'Test Character',
         'spell_slots_level_1',
-        2
+        2,
+        undefined
        );
-     });
+      });
 
   it('should reset to totalSlots when availableSlots is 0', () => {
     storage.getProperty.mockReturnValue(0);
@@ -107,9 +110,10 @@ describe('CharSpellSlotLevel', () => {
     expect(storage.setProperty).toHaveBeenCalledWith(
         'Test Character',
         'spell_slots_level_1',
-        3
+        3,
+        undefined
        );
-     });
+      });
 
   it('should not decrement on Tab key press', () => {
     storage.getProperty.mockReturnValue(3);
@@ -145,9 +149,10 @@ describe('CharSpellSlotLevel', () => {
     expect(storage.setProperty).toHaveBeenCalledWith(
         'Test Character',
         'spell_slots_level_1',
-        2
+        2,
+        undefined
        );
-     });
+      });
 
   it('should render the correct number of slot divs', () => {
     storage.getProperty.mockReturnValue(3);

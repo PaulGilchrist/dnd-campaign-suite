@@ -37,7 +37,7 @@ function AvatarImage({ name, imagePath }) {
     );
 }
 
-function Initiative({ characters, onNpcsChange }) {
+function Initiative({ characters, campaignName, onNpcsChange }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
     const [numOfNpc, setNumOfNpc] = React.useState(5);
     const [activeCreatureId, setActiveCreatureId] = React.useState(null);
@@ -75,7 +75,7 @@ function Initiative({ characters, onNpcsChange }) {
         if (!combatSummary) return;
         combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${numOfNpc + 1}`, type: 'npc', initiative: '' });
         setNumOfNpc(numOfNpc + 1);
-        storage.set('combatSummary', combatSummary);
+        storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
     }, [combatSummary, numOfNpc]);
 
@@ -86,7 +86,7 @@ function Initiative({ characters, onNpcsChange }) {
                 if (combatSummary.creatures[i].initiative == '' || window.confirm(`${combatSummary.creatures[i].name} has initiative assigned.  Remove anyway?`)) {
                     combatSummary.creatures.splice(i, 1);
                     setNumOfNpc(numOfNpc - 1);
-                    storage.set('combatSummary', combatSummary);
+                    storage.set('combatSummary', combatSummary, campaignName);
                     setCombatSummary(cloneDeep(combatSummary));
                 }
                 break;
@@ -97,14 +97,14 @@ function Initiative({ characters, onNpcsChange }) {
     const handleAddCombatRound = React.useCallback(() => {
         if (!combatSummary) return;
         combatSummary.round++;
-        storage.set('combatSummary', combatSummary);
+        storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary({...combatSummary});
     }, [combatSummary]);
 
     const handleRemoveCombatRound = React.useCallback(() => {
         if (!combatSummary) return;
         combatSummary.round = Math.max(0, combatSummary.round - 1);
-        storage.set('combatSummary', combatSummary);
+        storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary({...combatSummary});
     }, [combatSummary]);
 
@@ -113,11 +113,11 @@ function Initiative({ characters, onNpcsChange }) {
         const currentIndex = combatSummary.creatures.findIndex((creature) => creature.id === activeCreatureId);
         if (currentIndex < combatSummary.creatures.length - 1) {
             const nextId = combatSummary.creatures[currentIndex + 1].id;
-            storage.set('activeCreatureId', nextId);
+            storage.set('activeCreatureId', nextId, campaignName);
             setActiveCreatureId(nextId);
         } else {
             const firstId = combatSummary.creatures[0].id;
-            storage.set('activeCreatureId', firstId);
+            storage.set('activeCreatureId', firstId, campaignName);
             setActiveCreatureId(firstId);
         }
     }, [combatSummary?.creatures, activeCreatureId]);
@@ -127,11 +127,11 @@ function Initiative({ characters, onNpcsChange }) {
         const currentIndex = combatSummary.creatures.findIndex((creature) => creature.id === activeCreatureId);
         if (currentIndex > 0) {
             const prevId = combatSummary.creatures[currentIndex - 1].id;
-            storage.set('activeCreatureId', prevId);
+            storage.set('activeCreatureId', prevId, campaignName);
             setActiveCreatureId(prevId);
         } else {
             const lastId = combatSummary.creatures[combatSummary.creatures.length - 1].id;
-            storage.set('activeCreatureId', lastId);
+            storage.set('activeCreatureId', lastId, campaignName);
             setActiveCreatureId(lastId);
         }
     }, [combatSummary?.creatures, activeCreatureId]);
@@ -143,11 +143,11 @@ function Initiative({ characters, onNpcsChange }) {
             round: 1,
             creatures
         };
-        storage.set('combatSummary', newSummary);
+        storage.set('combatSummary', newSummary, campaignName);
         setCombatSummary(newSummary);
 
         const firstId = creatures[0]?.id;
-        storage.set('activeCreatureId', firstId);
+        storage.set('activeCreatureId', firstId, campaignName);
         setActiveCreatureId(firstId);
     }, [characters]);
 
@@ -201,10 +201,10 @@ function Initiative({ characters, onNpcsChange }) {
                 round: 1,
                 creatures: setupCreatures()
             }
-            storage.set('combatSummary', combatSummary);
+            storage.set('combatSummary', combatSummary, campaignName);
             setCombatSummary(combatSummary);
             const firstCreatureId = setupCreatures()[0].id;
-            storage.set('activeCreatureId', firstCreatureId);
+            storage.set('activeCreatureId', firstCreatureId, campaignName);
             setActiveCreatureId(firstCreatureId);
         }
     };
@@ -213,7 +213,7 @@ function Initiative({ characters, onNpcsChange }) {
         const index = combatSummary.creatures.findIndex((creature) => creature.id === id);
         combatSummary.creatures[index].initiative = value;
         combatSummary.creatures.sort((a, b) => b.initiative - a.initiative); // desc
-        storage.set('combatSummary', combatSummary);
+        storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
     };
     const handleNameChange = (id, value) => {

@@ -332,7 +332,7 @@ describe('Barbarian', () => {
   it('persists rage points to storage', () => {
     render(<CharClassFeatures playerStats={mockStats} />);
     toggleFirstClickChangeAndSet('3');
-    expect(storage.setProperty).toHaveBeenCalledWith('Barb', 'ragePoints', '3');
+    expect(storage.setProperty).toHaveBeenCalledWith('Barb', 'ragePoints', '3', undefined);
      });
 });
 
@@ -377,7 +377,7 @@ describe('Bard', () => {
   it('persists bardic inspiration to storage', () => {
     render(<CharClassFeatures playerStats={mockStats} />);
     toggleFirstClickChangeAndSet('1');
-    expect(storage.setProperty).toHaveBeenCalledWith('Bard', 'bardicInspirationUses', '1');
+    expect(storage.setProperty).toHaveBeenCalledWith('Bard', 'bardicInspirationUses', '1', undefined);
      });
 });
 
@@ -409,7 +409,7 @@ describe('Cleric', () => {
   it('persists channel divinity to storage', () => {
     render(<CharClassFeatures playerStats={mockStats} />);
     toggleFirstClickChangeAndSet('1');
-    expect(storage.setProperty).toHaveBeenCalledWith('Cleric', 'channelDivinityCharges', '1');
+    expect(storage.setProperty).toHaveBeenCalledWith('Cleric', 'channelDivinityCharges', '1', undefined);
      });
 });
 
@@ -460,7 +460,7 @@ describe('Druid', () => {
   it('persists wild shape uses to storage', () => {
     render(<CharClassFeatures playerStats={mockStats5e} />);
     toggleFirstClickChangeAndSet('1');
-    expect(storage.setProperty).toHaveBeenCalledWith('Druid', 'wildShapeUses', '1');
+    expect(storage.setProperty).toHaveBeenCalledWith('Druid', 'wildShapeUses', '1', undefined);
      });
 });
 
@@ -489,7 +489,7 @@ describe('Fighter', () => {
     fireEvent.click(clickable);
     const input = screen.getByTestId('hidden-input');
     fireEvent.change(input, { target: { value: '0' } });
-    expect(storage.setProperty).toHaveBeenCalledWith('Fighter', 'secondWindUses', '0');
+    expect(storage.setProperty).toHaveBeenCalledWith('Fighter', 'secondWindUses', '0', undefined);
      });
 
   it('renders psionic energy for Psi Warrior', () => {
@@ -544,7 +544,7 @@ describe('Monk', () => {
   it('persists focus points to storage', () => {
     render(<CharClassFeatures playerStats={mockStats} />);
     toggleFirstClickChangeAndSet('0');
-    expect(storage.setProperty).toHaveBeenCalledWith('Monk', 'focusPoints', '0');
+    expect(storage.setProperty).toHaveBeenCalledWith('Monk', 'focusPoints', '0', undefined);
      });
 });
 
@@ -662,7 +662,7 @@ describe('Sorcerer', () => {
   it('persists sorcery points to storage', () => {
     render(<CharClassFeatures playerStats={mockStats5e} />);
     toggleFirstClickChangeAndSet('2');
-    expect(storage.setProperty).toHaveBeenCalledWith('Sorcerer', 'sorceryPoints', '2');
+    expect(storage.setProperty).toHaveBeenCalledWith('Sorcerer', 'sorceryPoints', '2', undefined);
      });
 });
 
@@ -737,7 +737,7 @@ describe('Wizard', () => {
   it('persists arcane recovery levels to storage', () => {
     render(<CharClassFeatures playerStats={mockStats5e} />);
     toggleFirstClickChangeAndSet('0');
-    expect(storage.setProperty).toHaveBeenCalledWith('Wizard', 'arcaneRecoveryLevels', '0');
+    expect(storage.setProperty).toHaveBeenCalledWith('Wizard', 'arcaneRecoveryLevels', '0', undefined);
      });
 });
 

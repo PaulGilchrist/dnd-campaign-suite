@@ -12,7 +12,7 @@ import usePopup from '../../../hooks/usePopup.js'
 import Popup from '../../common/Popup.jsx'
 import useTrackedResource from '../../../hooks/useTrackedResource.js'
 
-function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick }) {
+function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName }) {
     const { popupHtml, setPopupHtml } = usePopup(() => null);
     const [showInput, setShowInput] = React.useState(false);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -21,7 +21,8 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         'hasInspiration',
         playerStats.name,
         () => false,
-        [playerStats]
+        [playerStats],
+        campaignName
     );
     const handleToggleInspiration = () => {
         const newValue = !hasInspiration;
@@ -32,7 +33,8 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         'shortRestHitDice',
         playerStats.name,
         () => playerStats.level,
-        [playerStats]
+        [playerStats],
+        campaignName
     );
     const handleShortRestHitDiceToggle = () => {
         setShowInput((showInput) => !showInput);
@@ -85,9 +87,9 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
             <div className='summaryGrid'>
                 <div>
                     <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{playerStats.armorClass}</div>
-                    <CharHitPoints playerStats={playerStats}></CharHitPoints>
+                    <CharHitPoints playerStats={playerStats} campaignName={campaignName}></CharHitPoints>
                     <b>Speed: </b>{speed} ft.<br />
-                    <CharGold playerStats={playerStats}></CharGold>
+                    <CharGold playerStats={playerStats} campaignName={campaignName}></CharGold>
                 </div>
                 <div>
                     <b>Proficiency: </b>+{playerStats.proficiency}<br />

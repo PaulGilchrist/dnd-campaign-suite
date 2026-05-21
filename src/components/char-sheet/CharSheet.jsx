@@ -15,7 +15,7 @@ import CharSummary from './char-summary/CharSummary.jsx'
 import Subscriber from '../common/Subscriber.jsx';
 import './CharSheet.css'
 
-function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick }) {
+function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName }) {
     const [playerStats, setPlayerStats] = React.useState(null);
     const [forceRefresh, setForceRefresh] = React.useState(0);
     React.useEffect(() => {
@@ -84,21 +84,21 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                     preparedSpells.push(spell.name);
                 }
             });
-            storage.setProperty(playerStats.name, 'preparedSpells', preparedSpells);
+            storage.setProperty(playerStats.name, 'preparedSpells', preparedSpells, campaignName);
             setPlayerStats(cloneDeep(playerStats));
         }
     }
 
     return (<React.Fragment>
         {playerStats && <div className='char-sheet' data-testid='char-sheet'>
-            <CharSummary playerStats={playerStats} onDeleteCharacter={onDeleteCharacter} onEditCharacter={onEditCharacter} onUploadClick={onUploadClick} onSaveClick={onSaveClick}></CharSummary><hr />
+            <CharSummary playerStats={playerStats} onDeleteCharacter={onDeleteCharacter} onEditCharacter={onEditCharacter} onUploadClick={onUploadClick} onSaveClick={onSaveClick} campaignName={campaignName}></CharSummary><hr />
             <CharAbilities allAbilityScores={allAbilityScores} playerStats={playerStats}></CharAbilities><hr />
             
             <CharActions playerStats={playerStats}></CharActions><hr />
             <CharReactions playerStats={playerStats}></CharReactions>
             {playerSummary.rules === '2024' 
-  ? <CharSpells playerStats={playerStats}></CharSpells>
-  : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)}></CharSpells>
+  ? <CharSpells playerStats={playerStats} campaignName={campaignName}></CharSpells>
+  : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName}></CharSpells>
 }<hr />
             <CharSpecialActions playerStats={playerStats}></CharSpecialActions><hr />
             <CharInventory playerStats={playerStats}></CharInventory><hr />

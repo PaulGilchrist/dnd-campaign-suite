@@ -1076,21 +1076,43 @@ app.get('/api/campaigns/:campaign/:file', (req, res) => {
 });
 
 const readFile = () => {
-    fs.readFile('characterChangeData.json', 'utf-8', (err, data) => {
-        if (err) {
-            console.error('Failed to read character file');
-        } else {
-            characterChangeData = JSON.parse(data.toString());
+    const campaignsDir = path.join(process.cwd(), 'public', 'campaigns');
+    try {
+        if (!fs.existsSync(campaignsDir)) return;
+        const campaigns = fs.readdirSync(campaignsDir, { withFileTypes: true })
+            .filter(d => d.isDirectory())
+            .map(d => d.name);
+        for (const campaign of campaigns) {
+            const filePath = path.join(campaignsDir, campaign, 'data', 'character-change-data.json');
+            try {
+                if (fs.existsSync(filePath)) {
+                    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+                    characterChangeData.set(campaign, data);
+                } else {
+                    characterChangeData.set(campaign, {});
+                }
+            } catch (err) {
+                console.error(`Failed to read character change data for campaign ${campaign}:`, err.message);
+                characterChangeData.set(campaign, {});
+            }
         }
-    });
+    } catch (err) {
+        console.error('Failed to read campaigns directory for character change data:', err.message);
+    }
 }
 const saveFile = () => {
-    const data = JSON.stringify(characterChangeData);
-    fs.writeFile('characterChangeData.json', data, (err) => {
-        if (err) {
-            console.error('Failed to save character change data');
+    for (const [campaign, data] of characterChangeData) {
+        const filePath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'character-change-data.json');
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
         }
-    });
+        fs.writeFile(filePath, JSON.stringify(data), (err) => {
+            if (err) {
+                console.error(`Failed to save character change data for campaign ${campaign}:`, err.message);
+            }
+        });
+    }
 }
 // API endpoint to create a new campaign folder (must be BEFORE wildcard routes)
 app.post('/api/campaigns', (req, res) => {
@@ -1113,6 +1135,8 @@ app.post('/api/campaigns', (req, res) => {
         fs.mkdirSync(path.join(newCampaignDir, 'maps'), { recursive: true });
         // Create images subdirectory for character images
         fs.mkdirSync(path.join(newCampaignDir, 'images'), { recursive: true });
+        // Create data subdirectory for character change data
+        fs.mkdirSync(path.join(newCampaignDir, 'data'), { recursive: true });
         
         res.status(201).json({ message: 'Campaign created successfully', campaignName: campaignName.trim() });
     } catch (error) {
@@ -1368,8 +1392,8 @@ app.post('/api/campaigns/character', (req, res) => {
 // API endpoint to get positioning data for a campaign
 app.get('/api/campaigns/:campaign/positioning', (req, res) => {
     const { campaign } = req.params;
-    const key = `positioning-${campaign}`;
-    const storedData = characterChangeData[key];
+    const campaignData = characterChangeData.get(campaign) || {};
+    const storedData = campaignData.positioning;
     if (storedData) {
         res.status(200).json(storedData);
     } else {
@@ -1381,8 +1405,10 @@ app.get('/api/campaigns/:campaign/positioning', (req, res) => {
 app.post('/api/campaigns/:campaign/positioning', (req, res) => {
     const { campaign } = req.params;
     const positioningData = req.body;
-    const key = `positioning-${campaign}`;
-    characterChangeData[key] = positioningData;
+    if (!characterChangeData.has(campaign)) {
+        characterChangeData.set(campaign, {});
+    }
+    characterChangeData.get(campaign).positioning = positioningData;
     res.status(200).json({ message: 'Positioning data stored successfully' });
     if (!saveTimer) {
         saveTimer = setTimeout(() => {
@@ -1391,23 +1417,27 @@ app.post('/api/campaigns/:campaign/positioning', (req, res) => {
             saveTimer = null;
         }, persistDataDebounceMilliseconds);
     }
-    publish(key, positioningData);
+    publish(`positioning-${campaign}`, positioningData);
 });
 
 // Wildcard routes for character data (must be AFTER /api/campaigns)
-app.get('/api/:key', (req, res) => {
-    const { key } = req.params;
-    const storedData = characterChangeData[key];
+app.get('/api/campaigns/:campaign/:key', (req, res) => {
+    const { campaign, key } = req.params;
+    const campaignData = characterChangeData.get(campaign) || {};
+    const storedData = campaignData[key];
     if (storedData) {
         res.status(200).json(storedData);
     } else {
         res.status(404).json({ error: 'Data not found' });
     }
 });
-app.post('/api/:key', (req, res) => {
-    const { key } = req.params;
+app.post('/api/campaigns/:campaign/:key', (req, res) => {
+    const { campaign, key } = req.params;
     const data = req.body?.value ?? req.body;
-    characterChangeData[key] = data;
+    if (!characterChangeData.has(campaign)) {
+        characterChangeData.set(campaign, {});
+    }
+    characterChangeData.get(campaign)[key] = data;
     res.status(200).json({ message: 'Data stored successfully' });
     if (!saveTimer) {
         saveTimer = setTimeout(() => {
@@ -1443,7 +1473,7 @@ app.get(/^\/dnd-char-sheet\/.*/, (req, res) => {
     res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
 });
 
-let characterChangeData = {}
+let characterChangeData = new Map()
 let activeMaps = new Map(); // campaign -> activeMap key
 let subscribers = [];
 readFile(); // Read once at startup

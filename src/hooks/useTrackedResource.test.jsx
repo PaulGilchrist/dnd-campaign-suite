@@ -39,7 +39,7 @@ describe('useTrackedResource', () => {
     render(<TestComponent storageKey="hp" playerName="Alice" maxGetter={mockMaxGetter} deps={[]} />);
 
     expect(screen.getByTestId('current').textContent).toBe('15');
-    expect(storage.getProperty).toHaveBeenCalledWith('Alice', 'hp');
+    expect(storage.getProperty).toHaveBeenCalledWith('Alice', 'hp', undefined);
   });
 
   it('initializes with maxGetter() result when getProperty returns null', () => {
@@ -66,7 +66,7 @@ describe('useTrackedResource', () => {
       screen.getByTestId('update').click();
     });
 
-    expect(storage.setProperty).toHaveBeenCalledWith('Alice', 'hp', 10);
+    expect(storage.setProperty).toHaveBeenCalledWith('Alice', 'hp', 10, undefined);
     expect(screen.getByTestId('current').textContent).toBe('10');
   });
 
@@ -79,7 +79,7 @@ describe('useTrackedResource', () => {
     rerender(<TestComponent storageKey="hp" playerName="Alice" maxGetter={mockMaxGetter} deps={[2]} />);
 
     expect(screen.getByTestId('current').textContent).toBe('12');
-    expect(storage.getProperty).toHaveBeenCalledWith('Alice', 'hp');
+    expect(storage.getProperty).toHaveBeenCalledWith('Alice', 'hp', undefined);
   });
 
   it('max value is computed correctly from maxGetter', () => {

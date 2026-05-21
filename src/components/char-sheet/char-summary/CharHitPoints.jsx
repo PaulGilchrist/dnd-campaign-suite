@@ -3,18 +3,18 @@ import React from 'react'
 import storage from '../../../services/storage.js'
 import HiddenInput from '../../common/HiddenInput.jsx'
 
-function CharHitPoints({ playerStats }) {
+function CharHitPoints({ playerStats, campaignName }) {
     const [currentHitPoints, setCurrentHitPoints] = React.useState(0);
     const [showInputCurrentHitPoints, setShowInputCurrentHitPoints] = React.useState(false);
     React.useEffect(() => {
-        let value = storage.getProperty(playerStats.name, 'currentHitPoints');
+        let value = storage.getProperty(playerStats.name, 'currentHitPoints', campaignName);
         setCurrentHitPoints(value ? value : playerStats.hitPoints);
     }, [playerStats]);
     const handleInputToggleCurrentHitPoints = () => {
         setShowInputCurrentHitPoints((showInputCurrentHitPoints) => !showInputCurrentHitPoints);
     };
     const handleValueChangeCurrentHitPoints = (value) => {
-        storage.setProperty(playerStats.name, 'currentHitPoints', value);
+        storage.setProperty(playerStats.name, 'currentHitPoints', value, campaignName);
         setCurrentHitPoints(value);
     };
     return (

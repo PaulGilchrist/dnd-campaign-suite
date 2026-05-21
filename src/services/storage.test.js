@@ -47,10 +47,10 @@ describe('storage', () => {
       const fetchMock = vi.fn().mockResolvedValue({ ok: true });
       global.fetch = fetchMock;
 
-      storage.set('TestName', testData);
+      storage.set('TestName', testData, 'TestCampaign');
 
       expect(fetchMock).toHaveBeenCalledWith(
-        '/api/TestName',
+        '/api/campaigns/TestCampaign/TestName',
         expect.objectContaining({
           method: 'POST',
           mode: 'cors',
@@ -72,7 +72,7 @@ describe('storage', () => {
 
   describe('getProperty', () => {
     it('should return null when object does not exist', () => {
-      const result = storage.getProperty('NonExistent', 'property');
+      const result = storage.getProperty('NonExistent', 'property', 'TestCampaign');
       expect(result).toBeNull();
     });
 
@@ -80,7 +80,7 @@ describe('storage', () => {
       const testData = { name: 'Test' };
       localStorage.setItem('Test', JSON.stringify(testData));
 
-      const result = storage.getProperty('Test', 'nonExistentProperty');
+      const result = storage.getProperty('Test', 'nonExistentProperty', 'TestCampaign');
       expect(result).toBeNull();
     });
 
@@ -88,7 +88,7 @@ describe('storage', () => {
       const testData = { name: 'Test', level: 5 };
       localStorage.setItem('Test', JSON.stringify(testData));
 
-      const result = storage.getProperty('Test', 'level');
+      const result = storage.getProperty('Test', 'level', 'TestCampaign');
       expect(result).toBe(5);
     });
 
@@ -96,7 +96,7 @@ describe('storage', () => {
       const testData = { level: 10 };
       localStorage.setItem('John', JSON.stringify(testData));
 
-      storage.getProperty('John Doe', 'level');
+      storage.getProperty('John Doe', 'level', 'TestCampaign');
 
       expect(utils.getFirstName).toHaveBeenCalledWith('John Doe');
     });
@@ -104,7 +104,7 @@ describe('storage', () => {
 
   describe('setProperty', () => {
     it('should create new object and set property', () => {
-      storage.setProperty('NewName', 'level', 3);
+      storage.setProperty('NewName', 'level', 3, 'TestCampaign');
 
       const stored = JSON.parse(localStorage.getItem('NewName'));
       expect(stored).toEqual({ level: 3 });
@@ -114,7 +114,7 @@ describe('storage', () => {
       const testData = { name: 'Test' };
       localStorage.setItem('Test', JSON.stringify(testData));
 
-      storage.setProperty('Test', 'level', 5);
+      storage.setProperty('Test', 'level', 5, 'TestCampaign');
 
       const stored = JSON.parse(localStorage.getItem('Test'));
       expect(stored).toEqual({ name: 'Test', level: 5 });
@@ -124,14 +124,14 @@ describe('storage', () => {
       const testData = { level: 1, name: 'Test' };
       localStorage.setItem('Test', JSON.stringify(testData));
 
-      storage.setProperty('Test', 'level', 10);
+      storage.setProperty('Test', 'level', 10, 'TestCampaign');
 
       const stored = JSON.parse(localStorage.getItem('Test'));
       expect(stored.level).toBe(10);
     });
 
     it('should use utils.getFirstName to get first name', () => {
-      storage.setProperty('John Doe', 'level', 5);
+      storage.setProperty('John Doe', 'level', 5, 'TestCampaign');
 
       expect(utils.getFirstName).toHaveBeenCalledWith('John Doe');
     });

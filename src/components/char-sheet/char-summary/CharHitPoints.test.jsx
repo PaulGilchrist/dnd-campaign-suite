@@ -97,7 +97,7 @@ describe('CharHitPoints', () => {
     const input = screen.getByTestId('hidden-input');
     fireEvent.change(input, { target: { value: '20' } });
     
-    expect(storage.setProperty).toHaveBeenCalledWith('Test Character', 'currentHitPoints', '20');
+    expect(storage.setProperty).toHaveBeenCalledWith('Test Character', 'currentHitPoints', '20', undefined);
   });
 
   it('should show max/cur label', () => {

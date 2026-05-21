@@ -89,12 +89,12 @@ Wizard infrastructure: `steps-config.js` (declarative step definitions), `consta
 - **Static JSON:** `public/data/*.json` (5e) and `public/data/2024/*.json` (2024) — classes, races, spells, feats, magic items, backgrounds, monsters, ability scores, skills, alignments, languages, fighting style, equipment, rules-validation
 - **Character files:** `public/campaigns/<campaign>/<name>.json` — JSON Schema draft-07 (`character.schema.json`)
 - **Campaign tool data:** JSON files under `public/campaigns/<campaign>/` (encounters, maps, notes, NPCs) — no schema validation
-- **Runtime state:** `characterChangeData.json` — in-memory, debounced 60s save (listed in `.gitignore`)
+- **Runtime state:** `public/campaigns/<campaign>/data/character-change-data.json` — per-campaign, in-memory, debounced 60s save (listed in `.gitignore`)
 
 ## Data Flow
 ```
 Static JSON → data-loader → rules.js + *-calc → React Components
-Character JSON → Express REST API → React Hooks
+Character JSON → Express REST API → React Hooks (runtime state: `public/campaigns/<campaign>/data/character-change-data.json`)
 SSE /subscribe → Subscriber component (real-time broadcast)
 Campaign tool JSON → Express REST API → Campaign tool hooks
 ```

@@ -11,7 +11,7 @@ const areEqual = (prevProps, nextProps) => {
          prevProps.handleTogglePreparedSpells === nextProps.handleTogglePreparedSpells;
 };
 
-const CharSpells = React.memo(function CharSpells({ playerStats, handleTogglePreparedSpells }) {
+const CharSpells = React.memo(function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName }) {
     const { showPopup, popupHtml, setPopupHtml } = useActionPopup('spell');
     const [filterPrepared, setFilterPrepared] = React.useState(false);
     const [spells, setSpells] = React.useState([]);
@@ -67,7 +67,7 @@ const CharSpells = React.memo(function CharSpells({ playerStats, handleTogglePre
                         <b>Max Prepared:</b> {playerStats.spellAbilities.maxPreparedSpells ? playerStats.spellAbilities.maxPreparedSpells : 'All'}
                     </div>}
                 </div>
-                <CharSpellSlots playerStats={playerStats}></CharSpellSlots>
+                <CharSpellSlots playerStats={playerStats} campaignName={campaignName}></CharSpellSlots>
             </div>
             <table className='table-spells table-striped'>
                 <thead>

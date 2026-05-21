@@ -4,13 +4,13 @@ import React from 'react'
 import storage from '../../../services/storage.js'
 import HiddenInput from '../../common/HiddenInput.jsx'
 
-function CharGold({ playerStats }) {
+function CharGold({ playerStats, campaignName }) {
 
     const [gold, setGold] = React.useState(0);
     const [showInputGold, setShowInputGold] = React.useState(false);
 
     React.useEffect(() => {
-        let value = storage.getProperty(playerStats.name, 'gold');
+        let value = storage.getProperty(playerStats.name, 'gold', campaignName);
         setGold(value ? value : playerStats.inventory.gold);
     }, [playerStats]);
     
@@ -19,7 +19,7 @@ function CharGold({ playerStats }) {
     };
     
     const handleValueChangeGold = (value) => {
-        storage.setProperty(playerStats.name, 'gold', value);
+        storage.setProperty(playerStats.name, 'gold', value, campaignName);
         setGold(value);
     };
 

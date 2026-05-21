@@ -157,7 +157,7 @@ JSON catalogs loaded at runtime by `data-loader.js`:
 
 ### 2.8 Runtime State
 
-- **`characterChangeData.json`** — In-memory debounced state for tracked resources (HP, spell slots, rage, etc.). Persisted to disk on a 60-second debounce interval. Listed in `.gitignore`.
+- **`public/campaigns/:campaign/data/character-change-data.json`** — Per-campaign in-memory debounced state for tracked resources (HP, spell slots, rage, etc.). Persisted to disk on a 60-second debounce interval. Listed in `.gitignore`.
 
 ---
 
@@ -194,7 +194,7 @@ JSON catalogs loaded at runtime by `data-loader.js`:
 1. **Initialization:** `data-loader.js` loads all static JSON catalogs (cached per ruleset). `useAppData.js` exposes this to components.
 2. **Character CRUD:** `useCharacterManagement.js` calls Express REST API (`/api/characters/*`) for list/create/update/delete. Characters are persisted as JSON files on disk.
 3. **Real-time sync:** `Subscriber` component connects to SSE (`/subscribe`). When any client modifies a character, the server broadcasts the change to all connected SSE clients.
-4. **Ephemeral state:** HP, spell slots, and tracked resources are stored in `characterChangeData.json` (in-memory, debounced 60s save).
+4. **Ephemeral state:** HP, spell slots, and tracked resources are stored in per-campaign `character-change-data.json` files under `public/campaigns/<campaign>/data/` (in-memory, debounced 60s save).
 5. **Rules evaluation:** `rules.js` dispatches to 5e or 2024 logic based on `playerStats.rules`. Calculation services compute modifiers, attacks, spells, and class features from the character data.
 6. **Campaign tools:** Encounter, faction, notes, NPC, and map data are stored as JSON files under `public/campaigns/<campaign>/` (e.g., `encounters/`, `maps/`, `data/notes.json`, `data/npcs.json`).
 
@@ -306,6 +306,13 @@ Services (pure logic, no UI):
 **Rationale:** Single source of truth for view behavior. Adding a new sidebar view requires only adding an entry to `VIEWS` and `SIDEBAR_BUTTONS`.
 
 **Trade-off:** Tight coupling between sidebar and view config; changes to one require awareness of the other.
+
+### ADR-7: Per-Campaign Character Change Data Files
+**Decision:** Tracked resource state (HP, spell slots, rage, etc.) is persisted to per-campaign files at `public/campaigns/<campaign>/data/character-change-data.json` rather than a single root-level file.
+
+**Rationale:** Campaigns are independent contexts; keeping change data scoped to each campaign prevents cross-campaign state leakage and aligns with the existing per-campaign directory structure used for characters, encounters, NPCs, and notes.
+
+**Trade-off:** Slightly more complex file path resolution when loading/saving change data, but cleaner campaign isolation.
 
 ---
 

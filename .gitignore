@@ -1,4 +1,5 @@
-characterChangeData.json
+# Per-campaign character change data (debounced in-memory state)
+public/campaigns/*/data/character-change-data.json
 
 # Logs
 logs
@@ -34,5 +35,3 @@ coverage
 
 # Openclaw backups
 *openclaw-backup*.tar.gz
-characterChangeData.json
-
