@@ -792,7 +792,7 @@ app.delete('/api/campaigns/:campaign/notes/:noteId', (req, res) => {
 // GET /api/campaigns/:campaign/npcs - List all NPCs
 app.get('/api/campaigns/:campaign/npcs', (req, res) => {
   const { campaign } = req.params;
-  const npcPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'npc.json');
+  const npcPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'npcs.json');
 
   try {
     if (!fs.existsSync(npcPath)) {
@@ -816,7 +816,7 @@ app.get('/api/campaigns/:campaign/npcs', (req, res) => {
 app.post('/api/campaigns/:campaign/npcs', (req, res) => {
   const { campaign } = req.params;
   const { npcs } = req.body;
-  const npcPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'npc.json');
+  const npcPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'npcs.json');
 
   try {
     const dataDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data');
@@ -834,7 +834,7 @@ app.post('/api/campaigns/:campaign/npcs', (req, res) => {
 // GET /api/campaigns/:campaign/npcs/:npcId - Get a specific NPC
 app.get('/api/campaigns/:campaign/npcs/:npcId', (req, res) => {
   const { campaign, npcId } = req.params;
-  const npcPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'npc.json');
+  const npcPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'npcs.json');
 
   try {
     if (!fs.existsSync(npcPath)) {
@@ -859,7 +859,7 @@ app.get('/api/campaigns/:campaign/npcs/:npcId', (req, res) => {
 // DELETE /api/campaigns/:campaign/npcs/:npcId - Delete a specific NPC
 app.delete('/api/campaigns/:campaign/npcs/:npcId', (req, res) => {
   const { campaign, npcId } = req.params;
-  const npcPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'npc.json');
+  const npcPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'npcs.json');
 
   try {
     if (!fs.existsSync(npcPath)) {
@@ -992,7 +992,7 @@ app.delete('/api/campaigns/:campaign/quests/:questId', (req, res) => {
 // GET /api/campaigns/:campaign/factions - List all Factions
 app.get('/api/campaigns/:campaign/factions', (req, res) => {
   const { campaign } = req.params;
-  const factionPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'faction.json');
+  const factionPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'factions.json');
 
   try {
     if (!fs.existsSync(factionPath)) {
@@ -1016,7 +1016,7 @@ app.get('/api/campaigns/:campaign/factions', (req, res) => {
 app.post('/api/campaigns/:campaign/factions', (req, res) => {
   const { campaign } = req.params;
   const { factions } = req.body;
-  const factionPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'faction.json');
+  const factionPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'factions.json');
 
   try {
     const dataDir = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data');
@@ -1034,7 +1034,7 @@ app.post('/api/campaigns/:campaign/factions', (req, res) => {
 // GET /api/campaigns/:campaign/factions/:factionId - Get a specific Faction
 app.get('/api/campaigns/:campaign/factions/:factionId', (req, res) => {
   const { campaign, factionId } = req.params;
-  const factionPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'faction.json');
+  const factionPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'factions.json');
 
   try {
     if (!fs.existsSync(factionPath)) {
@@ -1059,7 +1059,7 @@ app.get('/api/campaigns/:campaign/factions/:factionId', (req, res) => {
 // DELETE /api/campaigns/:campaign/factions/:factionId - Delete a specific Faction
 app.delete('/api/campaigns/:campaign/factions/:factionId', (req, res) => {
   const { campaign, factionId } = req.params;
-  const factionPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'faction.json');
+  const factionPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'factions.json');
 
   try {
     if (!fs.existsSync(factionPath)) {

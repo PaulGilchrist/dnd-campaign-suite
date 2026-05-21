@@ -196,7 +196,7 @@ JSON catalogs loaded at runtime by `data-loader.js`:
 3. **Real-time sync:** `Subscriber` component connects to SSE (`/subscribe`). When any client modifies a character, the server broadcasts the change to all connected SSE clients.
 4. **Ephemeral state:** HP, spell slots, and tracked resources are stored in `characterChangeData.json` (in-memory, debounced 60s save).
 5. **Rules evaluation:** `rules.js` dispatches to 5e or 2024 logic based on `playerStats.rules`. Calculation services compute modifiers, attacks, spells, and class features from the character data.
-6. **Campaign tools:** Encounter, faction, notes, NPC, and map data are stored as JSON files under `public/campaigns/<campaign>/` (e.g., `encounters/`, `maps/`, `data/notes.json`, `data/npc.json`).
+6. **Campaign tools:** Encounter, faction, notes, NPC, and map data are stored as JSON files under `public/campaigns/<campaign>/` (e.g., `encounters/`, `maps/`, `data/notes.json`, `data/npcs.json`).
 
 ---
 
