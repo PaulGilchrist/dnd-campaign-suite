@@ -16,6 +16,7 @@ import useCharacterManagement from './hooks/useCharacterManagement.js';
 import useCampaignManagement from './hooks/useCampaignManagement.js';
 import { useCharacterWizard } from './hooks/useCharacterWizard.js';
 import Notes from './components/notes/Notes.jsx';
+import Quests from './components/quests/Quests.jsx';
 import NPCs from './components/npcs/NPCs.jsx';
 import Factions from './components/factions/Factions.jsx';
 
@@ -134,6 +135,10 @@ function App() {
     setActiveView(prev => prev === 'notes' ? null : 'notes');
   };
 
+  const handleQuestsClick = () => {
+    setActiveView(prev => prev === 'quests' ? null : 'quests');
+  };
+
   const handleNPCsClick = () => {
     setActiveView(prev => prev === 'npcs' ? null : 'npcs');
   };
@@ -189,6 +194,7 @@ function App() {
           onInitiativeClick={handleInitiativeClick}
           onMapsClick={handleMapsClick}
           onNotesClick={handleNotesClick}
+          onQuestsClick={handleQuestsClick}
           onEncounterClick={handleEncounterClick}
           onRenameCampaign={handleRenameCampaign}
           onDeleteCampaign={handleDeleteCampaign}
@@ -242,6 +248,13 @@ function App() {
           <Notes
             campaignName={campaignName}
             characters={characters}
+            isLocalhost={isLocalhost}
+            onBack={() => setActiveView(null)}
+          />
+        )}
+        {activeView === 'quests' && (
+          <Quests
+            campaignName={campaignName}
             isLocalhost={isLocalhost}
             onBack={() => setActiveView(null)}
           />

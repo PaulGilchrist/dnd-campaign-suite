@@ -1,0 +1,385 @@
+/* ====== Quests Container ====== */
+.quests-container {
+  flex: 1;
+  padding: 20px;
+  width: 100%;
+}
+
+/* ====== Header ====== */
+.quests-container .quests-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.quests-container .quests-back-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--color-text);
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.quests-container .quests-back-btn:hover {
+  background-color: var(--background-color-card-hover);
+}
+
+.quests-container .quests-title {
+  flex: 1;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quests-container .quests-title i {
+  color: var(--color-primary);
+}
+
+.quests-container .quests-new-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.quests-container .quests-new-btn:hover {
+  background-color: var(--color-primary-hover);
+}
+
+/* ====== Search Bar ====== */
+.quests-container .quests-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--background-color-card);
+}
+
+.quests-container .quests-search-icon {
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.quests-container .quests-search-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: var(--background-color-input);
+  color: var(--color-text);
+  transition: border-color 0.2s;
+}
+
+.quests-container .quests-search-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.15);
+}
+
+.quests-container .quests-search-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: color 0.2s;
+}
+
+.quests-container .quests-search-clear:hover {
+  color: var(--color-text);
+}
+
+/* ====== Empty State ====== */
+.quests-container .quests-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 16px;
+  color: var(--color-text-muted);
+  font-size: 15px;
+  text-align: center;
+}
+
+.quests-container .quests-empty-state i.fa-spinner {
+  font-size: 24px;
+  color: var(--color-primary);
+}
+
+/* ====== Quests List ====== */
+.quests-container .quests-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quests-container .quests-list-item {
+  background: var(--background-color-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.15s;
+}
+
+.quests-container .quests-list-item:hover {
+  border-color: var(--color-primary);
+  background: var(--background-color-card-hover);
+}
+
+.quests-container .quests-list-item:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.quests-container .quests-list-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.quests-container .quests-list-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.quests-container .quests-list-status {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid;
+  text-transform: capitalize;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.quests-container .quests-list-description {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+/* ====== Modal ====== */
+.quests-container .quests-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: var(--background-color-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.quests-container .quests-modal {
+  width: 520px;
+  max-width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--background-color-modal);
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+}
+
+.quests-container .quests-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.quests-container .quests-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.quests-container .quests-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--color-text-muted);
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: color 0.2s;
+}
+
+.quests-container .quests-modal-close:hover {
+  color: var(--color-text);
+}
+
+.quests-container .quests-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.quests-container .quests-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-color);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.quests-container .quests-modal-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.quests-container .quests-modal-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* ====== Form Fields ====== */
+.quests-container .quests-form-row {
+  margin-bottom: 16px;
+}
+
+.quests-container .quests-form-row:last-child {
+  margin-bottom: 0;
+}
+
+.quests-container .quests-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.quests-container .quests-required {
+  color: var(--color-error);
+}
+
+.quests-container .quests-input,
+.quests-container .quests-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: var(--background-color-input);
+  color: var(--color-text);
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.quests-container .quests-input:focus,
+.quests-container .quests-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb), 0.15);
+}
+
+/* ====== Buttons ====== */
+.quests-container .quests-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s, opacity 0.2s;
+}
+
+.quests-container .quests-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.quests-container .quests-btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.quests-container .quests-btn-primary:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+}
+
+.quests-container .quests-btn-secondary {
+  background-color: var(--background-color-button-secondary);
+  color: var(--color-text);
+}
+
+.quests-container .quests-btn-secondary:hover:not(:disabled) {
+  background-color: var(--background-color-button-secondary-hover);
+}
+
+.quests-container .quests-btn-danger {
+  background-color: var(--background-color-error);
+  color: var(--color-error);
+}
+
+.quests-container .quests-btn-danger:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+/* ====== Responsive ====== */
+@media (max-width: 600px) {
+  .quests-container .quests-header {
+    flex-wrap: wrap;
+  }
+
+  .quests-container .quests-modal {
+    max-width: 95vw;
+    max-height: 95vh;
+  }
+
+  .quests-container .quests-modal-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .quests-container .quests-modal-actions,
+  .quests-container .quests-modal-buttons {
+    justify-content: stretch;
+  }
+
+  .quests-container .quests-modal-buttons {
+    flex-direction: row;
+  }
+
+  .quests-container .quests-modal-buttons .quests-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}

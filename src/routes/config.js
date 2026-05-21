@@ -61,6 +61,13 @@ export const VIEWS = {
     component: 'Notes',
     description: 'Campaign notes'
   },
+  QUESTS: {
+    name: 'quests',
+    stateVar: 'activeView',
+    type: 'string',
+    component: 'Quests',
+    description: 'Quest tracking'
+  },
   NPCS: {
     name: 'npcs',
     stateVar: 'activeView',
@@ -106,10 +113,11 @@ export const SIDEBAR_BUTTONS = [
   { label: 'Initiative', icon: 'fa-gavel', view: 'initiative' },
   { label: 'Maps', icon: 'fa-map', view: 'mapsManager' },
   { label: 'Notes', icon: 'fa-sticky-note', view: 'notes' },
+  { label: 'Quests', icon: 'fa-scroll', view: 'quests' },
   { label: 'NPCs', icon: 'fa-users', view: 'npcs' }
 ];
 
 /**
  * All sidebar views — mutually exclusive via single activeView variable.
  */
-export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'npcs'];
+export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'npcs'];

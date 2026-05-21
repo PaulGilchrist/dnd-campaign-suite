@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './Sidebar.css';
 
-function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onNPCsClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost, activeView }) {
+function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick, onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick, onNPCsClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost, activeView }) {
   const [isExpanded, setIsExpanded] = useState(() => {
     try {
       const stored = localStorage.getItem('sidebar-characters-expanded');
@@ -94,6 +94,16 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
           <i className="fa-solid fa-users"></i> NPCs
         </button>
       )}
+
+      {isLocalhost && (
+        <button
+          className={`sidebar-section-header${activeView === 'quests' ? ' active' : ''}`}
+          onClick={onQuestsClick}
+        >
+          <i className="fa-solid fa-scroll"></i> Quests
+        </button>
+      )}
+
     </nav>
   );
 }
