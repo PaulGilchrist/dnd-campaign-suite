@@ -1,7 +1,7 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Character Schema",
-    "description": "Schema for D&D 5e character data",
+    "description": "Schema for D&D character data",
     "type": "object",
     "required": [
         "name",

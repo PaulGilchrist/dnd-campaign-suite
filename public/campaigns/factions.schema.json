@@ -1,7 +1,7 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Faction Schema",
-    "description": "Schema for D&D 5e faction data",
+    "description": "Schema for D&D faction data",
     "type": "array",
     "items": {
         "type": "object",
