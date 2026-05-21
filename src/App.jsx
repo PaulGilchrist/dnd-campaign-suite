@@ -93,9 +93,8 @@ function App() {
       // Already viewing a map — go back to the manager listing
       setMapsView({ type: 'manager' });
     } else if (activeView === 'mapsManager') {
-      // Already on the manager listing — toggle off
-      setMapsView({ type: 'none' });
-      setActiveView(null);
+      // Already on the manager listing — do nothing
+      return;
     } else {
       // Not on maps at all — open the manager
       setActiveView('mapsManager');
@@ -124,23 +123,33 @@ function App() {
   };
 
   const handleInitiativeClick = () => {
-    setActiveView(prev => prev === 'initiative' ? null : 'initiative');
+    if (activeView !== 'initiative') {
+      setActiveView('initiative');
+    }
   };
 
   const handleEncounterClick = () => {
-    setActiveView(prev => prev === 'encounter' ? null : 'encounter');
+    if (activeView !== 'encounter') {
+      setActiveView('encounter');
+    }
   };
 
   const handleNotesClick = () => {
-    setActiveView(prev => prev === 'notes' ? null : 'notes');
+    if (activeView !== 'notes') {
+      setActiveView('notes');
+    }
   };
 
   const handleQuestsClick = () => {
-    setActiveView(prev => prev === 'quests' ? null : 'quests');
+    if (activeView !== 'quests') {
+      setActiveView('quests');
+    }
   };
 
   const handleNPCsClick = () => {
-    setActiveView(prev => prev === 'npcs' ? null : 'npcs');
+    if (activeView !== 'npcs') {
+      setActiveView('npcs');
+    }
   };
 
   const handleBackFromNPCs = () => {
@@ -148,7 +157,9 @@ function App() {
   };
 
   const handleFactionsClick = () => {
-    setActiveView(prev => prev === 'factions' ? null : 'factions');
+    if (activeView !== 'factions') {
+      setActiveView('factions');
+    }
   };
 
   const handleRenameCampaign = async () => {
