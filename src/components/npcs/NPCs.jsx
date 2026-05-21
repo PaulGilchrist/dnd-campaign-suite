@@ -143,26 +143,26 @@ function NPCs({ campaignName, characters, onBack }) {
   };
 
   return (
-    <div className="npcs-container">
+    <div className="ct-container">
       {/* Header */}
-      <div className="npcs-header">
-        <button className="npcs-back-btn" onClick={onBack}>
+      <div className="ct-header">
+        <button className="ct-back-btn" onClick={onBack}>
           <i className="fa-solid fa-arrow-left" /> Back
         </button>
-        <h2 className="npcs-title">
+        <h2 className="ct-title">
           <i className="fa-solid fa-users" /> NPCs
         </h2>
-        <button className="npcs-new-btn" onClick={handleNewNPC}>
+        <button className="ct-new-btn" onClick={handleNewNPC}>
           <i className="fa-solid fa-plus" /> New NPC
         </button>
       </div>
 
       {/* Search bar */}
-      <div className="npcs-search-row">
-        <i className="fa-solid fa-magnifying-glass npcs-search-icon" />
+      <div className="ct-search-row">
+        <i className="fa-solid fa-magnifying-glass ct-search-icon" />
         <input
           type="text"
-          className="npcs-search-input"
+          className="ct-search-input"
           placeholder="Search NPCs…"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -170,7 +170,7 @@ function NPCs({ campaignName, characters, onBack }) {
         />
         {searchQuery && (
           <button
-            className="npcs-search-clear"
+            className="ct-search-clear"
             onClick={() => setSearchQuery('')}
             aria-label="Clear search"
           >
@@ -181,14 +181,14 @@ function NPCs({ campaignName, characters, onBack }) {
 
       {/* Loading state */}
       {loading && (
-        <div className="npcs-empty-state">
+        <div className="ct-empty-state">
           <i className="fa-solid fa-spinner fa-spin" /> Loading NPCs…
         </div>
       )}
 
       {/* NPCs list */}
       {!loading && filteredNPCs.length === 0 && (
-        <div className="npcs-empty-state">
+        <div className="ct-empty-state">
           {searchQuery ? (
             <>
               <i className="fa-solid fa-search" />
@@ -204,11 +204,11 @@ function NPCs({ campaignName, characters, onBack }) {
       )}
 
       {!loading && filteredNPCs.length > 0 && (
-        <ul className="npcs-list">
+        <ul className="ct-list">
           {filteredNPCs.map((npc) => (
             <li
               key={npc.id}
-              className="npcs-list-item"
+              className="ct-list-item"
               onClick={() => handleEditNPC(npc)}
               role="button"
               tabIndex={0}
@@ -219,12 +219,12 @@ function NPCs({ campaignName, characters, onBack }) {
               }}
               aria-label={`Edit NPC: ${npc.name}`}
             >
-              <div className="npcs-list-item-header">
-                <span className="npcs-list-name">{npc.name}</span>
-                <div className="npcs-list-meta">
+              <div className="ct-list-item-header">
+                <span className="ct-list-name">{npc.name}</span>
+                <div className="ct-list-meta">
                   {npc.attitude && (
                     <span
-                      className="npcs-list-attitude"
+                      className="ct-list-attitude"
                       style={getAttitudeStyle(npc.attitude)}
                       title={npc.attitude}
                     >
@@ -233,16 +233,16 @@ function NPCs({ campaignName, characters, onBack }) {
                   )}
                 </div>
               </div>
-              <div className="npcs-list-details">
+              <div className="ct-list-details">
                 {(npc.race || npc.classRole) && (
-                  <span className="npcs-list-subtitle">
+                  <span className="ct-list-subtitle">
                     {npc.race && <span>{npc.race}</span>}
-                    {npc.race && npc.classRole && <span className="npcs-list-separator"> / </span>}
+                    {npc.race && npc.classRole && <span className="ct-list-separator"> / </span>}
                     {npc.classRole && <span>{npc.classRole}</span>}
                   </span>
                 )}
                 {npc.tags && (
-                  <span className="npcs-list-tags">
+                  <span className="ct-list-tags">
                     <i className="fa-solid fa-tags" /> {npc.tags}
                   </span>
                 )}
@@ -254,14 +254,14 @@ function NPCs({ campaignName, characters, onBack }) {
 
       {/* Create/Edit Modal */}
       {modalOpen && formData && (
-        <div className="npcs-modal-overlay" onClick={(e) => {
+        <div className="ct-modal-overlay" onClick={(e) => {
           if (e.target === e.currentTarget) handleCloseModal();
         }}>
-          <div className="npcs-modal">
-            <div className="npcs-modal-header">
+          <div className="ct-modal">
+            <div className="ct-modal-header">
               <h3>{editingNPC ? 'Edit NPC' : 'New NPC'}</h3>
               <button
-                className="npcs-modal-close"
+                className="ct-modal-close"
                 onClick={handleCloseModal}
                 aria-label="Close"
               >
@@ -269,15 +269,15 @@ function NPCs({ campaignName, characters, onBack }) {
               </button>
             </div>
 
-            <div className="npcs-modal-body">
+            <div className="ct-modal-body">
               {/* Name (required) */}
-              <label htmlFor="npc-name" className="npcs-label">
-                Name <span className="npcs-required">*</span>
+              <label htmlFor="npc-name" className="ct-label">
+                Name <span className="ct-required">*</span>
               </label>
               <input
                 id="npc-name"
                 type="text"
-                className="npcs-input"
+                className="ct-input"
                 value={formData.name}
                 onChange={(e) => handleFormChange('name', e.target.value)}
                 placeholder="NPC name"
@@ -285,38 +285,38 @@ function NPCs({ campaignName, characters, onBack }) {
               />
 
               {/* Race */}
-              <label htmlFor="npc-race" className="npcs-label">
+              <label htmlFor="npc-race" className="ct-label">
                 Race
               </label>
               <input
                 id="npc-race"
                 type="text"
-                className="npcs-input"
+                className="ct-input"
                 value={formData.race}
                 onChange={(e) => handleFormChange('race', e.target.value)}
                 placeholder="e.g., Human, Elf, Dwarf"
               />
 
               {/* Class / Role */}
-              <label htmlFor="npc-classRole" className="npcs-label">
+              <label htmlFor="npc-classRole" className="ct-label">
                 Class / Role
               </label>
               <input
                 id="npc-classRole"
                 type="text"
-                className="npcs-input"
+                className="ct-input"
                 value={formData.classRole}
                 onChange={(e) => handleFormChange('classRole', e.target.value)}
                 placeholder="e.g., Fighter, Wizard, Merchant"
               />
 
               {/* Attitude */}
-              <label htmlFor="npc-attitude" className="npcs-label">
+              <label htmlFor="npc-attitude" className="ct-label">
                 Attitude
               </label>
               <select
                 id="npc-attitude"
-                className="npcs-select"
+                className="ct-select"
                 value={formData.attitude}
                 onChange={(e) => handleFormChange('attitude', e.target.value)}
               >
@@ -373,13 +373,13 @@ function NPCs({ campaignName, characters, onBack }) {
               />
 
               {/* Tags */}
-              <label htmlFor="npc-tags" className="npcs-label">
+              <label htmlFor="npc-tags" className="ct-label">
                 Tags (comma separated)
               </label>
               <input
                 id="npc-tags"
                 type="text"
-                className="npcs-input"
+                className="ct-input"
                 value={formData.tags}
                 onChange={(e) => handleFormChange('tags', e.target.value)}
                 placeholder="e.g., ally, enemy, quest-giver"
@@ -387,11 +387,11 @@ function NPCs({ campaignName, characters, onBack }) {
 
             </div>
 
-            <div className="npcs-modal-footer">
-              <div className="npcs-modal-actions">
+            <div className="ct-modal-footer">
+              <div className="ct-modal-actions">
                 {editingNPC && (
                   <button
-                    className="npcs-btn npcs-btn-danger"
+                    className="ct-btn ct-btn-danger"
                     onClick={handleDelete}
                     disabled={deleting}
                   >
@@ -400,16 +400,16 @@ function NPCs({ campaignName, characters, onBack }) {
                   </button>
                 )}
               </div>
-              <div className="npcs-modal-buttons">
+              <div className="ct-modal-buttons">
                 <button
-                  className="npcs-btn npcs-btn-secondary"
+                  className="ct-btn ct-btn"
                   onClick={handleCloseModal}
                   disabled={saving}
                 >
                   Cancel
                 </button>
                 <button
-                  className="npcs-btn npcs-btn-primary"
+                  className="ct-btn ct-btn-primary"
                   onClick={handleSave}
                   disabled={saving || !formData.name.trim()}
                 >

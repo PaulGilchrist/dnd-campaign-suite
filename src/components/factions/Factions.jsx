@@ -131,26 +131,26 @@ function Factions({ campaignName, onBack }) {
   };
 
   return (
-    <div className="factions-container">
+    <div className="ct-container">
       {/* Header */}
-      <div className="factions-header">
-        <button className="factions-back-btn" onClick={onBack}>
+      <div className="ct-header">
+        <button className="ct-back-btn" onClick={onBack}>
           <i className="fa-solid fa-arrow-left" /> Back
         </button>
-        <h2 className="factions-title">
+        <h2 className="ct-title">
           <i className="fa-solid fa-handshake" /> Factions
         </h2>
-        <button className="factions-new-btn" onClick={handleNewFaction}>
+        <button className="ct-new-btn" onClick={handleNewFaction}>
           <i className="fa-solid fa-plus" /> New Faction
         </button>
       </div>
 
       {/* Search bar */}
-      <div className="factions-search-row">
-        <i className="fa-solid fa-magnifying-glass factions-search-icon" />
+      <div className="ct-search-row">
+        <i className="fa-solid fa-magnifying-glass ct-search-icon" />
         <input
           type="text"
-          className="factions-search-input"
+          className="ct-search-input"
           placeholder="Search factions…"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -158,7 +158,7 @@ function Factions({ campaignName, onBack }) {
         />
         {searchQuery && (
           <button
-            className="factions-search-clear"
+            className="ct-search-clear"
             onClick={() => setSearchQuery('')}
             aria-label="Clear search"
           >
@@ -169,14 +169,14 @@ function Factions({ campaignName, onBack }) {
 
       {/* Loading state */}
       {loading && (
-        <div className="factions-empty-state">
+        <div className="ct-empty-state">
           <i className="fa-solid fa-spinner fa-spin" /> Loading factions…
         </div>
       )}
 
       {/* Factions list */}
       {!loading && filteredFactions.length === 0 && (
-        <div className="factions-empty-state">
+        <div className="ct-empty-state">
           {searchQuery ? (
             <>
               <i className="fa-solid fa-search" />
@@ -192,11 +192,11 @@ function Factions({ campaignName, onBack }) {
       )}
 
       {!loading && filteredFactions.length > 0 && (
-        <ul className="factions-list">
+        <ul className="ct-list">
           {filteredFactions.map((faction) => (
             <li
               key={faction.id}
-              className="factions-list-item"
+              className="ct-list-item"
               onClick={() => handleEditFaction(faction)}
               role="button"
               tabIndex={0}
@@ -207,9 +207,9 @@ function Factions({ campaignName, onBack }) {
               }}
               aria-label={`Edit faction: ${faction.name}`}
             >
-              <div className="factions-list-item-header">
-                <span className="factions-list-name">{faction.name}</span>
-                <div className="factions-list-meta">
+              <div className="ct-list-item-header">
+                <span className="ct-list-name">{faction.name}</span>
+                <div className="ct-list-meta">
                   {faction.influence != null && (
                     <span
                       className="factions-list-influence"
@@ -221,7 +221,7 @@ function Factions({ campaignName, onBack }) {
                   )}
                 </div>
               </div>
-              <div className="factions-list-details">
+              <div className="ct-list-details">
                 {faction.description && (
                   <span className="factions-list-preview">
                     {truncateText(faction.description, 60)}
@@ -235,14 +235,14 @@ function Factions({ campaignName, onBack }) {
 
       {/* Create/Edit Modal */}
       {modalOpen && formData && (
-        <div className="factions-modal-overlay" onClick={(e) => {
+        <div className="ct-modal-overlay" onClick={(e) => {
           if (e.target === e.currentTarget) handleCloseModal();
         }}>
-          <div className="factions-modal">
-            <div className="factions-modal-header">
+          <div className="ct-modal">
+            <div className="ct-modal-header">
               <h3>{editingFaction ? 'Edit Faction' : 'New Faction'}</h3>
               <button
-                className="factions-modal-close"
+                className="ct-modal-close"
                 onClick={handleCloseModal}
                 aria-label="Close"
               >
@@ -250,15 +250,15 @@ function Factions({ campaignName, onBack }) {
               </button>
             </div>
 
-            <div className="factions-modal-body">
+            <div className="ct-modal-body">
               {/* Name (required) */}
-              <label htmlFor="faction-name" className="factions-label">
-                Faction Name <span className="factions-required">*</span>
+              <label htmlFor="faction-name" className="ct-label">
+                Faction Name <span className="ct-required">*</span>
               </label>
               <input
                 id="faction-name"
                 type="text"
-                className="factions-input"
+                className="ct-input"
                 value={formData.name}
                 onChange={(e) => handleFormChange('name', e.target.value)}
                 placeholder="Faction name"
@@ -284,7 +284,7 @@ function Factions({ campaignName, onBack }) {
               />
 
               {/* Influence Level */}
-              <label htmlFor="faction-influence" className="factions-label">
+              <label htmlFor="faction-influence" className="ct-label">
                 Influence Level
               </label>
               <div className="factions-influence-row">
@@ -314,11 +314,11 @@ function Factions({ campaignName, onBack }) {
               />
             </div>
 
-            <div className="factions-modal-footer">
-              <div className="factions-modal-actions">
+            <div className="ct-modal-footer">
+              <div className="ct-modal-actions">
                 {editingFaction && (
                   <button
-                    className="factions-btn factions-btn-danger"
+                    className="ct-btn ct-btn-danger"
                     onClick={handleDelete}
                     disabled={deleting}
                   >
@@ -327,16 +327,16 @@ function Factions({ campaignName, onBack }) {
                   </button>
                 )}
               </div>
-              <div className="factions-modal-buttons">
+              <div className="ct-modal-buttons">
                 <button
-                  className="factions-btn factions-btn-secondary"
+                  className="ct-btn"
                   onClick={handleCloseModal}
                   disabled={saving}
                 >
                   Cancel
                 </button>
                 <button
-                  className="factions-btn factions-btn-primary"
+                  className="ct-btn ct-btn-primary"
                   onClick={handleSave}
                   disabled={saving || !formData.name.trim()}
                 >

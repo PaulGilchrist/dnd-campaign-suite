@@ -79,24 +79,24 @@ function Quests({ campaignName, isLocalhost, onBack }) {
   };
 
   return (
-    <div className="quests-container">
-      <div className="quests-header">
-        <button className="quests-back-btn" onClick={onBack}>
+    <div className="ct-container">
+      <div className="ct-header">
+        <button className="ct-back-btn" onClick={onBack}>
           <i className="fa-solid fa-arrow-left" /> Back
         </button>
-        <h2 className="quests-title">
+        <h2 className="ct-title">
           <i className="fa-solid fa-scroll" /> Quests
         </h2>
-        <button className="quests-new-btn" onClick={handleNewQuest}>
+        <button className="ct-new-btn" onClick={handleNewQuest}>
           <i className="fa-solid fa-plus" /> New Quest
         </button>
       </div>
 
-      <div className="quests-search-row">
-        <i className="fa-solid fa-magnifying-glass quests-search-icon" />
+      <div className="ct-search-row">
+        <i className="fa-solid fa-magnifying-glass ct-search-icon" />
         <input
           type="text"
-          className="quests-search-input"
+          className="ct-search-input"
           placeholder="Search Quests\u2026"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -104,7 +104,7 @@ function Quests({ campaignName, isLocalhost, onBack }) {
         />
         {searchQuery && (
           <button
-            className="quests-search-clear"
+            className="ct-search-clear"
             onClick={() => setSearchQuery('')}
             aria-label="Clear search"
           >
@@ -114,13 +114,13 @@ function Quests({ campaignName, isLocalhost, onBack }) {
       </div>
 
       {loading && (
-        <div className="quests-empty-state">
+        <div className="ct-empty-state">
           <i className="fa-solid fa-spinner fa-spin" /> Loading quests\u2026
         </div>
       )}
 
       {!loading && filteredQuests.length === 0 && (
-        <div className="quests-empty-state">
+        <div className="ct-empty-state">
           {searchQuery ? (
             <>
               <i className="fa-solid fa-search" />
@@ -136,13 +136,13 @@ function Quests({ campaignName, isLocalhost, onBack }) {
       )}
 
       {!loading && filteredQuests.length > 0 && (
-        <ul className="quests-list">
+        <ul className="ct-list">
           {filteredQuests.map(quest => {
             const statusColor = STATUS_COLORS[quest.status] || STATUS_COLORS.active;
             return (
               <li
                 key={quest.id}
-                className="quests-list-item"
+                className="ct-list-item"
                 onClick={() => handleEditQuest(quest)}
                 role="button"
                 tabIndex={0}
@@ -153,9 +153,9 @@ function Quests({ campaignName, isLocalhost, onBack }) {
                 }}
                 aria-label={`Edit quest: ${quest.name}`}
               >
-                <div className="quests-list-item-header">
-                  <span className="quests-list-name">{quest.name}</span>
-                  <div className="quests-list-meta">
+                <div className="ct-list-item-header">
+                  <span className="ct-list-name">{quest.name}</span>
+                  <div className="ct-list-meta">
                     <span
                       className="quests-list-status"
                       style={statusColor}
@@ -166,7 +166,7 @@ function Quests({ campaignName, isLocalhost, onBack }) {
                   </div>
                 </div>
                 {quest.description && (
-                  <div className="quests-list-details">
+                  <div className="ct-list-details">
                     <span className="quests-list-subtitle">
                       {quest.description.length > 100 ? quest.description.substring(0, 100) + '...' : quest.description}
                     </span>
@@ -179,14 +179,14 @@ function Quests({ campaignName, isLocalhost, onBack }) {
       )}
 
       {modalOpen && formData && (
-        <div className="quests-modal-overlay" onClick={(e) => {
+        <div className="ct-modal-overlay" onClick={(e) => {
           if (e.target === e.currentTarget) handleCloseModal();
         }}>
-          <div className="quests-modal">
-            <div className="quests-modal-header">
+          <div className="ct-modal">
+            <div className="ct-modal-header">
               <h3>{editingQuest ? 'Edit Quest' : 'New Quest'}</h3>
               <button
-                className="quests-modal-close"
+                className="ct-modal-close"
                 onClick={handleCloseModal}
                 aria-label="Close"
               >
@@ -194,26 +194,26 @@ function Quests({ campaignName, isLocalhost, onBack }) {
               </button>
             </div>
 
-            <div className="quests-modal-body">
-              <label htmlFor="quest-name" className="quests-label">
-                Name <span className="quests-required">*</span>
+            <div className="ct-modal-body">
+              <label htmlFor="quest-name" className="ct-label">
+                Name <span className="ct-required">*</span>
               </label>
               <input
                 id="quest-name"
                 type="text"
-                className="quests-input"
+                className="ct-input"
                 value={formData.name}
                 onChange={(e) => handleFormChange('name', e.target.value)}
                 placeholder="Quest name"
                 autoFocus
               />
 
-              <label htmlFor="quest-status" className="quests-label">
+              <label htmlFor="quest-status" className="ct-label">
                 Status
               </label>
               <select
                 id="quest-status"
-                className="quests-select"
+                className="ct-select"
                 value={formData.status}
                 onChange={(e) => handleFormChange('status', e.target.value)}
               >
@@ -247,11 +247,11 @@ function Quests({ campaignName, isLocalhost, onBack }) {
               />
             </div>
 
-            <div className="quests-modal-footer">
-              <div className="quests-modal-actions">
+            <div className="ct-modal-footer">
+              <div className="ct-modal-actions">
                 {editingQuest && (
                   <button
-                    className="quests-btn quests-btn-danger"
+                    className="ct-btn ct-btn-danger"
                     onClick={() => handleDelete(editingQuest)}
                     disabled={deleting}
                   >
@@ -260,16 +260,16 @@ function Quests({ campaignName, isLocalhost, onBack }) {
                   </button>
                 )}
               </div>
-              <div className="quests-modal-buttons">
+              <div className="ct-modal-buttons">
                 <button
-                  className="quests-btn quests-btn-secondary"
+                  className="ct-btn ct-btn"
                   onClick={handleCloseModal}
                   disabled={saving}
                 >
                   Cancel
                 </button>
                 <button
-                  className="quests-btn quests-btn-primary"
+                  className="ct-btn ct-btn-primary"
                   onClick={handleSave}
                   disabled={saving || !formData.name.trim()}
                 >

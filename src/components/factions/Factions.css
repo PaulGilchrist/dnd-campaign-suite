@@ -1,172 +1,7 @@
-/* ============ Layout ============ */
-.factions-container {
-  flex: 1;
-  padding: 20px;
-  width: 100%;
-}
+/* ============ Factions Unique Styles ============ */
 
-.factions-container .factions-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.factions-container .factions-back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  font-size: 0.85rem;
-  border-radius: 4px;
-  border: 1px solid var(--border-color);
-  background: var(--background-color-button-secondary);
-  color: var(--color-text);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.factions-container .factions-back-btn:hover {
-  background: var(--background-color-button-secondary-hover);
-}
-
-.factions-container .factions-title {
-  margin: 0;
-  color: var(--color-header);
-  font-size: 1.6em;
-}
-
-.factions-container .factions-new-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  font-size: 0.85rem;
-  border-radius: 4px;
-  border: 1px solid var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.factions-container .factions-new-btn:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
-}
-
-/* ============ Search Bar ============ */
-.factions-container .factions-search-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  background: var(--background-color-card);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 8px 12px;
-}
-
-.factions-container .factions-search-icon {
-  color: var(--color-text-muted);
-  font-size: 0.9rem;
-}
-
-.factions-container .factions-search-input {
-  flex: 1;
-  padding: 6px 10px;
-  font-size: 0.88rem;
-  background: var(--background-color-input);
-  color: var(--color-text);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  outline: none;
-}
-
-.factions-container .factions-search-input:focus {
-  border-color: var(--color-primary);
-}
-
-.factions-container .factions-search-clear {
-  background: none;
-  border: none;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  font-size: 0.9rem;
-  padding: 2px 4px;
-  border-radius: 3px;
-  transition: color 0.2s;
-}
-
-.factions-container .factions-search-clear:hover {
-  color: var(--color-error);
-}
-
-/* ============ Empty State ============ */
-.factions-container .factions-empty-state {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--color-text-muted);
-  font-style: italic;
-  font-size: 0.95rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.factions-container .factions-empty-state i {
-  font-size: 2rem;
-  opacity: 0.4;
-}
-
-/* ============ Factions List ============ */
-.factions-container .factions-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.factions-container .factions-list-item {
-  background: var(--background-color-card);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 12px 16px;
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.15s;
-}
-
-.factions-container .factions-list-item:hover {
-  border-color: var(--color-primary);
-  background: var(--background-color-card-hover);
-}
-
-.factions-container .factions-list-item-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 6px;
-}
-
-.factions-container .factions-list-name {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.factions-container .factions-list-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.factions-container .factions-list-influence {
+/* Influence badge in list */
+.factions-list-influence {
   display: inline-block;
   padding: 2px 8px;
   font-size: 0.78rem;
@@ -177,159 +12,20 @@
   text-align: center;
 }
 
-.factions-container .factions-list-details {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.factions-container .factions-list-preview {
+/* Description preview in list */
+.factions-list-preview {
   font-size: 0.82rem;
   color: var(--color-text-secondary);
 }
 
-/* ============ Modal ============ */
-.factions-container .factions-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.factions-container .factions-modal {
-  background: var(--background-color-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  width: 520px;
-  max-width: 90vw;
-  max-height: 85vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-
-.factions-container .factions-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.factions-container .factions-modal-header h3 {
-  margin: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.factions-container .factions-modal-close {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-  transition: color 0.2s;
-}
-
-.factions-container .factions-modal-close:hover {
-  color: var(--color-text);
-}
-
-.factions-container .factions-modal-body {
-  padding: 20px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.factions-container .factions-modal-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-top: 1px solid var(--border-color);
-}
-
-.factions-container .factions-modal-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.factions-container .factions-modal-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-/* ============ Form Fields ============ */
-.factions-container .factions-label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-}
-
-.factions-container .factions-required {
-  color: var(--color-error);
-}
-
-.factions-container .factions-input {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  font-size: 0.9rem;
-  background: var(--background-color-input);
-  color: var(--color-text);
-  box-sizing: border-box;
-  transition: border-color 0.2s;
-}
-
-.factions-container .factions-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb, 0, 123, 255), 0.15);
-}
-
-.factions-container .factions-textarea {
-  width: 100%;
-  min-height: 80px;
-  padding: 10px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-family: inherit;
-  line-height: 1.5;
-  background: var(--background-color-input);
-  color: var(--color-text);
-  resize: vertical;
-  box-sizing: border-box;
-  transition: border-color 0.2s;
-}
-
-.factions-container .factions-textarea:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(var(--color-primary-rgb, 0, 123, 255), 0.15);
-}
-
-/* ============ Influence Slider ============ */
-.factions-container .factions-influence-row {
+/* Influence slider wrapper */
+.factions-influence-row {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.factions-container .factions-influence-row input[type="range"] {
+.factions-influence-row input[type="range"] {
   flex: 1;
   height: 6px;
   -webkit-appearance: none;
@@ -340,7 +36,7 @@
   cursor: pointer;
 }
 
-.factions-container .factions-influence-row input[type="range"]::-webkit-slider-thumb {
+.factions-influence-row input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 20px;
@@ -352,7 +48,7 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-.factions-container .factions-influence-row input[type="range"]::-moz-range-thumb {
+.factions-influence-row input[type="range"]::-moz-range-thumb {
   width: 20px;
   height: 20px;
   border-radius: 50%;
@@ -362,7 +58,8 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-.factions-container .factions-influence-value {
+/* Influence value badge */
+.factions-influence-value {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -374,78 +71,4 @@
   border-radius: 10px;
   border: 1px solid;
   flex-shrink: 0;
-}
-
-/* ============ Buttons ============ */
-.factions-container .factions-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  font-size: 0.88rem;
-  border-radius: 4px;
-  border: 1px solid var(--border-color);
-  background: var(--background-color-button-secondary);
-  color: var(--color-text);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.factions-container .factions-btn:hover:not(:disabled) {
-  background: var(--background-color-button-secondary-hover);
-}
-
-.factions-container .factions-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.factions-container .factions-btn-primary {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  border-color: var(--color-primary);
-}
-
-.factions-container .factions-btn-primary:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
-}
-
-.factions-container .factions-btn-danger {
-  color: var(--color-error);
-  border-color: var(--color-error);
-}
-
-.factions-container .factions-btn-danger:hover:not(:disabled) {
-  background: var(--background-color-error);
-}
-
-/* ============ Responsive ============ */
-@media (max-width: 600px) {
-  .factions-container {
-    padding: 12px;
-  }
-
-  .factions-container .factions-header {
-    flex-wrap: wrap;
-  }
-
-  .factions-container .factions-modal {
-    width: 95vw;
-    max-height: 90vh;
-  }
-
-  .factions-container .factions-modal-footer {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .factions-container .factions-modal-actions,
-  .factions-container .factions-modal-buttons {
-    width: 100%;
-  }
-
-  .factions-container .factions-modal-buttons {
-    justify-content: flex-end;
-  }
 }

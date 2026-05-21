@@ -126,26 +126,26 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
   };
 
   return (
-    <div className="notes-container">
+    <div className="ct-container">
       {/* Header */}
-      <div className="notes-header">
-        <button className="notes-back-btn" onClick={onBack}>
+      <div className="ct-header">
+        <button className="ct-back-btn" onClick={onBack}>
           <i className="fa-solid fa-arrow-left" /> Back
         </button>
-        <h2 className="notes-title">
+        <h2 className="ct-title">
           <i className="fa-solid fa-book-open" /> Notes
         </h2>
-        <button className="notes-new-btn" onClick={handleNewNote}>
+        <button className="ct-new-btn" onClick={handleNewNote}>
           <i className="fa-solid fa-plus" /> New Note
         </button>
       </div>
 
       {/* Search bar */}
-      <div className="notes-search-row">
-        <i className="fa-solid fa-magnifying-glass notes-search-icon" />
+      <div className="ct-search-row">
+        <i className="fa-solid fa-magnifying-glass ct-search-icon" />
         <input
           type="text"
-          className="notes-search-input"
+          className="ct-search-input"
           placeholder="Search notes…"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -153,7 +153,7 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
         />
         {searchQuery && (
           <button
-            className="notes-search-clear"
+            className="ct-search-clear"
             onClick={() => setSearchQuery('')}
             aria-label="Clear search"
           >
@@ -164,14 +164,14 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
 
       {/* Loading state */}
       {loading && (
-        <div className="notes-empty-state">
+        <div className="ct-empty-state">
           <i className="fa-solid fa-spinner fa-spin" /> Loading notes…
         </div>
       )}
 
       {/* Notes list */}
       {!loading && filteredNotes.length === 0 && (
-        <div className="notes-empty-state">
+        <div className="ct-empty-state">
           {searchQuery ? (
             <>
               <i className="fa-solid fa-search" />
@@ -187,11 +187,11 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
       )}
 
       {!loading && filteredNotes.length > 0 && (
-        <ul className="notes-list">
+        <ul className="ct-list">
           {filteredNotes.map((note) => (
             <li
               key={note.id}
-              className="notes-list-item"
+              className="ct-list-item"
               onClick={() => handleEditNote(note)}
               role="button"
               tabIndex={0}
@@ -202,7 +202,7 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
               }}
               aria-label={`Edit note: ${truncateDescription(note.description, 50)}`}
             >
-              <div className="notes-list-item-header">
+              <div className="ct-list-item-header">
                 <span className="notes-list-location">
                   {note.partyLocation ? (
                     <>
@@ -234,14 +234,14 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
 
       {/* Create/Edit Modal */}
       {modalOpen && formData && (
-        <div className="notes-modal-overlay" onClick={(e) => {
+        <div className="ct-modal-overlay" onClick={(e) => {
           if (e.target === e.currentTarget) handleCloseModal();
         }}>
-          <div className="notes-modal">
-            <div className="notes-modal-header">
+          <div className="ct-modal">
+            <div className="ct-modal-header">
               <h3>{editingNote ? 'Edit Note' : 'New Note'}</h3>
               <button
-                className="notes-modal-close"
+                className="ct-modal-close"
                 onClick={handleCloseModal}
                 aria-label="Close"
               >
@@ -249,7 +249,7 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
               </button>
             </div>
 
-            <div className="notes-modal-body">
+            <div className="ct-modal-body">
               {/* Description (largest input) */}
               <PreviewToggle
                 id="note-description"
@@ -261,13 +261,13 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
               />
 
               {/* Party Location */}
-              <label htmlFor="note-location" className="notes-label">
+              <label htmlFor="note-location" className="ct-label">
                 Party Location
               </label>
               <input
                 id="note-location"
                 type="text"
-                className="notes-input"
+                className="ct-input"
                 value={formData.partyLocation}
                 onChange={(e) => handleFormChange('partyLocation', e.target.value)}
                 placeholder="e.g., Skull Creek Cave"
@@ -275,19 +275,19 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
 
               {/* Party Level (auto-calculated, read-only) */}
               <div className="notes-field-group">
-                <label className="notes-label">Party Level</label>
+                <label className="ct-label">Party Level</label>
                 <span className="notes-readonly">{partyLevel}</span>
               </div>
 
               {/* Date Created (auto-set, read-only) */}
               <div className="notes-field-group">
-                <label className="notes-label">Date Created</label>
+                <label className="ct-label">Date Created</label>
                 <span className="notes-readonly">{formatDate(formData.dateCreated)}</span>
               </div>
 
               {/* Date Modified (auto-set, read-only) */}
               <div className="notes-field-group">
-                <label className="notes-label">Date Modified</label>
+                <label className="ct-label">Date Modified</label>
                 <span className="notes-readonly">{formatDate(formData.dateModified)}</span>
               </div>
 
@@ -308,11 +308,11 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
               )}
             </div>
 
-            <div className="notes-modal-footer">
-              <div className="notes-modal-actions">
+            <div className="ct-modal-footer">
+              <div className="ct-modal-actions">
                 {editingNote && (
                   <button
-                    className="notes-btn notes-btn-danger"
+                    className="ct-btn ct-btn-danger"
                     onClick={handleDelete}
                     disabled={deleting}
                   >
@@ -321,16 +321,16 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
                   </button>
                 )}
               </div>
-              <div className="notes-modal-buttons">
+              <div className="ct-modal-buttons">
                 <button
-                  className="notes-btn notes-btn-secondary"
+                  className="ct-btn ct-btn-secondary"
                   onClick={handleCloseModal}
                   disabled={saving}
                 >
                   Cancel
                 </button>
                 <button
-                  className="notes-btn notes-btn-primary"
+                  className="ct-btn ct-btn-primary"
                   onClick={handleSave}
                   disabled={saving || !formData.description.trim()}
                 >
