@@ -196,7 +196,7 @@ app.get('/api/campaigns/:campaign/maps', (req, res) => {
     
     // Read active map from meta file
     let activeMap = null;
-    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps', 'maps-meta.json');
+    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'maps-meta.json');
     if (fs.existsSync(metaPath)) {
       try {
         const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
@@ -340,7 +340,7 @@ app.delete('/api/campaigns/:campaign/maps/:mapname', (req, res) => {
     fs.unlinkSync(filePath);
     
     // If this was the active map, clear active map in meta
-    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps', 'maps-meta.json');
+    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'maps-meta.json');
     if (fs.existsSync(metaPath)) {
       try {
         const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
@@ -399,7 +399,7 @@ app.put('/api/campaigns/:campaign/maps/:mapname/rename', (req, res) => {
     }
     
     // Update maps-meta.json if this was the active map
-    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps', 'maps-meta.json');
+    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'maps-meta.json');
     if (fs.existsSync(metaPath)) {
       try {
         const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
@@ -442,7 +442,7 @@ app.put('/api/campaigns/:campaign/maps/:mapname/activate', (req, res) => {
     }
     
     const mapKey = fileName.replace(/\.json$/, '');
-    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'maps', 'maps-meta.json');
+    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'maps-meta.json');
     const meta = { activeMap: mapKey };
     fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
     
