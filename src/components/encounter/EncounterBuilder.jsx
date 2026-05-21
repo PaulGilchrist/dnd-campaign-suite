@@ -267,6 +267,10 @@ function EncounterBuilder({ characters, campaignName }) {
             valA = a.xp || 0;
             valB = b.xp || 0;
             break;
+          case 'sel':
+            valA = selectedMonsters.some((m) => m.index === a.index) ? 0 : 1;
+            valB = selectedMonsters.some((m) => m.index === b.index) ? 0 : 1;
+            break;
           default:
             valA = a.name.toLowerCase();
             valB = b.name.toLowerCase();

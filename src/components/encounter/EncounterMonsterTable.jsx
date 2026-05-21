@@ -44,7 +44,18 @@ function EncounterMonsterTable({
           <table className="monster-table">
             <thead>
               <tr>
-                <th className="col-check">Sel</th>
+                <th
+                  className="col-check sortable"
+                  onClick={() => onSort('sel')}
+                  aria-label="Sort by selection status"
+                  role="button"
+                  tabIndex={0}
+                >
+                  Sel
+                  <span className="sort-indicator">
+                    {sortField === 'sel' ? (sortDirection === 'asc' ? ' \u25B2' : ' \u25BC') : ''}
+                  </span>
+                </th>
                 <th
                   className="col-name sortable"
                   onClick={() => onSort('name')}
