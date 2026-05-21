@@ -194,15 +194,7 @@ app.get('/api/campaigns/:campaign/maps', (req, res) => {
       .map(item => item.name)
       .sort();
     
-    // Read active map from meta file
-    let activeMap = null;
-    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'maps-meta.json');
-    if (fs.existsSync(metaPath)) {
-      try {
-        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
-        activeMap = meta.activeMap || null;
-      } catch (e) {}
-    }
+    const activeMap = activeMaps.get(campaign) || null;
     
     const maps = mapFiles.map(f => {
       // Read the type field from the map file
@@ -339,17 +331,10 @@ app.delete('/api/campaigns/:campaign/maps/:mapname', (req, res) => {
     
     fs.unlinkSync(filePath);
     
-    // If this was the active map, clear active map in meta
-    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'maps-meta.json');
-    if (fs.existsSync(metaPath)) {
-      try {
-        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
-        const mapKey = fileName.replace(/\.json$/, '');
-        if (meta.activeMap === mapKey) {
-          delete meta.activeMap;
-          fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
-        }
-      } catch (e) {}
+    // If this was the active map, clear it
+    const mapKey = fileName.replace(/\.json$/, '');
+    if (activeMaps.get(campaign) === mapKey) {
+      activeMaps.delete(campaign);
     }
     
     // Broadcast maps list change
@@ -398,18 +383,11 @@ app.put('/api/campaigns/:campaign/maps/:mapname/rename', (req, res) => {
       fs.unlinkSync(oldFilePath);
     }
     
-    // Update maps-meta.json if this was the active map
-    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'maps-meta.json');
-    if (fs.existsSync(metaPath)) {
-      try {
-        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
-        const oldKey = oldFileName.replace(/\.json$/, '');
-        const newKey = newFileName.replace(/\.json$/, '');
-        if (meta.activeMap === oldKey) {
-          meta.activeMap = newKey;
-          fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
-        }
-      } catch (e) {}
+    // Update active map in memory if this was the active map
+    const oldKey = oldFileName.replace(/\.json$/, '');
+    const newKey = newFileName.replace(/\.json$/, '');
+    if (activeMaps.get(campaign) === oldKey) {
+      activeMaps.set(campaign, newKey);
     }
     
     // Broadcast maps list change
@@ -442,9 +420,7 @@ app.put('/api/campaigns/:campaign/maps/:mapname/activate', (req, res) => {
     }
     
     const mapKey = fileName.replace(/\.json$/, '');
-    const metaPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'maps-meta.json');
-    const meta = { activeMap: mapKey };
-    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+    activeMaps.set(campaign, mapKey);
     
     // Broadcast activation change
     publish(`map-activate-${campaign}`, { activeMap: mapKey });
@@ -1469,6 +1445,7 @@ app.get(/^\/dnd-char-sheet\/.*/, (req, res) => {
 });
 
 let characterChangeData = {}
+let activeMaps = new Map(); // campaign -> activeMap key
 let subscribers = [];
 readFile(); // Read once at startup
 let saveTimer = null;

@@ -40,12 +40,21 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
         loadMapsList();
     }, [loadMapsList]);
 
-    // SSE handler — re-fetch maps list on any maps-list event
+    // SSE handler — re-fetch maps list on maps-list event, update active map directly on activate event
     const handleSSEEvent = useCallback((event) => {
         if (!event || !event.key) return;
-        const expectedKey = `maps-list-${campaignName}`;
-        if (event.key !== expectedKey) return;
-        loadMapsList();
+        const mapsListKey = `maps-list-${campaignName}`;
+        const activateKey = `map-activate-${campaignName}`;
+        if (event.key === mapsListKey) {
+            loadMapsList();
+        } else if (event.key === activateKey) {
+            // Update active map directly without re-fetching the list
+            const { activeMap } = event.data;
+            setMaps(prev => prev.map(m => ({
+                ...m,
+                isActive: m.name === activeMap
+            })));
+        }
     }, [campaignName, loadMapsList]);
 
     const handleCreate = async () => {
