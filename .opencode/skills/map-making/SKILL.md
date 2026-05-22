@@ -13,6 +13,7 @@ Break map generation into four sequential passes that must be dispatched to a su
 Pass 1 — Architect: Dispatch to subagent.
 - Input: grid size, walls array format explanation, any size constraints.
 - Task: Sketch wall layout forming entrance → corridors → rooms → branching paths.
+- Tell the subagent not to be concerned with doorways.
 - Output: walls JSON (walls array only, no other fields).
 
 Pass 2 — Door Placer: Dispatch to subagent.
@@ -31,7 +32,7 @@ Pass 4 — Finisher: Dispatch to subagent.
 - Output: final map JSON with players and fog arrays.
 
 ## Learned Best Practices
-- Walls define room boundaries. Rooms are the open floor space between them.
+- Walls define room boundaries and two rooms can share a wall. Rooms are the open floor space between walls.
 - Items must NOT be placed on wall cells — every item's gridX/gridY must be absent from the walls array.
 - Doors REPLACE wall cells (the wall at that position is removed). Rotation: north/south wall = 0°, east/west wall = 90°.
 - Torches/bookshelves on walls: left wall = 0°, north wall = 90°, east wall = 180°, south wall = 270°.
