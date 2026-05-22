@@ -19,10 +19,6 @@ Generate indoor dungeon maps to improve the map-making skill based on user's fee
 5. Save the final map JSON to `public/campaigns/Map Training/maps/map-(N+1).json`.
 6. Improve the `map-making` skill based on lessons learned.
 
-## Critical Constraint
-
-**You are the orchestrator, not the executor.** You must NEVER write map data yourself. Every pass defined in the map-making skill MUST be dispatched to a subagent. Your only responsibilities are: read the skill, extract the pipeline, dispatch passes sequentially, collect results, save the file, and improve the skill.
-
 ## Important
 - Use ONLY the map-making skill. Never load, call, or reference any other skill.
 - Do NOT read, open, parse, or reference any existing maps. Create new maps only.

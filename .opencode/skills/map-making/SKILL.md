@@ -10,14 +10,25 @@ description: How to build indoor D&D fantasy themed dungeon maps.
 ## Subagent Pipeline
 Break map generation into four sequential passes that must be dispatched to a subagent and never done by the primary agent. Each subagent receives the current JSON state and adds only its layer before passing the result forward.
 
-Pass 1 — Architect: Sketch layout (entrance → corridors → rooms → branching paths), then output only walls and rooms. Do not add any other fields yet.
+Pass 1 — Architect: Dispatch to subagent.
+- Input: grid size, walls array format explanation, any size constraints.
+- Task: Sketch wall layout forming entrance → corridors → rooms → branching paths.
+- Output: walls JSON (walls array only, no other fields).
 
-Pass 2 — Door Placer: Receive the walls/rooms JSON. Insert doors where wall cells should open; remove the corresponding wall cell at each door position. Only modify walls and doors.
+Pass 2 — Door Placer: Dispatch to subagent.
+- Input: walls JSON from Pass 1.
+- Task: Insert doors where wall cells should open; remove the corresponding wall cell at each door position. Apply rotation rules.
+- Output: walls + doors JSON (walls array with door positions removed, placedItems with door entries).
 
-Pass 3 — Decorator: Receive the current map JSON. Place items, torches, and bookshelves on floor cells only — never on wall cells. Only modify items (or equivalent decoration arrays). Apply rotation rules: torches/bookshelves on left wall = 0°, north wall = 90°, east wall = 180°, south wall = 270°. Bookshelves are 2 squares wide; place by their left square.
+Pass 3 — Decorator: Dispatch to subagent.
+- Input: walls + doors JSON from Pass 2.
+- Task: Place items, torches, and bookshelves on floor cells only — never on wall cells. Apply rotation rules.
+- Output: full map JSON with placedItems (items, torches, bookshelves).
 
-Pass 4 — Finisher: Receive the full map JSON. Place player tokens at the entrance in an unfogged area. Apply fog of war to unvisited areas to create exploration tension. Only modify players/tokens and fog.
-Each pass must leave all fields from prior passes untouched.
+Pass 4 — Finisher: Dispatch to subagent.
+- Input: full map JSON from Pass 3.
+- Task: Place player tokens at the entrance in an unfogged area. Apply fog of war to unvisited areas.
+- Output: final map JSON with players and fog arrays.
 
 ## Learned Best Practices
 - Walls define room boundaries. Rooms are the open floor space between them.
