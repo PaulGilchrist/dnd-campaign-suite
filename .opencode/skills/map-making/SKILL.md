@@ -9,12 +9,9 @@ description: How to build indoor D&D fantasy themed dungeon maps.
 - Maps are saved as ``public/campaigns/Map Training/maps/map-N.json` incrementing N each new map.
 
 ## Learned Best Practices
-- Doors are placed instead of a wall not on top of a wall.
-- Door rotation: north/south wall = 0°, east/west wall = 90°.
-- Torch always placed on a wall with rotation: left wall = 0°, north wall = 90°, east wall = 180°, south wall = 270°.
-- Bookshelves are 2 squares wide and placed by their left square.
-- Bookshelf when placed on a wall use rotation: left wall = 0°, north wall = 90°, east wall = 180°, south wall = 270°.
+- Any item placed against a wall (torches, bookshelves) uses the same rotation: left wall = 0°, north wall = 90°, east wall = 180°, south wall = 270°.
+- Doors are placed instead of a wall not on top of a wall with facing: east/west = 0°, north/south wall = 90°.
+- Bookshelves and Tables are 2 squares wide and placed by their left square.
 - Before writing JSON, mentally or sketch the full dungeon layout: entrance, corridors, rooms, branching paths, and key features.
 - Consider narrative flow (e.g., entrance → courtyard → branching paths → boss chamber).
-- Plan fog of war to create exploration tension — reveal only the entrance area initially.
-- Place player tokens at the entrance in an unfogged area so they can see where they are before venturing into the unknown.
+- Place player tokens at the entrance and fog all squares except the area around the players.
