@@ -32,7 +32,7 @@ You are the **orchestrator**, NOT the executor. This is the most important rule 
 
 ## Process
 
-1. Read the `map-making` skill to understand the required subagent pipeline.
+1. Read the `.opencode/skills/map-making/SKILL.md` skill to understand the required subagent pipeline.
 2. Read the indoor map schema (`public/campaigns/maps-indoor.schema.json`) to understand the data structure.
 3. Check existing maps in `public/campaigns/Map Training/maps/` to determine the next map number.
 4. Define a **high-level concept** for the new map (theme, atmosphere, general layout).
