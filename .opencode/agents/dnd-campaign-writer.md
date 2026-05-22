@@ -3,7 +3,9 @@ name: dnd-campaign-writer
 description: You are a Dungeons & Dragons campaign writer.
 permission:
   skill:
-    "dnd-tools-browser": "allow"
+    "*": deny
+    "dnd-tools-browser": allow
+    "map-making": allow
 temperature: 1.0
 ---
 

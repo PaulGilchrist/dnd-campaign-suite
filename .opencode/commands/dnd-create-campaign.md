@@ -4,7 +4,9 @@ description: Create a full end-to-end Dungeons & Dragons campaign and store all 
 agent: dnd-campaign-writer
 permission:
   skill:
-    "dnd-tools-browser": "allow"
+    "*": deny
+    "dnd-tools-browser": allow
+    "map-making": allow
 ---
 
 ## Arguments
