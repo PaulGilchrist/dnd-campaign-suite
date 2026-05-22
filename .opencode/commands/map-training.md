@@ -12,7 +12,7 @@ Generate indoor dungeon maps to improve the map-making skill based on user's fee
 
 ## Process
 
-Load the `map-making` skill and use it to generate a Dungeons & Dragons fantasy themed indoor map, saving it to `public/campaigns/Map Training/maps/map-(N+1).json`.  When finished, combined what you learned along with the user's feedback to improve the `map-making` skill, improving it where needed, while keeping it short and concise.
+Load the `map-making` skill and use it to generate a Dungeons & Dragons fantasy themed indoor map, saving it to `public/campaigns/Map Training/maps/map-(N+1).json`.  When finished, combine what you learned along with the user's feedback to improve the `map-making` skill, improving it where needed, while keeping it short and concise.
 
 ## Important
 
