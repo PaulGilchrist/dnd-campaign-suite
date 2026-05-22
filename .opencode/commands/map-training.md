@@ -16,5 +16,5 @@ Load the `map-making` skill and use it to generate a Dungeons & Dragons fantasy 
 
 ## Important
 
-- NEVER use any skill other than "map-making".
-- NEVER look at any existing maps.
+- Use ONLY the map-making skill. Never load, call, or reference any other skill.
+- Do NOT read, open, parse, or reference any existing maps. Create new maps only.
