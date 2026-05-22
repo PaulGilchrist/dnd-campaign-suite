@@ -9,7 +9,13 @@ vi.mock('./dataLoader.js', () => ({
 import rules from './rules.js';
 import classRules from './classRules.js';
 import { rules5e as raceRules } from './race-rules/index.js';
+import { rules2024 as raceRules2024 } from './race-rules/index.js';
 import * as dataLoader from './dataLoader.js';
+import * as abilityCalc2024 from './abilityCalc2024.js';
+import * as attackCalc2024 from './attackCalc2024.js';
+import * as spellCalc2024 from './spellCalc2024.js';
+import * as proficiencyUtils2024 from './proficiencyUtils2024.js';
+import classRules2024 from './classRules2024.js';
 
 // Mock dependencies
 vi.mock('./utils.js', () => ({
@@ -44,6 +50,37 @@ vi.mock('./race-rules/index.js', () => ({
     getResistances: vi.fn(),
     getSenses: vi.fn(),
     getTraits: vi.fn()
+  },
+  rules2024: {
+    getRace: vi.fn(),
+    getSenses: vi.fn(),
+    getTraits: vi.fn()
+  }
+}));
+
+vi.mock('./abilityCalc2024.js', () => ({
+  getAbilities: vi.fn(),
+  getHitPoints: vi.fn()
+}));
+
+vi.mock('./attackCalc2024.js', () => ({
+  getAttacks: vi.fn()
+}));
+
+vi.mock('./spellCalc2024.js', () => ({
+  getSpellAbilities: vi.fn()
+}));
+
+vi.mock('./proficiencyUtils2024.js', () => ({
+  getProficiencyChoiceCount: vi.fn(),
+  getProficiencies: vi.fn()
+}));
+
+vi.mock('./classRules2024.js', () => ({
+  default: {
+    getClass: vi.fn(),
+    getFeatures: vi.fn(),
+    getHighestSubclassLevel: vi.fn()
   }
 }));
 
@@ -1102,6 +1139,22 @@ describe('rules', () => {
       expect(ac).toBe(17); // 11 + 2 + 2 (shield) + 2 (magic shield)
     });
 
+    it('should handle equipped items not found in equipment catalog', () => {
+      const limitedEquipment = () => [
+        { name: 'Leather Armor', equipment_category: 'Armor', armor_class: { base: 11, dex_bonus: true, max_bonus: null } }
+      ];
+      const playerStats = {
+        class: { name: 'Fighter' },
+        abilities: [
+          { name: 'Dexterity', bonus: 2 }
+        ],
+        // 'Unknown Item' is not in limitedEquipment, triggers line 212 (return false)
+        inventory: { equipped: ['Unknown Item', 'Leather Armor'] }
+      };
+      const [ac] = rules.getArmorClass(limitedEquipment(), playerStats);
+      expect(ac).toBe(13); // 11 + 2 (dex)
+    });
+
     it('should apply Monk wisdom bonus to AC', () => {
       const playerStats = {
         class: { name: 'Monk' },
@@ -2067,4 +2120,637 @@ describe('rules', () => {
         expect(str.skills).toContainEqual(expect.objectContaining({ name: 'Custom Skill' }));
         });
       });
+
+   describe('getSubModules', () => {
+      it('should return 5e modules when rules is "5e"', () => {
+        const modules = rules.getSubModules({ rules: '5e' });
+        expect(modules.use2024).toBe(false);
+        expect(modules.abilityCalc.getAbilities).toBeDefined();
+        expect(modules.abilityCalc.getHitPoints).toBeDefined();
+        expect(modules.spellCalc.getSpellAbilities).toBeDefined();
+        expect(typeof modules.attackCalc).toBe('function');
+        expect(typeof modules.proficiencyUtils).toBe('object');
+        expect(typeof modules.classRules).toBe('object');
+        expect(typeof modules.raceRules).toBe('object');
+      });
+
+      it('should return 2024 modules when rules is "2024"', () => {
+        const modules = rules.getSubModules({ rules: '2024' });
+        expect(modules.use2024).toBe(true);
+        expect(modules.abilityCalc.getAbilities).toBe(abilityCalc2024.getAbilities);
+        expect(modules.abilityCalc.getHitPoints).toBe(abilityCalc2024.getHitPoints);
+        expect(modules.spellCalc.getSpellAbilities).toBe(spellCalc2024.getSpellAbilities);
+        expect(modules.attackCalc).toBe(attackCalc2024.getAttacks);
+        expect(modules.proficiencyUtils).toBeDefined();
+        expect(modules.classRules).toBeDefined();
+        expect(modules.raceRules).toBe(raceRules2024);
+      });
+
+      it('should default to 5e when playerStats is null', () => {
+        const modules = rules.getSubModules(null);
+        expect(modules.use2024).toBe(false);
+      });
+
+      it('should default to 5e when rules field is missing', () => {
+        const modules = rules.getSubModules({ name: 'Test' });
+        expect(modules.use2024).toBe(false);
+      });
+
+      it('should read rules from playerSummary when playerStats lacks rules', () => {
+        const modules = rules.getSubModules({ name: 'Test' }, { rules: '2024' });
+        expect(modules.use2024).toBe(true);
+      });
+
+      it('should prefer playerStats.rules over playerSummary.rules', () => {
+        const modules = rules.getSubModules({ rules: '5e' }, { rules: '2024' });
+        expect(modules.use2024).toBe(false);
+      });
+    });
+
+   describe('2024 ruleset dispatch', () => {
+      describe('getHitPoints', () => {
+        beforeEach(() => {
+          vi.clearAllMocks();
+        });
+
+        it('should dispatch to 2024 implementation when rules is "2024"', () => {
+          const playerStats = { rules: '2024' };
+          abilityCalc2024.getHitPoints.mockReturnValue(99);
+          const result = rules.getHitPoints(playerStats);
+          expect(result).toBe(99);
+          expect(abilityCalc2024.getHitPoints).toHaveBeenCalledWith(playerStats);
+        });
+
+        it('should use 5e when rules is "5e"', () => {
+          const playerStats = {
+            rules: '5e',
+            class: { hit_die: 10 },
+            level: 1,
+            abilities: [{ name: 'Constitution', bonus: 2 }]
+          };
+          const result = rules.getHitPoints(playerStats);
+          expect(result).toBe(12);
+          expect(abilityCalc2024.getHitPoints).not.toHaveBeenCalled();
+        });
+      });
+
+      describe('getAbilities', () => {
+        beforeEach(() => {
+          vi.clearAllMocks();
+        });
+
+        it('should dispatch to 2024 implementation when rules is "2024"', async () => {
+          const playerStats = { rules: '2024', abilities: [] };
+          abilityCalc2024.getAbilities.mockResolvedValue([{ name: 'Strength', totalScore: 15 }]);
+          const result = await rules.getAbilities(playerStats);
+          expect(result).toHaveLength(1);
+          expect(result[0].name).toBe('Strength');
+          expect(abilityCalc2024.getAbilities).toHaveBeenCalledWith(playerStats);
+        });
+
+        it('should use 5e when rules is "5e"', async () => {
+          vi.mocked(dataLoader.loadSkills).mockResolvedValue([
+            { name: 'Athletics', ability: 'Strength' }
+          ]);
+          vi.mocked(dataLoader.loadPassiveSkills).mockResolvedValue(['Insight']);
+          const playerStats = {
+            rules: '5e',
+            level: 1,
+            abilities: [{ name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }],
+            class: { name: 'Fighter', saving_throws: [] },
+            skillProficiencies: [],
+            expertise: []
+          };
+          const result = await rules.getAbilities(playerStats);
+          expect(result).toHaveLength(1);
+          expect(abilityCalc2024.getAbilities).not.toHaveBeenCalled();
+        });
+      });
+
+      describe('getSpellAbilities', () => {
+        beforeEach(() => {
+          vi.clearAllMocks();
+        });
+
+        it('should dispatch to 2024 implementation when rules is "2024"', () => {
+          const allSpells = [];
+          const playerStats = { rules: '2024' };
+          spellCalc2024.getSpellAbilities.mockReturnValue({ modifier: 5 });
+          const result = rules.getSpellAbilities(allSpells, playerStats);
+          expect(result).toEqual({ modifier: 5 });
+          expect(spellCalc2024.getSpellAbilities).toHaveBeenCalledWith(allSpells, playerStats);
+        });
+
+        it('should use 5e when rules is "5e"', () => {
+          const playerStats = {
+            rules: '5e',
+            level: 1,
+            race: {},
+            class: { class_levels: [{}] },
+            abilities: [],
+            spells: []
+          };
+          const result = rules.getSpellAbilities([], playerStats);
+          expect(result).toBeNull();
+          expect(spellCalc2024.getSpellAbilities).not.toHaveBeenCalled();
+        });
+      });
+
+      describe('getAttacks', () => {
+        beforeEach(() => {
+          vi.clearAllMocks();
+        });
+
+        it('should dispatch to 2024 implementation when rules is "2024"', () => {
+          const allEquipment = [];
+          const allSpells = [];
+          const playerStats = { rules: '2024' };
+          attackCalc2024.getAttacks.mockReturnValue([{ name: 'Test Attack' }]);
+          const result = rules.getAttacks(allEquipment, allSpells, playerStats);
+          expect(result).toHaveLength(1);
+          expect(result[0].name).toBe('Test Attack');
+          expect(attackCalc2024.getAttacks).toHaveBeenCalledWith(allEquipment, allSpells, playerStats);
+        });
+
+        it('should use 5e when rules is "5e"', () => {
+          const playerStats = {
+            rules: '5e',
+            level: 5,
+            class: { name: 'Fighter' },
+            abilities: [{ name: 'Strength', bonus: 3 }],
+            inventory: { equipped: [] },
+            spellAbilities: null
+          };
+          const result = rules.getAttacks([], [], playerStats);
+          expect(Array.isArray(result)).toBe(true);
+          expect(attackCalc2024.getAttacks).not.toHaveBeenCalled();
+        });
+      });
+
+      describe('getProficiencyChoiceCount', () => {
+        beforeEach(() => {
+          vi.clearAllMocks();
+        });
+
+        it('should dispatch to 2024 proficiencyUtils via getSubModules', () => {
+          proficiencyUtils2024.getProficiencyChoiceCount.mockReturnValue(5);
+          const playerStats = { rules: '2024', class: {}, race: {} };
+          const result = rules.getProficiencyChoiceCount(playerStats, true);
+          expect(result).toBe(5);
+          expect(proficiencyUtils2024.getProficiencyChoiceCount).toHaveBeenCalled();
+        });
+
+        it('should use 5e when rules is missing (default)', () => {
+          const playerStats = {
+            class: {
+              proficiency_choices: [
+                { choose: 3, from: ['Skill: Arcana'] }
+              ]
+            },
+            race: { starting_proficiency_options: null }
+          };
+          const result = rules.getProficiencyChoiceCount(playerStats, true);
+          expect(result).toBe(3);
+        });
+      });
+
+      describe('getProficiencies', () => {
+        beforeEach(() => {
+          vi.clearAllMocks();
+        });
+
+        it('should dispatch to 2024 and use class.major as bonusSource', () => {
+          proficiencyUtils2024.getProficiencies.mockReturnValue([5, ['Arcana', 'History']]);
+          const playerStats = {
+            rules: '2024',
+            class: { major: { name: 'Evocation' } },
+            race: { traits: [], starting_proficiencies: [] },
+            proficiencies: []
+          };
+          const [_allowed, proficiencies] = rules.getProficiencies(playerStats, true);
+          expect(proficiencies).toContain('Arcana');
+          expect(proficiencyUtils2024.getProficiencies).toHaveBeenCalled();
+        });
+
+        it('should use 5e with race trait and subrace proficiencies', () => {
+          const playerStats = {
+            class: {
+              proficiencies: ['Skill: Arcana'],
+              subclass: { name: 'Lore' }
+            },
+            race: {
+              starting_proficiencies: [],
+              traits: [
+                { proficiencies: ['Skill: Nature'] }
+              ],
+              subrace: {
+                starting_proficiencies: ['Skill: Religion'],
+                racial_traits: [
+                  { proficiencies: ['Skill: History'] }
+                ]
+              }
+            },
+            skillProficiencies: []
+          };
+          const [_allowed, proficiencies] = rules.getProficiencies(playerStats, true);
+          expect(proficiencies).toContain('Nature');
+          expect(proficiencies).toContain('Religion');
+          expect(proficiencies).toContain('History');
+        });
+      });
+
+      describe('getActions', () => {
+        beforeEach(() => {
+          vi.clearAllMocks();
+        });
+
+        it('should include magic/utilize/craft actions in 2024 mode', () => {
+          classRules2024.getFeatures.mockReturnValue({
+            actions: [{ name: 'Feature Action' }],
+            bonusActions: [{ name: 'Feature Bonus' }],
+            reactions: [{ name: 'Feature Reaction' }],
+            specialActions: [],
+            characterAdvancement: []
+          });
+          raceRules2024.getTraits.mockReturnValue({
+            actions: [{ name: 'Trait Action' }],
+            bonusActions: [],
+            reactions: [],
+            specialActions: [],
+            characterAdvancement: []
+          });
+          const playerStats = {
+            rules: '2024',
+            actions: ['String Action'],
+            bonusActions: [{ name: 'Player Bonus' }],
+            reactions: [{ name: 'Player Reaction' }],
+            specialActions: [],
+            magicActions: [{ name: 'Magic Action' }],
+            utilizeActions: [{ name: 'Utilize Action' }],
+            craftActions: [{ name: 'Craft Action' }]
+          };
+          const [actions, bonusActions, reactions] = rules.getActions(playerStats);
+          expect(actions).toContainEqual(expect.objectContaining({ name: 'Magic Action' }));
+          expect(actions).toContainEqual(expect.objectContaining({ name: 'Utilize Action' }));
+          expect(actions).toContainEqual(expect.objectContaining({ name: 'Craft Action' }));
+          expect(actions).toContainEqual(expect.objectContaining({ name: 'String Action', description: '' }));
+          expect(bonusActions).toHaveLength(2);
+          expect(reactions).toHaveLength(2);
+        });
+
+        it('should normalize string actions to objects in 2024 mode', () => {
+          classRules2024.getFeatures.mockReturnValue({
+            actions: [],
+            bonusActions: [],
+            reactions: [],
+            specialActions: [],
+            characterAdvancement: []
+          });
+          raceRules2024.getTraits.mockReturnValue({
+            actions: [],
+            bonusActions: [],
+            reactions: [],
+            specialActions: [],
+            characterAdvancement: []
+          });
+          const playerStats = {
+            rules: '2024',
+            bonusActions: [],
+            reactions: [],
+            specialActions: ['Special String Action'],
+            magicSpecialActions: [{ name: 'Magic Special' }]
+          };
+          const [_actions, _bonusActions, _reactions, specialActions] = rules.getActions(playerStats);
+          expect(specialActions).toContainEqual(expect.objectContaining({ name: 'Special String Action', description: '' }));
+          expect(specialActions).toContainEqual(expect.objectContaining({ name: 'Magic Special' }));
+        });
+
+        it('should not include magic/utilize/craft actions in 5e mode', () => {
+          classRules.getFeatures.mockReturnValue({
+            actions: [{ name: 'Feature Action' }],
+            bonusActions: [],
+            reactions: [],
+            specialActions: [],
+            characterAdvancement: []
+          });
+          raceRules.getTraits.mockReturnValue({
+            actions: [],
+            bonusActions: [],
+            reactions: [],
+            specialActions: [],
+            characterAdvancement: []
+          });
+          const playerStats = {
+            bonusActions: [],
+            reactions: [],
+            specialActions: [],
+            magicActions: [{ name: 'Magic Action' }],
+            utilizeActions: [{ name: 'Utilize Action' }]
+          };
+          const [actions] = rules.getActions(playerStats);
+          expect(actions).not.toContainEqual(expect.objectContaining({ name: 'Magic Action' }));
+          expect(actions).not.toContainEqual(expect.objectContaining({ name: 'Utilize Action' }));
+        });
+      });
+
+      describe('getArmorClass', () => {
+        const baseEquipment2024 = () => [
+          { name: 'Leather Armor', equipment_category: 'Armor', armor_class: { base: 11, dex_bonus: true, max_bonus: null } },
+          { name: 'Shield', equipment_category: 'Armor', armor_class: { base: 2 } }
+        ];
+
+        it('should not apply Defense fighting style in 2024 mode', () => {
+          const playerStats = {
+            rules: '2024',
+            class: { name: 'Fighter', fightingStyles: ['Defense'] },
+            abilities: [{ name: 'Dexterity', bonus: 2 }],
+            inventory: { equipped: [] }
+          };
+          const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
+          expect(ac).toBe(12); // 10 + 2 (dex), no Defense bonus
+        });
+
+        it('should not apply Cloak of Protection in 2024 mode', () => {
+          const playerStats = {
+            rules: '2024',
+            class: { name: 'Wizard' },
+            abilities: [{ name: 'Dexterity', bonus: 2 }],
+            inventory: { equipped: [], magicItems: [{ name: 'Cloak of Protection' }] }
+          };
+          const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
+          expect(ac).toBe(12);
+        });
+
+        it('should not apply Ring of Protection in 2024 mode', () => {
+          const playerStats = {
+            rules: '2024',
+            class: { name: 'Wizard' },
+            abilities: [{ name: 'Dexterity', bonus: 2 }],
+            inventory: { equipped: [], magicItems: [{ name: 'Ring of Protection' }] }
+          };
+          const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
+          expect(ac).toBe(12);
+        });
+
+        it('should not apply Barbarian unarmored defense in 2024 mode', () => {
+          const playerStats = {
+            rules: '2024',
+            class: { name: 'Barbarian' },
+            abilities: [
+              { name: 'Dexterity', bonus: 2 },
+              { name: 'Constitution', bonus: 3 }
+            ],
+            inventory: { equipped: [] }
+          };
+          const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
+          expect(ac).toBe(12); // 10 + 2, no Con bonus
+        });
+
+        it('should not apply Draconic Sorcerer unarmored defense in 2024 mode', () => {
+          const playerStats = {
+            rules: '2024',
+            class: { name: 'Sorcerer', subclass: { name: 'Draconic' } },
+            abilities: [{ name: 'Dexterity', bonus: 2 }],
+            inventory: { equipped: [] }
+          };
+          const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
+          expect(ac).toBe(12); // 10 + 2, no Draconic bonus
+        });
+      });
+
+      describe('getLanguages', () => {
+        it('should use class.major.language_choices in 2024 mode', () => {
+          const playerStats = {
+            rules: '2024',
+            race: { languages: ['Common'] },
+            class: { major: { language_choices: { choose: 3 } } },
+            level: 1
+          };
+          const [languagesAllowed] = rules.getLanguages(playerStats);
+          expect(languagesAllowed).toBeGreaterThanOrEqual(5); // 1 + 2 (background) + 3 (major)
+        });
+
+        it('should use class.subclass.language_choices in 5e mode', () => {
+          const playerStats = {
+            race: { languages: ['Common'] },
+            class: {
+              languages: [],
+              subclass: { language_choices: { choose: 2 } }
+            },
+            level: 1
+          };
+          const [languagesAllowed] = rules.getLanguages(playerStats);
+          expect(languagesAllowed).toBeGreaterThanOrEqual(4); // 1 + 2 (background) + 2 (subclass)
+        });
+      });
+
+      describe('getMagicItems', () => {
+        it('should return [] instead of null for empty magic items in 2024 mode', () => {
+          const result = rules.getMagicItems([], { inventory: {} }, { rules: '2024' });
+          expect(result).toEqual([]);
+        });
+
+        it('should return null for empty magic items in 5e mode', () => {
+          const result = rules.getMagicItems([], { inventory: {} });
+          expect(result).toBeNull();
+        });
+
+        it('should filter out not-found items in 2024 mode', () => {
+          const allMagicItems = [{ name: 'Ring of Protection', rarity: 'Rare' }];
+          const playerSummary = {
+            inventory: {
+              magicItems: [
+                { name: 'Ring of Protection' },
+                { name: 'Unknown Item' }
+              ]
+            }
+          };
+          const result = rules.getMagicItems(allMagicItems, playerSummary, { rules: '2024' });
+          expect(result).toHaveLength(1);
+          expect(result[0].name).toBe('Ring of Protection');
+        });
+
+        it('should keep not-found items in 5e mode', () => {
+          const allMagicItems = [];
+          const playerSummary = {
+            inventory: {
+              magicItems: [
+                { name: 'Custom Item', quantity: 1 }
+              ]
+            }
+          };
+          const result = rules.getMagicItems(allMagicItems, playerSummary);
+          expect(result).toHaveLength(1);
+          expect(result[0].name).toBe('Custom Item');
+        });
+      });
+
+      describe('getPlayerStats', () => {
+        beforeEach(() => {
+          vi.clearAllMocks();
+          classRules2024.getClass.mockReturnValue({
+            name: 'Fighter',
+            hit_die: 10,
+            saving_throws: ['Strength', 'Constitution'],
+            proficiencies: [],
+            class_levels: [{ spellcasting: null }]
+          });
+          raceRules2024.getRace.mockReturnValue({
+            name: 'Human',
+            languages: ['Common'],
+            starting_proficiencies: [],
+            traits: []
+          });
+          classRules2024.getFeatures.mockReturnValue({
+            actions: [],
+            bonusActions: [],
+            reactions: [],
+            specialActions: [],
+            characterAdvancement: []
+          });
+          raceRules2024.getTraits.mockReturnValue({
+            actions: [],
+            bonusActions: [],
+            reactions: [],
+            specialActions: [],
+            characterAdvancement: []
+          });
+          raceRules2024.getSenses.mockReturnValue(['Darkvision 60 ft.']);
+          abilityCalc2024.getAbilities.mockResolvedValue([
+            { name: 'Strength', totalScore: 15, bonus: 2 },
+            { name: 'Dexterity', totalScore: 14, bonus: 2 },
+            { name: 'Constitution', totalScore: 13, bonus: 1 },
+            { name: 'Intelligence', totalScore: 12, bonus: 1 },
+            { name: 'Wisdom', totalScore: 10, bonus: 0 },
+            { name: 'Charisma', totalScore: 8, bonus: -1 }
+          ]);
+          abilityCalc2024.getHitPoints.mockReturnValue(44);
+          attackCalc2024.getAttacks.mockReturnValue([]);
+          spellCalc2024.getSpellAbilities.mockReturnValue(null);
+          proficiencyUtils2024.getProficiencies.mockReturnValue([2, ['Common']]);
+          proficiencyUtils2024.getProficiencyChoiceCount.mockReturnValue(2);
+        });
+
+        it('should build complete player stats using 2024 rules', async () => {
+          const allClasses = [];
+          const allEquipment = [];
+          const allMagicItems = [];
+          const allRaces = [];
+          const allSpells = [];
+          const playerSummary = {
+            rules: '2024',
+            level: 1,
+            class: { name: 'Fighter' },
+            race: { name: 'Human' },
+            abilities: [
+              { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
+              { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
+              { name: 'Constitution', baseScore: 13, abilityImprovements: 0, miscBonus: 0 },
+              { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
+              { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+              { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
+            ],
+            inventory: { equipped: [], magicItems: [] },
+            skillProficiencies: [],
+            actions: [],
+            bonusActions: [],
+            reactions: [],
+            specialActions: []
+          };
+
+          const result = await rules.getPlayerStats(allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary);
+
+          expect(result.rules).toBe('2024');
+          expect(result.proficiency).toBe(2);
+          expect(classRules2024.getClass).toHaveBeenCalled();
+          expect(raceRules2024.getRace).toHaveBeenCalled();
+          expect(abilityCalc2024.getAbilities).toHaveBeenCalled();
+          expect(abilityCalc2024.getHitPoints).toHaveBeenCalled();
+          expect(result.senses).toEqual(['Darkvision 60 ft.']);
+          expect(result.equipment).toBe(allEquipment);
+          expect(raceRules2024.getSenses).toHaveBeenCalled();
+        });
+
+        it('should set senses and equipment early in 2024 mode', async () => {
+          const playerSummary = {
+            rules: '2024',
+            level: 1,
+            class: { name: 'Fighter' },
+            race: { name: 'Human' },
+            abilities: [
+              { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
+              { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
+              { name: 'Constitution', baseScore: 13, abilityImprovements: 0, miscBonus: 0 },
+              { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
+              { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+              { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
+            ],
+            inventory: { equipped: [], magicItems: [] },
+            skillProficiencies: [],
+            actions: [],
+            bonusActions: [],
+            reactions: [],
+            specialActions: []
+          };
+
+          const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+          // 2024 mode sets senses to [] early (before getSenses override), stores equipment
+          expect(result.senses).toEqual(['Darkvision 60 ft.']);
+          expect(result.equipment).toBeDefined();
+        });
+      });
+    });
+
+   describe('dispatch edge cases', () => {
+      describe('getRulesType fallback chain', () => {
+        it('should prefer playerStats.rules over playerSummary.rules', () => {
+          const modules = rules.getSubModules({ rules: '5e' }, { rules: '2024' });
+          expect(modules.use2024).toBe(false);
+        });
+
+        it('should fall back to playerSummary.rules when playerStats lacks rules', () => {
+          const modules = rules.getSubModules({ level: 1 }, { rules: '2024' });
+          expect(modules.use2024).toBe(true);
+        });
+
+        it('should default to 5e when neither has rules', () => {
+          const modules = rules.getSubModules({ level: 1 }, { level: 1 });
+          expect(modules.use2024).toBe(false);
+        });
+
+        it('should default to 5e when both playerStats and playerSummary are null', () => {
+          const modules = rules.getSubModules(null, null);
+          expect(modules.use2024).toBe(false);
+        });
+
+        it('should handle missing rules field at every dispatch method', () => {
+          // getHitPoints with undefined rules should use 5e formula
+          const hpStats = {
+            class: { hit_die: 10 },
+            level: 1,
+            abilities: [{ name: 'Constitution', bonus: 2 }]
+          };
+          expect(rules.getHitPoints(hpStats)).toBe(12);
+
+          // getAbilities with undefined rules
+          expect(rules.getAbilities({ abilities: [] })).resolves.toEqual([]);
+        });
+      });
+
+      describe('Shield string variant in getArmorClass', () => {
+        it('should handle "Shield" string in equipped items', () => {
+          const equipment = [
+            { name: 'Leather Armor', equipment_category: 'Armor', armor_class: { base: 11, dex_bonus: true, max_bonus: null } },
+            { name: 'Shield', equipment_category: 'Armor', armor_class: { base: 2 } }
+          ];
+          const playerStats = {
+            class: { name: 'Fighter' },
+            abilities: [{ name: 'Dexterity', bonus: 2 }],
+            inventory: { equipped: ['Leather Armor', 'Shield'] }
+          };
+          const [ac] = rules.getArmorClass(equipment, playerStats);
+          expect(ac).toBe(15); // 11 + 2 (dex) + 2 (shield)
+        });
+      });
+    });
 });
