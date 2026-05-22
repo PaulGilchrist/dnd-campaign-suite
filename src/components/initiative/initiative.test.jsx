@@ -78,8 +78,8 @@ describe('Initiative', () => {
     expect(screen.getByText('Clear')).toBeInTheDocument();
     expect(screen.getByText('+ NPC')).toBeInTheDocument();
     expect(screen.getByText('- NPC')).toBeInTheDocument();
-    expect(screen.getByText('← Round')).toBeInTheDocument();
-    expect(screen.getByText('Round →')).toBeInTheDocument();
+    expect(screen.getByText('↑ Round')).toBeInTheDocument();
+    expect(screen.getByText('Round ↓')).toBeInTheDocument();
     expect(screen.getByText('← Prev')).toBeInTheDocument();
     expect(screen.getByText('Next →')).toBeInTheDocument();
   });

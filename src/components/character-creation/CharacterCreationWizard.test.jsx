@@ -172,7 +172,7 @@ vi.mock('./WizardSidebar.jsx', () => ({
 }));
 
 // Mock steps-config with components that call handlers
-vi.mock('./steps-config.js', () => {
+vi.mock('../../config/steps-config.js', () => {
   const StepComponent = ({ onRulesetChange, onSkillToggle, onSkillExpertiseToggle, onLanguageToggle, onFightingStyleToggle, onResistanceToggle, onImmunityToggle, onAbilityBaseScoreChange, onAbilityImprovementChange, onAbilityMiscBonusChange }) => (
     <div data-testid="step-ruleset">
       <button onClick={() => onRulesetChange('2024')}>Change Ruleset</button>

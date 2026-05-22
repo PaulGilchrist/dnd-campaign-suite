@@ -418,7 +418,8 @@ describe('CharSheet', () => {
       expect(storage.setProperty).toHaveBeenCalledWith(
         'Test Character',
         'preparedSpells',
-        expect.any(Array)
+        ['Fireball'],
+        undefined
       );
     });
 

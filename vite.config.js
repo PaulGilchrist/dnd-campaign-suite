@@ -4,6 +4,24 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
     plugins: [react()],
+    build: {
+        rollupOptions: {
+            output: {
+                entryFileNames: 'assets/index.js',
+                chunkFileNames: 'assets/[name].js',
+                assetFileNames: (chunkInfo) => {
+                    // Don't hash image files - keep original names for faster deployments
+                    if (chunkInfo.type === 'asset' && chunkInfo.name && /\.(jpg|jpeg|png|gif|webp)$/i.test(chunkInfo.name)) {
+                        return `assets/${chunkInfo.name}`;
+                    }
+                    return 'assets/[name].[ext]';
+                }
+            }
+        },
+        copyPublicDir: true,
+        outDir: 'dist',
+        emptyOutDir: true
+    },
     server: {
         proxy: {
             '/api': {
@@ -16,49 +34,5 @@ export default defineConfig({
                 ws: true,
             },
         },
-    },
-    test: {
-        environment: 'jsdom',
-        globals: true,
-        setupFiles: './src/tests/setup.js',
-        coverage: {
-            provider: 'v8',
-            reporter: ['text', 'html', 'json'],
-            reportsDirectory: './coverage',
-            exclude: [
-                'node_modules/',
-                'dist/',
-                'public/',
-                'vite.config.js',
-                'server.js',
-                '**/*.stories.{js,jsx,ts,tsx}',
-                '**/*.css',
-                '**/*.scss',
-                '**/*.sass',
-                '**/*.less',
-                '**/*.jpg',
-                '**/*.jpeg',
-                '**/*.png',
-                '**/*.gif',
-                '**/*.svg',
-                '**/*.webp',
-                '**/*.ico',
-                '**/*.mp3',
-                '**/*.mp4',
-                '**/*.woff',
-                '**/*.woff2',
-                '**/*.ttf',
-                '**/*.eot'
-
-            ],
-            thresholds: {
-                lines: 0,
-                branches: 0,
-                functions: 0,
-                statements: 0
-            }
-        },
-        include: ['src/**/*.{test,spec}.{js,jsx}'],
-        exclude: ['node_modules', 'dist', '.git']
     }
 })

@@ -17,10 +17,13 @@ const dataLoaderMocks = vi.hoisted(() => ({
 }));
 
 const { MockCharSheet } = vi.hoisted(() => ({
-  MockCharSheet: vi.fn(({ playerSummary, onDeleteCharacter }) => (
+  MockCharSheet: vi.fn(({ playerSummary, onDeleteCharacter, onUploadClick, onSaveClick, onEditCharacter }) => (
     <div data-testid="char-sheet">
       {playerSummary?.name || 'no character'}
       <button title="Delete Character" onClick={() => onDeleteCharacter?.(playerSummary?.name)}>Delete</button>
+      <button onClick={onUploadClick}>Upload</button>
+      <button onClick={onSaveClick}>Download</button>
+      <button onClick={onEditCharacter}>Edit</button>
     </div>
   ))
 }));
@@ -61,6 +64,79 @@ vi.mock('./components/initiative/initiative.jsx', () => ({ default: MockInitiati
 vi.mock('./components/campaign-selection/CampaignSelection.jsx', () => ({ default: CampaignSelectionFn }));
 
 vi.mock('./components/character-creation/CharacterCreationWizard.jsx', () => ({ default: WizardFn }));
+
+vi.mock('./components/sidebar/Sidebar.jsx', () => ({
+  default: vi.fn(({ onInitiativeClick, onMapsClick, onNotesClick, onQuestsClick, onEncounterClick, onRenameCampaign, onDeleteCampaign, onBackToCampaigns, onAddCharacter, onCharacterClick, onNPCsClick, onFactionsClick, campaignName, characters, activeCharacter, theme, toggleTheme, isLocalhost }) => (
+    <div data-testid="sidebar">
+      <div className="campaign-name">{campaignName}</div>
+      <button className="icon-button rename-campaign-btn" onClick={onRenameCampaign} disabled={!isLocalhost} title="Rename Campaign"><i className="fas fa-pen"></i></button>
+      <button className="icon-button delete-campaign-btn" onClick={onDeleteCampaign} disabled={characters?.length > 0} title="Delete Campaign"><i className="fas fa-trash"></i></button>
+      <button className="icon-button theme-toggle-btn" onClick={toggleTheme} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+        <i className={`fas ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i>
+      </button>
+      <button className="sidebar-section-header" onClick={onBackToCampaigns}>
+        <i className="fa-solid fa-arrow-left"></i> Campaigns
+      </button>
+      <div className="sidebar-section">
+        <button className="sidebar-section-header" onClick={() => {}}>
+          <span className="sidebar-toggle-icon">{'\u25BC'}</span> Characters
+        </button>
+        <div className="sidebar-submenu">
+          <button className="sidebar-link add-character" onClick={onAddCharacter}>
+            <i className="fa-solid fa-plus"></i> Add Character
+          </button>
+          {characters?.map((char, index) => (
+            <button
+              key={`${char.name}-${index}`}
+              className={`sidebar-link${activeCharacter && activeCharacter.name === char.name ? ' active' : ''}`}
+              onClick={() => onCharacterClick(char)}
+            >
+              {char.name}
+            </button>
+          ))}
+        </div>
+      </div>
+      {isLocalhost && (
+        <button className="sidebar-section-header" onClick={onEncounterClick}>
+          <i className="fa-solid fa-dragon"></i> Encounters
+        </button>
+      )}
+      {isLocalhost && (
+        <button
+          className={`sidebar-section-header`}
+          onClick={onFactionsClick}
+        >
+          <i className="fa-solid fa-handshake"></i> Factions
+        </button>
+      )}
+      <button className="sidebar-section-header" onClick={onInitiativeClick}>
+        <i className="fa-solid fa-shield-alt"></i> Initiative
+      </button>
+      <button className="sidebar-section-header" onClick={onMapsClick}>
+        <i className="fa-solid fa-map"></i> {isLocalhost ? 'Maps' : 'Map'}
+      </button>
+      <button className="sidebar-section-header" onClick={onNotesClick}>
+        <i className="fa-solid fa-book"></i> Notes
+      </button>
+      {isLocalhost && (
+        <button
+          className={`sidebar-section-header`}
+          onClick={onNPCsClick}
+        >
+          <i className="fa-solid fa-users"></i> NPCs
+        </button>
+      )}
+      {isLocalhost && (
+        <button
+          className={`sidebar-section-header`}
+          onClick={onQuestsClick}
+        >
+          <i className="fa-solid fa-scroll"></i> Quests
+        </button>
+      )}
+    </div>
+  ))
+}));
 
 vi.mock('./services/dataLoader.js', () => dataLoaderMocks);
 
@@ -179,6 +255,8 @@ describe('App', () => {
   });
 
   it('should show Upload button when data is loaded', async () => {
+    mockState.characters = [{ name: 'Test Character', level: 1 }];
+
     render(<App />);
 
     fireEvent.click(screen.getByText('Select Campaign'));
@@ -278,8 +356,8 @@ describe('App', () => {
 
     fireEvent.click(screen.getByText('Select Campaign'));
 
-    // First character is set active, so Combat button shows. Click it to set activeCharacter to null.
-    fireEvent.click(screen.getByText(/Combat/));
+    // First character is set active, so Initiative button shows. Click it to set activeCharacter to null.
+    fireEvent.click(screen.getByText(/Initiative/));
 
     await waitFor(() => {
       expect(screen.getByTestId('initiative')).toBeInTheDocument();
@@ -317,6 +395,7 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Edit/)).toBeInTheDocument();
+
     });
 
     fireEvent.click(screen.getByText(/Edit/));
@@ -380,8 +459,8 @@ describe('App', () => {
 
     fireEvent.click(screen.getByText('Select Campaign'));
 
-    // First character is set active, so Combat button shows. Click it to set activeCharacter to null.
-    fireEvent.click(screen.getByText(/Combat/));
+    // First character is set active, so Initiative button shows. Click it to set activeCharacter to null.
+    fireEvent.click(screen.getByText(/Initiative/));
 
     await waitFor(() => {
       expect(screen.getByTestId('initiative')).toBeInTheDocument();
@@ -399,7 +478,7 @@ describe('App', () => {
       expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText(/Combat/));
+    fireEvent.click(screen.getByText(/Initiative/));
 
     await waitFor(() => {
       expect(screen.getByTestId('initiative')).toBeInTheDocument();
@@ -562,8 +641,8 @@ describe('App', () => {
       expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     });
 
-    // Click Combat to set activeCharacter to null
-    fireEvent.click(screen.getByText(/Combat/));
+    // Click Initiative to set activeCharacter to null
+    fireEvent.click(screen.getByText(/Initiative/));
 
     await waitFor(() => {
       expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
