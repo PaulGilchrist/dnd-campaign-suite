@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepBasic from './WizardStepBasic.jsx';
 
@@ -173,4 +173,177 @@ describe('WizardStepBasic', () => {
 
     expect(screen.getByText('Step 2: Basic Information')).toBeInTheDocument();
      });
+
+  it('should show click to upload when no image is set', () => {
+    render(<WizardStepBasic {...mockProps} />);
+
+    expect(screen.getByText('Click to upload')).toBeInTheDocument();
+  });
+
+  it('should render image preview from image data', () => {
+    render(
+      <WizardStepBasic
+        {...mockProps}
+        formData={{ ...mockProps.formData, image: 'data:image/png;base64,test' }}
+      />
+    );
+
+    const img = document.querySelector('.image-preview img');
+    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute('src', 'data:image/png;base64,test');
+  });
+
+  it('should render image preview from image path', () => {
+    render(
+      <WizardStepBasic
+        {...mockProps}
+        formData={{ ...mockProps.formData, imagePath: '/path/to/portrait.jpg' }}
+      />
+    );
+
+    const img = document.querySelector('.image-preview img');
+    expect(img).toBeInTheDocument();
+    expect(img).toHaveAttribute('src', '/path/to/portrait.jpg');
+  });
+
+  it('should remove image when Remove Image button is clicked', () => {
+    const mockOnChange = vi.fn();
+    render(
+      <WizardStepBasic
+        {...mockProps}
+        formData={{ ...mockProps.formData, image: 'data:image/png;base64,test', imagePath: '/path/to/img.jpg' }}
+        onInputChange={mockOnChange}
+      />
+    );
+
+    const removeBtn = screen.getByText('Remove Image');
+    fireEvent.click(removeBtn);
+
+    expect(mockOnChange).toHaveBeenCalledWith('image', '');
+    expect(mockOnChange).toHaveBeenCalledWith('imagePath', '');
+  });
+
+  it('should handle image upload via FileReader', () => {
+    const mockOnChange = vi.fn();
+    const mockReadAsDataURL = vi.fn();
+    let capturedOnload = null;
+    const originalFileReader = global.FileReader;
+
+    global.FileReader = class {
+      constructor() {
+        this._onload = null;
+      }
+      get onload() { return this._onload; }
+      set onload(fn) { this._onload = fn; capturedOnload = fn; }
+      readAsDataURL(file) { mockReadAsDataURL(file); }
+    };
+
+    try {
+      render(<WizardStepBasic {...mockProps} onInputChange={mockOnChange} />);
+
+      const fileInput = document.getElementById('character-image-upload');
+      const file = new File(['test'], 'test-image.png', { type: 'image/png' });
+
+      fireEvent.change(fileInput, { target: { files: [file] } });
+
+      expect(mockReadAsDataURL).toHaveBeenCalledWith(file);
+
+      // Simulate FileReader completing
+      capturedOnload({ target: { result: 'data:image/png;base64,mockdata' } });
+
+      expect(mockOnChange).toHaveBeenCalledWith('image', 'data:image/png;base64,mockdata');
+      expect(mockOnChange).toHaveBeenCalledWith('imageName', 'test-image.png');
+    } finally {
+      global.FileReader = originalFileReader;
+    }
+  });
+
+  it('should do nothing when no file is selected for image upload', () => {
+    const mockOnChange = vi.fn();
+    const mockReadAsDataURL = vi.fn();
+    const originalFileReader = global.FileReader;
+
+    global.FileReader = class {
+      constructor() {
+        this._onload = null;
+      }
+      readAsDataURL(file) { mockReadAsDataURL(file); }
+    };
+
+    try {
+      render(<WizardStepBasic {...mockProps} onInputChange={mockOnChange} />);
+
+      const fileInput = document.getElementById('character-image-upload');
+      fireEvent.change(fileInput, { target: { files: [] } });
+
+      expect(mockReadAsDataURL).not.toHaveBeenCalled();
+      expect(mockOnChange).not.toHaveBeenCalled();
+    } finally {
+      global.FileReader = originalFileReader;
+    }
+  });
+
+  it('should render alignment options from fetched data', async () => {
+    render(<WizardStepBasic {...mockProps} />);
+
+    await waitFor(() => {
+      const options = document.querySelectorAll('select option');
+      expect(options.length).toBe(9);
+      expect(options[0]).toHaveValue('Lawful Good');
+      expect(options[8]).toHaveValue('Chaotic Evil');
+    });
+  });
+
+  it('should call onInputChange when alignment is changed', async () => {
+    const mockOnChange = vi.fn();
+    render(<WizardStepBasic {...mockProps} onInputChange={mockOnChange} />);
+
+    await waitFor(() => {
+      const options = document.querySelectorAll('select option');
+      expect(options.length).toBe(9);
+    });
+
+    const alignmentSelect = document.querySelector('select');
+    fireEvent.change(alignmentSelect, { target: { value: 'Chaotic Neutral' } });
+
+    expect(mockOnChange).toHaveBeenCalledWith('alignment', 'Chaotic Neutral');
+  });
+
+  it('should handle alignment fetch error gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // Replace fetch to simulate error
+    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+
+    render(<WizardStepBasic {...mockProps} />);
+
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith('Error loading alignments:', expect.any(Error));
+    });
+
+    expect(screen.getByText('Step 2: Basic Information')).toBeInTheDocument();
+    consoleSpy.mockRestore();
+  });
+
+  it('should render 2024 background options from backgrounds prop', () => {
+    const backgrounds = [
+      { index: 'acrobat', name: 'Acrobat' },
+      { index: 'soldier', name: 'Soldier' },
+    ];
+
+    render(
+      <WizardStepBasic
+        {...mockProps}
+        ruleset="2024"
+        backgrounds={backgrounds}
+      />
+    );
+
+    const bgSelect = document.querySelectorAll('select')[1];
+    const options = bgSelect.querySelectorAll('option');
+    expect(options[0]).toHaveValue('');
+    expect(options[0]).toHaveTextContent('Select a background');
+    expect(options[1]).toHaveValue('Acrobat');
+    expect(options[2]).toHaveValue('Soldier');
+  });
 });

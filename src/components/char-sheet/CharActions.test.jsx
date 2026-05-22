@@ -337,4 +337,48 @@ describe('CharActions', () => {
 
     expect(screen.getByText('Piercing')).toBeInTheDocument();
   });
+
+  it('should render popupHtml in the actions section', async () => {
+    useActionPopup.mockImplementation(() => ({
+      showPopup: vi.fn(),
+      popupHtml: '<div>Popup Content</div>',
+      setPopupHtml: vi.fn(),
+    }));
+
+    render(<CharActions playerStats={mockPlayerStats} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
+    });
+  });
+
+  it('should render both bonus action attacks and bonus action descriptions', async () => {
+    const statsWithBoth = {
+      ...mockPlayerStats,
+      attacks: [
+        ...mockPlayerStats.attacks,
+        {
+          name: 'Handaxe',
+          range: 20,
+          hitBonus: 3,
+          hitBonusFormula: null,
+          damage: '1d6+2',
+          damageFormula: null,
+          damageType: 'Slashing',
+          type: 'Bonus Action',
+        },
+      ],
+    };
+
+    render(<CharActions playerStats={statsWithBoth} />);
+
+    await waitFor(() => {
+      // Should show Bonus Actions header
+      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
+      // Should show the bonus action attack name
+      expect(screen.getByText('Handaxe')).toBeInTheDocument();
+      // Should show the bonus action description (Cunning Action)
+      expect(screen.getByText(/Cunning Action:/)).toBeInTheDocument();
+    });
+  });
 });

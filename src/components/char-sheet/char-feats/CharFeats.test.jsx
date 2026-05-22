@@ -205,4 +205,69 @@ describe('CharFeats', () => {
       expect(loadFeatData).toHaveBeenCalledWith('2024');
    });
     });
+
+  it('should handle null featsData gracefully', async () => {
+    loadFeatData.mockResolvedValue(null);
+
+    const mockSetPopupHtml = vi.fn();
+    usePopup.mockImplementation(() => ({
+      showPopup: vi.fn(),
+      popupHtml: null,
+      setPopupHtml: mockSetPopupHtml,
+    }));
+
+    render(
+        <CharFeats playerStats={mockPlayerStats} />
+      );
+
+    const actorElements = screen.getAllByText(/Actor/);
+    fireEvent.click(actorElements[0]);
+
+    await waitFor(() => {
+      expect(mockSetPopupHtml).toHaveBeenCalledWith(
+        expect.stringContaining('Feat details not found')
+      );
+    });
+  });
+
+  it('should include error message in popup when loading fails', async () => {
+    loadFeatData.mockRejectedValue(new Error('API failure'));
+
+    const mockSetPopupHtml = vi.fn();
+    usePopup.mockImplementation(() => ({
+      showPopup: vi.fn(),
+      popupHtml: null,
+      setPopupHtml: mockSetPopupHtml,
+    }));
+
+    render(
+        <CharFeats playerStats={mockPlayerStats} />
+      );
+
+    const actorElements = screen.getAllByText(/Actor/);
+    fireEvent.click(actorElements[0]);
+
+    await waitFor(() => {
+      expect(mockSetPopupHtml).toHaveBeenCalledWith(
+        expect.stringContaining('API failure')
+      );
+    });
+  });
+
+  it('should render feat name even when not found in loaded data', async () => {
+    const statsWithUnknownFeat = {
+      feats: ['Unknown Feat', 'Actor'],
+      rules: '5e',
+    };
+
+    loadFeatData.mockResolvedValue(mockFeatsData);
+
+    render(
+        <CharFeats playerStats={statsWithUnknownFeat} />
+      );
+
+    // Both feat names should still be rendered
+    expect(screen.getByText(/Unknown Feat/)).toBeInTheDocument();
+    expect(screen.getByText(/Actor/)).toBeInTheDocument();
+  });
 });

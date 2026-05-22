@@ -2,6 +2,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
 import storage from '../../../services/storage.js';
+import classRules2024 from '../../../services/classRules2024.js';
+import CharFeats from '../char-feats/CharFeats.jsx';
 
 vi.mock('../../../services/storage.js', () => ({
   default: {
@@ -552,5 +554,144 @@ describe('CharSummary', () => {
     fireEvent.click(triggerButton);
 
     expect(setPopupHtmlMock).toHaveBeenCalled();
+  });
+
+  it('should show Monk unarmored movement speed increase for 2024 rules', () => {
+    classRules2024.getUnarmoredMovementIncrease.mockReturnValue(15);
+    const monkStats = {
+      ...mockPlayerStats,
+      race: { name: 'Human', speed: 30, type: 'Humanoid' },
+      class: { name: 'Monk' },
+      rules: '2024',
+    };
+
+    render(<CharSummary playerStats={monkStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByText(/Speed/)).toBeInTheDocument();
+    expect(screen.getByText(/45 ft\./)).toBeInTheDocument();
+  });
+
+  it('should show Barbarian unarmored movement speed increase', () => {
+    const barbarianStats = {
+      ...mockPlayerStats,
+      race: { name: 'Human', speed: 30, type: 'Humanoid' },
+      class: {
+        name: 'Barbarian',
+        class_levels: [
+          { class_specific: {} },
+          { class_specific: {} },
+          { class_specific: {} },
+          { class_specific: {} },
+          { class_specific: { unarmored_movement: 10 } },
+        ],
+      },
+      rules: '5e',
+    };
+
+    render(<CharSummary playerStats={barbarianStats} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByText(/Speed/)).toBeInTheDocument();
+    expect(screen.getByText(/40 ft\./)).toBeInTheDocument();
+  });
+
+  it('should render resistances', () => {
+    const statsWithResistances = {
+      ...mockPlayerStats,
+      resistances: ['Fire', 'Cold'],
+    };
+
+    render(<CharSummary playerStats={statsWithResistances} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByText(/Resistances/)).toBeInTheDocument();
+    expect(screen.getByText(/Fire, Cold/)).toBeInTheDocument();
+  });
+
+  it('should render immunities', () => {
+    const statsWithImmunities = {
+      ...mockPlayerStats,
+      immunities: ['Poison', 'Disease'],
+    };
+
+    render(<CharSummary playerStats={statsWithImmunities} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByText(/Immunities/)).toBeInTheDocument();
+    expect(screen.getByText(/Poison, Disease/)).toBeInTheDocument();
+  });
+
+  it('should render vulnerabilities', () => {
+    const statsWithVulnerabilities = {
+      ...mockPlayerStats,
+      vulnerabilities: ['Radiant'],
+    };
+
+    render(<CharSummary playerStats={statsWithVulnerabilities} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByText(/Vulnerabilities/)).toBeInTheDocument();
+    expect(screen.getByText(/Radiant/)).toBeInTheDocument();
+  });
+
+  it('should render senses', () => {
+    const statsWithSenses = {
+      ...mockPlayerStats,
+      senses: [{ name: 'Darkvision', value: '60 ft' }],
+    };
+
+    render(<CharSummary playerStats={statsWithSenses} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByText(/Senses/)).toBeInTheDocument();
+    expect(screen.getByText(/Darkvision 60 ft/)).toBeInTheDocument();
+  });
+
+  it('should render proficiencies', () => {
+    const statsWithProficiencies = {
+      ...mockPlayerStats,
+      proficiencies: ['Light Armor', 'Simple Weapons'],
+    };
+
+    render(<CharSummary playerStats={statsWithProficiencies} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByText(/Proficiencies/)).toBeInTheDocument();
+    expect(screen.getByText(/Light Armor, Simple Weapons/)).toBeInTheDocument();
+  });
+
+  it('should render languages', () => {
+    const statsWithLanguages = {
+      ...mockPlayerStats,
+      languages: ['Common', 'Elvish'],
+    };
+
+    render(<CharSummary playerStats={statsWithLanguages} onDeleteCharacter={vi.fn()} />);
+
+    expect(screen.getByText(/Languages/)).toBeInTheDocument();
+    expect(screen.getByText(/Common, Elvish/)).toBeInTheDocument();
+  });
+
+  it('should show feat benefits HTML in popup', () => {
+    const originalImpl = vi.mocked(CharFeats).getMockImplementation();
+    vi.mocked(CharFeats).mockImplementation(({ playerStats, showPopup }) => (
+      <div data-testid="char-feats">
+        <button onClick={() => showPopup({
+          name: 'Feat with Benefits',
+          desc: ['A test feat'],
+          benefits: [{ description: 'Benefit the First' }, { description: 'Benefit the Second' }],
+        })}>Trigger Popup</button>
+      </div>
+    ));
+
+    render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
+
+    fireEvent.click(screen.getByText('Trigger Popup'));
+
+    expect(setPopupHtmlMock).toHaveBeenCalledWith(
+      expect.stringContaining('<b>Benefits:</b><ul>')
+    );
+    expect(setPopupHtmlMock).toHaveBeenCalledWith(
+      expect.stringContaining('<li>Benefit the First</li>')
+    );
+    expect(setPopupHtmlMock).toHaveBeenCalledWith(
+      expect.stringContaining('<li>Benefit the Second</li>')
+    );
+
+    vi.mocked(CharFeats).mockImplementation(originalImpl);
   });
 });

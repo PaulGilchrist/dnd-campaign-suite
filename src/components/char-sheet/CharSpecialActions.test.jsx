@@ -353,4 +353,129 @@ describe('CharSpecialActions', () => {
     expect(result).toContain('<b>Test</b>');
     expect(result).toContain('Some details');
   });
+
+  it('should only add Great Weapon Fighting when both fighting styles are present due to else if', () => {
+    const playerStatsWithBoth = {
+      specialActions: [],
+      class: {
+        fightingStyles: ['Great Weapon Fighting', 'Protection'],
+      },
+      actions: [],
+      bonusActions: [],
+      reactions: [],
+      characterAdvancement: [],
+    };
+
+    render(
+      <CharSpecialActions playerStats={playerStatsWithBoth} />
+    );
+
+    expect(screen.getByText(/Great Weapon Fighting/)).toBeInTheDocument();
+    expect(screen.queryByText(/Protection/)).not.toBeInTheDocument();
+  });
+
+  it('should not duplicate Protection when already in specialActions', () => {
+    const playerStatsWithDupProtection = {
+      specialActions: [
+        {
+          name: 'Protection',
+          description: 'When a creature you can see attacks a target other than you...',
+        },
+      ],
+      class: {
+        fightingStyles: ['Protection'],
+      },
+      actions: [],
+      bonusActions: [],
+      reactions: [],
+      characterAdvancement: [],
+    };
+
+    render(
+      <CharSpecialActions playerStats={playerStatsWithDupProtection} />
+    );
+
+    const protectionElements = screen.getAllByText(/Protection/);
+    expect(protectionElements.length).toBe(1);
+  });
+
+  it('should dismiss popup when overlay is clicked', () => {
+    const mockSetPopupHtml = vi.fn();
+    useActionPopup.mockImplementation(() => ({
+      showPopup: vi.fn(),
+      popupHtml: '<div>Popup Content</div>',
+      setPopupHtml: mockSetPopupHtml,
+    }));
+
+    render(
+      <CharSpecialActions playerStats={mockPlayerStats} />
+    );
+
+    const overlay = screen.getByTestId('popup-overlay');
+    fireEvent.click(overlay);
+
+    expect(mockSetPopupHtml).toHaveBeenCalledWith(null);
+  });
+
+  it('should handle undefined specialActions gracefully', () => {
+    const playerStatsNoSpecial = {
+      class: {
+        fightingStyles: [],
+      },
+      actions: [],
+      bonusActions: [],
+      reactions: [],
+      characterAdvancement: [],
+    };
+
+    render(
+      <CharSpecialActions playerStats={playerStatsNoSpecial} />
+    );
+
+    expect(screen.getByText('Special Actions')).toBeInTheDocument();
+  });
+
+  it('should handle undefined actions/bonusActions/reactions/characterAdvancement gracefully', () => {
+    const playerStatsMinimal = {
+      specialActions: [
+        {
+          name: 'Second Wind',
+          description: 'You can use a bonus action to regain hit points.',
+        },
+      ],
+      class: {
+        fightingStyles: [],
+      },
+    };
+
+    render(
+      <CharSpecialActions playerStats={playerStatsMinimal} />
+    );
+
+    expect(screen.getByText(/Second Wind/)).toBeInTheDocument();
+  });
+
+  it('should use fallback key when special action has no name', () => {
+    const playerStatsNoName = {
+      specialActions: [
+        {
+          description: 'An unnamed special action',
+        },
+      ],
+      class: {
+        fightingStyles: [],
+      },
+      actions: [],
+      bonusActions: [],
+      reactions: [],
+      characterAdvancement: [],
+    };
+
+    const { container } = render(
+      <CharSpecialActions playerStats={playerStatsNoName} />
+    );
+
+    expect(container.querySelector('.sectionHeader')).toBeInTheDocument();
+    expect(screen.getByText('An unnamed special action')).toBeInTheDocument();
+  });
 });

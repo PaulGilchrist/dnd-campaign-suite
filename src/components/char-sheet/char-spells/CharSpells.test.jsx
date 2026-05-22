@@ -580,6 +580,122 @@ describe('CharSpells', () => {
     const spellAbilitiesDiv = container.querySelector('.spell-abilities');
     expect(spellAbilitiesDiv.textContent).toContain('All');
      });
+
+  it('should render damage_at_character_level effect', () => {
+    const statsWithCharLevelDamage = {
+      ...mockPlayerStats,
+      spellAbilities: {
+        ...mockPlayerStats.spellAbilities,
+        spells: [
+          ...mockPlayerStats.spellAbilities.spells,
+          {
+            name: 'Fire Bolt',
+            level: 0,
+            casting_time: '1 action',
+            range: '120 feet',
+            duration: 'Instantaneous',
+            components: ['V', 'S'],
+            damage: {
+              damage_at_character_level: {
+                '1': '1d10',
+              },
+              damage_type: 'Fire',
+            },
+            prepared: 'Always',
+          },
+        ],
+      },
+    };
+
+    render(
+      <CharSpells
+        playerStats={statsWithCharLevelDamage}
+        handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
+      />
+    );
+
+    // Spell with damage_at_character_level should show that damage
+    expect(screen.getByText('1d10 Fire')).toBeInTheDocument();
+  });
+
+  it('should exclude non-prepared spells when filter is active', () => {
+    const statsWithNonPrepared = {
+      ...mockPlayerStats,
+      spellAbilities: {
+        ...mockPlayerStats.spellAbilities,
+        spells: [
+          ...mockPlayerStats.spellAbilities.spells,
+          {
+            name: 'Vicious Mockery',
+            level: 0,
+            casting_time: '1 action',
+            range: '60 feet',
+            duration: 'Instantaneous',
+            components: ['V'],
+            prepared: '',  // Empty string - not 'Always' or 'Prepared'
+          },
+        ],
+      },
+    };
+
+    render(
+      <CharSpells
+        playerStats={statsWithNonPrepared}
+        handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
+      />
+    );
+
+    // Vicious Mockery should be visible initially
+    expect(screen.getByText('Vicious Mockery')).toBeInTheDocument();
+
+    // Click the Prepared header to filter
+    const preparedHeader = screen.getByText('Prepared');
+    fireEvent.click(preparedHeader);
+
+    // Vicious Mockery should be filtered out (prepared is empty string)
+    expect(screen.queryByText('Vicious Mockery')).not.toBeInTheDocument();
+
+    // Prepared/Always spells should still be visible
+    expect(screen.getByText('Fireball')).toBeInTheDocument();
+    expect(screen.getByText('Magic Missile')).toBeInTheDocument();
+    expect(screen.getByText('Light')).toBeInTheDocument();
+  });
+
+  it('should toggle filter back to show all spells', () => {
+    const statsWithNonPrepared = {
+      ...mockPlayerStats,
+      spellAbilities: {
+        ...mockPlayerStats.spellAbilities,
+        spells: [
+          ...mockPlayerStats.spellAbilities.spells,
+          {
+            name: 'Vicious Mockery',
+            level: 0,
+            casting_time: '1 action',
+            range: '60 feet',
+            duration: 'Instantaneous',
+            components: ['V'],
+            prepared: '',
+          },
+        ],
+      },
+    };
+
+    render(
+      <CharSpells
+        playerStats={statsWithNonPrepared}
+        handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
+      />
+    );
+
+    // First click filters, second click shows all
+    const preparedHeader = screen.getByText('Prepared');
+    fireEvent.click(preparedHeader);
+    fireEvent.click(preparedHeader);
+
+    // Vicious Mockery should be visible again after toggling filter off
+    expect(screen.getByText('Vicious Mockery')).toBeInTheDocument();
+  });
 });
 
 const mockPlayerStats2024 = {

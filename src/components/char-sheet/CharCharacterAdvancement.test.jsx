@@ -154,4 +154,39 @@ describe('CharCharacterAdvancement', () => {
     const clickableElements = document.querySelectorAll('.clickable');
     expect(clickableElements.length).toBe(0);
   });
+
+  it('should dismiss popup when overlay is clicked', () => {
+    const mockSetPopupHtml = vi.fn();
+    useActionPopup.mockImplementation(() => ({
+      showPopup: vi.fn(),
+      popupHtml: '<div>Popup Content</div>',
+      setPopupHtml: mockSetPopupHtml,
+    }));
+
+    render(
+      <CharCharacterAdvancement playerStats={mockPlayerStats} />
+    );
+
+    const overlay = screen.getByTestId('popup-overlay');
+    fireEvent.click(overlay);
+
+    expect(mockSetPopupHtml).toHaveBeenCalledWith(null);
+  });
+
+  it('should use fallback key when feature has no name', () => {
+    const statsWithNoName = {
+      characterAdvancement: [
+        {
+          description: 'A feature without a name',
+        },
+      ],
+    };
+
+    const { container } = render(
+      <CharCharacterAdvancement playerStats={statsWithNoName} />
+    );
+
+    expect(container.querySelector('.sectionHeader')).toBeInTheDocument();
+    expect(screen.getByText('A feature without a name')).toBeInTheDocument();
+  });
 });

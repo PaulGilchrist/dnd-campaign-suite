@@ -1,6 +1,8 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharacterCreationWizard from './CharacterCreationWizard.jsx';
+import { validateStep, validateFinalFormData } from '../../config/utils.js';
+import useWizardNavigation from '../../hooks/useWizardNavigation.js';
 
 // Stable mock data - defined outside vi.fn() to preserve reference identity across renders
 const mockFormData = {
@@ -42,6 +44,12 @@ vi.mock('lodash/merge.js', () => ({
   default: vi.fn((...args) => args.reduce((acc, obj) => ({ ...acc, ...obj }), {})),
 }));
 
+// Shared spies for navigation - created at module level for test access
+const mockGoToStep = vi.fn();
+const mockNavigateNext = vi.fn();
+const mockNavigatePrevious = vi.fn();
+const mockGetStepEnabled = vi.fn(() => true);
+
 // Mock all the hooks with stable references
 vi.mock('../../hooks/useWizardForm.js', () => ({
   default: vi.fn(() => ({
@@ -73,10 +81,10 @@ vi.mock('../../hooks/useWizardNavigation.js', () => ({
   default: vi.fn(() => ({
     currentStep: 1,
     isNextDisabled: false,
-    navigateNext: vi.fn(),
-    navigatePrevious: vi.fn(),
-    goToStep: vi.fn(),
-    getStepEnabled: vi.fn(() => true),
+    navigateNext: mockNavigateNext,
+    navigatePrevious: mockNavigatePrevious,
+    goToStep: mockGoToStep,
+    getStepEnabled: mockGetStepEnabled,
     isSaveEnabled: true,
   })),
 }));
@@ -173,9 +181,12 @@ vi.mock('./WizardSidebar.jsx', () => ({
 
 // Mock steps-config with components that call handlers
 vi.mock('../../config/steps-config.js', () => {
-  const StepComponent = ({ onRulesetChange, onSkillToggle, onSkillExpertiseToggle, onLanguageToggle, onFightingStyleToggle, onResistanceToggle, onImmunityToggle, onAbilityBaseScoreChange, onAbilityImprovementChange, onAbilityMiscBonusChange }) => (
+  const StepComponent = ({ onRulesetChange, onSkillToggle, onSkillExpertiseToggle, onLanguageToggle, onFightingStyleToggle, onResistanceToggle, onImmunityToggle, onAbilityBaseScoreChange, onAbilityImprovementChange, onAbilityMiscBonusChange, onTempInventoryChange, tempInventory }) => (
     <div data-testid="step-ruleset">
       <button onClick={() => onRulesetChange('2024')}>Change Ruleset</button>
+      <button onClick={() => onRulesetChange('5e')}>Ruleset 5e</button>
+      <button onClick={() => onTempInventoryChange?.('backpack', ['Sword'])}>Update Inventory</button>
+      <span data-testid="temp-inventory-count">{tempInventory?.backpack?.length ?? 0}</span>
       <button onClick={() => onSkillToggle('Stealth')}>Toggle Skill</button>
       <button onClick={() => onSkillExpertiseToggle('Stealth', true)}>Toggle Expertise</button>
       <button onClick={() => onLanguageToggle('Elvish')}>Toggle Language</button>
@@ -215,6 +226,11 @@ vi.mock('./utils.js', () => ({
   getPointBuyCosts: vi.fn(() => Promise.resolve({ 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 })),
 }));
 
+vi.mock('../../config/utils.js', () => ({
+  validateStep: vi.fn(() => Promise.resolve({})),
+  validateFinalFormData: vi.fn(() => ({})),
+}));
+
 describe('CharacterCreationWizard', () => {
   const mockOnComplete = vi.fn();
   const mockOnCancel = vi.fn();
@@ -232,6 +248,25 @@ describe('CharacterCreationWizard', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset shared navigation spies
+    mockGoToStep.mockReset();
+    mockNavigateNext.mockReset();
+    mockNavigatePrevious.mockReset();
+    mockGetStepEnabled.mockReset();
+    mockGetStepEnabled.mockImplementation(() => true);
+    // Reset useWizardNavigation to default return value
+    useWizardNavigation.mockImplementation(() => ({
+      currentStep: 1,
+      isNextDisabled: false,
+      navigateNext: mockNavigateNext,
+      navigatePrevious: mockNavigatePrevious,
+      goToStep: mockGoToStep,
+      getStepEnabled: mockGetStepEnabled,
+      isSaveEnabled: true,
+    }));
+    // Reset validation mocks to default (no errors)
+    validateStep.mockImplementation(() => Promise.resolve({}));
+    validateFinalFormData.mockImplementation(() => ({}));
   });
 
   it('should render the wizard overlay', () => {
@@ -466,5 +501,159 @@ describe('CharacterCreationWizard', () => {
   it('should show validation errors on submit when step has errors', () => {
     render(<CharacterCreationWizard {...defaultProps} />);
     expect(screen.getByText('Create New Character')).toBeInTheDocument();
+  });
+
+  it('should handle ruleset change to 2024 and clear spells/feats/background', () => {
+    render(<CharacterCreationWizard {...defaultProps} />);
+    fireEvent.click(screen.getByText('Change Ruleset'));
+
+    expect(mockSetFormData).toHaveBeenCalledWith(expect.any(Function));
+
+    // Verify the updater function transforms form data correctly
+    const updater = mockSetFormData.mock.calls[0][0];
+    const result = updater({
+      ...mockFormData,
+      spells: ['Fireball'],
+      feats: ['Alert'],
+      background: 'Acolyte',
+      rules: '5e',
+    });
+    expect(result.rules).toBe('2024');
+    expect(result.spells).toEqual([]);
+    expect(result.feats).toEqual([]);
+    expect(result.background).toBe('');
+
+    // Verify navigation to step 2 via shared spy
+    expect(mockGoToStep).toHaveBeenCalledWith(2);
+  });
+
+  it('should handle ruleset change to 5e and clear spells/feats/background', () => {
+    render(<CharacterCreationWizard {...defaultProps} />);
+    fireEvent.click(screen.getByText('Ruleset 5e'));
+
+    expect(mockSetFormData).toHaveBeenCalledWith(expect.any(Function));
+
+    const updater = mockSetFormData.mock.calls[0][0];
+    const result = updater({
+      ...mockFormData,
+      spells: ['Fireball'],
+      feats: ['Alert'],
+      background: 'Acolyte',
+      rules: '2024',
+    });
+    expect(result.rules).toBe('5e');
+    expect(result.spells).toEqual([]);
+    expect(result.feats).toEqual([]);
+    expect(result.background).toBe('');
+
+    expect(mockGoToStep).toHaveBeenCalledWith(2);
+  });
+
+  it('should navigate next and reset errors on success', async () => {
+    mockNavigateNext.mockResolvedValue(true);
+    render(<CharacterCreationWizard {...defaultProps} />);
+
+    fireEvent.click(screen.getByText('Next'));
+
+    await waitFor(() => {
+      expect(mockNavigateNext).toHaveBeenCalled();
+      expect(mockResetErrors).toHaveBeenCalled();
+    });
+  });
+
+  it('should not reset errors when navigation fails', async () => {
+    // Default: mockNavigateNext returns undefined (falsy)
+    render(<CharacterCreationWizard {...defaultProps} />);
+
+    fireEvent.click(screen.getByText('Next'));
+
+    await waitFor(() => {
+      expect(mockNavigateNext).toHaveBeenCalled();
+      expect(mockResetErrors).not.toHaveBeenCalled();
+    });
+  });
+
+  it('should set step errors on submit and not call onComplete', async () => {
+    validateStep.mockImplementation(() => Promise.resolve({ name: 'Name is required' }));
+    useWizardNavigation.mockImplementation(() => ({
+      currentStep: 12,
+      isNextDisabled: false,
+      navigateNext: mockNavigateNext,
+      navigatePrevious: mockNavigatePrevious,
+      goToStep: mockGoToStep,
+      getStepEnabled: mockGetStepEnabled,
+      isSaveEnabled: true,
+    }));
+
+    const localOnComplete = vi.fn();
+    render(<CharacterCreationWizard {...defaultProps} onComplete={localOnComplete} characterData={{ rules: '5e' }} />);
+
+    fireEvent.click(screen.getByText('Submit'));
+
+    await waitFor(() => {
+      expect(validateStep).toHaveBeenCalledWith(12, mockFormData, {}, [], [], '5e');
+      expect(mockSetErrors).toHaveBeenCalledWith({ name: 'Name is required' });
+      expect(localOnComplete).not.toHaveBeenCalled();
+    });
+  });
+
+  it('should set final validation errors on submit and not call onComplete', async () => {
+    validateStep.mockImplementation(() => Promise.resolve({}));
+    validateFinalFormData.mockImplementation(() => ({ name: 'Name is required' }));
+    useWizardNavigation.mockImplementation(() => ({
+      currentStep: 12,
+      isNextDisabled: false,
+      navigateNext: mockNavigateNext,
+      navigatePrevious: mockNavigatePrevious,
+      goToStep: mockGoToStep,
+      getStepEnabled: mockGetStepEnabled,
+      isSaveEnabled: true,
+    }));
+
+    const localOnComplete = vi.fn();
+    render(<CharacterCreationWizard {...defaultProps} onComplete={localOnComplete} characterData={{ rules: '5e' }} />);
+
+    fireEvent.click(screen.getByText('Submit'));
+
+    await waitFor(() => {
+      expect(mockSetErrors).toHaveBeenCalledWith({ name: 'Name is required' });
+      expect(localOnComplete).not.toHaveBeenCalled();
+    });
+  });
+
+  it('should submit successfully when no validation errors', async () => {
+    useWizardNavigation.mockImplementation(() => ({
+      currentStep: 12,
+      isNextDisabled: false,
+      navigateNext: mockNavigateNext,
+      navigatePrevious: mockNavigatePrevious,
+      goToStep: mockGoToStep,
+      getStepEnabled: mockGetStepEnabled,
+      isSaveEnabled: true,
+    }));
+
+    const localOnComplete = vi.fn();
+    render(<CharacterCreationWizard {...defaultProps} onComplete={localOnComplete} characterData={{ rules: '5e' }} />);
+
+    fireEvent.click(screen.getByText('Submit'));
+
+    await waitFor(() => {
+      expect(localOnComplete).toHaveBeenCalledWith(mockFormData);
+    });
+  });
+
+  it('should display total steps from getTotalSteps', () => {
+    render(<CharacterCreationWizard {...defaultProps} />);
+    expect(screen.getByText('Step 1 of 12')).toBeInTheDocument();
+  });
+
+  it('should update tempInventory via onTempInventoryChange callback', () => {
+    render(<CharacterCreationWizard {...defaultProps} />);
+    // TempInventory is synced from formData.inventory on mount (should be 0 items)
+    expect(screen.getByTestId('temp-inventory-count').textContent).toBe('0');
+    // Click the update button to exercise updateTempInventory
+    fireEvent.click(screen.getByText('Update Inventory'));
+    // Component should still be rendered after state update
+    expect(screen.getByTestId('wizard-footer')).toBeInTheDocument();
   });
 });

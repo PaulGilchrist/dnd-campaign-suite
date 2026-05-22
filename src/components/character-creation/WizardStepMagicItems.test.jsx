@@ -3,12 +3,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepMagicItems from './WizardStepMagicItems.jsx';
 
 vi.mock('./SelectableList.jsx', () => ({
-  default: vi.fn(({ title, resultLabel, renderWarnings, items }) => (
+  default: vi.fn(({ title, resultLabel, renderWarnings, items, renderItem }) => (
      <div data-testid="selectable-list">
        <h2>{title}</h2>
        <div data-testid="result-label">{resultLabel}</div>
        <div data-testid="item-count">{items?.length || 0} items</div>
        {renderWarnings && <div data-testid="warnings">{renderWarnings()}</div>}
+       {items && items.map((item, index) =>
+         renderItem ? renderItem(item, index, {
+           isSelected: index === 0,
+           isPreSelected: false,
+           isExpanded: index === 0,
+           onToggle: () => {},
+           onToggleExpand: () => {},
+         }) : null
+       )}
      </div>
    ))
 }));
@@ -161,10 +170,93 @@ describe('WizardStepMagicItems', () => {
         {...mockProps}
         allMagicItems={[singleDescItem]}
        />
-     );
+      );
     
     await waitFor(() => {
       expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
+     });
+   });
+
+  it('should display item type for magic items', async () => {
+    render(<WizardStepMagicItems {...mockProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Rod')).toBeInTheDocument();
+      expect(screen.getByText('Amulet')).toBeInTheDocument();
+     });
+   });
+
+  it('should display item rarity for magic items', async () => {
+    const { container } = render(<WizardStepMagicItems {...mockProps} />);
+
+    await waitFor(() => {
+      const rarities = container.querySelectorAll('.magic-item-rarity');
+      expect(rarities.length).toBe(2);
+      expect(rarities[0]).toHaveTextContent('Uncommon');
+     });
+   });
+
+  it('should show item description for expanded item', async () => {
+    const { container } = render(<WizardStepMagicItems {...mockProps} />);
+
+    await waitFor(() => {
+      expect(container.querySelector('.magic-item-description')).toBeInTheDocument();
+      expect(screen.getByText('A magic wand.')).toBeInTheDocument();
+     });
+   });
+
+  it('should show Show Less for expanded items and Show More for collapsed items', async () => {
+    render(<WizardStepMagicItems {...mockProps} />);
+
+    await waitFor(() => {
+      // First item is expanded -> "Show Less"
+      expect(screen.getByText('Show Less')).toBeInTheDocument();
+      // Second item is collapsed -> "Show More"
+      expect(screen.getByText('Show More')).toBeInTheDocument();
+     });
+   });
+
+  it('should render additional description lines for array descriptions', async () => {
+    const multiLineItem = {
+      name: 'Multi Desc Item',
+      index: 'multi',
+      type: 'Ring',
+      rarity: 'Rare',
+      description: ['<p>First paragraph.</p>', '<p>Second paragraph.</p>'],
+     };
+    
+    const { container } = render(
+       <WizardStepMagicItems
+        {...mockProps}
+        allMagicItems={[multiLineItem]}
+       />
+      );
+
+    await waitFor(() => {
+      expect(container.querySelector('.magic-item-description')).toBeInTheDocument();
+      expect(container.querySelector('.magic-item-more-description')).toBeInTheDocument();
+      expect(container.querySelector('.magic-item-more-description')).toHaveTextContent('Second paragraph.');
+     });
+   });
+
+  it('should not render more-description for single-item array descriptions', async () => {
+    const singleArrayItem = {
+      name: 'Single Array',
+      index: 'single-array',
+      type: 'Scroll',
+      description: ['<p>Only one entry.</p>'],
+     };
+    
+    const { container } = render(
+       <WizardStepMagicItems
+        {...mockProps}
+        allMagicItems={[singleArrayItem]}
+       />
+      );
+
+    await waitFor(() => {
+      expect(container.querySelector('.magic-item-description')).toBeInTheDocument();
+      expect(container.querySelector('.magic-item-more-description')).not.toBeInTheDocument();
      });
    });
 });

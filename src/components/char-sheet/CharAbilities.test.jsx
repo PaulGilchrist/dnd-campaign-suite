@@ -236,4 +236,36 @@ describe('CharAbilities', () => {
     expect(result).toContain('<h3>Strength</h3>');
     expect(result).toContain('Strength measures physical power');
    });
+
+  it('should not render popup when popupHtml is null', () => {
+    render(
+      <CharAbilities
+        playerStats={mockPlayerStats}
+        allAbilityScores={mockAllAbilityScores}
+      />
+    );
+
+    expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
+  });
+
+  it('should dismiss popup when overlay is clicked', () => {
+    const mockSetPopupHtml = vi.fn();
+    useActionPopup.mockImplementation(() => ({
+      showPopup: vi.fn(),
+      popupHtml: '<div>Popup Content</div>',
+      setPopupHtml: mockSetPopupHtml,
+    }));
+
+    render(
+      <CharAbilities
+        playerStats={mockPlayerStats}
+        allAbilityScores={mockAllAbilityScores}
+      />
+    );
+
+    const overlay = screen.getByTestId('popup-overlay');
+    fireEvent.click(overlay);
+
+    expect(mockSetPopupHtml).toHaveBeenCalledWith(null);
+  });
 });

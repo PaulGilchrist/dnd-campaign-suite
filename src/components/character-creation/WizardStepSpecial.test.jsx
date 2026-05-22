@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepSpecial from './WizardStepSpecial.jsx';
 
@@ -149,10 +149,84 @@ describe('WizardStepSpecial', () => {
            { name: 'Action with Details', description: 'Desc', details: 'Important details here' },
           ],
          },
-       };
+        };
 
     render(<WizardStepSpecial {...actionWithDetails} />);
 
     expect(screen.getByText('Important details here')).toBeInTheDocument();
      });
+
+  it('should update new action name field on typing', () => {
+    const mockOnChange = vi.fn();
+    render(<WizardStepSpecial {...mockProps} onArrayFieldChange={mockOnChange} />);
+
+    const nameInput = screen.getByPlaceholderText('Action name (required)');
+    fireEvent.change(nameInput, { target: { value: 'New Action Name' } });
+
+    expect(mockOnChange).toHaveBeenCalledWith('newSpecialAction', { name: 'New Action Name' });
+  });
+
+  it('should allow adding actions with duplicate names', () => {
+    const mockOnChange = vi.fn();
+    const propsWithSameName = {
+      ...mockProps,
+      formData: {
+        specialActions: [
+          { name: 'Action 1', description: 'Description 1', details: null },
+        ],
+        newSpecialAction: { name: 'Action 1', description: 'Duplicate version', details: '' },
+      },
+      onArrayFieldChange: mockOnChange,
+    };
+
+    render(<WizardStepSpecial {...propsWithSameName} />);
+    fireEvent.click(screen.getByText('Add Action'));
+
+    expect(mockOnChange).toHaveBeenCalledWith('specialActions', [
+      { name: 'Action 1', description: 'Description 1', details: null },
+      { name: 'Action 1', description: 'Duplicate version', details: null },
+    ]);
+    expect(mockOnChange).toHaveBeenCalledWith('newSpecialAction', {});
+  });
+
+  it('should clear new action form after adding', () => {
+    const mockOnChange = vi.fn();
+    const propsWithAction = {
+      ...mockProps,
+      formData: {
+        specialActions: [],
+        newSpecialAction: { name: 'Test Action', description: 'Test Desc', details: '' },
+      },
+      onArrayFieldChange: mockOnChange,
+    };
+
+    render(<WizardStepSpecial {...propsWithAction} />);
+    fireEvent.click(screen.getByText('Add Action'));
+
+    expect(mockOnChange).toHaveBeenCalledWith('newSpecialAction', {});
+  });
+
+  it('should update description via PreviewToggle textarea', () => {
+    const mockOnChange = vi.fn();
+    render(<WizardStepSpecial {...mockProps} onArrayFieldChange={mockOnChange} />);
+
+    const descriptionTextarea = screen.getByPlaceholderText('Description');
+    fireEvent.change(descriptionTextarea, { target: { value: 'A powerful new description' } });
+
+    expect(mockOnChange).toHaveBeenCalledWith('newSpecialAction', {
+      description: 'A powerful new description',
+    });
+  });
+
+  it('should update details via PreviewToggle textarea', () => {
+    const mockOnChange = vi.fn();
+    render(<WizardStepSpecial {...mockProps} onArrayFieldChange={mockOnChange} />);
+
+    const detailsTextarea = screen.getByPlaceholderText('Additional details (optional)');
+    fireEvent.change(detailsTextarea, { target: { value: 'Some important details' } });
+
+    expect(mockOnChange).toHaveBeenCalledWith('newSpecialAction', {
+      details: 'Some important details',
+    });
+  });
 });

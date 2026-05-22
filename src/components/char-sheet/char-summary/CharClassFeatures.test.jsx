@@ -442,8 +442,9 @@ describe('Druid', () => {
 
   it('does not render at level 1', () => {
     const stats = { ...mockStats5e, level: 1 };
-    render(<CharClassFeatures playerStats={stats} />);
+    const { container } = render(<CharClassFeatures playerStats={stats} />);
     expect(screen.queryByText(/Wild Shape Uses:/)).not.toBeInTheDocument();
+    expect(container.querySelector('[data-testid="char-class-druid"]')).toBeNull();
      });
 
   it('renders druid features (5e)', () => {
@@ -510,6 +511,21 @@ describe('Fighter', () => {
     render(<CharClassFeatures playerStats={mockStats} />);
     expect(screen.queryByText(/Psionic Energy/)).not.toBeInTheDocument();
      });
+
+  it('renders psi warrior energy dice count and type', () => {
+    const psiStats = {
+         ...mockStats,
+       class: {
+              ...mockStats.class,
+           major: { name: 'Psi Warrior' },
+           subclass: { name: 'Psi Warrior' },
+           class_levels: Array(5).fill({ extra_attacks: 1, second_wind: 2, weapon_mastery: 'Slashing', energy: { required_major: 'Psi Warrior', energy_die_num: 4, energy_die_type: 8 } }),
+            },
+         };
+    render(<CharClassFeatures playerStats={psiStats} />);
+    expect(screen.getByText(/Energy Dice/)).toBeInTheDocument();
+    expect(screen.getByText(/d8/)).toBeInTheDocument();
+     });
 });
 
 /* -- Monk -- */
@@ -569,6 +585,20 @@ describe('Paladin', () => {
   it('shows aura range for 5e', () => {
     render(<CharClassFeatures playerStats={mockStats} />);
     expect(screen.getByText(/Aura Range:/)).toBeInTheDocument();
+     });
+
+  it('does not show aura range when null (2024 or low level)', () => {
+    const paladinNoAura = {
+      name: 'Paladin',
+      level: 1,
+      rules: '2024',
+      class: {
+        name: 'Paladin',
+        class_levels: [{ level: 1 }],
+       },
+     };
+    render(<CharClassFeatures playerStats={paladinNoAura} />);
+    expect(screen.queryByText(/Aura Range:/)).not.toBeInTheDocument();
      });
 });
 
@@ -708,6 +738,34 @@ describe('Warlock', () => {
     render(<CharClassFeatures playerStats={mockStats2024} />);
     expect(classRules2024.getEldritchInvocations).toHaveBeenCalled();
      });
+
+  it('shows arcanum features for level 11+ (5e)', () => {
+    render(<CharClassFeatures playerStats={mockStats5e} />);
+    expect(screen.getByText(/Arcanums Known/)).toBeInTheDocument();
+    const warlockEl = screen.getByTestId('char-class-warlock');
+    expect(warlockEl.textContent).toContain('Cone of Cold');
+     });
+
+  it('does not show arcanum features for level &lt;= 10 (5e)', () => {
+    const lowLevelWarlock = {
+      name: 'WarlockLow',
+      level: 5,
+      rules: '5e',
+      class: {
+        name: 'Warlock',
+        invocations: ['Agonizing Blast'],
+        arcanums: [],
+        class_levels: Array.from({ length: 5 }, (_, i) => ({ level: i + 1, class_specific: { invocations_known: 3 } })),
+       },
+     };
+    render(<CharClassFeatures playerStats={lowLevelWarlock} />);
+    expect(screen.queryByText(/Arcanums Known/)).not.toBeInTheDocument();
+     });
+
+  it('shows invocations list for warlock', () => {
+    render(<CharClassFeatures playerStats={mockStats5e} />);
+    expect(screen.getByText(/Agonizing Blast/)).toBeInTheDocument();
+     });
 });
 
 /* -- Wizard -- */
@@ -738,6 +796,13 @@ describe('Wizard', () => {
     render(<CharClassFeatures playerStats={mockStats5e} />);
     toggleFirstClickChangeAndSet('0');
     expect(storage.setProperty).toHaveBeenCalledWith('Wizard', 'arcaneRecoveryLevels', '0', undefined);
+     });
+
+  it('renders when showWizardFeatures is undefined (defaults to true)', () => {
+    classRules.getWizardFeatures.mockReturnValue({ arcaneRecoveryLevels: 1 });
+    const stats = { ...mockStats5e, class: { name: 'Wizard', class_levels: Array.from({ length: 5 }, (_, i) => ({ level: i + 1, class_specific: { arcane_recovery_levels: 1 } })) } };
+    render(<CharClassFeatures playerStats={stats} />);
+    expect(screen.getByText(/Arcane Recovery Levels:/)).toBeInTheDocument();
      });
 });
 

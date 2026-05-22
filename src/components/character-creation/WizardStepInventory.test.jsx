@@ -7,9 +7,14 @@ vi.mock('../../hooks/useEquipmentSearch.js', () => ({
 }));
 
 vi.mock('./EquipmentSearchModal.jsx', () => ({
-  default: function MockEquipmentSearchModal({ showSearchModal, searchField }) {
+  default: function MockEquipmentSearchModal({ showSearchModal, searchField, onClose }) {
     if (!showSearchModal) return null;
-    return <div data-testid="equipment-search-modal">Modal for {searchField}</div>;
+    return (
+      <div data-testid="equipment-search-modal">
+        Modal for {searchField}
+        <button data-testid="modal-close-btn" onClick={onClose}>Close</button>
+      </div>
+    );
   },
 }));
 
@@ -355,6 +360,96 @@ describe('WizardStepInventory', () => {
       render(<WizardStepInventory {...props} />);
 
       expect(screen.queryByTestId('equipment-search-modal')).not.toBeInTheDocument();
+    });
+
+    it('clicking close button calls setSearchField and setSearchQuery', () => {
+      const setSearchField = vi.fn();
+      const setSearchQuery = vi.fn();
+      useEquipmentSearch.mockReturnValue(createMockHookReturn({
+        searchField: 'backpack',
+        setSearchField,
+        setSearchQuery,
+      }));
+
+      const props = createMockProps();
+      render(<WizardStepInventory {...props} />);
+
+      fireEvent.click(screen.getByTestId('modal-close-btn'));
+
+      expect(setSearchField).toHaveBeenCalledWith(null);
+      expect(setSearchQuery).toHaveBeenCalledWith('');
+    });
+  });
+
+  describe('Focus behavior', () => {
+    it('typing does not split on comma while field is focused', () => {
+      const onInventoryChange = vi.fn();
+      const onTempInventoryChange = vi.fn();
+      const props = createMockProps({
+        tempInventory: { backpack: ['Rope'], equipped: [] },
+        onInventoryChange,
+        onTempInventoryChange,
+      });
+      render(<WizardStepInventory {...props} />);
+
+      const textarea = screen.getAllByRole('textbox')[0];
+      // Focus the textarea to set focusedField
+      fireEvent.focus(textarea);
+      // Type a comma-separated string - should NOT commit during typing
+      fireEvent.change(textarea, { target: { value: 'Rope, Torch' } });
+
+      expect(onInventoryChange).not.toHaveBeenCalled();
+      expect(onTempInventoryChange).not.toHaveBeenCalled();
+    });
+
+    it('blur after focus commits the items', () => {
+      const onInventoryChange = vi.fn();
+      const onTempInventoryChange = vi.fn();
+      const props = createMockProps({
+        tempInventory: { backpack: [], equipped: [] },
+        onInventoryChange,
+        onTempInventoryChange,
+      });
+      render(<WizardStepInventory {...props} />);
+
+      const textarea = screen.getAllByRole('textbox')[0];
+      fireEvent.focus(textarea);
+      fireEvent.change(textarea, { target: { value: 'Rope, Torch' } });
+      fireEvent.blur(textarea);
+
+      expect(onTempInventoryChange).toHaveBeenCalledWith('backpack', ['Rope', 'Torch']);
+      expect(onInventoryChange).toHaveBeenCalledWith('backpack', ['Rope', 'Torch']);
+    });
+  });
+
+  describe('Raw text sync', () => {
+    it('syncs raw text from items when no field is focused', () => {
+      const props = createMockProps({
+        tempInventory: { backpack: ['Rope', 'Torch'], equipped: [] },
+      });
+      render(<WizardStepInventory {...props} />);
+
+      const textarea = screen.getAllByRole('textbox')[0];
+      // Textarea shows items joined by comma (synced via useEffect)
+      expect(textarea).toHaveValue('Rope, Torch');
+    });
+
+    it('updates textarea when items change and not focused', () => {
+      const props = createMockProps({
+        tempInventory: { backpack: ['Rope'], equipped: [] },
+      });
+      const { rerender } = render(<WizardStepInventory {...props} />);
+
+      const textarea = screen.getAllByRole('textbox')[0];
+      expect(textarea).toHaveValue('Rope');
+
+      // Re-render with updated items
+      rerender(<WizardStepInventory {...{
+        ...props,
+        tempInventory: { backpack: ['Rope', 'Torch', 'Rations'], equipped: [] },
+      }} />);
+
+      expect(textarea).toHaveValue('Rope, Torch, Rations');
     });
   });
 });

@@ -566,4 +566,102 @@ describe('CharInventory', () => {
       expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Craft:'));
     });
   });
+
+  it('should strip parenthetical quantity from item name before lookup', async () => {
+    const dataWithRations = [
+      {
+        name: 'Rations',
+        index: 'rations',
+        desc: ['Food supplies for travel.'],
+        cost: { quantity: 5, unit: 'sp' },
+        weight: 2,
+        equipment_category: 'Supplies',
+      },
+    ];
+
+    loadEquipment.mockResolvedValue(dataWithRations);
+
+    const mockSetPopupHtml = vi.fn();
+    usePopup.mockImplementation(() => ({
+      showPopup: vi.fn(),
+      popupHtml: null,
+      setPopupHtml: mockSetPopupHtml,
+    }));
+
+    render(
+      <CharInventory playerStats={mockPlayerStats} />
+    );
+
+    // Backpack has 'Rations (10)' - clicking should strip the (10) and look up 'Rations'
+    const backpackSection = screen.getByText(/Backpack:/).parentElement;
+    const rationsElement = backpackSection.querySelector('.clickable');
+    fireEvent.click(rationsElement);
+
+    await waitFor(() => {
+      expect(mockSetPopupHtml).toHaveBeenCalledWith(
+        expect.stringContaining('Rations')
+      );
+    });
+  });
+
+  it('should display all item properties when present simultaneously', async () => {
+    const dataWithAllProps = [
+      {
+        ...mockEquipmentData[0],
+        ability: 'Strength',
+        utilize: 'Dexterity (Dex) check',
+        craft: 'Smiths tools',
+      },
+    ];
+
+    loadEquipment.mockResolvedValue(dataWithAllProps);
+
+    const mockSetPopupHtml = vi.fn();
+    usePopup.mockImplementation(() => ({
+      showPopup: vi.fn(),
+      popupHtml: null,
+      setPopupHtml: mockSetPopupHtml,
+    }));
+
+    render(
+      <CharInventory playerStats={mockPlayerStats} />
+    );
+
+    const equippedSection = screen.getByText(/Equipped:/).parentElement;
+    const longswordElement = equippedSection.querySelector('.clickable');
+    fireEvent.click(longswordElement);
+
+    await waitFor(() => {
+      const callArg = mockSetPopupHtml.mock.calls[0][0];
+      expect(callArg).toContain('Cost:');
+      expect(callArg).toContain('Weight:');
+      expect(callArg).toContain('Ability:');
+      expect(callArg).toContain('Utilize:');
+      expect(callArg).toContain('Craft:');
+    });
+  });
+
+  it('should render item names without parentheses normally', async () => {
+    loadEquipment.mockResolvedValue(mockEquipmentData);
+
+    const mockSetPopupHtml = vi.fn();
+    usePopup.mockImplementation(() => ({
+      showPopup: vi.fn(),
+      popupHtml: null,
+      setPopupHtml: mockSetPopupHtml,
+    }));
+
+    render(
+      <CharInventory playerStats={{ inventory: { equipped: ['Longsword'], backpack: [] } }} />
+    );
+
+    const longswordElement = screen.getByText('Longsword');
+    fireEvent.click(longswordElement);
+
+    await waitFor(() => {
+      expect(mockSetPopupHtml).toHaveBeenCalledWith(
+        expect.stringContaining('Longsword')
+      );
+    });
+  });
 });
