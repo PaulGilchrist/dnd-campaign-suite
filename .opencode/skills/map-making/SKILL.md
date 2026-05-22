@@ -1,7 +1,7 @@
 ---
 name: map-making
 description: Describes how to build the best Dungeons & Dragons fantasy-themed indoor dungeon maps.
-version: 1
+version: 2
 ---
 
 ## General information
@@ -52,6 +52,12 @@ Use these criteria both when **creating** maps and when **interpreting feedback*
 - **Clarity**
   - The map structure should be easy to understand from the JSON representation.
   - Names and tags should be descriptive and consistent.
+- **Feature alignment with walls**
+  - Doors, torches, bookshelves, and similar placed items must be aligned to walls — never floating in open space.
+  - Interior walls are essential for logical placement of doors, torches, and furniture.
+  - Doors must be placed on wall cells and rotated to face the correct direction.
+  - Torches must be placed on wall cells and rotated to mount on the correct wall.
+  - Bookshelves are 2 squares wide (placed by their left square) and offset to occupy the top half of those squares — they are designed for northern walls by default.
 
 ## Feedback integration rules
 
@@ -95,5 +101,28 @@ Initial seed practices:
   - At least one secret or hidden element (room, passage, cache) should be discoverable by careful play.
 - **Environmental storytelling**
   - Use room names, features, and connections to imply history and purpose (e.g., barracks near an armory, shrine near a reliquary).
+- **Interior walls are essential**
+  - Always define interior walls to create distinct rooms and corridors.
+  - Without interior walls, doors, torches, and furniture appear randomly placed or floating.
+  - Plan the full room layout (walls, doors, corridors) before placing furniture and decorations.
+- **Door rotation**
+  - Doors default to mounting on a left wall (rotation 0°).
+  - When replacing a horizontal wall, rotate the door 90° (rotation: 90).
+  - Always verify the door faces the correct direction relative to the corridor it connects.
+- **Torch rotation**
+  - Torches default to mounting on a left wall (rotation 0°).
+  - Rotation mapping: left wall = 0°, north wall = 90°, east wall = 180°, south wall = 270°.
+  - Place torches on wall cells, not in the middle of rooms.
+- **Bookshelf placement**
+  - Bookshelves are 2 squares wide and placed by their left square — the right square extends one cell further right.
+  - If a wall exists on the right side, place the bookshelf one cell further left to compensate.
+  - Bookshelves are offset to occupy the top half of the two squares — designed for northern walls by default.
+  - Rotation mapping: north wall = 0°, east wall = 90° (1x), south wall = 180° (2x), west wall = 270° (3x).
+- **Pre-planning layout**
+  - Before writing JSON, mentally or sketch the full dungeon layout: entrance, corridors, rooms, branching paths, and key features.
+  - Consider narrative flow (e.g., entrance → courtyard → branching paths → boss chamber).
+  - Plan fog of war to create exploration tension — reveal only the entrance area initially.
+- **Player starting position**
+  - Place player tokens at the entrance in an unfogged area so they can see where they are before venturing into the unknown.
 
 As feedback is received, extend and refine these bullets according to the **Feedback Integration Rules**.

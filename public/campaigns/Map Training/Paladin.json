@@ -1,0 +1,101 @@
+{
+  "name": "Paladin",
+  "level": 5,
+  "alignment": "Lawful Good",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Dexterity",
+      "baseScore": 10,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Constitution",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 12,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    }
+  ],
+  "background": "Guard",
+  "class": {
+    "name": "Paladin",
+    "subclass": {
+      "name": "Oath of Glory",
+      "type": ""
+    },
+    "fightingStyles": [
+      "Defense"
+    ]
+  },
+  "expertSkills": [],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Dragonborn",
+    "subrace": {
+      "name": "Black Dragonborn",
+      "description": ""
+    }
+  },
+  "immunities": [],
+  "inventory": {
+    "backpack": [
+      "Bedroll",
+      "Light Hammer",
+      "Mess Kit",
+      "Rations (10 days)",
+      "Rope, Hempen (50 feet)",
+      "Tinderbox",
+      "Torch",
+      "Waterskin"
+    ],
+    "equipped": [
+      "Chain Mail",
+      "Shield",
+      "Crossbow, heavy",
+      "Longsword",
+      "Dagger"
+    ],
+    "gold": 25,
+    "magicItems": []
+  },
+  "languages": [
+    "Elvish"
+  ],
+  "resistances": [],
+  "skillProficiencies": [
+    "Athletics",
+    "History",
+    "Intimidation",
+    "Persuasion"
+  ],
+  "specialActions": [],
+  "spells": [],
+  "rules": "2024",
+  "imagePath": "campaigns/2024 Testing/images/Paladin.png",
+  "originalFileName": "paladin.json"
+}
