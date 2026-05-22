@@ -12,7 +12,7 @@ Generate indoor dungeon maps and improve the map-making skill based on user feed
 
 ## Process
 
-Load the maps schema `public/campaigns/maps-indoor.schema.json` and `map-making` skill and use them to generate a Dungeons & Dragons fantasy themed map, saving it to `public/campaigns/Map Training/maps/map-(N+1).json`.  When finished, ask the user for feedback that you can use to improve the `map-making` skill.  Update the skill as needed, but keep it short and concise.
+Load the `map-making` skill and use it to generate a Dungeons & Dragons fantasy themed map, saving it to `public/campaigns/Map Training/maps/map-(N+1).json`.  When finished, ask the user for feedback that you can use to improve this skill.  Update the skill as needed, but keep it short and concise.
 
 ## Important
 

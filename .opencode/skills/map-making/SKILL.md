@@ -4,9 +4,8 @@ description: How to build indoor D&D fantasy themed dungeon maps.
 ---
 
 ## Core Rules
-- Always follow `public/campaigns/maps-indoor.schema.json`.
-- Always follow `public/campaigns/maps-indoor.schema.json`.
-- Maps are saved as ``public/campaigns/Map Training/maps/map-N.json` incrementing N each new map.
+- Always follow `public/campaigns/maps-indoor.schema.json` for indoor maps or `public/campaigns/maps-outdoor.schema.json` for outdoor maps.
+- Maps are saved to `public/campaigns/{campaign name}/maps`.
 
 ## Learned Best Practices
 - Walls define room boundaries. Rooms are the open floor space between them.
