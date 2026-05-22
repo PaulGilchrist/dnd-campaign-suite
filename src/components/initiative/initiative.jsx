@@ -39,7 +39,7 @@ function AvatarImage({ name, imagePath }) {
 
 function Initiative({ characters, campaignName, onNpcsChange }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
-    const [numOfNpc, setNumOfNpc] = React.useState(5);
+    const [numOfNpc, setNumOfNpc] = React.useState(4);
     const [activeCreatureId, setActiveCreatureId] = React.useState(null);
     const [npcImages, setNpcImages] = React.useState({});
     const carouselRef = React.useRef(null);
