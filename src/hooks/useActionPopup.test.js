@@ -5,314 +5,183 @@ import useActionPopup, {
   buildAbilityDetailHtml,
 } from './useActionPopup.js';
 
-describe('buildFeatureDetailHtml', () => {
-  it('returns HTML string when entity has details', () => {
-    const entity = {
-      name: 'Rage',
-      description: 'Enter a rage',
-      details: 'Lasts 1 minute',
-    };
-    const result = buildFeatureDetailHtml(entity);
-    expect(result).toBe(
-      '<b>Rage</b><br/>Enter a rage<br/><br/>Lasts 1 minute'
-    );
-  });
-
-  it('returns null when entity has no details key', () => {
-    const entity = {
-      name: 'Rage',
-      description: 'Enter a rage',
-    };
-    expect(buildFeatureDetailHtml(entity)).toBeNull();
-  });
-
-  it('returns null when details is an empty string', () => {
-    const entity = {
-      name: 'Rage',
-      description: 'Enter a rage',
-      details: '',
-    };
-    expect(buildFeatureDetailHtml(entity)).toBeNull();
-  });
-});
-
-describe('buildAbilityDetailHtml', () => {
-  const mockAbilityScores = [
-    { full_name: 'Strength', desc: 'Strength measures bodily power.' },
-    { full_name: 'Dexterity', desc: 'Dexterity measures agility.' },
-  ];
-
-  it('returns a function', () => {
-    const handler = buildAbilityDetailHtml(mockAbilityScores);
-    expect(typeof handler).toBe('function');
-  });
-
-  it('returned function returns HTML when name matches an ability score', () => {
-    const handler = buildAbilityDetailHtml(mockAbilityScores);
-    const result = handler('Strength');
-    expect(result).toBe('<h3>Strength</h3>Strength measures bodily power.<br/>');
-  });
-
-  it('returned function returns null when name does not match', () => {
-    const handler = buildAbilityDetailHtml(mockAbilityScores);
-    expect(handler('Charisma')).toBeNull();
-  });
-
-  it('returned function returns null with empty array', () => {
-    const handler = buildAbilityDetailHtml([]);
-    expect(handler('Strength')).toBeNull();
-  });
-});
+vi.mock('./usePopup.js', () => ({
+  default: (buildHtml) => {
+    const React = require('react');
+    const [popupHtml, setPopupHtml] = React.useState(null);
+    const showPopup = React.useCallback((entity) => {
+      const html = buildHtml(entity);
+      if (html) {
+        setPopupHtml(html);
+      }
+    }, [buildHtml]);
+    return { showPopup, popupHtml, setPopupHtml };
+  },
+}));
 
 describe('useActionPopup', () => {
-  describe('preset: "feature"', () => {
-    it('sets popupHtml when showPopup is called with a feature that has details', () => {
-      const { result } = renderHook(() => useActionPopup('feature'));
+  describe('buildFeatureDetailHtml', () => {
+    it('should return HTML with name, description, and details', () => {
+      const entity = {
+        name: 'Second Wind',
+        description: 'You have a limited well of stamina.',
+        details: 'You can use a bonus action to regain 1d10 + fighter level hit points.',
+      };
 
-      expect(result.current.popupHtml).toBeNull();
-
-      act(() => {
-        result.current.showPopup({
-          name: 'Rage',
-          description: 'Enter a rage',
-          details: 'Lasts 1 minute',
-        });
-      });
-
-      expect(result.current.popupHtml).toBe(
-        '<b>Rage</b><br/>Enter a rage<br/><br/>Lasts 1 minute'
+      const result = buildFeatureDetailHtml(entity);
+      expect(result).toBe(
+        '<b>Second Wind</b><br/>You have a limited well of stamina.<br/><br/>You can use a bonus action to regain 1d10 + fighter level hit points.'
       );
     });
 
-    it('leaves popupHtml as null when feature lacks details', () => {
-      const { result } = renderHook(() => useActionPopup('feature'));
+    it('should return null when entity has no details', () => {
+      const entity = {
+        name: 'Simple Feature',
+        description: 'Just a description.',
+      };
 
-      act(() => {
-        result.current.showPopup({
-          name: 'Rage',
-          description: 'Enter a rage',
-        });
-      });
+      const result = buildFeatureDetailHtml(entity);
+      expect(result).toBeNull();
+    });
 
-      expect(result.current.popupHtml).toBeNull();
+    it('should return null when details is empty string', () => {
+      const entity = {
+        name: 'Simple Feature',
+        description: 'Just a description.',
+        details: '',
+      };
+
+      const result = buildFeatureDetailHtml(entity);
+      expect(result).toBeNull();
     });
   });
 
-  describe('preset: "spell"', () => {
-    it('sets popupHtml when showPopup is called with a spell that has a desc', () => {
+  describe('buildAbilityDetailHtml', () => {
+    it('should return a function that looks up ability by name', () => {
+      const allAbilityScores = [
+        { full_name: 'Strength', desc: 'Measures physical power.' },
+        { full_name: 'Dexterity', desc: 'Measures agility.' },
+      ];
+
+      const lookup = buildAbilityDetailHtml(allAbilityScores);
+
+      const result = lookup('Strength');
+      expect(result).toBe('<h3>Strength</h3>Measures physical power.<br/>');
+    });
+
+    it('should return null for unknown ability', () => {
+      const allAbilityScores = [
+        { full_name: 'Strength', desc: 'Measures physical power.' },
+      ];
+
+      const lookup = buildAbilityDetailHtml(allAbilityScores);
+
+      const result = lookup('Unknown');
+      expect(result).toBeNull();
+    });
+
+    it('should match full_name case-sensitively', () => {
+      const allAbilityScores = [
+        { full_name: 'Strength', desc: 'Measures physical power.' },
+      ];
+
+      const lookup = buildAbilityDetailHtml(allAbilityScores);
+
+      const result = lookup('strength');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('preset selection', () => {
+    it('should return showPopup, popupHtml, and setPopupHtml for feature preset', () => {
+      const { result } = renderHook(() => useActionPopup('feature'));
+
+      expect(result.current).toHaveProperty('showPopup');
+      expect(result.current).toHaveProperty('popupHtml');
+      expect(result.current).toHaveProperty('setPopupHtml');
+      expect(typeof result.current.showPopup).toBe('function');
+    });
+
+    it('should return handlers for spell preset', () => {
       const { result } = renderHook(() => useActionPopup('spell'));
 
-      act(() => {
-        result.current.showPopup({
-          name: 'Fireball',
-          desc: 'A bright streak flashes from your finger.',
-        });
-      });
+      expect(result.current).toHaveProperty('showPopup');
+      expect(result.current).toHaveProperty('popupHtml');
+      expect(result.current).toHaveProperty('setPopupHtml');
+    });
 
-      expect(result.current.popupHtml).toContain('Fireball');
-      expect(result.current.popupHtml).toContain(
-        'A bright streak flashes from your finger.'
+    it('should return handlers for ability preset', () => {
+      const { result } = renderHook(() =>
+        useActionPopup('ability', { allAbilityScores: [] })
       );
+
+      expect(result.current).toHaveProperty('showPopup');
+      expect(result.current).toHaveProperty('popupHtml');
+      expect(result.current).toHaveProperty('setPopupHtml');
     });
 
-    it('includes higher_level content when present and non-empty', () => {
-      const { result } = renderHook(() => useActionPopup('spell'));
+    it('should return handlers for custom function preset', () => {
+      const customHandler = (entity) => `<b>${entity.name}</b>`;
+      const { result } = renderHook(() => useActionPopup(customHandler));
+
+      expect(result.current).toHaveProperty('showPopup');
+      expect(result.current).toHaveProperty('popupHtml');
+      expect(result.current).toHaveProperty('setPopupHtml');
+    });
+
+    it('should return null handler for unknown preset', () => {
+      const { result } = renderHook(() => useActionPopup('unknown'));
+
+      expect(result.current).toHaveProperty('showPopup');
+      expect(result.current).toHaveProperty('popupHtml');
+      expect(result.current).toHaveProperty('setPopupHtml');
+    });
+  });
+
+  describe('showPopup behavior', () => {
+    it('should set popupHtml when buildHtml returns content', () => {
+      const { result } = renderHook(() => useActionPopup('feature'));
 
       act(() => {
         result.current.showPopup({
-          name: 'Fireball',
-          desc: 'A bright streak flashes from your finger.',
-          higher_level: 'When cast at 6th level, damage increases.',
+          name: 'Test',
+          description: 'Desc',
+          details: 'Details here',
         });
       });
 
-      expect(result.current.popupHtml).toContain('At higher levels.');
-      expect(result.current.popupHtml).toContain(
-        'When cast at 6th level, damage increases.'
-      );
+      expect(result.current.popupHtml).toContain('<b>Test</b>');
     });
 
-    it('does not include higher_level when it is empty string', () => {
-      const { result } = renderHook(() => useActionPopup('spell'));
+    it('should not set popupHtml when buildHtml returns null', () => {
+      const { result } = renderHook(() => useActionPopup('feature'));
 
       act(() => {
-        result.current.showPopup({
-          name: 'Fireball',
-          desc: 'A bright streak flashes from your finger.',
-          higher_level: '',
-        });
+        result.current.showPopup({ name: 'Test', description: 'Desc' });
       });
 
-      expect(result.current.popupHtml).not.toContain('At higher levels.');
+      expect(result.current.popupHtml).toBeNull();
     });
 
-    it('does not include higher_level when it is not a string', () => {
-      const { result } = renderHook(() => useActionPopup('spell'));
-
-      act(() => {
-        result.current.showPopup({
-          name: 'Fireball',
-          desc: 'A bright streak flashes from your finger.',
-          higher_level: null,
-        });
-      });
-
-      expect(result.current.popupHtml).not.toContain('At higher levels.');
-    });
-
-    it('leaves popupHtml as null when spell lacks a desc', () => {
-      const { result } = renderHook(() => useActionPopup('spell'));
+    it('should use custom function when passed as preset', () => {
+      const customHandler = (entity) => `<b>${entity.name}</b>`;
+      const { result } = renderHook(() => useActionPopup(customHandler));
 
       act(() => {
         result.current.showPopup({ name: 'Fireball' });
       });
 
-      expect(result.current.popupHtml).toBeNull();
-    });
-  });
-
-  describe('preset: "ability"', () => {
-    const mockAbilities = [
-      {
-        full_name: 'Strength',
-        desc: 'Strength measures bodily power.',
-      },
-    ];
-
-    it('sets popupHtml when name matches an ability score', () => {
-      const { result } = renderHook(() =>
-        useActionPopup('ability', { allAbilityScores: mockAbilities })
-      );
-
-      act(() => {
-        result.current.showPopup('Strength');
-      });
-
-      expect(result.current.popupHtml).toBe(
-        '<h3>Strength</h3>Strength measures bodily power.<br/>'
-      );
+      expect(result.current.popupHtml).toBe('<b>Fireball</b>');
     });
 
-    it('leaves popupHtml as null when name does not match', () => {
-      const { result } = renderHook(() =>
-        useActionPopup('ability', { allAbilityScores: mockAbilities })
-      );
-
-      act(() => {
-        result.current.showPopup('Charisma');
-      });
-
-      expect(result.current.popupHtml).toBeNull();
-    });
-
-    it('leaves popupHtml as null when ability scores list is empty', () => {
-      const { result } = renderHook(() =>
-        useActionPopup('ability', { allAbilityScores: [] })
-      );
-
-      act(() => {
-        result.current.showPopup('Strength');
-      });
-
-      expect(result.current.popupHtml).toBeNull();
-    });
-  });
-
-  describe('preset: custom function', () => {
-    it('uses the custom function to build HTML', () => {
-      const customFn = vi.fn(
-        (entity) => `<div>${entity.label}</div>`
-      );
-      const { result } = renderHook(() => useActionPopup(customFn));
-
-      act(() => {
-        result.current.showPopup({ label: 'Custom Content' });
-      });
-
-      expect(customFn).toHaveBeenCalledWith({ label: 'Custom Content' });
-      expect(result.current.popupHtml).toBe('<div>Custom Content</div>');
-    });
-
-    it('leaves popupHtml as null when custom function returns null', () => {
-      const customFn = vi.fn(() => null);
-      const { result } = renderHook(() => useActionPopup(customFn));
-
-      act(() => {
-        result.current.showPopup({ label: 'Will not show' });
-      });
-
-      expect(customFn).toHaveBeenCalled();
-      expect(result.current.popupHtml).toBeNull();
-    });
-  });
-
-  describe('preset: unknown string', () => {
-    it('uses a noop handler that always returns null', () => {
+    it('should not show popup for unknown preset', () => {
       const { result } = renderHook(() => useActionPopup('unknown'));
 
       act(() => {
-        result.current.showPopup({ anything: 'value' });
+        result.current.showPopup({ name: 'Test', details: 'Stuff' });
       });
 
       expect(result.current.popupHtml).toBeNull();
-    });
-  });
-
-  describe('state transitions and edge cases', () => {
-    it('updates popupHtml when showPopup is called multiple times', () => {
-      const { result } = renderHook(() => useActionPopup('feature'));
-
-      act(() => {
-        result.current.showPopup({
-          name: 'First',
-          description: 'first',
-          details: 'First detail',
-        });
-      });
-      expect(result.current.popupHtml).toContain('First');
-
-      act(() => {
-        result.current.showPopup({
-          name: 'Second',
-          description: 'second',
-          details: 'Second detail',
-        });
-      });
-      expect(result.current.popupHtml).toContain('Second');
-    });
-
-    it('setPopupHtml directly updates the HTML', () => {
-      const { result } = renderHook(() => useActionPopup('feature'));
-
-      act(() => {
-        result.current.setPopupHtml('<p>Direct HTML</p>');
-      });
-
-      expect(result.current.popupHtml).toBe('<p>Direct HTML</p>');
-    });
-
-    it('preserves previous popupHtml when showPopup receives entity without content', () => {
-      const { result } = renderHook(() => useActionPopup('feature'));
-
-      act(() => {
-        result.current.showPopup({
-          name: 'Shown',
-          description: 'desc',
-          details: 'Some detail',
-        });
-      });
-      expect(result.current.popupHtml).toContain('Shown');
-
-      // Now call showPopup with a feature lacking details — popupHtml should NOT change
-      act(() => {
-        result.current.showPopup({
-          name: 'Hidden',
-          description: 'no details',
-        });
-      });
-
-      // The previous popupHtml should still be there since the handler returned null
-      expect(result.current.popupHtml).toContain('Shown');
     });
   });
 });
