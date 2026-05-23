@@ -1,7 +1,32 @@
 {
-  "players": [],
+  "players": [
+    {
+      "id": "monk",
+      "name": "Monk",
+      "gridX": 3,
+      "gridY": 6
+    },
+    {
+      "id": "paladin",
+      "name": "Paladin",
+      "gridX": 3,
+      "gridY": 0
+    },
+    {
+      "id": "sorcerer",
+      "name": "Sorcerer",
+      "gridX": 3,
+      "gridY": 4
+    },
+    {
+      "id": "warlock",
+      "name": "Warlock",
+      "gridX": 3,
+      "gridY": 2
+    }
+  ],
   "walls": [],
-  "gridSize": 20,
+  "gridSize": 7,
   "placedItems": [],
   "fog": [
     "0,0",
@@ -404,5 +429,6 @@
     "17,19",
     "18,19",
     "19,19"
-  ]
+  ],
+  "name": "Marching Order"
 }
