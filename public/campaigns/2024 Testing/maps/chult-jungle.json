@@ -1,7 +1,5 @@
 {
   "type": "outdoor",
-  "name": "chult-jungle",
-  "description": "## Chult Jungle Region\n\nA dense tropical jungle on the southern coast of Faerûn, known for its dangerous wildlife, ancient ruins, and mysterious atmosphere. The region is home to the hidden city of Mezro and various ancient chulan ruins.\n\n### Key Locations\n- **Mezro's Outpost Village** (hex 10,10): Small frontier settlement on the edge of the jungle\n- **Sunken Temple of Omu** (hex 15,15): Ancient chulan temple half-buried in jungle earth\n- **Jungle Hunters' Guild Camp** (hex 8,12): Base of operations for the Jungle Hunters' Guild\n- **Ancient Ruins** (hex 18,8): Partially excavated chulan ruins with murals\n- **Serpent's Lair** (hex 12,18): Cave system inhabited by giant serpents\n- **Waterfall Falls** (hex 20,12): Beautiful but dangerous waterfall with hidden cave behind it\n- **Poison Marsh** (hex 5,15): Swampy area with toxic flora and fauna\n- **Dragon's Peak** (hex 22,20): Mountain peak with dragon lair (future adventure hook)",
   "gridSize": 64,
   "terrain": {
     "5,10": "forest",
@@ -286,17 +284,90 @@
     "24,7": "water"
   },
   "pois": [
-    { "id": "village", "type": "settlement", "q": 10, "r": 10, "visible": true, "label": "Mezro's Outpost Village" },
-    { "id": "temple", "type": "dungeon", "q": 15, "r": 15, "visible": true, "label": "Sunken Temple of Omu" },
-    { "id": "guild-camp", "type": "camp", "q": 8, "r": 12, "visible": true, "label": "Jungle Hunters' Guild Camp" },
-    { "id": "ancient-ruins", "type": "loreSite", "q": 18, "r": 8, "visible": true, "label": "Ancient Chulan Ruins" },
-    { "id": "serpent-lair", "type": "dungeon", "q": 12, "r": 18, "visible": true, "label": "Serpent's Lair" },
-    { "id": "waterfall", "type": "naturalWonder", "q": 20, "r": 12, "visible": true, "label": "Waterfall Falls" },
-    { "id": "poison-marsh", "type": "hazard", "q": 5, "r": 15, "visible": true, "label": "Poison Marsh" },
-    { "id": "dragons-peak", "type": "landmark", "q": 22, "r": 20, "visible": true, "label": "Dragon's Peak" },
-    { "id": "ocean", "type": "landmark", "q": 20, "r": 5, "visible": true, "label": "Chult Coastline" }
+    {
+      "id": "village",
+      "type": "settlement",
+      "q": 10,
+      "r": 10,
+      "visible": true,
+      "label": "Mezro's Outpost Village"
+    },
+    {
+      "id": "temple",
+      "type": "dungeon",
+      "q": 15,
+      "r": 15,
+      "visible": true,
+      "label": "Sunken Temple of Omu"
+    },
+    {
+      "id": "guild-camp",
+      "type": "camp",
+      "q": 8,
+      "r": 12,
+      "visible": true,
+      "label": "Jungle Hunters' Guild Camp"
+    },
+    {
+      "id": "ancient-ruins",
+      "type": "loreSite",
+      "q": 18,
+      "r": 8,
+      "visible": true,
+      "label": "Ancient Chulan Ruins"
+    },
+    {
+      "id": "serpent-lair",
+      "type": "dungeon",
+      "q": 12,
+      "r": 18,
+      "visible": true,
+      "label": "Serpent's Lair"
+    },
+    {
+      "id": "waterfall",
+      "type": "naturalWonder",
+      "q": 20,
+      "r": 12,
+      "visible": true,
+      "label": "Waterfall Falls"
+    },
+    {
+      "id": "poison-marsh",
+      "type": "hazard",
+      "q": 5,
+      "r": 15,
+      "visible": true,
+      "label": "Poison Marsh"
+    },
+    {
+      "id": "dragons-peak",
+      "type": "landmark",
+      "q": 22,
+      "r": 20,
+      "visible": true,
+      "label": "Dragon's Peak"
+    },
+    {
+      "id": "ocean",
+      "type": "landmark",
+      "q": 20,
+      "r": 5,
+      "visible": true,
+      "label": "Chult Coastline"
+    }
   ],
-  "zoom": 1.0,
-  "panX": 0,
-  "panY": 0
+  "zoom": 3.5556726879443583,
+  "panX": 446.6838272354259,
+  "panY": 136.05280979311362,
+  "marchingOrder": [
+    "Cleric",
+    "Fighter",
+    "Rogue",
+    "Wizard"
+  ],
+  "partyPosition": {
+    "q": 15,
+    "r": 13
+  }
 }

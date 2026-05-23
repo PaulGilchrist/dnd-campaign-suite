@@ -15,6 +15,9 @@ function HexMapToolbar({
     setPoiPanelOpen,
     gridSize,
     setGridSize,
+    marchingOrderOpen,
+    setMarchingOrderOpen,
+    marchingOrder,
 }) {
     return (
         <div className="hex-map-toolbar">
@@ -61,6 +64,18 @@ function HexMapToolbar({
                 className={poiPanelOpen ? 'active' : ''}
             >
                 <i className="fa-solid fa-layer-group"></i>
+            </button>
+
+            {/* Marching order toggle */}
+            <button
+                onClick={() => setMarchingOrderOpen(!marchingOrderOpen)}
+                title={marchingOrderOpen ? 'Close marching order' : 'Manage marching order'}
+                className={marchingOrderOpen ? 'active' : ''}
+            >
+                <i className="fa-solid fa-people-group"></i>
+                {marchingOrder.length > 0 && (
+                    <span className="hex-map-poi-indicator">{marchingOrder.length}</span>
+                )}
             </button>
 
             {/* Zoom controls */}

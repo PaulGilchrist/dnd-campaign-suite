@@ -112,6 +112,27 @@
         "panY": {
             "type": "number",
             "description": "Vertical pan offset of the map view"
+        },
+        "marchingOrder": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "description": "Characters in marching order by name"
+        },
+        "partyPosition": {
+            "type": "object",
+            "properties": {
+                "hexQ": {
+                    "type": "integer",
+                    "description": "Hex axial column coordinate"
+                },
+                "hexR": {
+                    "type": "integer",
+                    "description": "Hex axial row coordinate"
+                }
+            },
+            "description": "Current party position on the hex grid"
         }
     }
 }

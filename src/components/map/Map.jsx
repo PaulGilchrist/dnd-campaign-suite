@@ -77,6 +77,9 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
     const [selectedBarrel, setSelectedBarrel] = useState(null); // { id, gridX, gridY }
     const [showRename, setShowRename] = useState(null);
 
+    // Player context menu state
+    const [selectedPlayer, setSelectedPlayer] = useState(null); // { id, name, gridX, gridY } | null
+
     // Zoom/Pan helpers
     const gridCenterX = useCallback((gridX) => gridX * CELL_SIZE + CELL_SIZE / 2, []);
     const gridCenterY = useCallback((gridY) => gridY * CELL_SIZE + CELL_SIZE / 2, []);
@@ -216,16 +219,37 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                         setFog(new Set(existing.fog));
                     }
 
-                    // If no players exist but characters are available, initialize player positions
-                    if ((!existing.players || existing.players.length === 0) && characters && characters.length > 0) {
-                        const gs = existing.gridSize || 20;
-                        const initialPlayers = characters.map((character, i) => ({
-                            id: (character.name || 'Unknown').toLowerCase(),
-                            name: character.name || 'Unknown',
-                            gridX: Math.min(1 + (i * 2) % gs, gs - 1),
-                            gridY: Math.min(1 + Math.floor((i * 2) / gs), gs - 1)
-                        }));
-                        setMapData(prev => ({ ...prev, players: initialPlayers }));
+                    // Reconcile players against current campaign characters
+                    if (characters && characters.length > 0) {
+                        const charNames = new Set(characters.map(c => c.name));
+                        const existingPlayers = existing.players || [];
+                        // Keep only players whose character still exists in the campaign
+                        let reconciled = existingPlayers.filter(p => charNames.has(p.name));
+                        // Add new characters not yet in the player list
+                        const existingNames = new Set(reconciled.map(p => p.name));
+                        const newChars = characters.filter(c => !existingNames.has(c.name));
+                        if (newChars.length > 0) {
+                            const gs = existing.gridSize || 20;
+                            const occupied = new Set(reconciled.map(p => `${p.gridX},${p.gridY}`));
+                            newChars.forEach((character) => {
+                                let gridX, gridY, key;
+                                do {
+                                    gridX = Math.floor(Math.random() * gs);
+                                    gridY = Math.floor(Math.random() * gs);
+                                    key = `${gridX},${gridY}`;
+                                } while (occupied.has(key));
+                                occupied.add(key);
+                                reconciled.push({
+                                    id: (character.name || 'Unknown').toLowerCase(),
+                                    name: character.name || 'Unknown',
+                                    gridX,
+                                    gridY
+                                });
+                            });
+                        }
+                        if (reconciled.length !== existingPlayers.length) {
+                            setMapData(prev => ({ ...prev, players: reconciled }));
+                        }
                     }
 
                     return;
@@ -443,6 +467,25 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         const dragData = e.dataTransfer.getData('text/plain');
         if (!dragData) return;
 
+        // Character drop from ItemsPanel — add player to map
+        if (dragData.startsWith('character:')) {
+            const charName = dragData.slice('character:'.length);
+            setMapData(prev => {
+                const existing = prev.players || [];
+                if (existing.some(p => p.name === charName)) return prev;
+                return {
+                    ...prev,
+                    players: [...existing, {
+                        id: charName.toLowerCase().replace(/\s+/g, '-'),
+                        name: charName,
+                        gridX: grid.gridX,
+                        gridY: grid.gridY
+                    }]
+                };
+            });
+            return;
+        }
+
         // Generic NPC drop
         if (dragData === 'npc') {
             const newItem = {
@@ -495,9 +538,18 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
         handleRotateChair,
     } = usePlacedItems(setPlacedItems, setSelectedBarrel);
 
+    const handleRemovePlayer = useCallback((playerId) => {
+        setMapData(prev => ({
+            ...prev,
+            players: (prev.players || []).filter(p => p.id !== playerId)
+        }));
+        setSelectedPlayer(null);
+    }, []);
+
     // Close context menu
     const handleCloseMenu = useCallback(() => {
         setSelectedBarrel(null);
+        setSelectedPlayer(null);
     }, []);
 
     const { npcImages, setNpcImages } = useNpcImageCache(placedItems);
@@ -513,7 +565,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
 
     // Outdoor map dispatcher — render HexMap for outdoor terrain maps
     if (mapData?.type === 'outdoor') {
-        return <HexMap campaignName={campaignName} mapName={mapName} onBack={onBack} />;
+        return <HexMap campaignName={campaignName} mapName={mapName} onBack={onBack} characters={characters} />;
     }
 
     const { players, walls } = mapData;
@@ -589,6 +641,8 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     fog={fog}
                     dragging={dragging}
                     handlePointerDown={handlePointerDown}
+                    selectedPlayer={selectedPlayer}
+                    setSelectedPlayer={setSelectedPlayer}
                 />
 
                 {/* Placed items */}
@@ -633,6 +687,39 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     setShowRename={setShowRename}
                     setSelectedBarrel={setSelectedBarrel}
                 />
+
+                {/* Player context menu */}
+                {selectedPlayer && (() => {
+                    const menuX = gridCenterX(selectedPlayer.gridX) + 10;
+                    const menuY = gridCenterY(selectedPlayer.gridY) + 10;
+                    return (
+                        <g className="barrel-context-menu" onClick={(e) => e.stopPropagation()}>
+                            <g>
+                                <rect x={menuX} y={menuY} width="120" height="36" rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
+                                <text
+                                    x={menuX + 8}
+                                    y={menuY + 24}
+                                    fill="#ccc"
+                                    fontSize="11"
+                                    className="menu-option"
+                                    onClick={() => handleRemovePlayer(selectedPlayer.id)}
+                                >
+                                    Remove from Map
+                                </text>
+                                <text
+                                    x={menuX + 108}
+                                    y={menuY + 12}
+                                    fill="#999"
+                                    fontSize="10"
+                                    className="menu-close"
+                                    onClick={() => setSelectedPlayer(null)}
+                                >
+                                    ✕
+                                </text>
+                            </g>
+                        </g>
+                    );
+                })()}
             </svg>
 
             {/* Items panel sidebar */}
@@ -642,6 +729,8 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     placedItems={placedItems}
                     onToggleItemVisibility={handleToggleItemVisibility}
                     onClose={() => setItemsPanelOpen(false)}
+                    characters={characters}
+                    players={players}
                 />
             )}
         </div>

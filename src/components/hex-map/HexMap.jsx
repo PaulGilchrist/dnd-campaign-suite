@@ -12,6 +12,8 @@ import HexMapToolbar from './HexMapToolbar.jsx';
 import POILayer from './POILayer.jsx';
 import POIPanel from './POIPanel.jsx';
 import POIContextMenu from './POIContextMenu.jsx';
+import MarchingOrderPanel from './MarchingOrderPanel.jsx';
+import PartyMarkerLayer from './PartyMarkerLayer.jsx';
 import SettlementSVG from './svg/SettlementSVG.jsx';
 import DungeonSVG from './svg/DungeonSVG.jsx';
 import CampSVG from './svg/CampSVG.jsx';
@@ -22,12 +24,17 @@ import NaturalWonderSVG from './svg/NaturalWonderSVG.jsx';
 import LandmarkSVG from './svg/LandmarkSVG.jsx';
 import './HexMap.css';
 
-function HexMap({ campaignName, mapName, onBack }) {
+function HexMap({ campaignName, mapName, onBack, characters = [] }) {
     const [loading, setLoading] = useState(true);
     const [mapData, setMapData] = useState(null);       // full map data object from server
     const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE); // hex grid dimensions
     const [terrain, setTerrain] = useState({});          // Record<hexKey, terrainType>
     const [pois, setPois] = useState([]);                // array of POI objects
+
+    // Marching order state
+    const [marchingOrder, setMarchingOrder] = useState([]);  // ordered character names
+    const [partyPosition, setPartyPosition] = useState(null); // {hexQ, hexR} | null
+    const [marchingOpen, setMarchingOpen] = useState(false);  // panel toggle
 
     // Tool state
     const [tool, setTool] = useState(TOOL_NONE);         // current tool mode
@@ -85,7 +92,7 @@ function HexMap({ campaignName, mapName, onBack }) {
     }, []);
 
     const resetView = useCallback(() => {
-        setZoom(1);
+        setZoom(2);
         setPanX(-(HEX_SIZE * Math.sqrt(3) / 2));
         setPanY(-HEX_SIZE);
     }, []);
@@ -214,13 +221,28 @@ function HexMap({ campaignName, mapName, onBack }) {
     const handleDrop = useCallback((e) => {
         e.preventDefault();
         const dragData = e.dataTransfer.getData('text/plain');
-        // Check if it's a POI type
-        const poiType = POI_TYPES.find(t => t.id === dragData);
-        if (!poiType) return;
+        if (!dragData) return;
 
         const hex = getHexFromEvent(e);
         if (!hex) return;
         if (hex.q < 0 || hex.q >= gridSize || hex.r < 0 || hex.r >= gridSize) return;
+
+        // Handle character drops from POI panel
+        if (dragData.startsWith('character:')) {
+            const charName = dragData.slice('character:'.length);
+            // Add character to marching order if not already present
+            setMarchingOrder(prev => {
+                if (prev.includes(charName)) return prev;
+                return [...prev, charName];
+            });
+            // Place party marker at drop position if none exists
+            setPartyPosition(prev => prev || { q: hex.q, r: hex.r });
+            return;
+        }
+
+        // Check if it's a POI type
+        const poiType = POI_TYPES.find(t => t.id === dragData);
+        if (!poiType) return;
 
         // Check if a POI already exists at this hex
         const exists = pois.some(p => p.q === hex.q && p.r === hex.r);
@@ -342,6 +364,20 @@ function HexMap({ campaignName, mapName, onBack }) {
                     setZoom(loadedZoom);
                     setPanX(loadedPanX);
                     setPanY(loadedPanY);
+
+                    // Initialize marching order from characters if empty
+                    const loadOrder = existing.marchingOrder ||
+                        (characters.length > 0 ? characters.map(c => c.name) : []);
+                    setMarchingOrder(loadOrder);
+
+                    // Auto-place party at map center if no saved position
+                    if (existing.partyPosition) {
+                        setPartyPosition(existing.partyPosition);
+                    } else {
+                        const center = Math.floor(loadedGridSize / 2);
+                        setPartyPosition({ q: center, r: center });
+                    }
+
                     hasLoaded.current = true;
                     setLoading(false);
                     return;
@@ -358,6 +394,11 @@ function HexMap({ campaignName, mapName, onBack }) {
                 }
             }
 
+            const initialOrder = characters.length > 0 ? characters.map(c => c.name) : [];
+            const initialPartyPos = initialOrder.length > 0
+                ? { q: Math.floor(DEFAULT_GRID_SIZE / 2), r: Math.floor(DEFAULT_GRID_SIZE / 2) }
+                : null;
+
             const newData = {
                 type: 'outdoor',
                 gridSize: DEFAULT_GRID_SIZE,
@@ -365,12 +406,16 @@ function HexMap({ campaignName, mapName, onBack }) {
                 pois: [],
                 zoom: 1,
                 panX: -(HEX_SIZE * Math.sqrt(3) / 2),
-                panY: -HEX_SIZE
+                panY: -HEX_SIZE,
+                marchingOrder: initialOrder,
+                partyPosition: initialPartyPos
             };
 
             setMapData(newData);
             setTerrain(initialTerrain);
             setGridSize(DEFAULT_GRID_SIZE);
+            setMarchingOrder(initialOrder);
+            setPartyPosition(initialPartyPos);
 
             // Save the new map data
             try {
@@ -398,11 +443,13 @@ function HexMap({ campaignName, mapName, onBack }) {
             pois,
             zoom,
             panX,
-            panY
+            panY,
+            marchingOrder,
+            partyPosition
         };
         mapsService.saveMapData(campaignName, mapName, dataToSave)
             .catch(err => console.error('Failed to save hex map data:', err));
-    }, [campaignName, mapName, terrain, pois, gridSize, zoom, panX, panY]);
+    }, [campaignName, mapName, terrain, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition]);
 
     // ─── Sync state to refs for use in event handlers ──────────────────
 
@@ -430,6 +477,9 @@ function HexMap({ campaignName, mapName, onBack }) {
                 setPoiPanelOpen={setPoiPanelOpen}
                 gridSize={gridSize}
                 setGridSize={setGridSize}
+                marchingOrderOpen={marchingOpen}
+                setMarchingOrderOpen={setMarchingOpen}
+                marchingOrder={marchingOrder}
             />
 
             {loading ? (
@@ -499,6 +549,13 @@ function HexMap({ campaignName, mapName, onBack }) {
                         poiDragging={poiDragging}
                         poiHover={null}
                     />
+                    <PartyMarkerLayer
+                        position={partyPosition}
+                        HEX_SIZE={HEX_SIZE}
+                        gridSize={gridSize}
+                        onPositionChange={setPartyPosition}
+                        svgRef={svgRef}
+                    />
 
                     {/* Hovered hex highlight (only when paint/erase active) */}
                     {hoveredHex && (tool === TOOL_PAINT || tool === TOOL_ERASE) && (() => {
@@ -529,11 +586,22 @@ function HexMap({ campaignName, mapName, onBack }) {
                 </svg>
             )}
 
+            {/* Marching Order Panel overlay */}
+            {marchingOpen && (
+                <MarchingOrderPanel
+                    marchingOrder={marchingOrder}
+                    setMarchingOrder={setMarchingOrder}
+                    characters={characters}
+                    onClose={() => setMarchingOpen(false)}
+                />
+            )}
+
             {/* POI Panel overlay */}
             {poiPanelOpen && (
                 <POIPanel
                     poiPanelOpen={poiPanelOpen}
                     onClose={() => setPoiPanelOpen(false)}
+                    characters={characters}
                 />
             )}
         </div>

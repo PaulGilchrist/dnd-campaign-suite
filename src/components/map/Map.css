@@ -117,6 +117,13 @@
     stroke-width: 3;
 }
 
+/* Selected state (context menu) */
+.map .creature-circle.selected {
+    stroke: #FFD700;
+    stroke-width: 3;
+    filter: drop-shadow(0 0 4px rgba(255,215,0,0.5));
+}
+
 /* Creature initial (no image) */
 .map .creature-initial {
     pointer-events: none;
@@ -156,6 +163,11 @@
 [data-theme="light"] .map .creature-circle.dragging {
     fill: #ff6b6b;
     stroke: #c0392b;
+}
+
+[data-theme="light"] .map .creature-circle.selected {
+    stroke: #B8860B;
+    stroke-width: 3;
 }
 
 [data-theme="light"] .map .creature-name {
@@ -202,6 +214,11 @@
     .map .creature-circle.dragging {
         fill: #ff6b6b;
         stroke: #c0392b;
+    }
+
+    .map .creature-circle.selected {
+        stroke: #B8860B;
+        stroke-width: 3;
     }
 
     .map .creature-name {
@@ -544,6 +561,56 @@
     .map .items-panel-npc-toggle:hover {
         color: #333;
     }
+}
+
+/* Items panel characters section */
+.map .items-panel-section {
+    border-top: 1px solid #444;
+    padding-top: 8px;
+    margin-top: 4px;
+}
+
+.map .items-panel-section-title {
+    margin: 4px 0 6px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #4a90d9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.map .items-panel-char {
+    cursor: grab;
+    border-color: #3a5a7a;
+}
+
+.map .items-panel-char:hover {
+    border-color: #4a90d9;
+    background: #2a3a4a;
+}
+
+.map .items-panel-char-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.map .items-panel-char-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.map .items-panel-char-initial {
+    color: #ccc;
+    font-size: 13px;
+    font-weight: bold;
 }
 
 /* NPC group */

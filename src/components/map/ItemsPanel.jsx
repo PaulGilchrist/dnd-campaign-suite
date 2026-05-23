@@ -18,19 +18,14 @@ import TorchSVG from './TorchSVG.jsx';
 import TrapSVG from './TrapSVG.jsx';
 import WebSVG from './WebSVG.jsx';
 
-function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClose }) {
+function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClose, characters = [], players = [] }) {
     const createDragGhost = (e) => {
         const svgEl = e.currentTarget.querySelector('svg');
         if (!svgEl) return;
 
-        // Clone the SVG so we don't modify the one in the DOM tree
         const clonedSvg = svgEl.cloneNode(true);
-
-        // Get original dimensions (fallback to 36×36 if not set)
         const origW = parseInt(svgEl.getAttribute('width'), 10) || 36;
         const origH = parseInt(svgEl.getAttribute('height'), 10) || 36;
-
-        // Scale to a reasonable drag ghost size (max 48px in any dimension, maintain aspect ratio)
         const maxSize = 48;
         const scale = Math.min(maxSize / Math.max(origW, origH), 1);
         const ghostW = Math.round(origW * scale);
@@ -39,7 +34,6 @@ function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClo
         clonedSvg.setAttribute('width', ghostW);
         clonedSvg.setAttribute('height', ghostH);
 
-        // Create temporary container for the ghost
         const ghost = document.createElement('div');
         ghost.style.position = 'absolute';
         ghost.style.top = '-9999px';
@@ -50,7 +44,45 @@ function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClo
         setTimeout(() => document.body.removeChild(ghost), 0);
     };
 
+    const createCharDragGhost = (e, charName) => {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('width', '40');
+        svg.setAttribute('height', '40');
+        svg.setAttribute('viewBox', '0 0 40 40');
+
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', '20');
+        circle.setAttribute('cy', '20');
+        circle.setAttribute('r', '18');
+        circle.setAttribute('fill', '#4a90d9');
+        circle.setAttribute('stroke', '#2c5f8a');
+        circle.setAttribute('stroke-width', '2');
+        svg.appendChild(circle);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', '20');
+        text.setAttribute('y', '25');
+        text.setAttribute('textAnchor', 'middle');
+        text.setAttribute('fill', '#fff');
+        text.setAttribute('font-size', '18');
+        text.setAttribute('font-weight', 'bold');
+        text.textContent = charName.charAt(0).toUpperCase();
+        svg.appendChild(text);
+
+        const ghost = document.createElement('div');
+        ghost.style.position = 'absolute';
+        ghost.style.top = '-9999px';
+        ghost.style.left = '-9999px';
+        ghost.appendChild(svg);
+        document.body.appendChild(ghost);
+        e.dataTransfer.setDragImage(ghost, 20, 20);
+        setTimeout(() => document.body.removeChild(ghost), 0);
+    };
+
     if (!itemsPanelOpen) return null;
+
+    const playerNames = new Set(players.map(p => p.name));
+    const missingChars = characters.filter(c => !playerNames.has(c.name));
 
     return (
         <div className="items-panel">
@@ -322,6 +354,34 @@ function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClo
                     <span>Treasure Chest</span>
                 </div>
             </div>
+
+            {missingChars.length > 0 && (
+                <div className="items-panel-section">
+                    <div className="items-panel-section-title">Characters</div>
+                    <div className="items-panel-content">
+                        {missingChars.map(char => (
+                            <div
+                                key={char.name}
+                                className="items-panel-item items-panel-char"
+                                draggable
+                                onDragStart={(e) => {
+                                    e.dataTransfer.setData('text/plain', `character:${char.name}`);
+                                    createCharDragGhost(e, char.name);
+                                }}
+                            >
+                                <div className="items-panel-char-avatar">
+                                    {char.imagePath ? (
+                                        <img src={char.imagePath} alt={char.name} className="items-panel-char-img" />
+                                    ) : (
+                                        <span className="items-panel-char-initial">{char.name.charAt(0).toUpperCase()}</span>
+                                    )}
+                                </div>
+                                <span>{char.name}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -2,7 +2,7 @@ import React from 'react';
 
 const RADIUS = 20;
 
-const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown }) => {
+const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, fog, dragging, handlePointerDown, selectedPlayer, setSelectedPlayer }) => {
     const getPlayerImage = (player, characters) => {
         if (!characters || !player) return null;
         const character = characters.find((c) => c.name === player.name);
@@ -15,6 +15,7 @@ const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, f
                 const cx = gridCenterX(player.gridX);
                 const cy = gridCenterY(player.gridY);
                 const img = getPlayerImage(player, characters);
+                const isSelected = selectedPlayer?.id === player.id;
                 // Hide creature from players if cell is fogged
                 if (!isLocalhost && fog?.has(`${player.gridX},${player.gridY}`)) return null;
 
@@ -34,8 +35,27 @@ const Players = ({ players, characters, gridCenterX, gridCenterY, isLocalhost, f
                             cx={cx}
                             cy={cy}
                             r={RADIUS}
-                            className={`creature-circle ${dragging?.creatureId === player.id ? 'dragging' : ''}`}
+                            className={`creature-circle ${dragging?.creatureId === player.id ? 'dragging' : ''} ${isSelected ? 'selected' : ''}`}
+                            onContextMenu={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setSelectedPlayer(player);
+                            }}
                         />
+                        {isSelected && (
+                            <rect
+                                x={cx - RADIUS - 3}
+                                y={cy - RADIUS - 3}
+                                width={(RADIUS + 3) * 2}
+                                height={(RADIUS + 3) * 2}
+                                fill="none"
+                                stroke="#FFD700"
+                                strokeWidth={2}
+                                rx={4}
+                                strokeDasharray="4 2"
+                                pointerEvents="none"
+                            />
+                        )}
                         {img ? (
                             <image
                                 xlinkHref={img}
