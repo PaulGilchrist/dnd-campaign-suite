@@ -159,7 +159,7 @@ function elevationMoistureToTerrain(elevation, moisture) {
     return 'desert';
   }
 
-  if (elevation > 0.35) {
+  if (elevation > 0.28) {
     if (moisture > 0.6) return 'swamp';
     if (moisture > 0.3) return 'plains';
     return 'desert';
@@ -232,7 +232,7 @@ function fillLakes(terrain, elevationMap, gridSize) {
     }
   }
 
-  const waterThreshold = 0.5;
+  const waterThreshold = 0.4;
   for (let r = 0; r < gridSize; r++) {
     for (let q = 0; q < gridSize; q++) {
       const key = hexKey(q, r);
