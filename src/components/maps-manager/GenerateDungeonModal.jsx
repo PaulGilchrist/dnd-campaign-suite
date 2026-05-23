@@ -6,8 +6,6 @@ import './GenerateDungeonModal.css';
 function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCreated }) {
     const [mapName, setMapName] = useState(initialMapName || '');
     const [gridSize, setGridSize] = useState(20);
-    const [corridorWidth, setCorridorWidth] = useState(1);
-    const [generateDoors, setGenerateDoors] = useState(true);
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState(null);
 
@@ -27,17 +25,13 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
 
         try {
             const seed = Math.floor(Math.random() * 2147483647);
-            const result = generateDungeon(safeGridSize, {
-                corridorWidth,
-                generateDoors,
+            const result = generateDungeon({
+                gridSize: safeGridSize,
                 seed,
             });
 
-            await mapsService.createMap(campaignName, name, {
-                gridSize: safeGridSize,
-                walls: result.walls,
-                placedItems: result.placedItems,
-            });
+            const { name: _generatedName, ...mapData } = result;
+            await mapsService.createMap(campaignName, name, mapData);
 
             onMapCreated();
             onClose();
@@ -81,40 +75,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                         </span>
                     </label>
 
-                    <div className="dungeon-gen-field">
-                        <span>Corridor Width</span>
-                        <div className="dungeon-gen-toggle">
-                            <label className={`dungeon-gen-option ${corridorWidth === 1 ? 'active' : ''}`}>
-                                <input
-                                    type="radio"
-                                    name="corridorWidth"
-                                    value={1}
-                                    checked={corridorWidth === 1}
-                                    onChange={() => setCorridorWidth(1)}
-                                />
-                                5 ft (1 square)
-                            </label>
-                            <label className={`dungeon-gen-option ${corridorWidth === 2 ? 'active' : ''}`}>
-                                <input
-                                    type="radio"
-                                    name="corridorWidth"
-                                    value={2}
-                                    checked={corridorWidth === 2}
-                                    onChange={() => setCorridorWidth(2)}
-                                />
-                                10 ft (2 squares)
-                            </label>
-                        </div>
-                    </div>
 
-                    <label className="dungeon-gen-field dungeon-gen-checkbox">
-                        <input
-                            type="checkbox"
-                            checked={generateDoors}
-                            onChange={e => setGenerateDoors(e.target.checked)}
-                        />
-                        <span>Place Doors at Doorways</span>
-                    </label>
                 </div>
                 <div>
                     Note: This is meant to be just a starting point for you to finish into a fully flushed out map<br/>

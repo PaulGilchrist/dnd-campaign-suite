@@ -52,7 +52,7 @@ router.get('/api/campaigns/:campaign/maps', (req, res) => {
 // POST /api/campaigns/:campaign/maps - Create a new map
 router.post('/api/campaigns/:campaign/maps', (req, res) => {
   const { campaign } = req.params;
-  const { name, gridSize, walls, placedItems, paintCells, items, players, type = 'indoor', terrain = {}, pois = [] } = req.body;
+  const { name, gridSize, walls, placedItems, paintCells, items, players, fog, type = 'indoor', terrain = {}, pois = [] } = req.body;
   
   if (!name || name.trim() === '') {
     return res.status(400).json({ error: 'Map name is required' });
@@ -81,6 +81,7 @@ router.post('/api/campaigns/:campaign/maps', (req, res) => {
       paintCells: paintCells ?? [],
       items: items ?? [],
       players: players ?? [],
+      fog: fog ?? [],
       terrain,
       pois,
       zoom: 1,

@@ -219,34 +219,11 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                         setFog(new Set(existing.fog));
                     }
 
-                    // Reconcile players against current campaign characters
+                    // Remove players whose characters no longer exist in the campaign
                     if (characters && characters.length > 0) {
                         const charNames = new Set(characters.map(c => c.name));
                         const existingPlayers = existing.players || [];
-                        // Keep only players whose character still exists in the campaign
-                        let reconciled = existingPlayers.filter(p => charNames.has(p.name));
-                        // Add new characters not yet in the player list
-                        const existingNames = new Set(reconciled.map(p => p.name));
-                        const newChars = characters.filter(c => !existingNames.has(c.name));
-                        if (newChars.length > 0) {
-                            const gs = existing.gridSize || 20;
-                            const occupied = new Set(reconciled.map(p => `${p.gridX},${p.gridY}`));
-                            newChars.forEach((character) => {
-                                let gridX, gridY, key;
-                                do {
-                                    gridX = Math.floor(Math.random() * gs);
-                                    gridY = Math.floor(Math.random() * gs);
-                                    key = `${gridX},${gridY}`;
-                                } while (occupied.has(key));
-                                occupied.add(key);
-                                reconciled.push({
-                                    id: (character.name || 'Unknown').toLowerCase(),
-                                    name: character.name || 'Unknown',
-                                    gridX,
-                                    gridY
-                                });
-                            });
-                        }
+                        const reconciled = existingPlayers.filter(p => charNames.has(p.name));
                         if (reconciled.length !== existingPlayers.length) {
                             setMapData(prev => ({ ...prev, players: reconciled }));
                         }
@@ -258,28 +235,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                 console.log('Map data not found, initializing empty map');
             }
 
-            // Generate random positions with no collision
-            const players = characters.map((character) => ({
-                id: (character.name || 'Unknown').toLowerCase(),
-                name: utils.getFirstName(character.name),
-                gridX: 0,
-                gridY: 0
-            }));
-
-            const occupied = new Set();
-            players.forEach((player) => {
-                let gridX, gridY, key;
-                do {
-                    gridX = Math.floor(Math.random() * gridSize); // 0–12
-                    gridY = Math.floor(Math.random() * gridSize); // 0–12
-                    key = `${gridX},${gridY}`;
-                } while (occupied.has(key));
-                occupied.add(key);
-                player.gridX = gridX;
-                player.gridY = gridY;
-            });
-
-            const newData = { players, walls: new Set() };
+            const newData = { players: [], walls: new Set() };
 
             // Fog all cells for new map
             const allFogged = new Set();

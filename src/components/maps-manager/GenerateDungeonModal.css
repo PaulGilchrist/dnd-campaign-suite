@@ -52,49 +52,6 @@
     margin-top: 2px;
 }
 
-.maps-manager-modal-overlay .dungeon-gen-toggle {
-    display: flex;
-    gap: 8px;
-    margin-top: 4px;
-}
-
-.maps-manager-modal-overlay .dungeon-gen-option {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    border: 1px solid var(--border-color-input);
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-    color: var(--color-text);
-    background: var(--background-color-input);
-    transition: border-color 0.15s, background 0.15s;
-}
-
-.maps-manager-modal-overlay .dungeon-gen-option.active {
-    border-color: var(--color-primary);
-    background: var(--background-color-selected);
-}
-
-.maps-manager-modal-overlay .dungeon-gen-option input[type="radio"] {
-    display: none;
-}
-
-.maps-manager-modal-overlay .dungeon-gen-checkbox {
-    flex-direction: row !important;
-    align-items: center;
-    gap: 8px !important;
-    cursor: pointer;
-}
-
-.maps-manager-modal-overlay .dungeon-gen-checkbox input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    accent-color: var(--color-primary);
-    cursor: pointer;
-}
-
 .maps-manager-modal-overlay .dungeon-gen-generate-btn {
     background: var(--color-primary) !important;
     color: var(--color-text-inverse) !important;
