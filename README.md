@@ -70,8 +70,6 @@ Creating a character doesn't have to be overwhelming. The app guides you step by
 
 Your character sheet works two ways:
 
-<img src="public/character-sheet.png" alt="Character Sheet" width="400" />
-
 **On Screen (Digital Mode):**
 Your sheet becomes a **living document** that updates as you play. Click to see details, track resources, and share everything in real time with your party.
 
@@ -127,6 +125,10 @@ The app is carefully designed to create **beautiful, well-organized character sh
 - **Magic items** — See your magic items with type, rarity, attunement status, and full descriptions
 - **Search equipment** — Browse the full equipment list by category during character creation
 
+**Example character sheet**
+
+<img src="public/character-sheet.png" alt="Character Sheet" width="500" />
+
 ### ⚔️ **Combat Tracking System**
 
 When battle erupts, the app becomes your **tactical command center**:
@@ -149,7 +151,7 @@ When battle erupts, the app becomes your **tactical command center**:
 **Battle Notes:**
 - Add notes to any creature (track conditions, remember tactics, etc.)
 
-<img src="public/initiative.jpeg" alt="Combat Tracking" width="600" />
+<img src="public/initiative.png" alt="Combat Tracking" width="600" />
 
 ### 🏰 **Campaign Tools (GM Features)**
 
@@ -168,12 +170,12 @@ The app includes powerful tools for Dungeon Masters to manage their campaigns:
 - Drag-and-drop creatures and items
 - 20+ SVG furniture and prop types (barrels, chests, tables, doors, traps, torches, and more)
 
-  <img src="public/map-outdoor-example.jpg" alt="Map Example" width="600" />
+  <img src="public/map-outdoor-example.png" alt="Map Example" width="600" />
 
 **🏚️ Procedural Dungeon Generator**
 - Generate random dungeon maps with configurable grid size, corridor width, and door placement — perfect for inspiration or quick sessions
 
-   <img src="public/map-example.jpg" alt="Map Example" width="600" />
+   <img src="public/map-indoor-example.png" alt="Map Example" width="600" />
 
 **📝 Campaign Notes**
 - Record story details, clues, and important information for your campaign
