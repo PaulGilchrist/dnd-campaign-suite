@@ -73,6 +73,12 @@
         "name": "Feather Fall (1/Day)",
         "description": "The aarakocra casts <strong>Feather Fall</strong> in response to that spell's trigger, using the same spellcasting ability as Spellcasting."
       }
+    ],
+    "environments": [
+      "mountain"
+    ],
+    "enemies": [
+      "gargoyle"
     ]
   },
   {
@@ -135,6 +141,12 @@
         "damage": "5 (1d6 + 2) Piercing damage plus 2 (1d4) Thunder damage",
         "damage_dice": "1d6 + 2"
       }
+    ],
+    "environments": [
+      "mountain"
+    ],
+    "enemies": [
+      "gargoyle"
     ]
   },
   {
@@ -216,6 +228,10 @@
         "name": "Counterspell (2/Day)",
         "description": "The cultist casts <em>Counterspell</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting."
       }
+    ],
+    "environments": [
+      "underdark",
+      "urban"
     ]
   },
   {
@@ -330,7 +346,10 @@
       }
     ],
     "lair_actions": "Aboleths usually dwell in submerged ruins and caverns. They keep air-filled spaces for their terrestrial servants and to hold treasures that would be damaged by water.<br/><br/>The region containing an aboleth's lair is warped by it, creating the following effects:<br/><br/><b>Foul Water.</b> Water sources within 1 mile of the lair are supernaturally fouled. Creatures other than the aboleth and its allies that drink such water must succeed on a DC 15 Constitution saving throw or have the Poisoned condition for 1 hour.<br/><b>Psionic Projection.</b> While in its lair, the aboleth can cast ProjectImage, requiring no spell components and using Intelligence as the spellcasting ability (spell save DC 16). When casting the spell this way, the spell's range is 1 mile, and the aboleth can use its telepathy as if it were in the illusion's space.<br/><br/>If the aboleth dies or moves its lair elsewhere, these effects end immediately.<br/><br/>'The lies we call reason are fragile things, vulnerable and raw on the shores of eons. But in the dream-vaults of dread ancients roil seas of terrifying truth. Our age is an island, and the ebb of primordial tides avows the Stygian wave.'<br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "abominable-yeti",
@@ -425,6 +444,9 @@
         "damage_dice": "10d8",
         "recharge": "6"
       }
+    ],
+    "environments": [
+      "underdark"
     ]
   },
   {
@@ -540,7 +562,10 @@
       }
     ],
     "lair_actions": "Black dragons lurk in dismal ruins, polluted bogs, or other sites gripped by decay.<br/><br/>The region containing an adult or ancient black dragon's lair is warped by its presence, creating the following effects:<br/><br/><b>Acrid Haze.</b> Odorous and stifling fog covers the area within 1 mile of the lair, rendering that area Lightly Obscured. Travel for creatures other than the dragon and its allies takes twice the usual time in that area.<br/><b>Foul Water.</b> Water sources within 1 mile of the lair are supernaturally fouled. A creature that drinks such water must succeed on a DC 15 Constitution saving throw or have the Poisoned condition for 1 hour.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "adult-blue-dragon",
@@ -646,8 +671,11 @@
         "description": "The dragon makes one Rend attack."
       }
     ],
-    "lair_actions": "Blue dragons dwell in arid lands. Their lairs might be death traps meant to entomb invaders or ostentatious fortresses where they plot domination.<br/><br/>The region containing an adult or ancient blue dragon'’'s lair is changed by its presence, creating the following effects:<br/><br/><b>Sinkholes.</b> Sinkholes form more frequently in the area within 1 mile of the lair. Whenever a creature in that area other than the dragon and its allies finishes a Long Rest, roll 1d20. On a 1, a sinkhole opens beneath the creature, and the creature must succeed on a DC 15 Dexterity saving throw or fall 2d4 x 10 feet into the sinkhole.<br/><b>Spiteful Storms.</b> Dust devils and thunderstorms rage within 1 mile of the lair. The area is Lightly Obscured.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/><br/>",
-    "image": true
+    "lair_actions": "Blue dragons dwell in arid lands. Their lairs might be death traps meant to entomb invaders or ostentatious fortresses where they plot domination.<br/><br/>The region containing an adult or ancient blue dragon'\u2019's lair is changed by its presence, creating the following effects:<br/><br/><b>Sinkholes.</b> Sinkholes form more frequently in the area within 1 mile of the lair. Whenever a creature in that area other than the dragon and its allies finishes a Long Rest, roll 1d20. On a 1, a sinkhole opens beneath the creature, and the creature must succeed on a DC 15 Dexterity saving throw or fall 2d4 x 10 feet into the sinkhole.<br/><b>Spiteful Storms.</b> Dust devils and thunderstorms rage within 1 mile of the lair. The area is Lightly Obscured.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/><br/>",
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "adult-brass-dragon",
@@ -769,8 +797,11 @@
         "damage_dice": "6d8"
       }
     ],
-    "lair_actions":"Brass dragons usually dwell in secret caves and canyons near well-traveled routes.<br/><br/>The area containing an adult or ancient brass dragon's lair is altered by its presence, creating the following effects:<br/><br/><b>Mirages.</b> While in its lair, the dragon can cast MajorImage, requiring no Material components and using the same spellcasting ability as its Spellcasting action. When casting the spell this way, the spell's range is 1 mile, and the dragon doesn't need to see the spot where the illusion appears.<br/><b>Refreshing Water.</b> Water within 1 mile of the lair is magically refreshing. A creature that drinks such water gains 2d4 Temporary Hit Points, and the dragon is immediately aware of the creature's presence.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "lair_actions": "Brass dragons usually dwell in secret caves and canyons near well-traveled routes.<br/><br/>The area containing an adult or ancient brass dragon's lair is altered by its presence, creating the following effects:<br/><br/><b>Mirages.</b> While in its lair, the dragon can cast MajorImage, requiring no Material components and using the same spellcasting ability as its Spellcasting action. When casting the spell this way, the spell's range is 1 mile, and the dragon doesn't need to see the spot where the illusion appears.<br/><b>Refreshing Water.</b> Water within 1 mile of the lair is magically refreshing. A creature that drinks such water gains 2d4 Temporary Hit Points, and the dragon is immediately aware of the creature's presence.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "adult-bronze-dragon",
@@ -893,7 +924,10 @@
       }
     ],
     "lair_actions": "Bronze dragons usually make their homes near or under the sea.<br/><br/>The region containing an adult or ancient bronze dragon's lair is changed by its presence, creating the following effects:<br/><br/><b>Buoying Currents.</b> Creatures within 1 mile of the lair that lack a Swim Speed ignore the extra cost of movement while swimming.<br/><b>Sun and Storms.</b> While in its lair, the dragon can cast Control Weather, requiring no Material components and using the same spellcasting ability as its Spellcasting action. When casting the spell this way, the dragon can control the weather within 1 mile of its lair, regardless if the dragon is inside or outside.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "adult-copper-dragon",
@@ -1013,7 +1047,10 @@
       }
     ],
     "lair_actions": "Copper dragons typically inhabit multichamber caves and renovated ruins.<br/><br/>The region containing an adult or ancient copper dragon's lair is changed by its presence, creating the following effects:<br/><br/><b>Chatty Critters.</b> Tiny Beasts magically gain the ability to speak and understand Draconic while within 6 miles of the lair.<br/><b>Giggle Fits.</b> Whenever a creature other than the dragon and its allies is within 1 mile of the lair and rolls a 1 on a D20 Test, it must succeed on a DC 15 Wisdom saving throw or have the Incapacitated condition until the end of its next turn, as it is wracked with laughter.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "adult-gold-dragon",
@@ -1139,7 +1176,10 @@
       }
     ],
     "lair_actions": "Gold dragons make their homes in places of natural and magical wonder.<br/><br/>The region containing an adult or ancient gold dragon's lair is altered by its presence, creating the following effects:<br/><br/><b>Dream Messenger.</b> While in its lair, the dragon can cast Dream, requiring no Material components and using Charisma as the spellcasting ability. When casting the spell this way, the dragon can target any creature within 6 miles.<br/><b>Foretelling Fog.</b> The area within 1 mile of the lair is Lightly Obscured by opalescent fog. While in that area, creatures can't be surprised, as the fog swirls into shapes that warn of danger.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "adult-green-dragon",
@@ -1248,7 +1288,7 @@
       },
       {
         "name": "Noxious Miasma",
-        "description": "Constitution Saving Throw: DC 17, each creature in a 20-foot-radius <strong>Sphere</strong> centered on a point the dragon can see within 90 feet. <strong>Failure:</strong> 7 (2d6) Poison damage, and the target takes a −2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
+        "description": "Constitution Saving Throw: DC 17, each creature in a 20-foot-radius <strong>Sphere</strong> centered on a point the dragon can see within 90 feet. <strong>Failure:</strong> 7 (2d6) Poison damage, and the target takes a \u22122 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
         "save_dc": 17,
         "save_type": "Constitution",
         "damage": "7 (2d6) Poison damage",
@@ -1260,7 +1300,10 @@
       }
     ],
     "lair_actions": "Green dragons lair in ancient forests, often shaping stands of massive trees into compounds of interwoven branches, hollow trunks, and caverns amid mighty roots. They might also dwell amid forested ruins, particularly the former homes of those they've conquered.<br/><br/>The region containing an adult or ancient green dragon's lair is warped by its presence, creating the following effects:<br/><br/><b>Beast Spies.</b> Tiny Beasts magically gain the ability to understand Draconic and can communicate telepathically with the dragon while within 1 mile of the lair.<br/><b>Poisonous Thicket.</b> Ordinary plants growing within 1 mile of the lair poison the air around them. Whenever a creature other than the dragon or its allies finishes a Long Rest in that area, it must succeed on a DC 15 Constitution saving throw or have the Poisoned condition for 1 hour.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "adult-red-dragon",
@@ -1367,7 +1410,10 @@
       }
     ],
     "lair_actions": "Red dragons make their lairs in smoldering, unapproachable places such as volcanic mountains, burning wastelands, and ruins they've stolen from other creatures.<br/><br/>The region containing an adult or ancient red dragon's lair is warped by its presence, creating the following effects:<br/><br/><b>Burning Heat.</b> The area within 1 mile of the lair is an area of extreme heat. A burning creature or object takes an additional 1d4 Fire damage at the start of each of its turns.<br/><b>Smoldering Haze.</b> The area within 1 mile of the lair is Lightly Obscured with clouds of ash. Whenever a creature other than the dragon or one of its allies finishes a Long Rest in that area, that creature must succeed on a DC 15 Constitution saving throw or have the Poisoned condition for 1 hour.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "adult-silver-dragon",
@@ -1486,7 +1532,10 @@
       }
     ],
     "lair_actions": "Silver dragons typically lair in picturesque mountain retreats or on sculpted cloud 'islands.'<br/><br/>The region containing an adult or ancient silver dragon's lair is changed by its magic, creating the following effects:<br/><br/><b>Gentle Gusts.</b> Winds buoy creatures that fall within 1 mile of the lair. Such creatures descend at a rate of 60 feet per round and take no damage from falling.<br/><b>Sun and Storms.</b> While in its lair, the dragon can cast Con rol Weather, requiring no Material components and using the same spellcasting ability as mits Spellcasting action.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "adult-white-dragon",
@@ -1597,7 +1646,10 @@
       }
     ],
     "lair_actions": "White dragons brood in bitterly cold lairs clawed from stone and ice.<br/><br/>The region containing an adult or ancient white dragon's lair is affected by its presence, creating the following effects:<br/><br/><b>Frigid Cold.</b> The area within 1 mile of the lair is an area of extreme cold. Any water in that area is frigid water. See the Dungeon Master's Guide for rules on extreme cold and frigid water.<br/><b>Glacial Gloom.</b> The area within 1 mile of the lair is Lightly Obscured by chilly fog. Whenever a creature other than the dragon or one of its allies finishes a Long Rest in that area, that creature must succeed on a DC 15 Constitution saving throw or have its Speed reduced by 10 feet for 1 hour.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/><br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "air-elemental",
@@ -1684,7 +1736,10 @@
         "recharge": "4-6"
       }
     ],
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "allosaurus",
@@ -1746,7 +1801,10 @@
         "damage_dice": "1d8 + 4"
       }
     ],
-    "artist": "ALEJANDRO PACHECO"
+    "artist": "ALEJANDRO PACHECO",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "ancient-black-dragon",
@@ -1860,7 +1918,10 @@
       }
     ],
     "lair_actions": "Black dragons lurk in dismal ruins, polluted bogs, or other sites gripped by decay.<br/><br/>The region containing an adult or ancient black dragon's lair is warped by its presence, creating the following effects:<br/><br/><b>Acrid Haze.</b> Odorous and stifling fog covers the area within 1 mile of the lair, rendering that area Lightly Obscured. Travel for creatures other than the dragon and its allies takes twice the usual time in that area.<br/><b>Foul Water.</b> Water sources within 1 mile of the lair are supernaturally fouled. A creature that drinks such water must succeed on a DC 15 Constitution saving throw or have the Poisoned condition for 1 hour.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "ancient-blue-dragon",
@@ -1965,8 +2026,11 @@
         "description": "The dragon makes one Rend attack."
       }
     ],
-    "lair_actions": "Blue dragons dwell in arid lands. Their lairs might be death traps meant to entomb invaders or ostentatious fortresses where they plot domination.<br/><br/>The region containing an adult or ancient blue dragon'’'s lair is changed by its presence, creating the following effects:<br/><br/><b>Sinkholes.</b> Sinkholes form more frequently in the area within 1 mile of the lair. Whenever a creature in that area other than the dragon and its allies finishes a Long Rest, roll 1d20. On a 1, a sinkhole opens beneath the creature, and the creature must succeed on a DC 15 Dexterity saving throw or fall 2d4 x 10 feet into the sinkhole.<br/><b>Spiteful Storms.</b> Dust devils and thunderstorms rage within 1 mile of the lair. The area is Lightly Obscured.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/><br/>",
-    "image": true
+    "lair_actions": "Blue dragons dwell in arid lands. Their lairs might be death traps meant to entomb invaders or ostentatious fortresses where they plot domination.<br/><br/>The region containing an adult or ancient blue dragon'\u2019's lair is changed by its presence, creating the following effects:<br/><br/><b>Sinkholes.</b> Sinkholes form more frequently in the area within 1 mile of the lair. Whenever a creature in that area other than the dragon and its allies finishes a Long Rest, roll 1d20. On a 1, a sinkhole opens beneath the creature, and the creature must succeed on a DC 15 Dexterity saving throw or fall 2d4 x 10 feet into the sinkhole.<br/><b>Spiteful Storms.</b> Dust devils and thunderstorms rage within 1 mile of the lair. The area is Lightly Obscured.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/><br/>",
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "ancient-brass-dragon",
@@ -2087,8 +2151,11 @@
         "damage_dice": "8d8"
       }
     ],
-    "lair_actions":"Brass dragons usually dwell in secret caves and canyons near well-traveled routes.<br/><br/>The area containing an adult or ancient brass dragon's lair is altered by its presence, creating the following effects:<br/><br/><b>Mirages.</b> While in its lair, the dragon can cast MajorImage, requiring no Material components and using the same spellcasting ability as its Spellcasting action. When casting the spell this way, the spell's range is 1 mile, and the dragon doesn't need to see the spot where the illusion appears.<br/><b>Refreshing Water.</b> Water within 1 mile of the lair is magically refreshing. A creature that drinks such water gains 2d4 Temporary Hit Points, and the dragon is immediately aware of the creature's presence.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "lair_actions": "Brass dragons usually dwell in secret caves and canyons near well-traveled routes.<br/><br/>The area containing an adult or ancient brass dragon's lair is altered by its presence, creating the following effects:<br/><br/><b>Mirages.</b> While in its lair, the dragon can cast MajorImage, requiring no Material components and using the same spellcasting ability as its Spellcasting action. When casting the spell this way, the spell's range is 1 mile, and the dragon doesn't need to see the spot where the illusion appears.<br/><b>Refreshing Water.</b> Water within 1 mile of the lair is magically refreshing. A creature that drinks such water gains 2d4 Temporary Hit Points, and the dragon is immediately aware of the creature's presence.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "ancient-bronze-dragon",
@@ -2211,7 +2278,10 @@
       }
     ],
     "lair_actions": "Bronze dragons usually make their homes near or under the sea.<br/><br/>The region containing an adult or ancient bronze dragon's lair is changed by its presence, creating the following effects:<br/><br/><b>Buoying Currents.</b> Creatures within 1 mile of the lair that lack a Swim Speed ignore the extra cost of movement while swimming.<br/><b>Sun and Storms.</b> While in its lair, the dragon can cast Control Weather, requiring no Material components and using the same spellcasting ability as its Spellcasting action. When casting the spell this way, the dragon can control the weather within 1 mile of its lair, regardless if the dragon is inside or outside.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "ancient-copper-dragon",
@@ -2330,7 +2400,10 @@
       }
     ],
     "lair_actions": "Copper dragons typically inhabit multichamber caves and renovated ruins.<br/><br/>The region containing an adult or ancient copper dragon's lair is changed by its presence, creating the following effects:<br/><br/><b>Chatty Critters.</b> Tiny Beasts magically gain the ability to speak and understand Draconic while within 6 miles of the lair.<br/><b>Giggle Fits.</b> Whenever a creature other than the dragon and its allies is within 1 mile of the lair and rolls a 1 on a D20 Test, it must succeed on a DC 15 Wisdom saving throw or have the Incapacitated condition until the end of its next turn, as it is wracked with laughter.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "ancient-gold-dragon",
@@ -2456,7 +2529,10 @@
       }
     ],
     "lair_actions": "Gold dragons make their homes in places of natural and magical wonder.<br/><br/>The region containing an adult or ancient gold dragon's lair is altered by its presence, creating the following effects:<br/><br/><b>Dream Messenger.</b> While in its lair, the dragon can cast Dream, requiring no Material components and using Charisma as the spellcasting ability. When casting the spell this way, the dragon can target any creature within 6 miles.<br/><b>Foretelling Fog.</b> The area within 1 mile of the lair is Lightly Obscured by opalescent fog. While in that area, creatures can't be surprised, as the fog swirls into shapes that warn of danger.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "ancient-green-dragon",
@@ -2565,7 +2641,7 @@
       },
       {
         "name": "Noxious Miasma",
-        "description": "Constitution Saving Throw: DC 21, each creature in a 30-foot-radius <strong>Sphere</strong> centered on a point the dragon can see within 90 feet. <strong>Failure:</strong> 17 (5d6) Poison damage, and the target takes a −2 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
+        "description": "Constitution Saving Throw: DC 21, each creature in a 30-foot-radius <strong>Sphere</strong> centered on a point the dragon can see within 90 feet. <strong>Failure:</strong> 17 (5d6) Poison damage, and the target takes a \u22122 penalty to AC until the end of its next turn. Failure or Success: The dragon can't take this action again until the start of its next turn.",
         "save_dc": 21,
         "save_type": "Constitution",
         "damage": "17 (5d6) Poison damage",
@@ -2577,7 +2653,10 @@
       }
     ],
     "lair_actions": "Green dragons lair in ancient forests, often shaping stands of massive trees into compounds of interwoven branches, hollow trunks, and caverns amid mighty roots. They might also dwell amid forested ruins, particularly the former homes of those they've conquered.<br/><br/>The region containing an adult or ancient green dragon's lair is warped by its presence, creating the following effects:<br/><br/><b>Beast Spies.</b> Tiny Beasts magically gain the ability to understand Draconic and can communicate telepathically with the dragon while within 1 mile of the lair.<br/><b>Poisonous Thicket.</b> Ordinary plants growing within 1 mile of the lair poison the air around them. Whenever a creature other than the dragon or its allies finishes a Long Rest in that area, it must succeed on a DC 15 Constitution saving throw or have the Poisoned condition for 1 hour.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "ancient-red-dragon",
@@ -2683,7 +2762,10 @@
       }
     ],
     "lair_actions": "Red dragons make their lairs in smoldering, unapproachable places such as volcanic mountains, burning wastelands, and ruins they've stolen from other creatures.<br/><br/>The region containing an adult or ancient red dragon's lair is warped by its presence, creating the following effects:<br/><br/><b>Burning Heat.</b> The area within 1 mile of the lair is an area of extreme heat. A burning creature or object takes an additional 1d4 Fire damage at the start of each of its turns.<br/><b>Smoldering Haze.</b> The area within 1 mile of the lair is Lightly Obscured with clouds of ash. Whenever a creature other than the dragon or one of its allies finishes a Long Rest in that area, that creature must succeed on a DC 15 Constitution saving throw or have the Poisoned condition for 1 hour.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "ancient-silver-dragon",
@@ -2801,7 +2883,10 @@
       }
     ],
     "lair_actions": "Silver dragons typically lair in picturesque mountain retreats or on sculpted cloud 'islands.'<br/><br/>The region containing an adult or ancient silver dragon's lair is changed by its magic, creating the following effects:<br/><br/><b>Gentle Gusts.</b> Winds buoy creatures that fall within 1 mile of the lair. Such creatures descend at a rate of 60 feet per round and take no damage from falling.<br/><b>Sun and Storms.</b> While in its lair, the dragon can cast Con rol Weather, requiring no Material components and using the same spellcasting ability as mits Spellcasting action.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "ancient-white-dragon",
@@ -2912,7 +2997,10 @@
       }
     ],
     "lair_actions": "White dragons brood in bitterly cold lairs clawed from stone and ice.<br/><br/>The region containing an adult or ancient white dragon's lair is affected by its presence, creating the following effects:<br/><br/><b>Frigid Cold.</b> The area within 1 mile of the lair is an area of extreme cold. Any water in that area is frigid water. See the Dungeon Master's Guide for rules on extreme cold and frigid water.<br/><b>Glacial Gloom.</b> The area within 1 mile of the lair is Lightly Obscured by chilly fog. Whenever a creature other than the dragon or one of its allies finishes a Long Rest in that area, that creature must succeed on a DC 15 Constitution saving throw or have its Speed reduced by 10 feet for 1 hour.<br/><br/>If the dragon dies or moves its lair elsewhere, these effects end immediately.<br/><br/>",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "animal-lord",
@@ -3051,6 +3139,10 @@
         "name": "Radiant Strike",
         "description": "The animal lord makes one Radiant Ray attack."
       }
+    ],
+    "environments": [
+      "forest",
+      "grassland"
     ]
   },
   {
@@ -3115,7 +3207,10 @@
         "damage_dice": "1d6 + 2"
       }
     ],
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "animated-broom",
@@ -3181,6 +3276,9 @@
         "damage": "5 (1d4 + 3) Bludgeoning damage",
         "damage_dice": "1d4 + 3"
       }
+    ],
+    "environments": [
+      "urban"
     ]
   },
   {
@@ -3241,6 +3339,9 @@
         "damage": "6 (1d8 + 2) Slashing damage",
         "damage_dice": "1d8 + 2"
       }
+    ],
+    "environments": [
+      "urban"
     ]
   },
   {
@@ -3300,6 +3401,9 @@
         "damage": "10 (2d6 + 3) Bludgeoning damage",
         "damage_dice": "2d6 + 3"
       }
+    ],
+    "environments": [
+      "urban"
     ]
   },
   {
@@ -3366,8 +3470,11 @@
         "recharge": "6"
       }
     ],
-    "artist": "JOHN PATRICK GAÑAS",
-    "image": true
+    "artist": "JOHN PATRICK GA\u00d1AS",
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "ankylosaurus",
@@ -3419,6 +3526,9 @@
         "damage": "9 (1d10 + 4) Bludgeoning damage",
         "damage_dice": "1d10 + 4"
       }
+    ],
+    "environments": [
+      "forest"
     ]
   },
   {
@@ -3488,6 +3598,9 @@
         "damage_dice": "2d6 + 3",
         "recharge": "6"
       }
+    ],
+    "environments": [
+      "forest"
     ]
   },
   {
@@ -3609,7 +3722,10 @@
         "description": "The arcanaloth casts <em>Counterspell</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting."
       }
     ],
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "arch-hag",
@@ -3742,7 +3858,11 @@
         "description": "The hag uses Spellcasting to cast <em>Dimension Door</em> or <em>Hypnotic Pattern</em>. The hag can't take this action again until the start of its next turn."
       }
     ],
-    "lair_actions": "Each arch-hag creates a magical home, such as a hidden demiplane, a mansion atop a storm cloud, or—in the case of the arch-hag Baba Yaga—a hut atop giant chicken legs. The interiors of these lairs frequently change or exhibit bewildering features.<br/><br/>The region containing an arch-hag's lair is altered by its presence, creating the following effects:<br/><br/><b>Lapsus Linguae.</b> Creatures (excluding the hag and its allies) within 1 mile of the lair subtract 1d10 from any ability checks they make when they take the Influence action.<br/><b>Meddlesome Magic.</b> Whenever a creature other than the hag or its allies finishes a Long Rest while within 1 mile of the lair, the next time that creature casts a spell using a spell slot, it also casts Confusion centered on itself. The spell uses the creature's spellcasting ability and doesn't require Concentration.<br/><br/>If the arch-hag is destroyed or moves its lair elsewhere, these effects end immediately.<br/><br/>Heh! People who know too much grow old before their time. Ask me your questions, but be certain that every secret has its cost.<br/>"
+    "lair_actions": "Each arch-hag creates a magical home, such as a hidden demiplane, a mansion atop a storm cloud, or\u2014in the case of the arch-hag Baba Yaga\u2014a hut atop giant chicken legs. The interiors of these lairs frequently change or exhibit bewildering features.<br/><br/>The region containing an arch-hag's lair is altered by its presence, creating the following effects:<br/><br/><b>Lapsus Linguae.</b> Creatures (excluding the hag and its allies) within 1 mile of the lair subtract 1d10 from any ability checks they make when they take the Influence action.<br/><b>Meddlesome Magic.</b> Whenever a creature other than the hag or its allies finishes a Long Rest while within 1 mile of the lair, the next time that creature casts a spell using a spell slot, it also casts Confusion centered on itself. The spell uses the creature's spellcasting ability and doesn't require Concentration.<br/><br/>If the arch-hag is destroyed or moves its lair elsewhere, these effects end immediately.<br/><br/>Heh! People who know too much grow old before their time. Ask me your questions, but be certain that every secret has its cost.<br/>",
+    "environments": [
+      "forest",
+      "swamp"
+    ]
   },
   {
     "index": "archelon",
@@ -3807,7 +3927,10 @@
         "damage_dice": "3d6 + 4"
       }
     ],
-    "artist": "APRIL PRIME"
+    "artist": "APRIL PRIME",
+    "environments": [
+      "underwater"
+    ]
   },
   {
     "index": "archmage",
@@ -3900,6 +4023,9 @@
         "name": "Protective Magic (3/Day)",
         "description": "The archmage casts <em>Counterspell</em> or <em>Shield</em> in response to the spell's trigger, using the same spellcasting ability as Spellcasting."
       }
+    ],
+    "environments": [
+      "forest"
     ]
   },
   {
@@ -3990,6 +4116,9 @@
         "name": "Divine Aid (3/Day)",
         "description": "The priest casts <em>Bless</em>, <em>Dispel Magic</em>, <em>Healing Word</em>, or <em>Lesser Restoration</em>, using the same spellcasting ability as Spellcasting."
       }
+    ],
+    "environments": [
+      "urban"
     ]
   },
   {
@@ -4081,7 +4210,10 @@
         "description": "The assassin takes the <strong>Dash</strong>, <strong>Disengage</strong>, or <strong>Hide</strong> action."
       }
     ],
-    "artist": "VICKI PANGES"
+    "artist": "VICKI PANGES",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "awakened-shrub",
@@ -4133,6 +4265,9 @@
         "reach": "5 ft.",
         "damage": "1 Slashing damage"
       }
+    ],
+    "environments": [
+      "forest"
     ]
   },
   {
@@ -4188,7 +4323,10 @@
         "damage_dice": "3d6 + 4"
       }
     ],
-    "artist": "ALEX STONE"
+    "artist": "ALEX STONE",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "axe-beak",
@@ -4235,6 +4373,9 @@
         "damage": "6 (1d8 + 2) Slashing damage",
         "damage_dice": "1d8 + 2"
       }
+    ],
+    "environments": [
+      "underdark"
     ]
   },
   {
@@ -4320,6 +4461,14 @@
         "name": "Hellish Rebuke (2/Day)",
         "description": "The azer casts <em>Hellish Rebuke</em> in response to that spell's trigger, using the same spellcasting ability as Spellcasting."
       }
+    ],
+    "environments": [
+      "desert",
+      "mountain",
+      "underdark"
+    ],
+    "enemies": [
+      "salamander"
     ]
   },
   {
@@ -4382,6 +4531,14 @@
         "damage": "8 (1d10 + 3) Bludgeoning damage plus 3 (1d6) Fire damage",
         "damage_dice": "1d10 + 3"
       }
+    ],
+    "environments": [
+      "desert",
+      "mountain",
+      "underdark"
+    ],
+    "enemies": [
+      "salamander"
     ]
   },
   {
@@ -4430,12 +4587,15 @@
     "actions": [
       {
         "name": "Bite",
-        "description": "Melee Attack Roll: +1, reach 5 ft. <strong>Hit:</strong> 1 (1d4 − 1) Piercing damage.",
+        "description": "Melee Attack Roll: +1, reach 5 ft. <strong>Hit:</strong> 1 (1d4 \u2212 1) Piercing damage.",
         "attack_bonus": 1,
         "reach": "5 ft.",
-        "damage": "1 (1d4 − 1) Piercing damage",
-        "damage_dice": "1d4 − 1"
+        "damage": "1 (1d4 \u2212 1) Piercing damage",
+        "damage_dice": "1d4 \u2212 1"
       }
+    ],
+    "environments": [
+      "forest"
     ]
   },
   {
@@ -4492,6 +4652,9 @@
         "reach": "5 ft.",
         "damage": "1 Piercing damage"
       }
+    ],
+    "environments": [
+      "forest"
     ]
   },
   {
@@ -4595,7 +4758,10 @@
         "description": "The balor teleports itself or a willing demon within 10 feet of itself up to 60 feet to an unoccupied space the balor can see."
       }
     ],
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "bandit-captain",
@@ -4674,7 +4840,28 @@
         "description": "Trigger: The bandit is hit by a melee attack roll while holding a weapon. Response: The bandit adds 2 to its AC against that attack, possibly causing it to miss."
       }
     ],
-    "image": true
+    "image": true,
+    "environments": [
+      "arctic",
+      "coastal",
+      "desert",
+      "forest",
+      "hill",
+      "urban"
+    ],
+    "allies": [
+      "assassin",
+      "commoner",
+      "mage",
+      "noble",
+      "scout",
+      "spy"
+    ],
+    "enemies": [
+      "guard",
+      "knight",
+      "warrior-veteran"
+    ]
   },
   {
     "index": "bandit-crime-lord",
@@ -4763,6 +4950,25 @@
         "damage": "28 (8d6) Poison damage",
         "damage_dice": "8d6"
       }
+    ],
+    "environments": [
+      "urban",
+      "coastal",
+      "forest"
+    ],
+    "allies": [
+      "assassin",
+      "bandit-captain",
+      "commoner",
+      "mage",
+      "noble",
+      "scout",
+      "spy"
+    ],
+    "enemies": [
+      "guard",
+      "knight",
+      "warrior-veteran"
     ]
   },
   {
@@ -4843,6 +5049,25 @@
         "name": "Spellcasting",
         "description": "The bandit casts one of the following spells, using Intelligence as the spellcasting ability (spell save DC 14):<br><strong>At Will:</strong> <em>Disguise Self</em>, <em>Mage Hand</em>, <em>Minor Illusion</em><br><strong>1/Day Each:</strong> <em>Hold Person</em> (level 4 version), <em>Mage Armor</em> (included in AC), <em>Major Image</em>"
       }
+    ],
+    "environments": [
+      "urban",
+      "coastal",
+      "forest"
+    ],
+    "allies": [
+      "assassin",
+      "bandit-captain",
+      "commoner",
+      "mage",
+      "noble",
+      "scout",
+      "spy"
+    ],
+    "enemies": [
+      "guard",
+      "knight",
+      "warrior-veteran"
     ]
   },
   {
@@ -4903,6 +5128,9 @@
         "damage": "5 (1d8 + 1) Piercing damage",
         "damage_dice": "1d8 + 1"
       }
+    ],
+    "environments": [
+      "forest"
     ]
   },
   {
@@ -5004,7 +5232,10 @@
         "damage_dice": "3d6"
       }
     ],
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "barbed-devil",
@@ -5108,7 +5339,10 @@
         "damage_dice": "5d6"
       }
     ],
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "barlgura",
@@ -5205,7 +5439,10 @@
         "description": "The barlgura jumps up to 40 feet by spending 10 feet of movement."
       }
     ],
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "basilisk",
@@ -5263,7 +5500,10 @@
         "recharge": "4-6"
       }
     ],
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "bat",
@@ -5274,7 +5514,7 @@
     "initiative": 2,
     "armor_class": 12,
     "hit_points": 1,
-    "hit_dice": "1d4 − 1",
+    "hit_dice": "1d4 \u2212 1",
     "speed": {
       "walk": "5 ft.",
       "fly": "30 ft."
@@ -5311,6 +5551,9 @@
         "reach": "5 ft.",
         "damage": "1 Piercing damage"
       }
+    ],
+    "environments": [
+      "forest"
     ]
   },
   {
@@ -5391,7 +5634,10 @@
       }
     ],
     "artist": "ANDREA PIPARO",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "behir",
@@ -5483,7 +5729,10 @@
         "damage_dice": "6d6"
       }
     ],
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "beholder-zombie",
@@ -5554,7 +5803,10 @@
         "save_dc": 14
       }
     ],
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "beholder",
@@ -5647,8 +5899,11 @@
         "description": "The beholder uses Eye Rays."
       }
     ],
-    "lair_actions":"Beholders lurk in cavern complexes they've carved using their eye rays deep in the Underdark or in lairs created for them by their servants.<br/><br/>The region containing a beholder's lair is twisted by its presence, creating the following effects:<br/><br/><b>Scopophobia.</b> Creatures within 1 mile of the lair feel as if they're being watched. Any creature (excluding the beholder and its allies) that finishes a Short Rest while within 1 mile of the lair must succeed on a DC 13 Wisdom saving throw or gain no benefit from that rest.<br/><b>Warping Terrain.</b> Minor warps in reality occur near the lair; any creature (excluding the beholder) within 1 mile of the lair that makes a D20 Test and rolls a 1 has the Prone condition.<br/><br/>If the beholder dies or moves its lair elsewhere, these effects end immediately.<br/>",
-    "image": true
+    "lair_actions": "Beholders lurk in cavern complexes they've carved using their eye rays deep in the Underdark or in lairs created for them by their servants.<br/><br/>The region containing a beholder's lair is twisted by its presence, creating the following effects:<br/><br/><b>Scopophobia.</b> Creatures within 1 mile of the lair feel as if they're being watched. Any creature (excluding the beholder and its allies) that finishes a Short Rest while within 1 mile of the lair must succeed on a DC 13 Wisdom saving throw or gain no benefit from that rest.<br/><b>Warping Terrain.</b> Minor warps in reality occur near the lair; any creature (excluding the beholder) within 1 mile of the lair that makes a D20 Test and rolls a 1 has the Prone condition.<br/><br/>If the beholder dies or moves its lair elsewhere, these effects end immediately.<br/>",
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "berserker-commander",
@@ -5736,6 +5991,11 @@
         "name": "Frenzied Rush",
         "description": "Each ally within 30 feet of the berserker can take a Reaction to move up to half the ally's Speed without provoking <strong>Opportunity Attacks</strong>. The berserker can also move up to half its Speed without provoking Opportunity Attacks."
       }
+    ],
+    "environments": [
+      "arctic",
+      "mountain",
+      "forest"
     ]
   },
   {
@@ -5793,6 +6053,9 @@
         "damage": "9 (1d12 + 3) Slashing damage",
         "damage_dice": "1d12 + 3"
       }
+    ],
+    "environments": [
+      "forest"
     ]
   },
   {
@@ -5852,6 +6115,9 @@
         "damage": "5 (1d6 + 2) Slashing damage",
         "damage_dice": "1d6 + 2"
       }
+    ],
+    "environments": [
+      "forest"
     ]
   },
   {
@@ -5935,7 +6201,10 @@
         "recharge": "5-6"
       }
     ],
-    "artist": "MARTIN MOTTET"
+    "artist": "MARTIN MOTTET",
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "black-pudding",
@@ -5995,7 +6264,7 @@
       },
       {
         "name": "Corrosive Form",
-        "description": "A creature that hits the pudding with a melee attack roll takes 4 (1d8) Acid damage. Nonmagical ammunition is destroyed immediately after hitting the pudding and dealing any damage. Any nonmagical weapon takes a cumulative −1 penalty to attack rolls immediately after dealing damage to the pudding and coming into contact with it. The weapon is destroyed if the penalty reaches −5. The penalty can be removed by casting the <em>Mending</em> spell on the weapon. In 1 minute, the pudding can eat through 2 feet of nonmagical wood or metal."
+        "description": "A creature that hits the pudding with a melee attack roll takes 4 (1d8) Acid damage. Nonmagical ammunition is destroyed immediately after hitting the pudding and dealing any damage. Any nonmagical weapon takes a cumulative \u22121 penalty to attack rolls immediately after dealing damage to the pudding and coming into contact with it. The weapon is destroyed if the penalty reaches \u22125. The penalty can be removed by casting the <em>Mending</em> spell on the weapon. In 1 minute, the pudding can eat through 2 feet of nonmagical wood or metal."
       },
       {
         "name": "Spider Climb",
@@ -6005,7 +6274,7 @@
     "actions": [
       {
         "name": "Dissolving Pseudopod",
-        "description": "Melee Attack Roll: +5, reach 10 ft. <strong>Hit:</strong> 17 (4d6 + 3) Acid damage. Nonmagical armor worn by the target takes a −1 penalty to the AC it offers. The armor is destroyed if the penalty reduces its AC to 10. The penalty can be removed by casting the <em>Mending</em> spell on the armor.",
+        "description": "Melee Attack Roll: +5, reach 10 ft. <strong>Hit:</strong> 17 (4d6 + 3) Acid damage. Nonmagical armor worn by the target takes a \u22121 penalty to the AC it offers. The armor is destroyed if the penalty reduces its AC to 10. The penalty can be removed by casting the <em>Mending</em> spell on the armor.",
         "attack_bonus": 5,
         "reach": "10 ft.",
         "damage": "17 (4d6 + 3) Acid damage",
@@ -6018,7 +6287,10 @@
         "description": "Trigger: While the pudding is Large or Medium and has 10+ Hit Points, it becomes <strong>Bloodied</strong> or is subjected to Lightning or Slashing damage. Response: The pudding splits into two new <strong>Black Puddings</strong>. Each new pudding is one size smaller than the original pudding and acts on its Initiative. The original pudding's Hit Points are divided evenly between the new puddings (round down)."
       }
     ],
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "blink-dog",
@@ -6082,7 +6354,10 @@
         "recharge": "4-6"
       }
     ],
-    "artist": "JOHN PATRICK GAÑAS"
+    "artist": "JOHN PATRICK GA\u00d1AS",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "blob-of-annihilation",
@@ -6206,6 +6481,9 @@
         "name": "Lashing Goo",
         "description": "The blob makes one Pseudopod attack."
       }
+    ],
+    "environments": [
+      "underdark"
     ]
   },
   {
@@ -6286,7 +6564,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "blue-dragon-wyrmling",
@@ -6385,7 +6666,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "ANTONIO JOSÉ MANZANEDO"
+    "artist": "ANTONIO JOS\u00c9 MANZANEDO",
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "blue-slaad",
@@ -6483,7 +6767,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "boar",
@@ -6557,7 +6844,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "KATERINA LADON"
+    "artist": "KATERINA LADON",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "bone-devil",
@@ -6665,8 +6955,11 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "flavor_text": "Bone devils are just one of a thousand reasons never to make a deal with a devil, but they're a significant one. Break said deal, and it'll likely be one of these nightmares that drags you down to the Nine Hells.\n—Sylvira Savikas, Candlekeep Sage",
-    "image": true
+    "flavor_text": "Bone devils are just one of a thousand reasons never to make a deal with a devil, but they're a significant one. Break said deal, and it'll likely be one of these nightmares that drags you down to the Nine Hells.\n\u2014Sylvira Savikas, Candlekeep Sage",
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "bone-naga",
@@ -6765,7 +7058,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "brass-dragon-wyrmling",
@@ -6867,7 +7163,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "brazen-gorgon",
@@ -6972,7 +7271,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "desert",
+      "mountain"
+    ]
   },
   {
     "index": "bronze-dragon-wyrmling",
@@ -7083,7 +7386,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "brown-bear",
@@ -7172,7 +7478,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "POLAR ENGINE"
+    "artist": "POLAR ENGINE",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "bugbear-stalker",
@@ -7282,7 +7591,11 @@
     "resistances": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest",
+      "underdark"
+    ]
   },
   {
     "index": "bugbear-warrior",
@@ -7380,7 +7693,11 @@
     "resistances": [],
     "habitat": "",
     "treasure": "",
-    "artist": "TARAS SUSAK"
+    "artist": "TARAS SUSAK",
+    "environments": [
+      "forest",
+      "underdark"
+    ]
   },
   {
     "index": "bulette-pup",
@@ -7462,7 +7779,12 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "grassland",
+      "hill",
+      "mountain"
+    ]
   },
   {
     "index": "bulette",
@@ -7559,7 +7881,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "bullywug-bog-sage",
@@ -7665,7 +7990,14 @@
     "resistances": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "swamp"
+    ],
+    "allies": [
+      "frog",
+      "giant-frog"
+    ]
   },
   {
     "index": "bullywug-warrior",
@@ -7753,7 +8085,14 @@
     "resistances": [],
     "habitat": "",
     "treasure": "",
-    "artist": "SEAN MURRAY"
+    "artist": "SEAN MURRAY",
+    "environments": [
+      "swamp"
+    ],
+    "allies": [
+      "frog",
+      "giant-frog"
+    ]
   },
   {
     "index": "cambion",
@@ -7864,7 +8203,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "camel",
@@ -7934,7 +8276,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "carrion-crawler",
@@ -8028,7 +8373,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "ERIC BELISLE",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "cat",
@@ -8111,7 +8459,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "centaur-trooper",
@@ -8218,7 +8569,11 @@
     "resistances": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest",
+      "grassland"
+    ]
   },
   {
     "index": "centaur-warden",
@@ -8331,7 +8686,11 @@
     "resistances": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest",
+      "grassland"
+    ]
   },
   {
     "index": "chain-devil",
@@ -8447,7 +8806,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "chasme",
@@ -8556,7 +8918,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "RICHARD LUONG",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "chimera",
@@ -8665,7 +9030,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "chuul",
@@ -8768,7 +9136,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "clay-golem",
@@ -8882,7 +9253,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "cloaker",
@@ -8996,7 +9370,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "cloud-giant",
@@ -9102,7 +9479,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "mountain"
+    ]
   },
   {
     "index": "cockatrice-regent",
@@ -9209,7 +9589,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "grassland"
+    ]
   },
   {
     "index": "cockatrice",
@@ -9287,7 +9670,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "DAREN BADER",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "colossus",
@@ -9426,7 +9812,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "MAXIME MINARD"
+    "artist": "MAXIME MINARD",
+    "environments": [
+      "urban",
+      "mountain"
+    ]
   },
   {
     "index": "commoner",
@@ -9496,7 +9886,10 @@
     "resistances": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "constrictor-snake",
@@ -9586,7 +9979,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "ALEJANDRO PACHECO"
+    "artist": "ALEJANDRO PACHECO",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "copper-dragon-wyrmling",
@@ -9688,7 +10084,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "SVETLIN VELINOV"
+    "artist": "SVETLIN VELINOV",
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "couatl",
@@ -9797,7 +10196,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "crab",
@@ -9876,7 +10278,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "crawling-claw",
@@ -9956,8 +10361,11 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "flavor_text": "Is it possible for any creature, any living being, to be inherently evil? Such an assertion may itself facilitate the committing of evil acts. By defining a person as evil, we give them free rein to behave as they will, absolving them from the wickedness of their words and the evil of their hands.\n—Ansolm Haas, The Isolation of Evil",
-    "image": true
+    "flavor_text": "Is it possible for any creature, any living being, to be inherently evil? Such an assertion may itself facilitate the committing of evil acts. By defining a person as evil, we give them free rein to behave as they will, absolving them from the wickedness of their words and the evil of their hands.\n\u2014Ansolm Haas, The Isolation of Evil",
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "crocodile",
@@ -10038,7 +10446,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "cultist-fanatic",
@@ -10137,7 +10548,14 @@
     "resistances": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban"
+    ],
+    "allies": [
+      "priest-acolyte",
+      "flying-snake"
+    ]
   },
   {
     "index": "cultist-hierophant",
@@ -10241,7 +10659,14 @@
     "resistances": [],
     "habitat": "",
     "treasure": "",
-    "artist": "AURORE FOLNY"
+    "artist": "AURORE FOLNY",
+    "environments": [
+      "urban"
+    ],
+    "allies": [
+      "priest-acolyte",
+      "flying-snake"
+    ]
   },
   {
     "index": "cultist",
@@ -10322,7 +10747,10 @@
     "resistances": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "cyclops-oracle",
@@ -10428,7 +10856,12 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "coastal",
+      "grassland",
+      "mountain"
+    ]
   },
   {
     "index": "cyclops-sentry",
@@ -10518,7 +10951,12 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "DAARKEN"
+    "artist": "DAARKEN",
+    "environments": [
+      "coastal",
+      "grassland",
+      "mountain"
+    ]
   },
   {
     "index": "dao",
@@ -10635,7 +11073,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "darkmantle",
@@ -10718,7 +11159,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "death-cultist",
@@ -10832,7 +11276,11 @@
     "resistances": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban",
+      "underdark"
+    ]
   },
   {
     "index": "death-dog",
@@ -10927,7 +11375,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "death-knight-aspirant",
@@ -11040,7 +11491,24 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "coastal",
+      "desert",
+      "forest",
+      "grassland",
+      "hill",
+      "mountain",
+      "swamp",
+      "underdark",
+      "urban"
+    ],
+    "allies": [
+      "nightmare",
+      "skeleton",
+      "warhorse",
+      "warhorse-skeleton"
+    ]
   },
   {
     "index": "death-knight",
@@ -11183,7 +11651,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "death-slaad",
@@ -11294,8 +11765,11 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "flavor_text": "Fight a slaad and lose, the story's over. Fight a slaad and win, there's a thousand more standing in line just to prove they're tougher.\n—Jebeel Sloom, guide to the Plane of Limbo",
-    "image": true
+    "flavor_text": "Fight a slaad and lose, the story's over. Fight a slaad and win, there's a thousand more standing in line just to prove they're tougher.\n\u2014Jebeel Sloom, guide to the Plane of Limbo",
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "death-tyrant",
@@ -11411,7 +11885,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "deer",
@@ -11490,7 +11967,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "BORJA PINDADO"
+    "artist": "BORJA PINDADO",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "demilich",
@@ -11626,7 +12106,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "SEAN MURRAY",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "deva",
@@ -11741,7 +12224,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "dire-wolf",
@@ -11825,7 +12311,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "dire-worg",
@@ -11926,7 +12415,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest",
+      "mountain"
+    ]
   },
   {
     "index": "displacer-beast",
@@ -12019,8 +12512,11 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "flavor_text": "The murderous fury of a displacer beast is fit only for nightmares, of which I've been haunted since narrowly escaping one's ambush. I'm certain that beast stalks me still.\n—Jen-Ahb, naturalist and Displacer Beast survivor",
-    "image": true
+    "flavor_text": "The murderous fury of a displacer beast is fit only for nightmares, of which I've been haunted since narrowly escaping one's ambush. I'm certain that beast stalks me still.\n\u2014Jen-Ahb, naturalist and Displacer Beast survivor",
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "djinni",
@@ -12135,7 +12631,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "doppelganger",
@@ -12242,8 +12741,11 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "flavor_text": "Meeting yourself is the surest way to realize you're not as charming as you think you are.\n—Someone claiming to be Lorhirin of Fearchor Keep",
-    "image": true
+    "flavor_text": "Meeting yourself is the surest way to realize you're not as charming as you think you are.\n\u2014Someone claiming to be Lorhirin of Fearchor Keep",
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "dracolich",
@@ -12395,7 +12897,12 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "flavor_text": "And naught will be left save shattered thrones with no rulers. But the dead dragons shall rule the world entire...\n—Sammaster the Fallen's translation of The Chronicle of Years to Come"
+    "flavor_text": "And naught will be left save shattered thrones with no rulers. But the dead dragons shall rule the world entire...\n\u2014Sammaster the Fallen's translation of The Chronicle of Years to Come",
+    "environments": [
+      "underdark",
+      "coastal",
+      "mountain"
+    ]
   },
   {
     "index": "draft-horse",
@@ -12464,7 +12971,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "JONATHAN KUO"
+    "artist": "JONATHAN KUO",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "elemental-cataclysm",
@@ -12598,7 +13108,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "desert",
+      "mountain"
+    ]
   },
   {
     "index": "elemental-cultist",
@@ -12708,7 +13222,11 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "flavor_text": "Dread Tharizdun, power of the Elder Elemental Eye and master of all destructive forces, I am the Champion of Elemental Evil and am ready to carry out your wishes.\n—Rites of the Cult of Elemental Evil"
+    "flavor_text": "Dread Tharizdun, power of the Elder Elemental Eye and master of all destructive forces, I am the Champion of Elemental Evil and am ready to carry out your wishes.\n\u2014Rites of the Cult of Elemental Evil",
+    "environments": [
+      "urban",
+      "coastal"
+    ]
   },
   {
     "index": "empyrean-iota",
@@ -12821,7 +13339,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "mountain",
+      "urban"
+    ]
   },
   {
     "index": "empyrean",
@@ -12959,7 +13481,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "erinyes",
@@ -13081,7 +13606,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "ettercap",
@@ -13202,7 +13730,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "ettin",
@@ -13301,8 +13832,11 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "flavor_text": "Twice the malice, aggressiveness, and appetite—the ettin demonstrates that two heads aren't necessarily better than one.\n—Bertrand, Inquisitor of the Mind Fire",
-    "image": true
+    "flavor_text": "Twice the malice, aggressiveness, and appetite\u2014the ettin demonstrates that two heads aren't necessarily better than one.\n\u2014Bertrand, Inquisitor of the Mind Fire",
+    "image": true,
+    "environments": [
+      "mountain"
+    ]
   },
   {
     "index": "faerie-dragon-adult",
@@ -13412,7 +13946,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "faerie-dragon-youth",
@@ -13522,7 +14059,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "fiend-cultist",
@@ -13620,7 +14160,11 @@
     "resistances": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban",
+      "underdark"
+    ]
   },
   {
     "index": "fire-elemental",
@@ -13729,7 +14273,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "fire-giant",
@@ -13823,7 +14370,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "BRIAN VALENZUELA",
-    "image": true
+    "image": true,
+    "environments": [
+      "mountain"
+    ]
   },
   {
     "index": "flameskull",
@@ -13939,7 +14489,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "flaming-skeleton",
@@ -14039,7 +14592,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "desert",
+      "underdark"
+    ]
   },
   {
     "index": "flesh-golem",
@@ -14145,7 +14702,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "flumph",
@@ -14253,7 +14813,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "flying-snake",
@@ -14330,7 +14893,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "fomorian",
@@ -14425,8 +14991,11 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "flavor_text": "All-Father Annam banished his son, Karontor, for Karontor's part in the fomorian assault on the Feywild. That day, the ordning—the hierarchy of the giants and their gods—changed forever, and the fomorians were part of it no more.\n—Bigby",
-    "image": true
+    "flavor_text": "All-Father Annam banished his son, Karontor, for Karontor's part in the fomorian assault on the Feywild. That day, the ordning\u2014the hierarchy of the giants and their gods\u2014changed forever, and the fomorians were part of it no more.\n\u2014Bigby",
+    "image": true,
+    "environments": [
+      "mountain"
+    ]
   },
   {
     "index": "frog",
@@ -14513,7 +15082,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "DARIO JELUSIC"
+    "artist": "DARIO JELUSIC",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "frost-giant",
@@ -14613,7 +15185,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "mountain"
+    ]
   },
   {
     "index": "galeb-duhr",
@@ -14698,7 +15273,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "mountain",
+      "hill"
+    ]
   },
   {
     "index": "gargoyle",
@@ -14790,8 +15369,11 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "flavor_text": "Where evil passes in the Elemental Plane of Earth, it stains the rock and spoils the soil. Malice vanishes amid other elements, but in the dismal dark, the wicked shape it into nightmares.\n—Tiv, scholar of the Elemental Planes",
-    "image": true
+    "flavor_text": "Where evil passes in the Elemental Plane of Earth, it stains the rock and spoils the soil. Malice vanishes amid other elements, but in the dismal dark, the wicked shape it into nightmares.\n\u2014Tiv, scholar of the Elemental Planes",
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "gas-spore-fungus",
@@ -14877,7 +15459,14 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "ANDREW HUYNH"
+    "artist": "ANDREW HUYNH",
+    "environments": [
+      "underdark"
+    ],
+    "allies": [
+      "beholder",
+      "death-tyrant"
+    ]
   },
   {
     "index": "gelatinous-cube",
@@ -14975,7 +15564,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "OLIVIER BERNARD",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "ghast-gravecaller",
@@ -15076,7 +15668,15 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "STEVEN BELLEDIN"
+    "artist": "STEVEN BELLEDIN",
+    "environments": [
+      "swamp",
+      "underdark",
+      "urban"
+    ],
+    "allies": [
+      "ghoul"
+    ]
   },
   {
     "index": "ghast",
@@ -15170,7 +15770,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "OLIVIER BERNARD",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "ghost",
@@ -15304,7 +15907,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "ghoul",
@@ -15394,7 +16000,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "giant-ape",
@@ -15497,7 +16106,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-axe-beak",
@@ -15584,7 +16196,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "grassland",
+      "hill"
+    ]
   },
   {
     "index": "giant-badger",
@@ -15662,7 +16278,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-bat",
@@ -15733,7 +16352,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "POLAR ENGINE"
+    "artist": "POLAR ENGINE",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-boar",
@@ -15807,7 +16429,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-centipede",
@@ -15878,7 +16503,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-constrictor-snake",
@@ -15970,7 +16598,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "WARREN MAHY",
-    "flavor_text": "We skirted the coastlines of several islands, sailing south by west until we reached a small peninsula cut off from the main island by a massive stone wall. We were well received by the people of Tanaroa, the small village that guards this wall. The villagers have no name for the large island other than the Isle of Dread.\n—Rory Barbarosa, log of the Gallivant"
+    "flavor_text": "We skirted the coastlines of several islands, sailing south by west until we reached a small peninsula cut off from the main island by a massive stone wall. We were well received by the people of Tanaroa, the small village that guards this wall. The villagers have no name for the large island other than the Isle of Dread.\n\u2014Rory Barbarosa, log of the Gallivant",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-crab",
@@ -16051,7 +16682,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-crocodile",
@@ -16144,7 +16778,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-eagle",
@@ -16226,7 +16863,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-elk",
@@ -16304,7 +16944,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-fire-beetle",
@@ -16381,7 +17024,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-frog",
@@ -16475,7 +17121,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "PINDURSKI"
+    "artist": "PINDURSKI",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-goat",
@@ -16551,7 +17200,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-hyena",
@@ -16632,7 +17284,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-lizard",
@@ -16708,7 +17363,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "JONATHAN KUO"
+    "artist": "JONATHAN KUO",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-octopus",
@@ -16800,7 +17458,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-owl",
@@ -16893,7 +17554,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-rat",
@@ -16974,7 +17638,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-scorpion",
@@ -17057,7 +17724,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-seahorse",
@@ -17137,7 +17807,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underwater"
+    ]
   },
   {
     "index": "giant-shark",
@@ -17222,7 +17895,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-spider",
@@ -17321,7 +17997,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-squid",
@@ -17422,7 +18101,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "ALEJANDRO PACHECO"
+    "artist": "ALEJANDRO PACHECO",
+    "environments": [
+      "underwater"
+    ]
   },
   {
     "index": "giant-toad",
@@ -17508,7 +18190,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "flavor_text": "Beware the furred giant snakes of the Yatil Mountains. Their pelts might be warm, but their bites are deadly.\n—Bannik Vorl, agent of the Margrave of the March of Bissel"
+    "flavor_text": "Beware the furred giant snakes of the Yatil Mountains. Their pelts might be warm, but their bites are deadly.\n\u2014Bannik Vorl, agent of the Margrave of the March of Bissel",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-venomous-snake",
@@ -17584,7 +18269,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest",
+      "swamp"
+    ]
   },
   {
     "index": "giant-vulture",
@@ -17667,7 +18356,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "DARIO JELUSIC"
+    "artist": "DARIO JELUSIC",
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "giant-wasp",
@@ -17742,7 +18434,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "ROWAN HOLLOWAY"
+    "artist": "ROWAN HOLLOWAY",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-weasel",
@@ -17826,7 +18521,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "giant-wolf-spider",
@@ -17912,7 +18610,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "MICHELE GIORGI"
+    "artist": "MICHELE GIORGI",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "gibbering-mouther",
@@ -18007,7 +18708,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "githyanki-dracomancer",
@@ -18117,7 +18821,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "mountain",
+      "urban"
+    ]
   },
   {
     "index": "githyanki-knight",
@@ -18205,7 +18913,10 @@
     "resistances": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "githyanki-warrior",
@@ -18293,7 +19004,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "githzerai-monk",
@@ -18395,7 +19109,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "githzerai-psion",
@@ -18495,7 +19212,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "mountain",
+      "urban"
+    ]
   },
   {
     "index": "githzerai-zerth",
@@ -18602,7 +19323,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "glabrezu",
@@ -18719,7 +19443,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "gladiator",
@@ -18824,7 +19551,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "flavor_text": "IN AN UNDERSEA ARENA, THE CROWD GOES WILD\nAS A GLADIATOR TRIUMPHS OVER A GIANT SQUID"
+    "flavor_text": "IN AN UNDERSEA ARENA, THE CROWD GOES WILD\nAS A GLADIATOR TRIUMPHS OVER A GIANT SQUID",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "gnoll-demoniac",
@@ -18921,7 +19651,17 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "grassland",
+      "forest",
+      "underdark"
+    ],
+    "allies": [
+      "gnoll-fang-of-yeenoghu",
+      "gnoll-pack-lord",
+      "hyena"
+    ]
   },
   {
     "index": "gnoll-fang-of-yeenoghu",
@@ -19011,7 +19751,17 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "flavor_text": "Yeenoghu claims gnolls not as his brood but as maggots purposefully released to infest a despised carcass. They are a pernicious rot the Beast of Butchery spreads across mortal worlds. Whatever they once were, they were remade and are now his.\n—Iggwilv, Demonomicon of Iggwilv"
+    "flavor_text": "Yeenoghu claims gnolls not as his brood but as maggots purposefully released to infest a despised carcass. They are a pernicious rot the Beast of Butchery spreads across mortal worlds. Whatever they once were, they were remade and are now his.\n\u2014Iggwilv, Demonomicon of Iggwilv",
+    "environments": [
+      "desert",
+      "forest",
+      "grassland",
+      "hill"
+    ],
+    "allies": [
+      "gnoll-pack-lord",
+      "hyena"
+    ]
   },
   {
     "index": "gnoll-pack-lord",
@@ -19107,7 +19857,17 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "desert",
+      "forest",
+      "grassland",
+      "hill"
+    ],
+    "allies": [
+      "gnoll-fang-of-yeenoghu",
+      "hyena"
+    ]
   },
   {
     "index": "gnoll-warrior",
@@ -19192,7 +19952,17 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "grassland",
+      "forest",
+      "underdark"
+    ],
+    "allies": [
+      "gnoll-fang-of-yeenoghu",
+      "gnoll-pack-lord",
+      "hyena"
+    ]
   },
   {
     "index": "goat",
@@ -19267,7 +20037,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "SUZANNE HELMIGH"
+    "artist": "SUZANNE HELMIGH",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "goblin-boss",
@@ -19371,7 +20144,21 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest",
+      "grassland",
+      "hill",
+      "underdark"
+    ],
+    "allies": [
+      "dire-wolf",
+      "giant-rat",
+      "rat",
+      "swarm-of-rats",
+      "wolf",
+      "worg"
+    ]
   },
   {
     "index": "goblin-hexer",
@@ -19469,7 +20256,20 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest",
+      "underdark",
+      "hill"
+    ],
+    "allies": [
+      "dire-wolf",
+      "giant-rat",
+      "rat",
+      "swarm-of-rats",
+      "wolf",
+      "worg"
+    ]
   },
   {
     "index": "goblin-minion",
@@ -19552,7 +20352,20 @@
     "resistances": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest",
+      "underdark",
+      "hill"
+    ],
+    "allies": [
+      "dire-wolf",
+      "giant-rat",
+      "rat",
+      "swarm-of-rats",
+      "wolf",
+      "worg"
+    ]
   },
   {
     "index": "goblin-warrior",
@@ -19646,7 +20459,20 @@
     "resistances": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest",
+      "underdark",
+      "hill"
+    ],
+    "allies": [
+      "dire-wolf",
+      "giant-rat",
+      "rat",
+      "swarm-of-rats",
+      "wolf",
+      "worg"
+    ]
   },
   {
     "index": "gold-dragon-wyrmling",
@@ -19758,7 +20584,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "ALEXANDER OSTROWSKI"
+    "artist": "ALEXANDER OSTROWSKI",
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "gorgon",
@@ -19857,7 +20686,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "goristro",
@@ -19978,7 +20810,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "MARK BEHM",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "graveyard-revenant",
@@ -20081,7 +20916,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban",
+      "underdark"
+    ]
   },
   {
     "index": "gray-ooze",
@@ -20154,13 +20993,13 @@
       },
       {
         "name": "Corrosive Form",
-        "description": "Nonmagical ammunition is destroyed immediately after hitting the ooze and dealing any damage. Any nonmagical weapon takes a cumulative −1 penalty to attack rolls immediately after dealing damage to the ooze and coming into contact with it. The weapon is destroyed if the penalty reaches −5. The penalty can be removed by casting the <strong>Mending</strong> spell on the weapon.\n\nThe ooze can eat through 2-inch-thick, nonmagical metal or wood in 1 round."
+        "description": "Nonmagical ammunition is destroyed immediately after hitting the ooze and dealing any damage. Any nonmagical weapon takes a cumulative \u22121 penalty to attack rolls immediately after dealing damage to the ooze and coming into contact with it. The weapon is destroyed if the penalty reaches \u22125. The penalty can be removed by casting the <strong>Mending</strong> spell on the weapon.\n\nThe ooze can eat through 2-inch-thick, nonmagical metal or wood in 1 round."
       }
     ],
     "actions": [
       {
         "name": "Pseudopod",
-        "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 10 (2d8 + 1) Acid damage. Nonmagical armor worn by the target takes a −1 penalty to the AC it offers. The armor is destroyed if the penalty reduces its AC to 10. The penalty can be removed by casting the <strong>Mending</strong> spell on the armor.",
+        "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 10 (2d8 + 1) Acid damage. Nonmagical armor worn by the target takes a \u22121 penalty to the AC it offers. The armor is destroyed if the penalty reduces its AC to 10. The penalty can be removed by casting the <strong>Mending</strong> spell on the armor.",
         "attack_bonus": 3,
         "reach": "5 ft.",
         "damage": "10 (2d8 + 1) Acid damage",
@@ -20180,7 +21019,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "gray-slaad",
@@ -20291,7 +21133,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "grell",
@@ -20395,7 +21240,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "grick-ancient",
@@ -20493,7 +21341,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest",
+      "underdark"
+    ]
   },
   {
     "index": "grick",
@@ -20583,7 +21435,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "griffon",
@@ -20669,7 +21524,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "grimlock",
@@ -20754,7 +21612,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "guard-captain",
@@ -20856,7 +21717,25 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban"
+    ],
+    "allies": [
+      "commoner",
+      "knight",
+      "mage",
+      "noble",
+      "scout",
+      "spy",
+      "warrior-veteran"
+    ],
+    "enemies": [
+      "assassin",
+      "bandit",
+      "bandit-captain",
+      "spy"
+    ]
   },
   {
     "index": "guard",
@@ -20935,7 +21814,10 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "guardian-naga",
@@ -21059,7 +21941,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "RICCARDO MOSCATELLO",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "gulthias-blight",
@@ -21172,7 +22057,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "BRIAN VALEZA"
+    "artist": "BRIAN VALEZA",
+    "environments": [
+      "forest",
+      "swamp"
+    ]
   },
   {
     "index": "half-dragon",
@@ -21286,7 +22175,12 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "mountain",
+      "hill",
+      "urban"
+    ]
   },
   {
     "index": "harpy",
@@ -21365,7 +22259,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "haunting-revenant",
@@ -21479,7 +22376,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "CRISTI BALANESCU"
+    "artist": "CRISTI BALANESCU",
+    "environments": [
+      "urban",
+      "underdark"
+    ]
   },
   {
     "index": "hawk",
@@ -21554,7 +22455,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "hell-hound",
@@ -21657,7 +22561,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "helmed-horror",
@@ -21768,7 +22675,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "hezrou",
@@ -21875,7 +22785,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "hill-giant",
@@ -21970,7 +22883,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "mountain"
+    ]
   },
   {
     "index": "hippogriff",
@@ -22060,7 +22976,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "hippopotamus",
@@ -22149,7 +23068,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "swamp",
+      "grassland"
+    ]
   },
   {
     "index": "hobgoblin-captain",
@@ -22248,7 +23171,21 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "desert",
+      "forest",
+      "grassland",
+      "hill",
+      "underdark"
+    ],
+    "allies": [
+      "manticore",
+      "ogre",
+      "owlbear",
+      "raven",
+      "worg"
+    ]
   },
   {
     "index": "hobgoblin-warlord",
@@ -22356,7 +23293,21 @@
     "habitat": "",
     "treasure": "",
     "artist": "TARAS SUSAK",
-    "image": true
+    "image": true,
+    "environments": [
+      "desert",
+      "forest",
+      "grassland",
+      "hill",
+      "underdark"
+    ],
+    "allies": [
+      "manticore",
+      "ogre",
+      "owlbear",
+      "raven",
+      "worg"
+    ]
   },
   {
     "index": "hobgoblin-warrior",
@@ -22445,7 +23396,19 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest",
+      "underdark",
+      "hill"
+    ],
+    "allies": [
+      "manticore",
+      "ogre",
+      "owlbear",
+      "raven",
+      "worg"
+    ]
   },
   {
     "index": "homunculus",
@@ -22530,7 +23493,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "hook-horror",
@@ -22618,7 +23584,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "horned-devil",
@@ -22736,7 +23705,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "hunter-shark",
@@ -22817,7 +23789,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "KATERINA LADON"
+    "artist": "KATERINA LADON",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "hydra",
@@ -22924,7 +23899,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "hyena",
@@ -23003,7 +23981,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "ice-devil",
@@ -23131,7 +24112,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "ice-mephit",
@@ -23243,7 +24227,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "imp",
@@ -23350,7 +24337,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "incubus",
@@ -23499,7 +24489,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban",
+      "underdark"
+    ]
   },
   {
     "index": "intellect-devourer",
@@ -23641,7 +24635,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "Mark Zug",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "invisible-stalker",
@@ -23785,7 +24782,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "iron-golem",
@@ -23934,7 +24934,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "Arash Radkia",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "jackal",
@@ -23999,9 +25002,9 @@
     "actions": [
       {
         "name": "Bite",
-        "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 − 1) Piercing damage.",
+        "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 \u2212 1) Piercing damage.",
         "attack_bonus": 1,
-        "damage": "1 (1d4 − 1) Piercing damage",
+        "damage": "1 (1d4 \u2212 1) Piercing damage",
         "damage_dice": "1d4",
         "damage_bonus": -1,
         "save_dc": 0,
@@ -24026,7 +25029,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "jackalwere",
@@ -24177,7 +25183,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "juvenile-shadow-dragon",
@@ -24317,7 +25326,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark",
+      "mountain"
+    ]
   },
   {
     "index": "kenku",
@@ -24426,7 +25439,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "killer-whale",
@@ -24523,7 +25539,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "Jonathan Kuo"
+    "artist": "Jonathan Kuo",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "knight",
@@ -24646,7 +25665,10 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "kobold-warrior",
@@ -24661,7 +25683,7 @@
     "armor_class_details": "",
     "armor_class_options": [],
     "hit_points": 7,
-    "hit_dice": "3d6 − 3",
+    "hit_dice": "3d6 \u2212 3",
     "speed": {
       "walk": "30 ft.",
       "fly": "",
@@ -24740,7 +25762,14 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark",
+      "mountain"
+    ],
+    "allies": [
+      "giant-centipede"
+    ]
   },
   {
     "index": "kraken",
@@ -24922,7 +25951,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "kuotoa-archpriest",
@@ -25058,7 +26090,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark",
+      "underwater"
+    ]
   },
   {
     "index": "kuotoa-monitor",
@@ -25173,7 +26209,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark",
+      "underwater"
+    ]
   },
   {
     "index": "kuotoa-whip",
@@ -25295,7 +26335,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark",
+      "underwater"
+    ]
   },
   {
     "index": "lacedon-ghoul",
@@ -25420,7 +26464,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark",
+      "coastal"
+    ]
   },
   {
     "index": "lamia",
@@ -25566,7 +26614,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "larva",
@@ -25622,9 +26673,9 @@
     "actions": [
       {
         "name": "Bite",
-        "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 − 1) Necrotic damage.",
+        "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 \u2212 1) Necrotic damage.",
         "attack_bonus": 1,
-        "damage": "1 (1d4 − 1) Necrotic damage",
+        "damage": "1 (1d4 \u2212 1) Necrotic damage",
         "damage_dice": "1d4",
         "damage_bonus": -1,
         "save_dc": 0,
@@ -25649,7 +26700,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "lemure",
@@ -25746,7 +26800,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "John Tedrick",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "lich",
@@ -25936,7 +26993,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "lion",
@@ -26065,7 +27125,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "lizard",
@@ -26153,7 +27216,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "lizardfolk-geomancer",
@@ -26291,7 +27357,16 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest",
+      "swamp"
+    ],
+    "allies": [
+      "crocodile",
+      "giant-lizard",
+      "lizard"
+    ]
   },
   {
     "index": "lizardfolk-sovereign",
@@ -26420,7 +27495,16 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "Zuzanna Wuzyk"
+    "artist": "Zuzanna Wuzyk",
+    "environments": [
+      "forest",
+      "swamp"
+    ],
+    "allies": [
+      "crocodile",
+      "giant-lizard",
+      "lizard"
+    ]
   },
   {
     "index": "mage-apprentice",
@@ -26528,7 +27612,25 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban"
+    ],
+    "allies": [
+      "archmage",
+      "assassin",
+      "bandit",
+      "bandit-captain",
+      "commoner",
+      "guard",
+      "knight",
+      "noble",
+      "pixie",
+      "pseudodragon",
+      "scout",
+      "spy",
+      "warrior-veteran"
+    ]
   },
   {
     "index": "mage",
@@ -26667,7 +27769,10 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "magma-mephit",
@@ -26782,7 +27887,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "magmin",
@@ -26880,7 +27988,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "mammoth",
@@ -26984,7 +28095,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "manes-vaporspawn",
@@ -27095,7 +28209,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "manes",
@@ -27188,7 +28305,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "manticore",
@@ -27300,7 +28420,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "marid",
@@ -27450,7 +28573,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "marilith",
@@ -27600,7 +28726,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "Justin Gerard",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "mastiff",
@@ -27689,7 +28818,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "medusa",
@@ -27835,7 +28967,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "merfolk-skirmisher",
@@ -27923,7 +29058,14 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underwater",
+      "coastal"
+    ],
+    "enemies": [
+      "merrow"
+    ]
   },
   {
     "index": "merfolk-wavebender",
@@ -28052,7 +29194,14 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underwater",
+      "coastal"
+    ],
+    "enemies": [
+      "merrow"
+    ]
   },
   {
     "index": "merrow",
@@ -28183,7 +29332,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "mezzoloth",
@@ -28338,7 +29490,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "mimic",
@@ -28399,9 +29554,9 @@
     "actions": [
       {
         "name": "Bite",
-        "description": "Melee Attack Roll: +5 (with Advantage if the target is <strong>Grappled</strong> by the mimic), reach 5 ft. Hit: 7 (1d8 + 3) Piercing damage—or 12 (2d8 + 3) Piercing damage if the target is Grappled by the mimic—plus 4 (1d8) Acid damage.",
+        "description": "Melee Attack Roll: +5 (with Advantage if the target is <strong>Grappled</strong> by the mimic), reach 5 ft. Hit: 7 (1d8 + 3) Piercing damage\u2014or 12 (2d8 + 3) Piercing damage if the target is Grappled by the mimic\u2014plus 4 (1d8) Acid damage.",
         "attack_bonus": 5,
-        "damage": "7 (1d8 + 3) Piercing damage—or 12 (2d8 + 3) Piercing damage if the target is Grappled by the mimic—plus 4 (1d8) Acid damage",
+        "damage": "7 (1d8 + 3) Piercing damage\u2014or 12 (2d8 + 3) Piercing damage if the target is Grappled by the mimic\u2014plus 4 (1d8) Acid damage",
         "damage_dice": "1d8 + 3",
         "damage_bonus": 3,
         "save_dc": 0,
@@ -28456,7 +29611,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "mind-flayer-arcanist",
@@ -28615,7 +29773,21 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark"
+    ],
+    "allies": [
+      "flumph",
+      "grimlock",
+      "intellect-devourer",
+      "ogre",
+      "quaggoth",
+      "troglodyte"
+    ],
+    "enemies": [
+      "purple-worm"
+    ]
   },
   {
     "index": "mind-flayer",
@@ -28767,7 +29939,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "minotaur-skeleton",
@@ -28871,7 +30046,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "minotaur-of-baphomet",
@@ -28977,7 +30155,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "modron-duodrone",
@@ -29081,7 +30262,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban",
+      "mountain"
+    ]
   },
   {
     "index": "modron-monodrone",
@@ -29185,7 +30370,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban",
+      "mountain"
+    ]
   },
   {
     "index": "modron-pentadrone",
@@ -29322,7 +30511,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban",
+      "mountain"
+    ]
   },
   {
     "index": "modron-quadrone",
@@ -29445,7 +30638,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban",
+      "mountain"
+    ]
   },
   {
     "index": "modron-tridrone",
@@ -29549,7 +30746,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban",
+      "mountain"
+    ]
   },
   {
     "index": "mud-mephit",
@@ -29661,7 +30862,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "mule",
@@ -29749,7 +30953,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "mummy-lord",
@@ -29950,7 +31157,13 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "desert"
+    ],
+    "allies": [
+      "priest"
+    ]
   },
   {
     "index": "mummy",
@@ -30072,7 +31285,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "myconid-adult",
@@ -30189,7 +31405,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "myconid-sovereign",
@@ -30334,7 +31553,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "myconid-spore-servant",
@@ -30424,7 +31646,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "myconid-sprout",
@@ -30480,9 +31705,9 @@
     "actions": [
       {
         "name": "Slam",
-        "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 − 1) Bludgeoning damage plus 2 (1d4) Poison damage.",
+        "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 \u2212 1) Bludgeoning damage plus 2 (1d4) Poison damage.",
         "attack_bonus": 1,
-        "damage": "1 (1d4 − 1) Bludgeoning damage plus 2 (1d4) Poison damage",
+        "damage": "1 (1d4 \u2212 1) Bludgeoning damage plus 2 (1d4) Poison damage",
         "damage_dice": "1d4",
         "damage_bonus": -1,
         "save_dc": 0,
@@ -30527,7 +31752,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "nalfeshnee",
@@ -30669,7 +31897,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "Justin Gerard",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "needle-blight",
@@ -30769,7 +32000,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "night-hag",
@@ -30937,7 +32171,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "Cynthia Sheppard",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "nightmare",
@@ -31046,7 +32283,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "noble-prodigy",
@@ -31172,7 +32412,23 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban"
+    ],
+    "allies": [
+      "assassin",
+      "commoner",
+      "guard",
+      "knight",
+      "mage",
+      "scout",
+      "spy"
+    ],
+    "enemies": [
+      "bandit",
+      "bandit-captain"
+    ]
   },
   {
     "index": "noble",
@@ -31278,7 +32534,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "nothic",
@@ -31414,7 +32673,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "nycaloth",
@@ -31545,7 +32807,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "ochre-jelly",
@@ -31656,7 +32921,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "octopus",
@@ -31763,7 +33031,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "Jonathan Kuo"
+    "artist": "Jonathan Kuo",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "ogre-zombie",
@@ -31855,7 +33126,24 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "arctic",
+      "coastal",
+      "desert",
+      "forest",
+      "grassland",
+      "hill",
+      "mountain",
+      "swamp",
+      "underdark"
+    ],
+    "allies": [
+      "mind-flayer",
+      "oni",
+      "troll",
+      "wereboar"
+    ]
   },
   {
     "index": "ogre",
@@ -31956,7 +33244,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "mountain"
+    ]
   },
   {
     "index": "ogrillon-ogre",
@@ -32056,7 +33347,12 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "hill",
+      "mountain",
+      "underdark"
+    ]
   },
   {
     "index": "oni",
@@ -32223,7 +33519,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "otyugh",
@@ -32349,7 +33648,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "owl",
@@ -32364,7 +33666,7 @@
     "armor_class_details": "",
     "armor_class_options": [],
     "hit_points": 1,
-    "hit_dice": "1d4 − 1",
+    "hit_dice": "1d4 \u2212 1",
     "speed": {
       "walk": "5 ft.",
       "fly": "60 ft.",
@@ -32446,7 +33748,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "owlbear",
@@ -32549,7 +33854,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "panther",
@@ -32648,7 +33956,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "pegasus",
@@ -32737,7 +34048,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "performer-legend",
@@ -32889,7 +34203,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "performer-maestro",
@@ -33037,7 +34354,10 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "performer",
@@ -33141,7 +34461,10 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "peryton",
@@ -33267,7 +34590,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "Sean Murray",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "phase-spider",
@@ -33390,7 +34716,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "piercer",
@@ -33498,7 +34827,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "piranha",
@@ -33513,7 +34845,7 @@
     "armor_class_details": "",
     "armor_class_options": [],
     "hit_points": 1,
-    "hit_dice": "1d4 − 1",
+    "hit_dice": "1d4 \u2212 1",
     "speed": {
       "walk": "5 ft.",
       "fly": "",
@@ -33586,7 +34918,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underwater"
+    ]
   },
   {
     "index": "pirate-admiral",
@@ -33726,7 +35061,11 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "coastal",
+      "underwater"
+    ]
   },
   {
     "index": "pirate-captain",
@@ -33862,7 +35201,11 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "coastal",
+      "underwater"
+    ]
   },
   {
     "index": "pirate",
@@ -33976,7 +35319,11 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "coastal",
+      "underwater"
+    ]
   },
   {
     "index": "pit-fiend",
@@ -34148,7 +35495,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "pixie-wonderbringer",
@@ -34284,7 +35634,19 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ],
+    "allies": [
+      "deer",
+      "mage",
+      "sprite",
+      "unicorn"
+    ],
+    "enemies": [
+      "ettercap"
+    ]
   },
   {
     "index": "pixie",
@@ -34299,7 +35661,7 @@
     "armor_class_details": "",
     "armor_class_options": [],
     "hit_points": 9,
-    "hit_dice": "6d4 − 6",
+    "hit_dice": "6d4 \u2212 6",
     "speed": {
       "walk": "10 ft.",
       "fly": "30 ft.",
@@ -34396,7 +35758,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "planetar",
@@ -34553,7 +35918,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "plesiosaurus",
@@ -34650,7 +36018,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "polar-bear",
@@ -34758,7 +36129,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "poltergeist",
@@ -34902,7 +36276,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban",
+      "underdark"
+    ]
   },
   {
     "index": "pony",
@@ -34985,7 +36363,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "priest-acolyte",
@@ -35116,7 +36497,16 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban"
+    ],
+    "allies": [
+      "clay-golem",
+      "grimlock",
+      "mummy",
+      "mummy-lord"
+    ]
   },
   {
     "index": "priest",
@@ -35265,7 +36655,10 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "primeval-owlbear",
@@ -35386,7 +36779,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest",
+      "mountain"
+    ]
   },
   {
     "index": "pseudodragon",
@@ -35512,7 +36909,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "psychic-gray-ooze",
@@ -35639,7 +37039,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "pteranodon",
@@ -35732,7 +37135,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "purple-worm",
@@ -35856,7 +37262,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "quaggoth-thonot",
@@ -35986,7 +37395,13 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark"
+    ],
+    "allies": [
+      "mind-flayer"
+    ]
   },
   {
     "index": "quaggoth",
@@ -36097,7 +37512,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "quasit",
@@ -36240,7 +37658,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "questing-knight",
@@ -36390,7 +37811,11 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "urban",
+      "grassland"
+    ]
   },
   {
     "index": "rakshasa",
@@ -36543,7 +37968,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "rat",
@@ -36558,7 +37986,7 @@
     "armor_class_details": "",
     "armor_class_options": [],
     "hit_points": 1,
-    "hit_dice": "1d4 − 1",
+    "hit_dice": "1d4 \u2212 1",
     "speed": {
       "walk": "20 ft.",
       "fly": "",
@@ -36636,7 +38064,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "Katerina Ladon"
+    "artist": "Katerina Ladon",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "raven",
@@ -36729,7 +38160,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "red-dragon-wyrmling",
@@ -36851,7 +38285,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "red-slaad",
@@ -36926,7 +38363,7 @@
       },
       {
         "name": "Injecting Claw",
-        "description": "Melee Attack Roll: +6, reach 10 ft. Hit: 10 (2d6 + 3) Piercing damage. If the target is a Humanoid not cursed by a slaad, it is subjected to the following effect. Constitution Saving Throw: DC 14. Failure: The target is <strong>cursed</strong> unawares, and a minuscule slaad egg is implanted in it. Removing the curse destroys the egg.<br><br>Over 2d4 × 10 days, the egg gestates. In the final 24 hours, the cursed target feels unwell; its Speed is halved, and it has Disadvantage on <strong>D20 Tests</strong>.<br>At the end of this time, the egg turns into a <strong>Slaad Tadpole</strong>, which chews out of the host and kills it.",
+        "description": "Melee Attack Roll: +6, reach 10 ft. Hit: 10 (2d6 + 3) Piercing damage. If the target is a Humanoid not cursed by a slaad, it is subjected to the following effect. Constitution Saving Throw: DC 14. Failure: The target is <strong>cursed</strong> unawares, and a minuscule slaad egg is implanted in it. Removing the curse destroys the egg.<br><br>Over 2d4 \u00d7 10 days, the egg gestates. In the final 24 hours, the cursed target feels unwell; its Speed is halved, and it has Disadvantage on <strong>D20 Tests</strong>.<br>At the end of this time, the egg turns into a <strong>Slaad Tadpole</strong>, which chews out of the host and kills it.",
         "attack_bonus": 6,
         "damage": "10 (2d6 + 3) Piercing damage",
         "damage_dice": "2d6 + 3",
@@ -36969,7 +38406,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "reef-shark",
@@ -37066,7 +38506,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "remorhaz",
@@ -37165,7 +38608,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "revenant",
@@ -37304,7 +38750,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "rhinoceros",
@@ -37387,7 +38836,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "Polar Engine"
+    "artist": "Polar Engine",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "riding-horse",
@@ -37470,7 +38922,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "roc",
@@ -37594,7 +39049,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "roper",
@@ -37734,7 +39192,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "rust-monster",
@@ -37818,7 +39279,7 @@
       },
       {
         "name": "Antennae",
-        "description": "The rust monster targets one nonmagical metal object—armor or a weapon—worn or carried by a creature within 5 feet of itself. Dexterity Saving Throw: DC 11, the creature with the object. Failure: The object takes a −1 penalty to the AC it offers (armor) or to its attack rolls (weapon). Armor is destroyed if the penalty reduces its AC to 10, and a weapon is destroyed if its penalty reaches −5. The penalty can be removed by casting the <strong>Mending</strong> spell on the armor or weapon.",
+        "description": "The rust monster targets one nonmagical metal object\u2014armor or a weapon\u2014worn or carried by a creature within 5 feet of itself. Dexterity Saving Throw: DC 11, the creature with the object. Failure: The object takes a \u22121 penalty to the AC it offers (armor) or to its attack rolls (weapon). Armor is destroyed if the penalty reduces its AC to 10, and a weapon is destroyed if its penalty reaches \u22125. The penalty can be removed by casting the <strong>Mending</strong> spell on the armor or weapon.",
         "attack_bonus": 0,
         "damage": "",
         "damage_dice": "",
@@ -37871,7 +39332,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "saber-toothed-tiger",
@@ -37989,7 +39453,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "Michele Giorgi"
+    "artist": "Michele Giorgi",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "sahuagin-baron",
@@ -38117,7 +39584,11 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal",
+      "underwater"
+    ]
   },
   {
     "index": "sahuagin-priest",
@@ -38260,7 +39731,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underwater",
+      "coastal"
+    ]
   },
   {
     "index": "sahuagin-warrior",
@@ -38385,7 +39860,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underwater",
+      "coastal"
+    ]
   },
   {
     "index": "salamander-fire-snake",
@@ -38477,7 +39956,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "desert",
+      "mountain"
+    ]
   },
   {
     "index": "salamander-inferno-master",
@@ -38608,7 +40091,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "desert",
+      "mountain"
+    ]
   },
   {
     "index": "salamander",
@@ -38729,7 +40216,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "satyr-revelmaster",
@@ -38858,7 +40348,13 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "Daarken"
+    "artist": "Daarken",
+    "environments": [
+      "forest"
+    ],
+    "allies": [
+      "unicorn"
+    ]
   },
   {
     "index": "satyr",
@@ -38974,7 +40470,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "scarecrow",
@@ -39083,7 +40582,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "scorpion",
@@ -39098,7 +40600,7 @@
     "armor_class_details": "",
     "armor_class_options": [],
     "hit_points": 1,
-    "hit_dice": "1d4 − 1",
+    "hit_dice": "1d4 \u2212 1",
     "speed": {
       "walk": "10 ft.",
       "fly": "",
@@ -39166,7 +40668,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "scout-captain",
@@ -39307,7 +40812,24 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "forest",
+      "grassland",
+      "hill"
+    ],
+    "allies": [
+      "assassin",
+      "bandit",
+      "bandit-captain",
+      "commoner",
+      "guard",
+      "knight",
+      "mage",
+      "noble",
+      "spy",
+      "warrior-veteran"
+    ]
   },
   {
     "index": "scout",
@@ -39440,7 +40962,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "sea-hag",
@@ -39565,7 +41090,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "seahorse",
@@ -39580,7 +41108,7 @@
     "armor_class_details": "",
     "armor_class_options": [],
     "hit_points": 1,
-    "hit_dice": "1d4 − 1",
+    "hit_dice": "1d4 \u2212 1",
     "speed": {
       "walk": "5 ft.",
       "fly": "",
@@ -39662,7 +41190,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underwater"
+    ]
   },
   {
     "index": "shadow-demon",
@@ -39792,7 +41323,11 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark",
+      "urban"
+    ]
   },
   {
     "index": "shadow-dragon",
@@ -39949,7 +41484,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": ""
+    "artist": "",
+    "environments": [
+      "underdark",
+      "mountain"
+    ]
   },
   {
     "index": "shadow",
@@ -40074,7 +41613,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "shambling-mound",
@@ -40203,7 +41745,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "shield-guardian",
@@ -40328,7 +41873,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "shrieker-fungus",
@@ -40398,7 +41946,13 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "underdark"
+    ],
+    "enemies": [
+      "hook-horror"
+    ]
   },
   {
     "index": "silver-dragon-wyrmling",
@@ -40502,7 +42056,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "ANNA PODEDWORNA"
+    "artist": "ANNA PODEDWORNA",
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "skeleton",
@@ -40590,7 +42147,10 @@
     ],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "slaad-tadpole",
@@ -40676,7 +42236,10 @@
     ],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "smoke-mephit",
@@ -40773,7 +42336,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "solar",
@@ -40910,7 +42476,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "CARLO ARELLANO",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "spectator",
@@ -41033,7 +42602,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "specter",
@@ -41133,7 +42705,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "sphinx-of-lore",
@@ -41268,7 +42843,11 @@
     ],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "desert",
+      "mountain"
+    ]
   },
   {
     "index": "sphinx-of-secrets",
@@ -41383,7 +42962,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "HAZEM AMEEN"
+    "artist": "HAZEM AMEEN",
+    "environments": [
+      "desert",
+      "mountain"
+    ]
   },
   {
     "index": "sphinx-of-valor",
@@ -41533,7 +43116,11 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "HAZEM AMEEN, CYPRIEN ROUSSON"
+    "artist": "HAZEM AMEEN, CYPRIEN ROUSSON",
+    "environments": [
+      "desert",
+      "mountain"
+    ]
   },
   {
     "index": "sphinx-of-wonder",
@@ -41629,7 +43216,11 @@
     ],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "desert",
+      "mountain"
+    ]
   },
   {
     "index": "spider",
@@ -41644,7 +43235,7 @@
     "armor_class_details": "",
     "armor_class_options": [],
     "hit_points": 1,
-    "hit_dice": "1d4 − 1",
+    "hit_dice": "1d4 \u2212 1",
     "speed": {
       "walk": "20 ft.",
       "climb": "20 ft."
@@ -41712,7 +43303,10 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "spined-devil",
@@ -41810,7 +43404,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "TARAS SUSAK",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "spirit-naga",
@@ -41905,7 +43502,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "sprite",
@@ -42003,7 +43603,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "spy-master",
@@ -42126,7 +43729,24 @@
       "Thieves' Tools"
     ],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "urban"
+    ],
+    "allies": [
+      "assassin",
+      "bandit",
+      "bandit-captain",
+      "commoner",
+      "mage",
+      "noble",
+      "scout"
+    ],
+    "enemies": [
+      "guard",
+      "knight",
+      "warrior-veteran"
+    ]
   },
   {
     "index": "spy",
@@ -42236,7 +43856,10 @@
       "Thieves' Tools"
     ],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "steam-mephit",
@@ -42334,7 +43957,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "stirge",
@@ -42406,7 +44032,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "JOHN TEDRICK",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "stone-giant",
@@ -42509,7 +44138,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "mountain"
+    ]
   },
   {
     "index": "stone-golem",
@@ -42614,7 +44246,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "storm-giant",
@@ -42739,7 +44374,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "mountain"
+    ]
   },
   {
     "index": "succubus",
@@ -42863,7 +44501,11 @@
     ],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "urban",
+      "underdark"
+    ]
   },
   {
     "index": "swarm-of-bats",
@@ -42951,7 +44593,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "swarm-of-crawling-claws",
@@ -43043,7 +44688,11 @@
     ],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "underdark",
+      "urban"
+    ]
   },
   {
     "index": "swarm-of-dretches",
@@ -43142,7 +44791,10 @@
     ],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "swarm-of-insects",
@@ -43234,7 +44886,10 @@
     ],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "swarm-of-larvae",
@@ -43320,7 +44975,10 @@
     ],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "swarm-of-lemures",
@@ -43418,7 +45076,10 @@
     ],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "swarm-of-piranhas",
@@ -43433,7 +45094,7 @@
     "armor_class_details": "",
     "armor_class_options": [],
     "hit_points": 28,
-    "hit_dice": "8d8 − 8",
+    "hit_dice": "8d8 \u2212 8",
     "speed": {
       "walk": "5 ft.",
       "swim": "40 ft."
@@ -43509,7 +45170,10 @@
     ],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "underwater"
+    ]
   },
   {
     "index": "swarm-of-rats",
@@ -43524,7 +45188,7 @@
     "armor_class_details": "",
     "armor_class_options": [],
     "hit_points": 14,
-    "hit_dice": "4d8 − 4",
+    "hit_dice": "4d8 \u2212 4",
     "speed": {
       "walk": "30 ft.",
       "climb": "30 ft."
@@ -43597,7 +45261,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "ROWAN HOLLOWAY"
+    "artist": "ROWAN HOLLOWAY",
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "swarm-of-ravens",
@@ -43694,7 +45361,10 @@
     ],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "swarm-of-stirges",
@@ -43781,7 +45451,10 @@
     ],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "swarm-of-venomous-snakes",
@@ -43830,10 +45503,10 @@
     "actions": [
       {
         "name": "Bites",
-        "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 8 (1d8 + 4) Piercing damage—or 6 (1d4 + 4) Piercing damage if the swarm is Bloodied—plus 10 (3d6) Poison damage.",
+        "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 8 (1d8 + 4) Piercing damage\u2014or 6 (1d4 + 4) Piercing damage if the swarm is Bloodied\u2014plus 10 (3d6) Poison damage.",
         "attack_bonus": 6,
         "reach": "5 ft.",
-        "damage": "8 (1d8 + 4) Piercing damage—or 6 (1d4 + 4) Piercing damage if the swarm is Bloodied—plus 10 (3d6) Poison damage",
+        "damage": "8 (1d8 + 4) Piercing damage\u2014or 6 (1d4 + 4) Piercing damage if the swarm is Bloodied\u2014plus 10 (3d6) Poison damage",
         "damage_dice": "1d8 + 4"
       }
     ],
@@ -43868,7 +45541,12 @@
     ],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "forest",
+      "swamp",
+      "desert"
+    ]
   },
   {
     "index": "tarrasque",
@@ -44023,7 +45701,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "thri-kreen-marauder",
@@ -44122,7 +45803,11 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "desert",
+      "grassland"
+    ]
   },
   {
     "index": "thri-kreen-psion",
@@ -44213,7 +45898,11 @@
     ],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "desert",
+      "grassland"
+    ]
   },
   {
     "index": "tiger",
@@ -44296,7 +45985,10 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "tough-boss",
@@ -44386,7 +46078,10 @@
       "Warhammer"
     ],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "tough",
@@ -44473,7 +46168,10 @@
     ],
     "habitat": "",
     "treasure": "",
-    "artist": "RICCARDO MOSCATELLO"
+    "artist": "RICCARDO MOSCATELLO",
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "treant",
@@ -44570,7 +46268,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "tree-blight",
@@ -44664,7 +46365,10 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "triceratops",
@@ -44736,7 +46440,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "APRIL PRIME"
+    "artist": "APRIL PRIME",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "troglodyte",
@@ -44821,7 +46528,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "troll-limb",
@@ -44899,7 +46609,16 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "hill",
+      "mountain",
+      "underdark"
+    ],
+    "allies": [
+      "ettin",
+      "ogre"
+    ]
   },
   {
     "index": "troll",
@@ -44993,7 +46712,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "JOHN TEDRICK",
-    "image": true
+    "image": true,
+    "environments": [
+      "mountain"
+    ]
   },
   {
     "index": "twig-blight",
@@ -45078,7 +46800,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "BRIAN VALEZA",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "tyrannosaurus-rex",
@@ -45164,7 +46889,10 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "ultroloth",
@@ -45291,7 +47019,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "umber-hulk",
@@ -45380,7 +47111,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "unicorn",
@@ -45501,7 +47235,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "vampire-familiar",
@@ -45604,7 +47341,14 @@
       "Daggers (10)"
     ],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "urban",
+      "underdark"
+    ],
+    "allies": [
+      "vampire-spawn"
+    ]
   },
   {
     "index": "vampire-nightbringer",
@@ -45724,7 +47468,14 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "CARLO ARELLANO"
+    "artist": "CARLO ARELLANO",
+    "environments": [
+      "urban",
+      "underdark"
+    ],
+    "allies": [
+      "vampire-spawn"
+    ]
   },
   {
     "index": "vampire-spawn",
@@ -45832,7 +47583,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "vampire-umbral-lord",
@@ -45975,7 +47729,14 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "FURY GALLUZZI"
+    "artist": "FURY GALLUZZI",
+    "environments": [
+      "urban",
+      "underdark"
+    ],
+    "allies": [
+      "vampire-spawn"
+    ]
   },
   {
     "index": "vampire",
@@ -46112,7 +47873,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "venomous-snake",
@@ -46181,7 +47945,12 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "forest",
+      "swamp",
+      "desert"
+    ]
   },
   {
     "index": "vine-blight",
@@ -46263,7 +48032,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "violet-fungus-necrohulk",
@@ -46357,7 +48129,13 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "underdark"
+    ],
+    "enemies": [
+      "hook-horror"
+    ]
   },
   {
     "index": "violet-fungus",
@@ -46434,7 +48212,10 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "vrock",
@@ -46544,7 +48325,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "VALERA LUTFULLINA",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "vulture",
@@ -46622,7 +48406,10 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "warhorse-skeleton",
@@ -46697,7 +48484,14 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "urban"
+    ],
+    "allies": [
+      "death-knight",
+      "knight"
+    ]
   },
   {
     "index": "warhorse",
@@ -46764,7 +48558,10 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "warrior-commander",
@@ -46873,7 +48670,11 @@
       "Plate Armor"
     ],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "urban",
+      "grassland"
+    ]
   },
   {
     "index": "warrior-infantry",
@@ -46950,7 +48751,11 @@
       "Spear"
     ],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "urban",
+      "grassland"
+    ]
   },
   {
     "index": "warrior-veteran",
@@ -47050,7 +48855,11 @@
       "Splint Armor"
     ],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "urban",
+      "grassland"
+    ]
   },
   {
     "index": "water-elemental",
@@ -47157,7 +48966,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "CHRIS COLD",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "water-weird",
@@ -47250,7 +49062,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "CRYSTAL SULLY",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "weasel",
@@ -47265,7 +49080,7 @@
     "armor_class_details": "",
     "armor_class_options": [],
     "hit_points": 1,
-    "hit_dice": "1d4 − 1",
+    "hit_dice": "1d4 \u2212 1",
     "speed": {
       "walk": "30 ft.",
       "climb": "30 ft."
@@ -47332,7 +49147,10 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "werebear",
@@ -47439,7 +49257,10 @@
     ],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "wereboar",
@@ -47543,7 +49364,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "SLAWOMIR MANIAK",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "wererat",
@@ -47652,7 +49476,10 @@
     ],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "weretiger",
@@ -47764,7 +49591,10 @@
     ],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "werewolf",
@@ -47878,7 +49708,10 @@
     "habitat": "",
     "treasure": "",
     "artist": "CRISTI BALANESCU",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "white-dragon-wyrmling",
@@ -47980,7 +49813,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "artist": "VANCE KOVACS"
+    "artist": "VANCE KOVACS",
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "wight",
@@ -48092,7 +49928,10 @@
     ],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "winged-kobold",
@@ -48107,7 +49946,7 @@
     "armor_class_details": "",
     "armor_class_options": [],
     "hit_points": 10,
-    "hit_dice": "4d6 − 4",
+    "hit_dice": "4d6 \u2212 4",
     "speed": {
       "walk": "30 ft.",
       "fly": "30 ft."
@@ -48180,7 +50019,10 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "winter-wolf",
@@ -48274,7 +50116,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "wisp",
@@ -48372,6 +50217,10 @@
         "name": "Vanish",
         "description": "The wisp and its light have the <strong>Invisible</strong> condition until the wisp's <strong>Concentration</strong> ends on this effect, which ends early immediately after the wisp makes an attack roll or uses Consume Life."
       }
+    ],
+    "environments": [
+      "forest",
+      "swamp"
     ]
   },
   {
@@ -48455,7 +50304,10 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "worg",
@@ -48530,7 +50382,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "forest"
+    ]
   },
   {
     "index": "wraith",
@@ -48633,7 +50488,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "wyvern",
@@ -48721,7 +50579,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "xorn",
@@ -48834,7 +50695,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "yeti",
@@ -48941,7 +50805,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "yochlol",
@@ -49066,7 +50933,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "urban"
+    ]
   },
   {
     "index": "young-black-dragon",
@@ -49167,7 +51037,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "young-blue-dragon",
@@ -49263,7 +51136,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "young-brass-dragon",
@@ -49371,7 +51247,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "young-bronze-dragon",
@@ -49484,7 +51363,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "young-copper-dragon",
@@ -49592,7 +51474,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "young-gold-dragon",
@@ -49709,7 +51594,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "young-green-dragon",
@@ -49815,7 +51703,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "young-red-dragon",
@@ -49911,7 +51802,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "young-remorhaz",
@@ -49991,7 +51885,10 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "young-silver-dragon",
@@ -50098,7 +51995,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "young-white-dragon",
@@ -50200,7 +52100,10 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "coastal"
+    ]
   },
   {
     "index": "yuan-ti-abomination",
@@ -50319,7 +52222,10 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "underdark"
+    ]
   },
   {
     "index": "yuan-ti-infiltrator",
@@ -50427,7 +52333,12 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "underdark",
+      "forest",
+      "swamp"
+    ]
   },
   {
     "index": "yuan-ti-malison-type-1",
@@ -50532,7 +52443,15 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "underdark",
+      "forest",
+      "swamp"
+    ],
+    "enemies": [
+      "guardian-naga"
+    ]
   },
   {
     "index": "yuan-ti-malison-type-2",
@@ -50628,7 +52547,15 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "underdark",
+      "forest",
+      "swamp"
+    ],
+    "enemies": [
+      "guardian-naga"
+    ]
   },
   {
     "index": "yuan-ti-malison-type-3",
@@ -50736,7 +52663,15 @@
     "resistances": [],
     "equipment": [],
     "habitat": "",
-    "treasure": ""
+    "treasure": "",
+    "environments": [
+      "underdark",
+      "forest",
+      "swamp"
+    ],
+    "enemies": [
+      "guardian-naga"
+    ]
   },
   {
     "index": "zombie",
@@ -50815,6 +52750,9 @@
     "equipment": [],
     "habitat": "",
     "treasure": "",
-    "image": true
+    "image": true,
+    "environments": [
+      "underdark"
+    ]
   }
 ]
