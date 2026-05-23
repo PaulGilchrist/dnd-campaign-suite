@@ -1,0 +1,67 @@
+[
+  {
+    "id": "b1a2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Kaelen Ironoak",
+    "race": "Half-Elf",
+    "classRole": "Scholar of Feywild Lore",
+    "appearance": "Kaelen is a lean half-elf in his early forties, with sun-weathered skin, autumn-brown hair streaked with grey, and keen hazel eyes that seem to miss nothing. He wears practical scholar's robes of forest green and brown, a weathered leather satchel always at his hip, and carries a gnarled walking staff covered in elven script. His fingers are stained with ink and faintly glow with residual fey-touched magic.",
+    "personality": "Kaelen is earnest and passionate about his research, sometimes to the point of obliviousness. He speaks with infectious enthusiasm about ancient lore and can lecture for hours on elven history. He is deeply empathetic and genuinely wants to help, but struggles with guilt over not discovering the Thorned One's return sooner. **Ideal:** 'Knowledge must be preserved and shared, for it is the light that banishes darkness.' **Bond:** 'I spent a decade studying Thornfast Keep; I will not let it fall to ruin.' **Flaw:** 'I sometimes prioritize my research over the safety of those around me.'",
+    "goals": "Kaelen seeks to reforge the ancient seal on the Thorned One before the Feywild corruption spreads beyond the Misty Forest. He also hopes to recover lost elven scrolls from within Thornfast Keep to complete his life's research.",
+    "secrets": "Kaelen unknowingly carries a spark of fey magic within him — his grandmother was a fey-touched elven mage who helped build the original seal. This makes him vulnerable to the Thorned One's influence, but also gives him a unique connection to the seal's magic.",
+    "notes": "Quest giver. Can provide the party with 2 Potions of Healing and a Scroll of Detect Magic before they enter. He waits at the entrance camp outside Thornfast Keep.",
+    "tags": "Quest Giver, Scholar, Ally",
+    "attitude": "positive"
+  },
+  {
+    "id": "c2b3d4e5-f6a7-8901- bcde-f12345678901",
+    "name": "Selena Moonshadow",
+    "race": "Elf",
+    "classRole": "Emerald Warden Ranger",
+    "appearance": "Selena is a tall wood elf with silver-streaked black hair pulled into a severe braid. Her pale blue eyes have a haunted quality. She wears camouflaged studded leather armor adorned with leaves and moss, and carries a longbow carved from duskwood. A silver crescent moon emblem hangs around her neck — the symbol of the Emerald Wardens. Faint, jagged scars along her left arm glow with a sickly green hue, marks of a close encounter with the Thorned One's corruption.",
+    "personality": "Selena is stoic and professional, speaking in measured tones. Years of solitary vigilance have made her guarded, but she warms to those who prove themselves capable. She has a dry wit that emerges in tense moments. **Ideal:** 'The natural order must be protected from unnatural corruption.' **Bond:** 'I failed to stop the Thorned One's return once. I will not fail again.' **Flaw:** 'I trust too easily in the wisdom of the old ways, which can make me inflexible.'",
+    "goals": "Selena wants to purge the corruption from Thornfast Keep and ensure the Emerald Wardens' ancient duty is fulfilled. She also secretly hopes to find her predecessor's remains within the keep and give them a proper burial.",
+    "secrets": "Selena's predecessor as Warden of Thornfast was her older brother, who disappeared into the keep a decade ago. She has reason to believe he may still be alive — corrupted and transformed by the Thorned One's influence. The corrupted elven spirits the party fights might include remnants of the former Wardens.",
+    "notes": "Potential ally. Selena has been tracking the corruption for weeks and can guide the party through the Misty Forest to Thornfast Keep's entrance. She knows the surface layout but has not ventured below the crypt level. She fights alongside the party in the Medium Dungeon encounter if they earn her trust.",
+    "tags": "Ally, Ranger, Emerald Warden",
+    "attitude": "neutral"
+  },
+  {
+    "id": "d4e5f6a7-b890-1234-cdef-123456789012",
+    "name": "Mother Thorn",
+    "race": "Corrupted Fey",
+    "classRole": "Avatar of the Thorned One",
+    "appearance": "Mother Thorn appears as a gaunt, seven-foot-tall elven woman with bark-like skin, thorny vines growing through her flesh like veins. Her hair is a tangle of dead briars, and her eyes glow with sickly amber light. Her fingers end in wicked wooden claws. She wears a tattered gown of autumn leaves long since rotted, and a crown of twisted black thorns sits upon her brow. A faint shimmer of Feywild energy distorts the air around her.",
+    "personality": "Mother Thorn speaks in a voice like rustling dry leaves and cracking branches — beautiful and terrible. She genuinely believes she is saving the Material Plane from itself, seeking to merge it with the Feywild to create a world of wild, unfettered beauty. She is patient, calculating, and views the party as children playing with forces they cannot comprehend. **Ideal:** 'All boundaries are prisons. Freedom lies in chaos.' **Bond:** 'Thornfast Keep was my prison. Now it shall be my throne.' **Flaw:** 'My arrogance blinds me to the possibility that I might be wrong.'",
+    "goals": "Mother Thorn seeks to tear down the final seal anchoring the Feywild crossing, allowing her influence to flood the Misty Forest and transform it into a new domain under her control. She also wants to corrupt or destroy any remaining Emerald Wardens.",
+    "secrets": "Mother Thorn was once a noble archfey of the Summer Court, charged with guarding the Feywild crossing. When the elven builders of Thornfast Keep bound her to prevent a Feywild invasion, her rage and bitterness twisted her into what she is now. The Warlock's Archfey patron may know her as a fallen cousin, and the Sorcerer's Wild Magic is drawn to her presence like a beacon.",
+    "notes": "Final antagonist. Uses Green Hag stat block (2024). She lairs in the Ancient Tomb, where the seal's central anchor is located. Her presence causes Wild Magic surges within the tomb. She can be negotiated with briefly before combat begins.",
+    "tags": "Antagonist, Archfey, Boss",
+    "attitude": "extreme opposition"
+  },
+  {
+    "id": "e5f6a7b8-c901-2345-defa-234567890123",
+    "name": "Thistle",
+    "race": "Sprite",
+    "classRole": "Fey Captive",
+    "appearance": "Thistle is a tiny sprite, barely eight inches tall, with iridescent blue-green dragonfly wings that shimmer with faint fey light. She has bright green skin, wide silver eyes, and hair like dandelion fluff that floats around her head. She wears a dress woven from flower petals and spider silk, now torn and dirty from captivity. A crude iron shackle on her ankle dampens her magic.",
+    "personality": "Thistle is cheerful and talkative despite her captivity, possessing the innate curiosity of all sprites. She chatters constantly when given the chance but grows quiet and fearful when the cultists are near. She has a mischievous streak and delights in minor pranks. **Ideal:** 'Freedom is the birthright of all living things.' **Bond:** 'My grove in the Feywild was destroyed by the Thorned One's blight.' **Flaw:** 'My curiosity often gets me into trouble I cannot escape on my own.'",
+    "goals": "Thistle wants to escape captivity and return to the Feywild to warn her kin about the Thorned One's growing power. She also wants to see the cultists who imprisoned her get their comeuppance.",
+    "secrets": "Thistle knows the location of a hidden passage within the Large Keep that leads directly to the Mega Dungeon levels, bypassing several dangerous patrols. She also knows that the Thorned One can be weakened by disrupting the three seal anchors hidden throughout the dungeon.",
+    "notes": "Captive/informant. Found in the Large Keep (held in a cage in the eastern guard room). If freed, she provides invaluable information about the fortress layout, the Thorned One's weaknesses, and the three seal anchors. She can also turn invisible for reconnaissance. She refuses to go deeper than the Mega Dungeon out of fear.",
+    "tags": "Informant, Captive, Fey",
+    "attitude": "positive"
+  },
+  {
+    "id": "f6a7b8c9-d012-3456-efab-345678901234",
+    "name": "Brother Aldric",
+    "race": "Human",
+    "classRole": "Cult Leader of the Thorned Court",
+    "appearance": "Brother Aldric is a middle-aged human with a shaved head and intricate thorn-and-vine tattoos covering his scalp and neck. He wears dark grey robes embroidered with twisted silver patterns that seem to writhe when glimpsed from the corner of the eye. A pendant of black iron shaped like a thorn-balled crown hangs around his neck. His eyes have a faint amber tint — the first sign of fey corruption taking root.",
+    "personality": "Aldric is charismatic and persuasive, genuinely believing that the Thorned One's victory will bring about a better world. He speaks in honeyed tones and offers the party a chance to join the 'new order.' He is not inherently evil — just misguided and desperate for purpose after a lifetime of feeling insignificant. **Ideal:** 'The old world is dying. A new one must be born from its ashes.' **Bond:** 'Mother Thorn gave me purpose when I had none.' **Flaw:** 'I am terrified of being unimportant again, which makes me cling to my faith in the Thorned One.'",
+    "goals": "Brother Aldric wants to protect the Thorned One's sanctum and ensure the ritual to tear down the final seal succeeds. He also hopes to recruit new members to the Thorned Court, especially those with visible power (like the Sorcerer or Warlock).",
+    "secrets": "Aldric is not actually loyal to the Thorned One — he is terrified of her and believes serving her is the only way to survive. If confronted and given a path to redemption, he can be persuaded to reveal the location of the three seal anchors and the password to bypass a magical ward in the Mega Dungeon. He does not know that the Thorned One plans to consume him once the seal falls.",
+    "notes": "Social encounter NPC. Found in the Large Keep's great hall. Can be parleyed with — if the party succeeds on a DC 14 Persuasion or Intimidation check (or uses the Warlock's Mask of Many Faces cleverly), Aldric reveals key information. He is not a combatant (use Cultist stat block if forced to fight).",
+    "tags": "Cult Leader, Social Encounter, Redeemable",
+    "attitude": "negative"
+  }
+]

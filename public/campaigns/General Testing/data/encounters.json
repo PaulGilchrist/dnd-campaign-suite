@@ -1,0 +1,65 @@
+{
+  "encounters": [
+    {
+      "name": "Crypt Guardians",
+      "description": "**Location:** Small Crypt — Entrance Level\n\nAs the party descends the ancient stone stairs into the crypt, the air grows cold and still. The faint glow of torches reveals burial niches lining the walls, their contents long since pilfered — but the guardians remain. These elven dead were animated by the Thorned One's corrupting influence seeping through the foundations. They lurch to unlife as the party enters the central chamber.\n\n**Terrain Features:** The crypt has scattered rubble (difficult terrain) in the western corridor. The central chamber contains two stone pillars that provide half cover. The eastern sarcophagus (hard, AC 15, HP 20) can be pushed over to create a barrier or crush enemies.\n\n**Tactics:** Zombies advance slowly, attempting to grapple while Skeletons use shortbows from behind pillars. If reduced to 2 or fewer monsters, the remaining undead fight mindlessly to the end.\n\n**Development:** The party finds Kaelen's first clue here — a fragment of an elven wardstone etched with instructions for navigating the deeper levels.",
+      "savedAt": "2026-05-23T00:00:00Z",
+      "rulesVersion": "2024",
+      "difficulty": 1,
+      "playerLevels": [3, 3, 3, 3],
+      "selectedMonsters": [
+        { "index": "zombie", "name": "Zombie", "qty": 3 },
+        { "index": "skeleton", "name": "Skeleton", "qty": 2 }
+      ]
+    },
+    {
+      "name": "Twisted Growth",
+      "description": "**Location:** Medium Dungeon — Garrison Halls\n\nThe former barracks and training halls of Thornfast Keep have been overtaken by fey-touched plant life. Vines crawl across the walls, bioluminescent fungi pulse with eerie light, and the air is thick with spores. The Emerald Wardens' ancient garden — once a place of meditation — has become a predatory thicket.\n\n**Terrain Features:** The central hall is covered in **slick moss** (DC 10 Dexterity save or fall prone when moving through affected squares marked on the map). Three **spore pods** (AC 10, HP 5) hang from the ceiling — if destroyed, they release a cloud of choking spores (10-ft radius, DC 12 Constitution save or poisoned for 1 round). The Vine Blights are hidden among the plant growth, using their False Appearance trait.\n\n**Tactics:** Twig Blights swarm from the walls while Vine Blights use Entangling Plants to restrain characters. The blights prioritize isolated targets. The Sorcerer's Fire Bolt or the Paladin's area smite damage is highly effective here.\n\n**Development:** If Selena Moonshadow has joined the party, she recognizes the blights as a corruption of the Wardens' sacred garden. She guides the party to a hidden cache containing a Potion of Healing and an elven journal detailing the seal anchors.",
+      "savedAt": "2026-05-23T00:00:00Z",
+      "rulesVersion": "2024",
+      "difficulty": 1,
+      "playerLevels": [3, 3, 3, 3],
+      "selectedMonsters": [
+        { "index": "vine-blight", "name": "Vine Blight", "qty": 2 },
+        { "index": "twig-blight", "name": "Twig Blight", "qty": 4 }
+      ]
+    },
+    {
+      "name": "Corrupted Defenders",
+      "description": "**Location:** Large Keep — Main Hall and Armory\n\nThe heart of Thornfast Keep is a sprawling complex of great halls, armories, and living quarters. The Thorned Court has established its base of operations here, with Brother Aldric leading the cultists in prayer before the desecrated altar of what was once an elven shrine. Animated suits of elven plate armor patrol the corridors, and the anguished specter of a former Emerald Warden — Theron Moonshadow — haunts the war room.\n\n**Terrain Features:** The great hall has a **raised dais** (5 ft high, half cover for anyone behind it) where the altar sits. The armory contains **weapon racks** that can be used as improvised weapons or pushed over (create difficult terrain in a 10-ft cone). Braziers hanging from the ceiling deal 1d6 fire damage to anyone who ends their turn beneath them.\n\n**Tactics:** The Animated Armor engages the party's front line while the Specter uses Possession on the weakest-looking character. Two Cultists (Brother Aldric's followers) hurl insults and fire crossbows from the balcony. Aldric himself attempts to negotiate before combat begins — this is the **social encounter** opportunity.\n\n**Social Encounter:** Brother Aldric stands before the altar and offers the party a chance to join the Thorned Court. He can be convinced (DC 14 Persuasion) to reveal the seal anchor locations and the password for the Mega Dungeon ward. Intimidation (DC 12) also works — he is a coward at heart. The Warlock's fey connection or the Sorcerer's Wild Magic might grant advantage on these checks.",
+      "savedAt": "2026-05-23T00:00:00Z",
+      "rulesVersion": "2024",
+      "difficulty": 2,
+      "playerLevels": [3, 3, 3, 3],
+      "selectedMonsters": [
+        { "index": "animated-armor", "name": "Animated Armor", "qty": 1 },
+        { "index": "specter", "name": "Specter", "qty": 1 },
+        { "index": "cultist", "name": "Cultist", "qty": 2 }
+      ]
+    },
+    {
+      "name": "Webbed Depths",
+      "description": "**Location:** Mega Dungeon — Deep Foundations\n\nThe lowest levels of Thornfast Keep were built directly into the bedrock, and the Feywild seal's three anchor points were housed here. The corruption has attracted giant spiders and an ettercap from the Feywild, who have spun massive webs throughout the foundation chambers. The air is thick with webbing, and the walls pulse with an unnatural amber glow from the seal anchors.\n\n**Skill Challenge: Navigating the Web Tunnels**\nBefore the combat encounter, the party must navigate a maze of web-choked passages (DC 12 Survival to find the safe path, DC 14 Acrobatics to squeeze through tight gaps, DC 12 Perception to spot traps). Each character must succeed on at least one check; the group needs 3 successes before 3 failures. Failure triggers a surprise round for the spiders.\n\n**Terrain Features:** The chamber is a **web-filled cavern** (web squares are difficult terrain; webs can be burned away with fire). Four **web strands** connect to the ceiling — cutting them drops heavy debris on enemies below (DC 13 Dexterity save or 2d6 bludgeoning). The central pillar houses **Seal Anchor #3** (glowing crystal, AC 12, HP 15, needs 10+ damage in one hit or DC 13 Arcana to shatter).\n\n**Tactics:** The Ettercap hides in the webs above, ambushing with its Web attack. Giant Spiders climb walls and ceiling, targeting isolated characters. The spiders avoid the web-strand traps (they know where to stand). If the Ettercap is killed, the spiders flee.\n\n**Treasure:** In the webbed-over chest behind the seal anchor: a **Bag of Holding** and 80 gp.",
+      "savedAt": "2026-05-23T00:00:00Z",
+      "rulesVersion": "2024",
+      "difficulty": 2,
+      "playerLevels": [3, 3, 3, 3],
+      "selectedMonsters": [
+        { "index": "ettercap", "name": "Ettercap", "qty": 1 },
+        { "index": "giant-spider", "name": "Giant Spider", "qty": 2 }
+      ]
+    },
+    {
+      "name": "The Thorned One's Sanctum",
+      "description": "**Location:** Ancient Tomb — Final Sealed Sanctum\n\nBeyond a massive stone door carved with elven script lies the heart of Thornfast Keep — the sealed sanctum where the Thorned One was imprisoned a millennium ago. The chamber is circular, its domed ceiling painted with faded constellations. Three empty pedestals mark where the seal anchors once stood (the party has shattered them in previous levels). In the center, a blazing green crystal — the final seal — pulses with unstable energy. Mother Thorn stands before it, her thorny form silhouetted against the light.\n\n**Boss Mechanics:** This is a two-phase encounter.\n\n**Phase 1 — Mother Thorn:** She attacks with claws, spells, and illusory duplicates. Her **Illusory Duplicates** (use mirror image mechanic) create three copies that must be hit (AC 12) to dispel. She can use **Corruption's Grasp** (ranged spell attack, +5, 2d8 necrotic) and **Thorny Whip** (melee, +5, 1d10+3 piercing plus DC 13 Strength save or be pulled 10 ft closer).\n\n**Phase 2 — The Unstable Seal:** When Mother Thorn is reduced to 30 HP or fewer, she attempts to shatter the final seal and escape. The crystal begins overloading — it has AC 12, HP 20, and must be stabilized. The party must either:\n- Reforge the seal (DC 15 Arcana check as an action, requires 3 successes),\n- Or destroy the crystal (dealing 20+ damage to it) to collapse the Feywild passage, destroying Mother Thorn in the backlash.\n\n**Terrain Features:** The room has **wild magic zones** — every time a spell is cast, the caster rolls on the Wild Magic Surge table (the Sorcerer does NOT trigger this — their magic is in harmony with the chaos). Three **crystal pillars** provide cover but explode if destroyed (2d6 force damage in 10-ft radius).\n\n**Development:** If Brother Aldric was spared, he appears with a single loyal cultist to help, revealing the Thorned One's betrayal. If Thistle was freed, she appears at the climax to bless one party member with Pixie Dust (flight for 1 minute). The Warlock's patron may whisper guidance at a crucial moment.",
+      "savedAt": "2026-05-23T00:00:00Z",
+      "rulesVersion": "2024",
+      "difficulty": 3,
+      "playerLevels": [3, 3, 3, 3],
+      "selectedMonsters": [
+        { "index": "green-hag", "name": "Green Hag", "qty": 1 },
+        { "index": "will-o-wisp", "name": "Will-o'-Wisp", "qty": 1 }
+      ]
+    }
+  ]
+}

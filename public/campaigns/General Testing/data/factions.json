@@ -1,0 +1,26 @@
+[
+  {
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "The Thorned Court",
+    "description": "A growing cult of fey-worshippers, corrupted creatures, and disillusioned outcasts who serve the Thorned One. They believe she will tear down the boundaries between worlds and usher in a new era of wild, fey-touched freedom. The court has been active in the Misty Forest for the past three months, recruiting from isolated farmsteads and hunting camps. Their symbol is a crown of twisted black thorns.",
+    "goals": "Complete the ritual to shatter the final Feywild seal beneath Thornfast Keep. Recruit new members from nearby settlements. Eliminate or convert any Emerald Wardens who oppose them.",
+    "influence": 4,
+    "notes": "The court has approximately 15-20 members total, mostly low-level cultists and corrupted beasts. Their leadership consists of Mother Thorn (the avatar), Brother Aldric, and a handful of corrupted elven spirits. They have established a base of operations in the Large Keep level of Thornfast Keep."
+  },
+  {
+    "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    "name": "The Emerald Wardens",
+    "description": "An ancient elven order tasked with guarding the Feywild crossings of the Misty Forest. Founded over a thousand years ago, the Wardens built Thornfast Keep to seal a rogue fey incursion. Their numbers have dwindled to a handful of scattered rangers and sages, but their knowledge of the keep's secrets remains unequaled. Their symbol is a silver crescent moon over an oak leaf.",
+    "goals": "Prevent the Thorned One's escape and maintain the Feywild seal. Preserve the ancient elven knowledge stored within Thornfast Keep. Protect the Misty Forest and its inhabitants from planar corruption.",
+    "influence": 3,
+    "notes": "The Wardens are nearly extinct — Selena Moonshadow is one of the last active members. Their former headquarters in the keep was overrun. They have a small safehouse deep in the Misty Forest where they store backup records and supplies. If the party aids them, they may gain the Wardens as long-term allies."
+  },
+  {
+    "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "name": "The Gleaming Accord",
+    "description": "A secretive network of archfey agents who monitor the boundaries between the Feywild and the Material Plane. They operate from the shadows, rarely revealing themselves to mortals. The Archfey patron of the Warlock in the party is a member of the Accord's inner circle. The Accord views the Thorned One's actions as a direct threat to the delicate balance of power in the Feywild.",
+    "goals": "Contain and neutralize the Thorned One without triggering a war between Feywild courts. Ensure the seals remain intact. Prevent mortals from learning too much about Feywild crossings.",
+    "influence": 7,
+    "notes": "The Accord is extremely powerful but moves slowly and subtly. They have not yet directly intervened in Thornfast Keep, preferring to test mortal agents (like the party) first. If the party succeeds, the Warlock's patron may offer a boon or expanded pact power. If the party fails, the Accord will seal the entire keep — with everyone inside."
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "id": "d4e5f6a7-b890-1234-cdef-123456789012",
+    "name": "The Thornfast Seal",
+    "status": "active",
+    "description": "Kaelen Ironoak, a half-elven scholar, has noticed strange occurrences in the Misty Forest — animals acting erratically, plants growing in impossible patterns, and eerie lights near the ruins of Thornfast Keep. He believes the ancient Feywild seal within the keep is failing and needs a brave party to venture inside, reach the sealed sanctum, and reforge the binding before the corrupted archfey known as 'The Thorned One' breaks free. **Objectives:** (1) Enter Thornfast Keep through the Small Crypt. (2) Navigate the Garrison Halls, the Main Keep, and the Deep Foundations. (3) Disrupt the three seal anchors (located in the Medium Dungeon, Large Keep, and Mega Dungeon levels). (4) Confront Mother Thorn in the Ancient Tomb and reforge the final seal.",
+    "rewards": "**Buried Treasure (per character):** 150 gp. **Faction Reward:** Favor of the Emerald Wardens (future aid in the Misty Forest). **Potential Reward:** A boon from the Warlock's Archfey patron if the Accord's interests are served. **Magic Items Found:** Bag of Holding (Mega Dungeon chest), Goggles of Night (Ancient Tomb chest), Potion of Healing x3, Scrolls of Bless and Detect Magic.",
+    "notes": "Main quest. The three seal anchors must all be disrupted before the final seal in the Ancient Tomb can be reforged. Each anchor is a glowing crystal node that requires a DC 13 Arcana check (or a hit dealing 10+ damage) to shatter. The party can attempt the quest in any order on each level, but must progress through the maps sequentially (Crypt → Dungeon → Keep → Foundation → Tomb)."
+  },
+  {
+    "id": "e5f6a7b8-c901-2345-defa-234567890123",
+    "name": "Thistle's Freedom",
+    "status": "active",
+    "description": "A sprite named Thistle has been captured by the Thorned Court cultists and is being held in a cage in the eastern guard room of the Large Keep level. The cultists have fitted her with an iron manacle that suppresses her fey magic. If freed, Thistle can provide invaluable intelligence about the fortress, including the location of a secret passage from the Large Keep to the Mega Dungeon that bypasses the patrol-heavy central corridors.",
+    "rewards": "Thistle's gratitude and intelligence (reveals secret passage and seal anchor locations). She may also give the party a single use of her Pixie Dust (grants one creature the ability to fly for 1 minute) before she departs for the Feywild.",
+    "notes": "Side quest. The cage is locked with an iron padlock (DC 15 Sleight of Hand to pick, or the key is held by the cultist patrol leader in the adjacent room). The iron manacle requires a DC 12 Strength check to break or can be unlocked with the same key. If freed, Thistle is initially fearful but warms up quickly to kindness."
+  },
+  {
+    "id": "f6a7b8c9-d012-3456-efab-345678901234",
+    "name": "The Guardian's Legacy",
+    "status": "active",
+    "description": "Selena Moonshadow's older brother, Theron, was the previous Emerald Warden of Thornfast Keep. He disappeared into the depths a decade ago, and Selena believes he may still be alive — transformed by the Thorned One's corruption into something monstrous. The party may encounter a corrupted elven spirit warden in the Medium Dungeon or Mega Dungeon who wears a tarnished silver crescent moon pendant. If the pendant is recovered and returned to Selena, she can perform a ritual to lay Theron's spirit to rest.",
+    "rewards": "Selena's permanent gratitude and friendship. She offers one of the following: a masterwork longbow (non-magical but +1 to attack rolls), or her guidance for a future quest in the region. **XP Equivalent:** 100 XP per character.",
+    "notes": "Side quest. The corrupted warden appears as a Specter (use Specter stat block) in the Large Keep's war room. If the party defeats him, they can take the tarnished silver pendant (DC 12 Perception to notice among the armor scraps). Selena is visibly moved if the pendant is returned, and shares a tearful story about her brother. This quest has no time limit."
+  }
+]

@@ -1,6 +1,6 @@
 {
-  "name": "mega-dungeon",
-  "description": "The air is thick with dust and the smell of decay. The walls are lined with empty alcoves, their contents long since taken. Only the brave — or foolish — dare enter.",
+  "name": "Deep Foundations",
+  "description": "## Mega Dungeon \u2014 Deep Foundations of Thornfast Keep\n\nThe lowest constructed levels of Thornfast Keep were built directly into the living bedrock of the Misty Forest's roots. These foundations house the three anchor points of the Feywild seal, designed to distribute the planar binding magic across multiple stable points. The Thorned One's corruption has attracted predators from both worlds \u2014 giant spiders and an ettercap from the Feywild have spun massive webs through the foundation chambers, making this level a treacherous labyrinth.\n\n**Zones:**\n- **Web Tunnels (south approach):** The entrance corridor is choked with thick webbing. Navigating requires careful movement and sharp eyes. The webbing here is layered and obscures hidden pit traps.\n- **Anchor Chamber Alpha (west wing):** A vaulted circular chamber where **Seal Anchor #3** pulses atop a stone pedestal. The Ettercap lairs here, surrounded by the husks of its victims. A webbed chest contains the Bag of Holding and 80 gp.\n- **Ancestral Vault (east wing):** Rows of empty display alcoves line these halls. Whatever treasures were once stored here have been looted or destroyed. The walls hum with residual sealing magic.\n- **Ritual Nexus (center):** The junction point where the three seal anchors' magic converges. A complex geometric pattern is carved into the floor, now partially obscured by webs and debris. A successful DC 15 Arcana check reveals the anchors must be destroyed in the correct order: Anchor #1 \u2192 Anchor #2 \u2192 Anchor #3.\n- **Descent to Sanctum (north end):** A spiraling stone staircase descends into darkness. At the bottom lies the sealed door to the Ancient Tomb, marked with the seal of the Summer Court.\n\n**Atmosphere:** The faint hum of ancient sealing magic vibrates through the stone. Webs shimmer with an amber glow reflected from the seal anchors. Skittering sounds echo from unseen passages. The temperature drops noticeably as one approaches the sanctum door.",
   "gridSize": 40,
   "walls": [
     "0,0",
@@ -1771,6 +1771,33 @@
       "type": "npc",
       "visible": false,
       "name": "Skeleton",
+      "rotation": 270
+    },
+    {
+      "id": "npc-3",
+      "gridX": 33,
+      "gridY": 16,
+      "type": "npc",
+      "visible": false,
+      "name": "Ettercap",
+      "rotation": 180
+    },
+    {
+      "id": "npc-4",
+      "gridX": 31,
+      "gridY": 16,
+      "type": "npc",
+      "visible": false,
+      "name": "Giant Spider",
+      "rotation": 90
+    },
+    {
+      "id": "npc-5",
+      "gridX": 34,
+      "gridY": 18,
+      "type": "npc",
+      "visible": false,
+      "name": "Giant Spider",
       "rotation": 270
     }
   ],
