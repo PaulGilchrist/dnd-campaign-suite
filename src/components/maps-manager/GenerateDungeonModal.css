@@ -46,6 +46,21 @@
     border-color: var(--border-color-focus);
 }
 
+.maps-manager-modal-overlay .dungeon-gen-room-range {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.maps-manager-modal-overlay .dungeon-gen-room-range input[type="number"] {
+    width: 72px;
+}
+
+.maps-manager-modal-overlay .dungeon-gen-range-sep {
+    font-size: 16px;
+    color: var(--color-text-secondary);
+}
+
 .maps-manager-modal-overlay .dungeon-gen-hint {
     font-size: 12px;
     color: var(--color-text-secondary);

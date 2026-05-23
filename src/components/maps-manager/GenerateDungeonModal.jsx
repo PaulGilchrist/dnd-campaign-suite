@@ -6,6 +6,8 @@ import './GenerateDungeonModal.css';
 function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCreated }) {
     const [mapName, setMapName] = useState(initialMapName || '');
     const [gridSize, setGridSize] = useState(20);
+    const [numRooms, setNumRooms] = useState({ min: 4, max: 10 });
+    const [seed, setSeed] = useState('');
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState(null);
 
@@ -24,10 +26,11 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
         setGenerating(true);
 
         try {
-            const seed = Math.floor(Math.random() * 2147483647);
+            const seedValue = seed ? parseInt(seed, 10) : Math.floor(Math.random() * 2147483647);
             const result = generateDungeon({
                 gridSize: safeGridSize,
-                seed,
+                numRooms: [numRooms.min, numRooms.max],
+                seed: seedValue,
             });
 
             const { name: _generatedName, ...mapData } = result;
@@ -71,10 +74,40 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                             onChange={e => setGridSize(Number(e.target.value))}
                         />
                         <span className="dungeon-gen-hint">
-                            {gridSize} ft &times; {gridSize} ft ({gridSize} squares) &mdash; ~{Math.max(2, Math.floor(gridSize / 3))} rooms
+                            {gridSize} ft &times; {gridSize} ft ({gridSize} squares)
                         </span>
                     </label>
 
+                    <label className="dungeon-gen-field">
+                        <span>Rooms (min &ndash; max)</span>
+                        <div className="dungeon-gen-room-range">
+                            <input
+                                type="number"
+                                min={2}
+                                max={numRooms.max}
+                                value={numRooms.min}
+                                onChange={e => setNumRooms(prev => ({ ...prev, min: Math.max(2, Number(e.target.value)) }))}
+                            />
+                            <span className="dungeon-gen-range-sep">&ndash;</span>
+                            <input
+                                type="number"
+                                min={numRooms.min}
+                                max={50}
+                                value={numRooms.max}
+                                onChange={e => setNumRooms(prev => ({ ...prev, max: Number(e.target.value) }))}
+                            />
+                        </div>
+                    </label>
+
+                    <label className="dungeon-gen-field">
+                        <span>Seed (optional)</span>
+                        <input
+                            type="text"
+                            value={seed}
+                            onChange={e => setSeed(e.target.value)}
+                            placeholder="Random if empty"
+                        />
+                    </label>
 
                 </div>
                 <div>
