@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { generateDungeon } from '../../services/dungeonGenerator.js';
 import * as mapsService from '../../services/mapsService.js';
 import './GenerateDungeonModal.css';
@@ -10,6 +10,10 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
     const [seed, setSeed] = useState('');
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState(null);
+
+    useEffect(() => {
+        setNumRooms({ min: Math.round(4 * gridSize / 10), max: Math.round(10 * gridSize / 10) });
+    }, [gridSize]);
 
     const handleGenerate = async () => {
         const name = mapName.trim();
