@@ -811,6 +811,11 @@ function generateDungeon(opts) {
       visible: door.doorType !== "secretDoor",
       rotation: door.rotation,
     });
+    // Secret doors: place a wall on the same cell so players see solid wall
+    if (door.doorType === "secretDoor") {
+      grid[door.y][door.x] = true;
+      walls.push(door.x + "," + door.y);
+    }
     doorIndex++;
     if (pair) {
       placedItems.push({
@@ -821,6 +826,10 @@ function generateDungeon(opts) {
         visible: pair.doorType !== "secretDoor",
         rotation: pair.rotation,
       });
+      if (pair.doorType === "secretDoor") {
+        grid[pair.y][pair.x] = true;
+        walls.push(pair.x + "," + pair.y);
+      }
       doorIndex++;
     }
   }

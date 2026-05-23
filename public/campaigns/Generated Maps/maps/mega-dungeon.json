@@ -480,6 +480,7 @@
     "14,17",
     "15,17",
     "16,17",
+    "17,17",
     "19,17",
     "20,17",
     "28,17",
@@ -501,6 +502,8 @@
     "15,18",
     "16,18",
     "19,18",
+    "20,18",
+    "28,18",
     "29,18",
     "30,18",
     "31,18",
@@ -519,6 +522,8 @@
     "15,19",
     "16,19",
     "19,19",
+    "20,19",
+    "28,19",
     "29,19",
     "30,19",
     "31,19",
@@ -538,6 +543,10 @@
     "15,20",
     "16,20",
     "19,20",
+    "29,20",
+    "30,20",
+    "31,20",
+    "32,20",
     "38,20",
     "39,20",
     "0,21",
@@ -834,6 +843,7 @@
     "23,30",
     "24,30",
     "25,30",
+    "26,30",
     "27,30",
     "28,30",
     "29,30",
@@ -980,6 +990,7 @@
     "14,35",
     "15,35",
     "16,35",
+    "19,35",
     "33,35",
     "34,35",
     "35,35",
@@ -1027,6 +1038,7 @@
     "17,37",
     "18,37",
     "19,37",
+    "20,37",
     "21,37",
     "22,37",
     "23,37",
@@ -1067,6 +1079,9 @@
     "25,38",
     "26,38",
     "27,38",
+    "28,38",
+    "29,38",
+    "30,38",
     "31,38",
     "32,38",
     "33,38",
@@ -1104,6 +1119,9 @@
     "25,39",
     "26,39",
     "27,39",
+    "28,39",
+    "29,39",
+    "30,39",
     "31,39",
     "32,39",
     "33,39",
@@ -1113,20 +1131,10 @@
     "37,39",
     "38,39",
     "39,39",
-    "4,34",
-    "26,30",
-    "17,17",
-    "18,17",
-    "18,18",
-    "18,19",
-    "18,20",
-    "18,21",
-    "17,21",
-    "17,20",
-    "17,19",
-    "17,18",
-    "7,5",
-    "31,7"
+    "16,4",
+    "13,8",
+    "15,8",
+    "4,30"
   ],
   "placedItems": [
     {
@@ -1155,7 +1163,7 @@
     },
     {
       "id": "torch-2-35-13",
-      "gridX": 36,
+      "gridX": 35,
       "gridY": 13,
       "type": "torch",
       "visible": true,
@@ -1171,8 +1179,8 @@
     },
     {
       "id": "chest-2",
-      "gridX": 35,
-      "gridY": 22,
+      "gridX": 36,
+      "gridY": 16,
       "type": "chest",
       "visible": true,
       "rotation": 180
@@ -1402,7 +1410,7 @@
       "gridY": 20,
       "type": "chair",
       "visible": true,
-      "rotation": 180
+      "rotation": 270
     },
     {
       "id": "chair-11-1",
@@ -1410,7 +1418,7 @@
       "gridY": 20,
       "type": "chair",
       "visible": true,
-      "rotation": 180
+      "rotation": 270
     },
     {
       "id": "torch-12-7-32",
@@ -1489,7 +1497,7 @@
       "gridY": 23,
       "type": "chair",
       "visible": true,
-      "rotation": 180
+      "rotation": 270
     },
     {
       "id": "chair-13-1",
@@ -1497,7 +1505,7 @@
       "gridY": 23,
       "type": "chair",
       "visible": true,
-      "rotation": 180
+      "rotation": 270
     },
     {
       "id": "chair-13-2",
@@ -1505,7 +1513,7 @@
       "gridY": 21,
       "type": "chair",
       "visible": true,
-      "rotation": 0
+      "rotation": 90
     },
     {
       "id": "chair-13-3",
@@ -1513,7 +1521,7 @@
       "gridY": 22,
       "type": "chair",
       "visible": true,
-      "rotation": 270
+      "rotation": 0
     },
     {
       "id": "chest-13",
@@ -1548,8 +1556,16 @@
       "rotation": 90
     },
     {
+      "id": "door-0",
+      "gridX": 7,
+      "gridY": 5,
+      "type": "door",
+      "visible": true,
+      "rotation": 90
+    },
+    {
       "id": "door-1",
-      "gridX": 8,
+      "gridX": 4,
       "gridY": 11,
       "type": "door",
       "visible": true,
@@ -1572,6 +1588,14 @@
       "rotation": 0
     },
     {
+      "id": "door-4",
+      "gridX": 31,
+      "gridY": 7,
+      "type": "door",
+      "visible": true,
+      "rotation": 90
+    },
+    {
       "id": "door-5",
       "gridX": 35,
       "gridY": 21,
@@ -1581,24 +1605,32 @@
     },
     {
       "id": "door-6",
-      "gridX": 29,
+      "gridX": 16,
       "gridY": 4,
       "type": "secretDoor",
       "visible": false,
       "rotation": 90
     },
     {
+      "id": "door-7",
+      "gridX": 19,
+      "gridY": 4,
+      "type": "door",
+      "visible": true,
+      "rotation": 0
+    },
+    {
       "id": "door-8",
-      "gridX": 7,
-      "gridY": 5,
+      "gridX": 13,
+      "gridY": 8,
       "type": "secretDoor",
       "visible": false,
       "rotation": 0
     },
     {
       "id": "door-9",
-      "gridX": 31,
-      "gridY": 7,
+      "gridX": 15,
+      "gridY": 8,
       "type": "secretDoor",
       "visible": false,
       "rotation": 0
@@ -1614,7 +1646,7 @@
     {
       "id": "door-11",
       "gridX": 4,
-      "gridY": 34,
+      "gridY": 30,
       "type": "secretDoor",
       "visible": false,
       "rotation": 0
@@ -1629,11 +1661,11 @@
     },
     {
       "id": "door-13",
-      "gridX": 19,
-      "gridY": 35,
+      "gridX": 4,
+      "gridY": 34,
       "type": "door",
       "visible": true,
-      "rotation": 180
+      "rotation": 90
     },
     {
       "id": "door-14",
@@ -1645,7 +1677,7 @@
     },
     {
       "id": "door-15",
-      "gridX": 29,
+      "gridX": 24,
       "gridY": 20,
       "type": "door",
       "visible": true,
@@ -1744,28 +1776,10 @@
   ],
   "players": [
     {
-      "id": "monk",
-      "name": "Monk",
-      "gridX": 28,
-      "gridY": 39
-    },
-    {
-      "id": "paladin",
-      "name": "Paladin",
-      "gridX": 28,
-      "gridY": 38
-    },
-    {
-      "id": "sorcerer",
-      "name": "Sorcerer",
-      "gridX": 30,
-      "gridY": 38
-    },
-    {
-      "id": "warlock",
-      "name": "Warlock",
-      "gridX": 30,
-      "gridY": 39
+      "id": "player-1",
+      "name": "Adventurer 1",
+      "gridX": 7,
+      "gridY": 8
     }
   ],
   "zoom": 1,
