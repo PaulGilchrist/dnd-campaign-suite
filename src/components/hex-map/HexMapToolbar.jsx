@@ -1,5 +1,5 @@
 import React from 'react';
-import { TOOL_NONE, TOOL_PAINT, TOOL_ERASE } from '../../config/outdoorConfig';
+import { TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER } from '../../config/outdoorConfig';
 
 function HexMapToolbar({
     onBack,
@@ -18,6 +18,7 @@ function HexMapToolbar({
     marchingOrderOpen,
     setMarchingOrderOpen,
     marchingOrder,
+    onGenerateRivers,
 }) {
     return (
         <div className="hex-map-toolbar">
@@ -56,6 +57,21 @@ function HexMapToolbar({
                     ))}
                 </div>
             )}
+
+            {/* River tool */}
+            <button
+                className={tool === TOOL_RIVER ? 'active' : ''}
+                onClick={() => setTool(tool === TOOL_RIVER ? TOOL_NONE : TOOL_RIVER)}
+                title="Paint rivers"
+            >
+                <i className="fa-solid fa-water"></i>
+            </button>
+            <button
+                onClick={onGenerateRivers}
+                title="Auto-generate rivers from terrain elevation"
+            >
+                <i className="fa-solid fa-wand-magic-sparkles"></i>
+            </button>
 
             {/* POI panel toggle */}
             <button

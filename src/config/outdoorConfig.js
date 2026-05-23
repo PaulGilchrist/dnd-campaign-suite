@@ -35,6 +35,7 @@ export const TOOL_NONE = 'none';
 export const TOOL_PAINT = 'paint';
 export const TOOL_ERASE = 'erase';
 export const TOOL_POI = 'poi';
+export const TOOL_RIVER = 'river';
 export const TOOL_PAN = 'pan';
 
 // Zoom limits

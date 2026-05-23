@@ -51,6 +51,33 @@ export function generateHexTerrain({ gridSize = 30, seed, weights } = {}) {
   return { terrain, rivers };
 }
 
+const TERRAIN_ELEVATION = {
+  water: 0.15,
+  swamp: 0.30,
+  beach: 0.38,
+  plains: 0.50,
+  desert: 0.50,
+  hills: 0.65,
+  forest: 0.65,
+  mountains: 0.82,
+  tundra: 0.90,
+};
+
+export function generateRiversFromTerrain(terrain, gridSize) {
+  if (!terrain || !gridSize) return [];
+
+  const allHexes = getAllHexes(gridSize, gridSize);
+  const elevationMap = {};
+
+  for (const { q, r } of allHexes) {
+    const key = hexKey(q, r);
+    const type = terrain[key];
+    elevationMap[key] = TERRAIN_ELEVATION[type] !== undefined ? TERRAIN_ELEVATION[type] : 0.5;
+  }
+
+  return generateRivers(elevationMap, null, terrain, gridSize);
+}
+
 function mulberry32(seed) {
   return function next() {
     seed |= 0;
@@ -227,9 +254,12 @@ function generateRivers(elevationMap, moistureMap, terrain, gridSize) {
     for (let q = 0; q < gridSize; q++) {
       const key = hexKey(q, r);
       const elev = elevationMap[key];
-      const moist = moistureMap[key];
-      if (elev > 0.6 && moist > 0.65) {
-        candidates.push({ q, r, moisture: moist });
+      const moist = moistureMap !== null ? moistureMap[key] : null;
+      const isValidSource = moist !== null
+        ? (elev > 0.6 && moist > 0.65)
+        : (elev > 0.6 && (terrain[key] === 'mountains' || terrain[key] === 'hills' || terrain[key] === 'tundra'));
+      if (isValidSource) {
+        candidates.push({ q, r, moisture: moist || 0.5 });
       }
     }
   }

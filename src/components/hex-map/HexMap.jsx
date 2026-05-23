@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import * as mapsService from '../../services/mapsService.js';
 import {
     HEX_SIZE, DEFAULT_GRID_SIZE, DEFAULT_TERRAIN, MIN_ZOOM, MAX_ZOOM,
-    TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_PAN,
+    TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_PAN,
     TERRAIN_TYPES, POI_TYPES
 } from '../../config/outdoorConfig.js';
+import { generateRiversFromTerrain } from '../../services/hexTerrainGenerator.js';
 import { hexKey, hexToPixel, pixelToHexSnapped, hexToSVGPath } from '../../services/hexMapUtils.js';
 import TerrainLayer from './TerrainLayer.jsx';
 import HexGridLayer from './HexGridLayer.jsx';
@@ -185,6 +186,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
         if (!hex) return;
         if (hex.q < 0 || hex.q >= gridSize || hex.r < 0 || hex.r >= gridSize) return;
         const key = hexKey(hex.q, hex.r);
+        if (tool === TOOL_RIVER) {
+            setRivers(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+            paintingRef.current = true;
+            return;
+        }
         setTerrain(prev => {
             const next = { ...prev };
             if (tool === TOOL_PAINT) {
@@ -203,6 +209,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
         if (!hex) return;
         if (hex.q < 0 || hex.q >= gridSize || hex.r < 0 || hex.r >= gridSize) return;
         const key = hexKey(hex.q, hex.r);
+        if (tool === TOOL_RIVER) {
+            setRivers(prev => prev.includes(key) ? prev : [...prev, key]);
+            return;
+        }
         setTerrain(prev => {
             const next = { ...prev };
             if (tool === TOOL_PAINT) {
@@ -289,6 +299,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
     const handlePoiPointerUp = useCallback(() => {
         setPoiDragging(null);
     }, []);
+
+    const handleGenerateRivers = useCallback(() => {
+        const result = generateRiversFromTerrain(terrain, gridSize);
+        setRivers(result);
+    }, [terrain, gridSize]);
 
     const handlePoiContextMenu = useCallback((poiId, e) => {
         const poi = pois.find(p => p.id === poiId);
@@ -485,86 +500,88 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
                 marchingOrderOpen={marchingOpen}
                 setMarchingOrderOpen={setMarchingOpen}
                 marchingOrder={marchingOrder}
+                onGenerateRivers={handleGenerateRivers}
             />
 
             {loading ? (
                 <div className="hex-map-loading">Loading map...</div>
             ) : (
-                <svg
-                    ref={svgRef}
-                    viewBox={`${panX} ${panY} ${svgWidth / zoom} ${svgHeight / zoom}`}
-                    className="hex-svg"
-                    onPointerDown={(e) => {
-                        if (tool === TOOL_PAINT || tool === TOOL_ERASE) {
-                            handleTerrainPointerDown(e);
-                        } else {
-                            handlePanStart(e);
-                        }
-                    }}
-                    onPointerMove={(e) => {
-                        handlePanMove(e);
-                        handleTerrainPointerMove(e);
-                        handlePoiPointerMove(e);
-                        handleHexHover(e);
-                    }}
-                    onPointerUp={(e) => {
-                        handlePanEnd(e);
-                        handleTerrainPointerUp(e);
-                        handlePoiPointerUp(e);
-                    }}
-                    onPointerLeave={() => {
-                        handlePanEnd();
-                        handleTerrainPointerUp();
-                        handlePoiPointerUp();
-                        setHoveredHex(null);
-                    }}
-                    onWheel={handleWheel}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={handleDrop}
-                    onContextMenu={(e) => e.preventDefault()}
-                    onClick={() => { setSelectedPoiMenu(null); setShowRename(null); }}
-                    style={{
-                        cursor: panning
-                            ? 'grabbing'
-                            : (tool === TOOL_PAN || tool === TOOL_NONE ? 'grab' : 'crosshair')
-                    }}
-                >
-                    <defs>
-                        <SettlementSVG id="poi-settlement" />
-                        <DungeonSVG id="poi-dungeon" />
-                        <CampSVG id="poi-camp" />
-                        <TowerSVG id="poi-tower" />
-                        <LoreSiteSVG id="poi-loreSite" />
-                        <HazardSVG id="poi-hazard" />
-                        <NaturalWonderSVG id="poi-naturalWonder" />
-                        <LandmarkSVG id="poi-landmark" />
-                    </defs>
+                <div className="hex-map-canvas">
+                    <svg
+                        ref={svgRef}
+                        viewBox={`${panX} ${panY} ${svgWidth / zoom} ${svgHeight / zoom}`}
+                        className="hex-svg"
+                        onPointerDown={(e) => {
+                            if (tool === TOOL_PAINT || tool === TOOL_ERASE) {
+                                handleTerrainPointerDown(e);
+                            } else {
+                                handlePanStart(e);
+                            }
+                        }}
+                        onPointerMove={(e) => {
+                            handlePanMove(e);
+                            handleTerrainPointerMove(e);
+                            handlePoiPointerMove(e);
+                            handleHexHover(e);
+                        }}
+                        onPointerUp={(e) => {
+                            handlePanEnd(e);
+                            handleTerrainPointerUp(e);
+                            handlePoiPointerUp(e);
+                        }}
+                        onPointerLeave={() => {
+                            handlePanEnd();
+                            handleTerrainPointerUp();
+                            handlePoiPointerUp();
+                            setHoveredHex(null);
+                        }}
+                        onWheel={handleWheel}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={handleDrop}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onClick={() => { setSelectedPoiMenu(null); setShowRename(null); }}
+                        style={{
+                            cursor: panning
+                                ? 'grabbing'
+                                : (tool === TOOL_PAN || tool === TOOL_NONE ? 'grab' : 'crosshair')
+                        }}
+                    >
+                        <defs>
+                            <SettlementSVG id="poi-settlement" />
+                            <DungeonSVG id="poi-dungeon" />
+                            <CampSVG id="poi-camp" />
+                            <TowerSVG id="poi-tower" />
+                            <LoreSiteSVG id="poi-loreSite" />
+                            <HazardSVG id="poi-hazard" />
+                            <NaturalWonderSVG id="poi-naturalWonder" />
+                            <LandmarkSVG id="poi-landmark" />
+                        </defs>
 
-                    <TerrainLayer
-                        gridSize={gridSize}
-                        terrain={terrain}
-                    />
-                    <RiverLayer
-                        rivers={rivers}
-                        gridSize={gridSize}
-                    />
-                    <HexGridLayer
-                        gridSize={gridSize}
-                    />
-                    <POILayer
-                        pois={pois}
-                        onPoiPointerDown={handlePoiPointerDown}
-                        onPoiContextMenu={handlePoiContextMenu}
-                        poiDragging={poiDragging}
-                        poiHover={null}
-                    />
-                    <PartyMarkerLayer
-                        position={partyPosition}
-                        HEX_SIZE={HEX_SIZE}
-                        gridSize={gridSize}
-                        onPositionChange={setPartyPosition}
-                        svgRef={svgRef}
-                    />
+                        <TerrainLayer
+                            gridSize={gridSize}
+                            terrain={terrain}
+                        />
+                        <RiverLayer
+                            rivers={rivers}
+                            gridSize={gridSize}
+                        />
+                        <HexGridLayer
+                            gridSize={gridSize}
+                        />
+                        <POILayer
+                            pois={pois}
+                            onPoiPointerDown={handlePoiPointerDown}
+                            onPoiContextMenu={handlePoiContextMenu}
+                            poiDragging={poiDragging}
+                            poiHover={null}
+                        />
+                        <PartyMarkerLayer
+                            position={partyPosition}
+                            HEX_SIZE={HEX_SIZE}
+                            gridSize={gridSize}
+                            onPositionChange={setPartyPosition}
+                            svgRef={svgRef}
+                        />
 
                     {/* Hovered hex highlight (only when paint/erase active) */}
                     {hoveredHex && (tool === TOOL_PAINT || tool === TOOL_ERASE) && (() => {
@@ -581,28 +598,46 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
                         );
                     })()}
 
-                    {/* Context menu for POIs */}
-                    <POIContextMenu
-                        selectedPoi={selectedPoiMenu}
-                        pois={pois}
-                        showRename={showRename}
-                        onToggleVisibility={handleTogglePoiVisibility}
-                        onDelete={handleDeletePoi}
-                        onRename={handleRenamePoi}
-                        onClose={() => { setSelectedPoiMenu(null); setShowRename(null); }}
-                        setShowRename={setShowRename}
-                    />
-                </svg>
-            )}
+                    {/* River hover highlight */}
+                    {hoveredHex && tool === TOOL_RIVER && (() => {
+                        const center = hexToPixel(hoveredHex.q, hoveredHex.r, HEX_SIZE);
+                        const pathD = hexToSVGPath(center.x, center.y, HEX_SIZE);
+                        const key = hexKey(hoveredHex.q, hoveredHex.r);
+                        const hasRiver = rivers.includes(key);
+                        return (
+                            <path
+                                d={pathD}
+                                fill={hasRiver ? 'rgba(200,50,50,0.15)' : 'rgba(60,130,210,0.2)'}
+                                stroke={hasRiver ? '#c44' : '#4A90D9'}
+                                strokeWidth={1.5}
+                                pointerEvents="none"
+                            />
+                        );
+                    })()}
 
-            <div className="hex-map-compass">
-                <svg viewBox="0 0 40 40" width="36" height="36">
-                    <polygon points="20,2 23,17 38,20 23,23 20,38 17,23 2,20 17,17" fill="#666" stroke="#999" strokeWidth="0.5" />
-                    <polygon points="20,2 23,17 20,20 17,17" fill="#c44" />
-                    <polygon points="20,38 23,23 20,20 17,23" fill="#555" />
-                    <text x="20" y="13" textAnchor="middle" fill="#c44" fontSize="5" fontWeight="bold">N</text>
-                </svg>
-            </div>
+                        {/* Context menu for POIs */}
+                        <POIContextMenu
+                            selectedPoi={selectedPoiMenu}
+                            pois={pois}
+                            showRename={showRename}
+                            onToggleVisibility={handleTogglePoiVisibility}
+                            onDelete={handleDeletePoi}
+                            onRename={handleRenamePoi}
+                            onClose={() => { setSelectedPoiMenu(null); setShowRename(null); }}
+                            setShowRename={setShowRename}
+                        />
+                    </svg>
+
+                    <div className="hex-map-compass">
+                        <svg viewBox="0 0 48 48" width="44" height="44">
+                            <polygon points="24,2 28,20 46,24 28,28 24,46 20,28 2,24 20,20" fill="#666" stroke="#999" strokeWidth="0.5" />
+                            <polygon points="24,2 28,20 24,24 20,20" fill="#c44" />
+                            <polygon points="24,46 28,28 24,24 20,28" fill="#555" />
+                            <text x="24" y="15" textAnchor="middle" fill="#c44" fontSize="6" fontWeight="bold">N</text>
+                        </svg>
+                    </div>
+                </div>
+            )}
 
             {/* Marching Order Panel overlay */}
             {marchingOpen && (
