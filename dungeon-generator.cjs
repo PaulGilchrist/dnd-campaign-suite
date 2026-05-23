@@ -312,59 +312,75 @@ function generateDungeon(opts) {
 
   // ---- 4. Place doors ----
   // Door position: at the corridor cell adjacent to the room wall (not inside the room).
-  // Door rotation: the door sprite has two states:
-  //   0 = horizontal door (opens E-W, for doors on east or west wall)
-  //   90 = vertical door (opens N-S, for doors on north or south wall)
+  // Door rotation: determined by corridor direction through the door.
+  //   Check cells around the door: if corridor continues N-S → rot=90, if E-W → rot=0
+  //   (Matches your existing data: N-S corridor doors → 90, E-W corridor doors → 0)
   const doors = [];
   for (let r = 0; r < rooms.length; r++) {
     const room = rooms[r];
     const candidates = [];
 
     // North wall: corridor cell is at y = room.rect.y - 1
-    // Door opens south into room → N-S opening → rotation 90
     for (let x = room.rect.x; x < room.rect.x + room.rect.w; x++) {
       if (corridorCells[x + "," + (room.rect.y - 1)])
-        candidates.push([x, room.rect.y - 1, 90]);
+        candidates.push([x, room.rect.y - 1]);
     }
     // South wall: corridor cell is at y = room.rect.y + room.rect.h
-    // Door opens north into room → N-S opening → rotation 90
     for (let x = room.rect.x; x < room.rect.x + room.rect.w; x++) {
       if (corridorCells[x + "," + (room.rect.y + room.rect.h)])
-        candidates.push([x, room.rect.y + room.rect.h, 90]);
+        candidates.push([x, room.rect.y + room.rect.h]);
     }
     // West wall: corridor cell is at x = room.rect.x - 1
-    // Door opens east into room → E-W opening → rotation 0
     for (let y = room.rect.y; y < room.rect.y + room.rect.h; y++) {
       if (corridorCells[room.rect.x - 1 + "," + y])
-        candidates.push([room.rect.x - 1, y, 0]);
+        candidates.push([room.rect.x - 1, y]);
     }
     // East wall: corridor cell is at x = room.rect.x + room.rect.w
-    // Door opens west into room → E-W opening → rotation 0
     for (let y = room.rect.y; y < room.rect.y + room.rect.h; y++) {
       if (corridorCells[room.rect.x + room.rect.w + "," + y])
-        candidates.push([room.rect.x + room.rect.w, y, 0]);
+        candidates.push([room.rect.x + room.rect.w, y]);
     }
 
     for (let c = 0; c < candidates.length; c++) {
-      const dx = candidates[c][0],
-        dy = candidates[c][1],
-        rot = candidates[c][2];
-      let tooClose = false;
-      for (let d = 0; d < doors.length; d++) {
-        if (Math.abs(doors[d].x - dx) <= 1 && Math.abs(doors[d].y - dy) <= 1) {
-          tooClose = true;
-          break;
-        }
-      }
-      if (!tooClose) {
-        doors.push({
-          x: dx,
-          y: dy,
-          rotation: rot,
-          doorType: rng() < 0.1 ? "secretDoor" : "door",
-        });
+      const dx = candidates[c][0], dy = candidates[c][1];
+
+      // Determine corridor direction: check if corridor continues N-S or E-W
+      // A cell is "open" (floor/corridor) if it's not a wall
+      const openN = dy > 0 && !grid[dy - 1][dx];
+      const openS = dy < gridSize - 1 && !grid[dy + 1][dx];
+      const openW = dx > 0 && !grid[dy][dx - 1];
+      const openE = dx < gridSize - 1 && !grid[dy][dx + 1];
+
+      const nsOpen = (openN ? 1 : 0) + (openS ? 1 : 0);
+      const ewOpen = (openW ? 1 : 0) + (openE ? 1 : 0);
+
+      // If more open directions are N-S → rot=90, if E-W → rot=0
+      // Default to 0 if tied
+      let rotation = 0;
+      if (nsOpen > ewOpen) rotation = 90;
+
+      // Check for double door: if corridor is 2 wide, there might be an adjacent door cell
+      doors.push({
+        x: dx,
+        y: dy,
+        rotation: rotation,
+        doorType: rng() < 0.1 ? "secretDoor" : "door",
+      });
+    }
+  }
+
+  // Deduplicate doors that are too close (within 1 cell), keeping the first
+  const finalDoors = [];
+  for (let i = 0; i < doors.length; i++) {
+    const d = doors[i];
+    let tooClose = false;
+    for (let j = 0; j < finalDoors.length; j++) {
+      if (Math.abs(finalDoors[j].x - d.x) <= 1 && Math.abs(finalDoors[j].y - d.y) <= 1) {
+        tooClose = true;
+        break;
       }
     }
+    if (!tooClose) finalDoors.push(d);
   }
 
   // ---- 5. Furniture ----
@@ -380,43 +396,69 @@ function generateDungeon(opts) {
 
   function placeTorches(room) {
     // Rotation convention: 0=east, 90=south, 180=west, 270=north
-    // Item on a wall faces INTO the room:
-    //   West wall  → faces east  → rotation 0
-    //   North wall → faces south → rotation 90
-    //   East wall  → faces west  → rotation 180
-    //   South wall → faces north → rotation 270
-    const torchDefs = []; // [x, y, rotation, wallSide]
+    // Torch on a wall faces INTO the room. Only place if there's a wall cell behind.
+    // Wall is behind the torch (opposite to facing direction):
+    //   rot=0 (faces east)  → wall at (x-1, y)  [west wall]
+    //   rot=90 (faces south) → wall at (x, y-1)  [north wall]
+    //   rot=180 (faces west) → wall at (x+1, y)  [east wall]
+    //   rot=270 (faces north)→ wall at (x, y+1)  [south wall]
+    const torchDefs = [];
 
     const midX = room.rect.x + Math.floor(room.rect.w / 2);
     const midY = room.rect.y + Math.floor(room.rect.h / 2);
 
-    // North wall torches (face south into room → rotation 90)
-    if (room.rect.y > 0) {
-      torchDefs.push([midX, room.rect.y, 90, "n"]);
-      if (room.rect.w > 4) {
-        torchDefs.push([room.rect.x + 1, room.rect.y, 90, "n"]);
-        torchDefs.push([room.rect.x + room.rect.w - 2, room.rect.y, 90, "n"]);
-      }
-    }
-    // South wall torches (face north into room → rotation 270)
-    if (room.rect.y + room.rect.h < gridSize) {
-      torchDefs.push([midX, room.rect.y + room.rect.h - 1, 270, "s"]);
-      if (room.rect.w > 4) {
-        torchDefs.push([room.rect.x + 1, room.rect.y + room.rect.h - 1, 270, "s"]);
-        torchDefs.push([room.rect.x + room.rect.w - 2, room.rect.y + room.rect.h - 1, 270, "s"]);
-      }
-    }
-    // West wall torches (face east into room → rotation 0)
-    if (room.rect.x > 0) {
-      torchDefs.push([room.rect.x, midY, 0, "w"]);
-    }
-    // East wall torches (face west into room → rotation 180)
-    if (room.rect.x + room.rect.w < gridSize) {
-      torchDefs.push([room.rect.x + room.rect.w - 1, midY, 180, "e"]);
+    // Helper: check if wall exists at (wx, wy)
+    function isWall(wx, wy) {
+      return wx >= 0 && wx < gridSize && wy >= 0 && wy < gridSize && grid[wy][wx];
     }
 
-    const count = Math.min(1 + Math.floor(rng() * 3), torchDefs.length);
-    const shuffled = torchDefs.slice().sort(function () { return rng() - 0.5; });
+    // North wall: torch at (x, room.rect.y), faces south (rot=90), wall at (x, room.rect.y - 1)
+    if (room.rect.y >= 2) {
+      [[midX], [room.rect.x + 1], [room.rect.x + room.rect.w - 2]].forEach(function(coords) {
+        var tx = coords[0];
+        if (room.rect.w > 4 || coords === midX) {
+          if (isWall(tx, room.rect.y - 1)) {
+            torchDefs.push([tx, room.rect.y, 90]);
+          }
+        }
+      });
+    }
+    // South wall: torch at (x, room.rect.y + room.rect.h - 1), faces north (rot=270), wall at (x, room.rect.y + room.rect.h)
+    if (room.rect.y + room.rect.h < gridSize - 1) {
+      var sy = room.rect.y + room.rect.h - 1;
+      [[midX], [room.rect.x + 1], [room.rect.x + room.rect.w - 2]].forEach(function(coords) {
+        var tx = coords[0];
+        if (room.rect.w > 4 || coords === midX) {
+          if (isWall(tx, sy + 1)) {
+            torchDefs.push([tx, sy, 270]);
+          }
+        }
+      });
+    }
+    // West wall: torch at (room.rect.x, y), faces east (rot=0), wall at (room.rect.x - 1, y)
+    if (room.rect.x >= 2) {
+      if (isWall(room.rect.x - 1, midY)) {
+        torchDefs.push([room.rect.x, midY, 0]);
+      }
+    }
+    // East wall: torch at (room.rect.x + room.rect.w - 1, y), faces west (rot=180), wall at (room.rect.x + room.rect.w, y)
+    if (room.rect.x + room.rect.w < gridSize - 1) {
+      var ex = room.rect.x + room.rect.w - 1;
+      if (isWall(ex + 1, midY)) {
+        torchDefs.push([ex, midY, 180]);
+      }
+    }
+
+    // Deduplicate (in case midX equals room.rect.x+1 etc.)
+    const seen = {};
+    const unique = [];
+    torchDefs.forEach(function(t) {
+      var key = t[0] + ',' + t[1];
+      if (!seen[key]) { seen[key] = true; unique.push(t); }
+    });
+
+    const count = Math.min(1 + Math.floor(rng() * 3), unique.length);
+    const shuffled = unique.slice().sort(function () { return rng() - 0.5; });
     for (let i = 0; i < count; i++) {
       const t = shuffled[i];
       placedItems.push({
@@ -428,7 +470,12 @@ function generateDungeon(opts) {
         rotation: t[2],
       });
     }
-    room._torchWalls = shuffled.slice(0, count).map(t => t[3]);
+    room._torchWalls = shuffled.slice(0, count).map(function(t) {
+      if (t[2] === 0) return "w";
+      if (t[2] === 90) return "n";
+      if (t[2] === 180) return "e";
+      return "s";
+    });
   }
 
   // Rotation helper: given a wall side, return the rotation for an item facing into the room
@@ -730,16 +777,52 @@ function generateDungeon(opts) {
     }
   }
 
-  // Doors → placedItems
-  for (let d = 0; d < doors.length; d++) {
+  // Doors → placedItems (with double door detection)
+  // Group doors by their position to find pairs (double doors)
+  const doorPairs = {};
+  for (let d = 0; d < finalDoors.length; d++) {
+    const door = finalDoors[d];
+    // Key: group doors that are adjacent (within 2 cells in one axis, same in other)
+    let paired = false;
+    for (let key in doorPairs) {
+      const existing = doorPairs[key];
+      // Check if this door is adjacent to an existing one (double door)
+      const sameRow = Math.abs(existing.y - door.y) <= 1 && existing.x !== door.x;
+      const sameCol = Math.abs(existing.x - door.x) <= 1 && existing.y !== door.y;
+      if (sameRow || sameCol) {
+        existing.pair = door;
+        paired = true;
+        break;
+      }
+    }
+    if (!paired) {
+      doorPairs[d] = { door: door, pair: null };
+    }
+  }
+
+  let doorIndex = 0;
+  for (let key in doorPairs) {
+    const { door, pair } = doorPairs[key];
     placedItems.push({
-      id: "door-" + d,
-      gridX: doors[d].x,
-      gridY: doors[d].y,
-      type: doors[d].doorType,
-      visible: doors[d].doorType !== "secretDoor",
-      rotation: doors[d].rotation,
+      id: "door-" + doorIndex,
+      gridX: door.x,
+      gridY: door.y,
+      type: door.doorType,
+      visible: door.doorType !== "secretDoor",
+      rotation: door.rotation,
     });
+    doorIndex++;
+    if (pair) {
+      placedItems.push({
+        id: "door-" + doorIndex,
+        gridX: pair.x,
+        gridY: pair.y,
+        type: pair.doorType,
+        visible: pair.doorType !== "secretDoor",
+        rotation: pair.rotation,
+      });
+      doorIndex++;
+    }
   }
 
   // Entrance stairs
@@ -797,7 +880,16 @@ function generateDungeon(opts) {
     zoom: 1,
     panX: 0,
     panY: 0,
-    fog: walls.slice(),
+    fog: (function() {
+      // Fog the entire grid so players don't know the dungeon size
+      const allCells = [];
+      for (let y = 0; y < gridSize; y++) {
+        for (let x = 0; x < gridSize; x++) {
+          allCells.push(x + "," + y);
+        }
+      }
+      return allCells;
+    })(),
   };
 }
 

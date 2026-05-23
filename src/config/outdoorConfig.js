@@ -37,5 +37,5 @@ export const TOOL_POI = 'poi';
 export const TOOL_PAN = 'pan';
 
 // Zoom limits
-export const MIN_ZOOM = 0.25;
-export const MAX_ZOOM = 4;
+export const MIN_ZOOM = 1;
+export const MAX_ZOOM = 8;
