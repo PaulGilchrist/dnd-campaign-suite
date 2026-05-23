@@ -312,31 +312,37 @@ function generateDungeon(opts) {
 
   // ---- 4. Place doors ----
   // Door position: at the corridor cell adjacent to the room wall (not inside the room).
-  // Door rotation: 0 = horizontal opening (N/S wall), 90 = vertical opening (E/W wall).
+  // Door rotation: the door sprite has two states:
+  //   0 = horizontal door (opens E-W, for doors on east or west wall)
+  //   90 = vertical door (opens N-S, for doors on north or south wall)
   const doors = [];
   for (let r = 0; r < rooms.length; r++) {
     const room = rooms[r];
     const candidates = [];
 
     // North wall: corridor cell is at y = room.rect.y - 1
+    // Door opens south into room → N-S opening → rotation 90
     for (let x = room.rect.x; x < room.rect.x + room.rect.w; x++) {
       if (corridorCells[x + "," + (room.rect.y - 1)])
-        candidates.push([x, room.rect.y - 1, 0]); // horizontal door in corridor
+        candidates.push([x, room.rect.y - 1, 90]);
     }
     // South wall: corridor cell is at y = room.rect.y + room.rect.h
+    // Door opens north into room → N-S opening → rotation 90
     for (let x = room.rect.x; x < room.rect.x + room.rect.w; x++) {
       if (corridorCells[x + "," + (room.rect.y + room.rect.h)])
-        candidates.push([x, room.rect.y + room.rect.h, 0]); // horizontal door in corridor
+        candidates.push([x, room.rect.y + room.rect.h, 90]);
     }
     // West wall: corridor cell is at x = room.rect.x - 1
+    // Door opens east into room → E-W opening → rotation 0
     for (let y = room.rect.y; y < room.rect.y + room.rect.h; y++) {
       if (corridorCells[room.rect.x - 1 + "," + y])
-        candidates.push([room.rect.x - 1, y, 90]); // vertical door in corridor
+        candidates.push([room.rect.x - 1, y, 0]);
     }
     // East wall: corridor cell is at x = room.rect.x + room.rect.w
+    // Door opens west into room → E-W opening → rotation 0
     for (let y = room.rect.y; y < room.rect.y + room.rect.h; y++) {
       if (corridorCells[room.rect.x + room.rect.w + "," + y])
-        candidates.push([room.rect.x + room.rect.w, y, 90]); // vertical door in corridor
+        candidates.push([room.rect.x + room.rect.w, y, 0]);
     }
 
     for (let c = 0; c < candidates.length; c++) {
@@ -373,42 +379,42 @@ function generateDungeon(opts) {
   }
 
   function placeTorches(room) {
-    // Place torches on walls with correct rotation:
-    // North wall (y = room.rect.y): torch faces south into room → rotation 180
-    // South wall (y = room.rect.y + room.rect.h - 1): torch faces north → rotation 0
-    // West wall (x = room.rect.x): torch faces east → rotation 90
-    // East wall (x = room.rect.x + room.rect.w - 1): torch faces west → rotation 270
+    // Rotation convention: 0=east, 90=south, 180=west, 270=north
+    // Item on a wall faces INTO the room:
+    //   West wall  → faces east  → rotation 0
+    //   North wall → faces south → rotation 90
+    //   East wall  → faces west  → rotation 180
+    //   South wall → faces north → rotation 270
     const torchDefs = []; // [x, y, rotation, wallSide]
 
     const midX = room.rect.x + Math.floor(room.rect.w / 2);
     const midY = room.rect.y + Math.floor(room.rect.h / 2);
 
-    // North wall torches (face south into room)
+    // North wall torches (face south into room → rotation 90)
     if (room.rect.y > 0) {
-      torchDefs.push([midX, room.rect.y, 180, "n"]);
+      torchDefs.push([midX, room.rect.y, 90, "n"]);
       if (room.rect.w > 4) {
-        torchDefs.push([room.rect.x + 1, room.rect.y, 180, "n"]);
-        torchDefs.push([room.rect.x + room.rect.w - 2, room.rect.y, 180, "n"]);
+        torchDefs.push([room.rect.x + 1, room.rect.y, 90, "n"]);
+        torchDefs.push([room.rect.x + room.rect.w - 2, room.rect.y, 90, "n"]);
       }
     }
-    // South wall torches (face north into room)
+    // South wall torches (face north into room → rotation 270)
     if (room.rect.y + room.rect.h < gridSize) {
-      torchDefs.push([midX, room.rect.y + room.rect.h - 1, 0, "s"]);
+      torchDefs.push([midX, room.rect.y + room.rect.h - 1, 270, "s"]);
       if (room.rect.w > 4) {
-        torchDefs.push([room.rect.x + 1, room.rect.y + room.rect.h - 1, 0, "s"]);
-        torchDefs.push([room.rect.x + room.rect.w - 2, room.rect.y + room.rect.h - 1, 0, "s"]);
+        torchDefs.push([room.rect.x + 1, room.rect.y + room.rect.h - 1, 270, "s"]);
+        torchDefs.push([room.rect.x + room.rect.w - 2, room.rect.y + room.rect.h - 1, 270, "s"]);
       }
     }
-    // West wall torches (face east into room)
+    // West wall torches (face east into room → rotation 0)
     if (room.rect.x > 0) {
-      torchDefs.push([room.rect.x, midY, 90, "w"]);
+      torchDefs.push([room.rect.x, midY, 0, "w"]);
     }
-    // East wall torches (face west into room)
+    // East wall torches (face west into room → rotation 180)
     if (room.rect.x + room.rect.w < gridSize) {
-      torchDefs.push([room.rect.x + room.rect.w - 1, midY, 270, "e"]);
+      torchDefs.push([room.rect.x + room.rect.w - 1, midY, 180, "e"]);
     }
 
-    // Pick 1-3 torches, preferring different walls
     const count = Math.min(1 + Math.floor(rng() * 3), torchDefs.length);
     const shuffled = torchDefs.slice().sort(function () { return rng() - 0.5; });
     for (let i = 0; i < count; i++) {
@@ -422,12 +428,57 @@ function generateDungeon(opts) {
         rotation: t[2],
       });
     }
-    // Store wall info for bookshelf/bed placement
     room._torchWalls = shuffled.slice(0, count).map(t => t[3]);
+  }
+
+  // Rotation helper: given a wall side, return the rotation for an item facing into the room
+  // 0=east, 90=south, 180=west, 270=north
+  function wallRotation(wall) {
+    // Item on west wall faces east (0), on north wall faces south (90), etc.
+    if (wall === "w") return 0;
+    if (wall === "n") return 90;
+    if (wall === "e") return 180;
+    if (wall === "s") return 270;
+    return 0;
+  }
+
+  // Pick a random wall that has enough room, preferring walls not already used by torches
+  function pickWall(room, rng, usedWalls) {
+    const walls = [];
+    if (room.rect.y > 1) walls.push("n");
+    if (room.rect.y + room.rect.h < gridSize - 1) walls.push("s");
+    if (room.rect.x > 1) walls.push("w");
+    if (room.rect.x + room.rect.w < gridSize - 1) walls.push("e");
+    // Prefer walls not already used
+    const fresh = walls.filter(w => !usedWalls.includes(w));
+    return pick(fresh.length > 0 ? fresh : walls, rng);
+  }
+
+  // Place an item along a wall with proper rotation. Returns {x, y, rotation}.
+  function placeAlongWall(room, wall, rng) {
+    let x, y;
+    const rot = wallRotation(wall);
+    if (wall === "n") {
+      x = room.rect.x + 1 + Math.floor(rng() * Math.max(1, room.rect.w - 2));
+      y = room.rect.y + 1;
+    } else if (wall === "s") {
+      x = room.rect.x + 1 + Math.floor(rng() * Math.max(1, room.rect.w - 2));
+      y = room.rect.y + room.rect.h - 2;
+    } else if (wall === "w") {
+      x = room.rect.x + 1;
+      y = room.rect.y + 1 + Math.floor(rng() * Math.max(1, room.rect.h - 2));
+    } else {
+      x = room.rect.x + room.rect.w - 2;
+      y = room.rect.y + 1 + Math.floor(rng() * Math.max(1, room.rect.h - 2));
+    }
+    return { x, y, rotation: rot };
   }
 
   function addLargeRoomFurniture(room) {
     const c = rectCenter(room.rect);
+    const usedWalls = room._torchWalls || [];
+
+    // Altar in center (no rotation needed for center placement)
     if (rng() < 0.4) {
       placedItems.push({
         id: "altar-" + room.id,
@@ -435,154 +486,203 @@ function generateDungeon(opts) {
         gridY: c[1],
         type: "altar",
         visible: true,
+        rotation: 0,
       });
     }
+
+    // Pillars in corners
     if (room.rect.w >= 6 && room.rect.h >= 6 && rng() < 0.5) {
-      const offsets = [
-        [-2, -2],
-        [2, -2],
-        [-2, 2],
-        [2, 2],
-      ];
+      const offsets = [[-2, -2], [2, -2], [-2, 2], [2, 2]];
       for (let i = 0; i < offsets.length; i++) {
-        const px = c[0] + offsets[i][0],
-          py = c[1] + offsets[i][1];
+        const px = c[0] + offsets[i][0], py = c[1] + offsets[i][1];
         if (rectContains(room.rect, px, py)) {
           placedItems.push({
             id: "pillar-" + room.id + "-" + px + "-" + py,
-            gridX: px,
-            gridY: py,
+            gridX: px, gridY: py,
             type: "pillar",
             visible: true,
           });
         }
       }
     }
+
+    // Table (2 wide, horizontal) with chairs
     if (rng() < 0.5) {
-      placedItems.push({
-        id: "table-" + room.id,
-        gridX: c[0],
-        gridY: c[1] + 1,
-        type: "table",
-        visible: true,
-      });
-      const chairOffs = [
-        [-1, 0],
-        [1, 0],
-        [0, -1],
-      ];
-      for (let i = 0; i < chairOffs.length; i++) {
+      const tableX = c[0] - 1;
+      const tableY = c[1];
+      if (tableX >= room.rect.x && tableX + 1 < room.rect.x + room.rect.w) {
         placedItems.push({
-          id: "chair-" + room.id + "-" + chairOffs[i][0] + "-" + chairOffs[i][1],
-          gridX: c[0] + chairOffs[i][0],
-          gridY: c[1] + 1 + chairOffs[i][1],
-          type: "chair",
+          id: "table-" + room.id,
+          gridX: tableX, gridY: tableY,
+          type: "table",
           visible: true,
+          rotation: 0, // 2-wide horizontal, default faces east
         });
+        // Chairs around table with proper rotation
+        const chairDefs = [
+          { dx: 0, dy: -1, rot: 90 },   // above table, faces south
+          { dx: 1, dy: -1, rot: 90 },   // above right, faces south
+          { dx: 0, dy: 1, rot: 270 },   // below table, faces north
+          { dx: 1, dy: 1, rot: 270 },   // below right, faces north
+          { dx: -1, dy: 0, rot: 0 },    // left of table, faces east
+          { dx: 2, dy: 0, rot: 180 },   // right of table, faces west
+        ];
+        const numChairs = 2 + Math.floor(rng() * 3);
+        const shuffled = chairDefs.slice().sort(function () { return rng() - 0.5; });
+        for (let i = 0; i < numChairs; i++) {
+          const ch = shuffled[i];
+          const chx = tableX + ch.dx, chy = tableY + ch.dy;
+          if (rectContains(room.rect, chx, chy)) {
+            placedItems.push({
+              id: "chair-" + room.id + "-" + i,
+              gridX: chx, gridY: chy,
+              type: "chair",
+              visible: true,
+              rotation: ch.rot,
+            });
+          }
+        }
       }
     }
+
+    // Chest along a wall
     if (rng() < 0.6) {
-      const wall = pick(["n", "s", "e", "w"], rng);
-      let wx, wy;
-      if (wall === "n") {
-        wx =
-          room.rect.x +
-          1 +
-          Math.floor(rng() * (room.rect.w - 2));
-        wy = room.rect.y + 1;
-      } else if (wall === "s") {
-        wx =
-          room.rect.x +
-          1 +
-          Math.floor(rng() * (room.rect.w - 2));
-        wy = room.rect.y + room.rect.h - 2;
-      } else if (wall === "e") {
-        wx = room.rect.x + room.rect.w - 2;
-        wy =
-          room.rect.y +
-          1 +
-          Math.floor(rng() * (room.rect.h - 2));
-      } else {
-        wx = room.rect.x + 1;
-        wy =
-          room.rect.y +
-          1 +
-          Math.floor(rng() * (room.rect.h - 2));
-      }
+      const wall = pickWall(room, rng, usedWalls);
+      const pos = placeAlongWall(room, wall, rng);
       placedItems.push({
         id: "chest-" + room.id,
-        gridX: wx,
-        gridY: wy,
+        gridX: pos.x, gridY: pos.y,
         type: "chest",
         visible: true,
+        rotation: pos.rotation,
       });
+      usedWalls.push(wall);
+    }
+
+    // Bed along a wall (2 wide, horizontal, pillow against wall)
+    if (rng() < 0.4) {
+      const wall = pickWall(room, rng, usedWalls);
+      let bx, by, rotation;
+      if (wall === "n") {
+        // Bed along north wall: pillow at north (top), extends south
+        // Place at y+1, rotation 90 means pillow faces north (toward wall)
+        bx = room.rect.x + 1 + Math.floor(rng() * Math.max(1, room.rect.w - 2));
+        by = room.rect.y + 1;
+        rotation = 90; // pillow faces north
+      } else if (wall === "s") {
+        bx = room.rect.x + 1 + Math.floor(rng() * Math.max(1, room.rect.w - 2));
+        by = room.rect.y + room.rect.h - 2;
+        rotation = 270; // pillow faces south
+      } else if (wall === "w") {
+        bx = room.rect.x + 1;
+        by = room.rect.y + 1 + Math.floor(rng() * Math.max(1, room.rect.h - 2));
+        rotation = 0; // pillow faces west (toward wall)... wait
+        // Actually for west wall, pillow should be on the west side
+        // rotation 0 = faces east, so pillow is on the west (back of sprite)
+        // That's correct — the "face" direction is feet, pillow is opposite
+        rotation = 0;
+      } else {
+        bx = room.rect.x + room.rect.w - 2;
+        by = room.rect.y + 1 + Math.floor(rng() * Math.max(1, room.rect.h - 2));
+        rotation = 180; // pillow faces east (toward west wall)... no
+        // rotation 180 = faces west, so pillow is on the east (back of sprite)
+        // For east wall, pillow should be on the east side (against wall)
+        // So feet face west = rotation 180. Correct.
+        rotation = 180;
+      }
+      placedItems.push({
+        id: "bed-" + room.id,
+        gridX: bx, gridY: by,
+        type: "bed",
+        visible: true,
+        rotation: rotation,
+      });
+      usedWalls.push(wall);
+    }
+
+    // Bookshelf along a wall (2 wide, horizontal)
+    if (rng() < 0.3) {
+      const wall = pickWall(room, rng, usedWalls);
+      const pos = placeAlongWall(room, wall, rng);
+      placedItems.push({
+        id: "bookshelf-" + room.id,
+        gridX: pos.x, gridY: pos.y,
+        type: "bookshelf",
+        visible: true,
+        rotation: pos.rotation,
+      });
+      usedWalls.push(wall);
     }
   }
 
   function addMediumRoomFurniture(room) {
     const c = rectCenter(room.rect);
+    const usedWalls = room._torchWalls || [];
     const roll = rng();
+
     if (roll < 0.3) {
-      placedItems.push({
-        id: "table-" + room.id,
-        gridX: c[0],
-        gridY: c[1],
-        type: "table",
-        visible: true,
-      });
-      placedItems.push({
-        id: "chair-" + room.id,
-        gridX: c[0] + 1,
-        gridY: c[1],
-        type: "chair",
-        visible: true,
-      });
+      // Table (2 wide, horizontal) with chair
+      const tableX = c[0] - 1;
+      const tableY = c[1];
+      if (tableX >= room.rect.x && tableX + 1 < room.rect.x + room.rect.w) {
+        placedItems.push({
+          id: "table-" + room.id,
+          gridX: tableX, gridY: tableY,
+          type: "table",
+          visible: true,
+          rotation: 0,
+        });
+        // Chair above table, faces south
+        if (rectContains(room.rect, c[0], c[1] - 1)) {
+          placedItems.push({
+            id: "chair-" + room.id,
+            gridX: c[0], gridY: c[1] - 1,
+            type: "chair",
+            visible: true,
+            rotation: 90,
+          });
+        }
+      }
     } else if (roll < 0.5) {
+      // Chest along a wall
+      const wall = pickWall(room, rng, usedWalls);
+      const pos = placeAlongWall(room, wall, rng);
       placedItems.push({
         id: "chest-" + room.id,
-        gridX: c[0],
-        gridY: c[1],
+        gridX: pos.x, gridY: pos.y,
         type: "chest",
         visible: true,
+        rotation: pos.rotation,
       });
     } else if (roll < 0.7) {
+      // Statue in center
       placedItems.push({
         id: "statue-" + room.id,
-        gridX: c[0],
-        gridY: c[1],
+        gridX: c[0], gridY: c[1],
         type: "statue",
         visible: true,
+        rotation: 0,
       });
     } else if (roll < 0.85) {
-      const bx =
-        rng() < 0.5
-          ? room.rect.x + 1
-          : room.rect.x + room.rect.w - 2;
-      const by =
-        room.rect.y +
-        1 +
-        Math.floor(rng() * (room.rect.h - 2));
+      // Bookshelf along a wall (2 wide, horizontal)
+      const wall = pickWall(room, rng, usedWalls);
+      const pos = placeAlongWall(room, wall, rng);
       placedItems.push({
         id: "bookshelf-" + room.id,
-        gridX: bx,
-        gridY: by,
+        gridX: pos.x, gridY: pos.y,
         type: "bookshelf",
         visible: true,
+        rotation: pos.rotation,
       });
     }
+
+    // Maybe a trap
     if (rng() < 0.15) {
-      const tx =
-        room.rect.x +
-        1 +
-        Math.floor(rng() * (room.rect.w - 2));
-      const ty =
-        room.rect.y +
-        1 +
-        Math.floor(rng() * (room.rect.h - 2));
+      const tx = room.rect.x + 1 + Math.floor(rng() * Math.max(1, room.rect.w - 2));
+      const ty = room.rect.y + 1 + Math.floor(rng() * Math.max(1, room.rect.h - 2));
       placedItems.push({
         id: "trap-" + room.id,
-        gridX: tx,
-        gridY: ty,
+        gridX: tx, gridY: ty,
         type: "trap",
         visible: false,
       });
@@ -591,28 +691,31 @@ function generateDungeon(opts) {
 
   function addSmallRoomFurniture(room) {
     const c = rectCenter(room.rect);
+    const usedWalls = room._torchWalls || [];
     const roll = rng();
+
     if (roll < 0.3) {
+      // Chest along a wall
+      const wall = pickWall(room, rng, usedWalls);
+      const pos = placeAlongWall(room, wall, rng);
       placedItems.push({
         id: "chest-" + room.id,
-        gridX: c[0],
-        gridY: c[1],
+        gridX: pos.x, gridY: pos.y,
         type: "chest",
         visible: true,
+        rotation: pos.rotation,
       });
     } else if (roll < 0.5) {
       placedItems.push({
         id: "crate-" + room.id,
-        gridX: c[0],
-        gridY: c[1],
+        gridX: c[0], gridY: c[1],
         type: "crate",
         visible: true,
       });
     } else if (roll < 0.65) {
       placedItems.push({
         id: "web-" + room.id,
-        gridX: c[0],
-        gridY: c[1],
+        gridX: c[0], gridY: c[1],
         type: "web",
         visible: true,
       });
@@ -653,6 +756,7 @@ function generateDungeon(opts) {
 
   // NPCs
   const npcNames = ["Goblin", "Skeleton", "Orc", "Bandit", "Spider", "Zombie"];
+  const npcRots = [0, 90, 180, 270];
   for (let i = 1; i < Math.min(4, rooms.length); i++) {
     const nc = rectCenter(rooms[i].rect);
     placedItems.push({
@@ -662,6 +766,7 @@ function generateDungeon(opts) {
       type: "npc",
       visible: false,
       name: pick(npcNames, rng),
+      rotation: pick(npcRots, rng),
     });
   }
 

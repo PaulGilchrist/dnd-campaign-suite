@@ -20,7 +20,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
 
         const safeGridSize = Math.max(5, Math.min(100, gridSize));
         if (safeGridSize !== gridSize) {
-            setError(`Grid size must be between 5 and 25. Using ${safeGridSize}.`);
+            setError(`Grid size must be between 5 and 100. Using ${safeGridSize}.`);
         }
 
         setGenerating(true);

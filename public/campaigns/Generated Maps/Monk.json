@@ -1,0 +1,95 @@
+{
+  "name": "Monk",
+  "level": 5,
+  "alignment": "Neutral Good",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 12,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Dexterity",
+      "baseScore": 15,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Constitution",
+      "baseScore": 13,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 10,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 14,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    }
+  ],
+  "background": "Farmer",
+  "class": {
+    "name": "Monk",
+    "subclass": {
+      "name": "Warrior of Mercy",
+      "type": ""
+    }
+  },
+  "expertSkills": [],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Human",
+    "subrace": {
+      "name": ""
+    }
+  },
+  "immunities": [],
+  "inventory": {
+    "backpack": [
+      "Potion of Healing (2)",
+      "Bedroll",
+      "Mess Kit",
+      "Rations (10 days)",
+      "Rope, Hempen (50 feet)",
+      "Tinderbox",
+      "Torch",
+      "Waterskin"
+    ],
+    "equipped": [
+      "Quarterstaff",
+      "Dart"
+    ],
+    "gold": 400,
+    "magicItems": []
+  },
+  "languages": [
+    "Halfling",
+    "Infernal"
+  ],
+  "resistances": [],
+  "skillProficiencies": [
+    "Acrobatics",
+    "Insight",
+    "Medicine",
+    "Religion"
+  ],
+  "specialActions": [],
+  "spells": [],
+  "rules": "2024",
+  "imagePath": "campaigns/Map Training/images/Monk.png",
+  "originalFileName": "monk.json"
+}
