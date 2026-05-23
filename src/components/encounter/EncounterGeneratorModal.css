@@ -1,0 +1,245 @@
+/* ============ Generate Modal ============ */
+
+.encounter-builder .gen-modal {
+  width: 560px;
+  max-width: 90vw;
+}
+
+.encounter-builder .gen-modal-overlay .encounter-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.encounter-builder .gen-section-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin-bottom: 6px;
+}
+
+.encounter-builder .gen-quick-picks {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.encounter-builder .gen-quick-btn {
+  padding: 3px 12px;
+  font-size: 0.78rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--background-color-button-secondary);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.encounter-builder .gen-quick-btn:hover {
+  border-color: var(--color-primary);
+}
+
+.encounter-builder .gen-env-groups {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.encounter-builder .gen-env-group {
+  background: var(--background-color-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.encounter-builder .gen-env-group-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+  letter-spacing: 0.03em;
+}
+
+.encounter-builder .gen-env-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.82rem;
+  padding: 2px 0;
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.encounter-builder .gen-env-item input {
+  accent-color: var(--color-primary);
+}
+
+.encounter-builder .gen-env-count {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.encounter-builder .gen-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.encounter-builder .gen-generate-btn {
+  padding: 8px 28px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  background: var(--color-primary) !important;
+  color: var(--color-text-inverse) !important;
+  border: none !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.encounter-builder .gen-generate-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.encounter-builder .gen-generate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============ Results ============ */
+
+.encounter-builder .gen-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.encounter-builder .gen-note {
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--color-text-muted);
+  margin-top: -4px;
+}
+
+.encounter-builder .gen-suggestion {
+  background: var(--background-color-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.encounter-builder .gen-suggestion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.encounter-builder .gen-suggestion-diff {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.encounter-builder .gen-suggestion-diff-easy {
+  background: var(--color-success);
+  color: #fff;
+}
+
+.encounter-builder .gen-suggestion-diff-medium {
+  background: var(--color-warning);
+  color: #000;
+}
+
+.encounter-builder .gen-suggestion-diff-hard {
+  background: #fd7e14;
+  color: #fff;
+}
+
+.encounter-builder .gen-suggestion-diff-deadly {
+  background: var(--color-error);
+  color: #fff;
+}
+
+.encounter-builder .gen-suggestion-xp {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-family: monospace;
+}
+
+.encounter-builder .gen-suggestion-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.encounter-builder .gen-suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.82rem;
+}
+
+.encounter-builder .gen-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.encounter-builder .gen-suggestion-mname {
+  flex: 1;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.encounter-builder .gen-suggestion-mcr {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  min-width: 35px;
+}
+
+.encounter-builder .gen-suggestion-mqty {
+  color: var(--color-text);
+  font-weight: 600;
+  min-width: 28px;
+  text-align: center;
+}
+
+.encounter-builder .gen-suggestion-mxp {
+  color: var(--color-text-muted);
+  font-family: monospace;
+  font-size: 0.78rem;
+  min-width: 55px;
+  text-align: right;
+}
+
+.encounter-builder .gen-apply-btn {
+  margin-top: 8px;
+  width: 100%;
+  padding: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border: none;
+}
+
+.encounter-builder .gen-apply-btn:hover {
+  opacity: 0.9;
+}
+
+.encounter-builder .gen-empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--color-text-muted);
+  font-style: italic;
+}

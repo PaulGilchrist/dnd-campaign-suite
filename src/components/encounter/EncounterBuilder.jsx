@@ -6,6 +6,7 @@ import EncounterSummaryPanel from './EncounterSummaryPanel.jsx';
 import EncounterMonsterTable from './EncounterMonsterTable.jsx';
 import EncounterSelectedMonsters from './EncounterSelectedMonsters.jsx';
 import EncounterModal from './EncounterModal.jsx';
+import EncounterGeneratorModal from './EncounterGeneratorModal.jsx';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import { formatEncounterName } from '../../services/encountersService.js';
 import './EncounterBuilder.css';
@@ -199,6 +200,7 @@ function EncounterBuilder({ characters, campaignName }) {
   } = useEncounterManagement(campaignName);
 
   const [pendingEncounterData, setPendingEncounterData] = useState(null);
+  const [showGenerator, setShowGenerator] = useState(false);
   const [encounterTitle, setEncounterTitle] = useState('Encounter Builder');
   const [currentEncounterName, setCurrentEncounterName] = useState(null);
   const [description, setDescription] = useState('');
@@ -369,6 +371,10 @@ function EncounterBuilder({ characters, campaignName }) {
     }
   };
 
+  const handleApplySuggestion = (monsters) => {
+    setSelectedMonsters(monsters);
+  };
+
   const handleReset = () => {
     setEncounterTitle('Encounter Builder');
     setCurrentEncounterName(null);
@@ -451,7 +457,7 @@ function EncounterBuilder({ characters, campaignName }) {
           <i className="fa-solid fa-dragon"></i>&nbsp; {encounterTitle}
         </h2>
 
-        {/* Save/Load/Reset Buttons */}
+        {/* Save/Load/Generate/Reset Buttons */}
         <div className="encounter-actions">
           <button
             className="encounter-btn encounter-btn-secondary"
@@ -468,6 +474,14 @@ function EncounterBuilder({ characters, campaignName }) {
             title="Load encounter"
           >
             <i className="fa-solid fa-folder-open" /> Load
+          </button>
+          <button
+            className="encounter-btn encounter-btn-generate"
+            onClick={() => setShowGenerator(true)}
+            aria-label="Generate encounter"
+            title="Generate encounter from environments"
+          >
+            <i className="fa-solid fa-wand-magic-sparkles" /> Generate
           </button>
           {currentEncounterName && (
             <button
@@ -591,6 +605,17 @@ function EncounterBuilder({ characters, campaignName }) {
         encounters={encounters}
         loading={encounterLoading}
       />
+
+      {/* Encounter Generator Modal */}
+      {showGenerator && (
+        <EncounterGeneratorModal
+          monsters={monsters}
+          playerLevels={filter.playerLevels}
+          difficulty={filter.difficulty}
+          onApply={handleApplySuggestion}
+          onClose={() => setShowGenerator(false)}
+        />
+      )}
     </div>
   );
 }

@@ -710,6 +710,16 @@
   background: var(--background-color-button-secondary-hover);
 }
 
+.encounter-builder .encounter-btn-generate {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-color: var(--color-primary);
+}
+
+.encounter-builder .encounter-btn-generate:hover {
+  opacity: 0.9;
+}
+
 /* ============ Encounter Description ============ */
 .encounter-builder .encounter-description-section {
   margin-bottom: 16px;
