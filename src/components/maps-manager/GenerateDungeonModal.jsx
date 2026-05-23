@@ -6,7 +6,7 @@ import './GenerateDungeonModal.css';
 function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCreated }) {
     const [mapName, setMapName] = useState(initialMapName || '');
     const [gridSize, setGridSize] = useState(20);
-    const [numRooms, setNumRooms] = useState({ min: 4, max: 10 });
+    const [numRooms, setNumRooms] = useState({ min: Math.round(4*gridSize/10), max: Math.round(10*gridSize/10) });
     const [seed, setSeed] = useState('');
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState(null);
@@ -18,7 +18,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
             return;
         }
 
-        const safeGridSize = Math.max(5, Math.min(100, gridSize));
+        const safeGridSize = Math.max(7, Math.min(100, gridSize));
         if (safeGridSize !== gridSize) {
             setError(`Grid size must be between 5 and 100. Using ${safeGridSize}.`);
         }
@@ -68,7 +68,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                         <span>Grid Size</span>
                         <input
                             type="number"
-                            min={5}
+                            min={7}
                             max={100}
                             value={gridSize}
                             onChange={e => setGridSize(Number(e.target.value))}
