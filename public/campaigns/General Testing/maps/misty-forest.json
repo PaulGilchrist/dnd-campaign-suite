@@ -904,10 +904,75 @@
     "29,29": "water"
   },
   "rivers": [],
-  "pois": [],
-  "zoom": 1.5625,
-  "panX": 504.3695270892178,
-  "panY": 447.22149152062724,
+  "pois": [
+    {
+      "id": "kaelens-camp",
+      "type": "camp",
+      "q": 20,
+      "r": 21,
+      "visible": true,
+      "label": "Kaelen's Camp"
+    },
+    {
+      "id": "thornfast-keep-entrance",
+      "type": "dungeon",
+      "q": 14,
+      "r": 21,
+      "visible": true,
+      "label": "Thornfast Keep Entrance"
+    },
+    {
+      "id": "gleaming-glade",
+      "type": "loreSite",
+      "q": 25,
+      "r": 14,
+      "visible": true,
+      "label": "The Gleaming Glade"
+    },
+    {
+      "id": "warden-watchtower",
+      "type": "tower",
+      "q": 15,
+      "r": 24,
+      "visible": true,
+      "label": "Emerald Warden Watchtower"
+    },
+    {
+      "id": "greenfields-village",
+      "type": "settlement",
+      "q": 18,
+      "r": 15,
+      "visible": true,
+      "label": "Greenfields Village"
+    },
+    {
+      "id": "feywild-rift",
+      "type": "hazard",
+      "q": 24,
+      "r": 17,
+      "visible": true,
+      "label": "Feywild Rift"
+    },
+    {
+      "id": "weeping-stones",
+      "type": "naturalWonder",
+      "q": 16,
+      "r": 12,
+      "visible": true,
+      "label": "The Weeping Stones"
+    },
+    {
+      "id": "ancient-road",
+      "type": "landmark",
+      "q": 12,
+      "r": 18,
+      "visible": true,
+      "label": "Ancient Elven Road"
+    }
+  ],
+  "zoom": 1.953125,
+  "panX": 844.8170103954534,
+  "panY": 450.1733800599998,
   "marchingOrder": [
     "Monk",
     "Paladin",
@@ -915,7 +980,8 @@
     "Warlock"
   ],
   "partyPosition": {
-    "q": 15,
-    "r": 15
-  }
+    "q": 18,
+    "r": 16
+  },
+  "name": "Misty Forest"
 }
