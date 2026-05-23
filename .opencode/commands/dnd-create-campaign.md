@@ -9,11 +9,14 @@ permission:
 ---
 
 ## Arguments
+- **campaign_name** string
+- **party_stasrting_level** (number, required)
 - **party_size** (number, required)
 
 ## Behavior
 - Before writing, look at all the content from the other campaigns. Review their encounters, factions, NPCs, quests, and notes. Ensure the new one-shot has distinct elements (e.g., different location, different primary antagonist type, different core mystery) and is not too similar to what already exists.
-- Confirm party level and size by looking at the characters in the campaign folder, or if no characters exist, ask the user to list party size and level.
+- Confirm a **campaign_name** was given or stop and ask the user to supply the **campaign_name** from the list of current campaign folders located at `public/campaigns`
+- Confirm **party_stasrting_level** and **party_size** by looking at the characters in the campaign folder, at `public/campaigns/{campaign_name}` or if no characters exist, ask the user to list **party_size** and **party_stasrting_level**.
 - Generate a 20-level campaign with sequential story progression.
 - Each level should be roughly 4-8 hours of gameplay.
 - Unveil the main antagonist slowly. At lower levels, the party should face minor villains, lieutenants, or factions acting on behalf of the true antagonist, allowing the players to sense a growing, unseen force long before they learn the villain's identity.
@@ -28,7 +31,7 @@ For each of Levels 1-3, update the data files with:
 - Encounters: Combat, social, and skill challenges with tactics
 - Side Quests: Optional adventures with rewards
 - Treasure: Gold and magic items appropriate to the current player level
-- Indoor and outdoor maps used for quests and encounters
+- One or more indoor and outdoor maps used for quests or encounters using `dungeon-generator.cjs` for all indoor maps and `hex-terrain-generator.js` for outdoor maps.
 - Foreshadowing: Hints of the greater story and antagonist
 - Level-Up Reward: What the party gains upon completion
 - DM Notes: Tips for running the level

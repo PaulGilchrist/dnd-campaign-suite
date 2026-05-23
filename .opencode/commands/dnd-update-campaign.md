@@ -13,8 +13,8 @@ permission:
 - **current_level** (number, required): The level the party is currently at (e.g., 4)
 
 ## Behavior
-- Read all exisitng campaign data files at "./public/campaigns{campaign name}" (including its subfolders) to understand the full campaign arc, themes, antagonist reveal plan, and level progression
-- For each of the next 3 levels ({current_level}, {current_level + 1}, {current_level + 2}):
+- Read all exisitng campaign data files at `./public/campaigns{**campaign_name**}` (including its subfolders) to understand the full campaign arc, themes, antagonist reveal plan, and level progression
+- For each of the next 3 levels ({**current_level**}, {**current_level** + 1}, {**current_level** + 2}):
   - Expand the outline into full detail matching the format of Levels 1-3
   - Include:
     - NPCs (short-term and long-term relevance) with full combat stats
@@ -22,7 +22,8 @@ permission:
     - Encounters (combat, social, skill challenges) with tactics
     - Side quests with rewards
     - Treasure and magic items appropriate to the current player level
-    - Foreshadowing of the greater story
+    - Treasure: Gold and magic items appropriate to the current player level
+    - One or more indoor and outdoor maps used for quests or encounters using `dungeon-generator.cjs` for all indoor maps and `hex-terrain-generator.js` for outdoor maps.
     - Level-up reward
     - DM notes
   - Maintain consistency with the campaign arc, antagonist reveal plan, and existing NPCs
