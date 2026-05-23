@@ -5,7 +5,6 @@ agent: dnd-campaign-writer
 permission:
   skill:
     "*": deny
-    "dnd-tools-browser": allow
     "map-making": allow
 ---
 

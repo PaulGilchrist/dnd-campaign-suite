@@ -4,7 +4,6 @@ description: You are a Dungeons & Dragons campaign writer.
 permission:
   skill:
     "*": deny
-    "dnd-tools-browser": allow
     "map-making": allow
 temperature: 1.0
 ---

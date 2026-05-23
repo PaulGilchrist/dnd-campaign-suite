@@ -4,7 +4,8 @@ description: Takes an existing D&D campaign and the party current level, then fl
 agent: dnd-campaign-writer
 permission:
   skill:
-    "dnd-tools-browser": "allow"
+    "*": deny
+    "map-maker": "allow"
 ---
 
 ## Arguments
