@@ -23,7 +23,7 @@ permission:
     - Side quests with rewards
     - Treasure and magic items appropriate to the current player level
     - Treasure: Gold and magic items appropriate to the current player level
-    - One or more indoor and outdoor maps used for quests or encounters using `dungeon-generator.cjs` for all indoor maps and `hex-terrain-generator.js` for outdoor maps.
+    - One or more indoor and outdoor maps used for quests or encounters using `dungeon-generator.mjs` for all indoor maps and `hex-terrain-generator.mjs` for outdoor maps.
     - Level-up reward
     - DM notes
   - Maintain consistency with the campaign arc, antagonist reveal plan, and existing NPCs

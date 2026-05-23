@@ -31,7 +31,7 @@ For each of Levels 1-3, update the data files with:
 - Encounters: Combat, social, and skill challenges with tactics
 - Side Quests: Optional adventures with rewards
 - Treasure: Gold and magic items appropriate to the current player level
-- One or more indoor and outdoor maps used for quests or encounters using `dungeon-generator.cjs` for all indoor maps and `hex-terrain-generator.js` for outdoor maps.
+- One or more indoor and outdoor maps used for quests or encounters using `dungeon-generator.mjs` for all indoor maps and `hex-terrain-generator.mjs` for outdoor maps.
 - Foreshadowing: Hints of the greater story and antagonist
 - Level-Up Reward: What the party gains upon completion
 - DM Notes: Tips for running the level

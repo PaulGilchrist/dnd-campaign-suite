@@ -3,7 +3,7 @@
  * Generates grid-based dungeon maps as JSON compatible with Paul's dnd-char-sheet app.
  *
  * Works in browsers (ES module) and Node.js.
- * This is the ES module mirror of dungeon-generator.cjs (standalone/CLI version).
+ * This is the canonical implementation. dungeon-generator.mjs is the CLI shim.
  *
  * Usage:
  *   import { generateDungeon, visualize } from './dungeonGenerator.js';
@@ -102,7 +102,7 @@ class BSPNode {
       });
       this.right = new BSPNode({
         x: split,
-        y: this.rect.x,
+        y: this.rect.y,
         w: this.rect.x + this.rect.w - split,
         h: this.rect.h,
       });
@@ -741,6 +741,7 @@ export function generateDungeon(opts) {
     });
     if (door.doorType === "secretDoor") {
       grid[door.y][door.x] = true;
+      walls.push(door.x + "," + door.y);
     }
     doorIndex++;
     if (pair) {
@@ -754,6 +755,7 @@ export function generateDungeon(opts) {
       });
       if (pair.doorType === "secretDoor") {
         grid[pair.y][pair.x] = true;
+        walls.push(pair.x + "," + pair.y);
       }
       doorIndex++;
     }
