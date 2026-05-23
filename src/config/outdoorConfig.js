@@ -1,17 +1,18 @@
 // Hex map rendering constants
-export const HEX_SIZE = 24; // radius of each hex in SVG pixels
+export const HEX_SIZE = 30; // radius of each hex in SVG pixels
 export const DEFAULT_GRID_SIZE = 30; // default grid is 30x30 hexes
 
 // Terrain types with distinct colors
 export const TERRAIN_TYPES = [
-  { id: 'plains',     name: 'Plains',     fill: '#A8D870', stroke: '#7CB342', label: 'Plains' },
-  { id: 'hills',      name: 'Hills',      fill: '#7CB342', stroke: '#558B2F', label: 'Hills' },
-  { id: 'forest',     name: 'Forest',     fill: '#2E7D32', stroke: '#1B5E20', label: 'Forest' },
-  { id: 'mountains',  name: 'Mountains',  fill: '#9E9E9E', stroke: '#616161', label: 'Mts' },
-  { id: 'desert',     name: 'Desert',     fill: '#F9E076', stroke: '#C4A265', label: 'Desert' },
-  { id: 'swamp',      name: 'Swamp',      fill: '#5D8A6D', stroke: '#3D5D4B', label: 'Swamp' },
-  { id: 'tundra',     name: 'Tundra',     fill: '#D4E8F0', stroke: '#9DB8C4', label: 'Tundra' },
-  { id: 'water',      name: 'Water',      fill: '#4A90D9', stroke: '#2B6CB0', label: 'Water' },
+  { id: 'plains',     name: 'Plains',     fill: '#C4D9A5', stroke: '#A8C088', label: 'Plains' },
+  { id: 'hills',      name: 'Hills',      fill: '#8DB580', stroke: '#70986A', label: 'Hills' },
+  { id: 'forest',     name: 'Forest',     fill: '#3D7A4A', stroke: '#2D5E37', label: 'Forest' },
+  { id: 'mountains',  name: 'Mountains',  fill: '#8B8B7A', stroke: '#6F6F62', label: 'Mts' },
+  { id: 'desert',     name: 'Desert',     fill: '#E8D5A3', stroke: '#C4B080', label: 'Desert' },
+  { id: 'swamp',      name: 'Swamp',      fill: '#6B8E6E', stroke: '#4F6E52', label: 'Swamp' },
+  { id: 'tundra',     name: 'Tundra',     fill: '#C8D8D8', stroke: '#A0B0B0', label: 'Tundra' },
+  { id: 'water',      name: 'Water',      fill: '#4A7FB5', stroke: '#356090', label: 'Water' },
+  { id: 'beach',      name: 'Beach',      fill: '#F0DCA0', stroke: '#D4C080', label: 'Beach' },
 ];
 
 // Default terrain (used when a hex has no assigned terrain)

@@ -19,8 +19,8 @@ function HexGridLayer({ gridSize }) {
                     key={key}
                     d={d}
                     fill="none"
-                    stroke="#B0B0B0"
-                    strokeWidth="0.5"
+                    stroke="#999"
+                    strokeWidth="0.3"
                 />
             ))}
         </g>

@@ -114,8 +114,22 @@
 .hex-svg {
     flex: 1;
     width: 100%;
-    background: #1a1a2e;
+    background: #F0E8D8;
     display: block;
+}
+
+/* Compass rose overlay */
+.hex-map-compass {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+/* River layer */
+.river-layer {
+    pointer-events: none;
 }
 
 /* Loading state */

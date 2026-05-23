@@ -14,6 +14,7 @@ import POIPanel from './POIPanel.jsx';
 import POIContextMenu from './POIContextMenu.jsx';
 import MarchingOrderPanel from './MarchingOrderPanel.jsx';
 import PartyMarkerLayer from './PartyMarkerLayer.jsx';
+import RiverLayer from './RiverLayer.jsx';
 import SettlementSVG from './svg/SettlementSVG.jsx';
 import DungeonSVG from './svg/DungeonSVG.jsx';
 import CampSVG from './svg/CampSVG.jsx';
@@ -29,6 +30,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
     const [mapData, setMapData] = useState(null);       // full map data object from server
     const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE); // hex grid dimensions
     const [terrain, setTerrain] = useState({});          // Record<hexKey, terrainType>
+    const [rivers, setRivers] = useState([]);            // array of "q,r" strings
     const [pois, setPois] = useState([]);                // array of POI objects
 
     // Marching order state
@@ -48,7 +50,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
     // Painting state
     const paintingRef = useRef(false); // whether we're in the middle of a paint/erase stroke
 
-    const [zoom, setZoom] = useState(1);
+    const [zoom, setZoom] = useState(1.5);
     const [panX, setPanX] = useState(0);
     const [panY, setPanY] = useState(0);
     const [panning, setPanning] = useState(null);        // { startX, startY, startPanX, startPanY } | null
@@ -344,6 +346,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
                 if (existing) {
                     // Load path — existing map data found
                     const loadedTerrain = existing.terrain || {};
+                    const loadedRivers = existing.rivers || [];
                     const loadedPois = existing.pois || [];
                     const loadedGridSize = existing.gridSize || DEFAULT_GRID_SIZE;
                     const loadedZoom = existing.zoom != null ? existing.zoom : 1;
@@ -360,6 +363,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
                     setMapData(existing);
                     setGridSize(loadedGridSize);
                     setTerrain(loadedTerrain);
+                    setRivers(loadedRivers);
                     setPois(loadedPois);
                     setZoom(loadedZoom);
                     setPanX(loadedPanX);
@@ -440,6 +444,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
             type: 'outdoor',
             gridSize,
             terrain,
+            rivers,
             pois,
             zoom,
             panX,
@@ -449,7 +454,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
         };
         mapsService.saveMapData(campaignName, mapName, dataToSave)
             .catch(err => console.error('Failed to save hex map data:', err));
-    }, [campaignName, mapName, terrain, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition]);
+    }, [campaignName, mapName, terrain, rivers, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition]);
 
     // ─── Sync state to refs for use in event handlers ──────────────────
 
@@ -539,6 +544,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
                         gridSize={gridSize}
                         terrain={terrain}
                     />
+                    <RiverLayer
+                        rivers={rivers}
+                        gridSize={gridSize}
+                    />
                     <HexGridLayer
                         gridSize={gridSize}
                     />
@@ -585,6 +594,15 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
                     />
                 </svg>
             )}
+
+            <div className="hex-map-compass">
+                <svg viewBox="0 0 40 40" width="36" height="36">
+                    <polygon points="20,2 23,17 38,20 23,23 20,38 17,23 2,20 17,17" fill="#666" stroke="#999" strokeWidth="0.5" />
+                    <polygon points="20,2 23,17 20,20 17,17" fill="#c44" />
+                    <polygon points="20,38 23,23 20,20 17,23" fill="#555" />
+                    <text x="20" y="13" textAnchor="middle" fill="#c44" fontSize="5" fontWeight="bold">N</text>
+                </svg>
+            </div>
 
             {/* Marching Order Panel overlay */}
             {marchingOpen && (

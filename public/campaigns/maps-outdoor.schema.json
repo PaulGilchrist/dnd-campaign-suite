@@ -36,6 +36,7 @@
             "additionalProperties": {
                 "type": "string",
                 "enum": [
+                    "beach",
                     "desert",
                     "forest",
                     "hills",
@@ -47,6 +48,14 @@
                 ]
             },
             "propertyNames": {
+                "pattern": "^[0-9]+,[0-9]+$"
+            }
+        },
+        "rivers": {
+            "type": "array",
+            "description": "Hex coordinates that rivers flow through",
+            "items": {
+                "type": "string",
                 "pattern": "^[0-9]+,[0-9]+$"
             }
         },

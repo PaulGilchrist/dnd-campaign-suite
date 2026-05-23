@@ -87,7 +87,7 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
                     </label>
                 </div>
                 <div className="dungeon-gen-note">
-                    Generates a terrain map using noise-based elevation and moisture to create realistic biomes. Use the seed to get different results.
+                    Generates a terrain map with fractal noise for realistic elevation, lakes, rivers, beaches, and coastline. Use the seed to get different results.
                 </div>
                 <div className="maps-manager-modal-actions">
                     <button onClick={onClose} disabled={generating}>

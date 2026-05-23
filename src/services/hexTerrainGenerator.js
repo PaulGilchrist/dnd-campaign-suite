@@ -1,266 +1,310 @@
 import { getAllHexes, hexKey, hexNeighbors } from './hexMapUtils.js';
 import { TERRAIN_TYPES } from '../config/outdoorConfig.js';
 
-/**
- * Procedural hex terrain generator for outdoor D&D maps.
- * Pure service — no React dependencies, no DOM access.
- *
- * Generates terrain using two-layer value noise (elevation + moisture)
- * bilinearly interpolated from coarse noise grids.  The (elevation, moisture)
- * pair is mapped to one of 8 terrain types via a biome threshold table.
- *
- * Terrain types: plains, hills, forest, mountains, desert, swamp, tundra, water
- *
- * @param {object} [options]
- * @param {number} [options.gridSize=30]  - Hex grid dimensions (gridSize × gridSize)
- * @param {number} [options.seed]         - PRNG seed (default: Math.floor(Math.random() * 100000))
- * @param {object} [options.weights]      - Terrain frequency bias, e.g. { plains: 0.8, water: 1.2 }
- * @returns {{ terrain: object.<string, string> }}
- *   terrain — map of "q,r" → terrain type id (e.g. "plains", "water")
- */
+const VALID_TERRAIN_IDS = new Set(TERRAIN_TYPES.map(t => t.id));
+
 export function generateHexTerrain({ gridSize = 30, seed, weights } = {}) {
-  // ---------------------------------------------------------------------------
-  // Edge cases
-  // ---------------------------------------------------------------------------
   if (!Number.isInteger(gridSize) || gridSize < 1) {
-    return { terrain: {} };
+    return { terrain: {}, rivers: [] };
   }
 
   const effectiveSeed = seed !== undefined ? seed : Math.floor(Math.random() * 100000);
 
-  // ---------------------------------------------------------------------------
-  // Build coarse noise grids (elevation + moisture)
-  // ---------------------------------------------------------------------------
-  // Resolution scales with grid size so biomes keep proportional feature sizes.
-  const noiseResolution = Math.max(3, Math.floor(gridSize / 4));
-  const elevationGrid = buildNoiseGrid(noiseResolution, effectiveSeed, 1);
-  const moistureGrid = buildNoiseGrid(noiseResolution, effectiveSeed, 2);
+  const baseResolution = Math.max(4, Math.floor(gridSize / 3));
 
-  // ---------------------------------------------------------------------------
-  // Sample noise per hex and map to terrain type
-  // ---------------------------------------------------------------------------
+  const octaves = [
+    { amplitude: 1.0, frequency: 1 },
+    { amplitude: 0.5, frequency: 2 },
+    { amplitude: 0.25, frequency: 4 },
+  ];
+
+  const elevationOctaveGrids = octaves.map((oct, i) =>
+    buildNoiseGrid(baseResolution * oct.frequency, effectiveSeed, 1, i)
+  );
+  const moistureOctaveGrids = octaves.map((oct, i) =>
+    buildNoiseGrid(baseResolution * oct.frequency, effectiveSeed, 2, i)
+  );
+
   const allHexes = getAllHexes(gridSize, gridSize);
   const terrain = {};
+  const elevationMap = {};
+  const moistureMap = {};
 
   for (const { q, r } of allHexes) {
-    const elevation = sampleNoiseGrid(elevationGrid, q, r, gridSize);
-    const moisture = sampleNoiseGrid(moistureGrid, q, r, gridSize);
-    terrain[hexKey(q, r)] = elevationMoistureToTerrain(elevation, moisture);
+    const elevation = sampleFractal(elevationOctaveGrids, octaves, q, r, gridSize, baseResolution);
+    const moisture = sampleFractal(moistureOctaveGrids, octaves, q, r, gridSize, baseResolution);
+    const key = hexKey(q, r);
+    elevationMap[key] = elevation;
+    moistureMap[key] = moisture;
+    terrain[key] = elevationMoistureToTerrain(elevation, moisture);
   }
 
-  // ---------------------------------------------------------------------------
-  // Apply optional frequency weights
-  // ---------------------------------------------------------------------------
+  frameWithWater(terrain, gridSize);
+  applyBeaches(terrain, gridSize);
+  fillLakes(terrain, elevationMap, gridSize);
+  const rivers = generateRivers(elevationMap, moistureMap, terrain, gridSize);
+
   if (weights && typeof weights === 'object' && Object.keys(weights).length > 0) {
     applyWeights(terrain, weights, allHexes, effectiveSeed);
   }
 
-  return { terrain };
+  return { terrain, rivers };
 }
 
-// ---------------------------------------------------------------------------
-// Seeded PRNG — mulberry32
-// ---------------------------------------------------------------------------
-
-/**
- * Mulberry32 — a fast, seedable 32-bit PRNG.
- * Returns a function that produces values in [0, 1).
- *
- * @param {number} seed  - 32-bit integer seed
- * @returns {function(): number}
- */
 function mulberry32(seed) {
   return function next() {
-    /* eslint-disable no-bitwise */
     seed |= 0;
     seed = (seed + 0x6D2B79F5) | 0;
     let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    /* eslint-enable no-bitwise */
   };
 }
 
-// ---------------------------------------------------------------------------
-// Coarse noise grid construction and sampling
-// ---------------------------------------------------------------------------
-
-/**
- * Build a (resolution + 1) × (resolution + 1) grid of deterministic
- * pseudo-random values in [0, 1).  Each cell uses a unique seed derived
- * from the base seed, its coordinates, and the channel offset so that
- * elevation and moisture grids are fully independent.
- *
- * @param {number} resolution  - Coarse grid cell count per dimension
- * @param {number} seed        - Base PRNG seed
- * @param {number} channel     - Channel index (1 = elevation, 2 = moisture)
- * @returns {number[][]}       - 2-D array of noise values
- */
-function buildNoiseGrid(resolution, seed, channel) {
+function buildNoiseGrid(resolution, seed, channel, octaveIndex) {
   const size = resolution + 1;
   const grid = [];
-
   for (let cy = 0; cy < size; cy++) {
     const row = [];
     for (let cx = 0; cx < size; cx++) {
-      const cellSeed = seed + cx * 1000 + cy * 10000 + channel * 100000;
+      const cellSeed = seed + cx * 1000 + cy * 10000 + channel * 100000 + octaveIndex * 1000000;
       const rng = mulberry32(cellSeed >>> 0);
       row.push(rng());
     }
     grid.push(row);
   }
-
   return grid;
 }
 
-/**
- * Bilinearly interpolate a noise value from the coarse grid for hex (q, r).
- *
- * The hex's relative position within the grid (0 … 1) is mapped to the
- * coarse-grid coordinate space so that each noise cell covers roughly
- * the same number of hexes regardless of grid size.
- *
- * @param {number[][]} grid   - Coarse noise grid
- * @param {number} q          - Hex axial column
- * @param {number} r          - Hex axial row
- * @param {number} gridSize   - Total grid dimension
- * @returns {number}          - Interpolated value in [0, 1]
- */
 function sampleNoiseGrid(grid, q, r, gridSize) {
   const resolution = grid.length - 1;
-
-  // Normalise hex position to [0, 1]
   const x = gridSize > 1 ? q / (gridSize - 1) : 0.5;
   const y = gridSize > 1 ? r / (gridSize - 1) : 0.5;
-
-  // Coordinate in noise-grid space
   const gx = x * resolution;
   const gy = y * resolution;
-
   const cx = Math.min(Math.floor(gx), resolution);
   const cy = Math.min(Math.floor(gy), resolution);
-  const fx = gx - cx; // fractional part within the cell
+  const fx = gx - cx;
   const fy = gy - cy;
-
-  const nx = Math.min(cx + 1, resolution); // right neighbour index
-  const ny = Math.min(cy + 1, resolution); // bottom neighbour index
-
+  const nx = Math.min(cx + 1, resolution);
+  const ny = Math.min(cy + 1, resolution);
   const c00 = grid[cy][cx];
   const c10 = grid[cy][nx];
   const c01 = grid[ny][cx];
   const c11 = grid[ny][nx];
-
-  // Bilinear interpolation
   const top = c00 + (c10 - c00) * fx;
   const bottom = c01 + (c11 - c01) * fx;
   return top + (bottom - top) * fy;
 }
 
-// ---------------------------------------------------------------------------
-// Biome mapping
-// ---------------------------------------------------------------------------
+function sampleFractal(octaveGrids, octaves, q, r, gridSize, baseResolution) {
+  let value = 0;
+  for (let i = 0; i < octaveGrids.length; i++) {
+    const grid = octaveGrids[i];
+    const { amplitude, frequency } = octaves[i];
+    const effectiveSize = Math.max(gridSize, baseResolution * frequency + 1);
+    value += sampleNoiseGrid(grid, q * frequency, r * frequency, effectiveSize) * amplitude;
+  }
+  const maxPossible = octaves.reduce((s, o) => s + o.amplitude, 0);
+  return value / maxPossible;
+}
 
-/**
- * Map elevation and moisture to a terrain type.
- *
- * The threshold table divides elevation into 6 bands, with moisture
- * determining the specific terrain within each band.
- *
- *    elevation         → bands       moisture          → terrain
- *    ──────────────────────────────────────────────────────────
- *    > 0.75           deep water     any                water
- *    0.65 – 0.75      shallow       > 0.6              swamp
- *                                    ≤ 0.6              water
- *    0.55 – 0.65      low land      > 0.7              swamp
- *                                    0.3 – 0.7         plains
- *                                    ≤ 0.3              desert
- *    0.40 – 0.55      mid land      > 0.7              forest
- *                                    0.4 – 0.7         hills
- *                                    0.2 – 0.4         plains
- *                                    ≤ 0.2              desert
- *    0.25 – 0.40      high land     > 0.5              forest
- *                                    0.3 – 0.5         hills
- *                                    ≤ 0.3              plains
- *    ≤ 0.25           peaks         > 0.5              tundra
- *                                    0.2 – 0.5         plains
- *                                    ≤ 0.2              mountains
- *
- * @param {number} elevation  - Noise value in [0, 1]
- * @param {number} moisture   - Noise value in [0, 1]
- * @returns {string}          - Terrain type id
- */
 function elevationMoistureToTerrain(elevation, moisture) {
-  if (elevation > 0.75) {
-    return 'water';
+  if (elevation > 0.85) {
+    return 'tundra';
   }
 
-  if (elevation > 0.65) {
-    return moisture > 0.6 ? 'swamp' : 'water';
+  if (elevation > 0.70) {
+    if (moisture > 0.4) return 'mountains';
+    return 'mountains';
   }
 
   if (elevation > 0.55) {
-    if (moisture > 0.7) return 'swamp';
-    if (moisture > 0.3) return 'plains';
-    return 'desert';
+    if (moisture > 0.6) return 'forest';
+    if (moisture > 0.3) return 'hills';
+    return 'plains';
   }
 
-  if (elevation > 0.40) {
+  if (elevation > 0.45) {
     if (moisture > 0.7) return 'forest';
     if (moisture > 0.4) return 'hills';
     if (moisture > 0.2) return 'plains';
     return 'desert';
   }
 
-  if (elevation > 0.25) {
-    if (moisture > 0.5) return 'forest';
-    if (moisture > 0.3) return 'hills';
-    return 'plains';
+  if (elevation > 0.35) {
+    if (moisture > 0.6) return 'swamp';
+    if (moisture > 0.3) return 'plains';
+    return 'desert';
   }
 
-  // elevation ≤ 0.25 — peaks / polar
-  if (moisture > 0.5) return 'tundra';
-  if (moisture > 0.2) return 'plains';
-  return 'mountains';
+  return 'water';
 }
 
-// ---------------------------------------------------------------------------
-// Weight biasing
-// ---------------------------------------------------------------------------
+function isOnEdge(q, r, gridSize) {
+  return q === 0 || q === gridSize - 1 || r === 0 || r === gridSize - 1;
+}
 
-/**
- * Adjust terrain frequency according to user-supplied weights.
- *
- *   weight < 1.0 —  reduce the terrain type: each hex of this type has a
- *                    `(1 - weight)` chance of converting to a neighbour's type.
- *   weight > 1.0 —  increase the terrain type: each hex adjacent to this type
- *                    has a chance (scaled by `weight - 1`) of converting to it.
- *   weight = 1.0 or missing — no change.
- *
- * The conversion probability is capped so that extreme values (e.g. 3.0)
- * don't cause every eligible hex to flip in a single pass.
- *
- * @param {object}   terrain    - Terrain map (mutated in place)
- * @param {object}   weights    - Terrain id → bias factor
- * @param {Array}    allHexes   - All { q, r } coordinates
- * @param {number}   seed       - Base seed (used with an offset for this pass)
- */
+function inBounds(q, r, gridSize) {
+  return q >= 0 && q < gridSize && r >= 0 && r < gridSize;
+}
+
+function frameWithWater(terrain, gridSize) {
+  for (let r = 0; r < gridSize; r++) {
+    for (let q = 0; q < gridSize; q++) {
+      if (isOnEdge(q, r, gridSize)) {
+        terrain[hexKey(q, r)] = 'water';
+      }
+    }
+  }
+}
+
+function applyBeaches(terrain, gridSize) {
+  for (let r = 0; r < gridSize; r++) {
+    for (let q = 0; q < gridSize; q++) {
+      const key = hexKey(q, r);
+      if (terrain[key] === 'water') continue;
+      const neighbors = hexNeighbors(q, r);
+      for (const n of neighbors) {
+        if (!inBounds(n.q, n.r, gridSize)) continue;
+        if (terrain[hexKey(n.q, n.r)] === 'water') {
+          terrain[key] = 'beach';
+          break;
+        }
+      }
+    }
+  }
+}
+
+function fillLakes(terrain, elevationMap, gridSize) {
+  const visited = new Set();
+  const queue = [];
+
+  for (let r = 0; r < gridSize; r++) {
+    for (let q = 0; q < gridSize; q++) {
+      if (!isOnEdge(q, r, gridSize)) continue;
+      const key = hexKey(q, r);
+      if (terrain[key] !== 'water' && !visited.has(key)) {
+        queue.push(key);
+        visited.add(key);
+      }
+    }
+  }
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    const [cq, cr] = current.split(',').map(Number);
+    const neighbors = hexNeighbors(cq, cr);
+    for (const n of neighbors) {
+      if (!inBounds(n.q, n.r, gridSize)) continue;
+      const nk = hexKey(n.q, n.r);
+      if (visited.has(nk)) continue;
+      if (terrain[nk] === 'water') continue;
+      queue.push(nk);
+      visited.add(nk);
+    }
+  }
+
+  const waterThreshold = 0.5;
+  for (let r = 0; r < gridSize; r++) {
+    for (let q = 0; q < gridSize; q++) {
+      const key = hexKey(q, r);
+      if (terrain[key] === 'water') continue;
+      if (visited.has(key)) continue;
+      const elev = elevationMap[key];
+      if (elev != null && elev < waterThreshold) {
+        terrain[key] = 'water';
+      }
+    }
+  }
+}
+
+function generateRivers(elevationMap, moistureMap, terrain, gridSize) {
+  const riverHexes = new Set();
+  const candidates = [];
+
+  for (let r = 0; r < gridSize; r++) {
+    for (let q = 0; q < gridSize; q++) {
+      const key = hexKey(q, r);
+      const elev = elevationMap[key];
+      const moist = moistureMap[key];
+      if (elev > 0.6 && moist > 0.65) {
+        candidates.push({ q, r, moisture: moist });
+      }
+    }
+  }
+
+  candidates.sort((a, b) => b.moisture - a.moisture);
+
+  const maxRivers = Math.max(2, Math.floor(gridSize / 8));
+  const taken = new Set();
+
+  for (const source of candidates) {
+    if (riverHexes.size >= maxRivers * 5) break;
+    const sk = hexKey(source.q, source.r);
+    if (taken.has(sk)) continue;
+
+    const path = traceRiver(source.q, source.r, elevationMap, terrain, gridSize);
+    if (path.length < 3) continue;
+
+    for (const h of path) {
+      riverHexes.add(h);
+      taken.add(h);
+    }
+  }
+
+  return Array.from(riverHexes);
+}
+
+function traceRiver(startQ, startR, elevationMap, terrain, gridSize) {
+  const path = [];
+  const visited = new Set();
+  let q = startQ;
+  let r = startR;
+  const maxSteps = gridSize * 2;
+
+  for (let step = 0; step < maxSteps; step++) {
+    const key = hexKey(q, r);
+    if (visited.has(key)) break;
+    visited.add(key);
+    path.push(key);
+
+    const terrainType = terrain[key];
+    if (terrainType === 'water') break;
+
+    const neighbors = hexNeighbors(q, r);
+    let lowest = null;
+    let lowestElev = Infinity;
+
+    for (const n of neighbors) {
+      if (!inBounds(n.q, n.r, gridSize)) continue;
+      const nk = hexKey(n.q, n.r);
+      if (visited.has(nk)) continue;
+      const elev = elevationMap[nk];
+      if (elev != null && elev < lowestElev) {
+        lowestElev = elev;
+        lowest = n;
+      }
+    }
+
+    if (!lowest || lowestElev >= elevationMap[hexKey(q, r)]) break;
+
+    q = lowest.q;
+    r = lowest.r;
+  }
+
+  return path;
+}
+
 function applyWeights(terrain, weights, allHexes, seed) {
-  // Build a set of valid terrain IDs from the config for key validation
-  const validTerrainIds = new Set(TERRAIN_TYPES.map(t => t.id));
-
   const rng = mulberry32((seed + 999999) >>> 0);
 
-  // -----------------------------------------------------------------------
-  // Phase 1 — reduce over-represented terrains (weight < 1.0)
-  // -----------------------------------------------------------------------
   for (const { q, r } of allHexes) {
     const key = hexKey(q, r);
     const current = terrain[key];
     const w = weights[current];
 
-    // Skip weight keys that don't match a known terrain type
-    if (w !== undefined && validTerrainIds.has(current) && w < 1.0) {
-      // Probability of switching away from this terrain = 1 - weight
+    if (w !== undefined && VALID_TERRAIN_IDS.has(current) && w < 1.0) {
       if (rng() > w) {
         const neighbors = hexNeighbors(q, r).filter(n =>
           terrain[hexKey(n.q, n.r)] !== undefined
@@ -273,9 +317,6 @@ function applyWeights(terrain, weights, allHexes, seed) {
     }
   }
 
-  // -----------------------------------------------------------------------
-  // Phase 2 — increase under-represented terrains (weight > 1.0)
-  // -----------------------------------------------------------------------
   for (const { q, r } of allHexes) {
     const key = hexKey(q, r);
     const current = terrain[key];
@@ -288,10 +329,7 @@ function applyWeights(terrain, weights, allHexes, seed) {
       const terrainType = terrain[nk];
       const w = weights[terrainType];
 
-      // Don't convert a hex to the same type it already is
-      if (w !== undefined && validTerrainIds.has(terrainType) && w > 1.0 && terrainType !== current) {
-        // Conversion probability scales with how far above 1.0 the weight is
-        // Capped at 0.5 to avoid total conversion in a single pass.
+      if (w !== undefined && VALID_TERRAIN_IDS.has(terrainType) && w > 1.0 && terrainType !== current) {
         const probability = Math.min((w - 1.0) * 0.4, 0.5);
         if (rng() < probability) {
           terrain[key] = terrainType;
