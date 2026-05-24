@@ -4,12 +4,13 @@ import { cloneDeep } from 'lodash';
 import utils from '../../services/utils.js'
 import storage from '../../services/storage.js'
 import { getMonsterImageUrl } from '../../services/monsterUtils.js';
+import AvatarImage from '../common/AvatarImage.jsx';
 import './initiative.css'
 
 function NpcAvatar({ name, imageUrl }) {
     if (imageUrl) {
         return (
-            <div className="player-avatar">
+            <div className="npc-avatar">
                 <img src={imageUrl} alt={name} className="avatar-image" />
             </div>
         );
@@ -18,21 +19,6 @@ function NpcAvatar({ name, imageUrl }) {
     return (
         <div className="npc-avatar">
             <span>{initial}</span>
-        </div>
-    );
-}
-
-function AvatarImage({ name, imagePath }) {
-    if (imagePath) {
-        return (
-            <div className="player-avatar">
-                <img src={imagePath} alt={name} className="avatar-image" />
-            </div>
-        );
-    }
-    return (
-        <div className="player-avatar">
-            <span className="avatar-initial">{name ? name.charAt(0).toUpperCase() : '?'}</span>
         </div>
     );
 }

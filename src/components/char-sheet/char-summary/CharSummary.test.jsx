@@ -196,10 +196,10 @@ describe('CharSummary', () => {
     expect(screen.getByText(/Inspiration/)).toBeInTheDocument();
     });
 
-  it('should render short rest hit dice', () => {
+  it('should render short rest button on localhost', () => {
     render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
 
-    expect(screen.getByText(/Short Rest Hit Dice/)).toBeInTheDocument();
+    expect(screen.getByTitle(/Short Rest/)).toBeInTheDocument();
     });
 
   it('should render feats component', () => {
@@ -427,28 +427,26 @@ describe('CharSummary', () => {
     expect(screen.getByText(/Background/)).toBeInTheDocument();
   });
 
-  it('should handle short rest hit dice toggle', () => {
+  it('should open short rest modal on button click', () => {
     render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
 
-    const hitDiceElement = screen.getByText(/Short Rest Hit Dice/);
-    fireEvent.click(hitDiceElement);
+    const shortRestBtn = screen.getByTitle(/Short Rest/);
+    fireEvent.click(shortRestBtn);
 
-    expect(screen.getByTestId('hidden-input')).toBeInTheDocument();
+    expect(screen.getByText(/Hit Dice/)).toBeInTheDocument();
+    expect(screen.getByText(/Resources Restored/)).toBeInTheDocument();
   });
 
-  it('should update short rest hit dice value', () => {
-    storage.getProperty.mockReturnValue(3);
-
+  it('should close short rest modal on cancel', () => {
     render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
 
-    const hiddenValues = screen.getAllByTestId('hidden-value');
-    expect(hiddenValues[0]).toHaveTextContent('3');
-   });
+    const shortRestBtn = screen.getByTitle(/Short Rest/);
+    fireEvent.click(shortRestBtn);
 
-  it('should not render short rest hit dice input when not toggled', () => {
-    render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
+    const cancelBtn = screen.getByText('Cancel');
+    fireEvent.click(cancelBtn);
 
-    expect(screen.queryByTestId('hidden-input')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Hit Dice/)).not.toBeInTheDocument();
   });
 
   it('should show feats popup with array description format', () => {

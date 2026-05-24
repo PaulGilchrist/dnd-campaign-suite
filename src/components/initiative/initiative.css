@@ -121,19 +121,18 @@
     background-color: #e74c3c;
 }
 
-.initiative .player-avatar {
-    width: 150px;
-    height: 150px;
+.initiative .avatar-wrapper {
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
     background-color: #d1d5db;
     color: #374151;
 }
 
 .initiative .avatar-initial {
-    font-size: 3.75em;
     font-weight: bold;
     text-transform: uppercase;
 }

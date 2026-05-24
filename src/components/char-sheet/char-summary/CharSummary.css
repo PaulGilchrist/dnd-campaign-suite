@@ -1,6 +1,17 @@
+.char-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.char-header-text {
+    flex: 1;
+    min-width: 0;
+}
 .name-row {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 .name {
     color: var(--color-header);
@@ -32,7 +43,27 @@
     grid-template-columns: auto auto auto;
 }
 
-
+/* Avatar styles for char sheet header */
+.char-header .avatar-wrapper {
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+    background-color: #d1d5db;
+    color: #374151;
+}
+.char-header .avatar-initial {
+    font-weight: bold;
+    text-transform: uppercase;
+}
+.char-header .avatar-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
 
 /* Light theme overrides */
 [data-theme="light"] .delete-character-btn {
@@ -41,4 +72,13 @@
 
 [data-theme="light"] .delete-character-btn:hover {
     color: #e74c3c;
+}
+
+@media print {
+    .char-header .avatar-wrapper {
+        border: 1px solid black;
+    }
+    .char-header .avatar-initial {
+        color: black;
+    }
 }

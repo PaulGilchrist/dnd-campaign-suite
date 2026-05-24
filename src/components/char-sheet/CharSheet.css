@@ -2,8 +2,82 @@
     max-width: 800px;
     padding: 10px;
 }
+
+/* Short Rest Modal */
+.short-rest-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.9);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.short-rest-modal {
+    background-color: var(--background-color-header-inner);
+    border: 1px solid var(--color-header);
+    border-radius: 10px;
+    color: var(--color-header-inner);
+    padding: 20px;
+    max-width: 450px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+.short-rest-modal h3 {
+    margin: 0 0 12px;
+    color: var(--color-header);
+}
+.short-rest-modal h4 {
+    margin: 0 0 8px;
+}
+.short-rest-section {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color-light);
+}
+.short-rest-section:last-of-type {
+    border-bottom: none;
+}
+.short-rest-dice-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+.short-rest-roll-log table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 0.9em;
+}
+.short-rest-roll-log th,
+.short-rest-roll-log td {
+    padding: 2px 8px;
+    text-align: center;
+}
+.short-rest-total {
+    margin-top: 6px;
+    font-size: 0.95em;
+}
+.short-rest-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+.short-rest-modal ul {
+    margin: 0;
+    padding-left: 20px;
+}
+.short-rest-modal ul li {
+    margin-bottom: 2px;
+}
+
 @media print {
     .char-sheet {
         padding: 0;
-        }
+    }
 }

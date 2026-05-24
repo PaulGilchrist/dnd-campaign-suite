@@ -1,4 +1,4 @@
-  
+   
 import React from 'react'
 import './CharSummary.css'
 
@@ -7,18 +7,19 @@ import CharGold from './CharGold.jsx'
 import CharHitPoints from './CharHitPoints.jsx'
 import CharClassFeatures from './CharClassFeatures.jsx'
 import CharFeats from '../char-feats/CharFeats.jsx'
-import HiddenInput from '../../common/HiddenInput.jsx'
 import Popup from '../../common/Popup.jsx'
+import AvatarImage from '../../common/AvatarImage.jsx'
 import useTrackedResource from '../../../hooks/useTrackedResource.js'
 import useDiceRoll from '../../../hooks/useDiceRoll.js'
-import { rollDice } from '../../../services/diceRoller.js'
 import LongRestButton from '../LongRestButton.jsx'
+import ShortRestButton from '../ShortRestButton.jsx'
+import ShortRestModal from '../ShortRestModal.jsx'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
 function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, onLongRest }) {
     const { popupHtml, setPopupHtml, rollInitiative } = useDiceRoll();
-    const [showInput, setShowInput] = React.useState(false);
+    const [showShortRest, setShowShortRest] = React.useState(false);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
     const { current: hasInspiration, update: setHasInspiration } = useTrackedResource(
@@ -31,38 +32,6 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const handleToggleInspiration = () => {
         const newValue = !hasInspiration;
         setHasInspiration(newValue);
-    };
-
-    const { current: shortRestHitDice, update: handleShortRestHitDiceChange } = useTrackedResource(
-        'shortRestHitDice',
-        playerStats.name,
-        () => playerStats.level,
-        [playerStats],
-        campaignName
-    );
-    const handleShortRestHitDiceToggle = () => {
-        setShowInput((showInput) => !showInput);
-    };
-
-    const handleRollHitDice = () => {
-        if (shortRestHitDice <= 0) return;
-        const con = playerStats.abilities?.find((a) => a.name === 'Constitution');
-        const conMod = con?.bonus || 0;
-        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-        const hitDie = classLevel?.hit_die || 8;
-        const { total, rolls } = rollDice(1, hitDie);
-        const hpRecovered = total + conMod;
-        const newRemaining = shortRestHitDice - 1;
-        handleShortRestHitDiceChange(newRemaining);
-
-        setPopupHtml(
-            `<div class="dice-roll-result">`
-            + `<div class="dice-roll-header"><i class="fa-solid fa-heart"></i>Hit Dice</div>`
-            + `<div class="dice-roll-total">${Math.max(1, hpRecovered)}</div>`
-            + `<div class="dice-roll-breakdown">1d${hitDie} (<span class="dice-rolled">${rolls[0]}</span>) ${signFormatter.format(conMod)}<br/>HP recovered</div>`
-            + `<div class="dice-roll-breakdown">Remaining Hit Dice: ${newRemaining}</div>`
-            + `<div class="dice-roll-hint">click to dismiss</div></div>`
-        );
     };
 
     let speed = playerStats.race.subrace && playerStats.race.subrace.speed ? playerStats.race.subrace.speed : playerStats.race.speed;
@@ -88,27 +57,38 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         }
     };
 
+    const handleShortRestComplete = () => {
+        setShowShortRest(false);
+        onLongRest && onLongRest();
+    };
+
     return (
         <div>
               {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)} />}
-            <div className='name-row'>
-                <span className='name'>{playerStats.name}</span>&nbsp;&nbsp;
-                {isLocalhost && (
-                    <div className='char-btn-group no-print'>
-                        <button className="char-btn" onClick={onEditCharacter} title="Edit Character"><i className="fas fa-pen"></i> Edit</button>
-                        <button className="char-btn" onClick={handleDeleteCharacter} title="Delete Character">Delete</button>
-                        <button className="char-btn" onClick={onUploadClick} title="Upload Character"><i className="fas fa-arrow-up"></i> Upload</button>
-                        <button className="char-btn" onClick={onSaveClick} title="Download Character"><i className="fas fa-arrow-down"></i> Download</button>
-                        <LongRestButton playerStats={playerStats} campaignName={campaignName} onLongRest={onLongRest} />
+            <div className='char-header'>
+                <AvatarImage name={playerStats.name} imagePath={playerStats.imagePath} size={60} />
+                <div className='char-header-text'>
+                    <div className='name-row'>
+                        <span className='name'>{playerStats.name}</span>&nbsp;&nbsp;
+                        {isLocalhost && (
+                            <div className='char-btn-group no-print'>
+                                <button className="char-btn" onClick={onEditCharacter} title="Edit Character"><i className="fas fa-pen"></i> Edit</button>
+                                <button className="char-btn" onClick={handleDeleteCharacter} title="Delete Character">Delete</button>
+                                <button className="char-btn" onClick={onUploadClick} title="Upload Character"><i className="fas fa-arrow-up"></i> Upload</button>
+                                <button className="char-btn" onClick={onSaveClick} title="Download Character"><i className="fas fa-arrow-down"></i> Download</button>
+                                <ShortRestButton onClick={() => setShowShortRest(true)} />
+                                <LongRestButton playerStats={playerStats} campaignName={campaignName} onLongRest={onLongRest} />
+                            </div>
+                        )}
                     </div>
-                )}
-            </div>
-            <div className='summary'>
-                {playerStats.race.subrace && playerStats.race.subrace.name ? playerStats.race.subrace.name : playerStats.race.name}
-                {playerStats.race.type ? ` (${playerStats.race.type.toLowerCase()})` : ''},&nbsp;
-                {playerStats.class.name}{playerStats.class.subclass ? ` (${playerStats.class.subclass.name.toLowerCase()}` : ''}
-                {playerStats.class.subclass && playerStats.class.subclass.type ? `-${playerStats.class.subclass.type.toLowerCase()}` : ''}
-                ), Level {playerStats.level}, {playerStats.alignment}
+                    <div className='summary'>
+                        {playerStats.race.subrace && playerStats.race.subrace.name ? playerStats.race.subrace.name : playerStats.race.name}
+                        {playerStats.race.type ? ` (${playerStats.race.type.toLowerCase()})` : ''},&nbsp;
+                        {playerStats.class.name}{playerStats.class.subclass ? ` (${playerStats.class.subclass.name.toLowerCase()}` : ''}
+                        {playerStats.class.subclass && playerStats.class.subclass.type ? `-${playerStats.class.subclass.type.toLowerCase()}` : ''}
+                        ), Level {playerStats.level}, {playerStats.alignment}
+                    </div>
+                </div>
             </div>
             <div className='summaryGrid'>
                 <div>
@@ -121,12 +101,6 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     <b>Proficiency: </b>+{playerStats.proficiency}<br />
                     <span className='clickable' onClick={() => rollInitiative(playerStats.initiative)}><b>Initiative: </b>{signFormatter.format(playerStats.initiative)}</span><br />
                     <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiration} /><br />
-                    <div className="clickable" onClick={handleRollHitDice} onKeyDown={(e) => { if (e.key === 'Enter') handleRollHitDice(); }} tabIndex={0}>
-                        <b>Roll Hit Die:</b> {shortRestHitDice > 0 ? `${playerStats.class?.class_levels?.[playerStats.level - 1]?.hit_die || 'd8'} (${shortRestHitDice} left)` : 'None remaining'}
-                    </div>
-                    <div className="clickable" onClick={handleShortRestHitDiceToggle} onKeyDown={handleShortRestHitDiceToggle} tabIndex={0}>
-                        <b>Short Rest Hit Dice:</b> {playerStats.level}/<HiddenInput handleInputToggle={handleShortRestHitDiceToggle} handleValueChange={(value) => handleShortRestHitDiceChange(value)} showInput={showInput} value={shortRestHitDice}></HiddenInput> <span className="text-muted">(max/cur)</span>
-                    </div>
                 </div>
                 <div>
                     <CharFeats playerStats={playerStats} showPopup={(feat) => {
@@ -181,6 +155,14 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
             {playerStats.senses != null && playerStats.senses.length > 0 && <div><b>Senses: </b>{playerStats.senses.map((sense) => { return `${sense.name} ${sense.value}`;}).join(', ')}</div>}
             {playerStats.proficiencies != null && playerStats.proficiencies.length > 0 && <div><b>Proficiencies: </b>{playerStats.proficiencies.join(', ')}</div>}
             {playerStats.languages != null && playerStats.languages.length > 0 && <span><b>Languages: </b>{playerStats.languages.join(', ')}</span>}<br />
+            {showShortRest && (
+                <ShortRestModal
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={() => setShowShortRest(false)}
+                    onComplete={handleShortRestComplete}
+                />
+            )}
   </div>
 )
 }

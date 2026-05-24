@@ -107,6 +107,21 @@ const raceRules = {
         if (darkvisionRace && !darkvisionInSenses) {
             senses.push({ name: 'Darkvision', value: '60 ft.' });
            }
+        // Passive skills
+        const getPassiveScore = (abilityName, skillName) => {
+            const ability = playerStats.abilities?.find(a => a.name === abilityName);
+            if (!ability) return null;
+            const skill = ability.skills?.find(s => s.name === skillName);
+            const base = 10 + (ability.bonus || 0);
+            if (!skill) return base;
+            return 10 + (skill.bonus || 0);
+        };
+        const passPer = getPassiveScore('Wisdom', 'Perception');
+        if (passPer !== null) senses.push({ name: 'Passive Perception', value: String(passPer) });
+        const passInv = getPassiveScore('Intelligence', 'Investigation');
+        if (passInv !== null) senses.push({ name: 'Passive Investigation', value: String(passInv) });
+        const passIns = getPassiveScore('Wisdom', 'Insight');
+        if (passIns !== null) senses.push({ name: 'Passive Insight', value: String(passIns) });
         return senses.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         },
         addTraits: (traits) => {
