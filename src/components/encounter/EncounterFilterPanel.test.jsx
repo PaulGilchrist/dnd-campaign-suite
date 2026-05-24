@@ -82,11 +82,15 @@ describe('EncounterFilterPanel', () => {
   it('should show threshold display with label', () => {
     render(<EncounterFilterPanel {...props} />);
     expect(screen.getByText(/600/)).toBeInTheDocument();
-    expect(screen.getByText(/Hard/)).toBeInTheDocument();
+    const threshold = document.querySelector('.threshold-display');
+    expect(threshold).toBeInTheDocument();
+    expect(threshold.textContent).toContain('Target:');
+    expect(threshold.textContent).toContain('Hard');
   });
 
   it('should show Unknown when difficultyLabels is missing', () => {
     render(<EncounterFilterPanel {...props} filter={{ ...props.filter, difficultyLabels: null }} />);
-    expect(screen.getByText('Unknown')).toBeInTheDocument();
+    const threshold = document.querySelector('.threshold-display');
+    expect(threshold.textContent).toContain('Unknown');
   });
 });

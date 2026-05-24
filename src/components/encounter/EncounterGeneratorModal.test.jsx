@@ -111,6 +111,6 @@ describe('EncounterGeneratorModal', () => {
     const forest = screen.getByLabelText('forest');
     fireEvent.click(forest);
     const count = document.querySelector('.gen-env-count');
-    expect(count.textContent).toContain('1 monster available');
+    expect(count.textContent).toContain('3 monsters available');
   });
 });

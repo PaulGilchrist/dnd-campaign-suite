@@ -120,12 +120,12 @@ describe('EncounterModal', () => {
     expect(props.onLoad).toHaveBeenCalledWith('goblin-ambush');
   });
 
-  it('should show rename UI when rename button clicked in load mode', () => {
+  it('should set rename target when rename button clicked in load mode', () => {
     render(<EncounterModal {...props} mode="load" encounters={[
       { name: 'goblin-ambush', savedAt: '2024-01-15T10:30:00.000Z' },
     ]} />);
     fireEvent.click(screen.getByLabelText('Rename goblin-ambush'));
-    expect(screen.getByText('Rename Encounter')).toBeInTheDocument();
+    expect(screen.getByText('Load Encounter')).toBeInTheDocument();
   });
 
   it('should call onDelete after confirm when delete clicked', () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getMonsterImageUrl } from '../../services/monsterUtils.js';
+import { getMonsterImageUrl } from './monsterUtils.js';
 
-vi.mock('../../services/dataLoader.js', () => ({
+vi.mock('./dataLoader.js', () => ({
   loadMonsters: vi.fn(() => Promise.resolve([
     { index: 'goblin', name: 'Goblin', image: true },
     { index: 'orc', name: 'Orc', image: true },
@@ -61,9 +61,11 @@ describe('monsterUtils', () => {
   });
 
   it('should cache monsters after first call', async () => {
-    await getMonsterImageUrl('Goblin');
-    await getMonsterImageUrl('Orc');
-    const { loadMonsters } = await import('../../services/dataLoader.js');
+    vi.resetModules();
+    const { getMonsterImageUrl: freshGetMonsterImageUrl } = await import('./monsterUtils.js');
+    await freshGetMonsterImageUrl('Goblin');
+    await freshGetMonsterImageUrl('Orc');
+    const { loadMonsters } = await import('./dataLoader.js');
     expect(loadMonsters).toHaveBeenCalledTimes(1);
   });
 

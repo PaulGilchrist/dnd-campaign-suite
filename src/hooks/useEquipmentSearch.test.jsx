@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useEquipmentSearch } from '../../hooks/useEquipmentSearch.js';
+import { useEquipmentSearch } from './useEquipmentSearch.js';
 
 vi.mock('../../services/dataLoader.js', () => ({
   loadEquipment: vi.fn(() => Promise.resolve([

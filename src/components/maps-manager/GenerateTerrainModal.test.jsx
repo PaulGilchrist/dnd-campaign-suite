@@ -67,12 +67,19 @@ describe('GenerateTerrainModal', () => {
     expect(btn.disabled).toBe(false);
   });
 
-  it('should show error when generating with empty name', () => {
+  it('should disable generate button when name is empty', () => {
     render(<GenerateTerrainModal {...props} />);
     const btn = document.querySelector('.dungeon-gen-generate-btn');
-    btn.disabled = false;
-    fireEvent.click(btn);
-    expect(screen.getByText('Map name cannot be empty')).toBeInTheDocument();
+    expect(btn.disabled).toBe(true);
+  });
+
+  it('should enable generate button when name is provided', () => {
+    render(<GenerateTerrainModal {...props} />);
+    fireEvent.change(screen.getByPlaceholderText('e.g. The Wild Frontier'), {
+      target: { value: 'Test Map' },
+    });
+    const btn = document.querySelector('.dungeon-gen-generate-btn');
+    expect(btn.disabled).toBe(false);
   });
 
   it('should call generateHexTerrain and createMap on generate', async () => {

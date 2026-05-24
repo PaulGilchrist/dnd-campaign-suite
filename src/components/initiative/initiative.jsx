@@ -212,17 +212,16 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
         if (!combatSummary) return;
         const index = combatSummary.creatures.findIndex((creature) => creature.id === id);
         combatSummary.creatures[index].initiative = value;
-        combatSummary.creatures.sort((a, b) => b.initiative - a.initiative); // desc
+        combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
     };
     const handleNameChange = (id, value) => {
         if (!combatSummary) return;
-        const index = combatSummary.creatures.findIndex((creature) => creature.id === id);
-        combatSummary.creatures[index].name = value;
-        storage.set('combatSummary', combatSummary);
+        const idx = combatSummary.creatures.findIndex((creature) => creature.id === id);
+        combatSummary.creatures[idx].name = value;
+        storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
-        // Clear the cached image so it gets recomputed
         setNpcImages(prev => ({ ...prev, [id]: null }));
     };
     if (!combatSummary) return null;

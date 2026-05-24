@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Initiative from './initiative.jsx';
 
@@ -9,12 +9,14 @@ vi.mock('../../services/storage.js', () => ({
   },
 }));
 
-vi.mock('../../services/utils.js', () => ({
-  default: {
-    guid: vi.fn(() => 'test-guid'),
-    getFirstName: vi.fn((name) => name?.split(' ')[0] || name),
-  },
-}));
+vi.mock('../../services/utils.js', () => {
+  return {
+    default: {
+      guid: vi.fn(() => `test-guid-${Date.now()}-${Math.random()}`),
+      getFirstName: vi.fn((name) => name?.split(' ')[0] || name),
+    },
+  };
+});
 
 vi.mock('lodash', () => ({
   cloneDeep: vi.fn((obj) => JSON.parse(JSON.stringify(obj))),
@@ -198,10 +200,21 @@ describe('Initiative', () => {
     expect(activeCards.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('should confirm before removing NPC with initiative', () => {
-    render(<Initiative characters={[]} />);
+  it('should not remove NPC when confirm returns false and initiative is set', async () => {
+    window.confirm = vi.fn(() => false);
+    render(<Initiative characters={[{ name: 'Hero' }]} />);
+    await act(async () => {});
+    const npcInitiativeInputs = document.querySelectorAll('.creature-card.npc .creature-initiative input');
+    await act(async () => {
+      for (let i = 0; i < npcInitiativeInputs.length; i++) {
+        fireEvent.change(npcInitiativeInputs[i], { target: { value: String(15 - i) } });
+      }
+    });
+    await act(async () => {});
+    const beforeCount = document.querySelectorAll('.creature-card').length;
     fireEvent.click(screen.getByText('- NPC'));
-    expect(window.confirm).toHaveBeenCalled();
+    const afterCount = document.querySelectorAll('.creature-card').length;
+    expect(afterCount).toBe(beforeCount);
   });
 
   it('should return early when no characters are provided', () => {
