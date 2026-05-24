@@ -1,5 +1,6 @@
 import React from 'react'
 import storage from '../../../services/storage.js'
+import './CharSummary.css'
 
 function DeathSavingThrows({ playerStats, campaignName }) {
     const [saves, setSaves] = React.useState([false, false, false])
@@ -28,8 +29,9 @@ function DeathSavingThrows({ playerStats, campaignName }) {
 
     return (
         <div className="death-saves-container">
+            <div className="death-saves-title">Death Saves</div>
             <div>
-                <b>Successes: </b>
+                <span className="death-saves-label">Successes: </span>
                 {saves.map((s, i) => (
                     <span key={`save-${i}`} className="clickable" onClick={() => toggleSave(i)} style={{ cursor: 'pointer', marginRight: '5px' }}>
                         {s ? '⬤' : '◯'}
@@ -37,7 +39,7 @@ function DeathSavingThrows({ playerStats, campaignName }) {
                 ))}
             </div>
             <div>
-                <b>Failures: </b>
+                <span className="death-saves-label">Failures: </span>
                 {failures.map((f, i) => (
                     <span key={`fail-${i}`} className="clickable" onClick={() => toggleFailure(i)} style={{ cursor: 'pointer', marginRight: '5px' }}>
                         {f ? '⬤' : '◯'}
