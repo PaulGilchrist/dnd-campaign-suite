@@ -692,4 +692,156 @@ describe('CharSummary', () => {
 
     vi.mocked(CharFeats).mockImplementation(originalImpl);
   });
+
+  describe('XP Tracking', () => {
+    it('should show Milestone Leveling by default', () => {
+      render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
+
+      expect(screen.getByText(/Level 5/)).toBeInTheDocument();
+      expect(screen.getByText(/Milestone Leveling/)).toBeInTheDocument();
+      expect(screen.queryByText(/XP/)).not.toBeInTheDocument();
+    });
+
+    it('should show XP when xpMode is experience', () => {
+      const xpStats = {
+        ...mockPlayerStats,
+        xp: 750,
+        xpMode: 'experience',
+      };
+
+      render(<CharSummary playerStats={xpStats} onDeleteCharacter={vi.fn()} />);
+
+      expect(screen.getByText(/Level 5/)).toBeInTheDocument();
+      expect(screen.getByText(/750 XP/)).toBeInTheDocument();
+      expect(screen.queryByText(/Milestone Leveling/)).not.toBeInTheDocument();
+    });
+
+    it('should show 0 XP when in experience mode with no XP', () => {
+      const xpStats = {
+        ...mockPlayerStats,
+        xp: 0,
+        xpMode: 'experience',
+        campaignName: 'test',
+      };
+
+      render(<CharSummary playerStats={xpStats} onDeleteCharacter={vi.fn()} />);
+
+      expect(screen.getByText(/0 XP/)).toBeInTheDocument();
+    });
+
+    it('should show large XP values with locale formatting', () => {
+      const xpStats = {
+        ...mockPlayerStats,
+        xp: 64000,
+        xpMode: 'experience',
+      };
+
+      render(<CharSummary playerStats={xpStats} onDeleteCharacter={vi.fn()} />);
+
+      expect(screen.getByText(/64,000 XP/)).toBeInTheDocument();
+    });
+
+    it('should open XP modal when subtitle is clicked in milestone mode', () => {
+      render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
+
+      const subtitle = screen.getByTestId('char-summary-text');
+      fireEvent.click(subtitle);
+
+      expect(screen.getByText(/Experience Points/)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/\+100 or -50/)).toBeInTheDocument();
+    });
+
+    it('should open XP modal when subtitle is clicked in experience mode', () => {
+      const xpStats = {
+        ...mockPlayerStats,
+        xp: 750,
+        xpMode: 'experience',
+      };
+
+      render(<CharSummary playerStats={xpStats} onDeleteCharacter={vi.fn()} />);
+
+      const subtitle = screen.getByTestId('char-summary-text');
+      fireEvent.click(subtitle);
+
+      expect(screen.getByText(/Experience Points/)).toBeInTheDocument();
+    });
+
+    it('should apply XP delta and call storage.setProperty on save', () => {
+      const xpStats = {
+        ...mockPlayerStats,
+        xp: 750,
+        xpMode: 'experience',
+      };
+
+      render(<CharSummary playerStats={xpStats} onDeleteCharacter={vi.fn()} />);
+
+      const subtitle = screen.getByTestId('char-summary-text');
+      fireEvent.click(subtitle);
+
+      const input = screen.getByPlaceholderText(/\+100 or -50/);
+      fireEvent.change(input, { target: { value: '100' } });
+
+      const applyBtn = screen.getByText('Apply');
+      fireEvent.click(applyBtn);
+
+      expect(storage.setProperty).toHaveBeenCalledWith('Test Character', 'xp', 850, undefined);
+    });
+
+    it('should handle negative XP delta on save', () => {
+      const xpStats = {
+        ...mockPlayerStats,
+        xp: 750,
+        xpMode: 'experience',
+      };
+
+      render(<CharSummary playerStats={xpStats} onDeleteCharacter={vi.fn()} />);
+
+      const subtitle = screen.getByTestId('char-summary-text');
+      fireEvent.click(subtitle);
+
+      const input = screen.getByPlaceholderText(/\+100 or -50/);
+      fireEvent.change(input, { target: { value: '-50' } });
+
+      const applyBtn = screen.getByText('Apply');
+      fireEvent.click(applyBtn);
+
+      expect(storage.setProperty).toHaveBeenCalledWith('Test Character', 'xp', 700, undefined);
+    });
+
+    it('should toggle milestone mode when checkbox is clicked in modal', () => {
+      const xpStats = {
+        ...mockPlayerStats,
+        xp: 750,
+        xpMode: 'experience',
+      };
+
+      render(<CharSummary playerStats={xpStats} onDeleteCharacter={vi.fn()} />);
+
+      const subtitle = screen.getByTestId('char-summary-text');
+      fireEvent.click(subtitle);
+
+      const checkbox = screen.getByRole('checkbox', { name: /Milestone Leveling/ });
+      expect(checkbox).not.toBeChecked();
+
+      fireEvent.click(checkbox);
+
+      expect(storage.setProperty).toHaveBeenCalledWith('Test Character', 'xpMode', 'milestone', undefined);
+    });
+
+    it('should uncheck milestone checkbox when in experience mode', () => {
+      const xpStats = {
+        ...mockPlayerStats,
+        xp: 0,
+        xpMode: 'experience',
+      };
+
+      render(<CharSummary playerStats={xpStats} onDeleteCharacter={vi.fn()} />);
+
+      const subtitle = screen.getByTestId('char-summary-text');
+      fireEvent.click(subtitle);
+
+      const checkbox = screen.getByRole('checkbox', { name: /Milestone Leveling/ });
+      expect(checkbox).not.toBeChecked();
+    });
+  });
 });

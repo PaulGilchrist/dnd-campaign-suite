@@ -45,4 +45,6 @@ export const DEFAULT_FORM_DATA = {
     specialActions: [],
     spells: [],
     rules: '5e',
+    xp: 0,
+    xpMode: 'milestone',
 };

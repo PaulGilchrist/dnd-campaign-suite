@@ -74,6 +74,84 @@
     color: #e74c3c;
 }
 
+/* XP Modal */
+.xp-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.9);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.xp-modal {
+    background-color: var(--background-color-header-inner);
+    border: 1px solid var(--color-header);
+    border-radius: 10px;
+    color: var(--color-header-inner);
+    padding: 20px;
+    max-width: 400px;
+    width: 90%;
+}
+.xp-modal h3 {
+    margin: 0 0 12px;
+    color: var(--color-header);
+}
+.xp-modal-section {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color-light);
+}
+.xp-modal-section:last-of-type {
+    border-bottom: none;
+}
+.xp-label-text {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.95em;
+}
+.xp-modal input[type="number"] {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border-color-light);
+    border-radius: 4px;
+    background-color: var(--background-color);
+    color: var(--color);
+    font-size: 1em;
+    box-sizing: border-box;
+}
+.xp-preview {
+    margin-top: 6px;
+    font-size: 0.95em;
+}
+.xp-preview-new {
+    font-weight: bold;
+    color: var(--color-header);
+}
+.xp-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+.xp-modal-info {
+    margin-top: 8px;
+    font-size: 0.85em;
+    opacity: 0.7;
+    padding: 6px 8px;
+    background-color: var(--border-color-light);
+    border-radius: 4px;
+}
+.xp-modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
 @media print {
     .char-header .avatar-wrapper {
         border: 1px solid black;

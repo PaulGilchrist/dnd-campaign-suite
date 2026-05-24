@@ -1,4 +1,4 @@
-   
+
 import React from 'react'
 import './CharSummary.css'
 
@@ -14,13 +14,23 @@ import useDiceRoll from '../../../hooks/useDiceRoll.js'
 import LongRestButton from '../LongRestButton.jsx'
 import ShortRestButton from '../ShortRestButton.jsx'
 import ShortRestModal from '../ShortRestModal.jsx'
+import storage from '../../../services/storage.js'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
 function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, onLongRest }) {
     const { popupHtml, setPopupHtml, rollInitiative } = useDiceRoll();
     const [showShortRest, setShowShortRest] = React.useState(false);
+    const [showXpModal, setShowXpModal] = React.useState(false);
+    const [xpDelta, setXpDelta] = React.useState('');
+    const [displayXp, setDisplayXp] = React.useState(playerStats?.xp ?? 0);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+    React.useEffect(() => {
+        setDisplayXp(playerStats?.xp ?? 0);
+    }, [playerStats?.xp]);
+
+    const isInXpMode = (playerStats?.xpMode || 'milestone') === 'experience';
 
     const { current: hasInspiration, update: setHasInspiration } = useTrackedResource(
         'hasInspiration',
@@ -32,6 +42,34 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const handleToggleInspiration = () => {
         const newValue = !hasInspiration;
         setHasInspiration(newValue);
+    };
+
+    const handleXpModalOpen = () => {
+        setXpDelta('');
+        setShowXpModal(true);
+    };
+
+    const handleXpSave = () => {
+        if (!xpDelta.trim()) {
+            setShowXpModal(false);
+            return;
+        }
+        const delta = parseInt(xpDelta, 10);
+        if (isNaN(delta)) {
+            setShowXpModal(false);
+            return;
+        }
+        const newXp = Math.max(0, displayXp + delta);
+        setDisplayXp(newXp);
+        storage.setProperty(playerStats.name, 'xp', newXp, campaignName);
+        setShowXpModal(false);
+    };
+
+    const handleXpModeToggle = (e) => {
+        const newMode = e.target.checked ? 'milestone' : 'experience';
+        playerStats.xpMode = newMode;
+        storage.setProperty(playerStats.name, 'xpMode', newMode, campaignName);
+        setShowXpModal(false);
     };
 
     let speed = playerStats.race.subrace && playerStats.race.subrace.speed ? playerStats.race.subrace.speed : playerStats.race.speed;
@@ -62,6 +100,10 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         onLongRest && onLongRest();
     };
 
+    const levelSuffix = isInXpMode
+        ? ` (${displayXp.toLocaleString()} XP)`
+        : ' (milestone)';
+
     return (
         <div>
               {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)} />}
@@ -81,12 +123,12 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                             </div>
                         )}
                     </div>
-                    <div className='summary'>
+                    <div className='summary' data-testid='char-summary-text'>
                         {playerStats.race.subrace && playerStats.race.subrace.name ? playerStats.race.subrace.name : playerStats.race.name}
                         {playerStats.race.type ? ` (${playerStats.race.type.toLowerCase()})` : ''},&nbsp;
                         {playerStats.class.name}{playerStats.class.subclass ? ` (${playerStats.class.subclass.name.toLowerCase()}` : ''}
                         {playerStats.class.subclass && playerStats.class.subclass.type ? `-${playerStats.class.subclass.type.toLowerCase()}` : ''}
-                        ), Level {playerStats.level}, {playerStats.alignment}
+                        ), Level {playerStats.level}<span className='clickable' onClick={handleXpModalOpen}>{levelSuffix}</span>, {playerStats.alignment}
                     </div>
                 </div>
             </div>
@@ -105,7 +147,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 <div>
                     <CharFeats playerStats={playerStats} showPopup={(feat) => {
                                              if (feat.desc || feat.description) {
-                              // Handle both array (5e) and string (2024) description formats
+                            // Handle both array (5e) and string (2024) description formats
                             let descriptionHtml = '';
                             if (Array.isArray(feat.desc)) {
                                 descriptionHtml = feat.desc.map(desc => desc || '').join('<br/>');
@@ -163,9 +205,54 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     onComplete={handleShortRestComplete}
                 />
             )}
+            {showXpModal && (
+              <div className='xp-modal-overlay' onClick={(e) => { if (e.target === e.currentTarget) setShowXpModal(false); }}>
+                <div className='xp-modal'>
+                  <h3>Experience Points</h3>
+                  <div className='xp-modal-section'>
+                    <label>
+                      <span className='xp-label-text'>Add or subtract XP:</span>
+                      <input
+                        type='number'
+                        value={xpDelta}
+                        onChange={(e) => setXpDelta(e.target.value)}
+                        placeholder={'+100 or -50'}
+                        autoFocus
+                      />
+                    </label>
+                    <div className='xp-preview'>
+                      Current: {displayXp.toLocaleString()} XP
+                      {xpDelta && !isNaN(parseInt(xpDelta, 10)) ? (
+                        <span className='xp-preview-new'>
+                          {' → '}{(Math.max(0, displayXp + parseInt(xpDelta, 10))).toLocaleString()} XP
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className='xp-modal-section'>
+                    <label className='xp-checkbox-label'>
+                      <input
+                        type='checkbox'
+                        checked={!isInXpMode}
+                        onChange={handleXpModeToggle}
+                      />
+                      Milestone Leveling
+                    </label>
+                    {!isInXpMode && (
+                      <div className='xp-modal-info'>
+                        XP tracking is disabled. Uncheck to enable XP display in the subtitle.
+                      </div>
+                    )}
+                  </div>
+                  <div className='xp-modal-actions'>
+                    <button className='char-btn' onClick={handleXpSave}>Apply</button>
+                    <button className='char-btn' onClick={() => setShowXpModal(false)}>Cancel</button>
+                  </div>
+                </div>
+              </div>
+            )}
   </div>
 )
 }
 
 export default CharSummary
-
