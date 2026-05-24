@@ -64,7 +64,7 @@ Creating a character doesn't have to be overwhelming. The app guides you step by
 - **Backgrounds** — Choose your character's background
 - **Rules validation** — The app checks your character against the rules and warns you if something doesn't match
 
-<img src="public/character-creation.png" alt="Character Creation" width="500" />
+<img src="public/character-creation.png" alt="Character Creation" width="800" />
 
 ### 📊 **Character Sheet — Digital & Printable**
 
@@ -127,7 +127,7 @@ The app is carefully designed to create **beautiful, well-organized character sh
 
 **Example character sheet**
 
-<img src="public/character-sheet.png" alt="Character Sheet" width="500" />
+<img src="public/character-sheet.png" alt="Character Sheet" width="800" />
 
 ### ⚔️ **Combat Tracking System**
 
@@ -151,7 +151,7 @@ When battle erupts, the app becomes your **tactical command center**:
 **Battle Notes:**
 - Add notes to any creature (track conditions, remember tactics, etc.)
 
-<img src="public/initiative.png" alt="Combat Tracking" width="600" />
+<img src="public/initiative.png" alt="Combat Tracking" width="800" />
 
 ### 🏰 **Campaign Tools (GM Features)**
 
@@ -170,12 +170,12 @@ The app includes powerful tools for Dungeon Masters to manage their campaigns:
 - Drag-and-drop creatures and items
 - 20+ SVG furniture and prop types (barrels, chests, tables, doors, traps, torches, and more)
 
-  <img src="public/map-outdoor-example.png" alt="Map Example" width="600" />
+  <img src="public/map-outdoor-example.png" alt="Map Example" width="800" />
 
 **🏚️ Procedural Dungeon Generator**
 - Generate random dungeon maps with configurable grid size, corridor width, and door placement — perfect for inspiration or quick sessions
 
-   <img src="public/map-indoor-example.png" alt="Map Example" width="600" />
+   <img src="public/map-indoor-example.png" alt="Map Example" width="800" />
 
 **📝 Campaign Notes**
 - Record story details, clues, and important information for your campaign
