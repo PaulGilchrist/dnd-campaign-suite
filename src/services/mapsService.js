@@ -1,3 +1,6 @@
+// Helper to sanitize map names to filenames (mirrors server route)
+const sanitizeMapName = (name) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '.json';
+
 export const loadMaps = async (campaignName) => {
   try {
     const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/maps`, {
@@ -16,22 +19,32 @@ export const loadMaps = async (campaignName) => {
 };
 
 export const createMap = async (campaignName, mapName, options = {}) => {
-  try {
-    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/maps`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: mapName, type: 'indoor', ...options }),
-    });
-    if (!response.ok) {
-      const { error } = await response.json();
-      throw new Error(error || 'Failed to create map');
+   try {
+     const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/maps`, {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ name: mapName, type: 'indoor', ...options }),
+      });
+     if (!response.ok) {
+        // If map already exists, resolve the existing map instead of throwing
+        let data;
+        try {
+          data = await response.json();
+        } catch {
+          data = {};
+        }
+       if (data.error && /map.*already exists/i.test(data.error)) {
+         return { name: mapName, fileName: sanitizeMapName(mapName), alreadyExists: true };
+       }
+       const error = new Error(data.error || 'Failed to create map');
+      throw error;
+      }
+     return await response.json();
+    } catch (error) {
+     console.error('Error creating map:', error);
+     throw error;
     }
-    return await response.json();
-  } catch (error) {
-    console.error('Error creating map:', error);
-    throw error;
-  }
-};
+  };
 
 export const deleteMap = async (campaignName, mapName) => {
   try {

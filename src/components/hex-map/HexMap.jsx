@@ -315,7 +315,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         const encounterName = `${baseMapName}-encounter-at-${q}-${r}`;
 
         try {
-            await mapsService.createMap(campaignName, encounterName, {
+            const result = await mapsService.createMap(campaignName, encounterName, {
                 type: 'indoor',
                 gridSize: grid,
                 placedItems: encounterData.placedItems,
@@ -327,7 +327,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 bgFill: encounterData.bgFill,
             });
 
-            await mapsService.saveMapData(campaignName, encounterName, encounterData);
+            // Only save if the map was freshly created (not already existing)
+            if (!result?.alreadyExists) {
+                await mapsService.saveMapData(campaignName, encounterName, encounterData);
+            }
 
             if (onEncounterCreated) {
                 onEncounterCreated(encounterName);
