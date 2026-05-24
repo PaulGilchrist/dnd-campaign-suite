@@ -59,14 +59,22 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     }, [allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, forceRefresh, allRaces2024, allMagicItems2024]);
 
     const handleEvent = (event) => {
-            if (event.key == null || event.data == null) return;
-            if (!isEqual(storage.get(event.key), event.data)) {
-                localStorage.setItem(event.key, JSON.stringify(event.data));
-                if (playerStats && event.key === utils.getFirstName(playerStats.name)) {
-                    setForceRefresh(utils.guid());
-                 }
-             }
-         }
+            if (event.key == null || event.data == null) { return; }
+            if (!event.key.startsWith('change-')) { return; }
+
+             // Parse "change-${campaignName}-${characterKey}" to extract character key
+            const prefix = `change-${campaignName}-`;
+            if (!event.key.startsWith(prefix)) { return; }
+            const characterKey = event.key.slice(prefix.length);
+
+            if (isEqual(storage.get(characterKey), event.data)) { return; }
+
+            localStorage.setItem(characterKey, JSON.stringify(event.data));
+
+            if (playerStats && utils.getFirstName(playerStats.name) === characterKey) {
+                setForceRefresh(utils.guid());
+              }
+            }
 
     const handleTogglePreparedSpells = (spellName) => {
         const spell = playerStats.spellAbilities.spells.find(spell => spell.name === spellName);
@@ -104,7 +112,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             <CharSpecialActions playerStats={playerStats}></CharSpecialActions><hr />
             <CharInventory playerStats={playerStats}></CharInventory><hr />
             <div className='no-print'><CharCharacterAdvancement playerStats={playerStats}></CharCharacterAdvancement></div>
-            <Subscriber handleEvent={handleEvent}></Subscriber>
+            <Subscriber campaignName={campaignName} handleEvent={handleEvent}></Subscriber>
         </div>}
     </React.Fragment>)
 }

@@ -3,7 +3,8 @@ const storage = {
     get: (key) => {
         const json = localStorage.getItem(key);
         if (json) {
-            return JSON.parse(json);
+            const parsed = JSON.parse(json);
+            return parsed;
         }
         return null;
     },

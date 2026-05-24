@@ -31,7 +31,9 @@ export default defineConfig({
             '/subscribe': {
                 target: 'http://localhost:80',
                 changeOrigin: true,
-                ws: true,
+                ws: false,
+                timeout: 0,
+                proxyTimeout: 0,
             },
         },
     }

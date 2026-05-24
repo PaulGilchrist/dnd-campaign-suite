@@ -5,6 +5,7 @@ import utils from '../../services/utils.js'
 import storage from '../../services/storage.js'
 import { getMonsterImageUrl } from '../../services/monsterUtils.js';
 import AvatarImage from '../common/AvatarImage.jsx';
+import Subscriber from '../common/Subscriber.jsx';
 import './initiative.css'
 
 function NpcAvatar({ name, imageUrl }) {
@@ -29,6 +30,24 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
     const [activeCreatureId, setActiveCreatureId] = React.useState(null);
     const [npcImages, setNpcImages] = React.useState({});
     const carouselRef = React.useRef(null);
+    const combatSummaryRef = React.useRef(null);
+    combatSummaryRef.current = combatSummary;
+
+    const handleEvent = React.useCallback((event) => {
+        if (event.key == null || event.data == null) return;
+        if (!event.key.startsWith(`change-${campaignName}-`)) return;
+
+        const dataKey = event.key.slice(`change-${campaignName}-`.length);
+
+        if (dataKey === 'combatSummary') {
+            localStorage.setItem('combatSummary', JSON.stringify(event.data));
+            combatSummaryRef.current = event.data;
+            setCombatSummary(event.data);
+        } else if (dataKey === 'activeCreatureId') {
+            localStorage.setItem('activeCreatureId', JSON.stringify(event.data));
+            setActiveCreatureId(event.data);
+        }
+    }, [campaignName]);
 
     React.useEffect(() => {
         if (!combatSummary) return;
@@ -95,46 +114,79 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
     }, [combatSummary]);
 
     const handleNextCreature = React.useCallback(() => {
-        if (!combatSummary) return;
-        const currentIndex = combatSummary.creatures.findIndex((creature) => creature.id === activeCreatureId);
-        if (currentIndex < combatSummary.creatures.length - 1) {
-            const nextId = combatSummary.creatures[currentIndex + 1].id;
+        const cs = combatSummaryRef.current;
+        if (!cs) return;
+        const currentIndex = cs.creatures.findIndex((creature) => creature.id === activeCreatureId);
+        if (currentIndex < cs.creatures.length - 1) {
+            const nextId = cs.creatures[currentIndex + 1].id;
             storage.set('activeCreatureId', nextId, campaignName);
             setActiveCreatureId(nextId);
         } else {
-            const firstId = combatSummary.creatures[0].id;
+            const firstId = cs.creatures[0].id;
             storage.set('activeCreatureId', firstId, campaignName);
             setActiveCreatureId(firstId);
         }
-    }, [combatSummary?.creatures, activeCreatureId]);
+    }, [activeCreatureId, campaignName]);
 
     const handlePreviousCreature = React.useCallback(() => {
-        if (!combatSummary) return;
-        const currentIndex = combatSummary.creatures.findIndex((creature) => creature.id === activeCreatureId);
+        const cs = combatSummaryRef.current;
+        if (!cs) return;
+        const currentIndex = cs.creatures.findIndex((creature) => creature.id === activeCreatureId);
         if (currentIndex > 0) {
-            const prevId = combatSummary.creatures[currentIndex - 1].id;
+            const prevId = cs.creatures[currentIndex - 1].id;
             storage.set('activeCreatureId', prevId, campaignName);
             setActiveCreatureId(prevId);
         } else {
-            const lastId = combatSummary.creatures[combatSummary.creatures.length - 1].id;
+            const lastId = cs.creatures[cs.creatures.length - 1].id;
             storage.set('activeCreatureId', lastId, campaignName);
             setActiveCreatureId(lastId);
         }
-    }, [combatSummary?.creatures, activeCreatureId]);
+    }, [activeCreatureId, campaignName]);
 
     React.useEffect(() => {
-        // Always regenerate creatures from the current characters
-        const creatures = setupCreatures();
-        const newSummary = {
-            round: 1,
-            creatures
-        };
-        storage.set('combatSummary', newSummary, campaignName);
-        setCombatSummary(newSummary);
+        // Load existing combatSummary from localStorage if available (fast startup)
+        const stored = localStorage.getItem('combatSummary');
+        let initialSummary = null;
+        if (stored) {
+            try { initialSummary = JSON.parse(stored); } catch {}
+        }
 
-        const firstId = creatures[0]?.id;
-        storage.set('activeCreatureId', firstId, campaignName);
-        setActiveCreatureId(firstId);
+        // Always regenerate creatures from the current characters to pick up new characters
+        const creatures = setupCreatures();
+
+        if (initialSummary) {
+            // Merge: keep existing creature data but add any new characters
+            const existingPlayerMap = new Map();
+            for (const c of initialSummary.creatures) {
+                if (c.type === 'player') existingPlayerMap.set(c.name, c);
+            }
+            const mergedCreatures = creatures.map(newC => {
+                const existing = existingPlayerMap.get(newC.name);
+                return existing ? { ...newC, initiative: existing.initiative } : newC;
+            });
+            // Keep NPCs from initial summary
+            const npcs = initialSummary.creatures.filter(c => c.type === 'npc');
+            mergedCreatures.push(...npcs);
+
+            const summary = { round: initialSummary.round, creatures: mergedCreatures };
+            setCombatSummary(summary);
+            combatSummaryRef.current = summary;
+
+            const storedActive = localStorage.getItem('activeCreatureId');
+            if (storedActive) {
+                setActiveCreatureId(JSON.parse(storedActive));
+            } else {
+                setActiveCreatureId(mergedCreatures[0]?.id || null);
+            }
+        } else {
+            const newSummary = { round: 1, creatures };
+            storage.set('combatSummary', newSummary, campaignName);
+            setCombatSummary(newSummary);
+            combatSummaryRef.current = newSummary;
+            const firstId = creatures[0]?.id;
+            storage.set('activeCreatureId', firstId, campaignName);
+            setActiveCreatureId(firstId);
+        }
     }, [characters]);
 
     React.useEffect(() => {
@@ -183,13 +235,11 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
 
     const handleClear = () => {
         if (window.confirm('Are you sure you want to clear all combat status?')) {
-            const combatSummary = {
-                round: 1,
-                creatures: setupCreatures()
-            }
+            const creatures = setupCreatures();
+            const combatSummary = { round: 1, creatures };
             storage.set('combatSummary', combatSummary, campaignName);
             setCombatSummary(combatSummary);
-            const firstCreatureId = setupCreatures()[0].id;
+            const firstCreatureId = creatures[0].id;
             storage.set('activeCreatureId', firstCreatureId, campaignName);
             setActiveCreatureId(firstCreatureId);
         }
@@ -213,6 +263,7 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
     if (!combatSummary) return null;
     return (
         <div className='initiative'>
+            <Subscriber campaignName={campaignName} handleEvent={handleEvent} />
             <h4>Initiative (round {combatSummary.round})</h4>
             <div className='carousel-container' ref={carouselRef}>
                 {combatSummary?.creatures?.map((creature) => {

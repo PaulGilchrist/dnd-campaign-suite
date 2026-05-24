@@ -2,38 +2,44 @@ import express from 'express';
 import path from 'path';
 import os from 'os';
 import guid from 'guid';
-import { subscribers } from '../utils/changeData.js';
+import { subscribers, characterChangeData } from '../utils/changeData.js';
 
 const router = express.Router();
 
-// SSE endpoint — must be BEFORE the catch-all fallback route
 router.get('/subscribe', (req, res) => {
-    const headers = {
-          'Content-Type': 'text/event-stream',
-          'Connection': 'keep-alive',
-          'Cache-Control': 'no-cache'
-      };
-    res.writeHead(200, headers);
+    const campaignName = req.query.campaign || '';
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.writeHead(200);
     const clientId = guid.create().value;
     const newClient = {
         id: clientId,
-        res
-     };
+        res,
+        campaignName,
+    };
     subscribers.push(newClient);
+
+    if (campaignName && characterChangeData.has(campaignName)) {
+        const snapshot = characterChangeData.get(campaignName);
+        for (const [key, value] of Object.entries(snapshot)) {
+            const unwrapped = value && typeof value === 'object' && 'value' in value && Object.keys(value).length === 1 ? value.value : value;
+            const eventData = `data: ${JSON.stringify({ key: `change-${campaignName}-${key}`, data: unwrapped })}\n\n`;
+            try { res.write(eventData); } catch (e) { break; }
+        }
+    }
+
     req.on('close', () => {
-        console.log(`${clientId} Connection closed`);
         const index = subscribers.findIndex(client => client.id === clientId);
         if (index !== -1) subscribers.splice(index, 1);
-     });
-    console.log(`Current subscriber count = ${subscribers.length}`)
+    });
 });
 
-// Health check endpoint
 router.get('/health', (req, res) => {
     res.status(200).json({ status: 'Healthy' });
 });
 
-// React Router fallback — MUST be last
 router.get(/^(?!\/api).*/, (req, res) => {
     res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
 });

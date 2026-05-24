@@ -31,7 +31,7 @@ function CampaignSelection({ onCampaignSelect }) {
                   setLoading(true);
                   const characterFiles = await getCharacterFiles(campaign);
                   const characters = await loadCharacters(campaign, characterFiles);
-        
+          
           // Notify parent to switch views
           if (onCampaignSelect) {
             onCampaignSelect(campaign, characters);

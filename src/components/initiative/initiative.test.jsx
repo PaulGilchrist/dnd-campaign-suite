@@ -26,11 +26,21 @@ vi.mock('../../services/monsterUtils.js', () => ({
   getMonsterImageUrl: vi.fn(() => Promise.resolve(null)),
 }));
 
+// Mock EventSource for Subscriber
+class MockEventSource {
+  constructor() {
+    this.close = vi.fn();
+    this.onmessage = null;
+    this.onerror = null;
+  }
+}
+
 describe('Initiative', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.confirm = vi.fn(() => true);
     Element.prototype.scrollIntoView = vi.fn();
+    global.EventSource = MockEventSource;
   });
 
   it('should render without crashing with empty characters', () => {
@@ -221,4 +231,8 @@ describe('Initiative', () => {
     const { container } = render(<Initiative characters={[]} />);
     expect(container.querySelector('.initiative')).toBeInTheDocument();
   });
+});
+
+afterEach(() => {
+  delete global.EventSource;
 });

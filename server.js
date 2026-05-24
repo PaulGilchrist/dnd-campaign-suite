@@ -96,10 +96,7 @@ app.use(campaignsBasic);
 // Character routes (GET/PUT/DELETE /:file, POST /character)
 app.use(campaignsCharacter);
 
-// Positioning routes
-app.use(campaignsPositioning);
-
-// Change data routes
+// Change data routes (after character file route so .json files aren't captured by :key)
 app.use(campaignsChangedata);
 
 // Campaign admin routes (create, rename, delete campaign)

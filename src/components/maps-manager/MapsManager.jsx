@@ -189,7 +189,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
 
     return (
         <div className="maps-manager">
-            <Subscriber handleEvent={handleSSEEvent} />
+            <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
 
             <div className="maps-manager-header">
                 <h2>Maps</h2>

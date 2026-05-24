@@ -82,29 +82,29 @@ export const debouncedSave = () => {
  * @param {object} data - Event data
  */
 export const publish = (key, data) => {
-    const eventData = `data: ${JSON.stringify({ key, ...data })}\n\n`;
+    const unwrapped = data && typeof data === 'object' && 'value' in data && Object.keys(data).length === 1 ? data.value : data;
+    const eventData = `data: ${JSON.stringify({ key, data: unwrapped })}\n\n`;
+    const campaignPrefix = key.match(/^change-(.+?)-/);
+    const targetCampaign = campaignPrefix ? campaignPrefix[1] : null;
     subscribers.forEach(client => {
+        if (targetCampaign && client.campaignName && client.campaignName !== targetCampaign) return;
         try {
             client.res.write(eventData);
-        } catch (e) {
-            // Client may have disconnected
-        }
-    });
-}
+         } catch (e) {
+         }
+     });
+ }
 
 /**
  * Self health-check via HTTP GET to /health, runs every 60s
  */
 export const keepAlive = () => {
     setInterval(() => {
-        http.get('http://localhost' + (process.env.PORT || 80) + '/health', (res) => {
-            if (res.statusCode === 200) {
-                console.log('Keep-alive: server is healthy');
-            } else {
+        http.get('http://localhost:' + (process.env.PORT || 80) + '/health', { headers: { 'X-Accel-Buffering': 'no' } }, (res) => {
+            if (res.statusCode !== 200) {
                 console.warn(`Keep-alive: server returned status ${res.statusCode}`);
             }
         }).on('error', (err) => {
-            console.error('Keep-alive: server is unreachable', err.message);
         });
     }, 60 * 1000);
 }

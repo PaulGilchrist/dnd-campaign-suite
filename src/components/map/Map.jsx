@@ -552,7 +552,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
                 zoomOut={zoomOut}
                 resetView={resetView}
             />
-            <Subscriber handleEvent={handleSSEEvent} />
+            <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
             <svg
                 ref={svgRef}
                 viewBox={`${panX} ${panY} ${SVG_SIZE / zoom} ${SVG_SIZE / zoom}`}

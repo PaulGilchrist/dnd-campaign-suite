@@ -138,6 +138,7 @@ const mockProps = {
   allRaces2024: [],
   allMagicItems2024: [],
   onDeleteCharacter: vi.fn(),
+  campaignName: 'Test Campaign',
 };
 
 describe('CharSheet', () => {
@@ -423,7 +424,7 @@ describe('CharSheet', () => {
         'Test Character',
         'preparedSpells',
         ['Fireball'],
-        undefined
+        'Test Campaign'
       );
     });
 
@@ -567,8 +568,8 @@ describe('CharSheet', () => {
       // Set storage.get to return different data than what we'll pass
       storage.get.mockReturnValue({ old: 'data' });
 
-      // Call handleEvent with different data
-      capturedHandleEvent({ key: 'Test Character', data: { new: 'data' } });
+      // Call handleEvent with different data using change- prefix format
+      capturedHandleEvent({ key: 'change-Test Campaign-Test Character', data: { new: 'data' } });
 
       expect(storage.get).toHaveBeenCalledWith('Test Character');
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
@@ -588,7 +589,7 @@ describe('CharSheet', () => {
       storage.get.mockReturnValue(eventData);
 
       // Call handleEvent with the same data (isEqual should return true)
-      capturedHandleEvent({ key: 'Test Character', data: eventData });
+      capturedHandleEvent({ key: 'change-Test Campaign-Test Character', data: eventData });
 
       // Since isEqual returns true, the if block should not execute
       expect(mockLocalStorage.setItem).not.toHaveBeenCalled();
@@ -603,12 +604,26 @@ describe('CharSheet', () => {
 
       storage.get.mockReturnValue({ preparedSpells: ['Fireball'] });
 
-      // Call handleEvent with a different key
-      capturedHandleEvent({ key: 'Different Character', data: { preparedSpells: ['Magic Missile'] } });
+      // Call handleEvent with a different character key
+      capturedHandleEvent({ key: 'change-Test Campaign-Different Character', data: { preparedSpells: ['Magic Missile'] } });
 
       // localStorage should be updated (different data) but setForceRefresh should
       // not be called because the key doesn't match
       expect(mockLocalStorage.setItem).toHaveBeenCalled();
+    });
+
+    it('should ignore non-change events', async () => {
+      render(<CharSheet {...mockProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('subscriber')).toBeInTheDocument();
+      });
+
+      // Call handleEvent with a non-change event key
+      capturedHandleEvent({ key: 'maps-list-Test Campaign', data: { action: 'created' } });
+
+      // Should not update localStorage or trigger refresh
+      expect(mockLocalStorage.setItem).not.toHaveBeenCalled();
     });
   });
 
