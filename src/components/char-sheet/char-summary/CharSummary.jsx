@@ -15,6 +15,7 @@ import LongRestButton from '../LongRestButton.jsx'
 import ShortRestButton from '../ShortRestButton.jsx'
 import ShortRestModal from '../ShortRestModal.jsx'
 import storage from '../../../services/storage.js'
+import CharConditions from './CharConditions.jsx'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
@@ -251,6 +252,9 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 </div>
               </div>
             )}
+            <div className='no-print'>
+              <CharConditions playerStats={playerStats} campaignName={campaignName} />
+            </div>
   </div>
 )
 }

@@ -1,0 +1,32 @@
+.char-conditions {
+    margin-top: 8px;
+}
+
+.char-conditions-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.condition-badge {
+    padding: 2px 8px;
+    border: 1px solid var(--border-color-light);
+    border-radius: 4px;
+    background-color: transparent;
+    color: var(--color);
+    font-size: 0.8em;
+    cursor: pointer;
+    opacity: 0.4;
+    transition: opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.condition-badge:hover {
+    opacity: 0.7;
+}
+
+.condition-badge--active {
+    opacity: 1;
+    background-color: rgba(220, 38, 38, 0.2);
+    border-color: rgba(220, 38, 38, 0.5);
+    color: var(--color);
+}
