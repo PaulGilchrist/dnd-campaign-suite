@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EncounterModal from './EncounterModal.jsx';
 
@@ -46,32 +46,32 @@ describe('EncounterModal', () => {
 
   it('should show error when saving with empty name', () => {
     render(<EncounterModal {...props} mode="save" />);
-    fireEvent.click(screen.getByText('Save').closest('button'));
+    const btn = screen.getByText('Save').closest('button');
+    fireEvent.click(btn);
     expect(screen.getByText('Encounter name is required')).toBeInTheDocument();
   });
 
-  it('should call onSave with trimmed name and close', () => {
+  it('should call onSave with trimmed name and close', async () => {
+    props.onSave.mockResolvedValue();
     render(<EncounterModal {...props} mode="save" />);
     const input = screen.getByPlaceholderText('e.g., Goblin Ambush');
     fireEvent.change(input, { target: { value: '  Goblin Ambush  ' } });
     fireEvent.click(screen.getByText('Save').closest('button'));
-    expect(props.onSave).toHaveBeenCalledWith('Goblin Ambush');
+    await waitFor(() => {
+      expect(props.onSave).toHaveBeenCalledWith('Goblin Ambush');
+    });
     expect(props.onClose).toHaveBeenCalled();
   });
 
-  it('should clear name after save', () => {
-    render(<EncounterModal {...props} mode="save" />);
-    const input = screen.getByPlaceholderText('e.g., Goblin Ambush');
-    fireEvent.change(input, { target: { value: 'Goblin Ambush' } });
-    fireEvent.click(screen.getByText('Save').closest('button'));
-  });
-
-  it('should trigger save on Enter key', () => {
+  it('should trigger save on Enter key', async () => {
+    props.onSave.mockResolvedValue();
     render(<EncounterModal {...props} mode="save" />);
     const input = screen.getByPlaceholderText('e.g., Goblin Ambush');
     fireEvent.change(input, { target: { value: 'Test' } });
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(props.onSave).toHaveBeenCalledWith('Test');
+    await waitFor(() => {
+      expect(props.onSave).toHaveBeenCalledWith('Test');
+    });
   });
 
   it('should render Load Encounter heading in load mode', () => {
@@ -120,7 +120,7 @@ describe('EncounterModal', () => {
     expect(props.onLoad).toHaveBeenCalledWith('goblin-ambush');
   });
 
-  it('should set rename target when rename button clicked', () => {
+  it('should show rename UI when rename button clicked in load mode', () => {
     render(<EncounterModal {...props} mode="load" encounters={[
       { name: 'goblin-ambush', savedAt: '2024-01-15T10:30:00.000Z' },
     ]} />);
@@ -145,17 +145,6 @@ describe('EncounterModal', () => {
   it('should show rename button in rename mode', () => {
     render(<EncounterModal {...props} mode="rename" />);
     expect(screen.getByText('Rename')).toBeInTheDocument();
-  });
-
-  it('should show error when renaming with empty name', async () => {
-    const { rerender } = render(<EncounterModal {...props} mode="rename"
-      encounters={[{ name: 'old-name', savedAt: '2024-01-15T10:30:00.000Z' }]} />);
-    const input = document.querySelector('#encounter-rename');
-    if (input) {
-      fireEvent.change(input, { target: { value: '' } });
-      const renameBtn = screen.getByText('Rename');
-      fireEvent.click(renameBtn);
-    }
   });
 
   it('should return null when isOpen is false', () => {

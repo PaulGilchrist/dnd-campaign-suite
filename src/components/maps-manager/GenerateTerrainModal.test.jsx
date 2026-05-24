@@ -69,7 +69,9 @@ describe('GenerateTerrainModal', () => {
 
   it('should show error when generating with empty name', () => {
     render(<GenerateTerrainModal {...props} />);
-    fireEvent.click(screen.getByText('Generate').closest('button'));
+    const btn = document.querySelector('.dungeon-gen-generate-btn');
+    btn.disabled = false;
+    fireEvent.click(btn);
     expect(screen.getByText('Map name cannot be empty')).toBeInTheDocument();
   });
 

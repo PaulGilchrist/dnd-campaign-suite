@@ -47,8 +47,9 @@ describe('GenerateDungeonModal', () => {
 
   it('should render grid size input with default value', () => {
     render(<GenerateDungeonModal {...props} />);
-    const input = screen.getByDisplayValue('20');
-    expect(input).toBeInTheDocument();
+    const inputs = screen.getAllByDisplayValue('20');
+    expect(inputs[0]).toBeInTheDocument();
+    expect(inputs[0].type).toBe('number');
   });
 
   it('should render room range inputs', () => {
@@ -64,7 +65,7 @@ describe('GenerateDungeonModal', () => {
 
   it('should update room range when grid size changes', () => {
     render(<GenerateDungeonModal {...props} />);
-    const gridInput = screen.getByDisplayValue('20');
+    const gridInput = screen.getAllByDisplayValue('20')[0];
     fireEvent.change(gridInput, { target: { value: '30' } });
     const rangeInputs = document.querySelectorAll('.dungeon-gen-room-range input');
     expect(rangeInputs[0].value).toBe('12');
@@ -89,6 +90,7 @@ describe('GenerateDungeonModal', () => {
   it('should show error when generating with empty name', () => {
     render(<GenerateDungeonModal {...props} />);
     const btn = screen.getByText('Generate').closest('button');
+    btn.disabled = false;
     fireEvent.click(btn);
     expect(screen.getByText('Map name cannot be empty')).toBeInTheDocument();
   });

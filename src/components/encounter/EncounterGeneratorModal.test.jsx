@@ -45,7 +45,8 @@ describe('EncounterGeneratorModal', () => {
 
   it('should show available monster count', () => {
     render(<EncounterGeneratorModal {...props} />);
-    expect(screen.getByText(/3 monsters available/)).toBeInTheDocument();
+    const count = document.querySelector('.gen-env-count');
+    expect(count.textContent).toContain('3 monsters available');
   });
 
   it('should render Generate button', () => {
@@ -109,6 +110,7 @@ describe('EncounterGeneratorModal', () => {
     render(<EncounterGeneratorModal {...props} />);
     const forest = screen.getByLabelText('forest');
     fireEvent.click(forest);
-    expect(screen.getByText(/1 monster available/)).toBeInTheDocument();
+    const count = document.querySelector('.gen-env-count');
+    expect(count.textContent).toContain('1 monster available');
   });
 });
