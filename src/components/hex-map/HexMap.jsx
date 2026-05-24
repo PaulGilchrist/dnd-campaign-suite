@@ -311,12 +311,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         const terrainType = terrain[hexKey(q, r)] || 'plains';
         const grid = 30;
         const encounterData = generateOutdoorEncounter(terrainType, grid, marchingOrder, q, r);
-        const encounterName = `${mapName}-encounter-at-${q}-${r}`;
-
-        console.log('[handleStartEncounter] Starting', { q, r, terrainType, encounterName, encounterData });
+        const baseMapName = mapName.replace(/\.json$/, '');
+        const encounterName = `${baseMapName}-encounter-at-${q}-${r}`;
 
         try {
-            console.log('[handleStartEncounter] createMap body includes parentHex:', !!encounterData.parentHex, 'bgFill:', encounterData.bgFill);
             await mapsService.createMap(campaignName, encounterName, {
                 type: 'indoor',
                 gridSize: grid,
@@ -328,14 +326,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 parentHex: { q, r },
                 bgFill: encounterData.bgFill,
             });
-            console.log('[handleStartEncounter] createMap succeeded');
 
-            console.log('[handleStartEncounter] saveMapData with encounterData parentHex:', encounterData.parentHex, 'bgFill:', encounterData.bgFill);
             await mapsService.saveMapData(campaignName, encounterName, encounterData);
-            console.log('[handleStartEncounter] saveMapData succeeded');
 
             if (onEncounterCreated) {
-                console.log('[handleStartEncounter] Calling onEncounterCreated with', encounterName);
                 onEncounterCreated(encounterName);
             }
         } catch (err) {
@@ -489,9 +483,15 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     }, [campaignName, mapName]);
 
     // ─── Auto-save when data changes ────────────────────────────────────
+    // Guard: only save for the mapName this HexMap was initialized with.
+    // Prevents overwriting encounter map files during the brief window
+    // when mapName changes (via onEncounterCreated) before Map.jsx switches.
+
+    const hexMapNameRef = useRef(mapName);
 
     useEffect(() => {
         if (!hasLoaded.current) return;
+        if (mapName !== hexMapNameRef.current) return;
 
         const dataToSave = {
             type: 'outdoor',

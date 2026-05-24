@@ -47,6 +47,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
     const SVG_SIZE = gridSize * CELL_SIZE;
     const [mapData, setMapData] = useState(null);
     const svgRef = useRef(null);
+    const loadInProgressRef = useRef(false);
     const loadedMapNameRef = useRef(null);
 
     // Zoom/Pan state
@@ -195,12 +196,11 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
     useEffect(() => {
         if (loadedMapNameRef.current === mapName) return;
         loadedMapNameRef.current = mapName;
+        loadInProgressRef.current = true;
 
         const loadMap = async () => {
             try {
-                console.log('[Map] Loading map data for', mapName);
                 const existing = await mapsService.loadMapData(campaignName, mapName);
-                console.log('[Map] loaded mapData:', { type: existing?.type, hasParentHex: !!existing?.parentHex, parentHex: existing?.parentHex, bgFill: existing?.bgFill, placedItemsCount: existing?.placedItems?.length });
                 if (existing) {
                     // LOAD PATH — entered for any existing map data (generated or hand-made)
                     const walls = existing.walls
@@ -266,12 +266,14 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
             mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save initial map data:', err));
         };
 
-        loadMap();
+        loadMap().finally(() => { loadInProgressRef.current = false; });
     }, [campaignName, characters, mapName]);
 
     // Save map data whenever it changes
     useEffect(() => {
         if (!mapData) return;
+        // Don't save stale mapData while a new map is loading
+        if (loadInProgressRef.current) return;
         // Convert walls Set to array for storage
         const dataToSave = {
             ...mapData,

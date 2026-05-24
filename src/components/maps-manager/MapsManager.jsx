@@ -28,7 +28,8 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
             setLoading(true);
             setError(null);
             const data = await mapsService.loadMaps(campaignName);
-            setMaps(data.maps || []);
+            const sorted = (data.maps || []).sort((a, b) => a.name.localeCompare(b.name));
+            setMaps(sorted);
         } catch (err) {
             setError(err.message || 'Failed to load maps');
         } finally {
