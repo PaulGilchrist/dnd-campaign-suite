@@ -1,6 +1,7 @@
   
 
 import Popup from '../common/Popup.jsx'
+import DiceRollResult from './DiceRollResult.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import useDiceRoll from '../../hooks/useDiceRoll.js'
@@ -43,7 +44,12 @@ function CharReactions({ playerStats }) {
     return (
         <div>
             <div className='sectionHeader'>Reactions</div>
-            {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
+            {popupHtml && (
+                <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
+                    {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
+                     <DiceRollResult {...popupHtml} />}
+                </Popup>
+            )}
               {reactions.map((reaction) => {
                 return <div key={reaction.name}>
                      <b className={reaction.details || reaction.name === 'Opportunity Attack' ? "clickable" : ""} onClick={() => handleReactionClick(reaction)}>{reaction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(reaction.description) }}></span>

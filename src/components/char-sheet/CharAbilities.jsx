@@ -1,6 +1,7 @@
 
 import useDiceRoll from '../../hooks/useDiceRoll.js'
 import Popup from '../common/Popup.jsx'
+import DiceRollResult from './DiceRollResult.jsx'
 import { buildAbilityDetailHtml } from '../../hooks/useActionPopup.js'
 import './CharAbilities.css'
 
@@ -11,7 +12,12 @@ function CharAbilities({ allAbilityScores, playerStats }) {
     const { popupHtml, setPopupHtml, rollAbilityCheck, rollSavingThrow, rollSkillCheck } = useDiceRoll();
     return (
         <div className='abilities-popup-parent'>
-               {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
+                {popupHtml && (
+                    <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
+                        {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
+                         <DiceRollResult {...popupHtml} />}
+                    </Popup>
+                )}
             <div className='abilities'>
                 <div className='left'><b>Ability</b></div>
                 <div><b>Score</b></div>

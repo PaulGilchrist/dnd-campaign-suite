@@ -1,0 +1,28 @@
+.dice-roll-toggles {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 10px 0;
+}
+
+.badge-toggle {
+    font-size: 0.75rem;
+    cursor: pointer;
+    user-select: none;
+    padding: 3px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color, #666);
+    background: transparent;
+    color: var(--color-text, #ccc);
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.badge-toggle:hover {
+    border-color: var(--color-primary-hover, #5a9fd4);
+}
+
+.badge-toggle.active {
+    background: var(--color-primary, #3b7dd8);
+    color: var(--color-text-inverse, #fff);
+    border-color: var(--color-primary, #3b7dd8);
+}

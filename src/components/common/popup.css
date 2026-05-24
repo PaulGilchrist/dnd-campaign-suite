@@ -1,8 +1,8 @@
 .popup-overlay {
     position: fixed;
     top: 0;
-    left: 0;
-    width: 100vw;
+    left: 180px;
+    width: calc(100vw - 180px);
     height: 100vh;
     background-color: rgba(0, 0, 0, 0.9);
 }
@@ -16,13 +16,13 @@
     font-size: 1.0em;
     height: fit-content;
     max-height: 95vh;
-    max-width:95vh;
+    max-width:95vw;
     width:fit-content;
     left: 50%;
     overflow-y: scroll;
     overscroll-behavior: contain;
     padding: 10px;
-    position: fixed;
+    position: absolute;
     text-align: left;
     top: 50%;
     transform: translate(-50%, -50%);

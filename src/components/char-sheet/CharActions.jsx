@@ -1,6 +1,7 @@
   
 import React, { useState, useEffect } from 'react'
 import Popup from '../common/Popup.jsx'
+import DiceRollResult from './DiceRollResult.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { parseMagicItemName } from '../../services/attackCalc.js';
 import useDiceRoll from '../../hooks/useDiceRoll.js'
@@ -74,7 +75,12 @@ const CharActions = React.memo(function CharActions({ playerStats }) {
                     })}
                 </div>
                 <br />
-                {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
+                                   {popupHtml && (
+                                       <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
+                                           {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
+                                            <DiceRollResult {...popupHtml} />}
+                                       </Popup>
+                                   )}
                 {playerStats.actions.map((action) => {
                                         return <div key={action.name}>
                           <b className={action.details ? "clickable" : ""} onClick={() => setPopupHtml(buildFeatureDetailHtml(action))}>{action.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }}></span>
@@ -116,7 +122,12 @@ const CharActions = React.memo(function CharActions({ playerStats }) {
                     {(playerStats.bonusActions.length > 0) && <div>
                         {playerStats.bonusActions.map((bonusAction) => {
                                                         return <div key={bonusAction.name}>
-                                  {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
+                {popupHtml && (
+                    <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
+                        {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
+                         <DiceRollResult {...popupHtml} />}
+                    </Popup>
+                )}
                                   <b className={bonusAction.details ? "clickable" : ""} onClick={() => setPopupHtml(buildFeatureDetailHtml(bonusAction))}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(bonusAction.description) }}></span>
                              </div>
                         })}

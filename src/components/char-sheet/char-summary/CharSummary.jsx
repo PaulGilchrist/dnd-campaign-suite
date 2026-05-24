@@ -1,6 +1,7 @@
 
 import React from 'react'
 import './CharSummary.css'
+import DiceRollResult from '../DiceRollResult.jsx'
 
 import rulesFactory from '../../../services/rulesFactory.js'
 import CharGold from './CharGold.jsx'
@@ -107,7 +108,12 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
 
     return (
         <div>
-              {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)} />}
+                {popupHtml && (
+                    <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
+                        {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
+                         <DiceRollResult {...popupHtml} />}
+                    </Popup>
+                )}
             <div className='char-header'>
                 <AvatarImage name={playerStats.name} imagePath={playerStats.imagePath} size={60} />
                 <div className='char-header-text'>

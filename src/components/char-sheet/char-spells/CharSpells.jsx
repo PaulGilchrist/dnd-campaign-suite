@@ -4,6 +4,7 @@ import { cloneDeep } from 'lodash';
 import useActionPopup from '../../../hooks/useActionPopup.js'
 import useDiceRoll from '../../../hooks/useDiceRoll.js'
 import Popup from '../../common/Popup.jsx'
+import DiceRollResult from '../DiceRollResult.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
 import { rollExpression } from '../../../services/diceRoller.js'
 import './CharSpells.css'
@@ -61,8 +62,18 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     return (
         <div className="char-spells">
             {(playerStats.spellAbilities && playerStats.spellAbilities.spells.length > 0) && <div className="spell-popup-parent">
-                  {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
-                  {dicePopupHtml && <Popup html={dicePopupHtml} onClickOrKeyDown={() => setDicePopupHtml && setDicePopupHtml(null)} />}
+                    {popupHtml && (
+                        <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
+                            {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
+                             <DiceRollResult {...popupHtml} />}
+                        </Popup>
+                    )}
+                    {dicePopupHtml && (
+                        <Popup onClickOrKeyDown={() => setDicePopupHtml && setDicePopupHtml(null)}>
+                            {typeof dicePopupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(dicePopupHtml) }}></div> : 
+                             <DiceRollResult {...dicePopupHtml} />}
+                        </Popup>
+                    )}
             <hr />
             <div className='spell-abilities'>
                 <div className="sectionHeader"><h4>&nbsp;Spells</h4></div>
