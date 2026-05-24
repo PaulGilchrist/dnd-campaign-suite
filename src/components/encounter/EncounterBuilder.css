@@ -186,6 +186,27 @@
   border-color: var(--color-primary);
 }
 
+/* Difficulty-specific backgrounds for the highlight row */
+.encounter-builder .summary-item-difficulty-easy {
+  background: rgba(46, 125, 50, 0.2);
+  border-color: #2e7d32 !important;
+}
+
+.encounter-builder .summary-item-difficulty-medium {
+  background: rgba(255, 193, 7, 0.25);
+  border-color: #ffc107 !important;
+}
+
+.encounter-builder .summary-item-difficulty-hard {
+  background: rgba(253, 126, 20, 0.25);
+  border-color: #fd7e14 !important;
+}
+
+.encounter-builder .summary-item-difficulty-deadly {
+  background: rgba(239, 83, 80, 0.25);
+  border-color: #ef5350 !important;
+}
+
 .encounter-builder .summary-label {
   display: block;
   font-size: 0.7rem;
