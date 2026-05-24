@@ -244,7 +244,7 @@ function EncounterBuilder({ characters, campaignName }) {
     [monsterCount]
   );
 
-  const effectiveXP = Math.round(totalMonsterXP / (difficultyMultiplier || 1));
+  const effectiveXP = Math.round(totalMonsterXP * difficultyMultiplier);
 
   const difficultyIndex = useMemo(
     () => calculateDifficultyIndex(effectiveXP, totalThreshold),
