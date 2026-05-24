@@ -71,7 +71,7 @@ Creating a character doesn't have to be overwhelming. The app guides you step by
 Your character sheet works two ways:
 
 **On Screen (Digital Mode):**
-Your sheet becomes a **living document** that updates as you play. Click to see details, track resources, and share everything in real time with your party.
+Your sheet becomes a **living document** that updates as you play. Click any stat to roll dice, see detailed breakdowns, track resources, and share everything in real time with your party.
 
 **On Paper (Printed Mode):**
 The app is carefully designed to create **beautiful, well-organized character sheets that fit on a single page** (in most cases!). When you print:
@@ -116,6 +116,8 @@ The app is carefully designed to create **beautiful, well-organized character sh
 - **Bonus actions** — Clearly separated from regular actions
 - **Reactions** — See your available reactions, including opportunity attacks and reaction spells
 - **Special actions** — Class features, fighting styles, and custom abilities
+- **Short and Long Rests** — One-click rest mechanics. Short rest with interactive hit die rolling (Con bonus applied, min 1 HP per die, full roll log). Long rest restores all HP, spell slots, hit dice, and class resources
+- **Built-in dice roller** — Click any stat to roll ability checks, saving throws, skill checks, attack rolls, or damage. Supports advantage, disadvantage, and dice expressions like "2d6+3"
 
 **Inventory & Wealth:**
 - **Gold pieces** — Track your wealth
@@ -163,25 +165,43 @@ The app includes powerful tools for Dungeon Masters to manage their campaigns:
 **👾 Encounter Builder**
 - Select monsters from the compendium, adjust quantities, calculate XP thresholds, assess difficulty, and save/load encounters for quick battle setup
 
-**🗺️ Indoor and Outdoor Interactive Maps**
+**🗺️ Indoor Maps**
 - Grid-based maps with zoom and pan
 - Paint and erase walls
-- Fog of war support
-- Drag-and-drop creatures and items
-- 20+ SVG furniture and prop types (barrels, chests, tables, doors, traps, torches, and more)
+- Fog of war with drag-to-select rectangular area fogging
+- Drag-and-drop creature tokens and character tokens onto the grid
+- 23+ SVG furniture and prop types — barrels, beds, bookshelves, chairs, chests, crates, doors, fire pits, tables, torches, traps, and more
+- Rotate furniture items in 90° increments (tables, beds, doors, chairs, bookshelves, altars, and more)
+- Smart collision detection — dragging a character auto-finds the nearest empty cell
 
-  <img src="public/map-outdoor-example.png" alt="Map Example" width="800" />
+    <img src="public/map-indoor-example.png" alt="Indoor Map Example" width="800" />
+
+**🏔️ Outdoor Hex Maps**
+- Hex-grid overland maps with zoom (1x–8x) and pan, compass rose overlay
+- 9 terrain types — Plains, Hills, Forest, Mountains, Desert, Swamp, Tundra, Water, Beach
+- Paint and erase terrain on individual hexes; paint rivers manually or auto-generate them from elevation data
+- Procedural terrain generation using fractal noise — configurable seed, grid size, and biome weights
+- 8 Point of Interest types — Settlement, Dungeon, Camp, Tower, Lore Site, Hazard, Natural Wonder, Landmark — with custom SVG icons
+- Drag POIs from a panel onto the map; right-click to rename, hide, or delete
+- Party marker with drag-to-move — right-click to start an encounter at the party's hex, auto-generating a linked indoor encounter map with biome-appropriate features
+- Marching order panel with reorderable character list, persisted across sessions
+
+    <img src="public/map-outdoor-example.png" alt="Outdoor Map Example" width="800" />
 
 **🏚️ Procedural Dungeon Generator**
-- Generate random dungeon maps with configurable grid size, corridor width, and door placement — perfect for inspiration or quick sessions
-
-   <img src="public/map-indoor-example.png" alt="Map Example" width="800" />
+- Generate random dungeon maps using a BSP (Binary Space Partitioning) algorithm — configurable grid size, room count, corridor width, and door placement. Perfect for inspiration or when you need a map in minutes
 
 **📝 Campaign Notes**
 - Record story details, clues, and important information for your campaign
 
 **🧙 NPC Management**
 - Create and manage NPCs with images, and track them on maps
+
+**📜 Quest Tracking**
+- Create and manage quests with status tracking (active, completed, failed), color-coded badges, search, and rich markdown descriptions and rewards
+
+**🤝 Faction Management**
+- Track campaign factions with influence levels (1–4), goals, markdown notes, and search
 
 **🗂️ Map Management**
 - Create, rename, activate, and delete maps — multiple maps per campaign
@@ -268,6 +288,8 @@ Want to level up, buy gear, or prepare spells between sessions?
 
 **No More Boring Maps** — Interactive maps with drag-and-drop creatures, fog of war, and a procedural dungeon generator make your table feel alive.
 
+**No More Dice Hunt** — Roll ability checks, saving throws, attacks, damage, and resting hits right from your character sheet. Built-in dice roller supports advantage, disadvantage, and custom expressions.
+
 **No More Late-Night Eye Strain** — Toggle between dark and light themes to match your gaming environment.
 
 ---
@@ -321,7 +343,7 @@ The app validates your character against the rules and shows warnings if somethi
 Yes! Download your character, work on it at home, then upload it before the next session.
 
 **What campaign tools are available?**
-The app includes an initiative tracker, encounter builder, interactive maps with drag-and-drop creatures, a procedural dungeon generator, campaign notes, and NPC management — everything a DM needs to run a great session.
+The app includes an initiative tracker, encounter builder, interactive indoor and outdoor maps with fog of war and terrain painting, a procedural dungeon generator, quest tracking, faction management, campaign notes, and NPC management — everything a DM needs to run a great session.
 
 ---
 
