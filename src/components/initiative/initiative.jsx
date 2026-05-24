@@ -221,7 +221,7 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
                         <div key={creature.id} className={`creature-card ${creature.type} ${isActive ? 'active' : ''}`}>
                             <div className='creature-avatar'>
                                 {creature.type === 'player' ? (
-                                    <AvatarImage name={creature.name} imagePath={creature.imagePath} />
+                                    <AvatarImage name={creature.name} imagePath={creature.imagePath} size={150} />
                                 ) : (
                                     <NpcAvatar name={creature.name} imageUrl={npcImages[creature.id]} />
                                 )}
