@@ -1,0 +1,54 @@
+.dice-roll-result {
+    text-align: center;
+    min-width: 220px;
+    padding: 8px 16px;
+}
+
+.dice-roll-header {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--color-header);
+    letter-spacing: 0.02em;
+}
+
+.dice-roll-header i {
+    margin-right: 8px;
+    color: var(--color-hover);
+}
+
+.dice-roll-total {
+    font-size: 3.2em;
+    font-weight: 700;
+    margin: 8px 0;
+    color: var(--color-header-inner);
+    line-height: 1;
+}
+
+.dice-roll-breakdown {
+    font-size: 0.95em;
+    color: var(--color-text);
+    margin-top: 8px;
+    opacity: 0.85;
+}
+
+.dice-rolled {
+    font-weight: 700;
+    color: var(--color-header);
+}
+
+.dice-roll-crit {
+    margin-top: 10px;
+    font-size: 1.1em;
+    font-weight: 700;
+    color: var(--color-warning);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.dice-roll-hint {
+    font-size: 0.7em;
+    color: var(--color-text-muted);
+    margin-top: 16px;
+    opacity: 0.5;
+}

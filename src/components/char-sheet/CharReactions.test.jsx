@@ -2,23 +2,16 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharReactions from './CharReactions.jsx';
 
-// Mock the useActionPopup hook
-vi.mock('../../hooks/useActionPopup.js', () => ({
+vi.mock('../../hooks/useDiceRoll.js', () => ({
   default: vi.fn(),
-  buildFeatureDetailHtml: (entity) => {
-    if (entity.details) {
-      return `<b>${entity.name}</b><br/>${entity.description}<br/><br/>${entity.details}`;
-    }
-    return null;
-  },
 }));
 
-// Mock sanitizeHtml
 vi.mock('../../services/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-import useActionPopup, { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js';
+import useDiceRoll from '../../hooks/useDiceRoll.js';
+import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js';
 
 const mockPlayerStats = {
   reactions: [
@@ -49,12 +42,11 @@ const mockPlayerStatsWithNoReactions = {
 describe('CharReactions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Mock useActionPopup to return a controlled popup
-    useActionPopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
+    useDiceRoll.mockImplementation(() => ({
       popupHtml: null,
-     }));
+      setPopupHtml: vi.fn(),
+      rollAttack: vi.fn(),
+    }));
    });
 
   it('should render reactions header', () => {
@@ -170,12 +162,13 @@ describe('CharReactions', () => {
     expect(screen.queryByText(/Shield/)).not.toBeInTheDocument();
    });
 
-  it('should call showPopup when reaction with details is clicked', () => {
-    const mockShowPopup = vi.fn();
-    useActionPopup.mockImplementation(() => ({
-      showPopup: mockShowPopup,
+  it('should call setPopupHtml when reaction with details is clicked', () => {
+    const mockSetPopupHtml = vi.fn();
+    useDiceRoll.mockImplementation(() => ({
       popupHtml: null,
-     }));
+      setPopupHtml: mockSetPopupHtml,
+      rollAttack: vi.fn(),
+    }));
 
     const playerStatsWithDetails = {
       reactions: [
@@ -197,7 +190,35 @@ describe('CharReactions', () => {
     const clickableElement = screen.getByText(/Cautious Action/);
     fireEvent.click(clickableElement);
 
-    expect(mockShowPopup).toHaveBeenCalledWith(playerStatsWithDetails.reactions[0]);
+    expect(mockSetPopupHtml).toHaveBeenCalled();
+    const expectedHtml = buildFeatureDetailHtml(playerStatsWithDetails.reactions[0]);
+    expect(mockSetPopupHtml).toHaveBeenCalledWith(expectedHtml);
+   });
+
+  it('should call rollAttack when Opportunity Attack is clicked', () => {
+    const mockRollAttack = vi.fn();
+    useDiceRoll.mockImplementation(() => ({
+      popupHtml: null,
+      setPopupHtml: vi.fn(),
+      rollAttack: mockRollAttack,
+    }));
+
+    const playerStatsWithAttack = {
+      reactions: [],
+      spellAbilities: { spells: [] },
+      attacks: [
+        { name: 'Longsword', range: 5, hitBonus: 5, type: 'Action' },
+      ],
+    };
+
+    render(
+       <CharReactions playerStats={playerStatsWithAttack} />
+     );
+
+    const oaElement = screen.getByText(/Opportunity Attack/);
+    fireEvent.click(oaElement);
+
+    expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5);
    });
 
   it('should handle empty playerStats gracefully', () => {
@@ -211,10 +232,11 @@ describe('CharReactions', () => {
 
   it('should render popup element container', () => {
     const mockPopupHtml = '<div>Popup Content</div>';
-    useActionPopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
+    useDiceRoll.mockImplementation(() => ({
       popupHtml: mockPopupHtml,
-     }));
+      setPopupHtml: vi.fn(),
+      rollAttack: vi.fn(),
+    }));
 
     render(
        <CharReactions playerStats={mockPlayerStats} />

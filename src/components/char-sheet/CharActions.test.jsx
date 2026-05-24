@@ -3,26 +3,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js';
 
-// Mock the useActionPopup hook
-vi.mock('../../hooks/useActionPopup.js', async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    default: vi.fn(),
-    buildFeatureDetailHtml: actual.buildFeatureDetailHtml,
-  };
-});
+vi.mock('../../hooks/useDiceRoll.js', () => ({
+  default: vi.fn(),
+}));
 
-// Mock sanitizeHtml
 vi.mock('../../services/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-// Mock fetch for actions.json
-vi.mock('node-fetch', () => ({
-  default: vi.fn(),
-}));
-
-import useActionPopup from '../../hooks/useActionPopup.js';
+import useDiceRoll from '../../hooks/useDiceRoll.js';
 
 const mockPlayerStats = {
   rules: '5e',
@@ -31,9 +20,9 @@ const mockPlayerStats = {
        name: 'Longsword',
        range: 5,
        hitBonus: 5,
-       hitBonusFormula: '+5 to hit',
+       hitBonusFormula: '1d20+5',
        damage: '1d8+3',
-       damageFormula: '1d8+3 slashing',
+       damageFormula: '1d8+3',
        damageType: 'Slashing',
        type: 'Action',
          },
@@ -64,17 +53,15 @@ const mockPlayerStats = {
 describe('CharActions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-      
-    // Mock fetch for actions.json
     global.fetch = vi.fn().mockResolvedValue({
       json: () => Promise.resolve(['Dash', 'Disengage', 'Dodge', 'Hide', 'Withdraw']),
     });
-    
-    // Mock useActionPopup
-    useActionPopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
+
+    useDiceRoll.mockImplementation(() => ({
       popupHtml: null,
       setPopupHtml: vi.fn(),
+      rollAttack: vi.fn(),
+      rollDamage: vi.fn(),
     }));
   });
 
@@ -119,12 +106,13 @@ describe('CharActions', () => {
     expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
   });
 
-  it('should call setPopupHtml when hit bonus is clicked', async () => {
-    const mockSetPopupHtml = vi.fn();
-    useActionPopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
+  it('should call rollAttack when hit bonus is clicked', async () => {
+    const mockRollAttack = vi.fn();
+    useDiceRoll.mockImplementation(() => ({
       popupHtml: null,
-      setPopupHtml: mockSetPopupHtml,
+      setPopupHtml: vi.fn(),
+      rollAttack: mockRollAttack,
+      rollDamage: vi.fn(),
     }));
 
     render(<CharActions playerStats={mockPlayerStats} />);
@@ -132,15 +120,16 @@ describe('CharActions', () => {
     const hitBonusElement = screen.getByText('+5');
     fireEvent.click(hitBonusElement);
 
-    expect(mockSetPopupHtml).toHaveBeenCalledWith('+5 to hit');
+    expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5);
   });
 
-  it('should call setPopupHtml when damage is clicked', async () => {
-    const mockSetPopupHtml = vi.fn();
-    useActionPopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
+  it('should call rollDamage when damage is clicked', async () => {
+    const mockRollDamage = vi.fn();
+    useDiceRoll.mockImplementation(() => ({
       popupHtml: null,
-      setPopupHtml: mockSetPopupHtml,
+      setPopupHtml: vi.fn(),
+      rollAttack: vi.fn(),
+      rollDamage: mockRollDamage,
     }));
 
     render(<CharActions playerStats={mockPlayerStats} />);
@@ -148,7 +137,11 @@ describe('CharActions', () => {
     const damageElement = screen.getByText('1d8+3');
     fireEvent.click(damageElement);
 
-    expect(mockSetPopupHtml).toHaveBeenCalledWith('1d8+3 slashing');
+    // rollDamage is called with (name, formula, total, rolls, modifier)
+    expect(mockRollDamage).toHaveBeenCalled();
+    const args = mockRollDamage.mock.calls[0];
+    expect(args[0]).toBe('Longsword');
+    expect(args[1]).toBe('1d8+3');
   });
 
   it('should not show Mastery column for 5e rules', async () => {
@@ -261,18 +254,18 @@ describe('CharActions', () => {
   });
 
   it('should sanitize action descriptions', async () => {
-
     render(<CharActions playerStats={mockPlayerStats} />);
 
     expect(screen.getByText(/You focus on movement/)).toBeInTheDocument();
   });
 
   it('should show popup when action with details is clicked', async () => {
-    const mockShowPopup = vi.fn();
-    useActionPopup.mockImplementation(() => ({
-      showPopup: mockShowPopup,
+    const mockSetPopupHtml = vi.fn();
+    useDiceRoll.mockImplementation(() => ({
       popupHtml: null,
-      setPopupHtml: vi.fn(),
+      setPopupHtml: mockSetPopupHtml,
+      rollAttack: vi.fn(),
+      rollDamage: vi.fn(),
     }));
 
     render(<CharActions playerStats={mockPlayerStats} />);
@@ -280,7 +273,7 @@ describe('CharActions', () => {
     const actionElement = screen.getByText(/Dash:/);
     fireEvent.click(actionElement);
 
-    expect(mockShowPopup).toHaveBeenCalled();
+    expect(mockSetPopupHtml).toHaveBeenCalled();
   });
 
   it('should return null for feature without details', () => {
@@ -303,7 +296,6 @@ describe('CharActions', () => {
 
     render(<CharActions playerStats={stats} />);
 
-    // Mastery column should still show for 2024
     expect(screen.getByText('Mastery')).toBeInTheDocument();
   });
 
@@ -339,10 +331,11 @@ describe('CharActions', () => {
   });
 
   it('should render popupHtml in the actions section', async () => {
-    useActionPopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
+    useDiceRoll.mockImplementation(() => ({
       popupHtml: '<div>Popup Content</div>',
       setPopupHtml: vi.fn(),
+      rollAttack: vi.fn(),
+      rollDamage: vi.fn(),
     }));
 
     render(<CharActions playerStats={mockPlayerStats} />);
@@ -373,11 +366,8 @@ describe('CharActions', () => {
     render(<CharActions playerStats={statsWithBoth} />);
 
     await waitFor(() => {
-      // Should show Bonus Actions header
       expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
-      // Should show the bonus action attack name
       expect(screen.getByText('Handaxe')).toBeInTheDocument();
-      // Should show the bonus action description (Cunning Action)
       expect(screen.getByText(/Cunning Action:/)).toBeInTheDocument();
     });
   });

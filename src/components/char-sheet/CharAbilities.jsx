@@ -1,13 +1,14 @@
- 
 
-import useActionPopup from '../../hooks/useActionPopup.js'
+import useDiceRoll from '../../hooks/useDiceRoll.js'
 import Popup from '../common/Popup.jsx'
+import { buildAbilityDetailHtml } from '../../hooks/useActionPopup.js'
 import './CharAbilities.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
 function CharAbilities({ allAbilityScores, playerStats }) {
-    const { showPopup, popupHtml, setPopupHtml } = useActionPopup('ability', { allAbilityScores });
+    const abilityDesc = buildAbilityDetailHtml(allAbilityScores);
+    const { popupHtml, setPopupHtml, rollAbilityCheck, rollSavingThrow, rollSkillCheck } = useDiceRoll();
     return (
         <div className='abilities-popup-parent'>
                {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
@@ -20,13 +21,16 @@ function CharAbilities({ allAbilityScores, playerStats }) {
             </div>
             {playerStats.abilities.map((ability) => {
                 return <div key={ability.name} className='abilities'>
-                    <div className='clickable left' onClick={() => showPopup(ability.name)}>{ability.name}</div>
+                    <div className='clickable left' onClick={() => setPopupHtml(abilityDesc(ability.name))}>{ability.name}</div>
                     <div>{ability.totalScore}</div>
-                    <div>{signFormatter.format(ability.bonus)}</div>
-                    <div>{signFormatter.format(ability.save)}</div>
+                    <div className='clickable' onClick={() => rollAbilityCheck(ability.name, ability.bonus)}>{signFormatter.format(ability.bonus)}</div>
+                    <div className='clickable' onClick={() => rollSavingThrow(ability.name, ability.save)}>{signFormatter.format(ability.save)}</div>
                     <div className='left'>{ability.skills.map((skill) => {
-                        return `${skill.name}    ${signFormatter.format(skill.bonus)}`;
-                    }).join(', ')}</div>
+                        return <span key={skill.name}>
+                            <span className='clickable' onClick={() => rollSkillCheck(skill.name, skill.bonus)}>{skill.name} ({signFormatter.format(skill.bonus)})</span>
+                            {ability.skills.indexOf(skill) < ability.skills.length - 1 ? ', ' : ''}
+                        </span>;
+                    })}</div>
                 </div>;
             })}
         </div>

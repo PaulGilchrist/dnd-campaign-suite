@@ -59,6 +59,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     }, [allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, forceRefresh, allRaces2024, allMagicItems2024]);
 
     const handleEvent = (event) => {
+            if (event.key == null || event.data == null) return;
             if (!isEqual(storage.get(event.key), event.data)) {
                 localStorage.setItem(event.key, JSON.stringify(event.data));
                 if (playerStats && event.key === utils.getFirstName(playerStats.name)) {
@@ -91,7 +92,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
     return (<React.Fragment>
         {playerStats && <div className='char-sheet' data-testid='char-sheet'>
-            <CharSummary playerStats={playerStats} onDeleteCharacter={onDeleteCharacter} onEditCharacter={onEditCharacter} onUploadClick={onUploadClick} onSaveClick={onSaveClick} campaignName={campaignName}></CharSummary><hr />
+            <CharSummary playerStats={playerStats} onDeleteCharacter={onDeleteCharacter} onEditCharacter={onEditCharacter} onUploadClick={onUploadClick} onSaveClick={onSaveClick} campaignName={campaignName} onLongRest={() => setForceRefresh(utils.guid())}></CharSummary><hr />
             <CharAbilities allAbilityScores={allAbilityScores} playerStats={playerStats}></CharAbilities><hr />
             
             <CharActions playerStats={playerStats}></CharActions><hr />

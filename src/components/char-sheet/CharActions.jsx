@@ -1,9 +1,11 @@
- 
+  
 import React, { useState, useEffect } from 'react'
-import useActionPopup from '../../hooks/useActionPopup.js'
 import Popup from '../common/Popup.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { parseMagicItemName } from '../../services/attackCalc.js';
+import useDiceRoll from '../../hooks/useDiceRoll.js'
+import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
+import { rollExpression } from '../../services/diceRoller.js'
 import './CharActions.css'
 import { isEqual } from 'lodash';
 
@@ -20,7 +22,14 @@ const CharActions = React.memo(function CharActions({ playerStats }) {
           .then(data => setActions(data))
           .catch(error => console.error('Error loading actions:', error));
     }, []);
-    const { showPopup, popupHtml, setPopupHtml } = useActionPopup('feature');
+    const { popupHtml, setPopupHtml, rollAttack, rollDamage } = useDiceRoll();
+
+    const handleDamageClick = (attack) => {
+        const result = rollExpression(attack.damage);
+        if (result) {
+            rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier);
+        }
+    };
 
     // Helper function to get mastery for a weapon name
     const getWeaponMastery = (weaponName) => {
@@ -57,18 +66,18 @@ const CharActions = React.memo(function CharActions({ playerStats }) {
                         return <React.Fragment key={attack.name}>
                             <div className='left'>{attack.name}</div>
                             <div>{attack.range} ft.</div>
-                            <div className={attack.hitBonusFormula ? "clickable" : ""} onClick={() => setPopupHtml(attack.hitBonusFormula)}>{signFormatter.format(attack.hitBonus)}</div>
-                            <div className={attack.damageFormula ? "clickable" : ""} onClick={() => setPopupHtml(attack.damageFormula)}>{attack.damage}</div>
+                            <div className={attack.hitBonusFormula ? "clickable" : ""} onClick={() => rollAttack(attack.name, attack.hitBonus)}>{signFormatter.format(attack.hitBonus)}</div>
+                            <div className={attack.damage ? "clickable" : ""} onClick={() => handleDamageClick(attack)}>{attack.damage}</div>
                             <div className='left'>{attack.damageType}</div>
                             {is2024Rules && <div>{getWeaponMastery(attack.name) || ''}</div>}
                         </React.Fragment>;
                     })}
                 </div>
                 <br />
+                {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
                 {playerStats.actions.map((action) => {
                                         return <div key={action.name}>
-                          {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
-                          <b className={action.details ? "clickable" : ""} onClick={() => showPopup(action)}>{action.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }}></span>
+                          <b className={action.details ? "clickable" : ""} onClick={() => setPopupHtml(buildFeatureDetailHtml(action))}>{action.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }}></span>
                      </div>
                 })}
                 <div><b>Base Actions:</b> {actions.join(', ')}</div>
@@ -89,8 +98,8 @@ const CharActions = React.memo(function CharActions({ playerStats }) {
                             return <React.Fragment key={attack.name}>
                                 <div className='left'>{attack.name}</div>
                                 <div>{attack.range} ft.</div>
-                                <div>{signFormatter.format(attack.hitBonus)}</div>
-                                <div>{attack.damage}</div>
+                                <div className={attack.hitBonusFormula ? "clickable" : ""} onClick={() => rollAttack(attack.name, attack.hitBonus)}>{signFormatter.format(attack.hitBonus)}</div>
+                                <div className={attack.damage ? "clickable" : ""} onClick={() => handleDamageClick(attack)}>{attack.damage}</div>
                                 <div className='left'>{attack.damageType}</div>
                                 {is2024Rules && <div>{getWeaponMastery(attack.name) || ''}</div>}
                             </React.Fragment>;
@@ -108,7 +117,7 @@ const CharActions = React.memo(function CharActions({ playerStats }) {
                         {playerStats.bonusActions.map((bonusAction) => {
                                                         return <div key={bonusAction.name}>
                                   {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
-                                  <b className={bonusAction.details ? "clickable" : ""} onClick={() => showPopup(bonusAction)}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(bonusAction.description) }}></span>
+                                  <b className={bonusAction.details ? "clickable" : ""} onClick={() => setPopupHtml(buildFeatureDetailHtml(bonusAction))}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(bonusAction.description) }}></span>
                              </div>
                         })}
                     </div>}

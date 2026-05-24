@@ -2,12 +2,8 @@
 import React from 'react'
 import TrackedResourceInput from './TrackedResourceInput.jsx';
 import { getClassFeatures } from '../../../services/classFeatures.js';
-import { isEqual } from 'lodash';
-
-const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats);
-
 /* ─── Barbarian ─── */
-const BarbarianFeatures = React.memo(function BarbarianFeatures({ playerStats }) {
+const BarbarianFeatures = function BarbarianFeatures({ playerStats }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     return (
          <div data-testid="char-class-barbarian">
@@ -17,10 +13,10 @@ const BarbarianFeatures = React.memo(function BarbarianFeatures({ playerStats })
              <div><b>Weapon Mastery: </b>{classLevel?.weapon_mastery ?? 'N/A'}</div>
          </div>
     );
-}, areEqual);
+};
 
 /* ─── Bard ─── */
-const BardFeatures = React.memo(function BardFeatures({ playerStats }) {
+const BardFeatures = function BardFeatures({ playerStats }) {
     const bardFeatures = getClassFeatures(playerStats);
     return (
          <div data-testid="char-class-bard">
@@ -32,10 +28,10 @@ const BardFeatures = React.memo(function BardFeatures({ playerStats }) {
              {playerStats.level > 2 && playerStats.class.expertise && <div><b>Expertise: </b>{playerStats.class.expertise.join(', ')}</div>}
          </div>
     );
-}, areEqual);
+};
 
 /* ─── Cleric ─── */
-const ClericFeatures = React.memo(function ClericFeatures({ playerStats }) {
+const ClericFeatures = function ClericFeatures({ playerStats }) {
     const clericFeatures = getClassFeatures(playerStats);
     return (
          <div data-testid="char-class-cleric">
@@ -43,10 +39,10 @@ const ClericFeatures = React.memo(function ClericFeatures({ playerStats }) {
              {clericFeatures?.destroyUndeadCR !== null && <div><b>Destroy Undead Challenge Rating: </b>{clericFeatures.destroyUndeadCR}</div>}
          </div>
     );
-}, areEqual);
+};
 
 /* ─── Druid ─── */
-const DruidFeatures = React.memo(function DruidFeatures({ playerStats }) {
+const DruidFeatures = function DruidFeatures({ playerStats }) {
     const druidFeatures = getClassFeatures(playerStats);
     if (playerStats.level < 2) return null;
     return (
@@ -57,10 +53,10 @@ const DruidFeatures = React.memo(function DruidFeatures({ playerStats }) {
              <div><b>Wild Shape Limitations: </b>{druidFeatures.wildShapeLimitations}</div>
          </div>
     );
-}, areEqual);
+};
 
 /* ─── Fighter ─── */
-const FighterFeatures = React.memo(function FighterFeatures({ playerStats }) {
+const FighterFeatures = function FighterFeatures({ playerStats }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name;
     const hasEnergy = classLevel?.energy && classLevel.energy.required_major === majorName;
@@ -82,10 +78,10 @@ const FighterFeatures = React.memo(function FighterFeatures({ playerStats }) {
              )}
          </div>
     );
-}, areEqual);
+};
 
 /* ─── Monk ─── */
-const MonkFeatures = React.memo(function MonkFeatures({ playerStats }) {
+const MonkFeatures = function MonkFeatures({ playerStats }) {
     const wisdom = playerStats.abilities?.find((a) => a.name === 'Wisdom');
     const monkFeatures = getClassFeatures(playerStats);
     if (playerStats.level < 2) return null;
@@ -98,10 +94,10 @@ const MonkFeatures = React.memo(function MonkFeatures({ playerStats }) {
              <div><b>Unarmored Movement:</b> +{monkFeatures?.unarmoredMovementIncrease || 0} ft.</div>
          </div>
     );
-}, areEqual);
+};
 
 /* ─── Paladin ─── */
-const PaladinFeatures = React.memo(function PaladinFeatures({ playerStats }) {
+const PaladinFeatures = function PaladinFeatures({ playerStats }) {
     const paladinFeatures = getClassFeatures(playerStats);
     return (
          <div data-testid="char-class-paladin">
@@ -111,10 +107,10 @@ const PaladinFeatures = React.memo(function PaladinFeatures({ playerStats }) {
              {paladinFeatures?.auraRange !== null && <div><b>Aura Range: </b>{paladinFeatures.auraRange}</div>}
          </div>
     );
-}, areEqual);
+};
 
 /* ─── Ranger ─── */
-const RangerFeatures = React.memo(function RangerFeatures({ playerStats }) {
+const RangerFeatures = function RangerFeatures({ playerStats }) {
     const rangerFeatures = getClassFeatures(playerStats);
     return (
          <div data-testid="char-class-ranger">
@@ -123,10 +119,10 @@ const RangerFeatures = React.memo(function RangerFeatures({ playerStats }) {
              <div><b>Favored Enemies: </b>{rangerFeatures?.favoredEnemies}</div>
          </div>
     );
-}, areEqual);
+};
 
 /* ─── Rogue ─── */
-const RogueFeatures = React.memo(function RogueFeatures({ playerStats }) {
+const RogueFeatures = function RogueFeatures({ playerStats }) {
     const rogueFeatures = getClassFeatures(playerStats);
     return (
          <div data-testid="char-class-rogue">
@@ -134,10 +130,10 @@ const RogueFeatures = React.memo(function RogueFeatures({ playerStats }) {
              {rogueFeatures?.expertise && <div><b>Expertise: </b>{rogueFeatures.expertise.join(', ')}</div>}
          </div>
     );
-}, areEqual);
+};
 
 /* ─── Sorcerer ─── */
-const SorcererFeatures = React.memo(function SorcererFeatures({ playerStats }) {
+const SorcererFeatures = function SorcererFeatures({ playerStats }) {
     const sorcererFeatures = getClassFeatures(playerStats);
     return (
          <div data-testid="char-class-sorcerer">
@@ -146,10 +142,10 @@ const SorcererFeatures = React.memo(function SorcererFeatures({ playerStats }) {
              {sorcererFeatures?.creatingSpellSlotCosts?.length > 0 && <div><b>Spell Slot (level 1-5) Costs: </b>{sorcererFeatures.creatingSpellSlotCosts.join(', ')}</div>}
          </div>
     );
-}, areEqual);
+};
 
 /* ─── Warlock ─── */
-const WarlockFeatures = React.memo(function WarlockFeatures({ playerStats }) {
+const WarlockFeatures = function WarlockFeatures({ playerStats }) {
     const warlockFeatures = getClassFeatures(playerStats);
     return (
          <div data-testid="char-class-warlock">
@@ -171,10 +167,10 @@ const WarlockFeatures = React.memo(function WarlockFeatures({ playerStats }) {
              )}
          </div>
     );
-}, areEqual);
+};
 
 /* ─── Wizard ─── */
-const WizardFeatures = React.memo(function WizardFeatures({ playerStats }) {
+const WizardFeatures = function WizardFeatures({ playerStats }) {
     const wizardFeatures = getClassFeatures(playerStats);
     if ((wizardFeatures?.showWizardFeatures ?? true) === false) return null;
     return (
@@ -182,7 +178,7 @@ const WizardFeatures = React.memo(function WizardFeatures({ playerStats }) {
              <TrackedResourceInput label="Arcane Recovery Levels" resourceKey="arcaneRecoveryLevels" playerName={playerStats.name} getMax={() => wizardFeatures?.arcaneRecoveryLevels || 0} deps={[playerStats]} />
          </div>
     );
-}, areEqual);
+};
 
 /* ─── Registry (maps class name → component) ─── */
 const CLASS_COMPONENTS = {

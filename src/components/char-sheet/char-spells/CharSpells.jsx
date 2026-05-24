@@ -1,18 +1,28 @@
 
 import React from 'react'
-import { cloneDeep, isEqual } from 'lodash';
+import { cloneDeep } from 'lodash';
 import useActionPopup from '../../../hooks/useActionPopup.js'
+import useDiceRoll from '../../../hooks/useDiceRoll.js'
 import Popup from '../../common/Popup.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
+import { rollExpression } from '../../../services/diceRoller.js'
 import './CharSpells.css'
 
-const areEqual = (prevProps, nextProps) => {
-  return isEqual(prevProps.playerStats, nextProps.playerStats) && 
-         prevProps.handleTogglePreparedSpells === nextProps.handleTogglePreparedSpells;
-};
-
-const CharSpells = React.memo(function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName }) {
+const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName }) {
     const { showPopup, popupHtml, setPopupHtml } = useActionPopup('spell');
+    const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage } = useDiceRoll();
+
+    const getDamageFormula = (effect) => {
+        const match = effect.match(/^(\d+d\d+(?:[+-]\d+)?)/);
+        return match ? match[1] : null;
+    };
+
+    const handleDamageRoll = (formula, spellName) => {
+        const result = rollExpression(formula);
+        if (result) {
+            rollDamage(spellName, formula, result.total, result.rolls, result.modifier);
+        }
+    };
     const [filterPrepared, setFilterPrepared] = React.useState(false);
     const [spells, setSpells] = React.useState([]);
     const is2024 = playerStats.rules === '2024';
@@ -52,11 +62,12 @@ const CharSpells = React.memo(function CharSpells({ playerStats, handleTogglePre
         <div className="char-spells">
             {(playerStats.spellAbilities && playerStats.spellAbilities.spells.length > 0) && <div className="spell-popup-parent">
                   {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
+                  {dicePopupHtml && <Popup html={dicePopupHtml} onClickOrKeyDown={() => setDicePopupHtml && setDicePopupHtml(null)} />}
             <hr />
             <div className='spell-abilities'>
                 <div className="sectionHeader"><h4>&nbsp;Spells</h4></div>
                 <div>
-                    <b>Attack (to hit):</b> +{playerStats.spellAbilities.toHit}<br/>
+                    <b className="clickable" onClick={() => rollAttack('Spell Attack', playerStats.spellAbilities.toHit)}>Attack (to hit):</b> +{playerStats.spellAbilities.toHit}<br/>
                     <b>Modifier:</b> +{playerStats.spellAbilities.modifier}<br/>
                     <b>Save DC:</b> {playerStats.spellAbilities.saveDc}
                 </div>
@@ -103,7 +114,7 @@ const CharSpells = React.memo(function CharSpells({ playerStats, handleTogglePre
                             {!is2024 && (spell.prepared === 'Prepared' || spell.prepared === '') && <td><input tabIndex={0} type="checkbox" checked={spell.prepared === 'Prepared'} onChange={() => handleTogglePreparedSpells(spell.name)}/></td>}
                             <td>{spell.casting_time ? spell.casting_time.replace('reaction','R').replace('bonus action','BA').replace('action',' A').replace('minute','min').replace('minutes','min') : ''}</td>
                             <td>{spell.range}</td>
-                            <td>{effect}</td>
+                            <td className={getDamageFormula(effect) ? 'clickable' : ''} onClick={getDamageFormula(effect) ? () => handleDamageRoll(getDamageFormula(effect), spell.name) : undefined}>{effect}</td>
                             <td>{spell.duration ? spell.duration.replace('Instantaneous','Instant').replace('minute','min').replace('minutes','min') : ''}</td>
                             <td className='left'>{notes.join(', ').replace('Concentration','Con')}</td>
                         </tr>
@@ -113,6 +124,6 @@ const CharSpells = React.memo(function CharSpells({ playerStats, handleTogglePre
         </div>}
     </div>
     )
-}, areEqual);
+};
 
 export default CharSpells

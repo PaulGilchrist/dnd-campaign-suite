@@ -2,14 +2,11 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities.jsx';
 
-// Mock the useActionPopup hook
-vi.mock('../../hooks/useActionPopup.js', () => ({
+vi.mock('../../hooks/useDiceRoll.js', () => ({
   default: vi.fn(),
-  buildAbilityDetailHtml: vi.fn(),
 }));
 
-import useActionPopup from '../../hooks/useActionPopup.js';
-import { buildAbilityDetailHtml } from '../../hooks/useActionPopup.js';
+import useDiceRoll from '../../hooks/useDiceRoll.js';
 
 const mockPlayerStats = {
   abilities: [
@@ -21,7 +18,7 @@ const mockPlayerStats = {
       skills: [
         { name: 'Athletics', bonus: 2 },
        ],
-     },
+      },
     {
       name: 'Dexterity',
       totalScore: 10,
@@ -31,7 +28,7 @@ const mockPlayerStats = {
         { name: 'Acrobatics', bonus: 0 },
         { name: 'Stealth', bonus: 0 },
        ],
-     },
+      },
    ],
 };
 
@@ -49,13 +46,13 @@ const mockAllAbilityScores = [
 describe('CharAbilities', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-     
-      // Mock useActionPopup to return a controlled popup
-    useActionPopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
+    useDiceRoll.mockImplementation(() => ({
       popupHtml: null,
       setPopupHtml: vi.fn(),
-     }));
+      rollAbilityCheck: vi.fn(),
+      rollSavingThrow: vi.fn(),
+      rollSkillCheck: vi.fn(),
+    }));
    });
 
   it('should render ability headers', () => {
@@ -124,13 +121,15 @@ describe('CharAbilities', () => {
     expect(screen.getByText(/Stealth/)).toBeInTheDocument();
    });
 
-  it('should call showPopup when ability name is clicked', () => {
-    const mockShowPopup = vi.fn();
-    useActionPopup.mockImplementation(() => ({
-       showPopup: mockShowPopup,
-       popupHtml: null,
-       setPopupHtml: vi.fn(),
-      }));
+  it('should call setPopupHtml with ability description when ability name is clicked', () => {
+    const mockSetPopupHtml = vi.fn();
+    useDiceRoll.mockImplementation(() => ({
+      popupHtml: null,
+      setPopupHtml: mockSetPopupHtml,
+      rollAbilityCheck: vi.fn(),
+      rollSavingThrow: vi.fn(),
+      rollSkillCheck: vi.fn(),
+    }));
 
     render(
       <CharAbilities
@@ -142,7 +141,9 @@ describe('CharAbilities', () => {
     const strengthElement = screen.getByText('Strength');
     fireEvent.click(strengthElement);
 
-    expect(mockShowPopup).toHaveBeenCalledWith('Strength');
+    expect(mockSetPopupHtml).toHaveBeenCalled();
+    const html = mockSetPopupHtml.mock.calls[0][0];
+    expect(html).toContain('Strength');
    });
 
   it('should render multiple abilities', () => {
@@ -181,7 +182,7 @@ describe('CharAbilities', () => {
           skills: [
             { name: 'Deception', bonus: -1 },
            ],
-         },
+          },
        ],
     };
 
@@ -198,11 +199,13 @@ describe('CharAbilities', () => {
 
   it('should render popup element container', () => {
     const mockPopupHtml = '<div>Popup Content</div>';
-    useActionPopup.mockImplementation(() => ({
-       showPopup: vi.fn(),
-       popupHtml: mockPopupHtml,
-       setPopupHtml: vi.fn(),
-     }));
+    useDiceRoll.mockImplementation(() => ({
+      popupHtml: mockPopupHtml,
+      setPopupHtml: vi.fn(),
+      rollAbilityCheck: vi.fn(),
+      rollSavingThrow: vi.fn(),
+      rollSkillCheck: vi.fn(),
+    }));
 
     render(
       <CharAbilities
@@ -214,28 +217,71 @@ describe('CharAbilities', () => {
     expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
   });
 
-  it('should return null when ability score not found', () => {
-    vi.resetAllMocks();
-    const allScores = [{ full_name: 'Strength', desc: '<p>desc</p>' }];
-    buildAbilityDetailHtml.mockImplementation((scores) => (name) => {
-      const found = scores.find((s) => s.full_name === name);
-      return found ? `<h3>${found.full_name}</h3>${found.desc}` : null;
-    });
-    const result = buildAbilityDetailHtml(allScores)('NonExistentAbility');
-    expect(result).toBeNull();
-   });
+  it('should call rollAbilityCheck when ability bonus is clicked', () => {
+    const mockRollAbilityCheck = vi.fn();
+    useDiceRoll.mockImplementation(() => ({
+      popupHtml: null,
+      setPopupHtml: vi.fn(),
+      rollAbilityCheck: mockRollAbilityCheck,
+      rollSavingThrow: vi.fn(),
+      rollSkillCheck: vi.fn(),
+    }));
 
-  it('should return html when ability score is found', () => {
-    vi.resetAllMocks();
-    const allScores = [{ full_name: 'Strength', desc: '<p>Strength measures physical power.</p>' }];
-    buildAbilityDetailHtml.mockImplementation((scores) => (name) => {
-      const found = scores.find((s) => s.full_name === name);
-      return found ? `<h3>${found.full_name}</h3>${found.desc}` : null;
-    });
-    const result = buildAbilityDetailHtml(allScores)('Strength');
-    expect(result).toContain('<h3>Strength</h3>');
-    expect(result).toContain('Strength measures physical power');
-   });
+    render(
+      <CharAbilities
+        playerStats={mockPlayerStats}
+        allAbilityScores={mockAllAbilityScores}
+      />
+    );
+
+    const bonusElements = screen.getAllByText('+2');
+    fireEvent.click(bonusElements[0]);
+    expect(mockRollAbilityCheck).toHaveBeenCalledWith('Strength', 2);
+  });
+
+  it('should call rollSavingThrow when save value is clicked', () => {
+    const mockRollSavingThrow = vi.fn();
+    useDiceRoll.mockImplementation(() => ({
+      popupHtml: null,
+      setPopupHtml: vi.fn(),
+      rollAbilityCheck: vi.fn(),
+      rollSavingThrow: mockRollSavingThrow,
+      rollSkillCheck: vi.fn(),
+    }));
+
+    render(
+      <CharAbilities
+        playerStats={mockPlayerStats}
+        allAbilityScores={mockAllAbilityScores}
+      />
+    );
+
+    const saveElements = screen.getAllByText('+2');
+    fireEvent.click(saveElements[saveElements.length - 1]);
+    expect(mockRollSavingThrow).toHaveBeenCalledWith('Strength', 2);
+  });
+
+  it('should call rollSkillCheck when skill is clicked', () => {
+    const mockRollSkillCheck = vi.fn();
+    useDiceRoll.mockImplementation(() => ({
+      popupHtml: null,
+      setPopupHtml: vi.fn(),
+      rollAbilityCheck: vi.fn(),
+      rollSavingThrow: vi.fn(),
+      rollSkillCheck: mockRollSkillCheck,
+    }));
+
+    render(
+      <CharAbilities
+        playerStats={mockPlayerStats}
+        allAbilityScores={mockAllAbilityScores}
+      />
+    );
+
+    const athleticsElement = screen.getByText(/Athletics/);
+    fireEvent.click(athleticsElement);
+    expect(mockRollSkillCheck).toHaveBeenCalledWith('Athletics', 2);
+  });
 
   it('should not render popup when popupHtml is null', () => {
     render(
@@ -250,10 +296,12 @@ describe('CharAbilities', () => {
 
   it('should dismiss popup when overlay is clicked', () => {
     const mockSetPopupHtml = vi.fn();
-    useActionPopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
+    useDiceRoll.mockImplementation(() => ({
       popupHtml: '<div>Popup Content</div>',
       setPopupHtml: mockSetPopupHtml,
+      rollAbilityCheck: vi.fn(),
+      rollSavingThrow: vi.fn(),
+      rollSkillCheck: vi.fn(),
     }));
 
     render(

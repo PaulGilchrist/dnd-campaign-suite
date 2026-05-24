@@ -1,4 +1,4 @@
- 
+  
 import React from 'react'
 import './CharSummary.css'
 
@@ -8,12 +8,16 @@ import CharHitPoints from './CharHitPoints.jsx'
 import CharClassFeatures from './CharClassFeatures.jsx'
 import CharFeats from '../char-feats/CharFeats.jsx'
 import HiddenInput from '../../common/HiddenInput.jsx'
-import usePopup from '../../../hooks/usePopup.js'
 import Popup from '../../common/Popup.jsx'
 import useTrackedResource from '../../../hooks/useTrackedResource.js'
+import useDiceRoll from '../../../hooks/useDiceRoll.js'
+import { rollDice } from '../../../services/diceRoller.js'
+import LongRestButton from '../LongRestButton.jsx'
 
-function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName }) {
-    const { popupHtml, setPopupHtml } = usePopup(() => null);
+const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
+
+function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, onLongRest }) {
+    const { popupHtml, setPopupHtml, rollInitiative } = useDiceRoll();
     const [showInput, setShowInput] = React.useState(false);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
@@ -38,6 +42,27 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     );
     const handleShortRestHitDiceToggle = () => {
         setShowInput((showInput) => !showInput);
+    };
+
+    const handleRollHitDice = () => {
+        if (shortRestHitDice <= 0) return;
+        const con = playerStats.abilities?.find((a) => a.name === 'Constitution');
+        const conMod = con?.bonus || 0;
+        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+        const hitDie = classLevel?.hit_die || 8;
+        const { total, rolls } = rollDice(1, hitDie);
+        const hpRecovered = total + conMod;
+        const newRemaining = shortRestHitDice - 1;
+        handleShortRestHitDiceChange(newRemaining);
+
+        setPopupHtml(
+            `<div class="dice-roll-result">`
+            + `<div class="dice-roll-header"><i class="fa-solid fa-heart"></i>Hit Dice</div>`
+            + `<div class="dice-roll-total">${Math.max(1, hpRecovered)}</div>`
+            + `<div class="dice-roll-breakdown">1d${hitDie} (<span class="dice-rolled">${rolls[0]}</span>) ${signFormatter.format(conMod)}<br/>HP recovered</div>`
+            + `<div class="dice-roll-breakdown">Remaining Hit Dice: ${newRemaining}</div>`
+            + `<div class="dice-roll-hint">click to dismiss</div></div>`
+        );
     };
 
     let speed = playerStats.race.subrace && playerStats.race.subrace.speed ? playerStats.race.subrace.speed : playerStats.race.speed;
@@ -74,6 +99,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                         <button className="char-btn" onClick={handleDeleteCharacter} title="Delete Character">Delete</button>
                         <button className="char-btn" onClick={onUploadClick} title="Upload Character"><i className="fas fa-arrow-up"></i> Upload</button>
                         <button className="char-btn" onClick={onSaveClick} title="Download Character"><i className="fas fa-arrow-down"></i> Download</button>
+                        <LongRestButton playerStats={playerStats} campaignName={campaignName} onLongRest={onLongRest} />
                     </div>
                 )}
             </div>
@@ -93,8 +119,11 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 </div>
                 <div>
                     <b>Proficiency: </b>+{playerStats.proficiency}<br />
-                    <b>Initiative: </b>+{playerStats.initiative}<br />
+                    <span className='clickable' onClick={() => rollInitiative(playerStats.initiative)}><b>Initiative: </b>{signFormatter.format(playerStats.initiative)}</span><br />
                     <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiration} /><br />
+                    <div className="clickable" onClick={handleRollHitDice} onKeyDown={(e) => { if (e.key === 'Enter') handleRollHitDice(); }} tabIndex={0}>
+                        <b>Roll Hit Die:</b> {shortRestHitDice > 0 ? `${playerStats.class?.class_levels?.[playerStats.level - 1]?.hit_die || 'd8'} (${shortRestHitDice} left)` : 'None remaining'}
+                    </div>
                     <div className="clickable" onClick={handleShortRestHitDiceToggle} onKeyDown={handleShortRestHitDiceToggle} tabIndex={0}>
                         <b>Short Rest Hit Dice:</b> {playerStats.level}/<HiddenInput handleInputToggle={handleShortRestHitDiceToggle} handleValueChange={(value) => handleShortRestHitDiceChange(value)} showInput={showInput} value={shortRestHitDice}></HiddenInput> <span className="text-muted">(max/cur)</span>
                     </div>
