@@ -218,6 +218,26 @@
     cursor: pointer;
 }
 
+/* Party marker context menu */
+.party-context-menu {
+    pointer-events: all;
+    cursor: default;
+}
+
+.party-menu-hit {
+    cursor: pointer;
+    pointer-events: all;
+}
+
+.party-menu-hit:hover + .party-menu-text {
+    fill: #fff;
+}
+
+.party-menu-text {
+    pointer-events: none;
+    user-select: none;
+}
+
 .poi-context-menu text:hover {
     fill: #fff !important;
 }

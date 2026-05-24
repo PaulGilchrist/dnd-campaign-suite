@@ -81,7 +81,10 @@
                             "table",
                             "torch",
                             "trap",
-                            "web"
+                            "web",
+                            "tree",
+                            "boulder",
+                            "bush"
                         ],
                         "description": "The type of placed item.  Note: npc represents a monster of other non-player character type and should have name property set to exactly match the name in the Monster Manual for proper image lookup"
                     },

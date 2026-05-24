@@ -7,6 +7,7 @@ import {
 } from '../../config/outdoorConfig.js';
 import { generateRiversFromTerrain } from '../../services/hexTerrainGenerator.js';
 import { hexKey, hexToPixel, pixelToHexSnapped, hexToSVGPath } from '../../services/hexMapUtils.js';
+import { generateOutdoorEncounter } from '../../services/outdoorEncounterGenerator.js';
 import TerrainLayer from './TerrainLayer.jsx';
 import HexGridLayer from './HexGridLayer.jsx';
 import HexMapToolbar from './HexMapToolbar.jsx';
@@ -26,7 +27,7 @@ import NaturalWonderSVG from './svg/NaturalWonderSVG.jsx';
 import LandmarkSVG from './svg/LandmarkSVG.jsx';
 import './HexMap.css';
 
-function HexMap({ campaignName, mapName, onBack, characters = [] }) {
+function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated }) {
     const [loading, setLoading] = useState(true);
     const [mapData, setMapData] = useState(null);       // full map data object from server
     const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE); // hex grid dimensions
@@ -56,6 +57,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
     const [panY, setPanY] = useState(0);
     const [panning, setPanning] = useState(null);        // { startX, startY, startPanX, startPanY } | null
     const [hoveredHex, setHoveredHex] = useState(null);  // { q, r } | null
+    const [partyContextMenu, setPartyContextMenu] = useState(null); // { q, r } | null
 
     const svgRef = useRef(null);
     const zoomValueRef = useRef(1);
@@ -305,6 +307,36 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
         setRivers(result);
     }, [terrain, gridSize]);
 
+    const handleStartEncounter = useCallback(async (q, r) => {
+        const terrainType = terrain[hexKey(q, r)] || 'plains';
+        const grid = 30;
+        const encounterData = generateOutdoorEncounter(terrainType, grid, marchingOrder, q, r);
+        const encounterName = `${mapName}-encounter-at-${q}-${r}`;
+
+        try {
+            await mapsService.createMap(campaignName, encounterName, {
+                type: 'indoor',
+                gridSize: grid,
+                placedItems: encounterData.placedItems,
+                players: encounterData.players,
+                fog: [],
+                walls: [],
+                parentTerrain: terrainType,
+                parentHex: { q, r },
+                bgFill: encounterData.bgFill,
+            });
+
+            // Save the full encounter data so it loads with terrain bg
+            await mapsService.saveMapData(campaignName, encounterName, encounterData);
+
+            if (onEncounterCreated) {
+                onEncounterCreated(encounterName);
+            }
+        } catch (err) {
+            console.error('Failed to create encounter map:', err);
+        }
+    }, [campaignName, mapName, terrain, marchingOrder, onEncounterCreated]);
+
     const handlePoiContextMenu = useCallback((poiId, e) => {
         const poi = pois.find(p => p.id === poiId);
         if (!poi) return;
@@ -539,7 +571,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={handleDrop}
                         onContextMenu={(e) => e.preventDefault()}
-                        onClick={() => { setSelectedPoiMenu(null); setShowRename(null); }}
+                        onClick={() => { setSelectedPoiMenu(null); setShowRename(null); setPartyContextMenu(null); }}
                         style={{
                             cursor: panning
                                 ? 'grabbing'
@@ -581,6 +613,9 @@ function HexMap({ campaignName, mapName, onBack, characters = [] }) {
                             gridSize={gridSize}
                             onPositionChange={setPartyPosition}
                             svgRef={svgRef}
+                            onEncounter={handleStartEncounter}
+                            contextMenuOpen={partyContextMenu !== null && partyContextMenu.q === (partyPosition?.q) && partyContextMenu.r === (partyPosition?.r)}
+                            onContextMenu={(q, r) => setPartyContextMenu({ q, r })}
                         />
 
                     {/* Hovered hex highlight (only when paint/erase active) */}

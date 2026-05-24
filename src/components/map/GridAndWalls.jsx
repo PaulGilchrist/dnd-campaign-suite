@@ -2,13 +2,13 @@ import React from 'react';
 
 const CELL_SIZE = 40;
 
-const GridAndWalls = ({ gridSize, walls, isLocalhost, fog }) => {
+const GridAndWalls = ({ gridSize, walls, isLocalhost, fog, bgFill }) => {
     const SVG_SIZE = gridSize * CELL_SIZE;
 
     return (
         <>
             {/* Grid background */}
-            <rect x="0" y="0" width={SVG_SIZE} height={SVG_SIZE} className="grid-bg" />
+            <rect x="0" y="0" width={SVG_SIZE} height={SVG_SIZE} className="grid-bg" style={{ fill: bgFill || '#1a1a1a' }} />
 
             {/* Vertical grid lines */}
             {Array.from({ length: gridSize + 1 }, (_, i) => (

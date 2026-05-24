@@ -2,6 +2,8 @@ import AltarSVG from './AltarSVG.jsx';
 import BarrelSVG from './BarrelSVG.jsx';
 import BedSVG from './BedSVG.jsx';
 import BookshelfSVG from './BookshelfSVG.jsx';
+import BoulderSVG from './BoulderSVG.jsx';
+import BushSVG from './BushSVG.jsx';
 import ChairSVG from './ChairSVG.jsx';
 import ChestSVG from './ChestSVG.jsx';
 import CrateSVG from './CrateSVG.jsx';
@@ -16,9 +18,10 @@ import StatueSVG from './StatueSVG.jsx';
 import TableSVG from './TableSVG.jsx';
 import TorchSVG from './TorchSVG.jsx';
 import TrapSVG from './TrapSVG.jsx';
+import TreeSVG from './TreeSVG.jsx';
 import WebSVG from './WebSVG.jsx';
 
-function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClose, characters = [], players = [] }) {
+function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClose, characters = [], players = [], mapVariant = 'indoor' }) {
     const createDragGhost = (e) => {
         const svgEl = e.currentTarget.querySelector('svg');
         if (!svgEl) return;
@@ -83,6 +86,16 @@ function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClo
 
     const playerNames = new Set(players.map(p => p.name));
     const missingChars = characters.filter(c => !playerNames.has(c.name));
+    const isOutdoor = mapVariant === 'outdoor';
+
+    const Item = ({ type, viewBox, width, children, label }) => (
+        <div className="items-panel-item" draggable
+            onDragStart={(e) => { e.dataTransfer.setData('text/plain', type); createDragGhost(e); }}
+        >
+            <svg viewBox={viewBox} width={width} height="36">{children}</svg>
+            <span>{label}</span>
+        </div>
+    );
 
     return (
         <div className="items-panel">
@@ -90,268 +103,44 @@ function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClo
                 <i className="fa-solid fa-times"></i>
             </button>
             <div className="items-panel-content">
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'altar');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 72 36" width="72" height="36">
-                        <AltarSVG />
-                    </svg>
-                    <span>Altar</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'barrel');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 36 36" width="36" height="36">
-                        <BarrelSVG />
-                    </svg>
-                    <span>Barrel</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'bed');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 72 36" width="72" height="36">
-                        <BedSVG />
-                    </svg>
-                    <span>Bed</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'bookshelf');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 72 36" width="72" height="36">
-                        <BookshelfSVG />
-                    </svg>
-                    <span>Bookshelf</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'chair');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 36 36" width="36" height="36">
-                        <ChairSVG />
-                    </svg>
-                    <span>Chair</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'crate');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 36 36" width="36" height="36">
-                        <CrateSVG />
-                    </svg>
-                    <span>Crate</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'door');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 36 36" width="36" height="36">
-                        <DoorSVG />
-                    </svg>
-                    <span>Door</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'firepit');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 36 36" width="36" height="36">
-                        <FirePitSVG />
-                    </svg>
-                    <span>Fire Pit</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'fountain');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 36 36" width="36" height="36">
-                        <FountainSVG />
-                    </svg>
-                    <span>Fountain</span>
-                </div>
-
+                {isOutdoor ? (<>
+                    <Item type="barrel" viewBox="0 0 36 36" width="36" label="Barrel"><BarrelSVG /></Item>
+                    <Item type="crate" viewBox="0 0 36 36" width="36" label="Crate"><CrateSVG /></Item>
+                    <Item type="firepit" viewBox="0 0 36 36" width="36" label="Fire Pit"><FirePitSVG /></Item>
+                    <Item type="torch" viewBox="0 0 36 36" width="36" label="Torch"><TorchSVG /></Item>
+                    <Item type="tree" viewBox="0 0 36 36" width="36" label="Tree"><TreeSVG /></Item>
+                    <Item type="boulder" viewBox="0 0 36 36" width="36" label="Boulder"><BoulderSVG /></Item>
+                    <Item type="bush" viewBox="0 0 36 36" width="36" label="Bush"><BushSVG /></Item>
+                </>) : (<>
+                    <Item type="altar" viewBox="0 0 72 36" width="72" label="Altar"><AltarSVG /></Item>
+                    <Item type="barrel" viewBox="0 0 36 36" width="36" label="Barrel"><BarrelSVG /></Item>
+                    <Item type="bed" viewBox="0 0 72 36" width="72" label="Bed"><BedSVG /></Item>
+                    <Item type="bookshelf" viewBox="0 0 72 36" width="72" label="Bookshelf"><BookshelfSVG /></Item>
+                    <Item type="chair" viewBox="0 0 36 36" width="36" label="Chair"><ChairSVG /></Item>
+                    <Item type="crate" viewBox="0 0 36 36" width="36" label="Crate"><CrateSVG /></Item>
+                    <Item type="door" viewBox="0 0 36 36" width="36" label="Door"><DoorSVG /></Item>
+                    <Item type="firepit" viewBox="0 0 36 36" width="36" label="Fire Pit"><FirePitSVG /></Item>
+                    <Item type="fountain" viewBox="0 0 36 36" width="36" label="Fountain"><FountainSVG /></Item>
+                    <Item type="pillar" viewBox="0 0 36 36" width="36" label="Pillar"><PillarSVG /></Item>
+                    <Item type="secretDoor" viewBox="0 0 36 36" width="36" label="Secret Door"><SecretDoorSVG /></Item>
+                    <Item type="skeleton" viewBox="0 0 36 36" width="36" label="Skeleton"><SkeletonSVG /></Item>
+                    <Item type="web" viewBox="0 0 36 36" width="36" label="Spider Web"><WebSVG /></Item>
+                    <Item type="stairs" viewBox="0 0 36 36" width="36" label="Stairs"><StairsSVG /></Item>
+                    <Item type="statue" viewBox="0 0 36 36" width="36" label="Statue"><StatueSVG /></Item>
+                    <Item type="table" viewBox="0 0 72 36" width="72" label="Table"><TableSVG /></Item>
+                    <Item type="torch" viewBox="0 0 36 36" width="36" label="Torch"><TorchSVG /></Item>
+                    <Item type="trap" viewBox="0 0 36 36" width="36" label="Trap"><TrapSVG /></Item>
+                    <Item type="chest" viewBox="0 0 36 36" width="36" label="Treasure Chest"><ChestSVG /></Item>
+                </>)}
                 {/* NPC - single draggable icon */}
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'npc');
-                        createDragGhost(e);
-                    }}
+                <div className="items-panel-item" draggable
+                    onDragStart={(e) => { e.dataTransfer.setData('text/plain', 'npc'); createDragGhost(e); }}
                 >
                     <svg viewBox="0 0 36 36" width="36" height="36">
                         <circle cx="18" cy="18" r="16" fill="#c0392b" stroke="#e74c3c" strokeWidth="2" />
                         <text x="18" y="23" textAnchor="middle" fill="#fff" fontSize="16" fontWeight="bold">N</text>
                     </svg>
                     <span>NPC</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'pillar');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 36 36" width="36" height="36">
-                        <PillarSVG />
-                    </svg>
-                    <span>Pillar</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'secretDoor');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 36 36" width="36" height="36">
-                        <SecretDoorSVG />
-                    </svg>
-                    <span>Secret Door</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'skeleton');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 36 36" width="36" height="36">
-                        <SkeletonSVG />
-                    </svg>
-                    <span>Skeleton</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'web');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 36 36" width="36" height="36">
-                        <WebSVG />
-                    </svg>
-                    <span>Spider Web</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'stairs');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 36 36" width="36" height="36">
-                        <StairsSVG />
-                    </svg>
-                    <span>Stairs</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'statue');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 36 36" width="36" height="36">
-                        <StatueSVG />
-                    </svg>
-                    <span>Statue</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'table');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 72 36" width="72" height="36">
-                        <TableSVG />
-                    </svg>
-                    <span>Table</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'torch');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 36 36" width="36" height="36">
-                        <TorchSVG />
-                    </svg>
-                    <span>Torch</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'trap');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 36 36" width="36" height="36">
-                        <TrapSVG />
-                    </svg>
-                    <span>Trap</span>
-                </div>
-                <div
-                    className="items-panel-item"
-                    draggable
-                    onDragStart={(e) => {
-                        e.dataTransfer.setData('text/plain', 'chest');
-                        createDragGhost(e);
-                    }}
-                >
-                    <svg viewBox="0 0 36 36" width="36" height="36">
-                        <ChestSVG />
-                    </svg>
-                    <span>Treasure Chest</span>
                 </div>
             </div>
 

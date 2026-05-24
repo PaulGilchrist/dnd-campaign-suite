@@ -545,12 +545,83 @@ function PlacedItems({
         );
     };
 
+    const renderTree = (item) => {
+        const cx = gridCenterX(item.gridX);
+        const cy = gridCenterY(item.gridY);
+        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        return (
+            <g key={item.id} className="placed-item">
+                <use href="#tree" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                {isLocalhost && (
+                    <>
+                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
+                            className="barrel-hit-area"
+                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            style={{ cursor: 'grab' }} />
+                        {itemDragging?.itemId === item.id && (
+                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
+                        )}
+                    </>
+                )}
+            </g>
+        );
+    };
+
+    const renderBoulder = (item) => {
+        const cx = gridCenterX(item.gridX);
+        const cy = gridCenterY(item.gridY);
+        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        return (
+            <g key={item.id} className="placed-item">
+                <use href="#boulder" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                {isLocalhost && (
+                    <>
+                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
+                            className="barrel-hit-area"
+                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            style={{ cursor: 'grab' }} />
+                        {itemDragging?.itemId === item.id && (
+                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
+                        )}
+                    </>
+                )}
+            </g>
+        );
+    };
+
+    const renderBush = (item) => {
+        const cx = gridCenterX(item.gridX);
+        const cy = gridCenterY(item.gridY);
+        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        return (
+            <g key={item.id} className="placed-item">
+                <use href="#bush" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
+                {isLocalhost && (
+                    <>
+                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
+                            className="barrel-hit-area"
+                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            style={{ cursor: 'grab' }} />
+                        {itemDragging?.itemId === item.id && (
+                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
+                        )}
+                    </>
+                )}
+            </g>
+        );
+    };
+
     return (
         <>
             {placedItems.filter(item => item.type === 'altar').map(renderAltar)}
             {placedItems.filter(item => item.type === 'barrel').map(renderBarrel)}
             {placedItems.filter(item => item.type === 'bed').map(renderBed)}
             {placedItems.filter(item => item.type === 'bookshelf').map(renderBookshelf)}
+            {placedItems.filter(item => item.type === 'boulder').map(renderBoulder)}
+            {placedItems.filter(item => item.type === 'bush').map(renderBush)}
             {placedItems.filter(item => item.type === 'chair').map(renderChair)}
             {placedItems.filter(item => item.type === 'chest').map(renderChest)}
             {placedItems.filter(item => item.type === 'crate').map(renderCrate)}
@@ -566,6 +637,7 @@ function PlacedItems({
             {placedItems.filter(item => item.type === 'table').map(renderTable)}
             {placedItems.filter(item => item.type === 'torch').map(renderTorch)}
             {placedItems.filter(item => item.type === 'trap').map(renderTrap)}
+            {placedItems.filter(item => item.type === 'tree').map(renderTree)}
             {placedItems.filter(item => item.type === 'web').map(renderWeb)}
         </>
     );

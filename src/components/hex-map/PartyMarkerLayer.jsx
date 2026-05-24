@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { hexToPixel, pixelToHexSnapped, hexToSVGPath } from '../../services/hexMapUtils.js';
 
-function PartyMarkerLayer({ position, HEX_SIZE, gridSize, onPositionChange, svgRef }) {
+function PartyMarkerLayer({ position, HEX_SIZE, gridSize, onPositionChange, svgRef, onEncounter, contextMenuOpen, onContextMenu }) {
     const draggingRef = useRef(false);
 
     if (!position) return null;
@@ -24,6 +24,7 @@ function PartyMarkerLayer({ position, HEX_SIZE, gridSize, onPositionChange, svgR
     };
 
     const handlePointerDown = (e) => {
+        if (e.button === 2) return;
         e.preventDefault();
         e.stopPropagation();
         draggingRef.current = true;
@@ -46,6 +47,16 @@ function PartyMarkerLayer({ position, HEX_SIZE, gridSize, onPositionChange, svgR
         document.addEventListener('pointerup', handlePointerUp);
     };
 
+    const handleContextMenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (onContextMenu) onContextMenu(position.q, position.r);
+    };
+
+    const handleStartEncounter = () => {
+        if (onEncounter) onEncounter(position.q, position.r);
+    };
+
     return (
         <g className="party-marker-layer">
             <path
@@ -57,6 +68,7 @@ function PartyMarkerLayer({ position, HEX_SIZE, gridSize, onPositionChange, svgR
                 strokeDasharray="6 3"
                 style={{ cursor: 'grab' }}
                 onPointerDown={handlePointerDown}
+                onContextMenu={handleContextMenu}
             />
             <text
                 x={cx}
@@ -71,6 +83,28 @@ function PartyMarkerLayer({ position, HEX_SIZE, gridSize, onPositionChange, svgR
             >
                 P
             </text>
+            {contextMenuOpen && (() => {
+                const menuW = 140;
+                const menuH = 30;
+                const menuX = cx + 15;
+                const menuY = cy - 15;
+                return (
+                    <g className="party-context-menu">
+                        <rect x={menuX} y={menuY} width={menuW} height={menuH} rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
+                        <rect x={menuX} y={menuY} width={menuW} height={menuH} rx="4" fill="transparent" className="party-menu-hit" onClick={handleStartEncounter} />
+                        <text
+                            x={menuX + 8}
+                            y={menuY + 20}
+                            fill="#FFD700"
+                            fontSize="11"
+                            className="party-menu-text"
+                            pointerEvents="none"
+                        >
+                            Start Encounter
+                        </text>
+                    </g>
+                );
+            })()}
         </g>
     );
 }

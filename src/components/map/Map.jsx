@@ -24,6 +24,9 @@ import SkeletonSVG from './SkeletonSVG.jsx';
 import StatueSVG from './StatueSVG.jsx';
 import TorchSVG from './TorchSVG.jsx';
 import WebSVG from './WebSVG.jsx';
+import TreeSVG from './TreeSVG.jsx';
+import BoulderSVG from './BoulderSVG.jsx';
+import BushSVG from './BushSVG.jsx';
 import PlacedItems from './PlacedItems.jsx';
 import GridAndWalls from './GridAndWalls.jsx';
 import Players from './Players.jsx';
@@ -39,12 +42,12 @@ import '../hex-map/HexMap.css';
 
 const CELL_SIZE = 40;
 
-function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
+function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onEncounterCreated }) {
     const [gridSize, setGridSize] = useState(20);
     const SVG_SIZE = gridSize * CELL_SIZE;
     const [mapData, setMapData] = useState(null);
     const svgRef = useRef(null);
-    const isInitialized = useRef(false);
+    const loadedMapNameRef = useRef(null);
 
     // Zoom/Pan state
     const [zoom, setZoom] = useState(1);
@@ -190,8 +193,8 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
 
     // Load or initialize map data on mount
     useEffect(() => {
-        if (isInitialized.current) return;
-        isInitialized.current = true;
+        if (loadedMapNameRef.current === mapName) return;
+        loadedMapNameRef.current = mapName;
 
         const loadMap = async () => {
             try {
@@ -206,7 +209,10 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     setPlacedItems(existing.placedItems || []);
 
                     // Load fog data: if no fog data or empty array, fog all cells
-                    if (!existing.fog || existing.fog.length === 0) {
+                    // (Skip for outdoor encounter maps — they have parentHex metadata)
+                    if (existing.parentHex) {
+                        setFog(new Set());
+                    } else if (!existing.fog || existing.fog.length === 0) {
                         const gs = existing.gridSize ||20;
                         const allFogged = new Set();
                         for (let x = 0; x < gs; x++) {
@@ -521,7 +527,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
 
     // Outdoor map dispatcher — render HexMap for outdoor terrain maps
     if (mapData?.type === 'outdoor') {
-        return <HexMap campaignName={campaignName} mapName={mapName} onBack={onBack} characters={characters} />;
+        return <HexMap campaignName={campaignName} mapName={mapName} onBack={onBack} characters={characters} onEncounterCreated={onEncounterCreated} />;
     }
 
     const { players, walls } = mapData;
@@ -578,6 +584,9 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     <StatueSVG id="statue" />
                     <TorchSVG id="torch" />
                     <WebSVG id="web" />
+                    <TreeSVG id="tree" />
+                    <BoulderSVG id="boulder" />
+                    <BushSVG id="bush" />
                 </defs>
 
                 <GridAndWalls
@@ -585,6 +594,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     walls={walls}
                     isLocalhost={isLocalhost}
                     fog={fog}
+                    bgFill={mapData.bgFill}
                 />
 
                 {/* Characters */}
@@ -687,6 +697,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack }) {
                     onClose={() => setItemsPanelOpen(false)}
                     characters={characters}
                     players={players}
+                    mapVariant={mapData.parentHex ? 'outdoor' : 'indoor'}
                 />
             )}
         </div>

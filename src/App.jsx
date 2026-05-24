@@ -251,6 +251,7 @@ function App() {
             isLocalhost={isLocalhost}
             mapName={mapsView.mapName}
             onBack={() => setMapsView({ type: isLocalhost ? 'manager' : 'none' })}
+            onEncounterCreated={(mapName) => setMapsView({ type: 'map', mapName })}
           />
         )}
         {activeView === 'encounter' && (
