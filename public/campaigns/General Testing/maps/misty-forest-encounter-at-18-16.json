@@ -89,7 +89,7 @@
       "id": "boulder-11",
       "type": "boulder",
       "gridX": 15,
-      "gridY": 9,
+      "gridY": 11,
       "visible": true
     },
     {
@@ -200,8 +200,8 @@
     {
       "id": "8e1061ea-df25-4e0b-bef0-3f094bae96db",
       "type": "npc",
-      "gridX": 22,
-      "gridY": 20,
+      "gridX": 14,
+      "gridY": 17,
       "visible": true,
       "name": "NPC"
     }
@@ -211,7 +211,7 @@
       "id": "monk",
       "name": "Monk",
       "gridX": 13,
-      "gridY": 13
+      "gridY": 12
     },
     {
       "id": "paladin",
@@ -222,14 +222,14 @@
     {
       "id": "sorcerer",
       "name": "Sorcerer",
-      "gridX": 16,
+      "gridX": 17,
       "gridY": 14
     },
     {
       "id": "warlock",
       "name": "Warlock",
-      "gridX": 14,
-      "gridY": 15
+      "gridX": 16,
+      "gridY": 16
     }
   ],
   "fog": [],

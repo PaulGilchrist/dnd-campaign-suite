@@ -96,8 +96,11 @@ function App() {
 
   const handleMapsClick = () => {
     if (mapsView.type === 'map') {
-      // Already viewing a map — go back to the manager listing
-      setMapsView({ type: 'manager' });
+      // Already viewing a map — go back to the manager listing (GM only)
+      if (isLocalhost) {
+        setMapsView({ type: 'manager' });
+      }
+      // Players: already on their only view, do nothing
     } else if (activeView === 'mapsManager') {
       // Already on the manager listing — do nothing
       return;
