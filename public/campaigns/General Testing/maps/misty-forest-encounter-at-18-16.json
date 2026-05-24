@@ -196,14 +196,22 @@
       "gridX": 13,
       "gridY": 24,
       "visible": true
+    },
+    {
+      "id": "8e1061ea-df25-4e0b-bef0-3f094bae96db",
+      "type": "npc",
+      "gridX": 22,
+      "gridY": 20,
+      "visible": true,
+      "name": "NPC"
     }
   ],
   "players": [
     {
       "id": "monk",
       "name": "Monk",
-      "gridX": 14,
-      "gridY": 14
+      "gridX": 13,
+      "gridY": 13
     },
     {
       "id": "paladin",

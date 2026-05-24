@@ -475,7 +475,8 @@ function PlacedItems({
     const renderNpc = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
-        const isFogged = !isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`));
+        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        const npcOpacity = isLocalhost ? (item.visible ? 1 : 0.5) : 1;
 
         return (
             <g key={item.id} className="npc-group">
@@ -484,7 +485,7 @@ function PlacedItems({
                         <circle cx={cx} cy={cy} r={20} />
                     </clipPath>
                 </defs>
-                <circle cx={cx} cy={cy} r={20} className="npc-circle" />
+                <circle cx={cx} cy={cy} r={20} className="npc-circle" style={{ opacity: npcOpacity }} />
                 {(npcImages[item.id] || item.imageUrl) ? (
                     <image
                         xlinkHref={npcImages[item.id] || item.imageUrl}
@@ -495,7 +496,7 @@ function PlacedItems({
                         preserveAspectRatio="xMidYMid slice"
                         clipPath={`url(#npc-clip-${item.id})`}
                         className="creature-image"
-                        style={{ opacity: isFogged ? 0.3 : 1 }}
+                        style={{ opacity: npcOpacity }}
                     />
                 ) : (
                     <text
@@ -507,7 +508,7 @@ function PlacedItems({
                         fontSize="16"
                         fontWeight="bold"
                         className="npc-initial"
-                        style={{ opacity: isFogged ? 0.3 : 1 }}
+                        style={{ opacity: npcOpacity }}
                     >
                         {item.name.charAt(0).toUpperCase()}
                     </text>
@@ -520,7 +521,7 @@ function PlacedItems({
                     fontSize="18"
                     fontWeight="bold"
                     className="npc-name"
-                    style={{ opacity: isFogged ? 0.3 : 1 }}
+                    style={{ opacity: npcOpacity }}
                 >
                     {item.name}
                 </text>

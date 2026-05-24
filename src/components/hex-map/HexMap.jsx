@@ -25,6 +25,8 @@ import LoreSiteSVG from './svg/LoreSiteSVG.jsx';
 import HazardSVG from './svg/HazardSVG.jsx';
 import NaturalWonderSVG from './svg/NaturalWonderSVG.jsx';
 import LandmarkSVG from './svg/LandmarkSVG.jsx';
+import Subscriber from '../common/Subscriber.jsx';
+import useHexMapSSESync from './hooks/useHexMapSSESync.js';
 import './HexMap.css';
 
 function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated }) {
@@ -66,6 +68,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const accumulatedDeltaRef = useRef(0);
     const isInitialized = useRef(false);
     const hasLoaded = useRef(false);
+
+    const { handleSSEEvent } = useHexMapSSESync({
+        campaignName, mapName, setGridSize, setTerrain, setRivers, setPois,
+        setZoom, setPanX, setPanY, setMarchingOrder, setPartyPosition, setMapData,
+    });
 
     // Computed SVG dimensions — corrected to account for full axial extent + hex shape
     const gridPixelBounds = useMemo(() => {
@@ -522,6 +529,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
 
     return (
         <div className="hex-map">
+            <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
             <HexMapToolbar
                 onBack={onBack}
                 mapName={mapsService.formatMapName(mapName)}
