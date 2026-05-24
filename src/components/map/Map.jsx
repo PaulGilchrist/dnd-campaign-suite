@@ -198,7 +198,9 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
 
         const loadMap = async () => {
             try {
+                console.log('[Map] Loading map data for', mapName);
                 const existing = await mapsService.loadMapData(campaignName, mapName);
+                console.log('[Map] loaded mapData:', { type: existing?.type, hasParentHex: !!existing?.parentHex, parentHex: existing?.parentHex, bgFill: existing?.bgFill, placedItemsCount: existing?.placedItems?.length });
                 if (existing) {
                     // LOAD PATH — entered for any existing map data (generated or hand-made)
                     const walls = existing.walls

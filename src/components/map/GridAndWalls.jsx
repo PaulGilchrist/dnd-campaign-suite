@@ -5,6 +5,7 @@ const CELL_SIZE = 40;
 const GridAndWalls = ({ gridSize, walls, isLocalhost, fog, bgFill }) => {
     const SVG_SIZE = gridSize * CELL_SIZE;
 
+    console.log('[GridAndWalls] bgFill prop:', bgFill);
     return (
         <>
             {/* Grid background */}

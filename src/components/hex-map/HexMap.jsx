@@ -313,7 +313,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         const encounterData = generateOutdoorEncounter(terrainType, grid, marchingOrder, q, r);
         const encounterName = `${mapName}-encounter-at-${q}-${r}`;
 
+        console.log('[handleStartEncounter] Starting', { q, r, terrainType, encounterName, encounterData });
+
         try {
+            console.log('[handleStartEncounter] createMap body includes parentHex:', !!encounterData.parentHex, 'bgFill:', encounterData.bgFill);
             await mapsService.createMap(campaignName, encounterName, {
                 type: 'indoor',
                 gridSize: grid,
@@ -325,15 +328,18 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 parentHex: { q, r },
                 bgFill: encounterData.bgFill,
             });
+            console.log('[handleStartEncounter] createMap succeeded');
 
-            // Save the full encounter data so it loads with terrain bg
+            console.log('[handleStartEncounter] saveMapData with encounterData parentHex:', encounterData.parentHex, 'bgFill:', encounterData.bgFill);
             await mapsService.saveMapData(campaignName, encounterName, encounterData);
+            console.log('[handleStartEncounter] saveMapData succeeded');
 
             if (onEncounterCreated) {
+                console.log('[handleStartEncounter] Calling onEncounterCreated with', encounterName);
                 onEncounterCreated(encounterName);
             }
         } catch (err) {
-            console.error('Failed to create encounter map:', err);
+            console.error('[handleStartEncounter] FAILED:', err);
         }
     }, [campaignName, mapName, terrain, marchingOrder, onEncounterCreated]);
 
