@@ -9,3 +9,9 @@
 .abilities-popup-parent {
     overflow: visible;
 }
+
+@media print {
+    .abilities-popup-parent .abilities {
+        font-size: 11px;
+    }
+}

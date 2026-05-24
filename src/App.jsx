@@ -80,6 +80,12 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
+    document.title = activeView === 'charSheet' && activeCharacter
+      ? activeCharacter.name
+      : 'CharSheets';
+  }, [activeView, activeCharacter]);
+
+  useEffect(() => {
     setMapsView({ type: 'none' });
   }, [campaignName]);
 

@@ -132,7 +132,7 @@ function CharInventory({ playerStats }) {
                             </i>
                             :&nbsp;
                         </b>
-                        <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(magicItem.description) }}></span>
+                        <span className="magic-item-description" dangerouslySetInnerHTML={{ __html: sanitizeHtml(magicItem.description) }}></span>
                     </div>}
                 )}
             </div>}

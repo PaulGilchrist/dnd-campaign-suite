@@ -17,4 +17,13 @@
     text-align: center;
     width: 100%;
 }
+@media print {
+    .char-spells .table-spells {
+        font-size: 10px;
+    }
+    .char-spells .table-spells td,
+    .char-spells .table-spells th {
+        padding: 1px 3px;
+    }
+}
 

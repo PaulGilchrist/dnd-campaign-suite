@@ -32,6 +32,8 @@
     grid-template-columns: auto auto auto;
 }
 
+
+
 /* Light theme overrides */
 [data-theme="light"] .delete-character-btn {
     color: #c0392b;

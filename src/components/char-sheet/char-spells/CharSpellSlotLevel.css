@@ -30,9 +30,12 @@
 }
 @media print {
     .level > .slots > .row > .slot.active {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
         background-color: black;
     }
     .level > .slots > .row > .slot.inactive {
-        background-color: black;
+        background-color: transparent;
+        border: 1px solid black;
     }
 }

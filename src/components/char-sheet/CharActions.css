@@ -11,3 +11,15 @@
 .attacks.mastery-enabled {
     grid-template-columns: 120px 80px 40px 80px 70px 80px;
 }
+
+@media print {
+    .attacks {
+        grid-template-columns: 160px 120px 60px 120px 1fr;
+    }
+    .attacks.mastery-enabled {
+        grid-template-columns: 140px 100px 50px 110px 80px 1fr;
+    }
+    .attacks > div {
+        padding-right: 4px;
+    }
+}

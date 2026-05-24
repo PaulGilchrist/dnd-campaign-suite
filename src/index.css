@@ -454,11 +454,17 @@ th {
 }
 
 @media print {
+    @page {
+        margin: 0.5in;
+    }
+
     :root {
         --color-header: black;
         --color-header-inner: black;
         --color-main: black;
         --color-body: black;
+        --border-color-light: black;
+        font-size: 12px;
     }
 
     .no-print {
@@ -467,5 +473,25 @@ th {
 
     .app-body {
         padding-left: 0;
+    }
+
+    .name {
+        font-size: 1.2em;
+    }
+
+    hr {
+        margin: 3px 0;
+    }
+
+    .sectionHeader {
+        page-break-after: avoid;
+    }
+
+    .attacks,
+    .abilities,
+    .char-spells,
+    .char-spell-slots.levels,
+    .char-feats-section {
+        page-break-inside: avoid;
     }
 }

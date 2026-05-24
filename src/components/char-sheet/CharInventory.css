@@ -1,0 +1,5 @@
+@media print {
+    .magic-item-description {
+        display: none;
+    }
+}
