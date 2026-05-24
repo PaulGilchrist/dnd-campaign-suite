@@ -44,6 +44,14 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const handleComplete = () => {
         storage.setProperty(playerStats.name, 'shortRestHitDice', remainingHitDice, campaignName);
 
+        let currentHp = storage.getProperty(playerStats.name, 'currentHitPoints', campaignName);
+        if (currentHp == null || currentHp === '') {
+            currentHp = playerStats.hitPoints;
+        } else {
+            currentHp = Number(currentHp) + recoveredHp;
+        }
+        storage.setProperty(playerStats.name, 'currentHitPoints', Math.min(playerStats.hitPoints, currentHp), campaignName);
+
         const shortRestResources = [
             'channelDivinityCharges',
             'wildShapeUses',
