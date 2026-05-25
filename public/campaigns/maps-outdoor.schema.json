@@ -81,6 +81,7 @@
                         "type": "string",
                         "enum": [
                             "camp",
+                            "city",
                             "dungeon",
                             "hazard",
                             "landmark",

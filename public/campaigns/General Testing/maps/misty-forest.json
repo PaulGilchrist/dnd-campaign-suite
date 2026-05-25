@@ -985,11 +985,19 @@
       "r": 18,
       "visible": true,
       "label": "Ancient Elven Road"
+    },
+    {
+      "id": "poi-1779730427436-y09a36",
+      "type": "city",
+      "q": 16,
+      "r": 20,
+      "visible": true,
+      "label": "City"
     }
   ],
-  "zoom": 2.44140625,
-  "panX": 872.616177958088,
-  "panY": 502.2494185997528,
+  "zoom": 8,
+  "panX": 1188.2103400265564,
+  "panY": 816.4317543913548,
   "marchingOrder": [
     "Monk",
     "Paladin",

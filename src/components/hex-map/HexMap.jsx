@@ -19,6 +19,7 @@ import MarchingOrderPanel from './MarchingOrderPanel.jsx';
 import PartyMarkerLayer from './PartyMarkerLayer.jsx';
 import RiverLayer from './RiverLayer.jsx';
 import SettlementSVG from './svg/SettlementSVG.jsx';
+import CitySVG from './svg/CitySVG.jsx';
 import DungeonSVG from './svg/DungeonSVG.jsx';
 import CampSVG from './svg/CampSVG.jsx';
 import TowerSVG from './svg/TowerSVG.jsx';
@@ -828,6 +829,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     >
                         <defs>
                             <SettlementSVG id="poi-settlement" />
+                            <CitySVG id="poi-city" />
                             <DungeonSVG id="poi-dungeon" />
                             <CampSVG id="poi-camp" />
                             <TowerSVG id="poi-tower" />

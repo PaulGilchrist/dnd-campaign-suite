@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { POI_TYPES } from '../../config/outdoorConfig';
 import SettlementSVG from './svg/SettlementSVG';
+import CitySVG from './svg/CitySVG';
 import DungeonSVG from './svg/DungeonSVG';
 import CampSVG from './svg/CampSVG';
 import TowerSVG from './svg/TowerSVG';
@@ -76,6 +77,7 @@ function POIPanel({ poiPanelOpen, onClose, characters = [] }) {
 
     const svgComponents = {
         settlement: SettlementSVG,
+        city: CitySVG,
         dungeon: DungeonSVG,
         camp: CampSVG,
         tower: TowerSVG,

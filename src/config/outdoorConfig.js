@@ -20,6 +20,7 @@ export const DEFAULT_TERRAIN = 'plains';
 
 // POI types
 export const POI_TYPES = [
+  { id: 'city',          name: 'City',          label: 'City',          svgId: 'poi-city',          description: 'Large city, metropolis' },
   { id: 'settlement',    name: 'Settlement',    label: 'Settlement',    svgId: 'poi-settlement',    description: 'Village, town, keep' },
   { id: 'dungeon',       name: 'Dungeon',       label: 'Dungeon',       svgId: 'poi-dungeon',       description: 'Ruins, cave, crypt' },
   { id: 'camp',          name: 'Camp',          label: 'Camp',          svgId: 'poi-camp',          description: 'Campsite, waystation' },
