@@ -1,11 +1,15 @@
 .app {
-    padding-bottom: 20px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
 .app-body {
     display: flex;
     gap: 0;
     padding-left: 180px;
+    flex: 1;
+    min-height: 0;
 }
 
 .icon-button {

@@ -7,7 +7,7 @@ function parseHexKey(key) {
     return { q: Number(q), r: Number(r) };
 }
 
-function RiverLayer({ rivers, gridSize }) {
+function RiverLayer({ rivers, hexCols, hexRows }) {
     const elements = useMemo(() => {
         if (!rivers || rivers.length === 0) return null;
 
@@ -26,7 +26,7 @@ function RiverLayer({ rivers, gridSize }) {
                 const { q, r } = parseHexKey(cur);
                 segment.push({ q, r });
                 for (const n of hexNeighbors(q, r)) {
-                    if (n.q < 0 || n.q >= gridSize || n.r < 0 || n.r >= gridSize) continue;
+                    if (n.q < 0 || n.q >= hexCols || n.r < 0 || n.r >= hexRows) continue;
                     const nk = `${n.q},${n.r}`;
                     if (riverSet.has(nk) && !visited.has(nk)) {
                         visited.add(nk);
@@ -78,7 +78,7 @@ function RiverLayer({ rivers, gridSize }) {
         }
 
         return { paths, fills };
-    }, [rivers, gridSize]);
+    }, [rivers, hexCols, hexRows]);
 
     if (!elements) return null;
 

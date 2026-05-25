@@ -254,7 +254,7 @@ export function isRoadConnectable(typeA, typeB) {
  * @param {Record<string, string>} terrain - hex key → terrain id
  * @returns {Array<{ q: number, r: number }> | null}
  */
-export function findHexPath(start, end, gridSize, terrain = {}) {
+export function findHexPath(start, end, hexCols, hexRows, terrain = {}) {
   const terrainCost = {
     plains: 1, beach: 1.2, hills: 1.5, forest: 1.5,
     desert: 1.8, tundra: 1.8, swamp: 2.5, mountains: 4, water: 10,
@@ -298,7 +298,7 @@ export function findHexPath(start, end, gridSize, terrain = {}) {
     const [cq, cr] = current.split(',').map(Number);
 
     for (const n of hexNeighbors(cq, cr)) {
-      if (n.q < 0 || n.q >= gridSize || n.r < 0 || n.r >= gridSize) continue;
+      if (n.q < 0 || n.q >= hexCols || n.r < 0 || n.r >= hexRows) continue;
       const nk = key(n.q, n.r);
       const terrainId = terrain[nk] || 'plains';
       const cost = terrainCost[terrainId] ?? 2;

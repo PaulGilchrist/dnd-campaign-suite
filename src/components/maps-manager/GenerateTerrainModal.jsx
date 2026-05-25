@@ -17,7 +17,7 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
             return;
         }
 
-        const safeGridSize = Math.max(5, Math.min(100, gridSize));
+        const safeGridSize = Math.max(30, Math.min(100, gridSize));
         setGenerating(true);
 
         try {
@@ -66,13 +66,13 @@ function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCrea
                         <span>Grid Size</span>
                         <input
                             type="number"
-                            min={5}
+                            min={30}
                             max={100}
                             value={gridSize}
                             onChange={e => setGridSize(Number(e.target.value))}
                         />
                         <span className="dungeon-gen-hint">
-                            {gridSize} hexes &times; {gridSize} hexes ({gridSize * gridSize} hexes)
+                            {gridSize * 2} hexes &times; {gridSize} hexes ({gridSize * gridSize * 2} hexes)
                         </span>
                     </label>
 

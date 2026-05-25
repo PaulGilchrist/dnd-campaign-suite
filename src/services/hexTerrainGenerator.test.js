@@ -23,7 +23,7 @@ describe('hexTerrainGenerator', () => {
 
     it('should generate terrain for all hexes in grid', () => {
       const result = generateHexTerrain({ gridSize: 5, seed: 42 });
-      expect(Object.keys(result.terrain).length).toBe(25);
+      expect(Object.keys(result.terrain).length).toBe(50);
     });
 
     it('should only produce valid terrain types', () => {
@@ -64,19 +64,19 @@ describe('hexTerrainGenerator', () => {
 
     it('should work with gridSize 1', () => {
       const result = generateHexTerrain({ gridSize: 1, seed: 42 });
-      expect(Object.keys(result.terrain).length).toBe(1);
+      expect(Object.keys(result.terrain).length).toBe(2);
       expect(result.terrain['0,0']).toBe('water');
     });
 
     it('should work without explicit seed', () => {
       const result = generateHexTerrain({ gridSize: 10 });
-      expect(Object.keys(result.terrain).length).toBe(100);
+      expect(Object.keys(result.terrain).length).toBe(200);
     });
 
     it('should apply weights when provided', () => {
       const weights = { water: 0.1, plains: 2.0 };
       const result = generateHexTerrain({ gridSize: 10, seed: 42, weights });
-      expect(Object.keys(result.terrain).length).toBe(100);
+      expect(Object.keys(result.terrain).length).toBe(200);
     });
 
     it('should ignore empty weights object', () => {

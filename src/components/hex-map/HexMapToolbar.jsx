@@ -109,7 +109,7 @@ function HexMapToolbar({
                 <button onClick={zoomIn} title="Zoom in">
                     <i className="fa-solid fa-plus"></i>
                 </button>
-                <span>{Math.round(zoom * 100)}%</span>
+                <span>{Math.round(zoom * 50)}%</span>
                 <button onClick={zoomOut} title="Zoom out">
                     <i className="fa-solid fa-minus"></i>
                 </button>
@@ -124,11 +124,12 @@ function HexMapToolbar({
                     Grid:
                     <input
                         type="number"
-                        min="5"
+                        min="30"
                         max="100"
                         value={gridSize}
                         onChange={(e) => setGridSize(Number(e.target.value))}
                     />
+                    <span className="hex-map-grid-hint">{gridSize * 2}×{gridSize}</span>
                 </label>
             </div>
         </div>

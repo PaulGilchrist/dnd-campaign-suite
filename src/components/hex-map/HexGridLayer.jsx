@@ -2,15 +2,15 @@ import React, { useMemo } from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig.js';
 import { getAllHexes, hexToPixel, hexToSVGPath } from '../../services/hexMapUtils.js';
 
-function HexGridLayer({ gridSize }) {
+function HexGridLayer({ hexCols, hexRows }) {
     const paths = useMemo(() => {
-        const allHexes = getAllHexes(gridSize, gridSize);
+        const allHexes = getAllHexes(hexCols, hexRows);
         return allHexes.map(({ q, r }) => {
             const center = hexToPixel(q, r, HEX_SIZE);
             const d = hexToSVGPath(center.x, center.y, HEX_SIZE);
             return { key: `${q},${r}`, d };
         });
-    }, [gridSize]);
+    }, [hexCols, hexRows]);
 
     return (
         <g className="hex-grid-layer">

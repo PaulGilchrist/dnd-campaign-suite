@@ -1,6 +1,7 @@
 // Hex map rendering constants
 export const HEX_SIZE = 30; // radius of each hex in SVG pixels
-export const DEFAULT_GRID_SIZE = 30; // default grid is 30x30 hexes
+export const DEFAULT_GRID_SIZE = 30; // default grid is 60×30 hexes (cols × rows)
+export const GRID_COLS_MULTIPLIER = 2; // columns = gridSize × this
 
 // Terrain types with distinct colors
 export const TERRAIN_TYPES = [
@@ -42,5 +43,5 @@ export const TOOL_ROAD = 'road';
 export const TOOL_TRAVEL = 'travel';
 
 // Zoom limits
-export const MIN_ZOOM = 1;
+export const MIN_ZOOM = 2;
 export const MAX_ZOOM = 8;

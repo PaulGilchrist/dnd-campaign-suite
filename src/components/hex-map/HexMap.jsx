@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import * as mapsService from '../../services/mapsService.js';
 import {
-    HEX_SIZE, DEFAULT_GRID_SIZE, DEFAULT_TERRAIN, MIN_ZOOM, MAX_ZOOM,
+    HEX_SIZE, DEFAULT_GRID_SIZE, GRID_COLS_MULTIPLIER, DEFAULT_TERRAIN, MIN_ZOOM, MAX_ZOOM,
     TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_PAN, TOOL_TRAVEL, TOOL_ROAD,
     TERRAIN_TYPES, POI_TYPES
 } from '../../config/outdoorConfig.js';
@@ -40,7 +40,9 @@ import './HexMap.css';
 function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered }) {
     const [loading, setLoading] = useState(true);
     const [mapData, setMapData] = useState(null);       // full map data object from server
-    const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE); // hex grid dimensions
+    const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE);
+    const hexCols = gridSize * GRID_COLS_MULTIPLIER;
+    const hexRows = gridSize;
     const [terrain, setTerrain] = useState({});          // Record<hexKey, terrainType>
     const [rivers, setRivers] = useState([]);            // array of "q,r" strings
     const [pois, setPois] = useState([]);                // array of POI objects
@@ -61,7 +63,8 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     );
 
     const travelMgmt = useTravelManagement({
-        gridSize,
+        hexCols,
+        hexRows,
         terrain,
         partyPosition,
         onPartyMove: setPartyPosition,
@@ -109,7 +112,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     // Painting state
     const paintingRef = useRef(false); // whether we're in the middle of a paint/erase stroke
 
-    const [zoom, setZoom] = useState(1.5);
+    const [zoom, setZoom] = useState(MIN_ZOOM);
     const [panX, setPanX] = useState(0);
     const [panY, setPanY] = useState(0);
     const [panning, setPanning] = useState(null);        // { startX, startY, startPanX, startPanY } | null
@@ -117,12 +120,13 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const [partyContextMenu, setPartyContextMenu] = useState(null); // { q, r } | null
 
     const svgRef = useRef(null);
-    const zoomValueRef = useRef(1);
+    const zoomValueRef = useRef(MIN_ZOOM);
     const panXValueRef = useRef(0);
     const panYValueRef = useRef(0);
     const accumulatedDeltaRef = useRef(0);
     const isInitialized = useRef(false);
     const hasLoaded = useRef(false);
+    const needsResetViewRef = useRef(false);
     const toolInitRef = useRef(true);
 
     // Sync tool ↔ travel management state
@@ -200,9 +204,9 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     // Computed SVG dimensions — corrected to account for full axial extent + hex shape
     const gridPixelBounds = useMemo(() => {
         const xMin = -HEX_SIZE * Math.sqrt(3) / 2;
-        const xMax = HEX_SIZE * Math.sqrt(3) * ((gridSize - 1) + (gridSize - 1) / 2 + 0.5);
+        const xMax = HEX_SIZE * Math.sqrt(3) * ((hexCols - 1) + (hexRows - 1) / 2 + 0.5);
         const yMin = -HEX_SIZE;
-        const yMax = HEX_SIZE * (1.5 * (gridSize - 1) + 1);
+        const yMax = HEX_SIZE * (1.5 * (hexRows - 1) + 1);
         return {
             width: xMax - xMin,
             height: yMax - yMin,
@@ -211,26 +215,111 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             centerX: (xMin + xMax) / 2,
             centerY: (yMin + yMax) / 2,
         };
-    }, [gridSize]);
+    }, [hexCols, hexRows]);
 
     const svgWidth = gridPixelBounds.width;
     const svgHeight = gridPixelBounds.height;
 
+    // ── TUNING: MARGIN_X / MARGIN_Y — hex-widths to inset from each grid edge ──
+    // These formulas exactly hide empty diagonal corners for any grid size.
+    // For 60×30: MARGIN_X=14.5, MARGIN_Y=6.5 (dialed in manually).
+    const MARGIN_X = (hexRows - 1) / 2 || 0.5;
+    const MARGIN_Y = hexRows / 4 - 1 || 0.5;
+
+    // Uncomment to override with manual values:
+    // const MARGIN_X = 14.5;
+    // const MARGIN_Y = 6.5;
+
+    const clampPan = useCallback((pz, px, py) => {
+        const viewW = gridPixelBounds.width / pz;
+        const viewH = gridPixelBounds.height / pz;
+        const sqrt3 = Math.sqrt(3);
+        const hexW = sqrt3 * HEX_SIZE; // one hex width in pixels
+        const hexH = 1.5 * HEX_SIZE;   // one hex height in pixels
+        const marginX = MARGIN_X * hexW;
+        const marginY = MARGIN_Y * hexH;
+
+        // Grid pixel bounds (outer edges of outermost hexes)
+        const gridLeft = gridPixelBounds.offsetX + marginX;
+        const gridRight = gridPixelBounds.offsetX + gridPixelBounds.width - marginX;
+        const gridTop = gridPixelBounds.offsetY + marginY;
+        const gridBottom = gridPixelBounds.offsetY + gridPixelBounds.height - marginY;
+
+        const minPanX = gridLeft;
+        const maxPanX = gridRight - viewW;
+        const minPanY = gridTop;
+        const maxPanY = gridBottom - viewH;
+
+        return {
+            x: Math.min(maxPanX, Math.max(minPanX, px)),
+            y: Math.min(maxPanY, Math.max(minPanY, py)),
+        };
+    }, [gridPixelBounds]);
+
+    useLayoutEffect(() => {
+        if (needsResetViewRef.current) {
+            needsResetViewRef.current = false;
+            const vw = gridPixelBounds.width / 2;
+            const vh = gridPixelBounds.height / 2;
+            const cx = gridPixelBounds.centerX - vw / 2;
+            const cy = gridPixelBounds.centerY - vh / 2;
+            const clamped = clampPan(2, cx, cy);
+            setZoom(2);
+            setPanX(clamped.x);
+            setPanY(clamped.y);
+            return;
+        }
+        const clamped = clampPan(zoom, panXValueRef.current, panYValueRef.current);
+        if (clamped.x !== panXValueRef.current) {
+            panXValueRef.current = clamped.x;
+            setPanX(clamped.x);
+        }
+        if (clamped.y !== panYValueRef.current) {
+            panYValueRef.current = clamped.y;
+            setPanY(clamped.y);
+        }
+    }, [zoom, gridSize, clampPan, gridPixelBounds]);
+
     // ─── Zoom/Pan helpers ────────────────────────────────────────────────
 
     const zoomIn = useCallback(() => {
-        setZoom(prev => Math.min(MAX_ZOOM, prev * 1.25));
-    }, []);
+        setZoom(prev => {
+            const next = Math.min(MAX_ZOOM, prev * 1.25);
+            const vw = gridPixelBounds.width / next;
+            const vh = gridPixelBounds.height / next;
+            const cx = gridPixelBounds.centerX - vw / 2;
+            const cy = gridPixelBounds.centerY - vh / 2;
+            const clamped = clampPan(next, cx, cy);
+            setPanX(clamped.x);
+            setPanY(clamped.y);
+            return next;
+        });
+    }, [gridPixelBounds, clampPan]);
 
     const zoomOut = useCallback(() => {
-        setZoom(prev => Math.max(MIN_ZOOM, prev * 0.8));
-    }, []);
+        setZoom(prev => {
+            const next = Math.max(MIN_ZOOM, prev * 0.8);
+            const vw = gridPixelBounds.width / next;
+            const vh = gridPixelBounds.height / next;
+            const cx = gridPixelBounds.centerX - vw / 2;
+            const cy = gridPixelBounds.centerY - vh / 2;
+            const clamped = clampPan(next, cx, cy);
+            setPanX(clamped.x);
+            setPanY(clamped.y);
+            return next;
+        });
+    }, [gridPixelBounds, clampPan]);
 
     const resetView = useCallback(() => {
+        const vw = gridPixelBounds.width / 2;
+        const vh = gridPixelBounds.height / 2;
+        const cx = gridPixelBounds.centerX - vw / 2;
+        const cy = gridPixelBounds.centerY - vh / 2;
+        const clamped = clampPan(2, cx, cy);
         setZoom(2);
-        setPanX(-(HEX_SIZE * Math.sqrt(3) / 2));
-        setPanY(-HEX_SIZE);
-    }, []);
+        setPanX(clamped.x);
+        setPanY(clamped.y);
+    }, [gridPixelBounds, clampPan]);
 
     const handlePanStart = useCallback((e) => {
         if (e.button !== 0) return;
@@ -260,9 +349,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         const svgY = (e.clientY - rect.top) / rect.height * vb.height;
         const dx = svgX - panning.startX;
         const dy = svgY - panning.startY;
-        setPanX(panning.startPanX - dx);
-        setPanY(panning.startPanY - dy);
-    }, [panning]);
+        const clamped = clampPan(zoomValueRef.current, panning.startPanX - dx, panning.startPanY - dy);
+        setPanX(clamped.x);
+        setPanY(clamped.y);
+    }, [panning, clampPan]);
 
     const handlePanEnd = useCallback(() => {
         setPanning(null);
@@ -294,21 +384,22 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, currentZoom * factor));
         const newPanX = svgX - (svgX - currentPanX) * (currentZoom / newZoom);
         const newPanY = svgY - (svgY - currentPanY) * (currentZoom / newZoom);
+        const clamped = clampPan(newZoom, newPanX, newPanY);
         setZoom(newZoom);
-        setPanX(newPanX);
-        setPanY(newPanY);
-    }, []);
+        setPanX(clamped.x);
+        setPanY(clamped.y);
+    }, [clampPan]);
 
     // ─── Hex coordinate helpers ─────────────────────────────────────────
 
     const getHexFromEvent = useCallback((e) => {
         const svg = svgRef.current;
         if (!svg) return null;
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
-        return pixelToHexSnapped(svgX, svgY, HEX_SIZE);
+        const pt = svg.createSVGPoint();
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+        const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+        return pixelToHexSnapped(svgP.x, svgP.y, HEX_SIZE);
     }, []);
 
     // ─── Terrain painting handlers ──────────────────────────────────────
@@ -316,7 +407,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const handleTerrainPointerDown = useCallback((e) => {
         const hex = getHexFromEvent(e);
         if (!hex) return;
-        if (hex.q < 0 || hex.q >= gridSize || hex.r < 0 || hex.r >= gridSize) return;
+        if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
         const key = hexKey(hex.q, hex.r);
         if (tool === TOOL_RIVER) {
             setRivers(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
@@ -339,7 +430,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         if (!paintingRef.current) return;
         const hex = getHexFromEvent(e);
         if (!hex) return;
-        if (hex.q < 0 || hex.q >= gridSize || hex.r < 0 || hex.r >= gridSize) return;
+        if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
         const key = hexKey(hex.q, hex.r);
         if (tool === TOOL_RIVER) {
             setRivers(prev => prev.includes(key) ? prev : [...prev, key]);
@@ -369,7 +460,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
 
         const hex = getHexFromEvent(e);
         if (!hex) return;
-        if (hex.q < 0 || hex.q >= gridSize || hex.r < 0 || hex.r >= gridSize) return;
+        if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
 
         // Handle character drops from POI panel
         if (dragData.startsWith('character:')) {
@@ -439,7 +530,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     return;
                 }
 
-                const path = findHexPath(fromPoi, toPoi, gridSize, terrain);
+                const path = findHexPath(fromPoi, toPoi, hexCols, hexRows, terrain);
                 if (path) {
                     const newRoad = {
                         id: `road-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
@@ -463,7 +554,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         if (!poiDragging) return;
         const hex = getHexFromEvent(e);
         if (!hex) return;
-        if (hex.q < 0 || hex.q >= gridSize || hex.r < 0 || hex.r >= gridSize) return;
+        if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
 
         // Check no other POI at target hex
         const exists = pois.some(p => p.id !== poiDragging.poiId && p.q === hex.q && p.r === hex.r);
@@ -484,7 +575,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     const movedPoi = pois.find(p => p.id === draggedId);
                     const otherPoi = pois.find(p => p.id === otherPoiId);
                     if (movedPoi && otherPoi) {
-                        const path = findHexPath(movedPoi, otherPoi, gridSize, terrain);
+                        const path = findHexPath(movedPoi, otherPoi, hexCols, hexRows, terrain);
                         if (path) {
                             return { ...road, hexes: path.map(h => `${h.q},${h.r}`) };
                         }
@@ -660,7 +751,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
         const snapped = pixelToHexSnapped(svgX, svgY, HEX_SIZE);
         // Clamp to grid bounds
-        if (snapped.q >= 0 && snapped.q < gridSize && snapped.r >= 0 && snapped.r < gridSize) {
+        if (snapped.q >= 0 && snapped.q < hexCols && snapped.r >= 0 && snapped.r < hexRows) {
             setHoveredHex(snapped);
         } else {
             setHoveredHex(null);
@@ -683,11 +774,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     const loadedRoads = existing.roads || [];
                     const loadedPois = existing.pois || [];
                     const loadedGridSize = existing.gridSize || DEFAULT_GRID_SIZE;
-                    const loadedZoom = existing.zoom != null ? existing.zoom : 1;
+                    const loadedZoom = existing.zoom != null ? Math.max(MIN_ZOOM, existing.zoom) : MIN_ZOOM;
                     // Migrate old broken default (panX=0, panY=0) to centering values
                     const isOldDefault = existing.panX === 0 && existing.panY === 0;
-                    const loadedPanX = (!isOldDefault && existing.panX != null) ? existing.panX : -(HEX_SIZE * Math.sqrt(3) / 2);
-                    const loadedPanY = (!isOldDefault && existing.panY != null) ? existing.panY : -HEX_SIZE;
+                    const loadedPanX = (!isOldDefault && existing.panX != null) ? existing.panX : 0;
+                    const loadedPanY = (!isOldDefault && existing.panY != null) ? existing.panY : 0;
 
                     // Set default type for backward compat
                     if (!existing.type) {
@@ -703,7 +794,14 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     setZoom(loadedZoom);
                     setPanX(loadedPanX);
                     setPanY(loadedPanY);
+                    panXValueRef.current = loadedPanX;
+                    panYValueRef.current = loadedPanY;
                     if (existing.weather) setWeather(existing.weather);
+
+                    // If pan was never set (old default 0,0), reset view to center
+                    if (isOldDefault) {
+                        needsResetViewRef.current = true;
+                    }
 
                     // Initialize marching order from characters if empty
                     const loadOrder = existing.marchingOrder ||
@@ -714,8 +812,8 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     if (existing.partyPosition) {
                         setPartyPosition(existing.partyPosition);
                     } else {
-                        const center = Math.floor(loadedGridSize / 2);
-                        setPartyPosition({ q: center, r: center });
+                        const centerCols = loadedGridSize * GRID_COLS_MULTIPLIER;
+                        setPartyPosition({ q: Math.floor(centerCols / 2), r: Math.floor(loadedGridSize / 2) });
                     }
 
                     hasLoaded.current = true;
@@ -728,15 +826,17 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
 
             // Create new empty map
             const initialTerrain = {};
-            for (let r = 0; r < DEFAULT_GRID_SIZE; r++) {
-                for (let q = 0; q < DEFAULT_GRID_SIZE; q++) {
+            const newCols = DEFAULT_GRID_SIZE * GRID_COLS_MULTIPLIER;
+            const newRows = DEFAULT_GRID_SIZE;
+            for (let r = 0; r < newRows; r++) {
+                for (let q = 0; q < newCols; q++) {
                     initialTerrain[hexKey(q, r)] = DEFAULT_TERRAIN;
                 }
             }
 
             const initialOrder = characters.length > 0 ? characters.map(c => c.name) : [];
             const initialPartyPos = initialOrder.length > 0
-                ? { q: Math.floor(DEFAULT_GRID_SIZE / 2), r: Math.floor(DEFAULT_GRID_SIZE / 2) }
+                ? { q: Math.floor(newCols / 2), r: Math.floor(newRows / 2) }
                 : null;
 
             const newData = {
@@ -745,9 +845,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 terrain: initialTerrain,
                 pois: [],
                 roads: [],
-                zoom: 1,
-                panX: -(HEX_SIZE * Math.sqrt(3) / 2),
-                panY: -HEX_SIZE,
+                zoom: MIN_ZOOM,
                 marchingOrder: initialOrder,
                 partyPosition: initialPartyPos
             };
@@ -757,6 +855,12 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             setGridSize(DEFAULT_GRID_SIZE);
             setMarchingOrder(initialOrder);
             setPartyPosition(initialPartyPos);
+            setZoom(MIN_ZOOM);
+            setPanX(0);
+            setPanY(0);
+            panXValueRef.current = 0;
+            panYValueRef.current = 0;
+            needsResetViewRef.current = true;
 
             // Save the new map data
             try {
@@ -848,6 +952,8 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                         ref={svgRef}
                         viewBox={`${panX} ${panY} ${svgWidth / zoom} ${svgHeight / zoom}`}
                         className="hex-svg"
+                        draggable={false}
+                        onDragStart={(e) => e.preventDefault()}
                         onPointerDown={(e) => {
                             if (tool === TOOL_PAINT || tool === TOOL_ERASE || tool === TOOL_RIVER) {
                                 handleTerrainPointerDown(e);
@@ -885,7 +991,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             } else if (tool === TOOL_TRAVEL && partyPosition) {
                                 const hex = getHexFromEvent(e);
                                 if (!hex) return;
-                                if (hex.q < 0 || hex.q >= gridSize || hex.r < 0 || hex.r >= gridSize) return;
+                                if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
                                 if (hex.q === partyPosition.q && hex.r === partyPosition.r) return;
                                 if (!travelMgmt.isTravelActive || travelMgmt.travelMode === travelMgmt.MODES.INACTIVE) {
                                     travelMgmt.startPlanning();
@@ -912,15 +1018,18 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                         </defs>
 
                         <TerrainLayer
-                            gridSize={gridSize}
+                            hexCols={hexCols}
+                            hexRows={hexRows}
                             terrain={terrain}
                         />
                         <RiverLayer
                             rivers={rivers}
-                            gridSize={gridSize}
+                            hexCols={hexCols}
+                            hexRows={hexRows}
                         />
                         <HexGridLayer
-                            gridSize={gridSize}
+                            hexCols={hexCols}
+                            hexRows={hexRows}
                         />
                         <RoadLayer
                             roads={roads}
@@ -940,7 +1049,8 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                         <PartyMarkerLayer
                             position={partyPosition}
                             HEX_SIZE={HEX_SIZE}
-                            gridSize={gridSize}
+                            hexCols={hexCols}
+                            hexRows={hexRows}
                             onPositionChange={setPartyPosition}
                             svgRef={svgRef}
                             onEncounter={handleStartEncounter}

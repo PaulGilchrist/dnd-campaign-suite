@@ -72,25 +72,36 @@ router.post('/api/campaigns/:campaign/maps', (req, res) => {
       return res.status(400).json({ error: 'A map with this name already exists' });
     }
     
-    const defaultMapData = {
-      name: name.trim(),
-      type,
-      gridSize: Math.max(5, Math.min(100, gridSize ?? 20)),
-      walls: walls ?? [],
-      placedItems: placedItems ?? [],
-      paintCells: paintCells ?? [],
-      items: items ?? [],
-      players: players ?? [],
-      fog: fog ?? [],
-      terrain,
-      pois,
-      zoom: 1,
-      panX: 0,
-      panY: 0,
-      parentHex,
-      parentTerrain,
-      bgFill
-    };
+    const defaultMapData = type === 'outdoor'
+      ? {
+          name: name.trim(),
+          type,
+          gridSize: Math.max(5, Math.min(100, gridSize ?? 20)),
+          terrain,
+          pois,
+          zoom: 1,
+          panX: 0,
+          panY: 0,
+        }
+      : {
+          name: name.trim(),
+          type,
+          gridSize: Math.max(5, Math.min(100, gridSize ?? 20)),
+          walls: walls ?? [],
+          placedItems: placedItems ?? [],
+          paintCells: paintCells ?? [],
+          items: items ?? [],
+          players: players ?? [],
+          fog: fog ?? [],
+          terrain,
+          pois,
+          zoom: 1,
+          panX: 0,
+          panY: 0,
+          parentHex,
+          parentTerrain,
+          bgFill,
+        };
     
     fs.writeFileSync(filePath, JSON.stringify(defaultMapData, null, 2));
     

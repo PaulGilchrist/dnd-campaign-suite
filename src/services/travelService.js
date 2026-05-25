@@ -99,7 +99,7 @@ export function getTotalTravelTime(path, terrain) {
   };
 }
 
-export function calculatePath(from, to, gridSize, terrain, roads) {
+export function calculatePath(from, to, hexCols, hexRows, terrain, roads) {
   if (!from || !to) return [];
   if (from.q === to.q && from.r === to.r) return [];
 
@@ -132,7 +132,7 @@ export function calculatePath(from, to, gridSize, terrain, roads) {
     for (const nb of hexNeighbors(current.q, current.r)) {
       const nk = hexKey(nb.q, nb.r);
       if (closedKeys.has(nk)) continue;
-      if (nb.q < 0 || nb.q >= gridSize || nb.r < 0 || nb.r >= gridSize) continue;
+      if (nb.q < 0 || nb.q >= hexCols || nb.r < 0 || nb.r >= hexRows) continue;
 
       const terrainType = terrain[nk] || DEFAULT_TERRAIN;
       const baseCost = TERRAIN_MOVE_COST[terrainType];

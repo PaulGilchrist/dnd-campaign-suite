@@ -30,7 +30,7 @@ const TERRAIN_TO_ENVIRONMENT = {
 };
 
 export default function useTravelManagement({
-  gridSize, terrain, partyPosition, onPartyMove, weather,
+  hexCols, hexRows, terrain, partyPosition, onPartyMove, weather,
   monsters, playerLevels, roads = [],
 }) {
   const [travelMode, setTravelMode] = useState(MODES.INACTIVE);
@@ -109,7 +109,7 @@ export default function useTravelManagement({
 
   const setDestinationAndPath = useCallback((to) => {
     if (!partyPosition) return;
-    const newPath = calculatePath(partyPosition, to, gridSize, terrain, roads);
+    const newPath = calculatePath(partyPosition, to, hexCols, hexRows, terrain, roads);
     if (newPath.length === 0) return;
     setDestination(to);
     setPath(newPath);
@@ -118,7 +118,7 @@ export default function useTravelManagement({
     pathIndexRef.current = 0;
     setLastMessage(null);
     setTravelMode(MODES.PLANNING);
-  }, [partyPosition, gridSize, terrain, roads]);
+  }, [partyPosition, hexCols, hexRows, terrain, roads]);
 
   const changePace = useCallback((paceId) => {
     setTravelPace(paceId);

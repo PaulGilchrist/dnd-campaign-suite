@@ -91,7 +91,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
 
     const handleStartRename = (fileName, currentName) => {
         setRenamingMap(fileName);
-        setRenameValue(currentName);
+        setRenameValue(mapsService.formatMapName(currentName));
     };
 
     const handleRenameSave = async (oldFileName) => {
@@ -100,12 +100,14 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
             setRenamingMap(null);
             return;
         }
-        if (newName === maps.find(m => m.fileName === oldFileName)?.name) {
+        const existingMap = maps.find(m => m.fileName === oldFileName);
+        if (existingMap && mapsService.formatMapName(existingMap.name) === newName) {
             setRenamingMap(null);
             return;
         }
-        // Check for duplicates
-        if (maps.some(m => m.fileName !== oldFileName && m.name.toLowerCase() === newName.toLowerCase())) {
+        // Check for duplicates (sanitize user input to compare against stored kebab-case names)
+        const sanitizedNew = newName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        if (maps.some(m => m.fileName !== oldFileName && m.name === sanitizedNew)) {
             setError('A map with that name already exists');
             setRenamingMap(null);
             return;

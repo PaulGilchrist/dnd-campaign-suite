@@ -1,6 +1,6 @@
 {
   "name": "Sealed Sanctum",
-  "description": "## Ancient Tomb \u2014 The Thorned One's Sealed Sanctum\n\nBeyond the massive stone door carved with elven script and warnings lies the heart of Thornfast Keep \u2014 the sealed sanctum where the archfey known as the Thorned One was imprisoned a thousand years ago. This circular chamber was built as both a prison and a shrine, its domed ceiling painted with the constellations of the Feywild sky. Three empty crystal pedestals stand in a triangle, representing the seal anchors the party has shattered on their journey. In the center of the chamber, a blazing green crystal \u2014 the final seal \u2014 throbs with unstable energy.\n\n**Zones:**\n- **Seal Chamber (center):** The main circular space, 60 feet across. The floor is carved with an intricate mandala of elven sealing runes, now cracked and flickering with unstable fey energy. Three crystal pillars provide cover.\n- **The Final Seal (center of chamber):** A floating green crystal, AC 12, HP 20. Pulses with unstable energy. Must be stabilized (Arcana DC 15 \u00d7 3) or destroyed to end the threat.\n- **Pedestals (forming a triangle):** Each once held a seal anchor crystal. They now glow faintly, resonating with the destroyed anchors. Provide dim illumination.\n- **Mother Thorn's Lair (north alcove):** A raised dais where the Thorned One's avatar meditates. Surrounded by withered briars and the bones of creatures that strayed too close. A stone pedestal here holds the **Goggles of Night** as a reward for those who reforge the seal.\n\n**Atmosphere:** The air crackles with Wild Magic energy. The Sorcerer feels a strange resonance here \u2014 magics surge and spark unpredictably. Every sound echoes strangely, as if the room is larger than it appears. The Thorned One's voice whispers from everywhere and nowhere. The green crystal pulses like a heartbeat, and with each pulse, the walls seem to breathe.",
+  "description": "## Ancient Tomb — The Thorned One's Sealed Sanctum\n\nBeyond the massive stone door carved with elven script and warnings lies the heart of Thornfast Keep — the sealed sanctum where the archfey known as the Thorned One was imprisoned a thousand years ago. This circular chamber was built as both a prison and a shrine, its domed ceiling painted with the constellations of the Feywild sky. Three empty crystal pedestals stand in a triangle, representing the seal anchors the party has shattered on their journey. In the center of the chamber, a blazing green crystal — the final seal — throbs with unstable energy.\n\n**Zones:**\n- **Seal Chamber (center):** The main circular space, 60 feet across. The floor is carved with an intricate mandala of elven sealing runes, now cracked and flickering with unstable fey energy. Three crystal pillars provide cover.\n- **The Final Seal (center of chamber):** A floating green crystal, AC 12, HP 20. Pulses with unstable energy. Must be stabilized (Arcana DC 15 × 3) or destroyed to end the threat.\n- **Pedestals (forming a triangle):** Each once held a seal anchor crystal. They now glow faintly, resonating with the destroyed anchors. Provide dim illumination.\n- **Mother Thorn's Lair (north alcove):** A raised dais where the Thorned One's avatar meditates. Surrounded by withered briars and the bones of creatures that strayed too close. A stone pedestal here holds the **Goggles of Night** as a reward for those who reforge the seal.\n\n**Atmosphere:** The air crackles with Wild Magic energy. The Sorcerer feels a strange resonance here — magics surge and spark unpredictably. Every sound echoes strangely, as if the room is larger than it appears. The Thorned One's voice whispers from everywhere and nowhere. The green crystal pulses like a heartbeat, and with each pulse, the walls seem to breathe.",
   "gridSize": 30,
   "walls": [
     "0,0",
@@ -1104,14 +1104,7 @@
       "rotation": 0
     }
   ],
-  "players": [
-    {
-      "id": "player-1",
-      "name": "Adventurer 1",
-      "gridX": 4,
-      "gridY": 4
-    }
-  ],
+  "players": [],
   "zoom": 1,
   "panX": 0,
   "panY": 0,

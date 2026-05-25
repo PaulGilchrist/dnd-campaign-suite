@@ -8,6 +8,9 @@ export function generateHexTerrain({ gridSize = 30, seed, weights } = {}) {
     return { terrain: {}, rivers: [] };
   }
 
+  const hexCols = gridSize * 2;
+  const hexRows = gridSize;
+
   const effectiveSeed = seed !== undefined ? seed : Math.floor(Math.random() * 100000);
 
   const baseResolution = Math.max(4, Math.floor(gridSize / 3));
@@ -25,24 +28,24 @@ export function generateHexTerrain({ gridSize = 30, seed, weights } = {}) {
     buildNoiseGrid(baseResolution * oct.frequency, effectiveSeed, 2, i)
   );
 
-  const allHexes = getAllHexes(gridSize, gridSize);
+  const allHexes = getAllHexes(hexCols, hexRows);
   const terrain = {};
   const elevationMap = {};
   const moistureMap = {};
 
   for (const { q, r } of allHexes) {
-    const elevation = sampleFractal(elevationOctaveGrids, octaves, q, r, gridSize, baseResolution);
-    const moisture = sampleFractal(moistureOctaveGrids, octaves, q, r, gridSize, baseResolution);
+    const elevation = sampleFractal(elevationOctaveGrids, octaves, q, r, hexCols, hexRows, baseResolution);
+    const moisture = sampleFractal(moistureOctaveGrids, octaves, q, r, hexCols, hexRows, baseResolution);
     const key = hexKey(q, r);
     elevationMap[key] = elevation;
     moistureMap[key] = moisture;
     terrain[key] = elevationMoistureToTerrain(elevation, moisture);
   }
 
-  frameWithWater(terrain, gridSize);
-  applyBeaches(terrain, gridSize);
-  fillLakes(terrain, elevationMap, gridSize);
-  const rivers = generateRivers(elevationMap, moistureMap, terrain, gridSize);
+  frameWithWater(terrain, hexCols, hexRows);
+  applyBeaches(terrain, hexCols, hexRows);
+  fillLakes(terrain, elevationMap, hexCols, hexRows);
+  const rivers = generateRivers(elevationMap, moistureMap, terrain, hexCols, hexRows);
 
   if (weights && typeof weights === 'object' && Object.keys(weights).length > 0) {
     applyWeights(terrain, weights, allHexes, effectiveSeed);
@@ -66,7 +69,10 @@ const TERRAIN_ELEVATION = {
 export function generateRiversFromTerrain(terrain, gridSize) {
   if (!terrain || !gridSize) return [];
 
-  const allHexes = getAllHexes(gridSize, gridSize);
+  const hexCols = gridSize * 2;
+  const hexRows = gridSize;
+
+  const allHexes = getAllHexes(hexCols, hexRows);
   const elevationMap = {};
 
   for (const { q, r } of allHexes) {
@@ -75,7 +81,7 @@ export function generateRiversFromTerrain(terrain, gridSize) {
     elevationMap[key] = TERRAIN_ELEVATION[type] !== undefined ? TERRAIN_ELEVATION[type] : 0.5;
   }
 
-  return generateRivers(elevationMap, null, terrain, gridSize);
+  return generateRivers(elevationMap, null, terrain, hexCols, hexRows);
 }
 
 function mulberry32(seed) {
@@ -103,10 +109,10 @@ function buildNoiseGrid(resolution, seed, channel, octaveIndex) {
   return grid;
 }
 
-function sampleNoiseGrid(grid, q, r, gridSize) {
+function sampleNoiseGrid(grid, q, r, hexCols, hexRows) {
   const resolution = grid.length - 1;
-  const x = gridSize > 1 ? q / (gridSize - 1) : 0.5;
-  const y = gridSize > 1 ? r / (gridSize - 1) : 0.5;
+  const x = hexCols > 1 ? q / (hexCols - 1) : 0.5;
+  const y = hexRows > 1 ? r / (hexRows - 1) : 0.5;
   const gx = x * resolution;
   const gy = y * resolution;
   const cx = Math.min(Math.floor(gx), resolution);
@@ -124,13 +130,13 @@ function sampleNoiseGrid(grid, q, r, gridSize) {
   return top + (bottom - top) * fy;
 }
 
-function sampleFractal(octaveGrids, octaves, q, r, gridSize, baseResolution) {
+function sampleFractal(octaveGrids, octaves, q, r, hexCols, hexRows, baseResolution) {
   let value = 0;
   for (let i = 0; i < octaveGrids.length; i++) {
     const grid = octaveGrids[i];
     const { amplitude, frequency } = octaves[i];
-    const effectiveSize = Math.max(gridSize, baseResolution * frequency + 1);
-    value += sampleNoiseGrid(grid, q * frequency, r * frequency, effectiveSize) * amplitude;
+    const effectiveSize = Math.max(Math.max(hexCols, hexRows), baseResolution * frequency + 1);
+    value += sampleNoiseGrid(grid, q * frequency, r * frequency, effectiveSize, effectiveSize) * amplitude;
   }
   const maxPossible = octaves.reduce((s, o) => s + o.amplitude, 0);
   return value / maxPossible;
@@ -168,32 +174,32 @@ function elevationMoistureToTerrain(elevation, moisture) {
   return 'water';
 }
 
-function isOnEdge(q, r, gridSize) {
-  return q === 0 || q === gridSize - 1 || r === 0 || r === gridSize - 1;
+function isOnEdge(q, r, hexCols, hexRows) {
+  return q === 0 || q === hexCols - 1 || r === 0 || r === hexRows - 1;
 }
 
-function inBounds(q, r, gridSize) {
-  return q >= 0 && q < gridSize && r >= 0 && r < gridSize;
+function inBounds(q, r, hexCols, hexRows) {
+  return q >= 0 && q < hexCols && r >= 0 && r < hexRows;
 }
 
-function frameWithWater(terrain, gridSize) {
-  for (let r = 0; r < gridSize; r++) {
-    for (let q = 0; q < gridSize; q++) {
-      if (isOnEdge(q, r, gridSize)) {
+function frameWithWater(terrain, hexCols, hexRows) {
+  for (let r = 0; r < hexRows; r++) {
+    for (let q = 0; q < hexCols; q++) {
+      if (isOnEdge(q, r, hexCols, hexRows)) {
         terrain[hexKey(q, r)] = 'water';
       }
     }
   }
 }
 
-function applyBeaches(terrain, gridSize) {
-  for (let r = 0; r < gridSize; r++) {
-    for (let q = 0; q < gridSize; q++) {
+function applyBeaches(terrain, hexCols, hexRows) {
+  for (let r = 0; r < hexRows; r++) {
+    for (let q = 0; q < hexCols; q++) {
       const key = hexKey(q, r);
       if (terrain[key] === 'water') continue;
       const neighbors = hexNeighbors(q, r);
       for (const n of neighbors) {
-        if (!inBounds(n.q, n.r, gridSize)) continue;
+        if (!inBounds(n.q, n.r, hexCols, hexRows)) continue;
         if (terrain[hexKey(n.q, n.r)] === 'water') {
           terrain[key] = 'beach';
           break;
@@ -203,13 +209,13 @@ function applyBeaches(terrain, gridSize) {
   }
 }
 
-function fillLakes(terrain, elevationMap, gridSize) {
+function fillLakes(terrain, elevationMap, hexCols, hexRows) {
   const visited = new Set();
   const queue = [];
 
-  for (let r = 0; r < gridSize; r++) {
-    for (let q = 0; q < gridSize; q++) {
-      if (!isOnEdge(q, r, gridSize)) continue;
+  for (let r = 0; r < hexRows; r++) {
+    for (let q = 0; q < hexCols; q++) {
+      if (!isOnEdge(q, r, hexCols, hexRows)) continue;
       const key = hexKey(q, r);
       if (terrain[key] !== 'water' && !visited.has(key)) {
         queue.push(key);
@@ -223,7 +229,7 @@ function fillLakes(terrain, elevationMap, gridSize) {
     const [cq, cr] = current.split(',').map(Number);
     const neighbors = hexNeighbors(cq, cr);
     for (const n of neighbors) {
-      if (!inBounds(n.q, n.r, gridSize)) continue;
+      if (!inBounds(n.q, n.r, hexCols, hexRows)) continue;
       const nk = hexKey(n.q, n.r);
       if (visited.has(nk)) continue;
       if (terrain[nk] === 'water') continue;
@@ -233,8 +239,8 @@ function fillLakes(terrain, elevationMap, gridSize) {
   }
 
   const waterThreshold = 0.4;
-  for (let r = 0; r < gridSize; r++) {
-    for (let q = 0; q < gridSize; q++) {
+  for (let r = 0; r < hexRows; r++) {
+    for (let q = 0; q < hexCols; q++) {
       const key = hexKey(q, r);
       if (terrain[key] === 'water') continue;
       if (visited.has(key)) continue;
@@ -246,12 +252,12 @@ function fillLakes(terrain, elevationMap, gridSize) {
   }
 }
 
-function generateRivers(elevationMap, moistureMap, terrain, gridSize) {
+function generateRivers(elevationMap, moistureMap, terrain, hexCols, hexRows) {
   const riverHexes = new Set();
   const candidates = [];
 
-  for (let r = 0; r < gridSize; r++) {
-    for (let q = 0; q < gridSize; q++) {
+  for (let r = 0; r < hexRows; r++) {
+    for (let q = 0; q < hexCols; q++) {
       const key = hexKey(q, r);
       const elev = elevationMap[key];
       const moist = moistureMap !== null ? moistureMap[key] : null;
@@ -266,7 +272,7 @@ function generateRivers(elevationMap, moistureMap, terrain, gridSize) {
 
   candidates.sort((a, b) => b.moisture - a.moisture);
 
-  const maxRivers = Math.max(2, Math.floor(gridSize / 8));
+  const maxRivers = Math.max(2, Math.floor(hexRows / 8));
   const taken = new Set();
 
   for (const source of candidates) {
@@ -274,7 +280,7 @@ function generateRivers(elevationMap, moistureMap, terrain, gridSize) {
     const sk = hexKey(source.q, source.r);
     if (taken.has(sk)) continue;
 
-    const path = traceRiver(source.q, source.r, elevationMap, terrain, gridSize);
+    const path = traceRiver(source.q, source.r, elevationMap, terrain, hexCols, hexRows);
     if (path.length < 3) continue;
 
     for (const h of path) {
@@ -286,12 +292,12 @@ function generateRivers(elevationMap, moistureMap, terrain, gridSize) {
   return Array.from(riverHexes);
 }
 
-function traceRiver(startQ, startR, elevationMap, terrain, gridSize) {
+function traceRiver(startQ, startR, elevationMap, terrain, hexCols, hexRows) {
   const path = [];
   const visited = new Set();
   let q = startQ;
   let r = startR;
-  const maxSteps = gridSize * 2;
+  const maxSteps = (hexCols + hexRows) * 2;
 
   for (let step = 0; step < maxSteps; step++) {
     const key = hexKey(q, r);
@@ -307,7 +313,7 @@ function traceRiver(startQ, startR, elevationMap, terrain, gridSize) {
     let lowestElev = Infinity;
 
     for (const n of neighbors) {
-      if (!inBounds(n.q, n.r, gridSize)) continue;
+      if (!inBounds(n.q, n.r, hexCols, hexRows)) continue;
       const nk = hexKey(n.q, n.r);
       if (visited.has(nk)) continue;
       const elev = elevationMap[nk];

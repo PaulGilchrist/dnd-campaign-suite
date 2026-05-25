@@ -123,6 +123,9 @@
     height: 100%;
     background: #F0E8D8;
     display: block;
+    resize: none;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 /* Compass rose overlay */

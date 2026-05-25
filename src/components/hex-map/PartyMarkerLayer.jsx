@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { hexToPixel, pixelToHexSnapped, hexToSVGPath } from '../../services/hexMapUtils.js';
 
-function PartyMarkerLayer({ position, HEX_SIZE, gridSize, onPositionChange, svgRef, onEncounter, contextMenuOpen, onContextMenu, travelMode, onAdvance, onCancelTravel }) {
+function PartyMarkerLayer({ position, HEX_SIZE, hexCols, hexRows, onPositionChange, svgRef, onEncounter, contextMenuOpen, onContextMenu, travelMode, onAdvance, onCancelTravel }) {
     const draggingRef = useRef(false);
 
     if (!position) return null;
@@ -19,7 +19,7 @@ function PartyMarkerLayer({ position, HEX_SIZE, gridSize, onPositionChange, svgR
         const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
         const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
         const hex = pixelToHexSnapped(svgX, svgY, HEX_SIZE);
-        if (hex.q < 0 || hex.q >= gridSize || hex.r < 0 || hex.r >= gridSize) return null;
+        if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return null;
         return hex;
     };
 

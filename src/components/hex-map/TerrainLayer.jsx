@@ -34,9 +34,9 @@ function hexVariation(q, r) {
     return (normalized - 0.5) * 0.1;
 }
 
-function TerrainLayer({ gridSize, terrain }) {
+function TerrainLayer({ hexCols, hexRows, terrain }) {
     const hexes = useMemo(() => {
-        const allHexes = getAllHexes(gridSize, gridSize);
+        const allHexes = getAllHexes(hexCols, hexRows);
         return allHexes.map(({ q, r }) => {
             const key = hexKey(q, r);
             const terrainId = terrain[key] || DEFAULT_TERRAIN;
@@ -54,7 +54,7 @@ function TerrainLayer({ gridSize, terrain }) {
                 fill: rgbToString(varied.r, varied.g, varied.b),
             };
         });
-    }, [gridSize, terrain]);
+    }, [hexCols, hexRows, terrain]);
 
     return (
         <g className="terrain-layer">
