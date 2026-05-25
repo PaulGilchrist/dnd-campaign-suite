@@ -13,10 +13,16 @@ const MapToolbar = ({
     handleClearWalls,
     zoomIn,
     zoomOut,
-    resetView
+    resetView,
+    onBack
 }) => {
     return (
         <div className="toolbar-row no-print">
+            {onBack && (
+                <button onClick={onBack} title="Back" className="toolbar-back-btn">
+                    <i className="fa-solid fa-arrow-left"></i>
+                </button>
+            )}
             <h4>{mapsService.formatMapName(mapName) || 'Map'}</h4>
             {isLocalhost && (
                 <label className="grid-size-label">

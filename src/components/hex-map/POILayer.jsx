@@ -1,8 +1,21 @@
 import React from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig';
-import { hexToPixel } from '../../services/hexMapUtils';
+import { hexToPixel, hexDistance } from '../../services/hexMapUtils';
 
-function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHover }) {
+function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHover, isLocalhost = false, partyPosition, onPoiEnter, validLinkedMaps }) {
+    const isAdjacentToParty = (poi) => {
+        if (!partyPosition) return false;
+        const dist = hexDistance(partyPosition, { q: poi.q, r: poi.r });
+        return dist === 1;
+    };
+
+    const isEnterable = (poi) => {
+        if (poi.visible === false) return false;
+        if (!poi.linkedMap) return false;
+        if (!validLinkedMaps || !validLinkedMaps.has(poi.linkedMap)) return false;
+        return isAdjacentToParty(poi);
+    };
+
     return (
         <g className="poi-layer">
             {pois.map(poi => {
@@ -10,9 +23,32 @@ function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHo
                 const cx = center.x;
                 const cy = center.y;
                 const isDragging = poiDragging?.poiId === poi.id;
+                const enterable = isEnterable(poi);
+
+                // Players cannot see hidden POIs at all
+                if (!isLocalhost && poi.visible === false) return null;
 
                 return (
-                    <g key={poi.id} className="poi-item" opacity={poi.visible !== false ? 1 : 0.4}>
+                    <g
+                        key={poi.id}
+                        className={`poi-item${enterable ? ' poi-item-enterable' : ''}`}
+                        opacity={poi.visible !== false ? 1 : 0.4}
+                    >
+                        {/* Golden glow ring for enterable POIs */}
+                        {enterable && (
+                            <circle
+                                cx={cx}
+                                cy={cy}
+                                r={22}
+                                fill="none"
+                                stroke="#FFD700"
+                                strokeWidth={2.5}
+                                strokeDasharray="5 3"
+                                opacity={0.9}
+                                pointerEvents="none"
+                            />
+                        )}
+
                         {/* The POI SVG icon */}
                         <use href={`#poi-${poi.type}`} x={cx - 18} y={cy - 18} />
 
@@ -31,17 +67,55 @@ function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHo
                             </text>
                         )}
 
-                        {/* Hit area for drag and context menu */}
-                        <rect
-                            x={cx - 18}
-                            y={cy - 18}
-                            width={36}
-                            height={36}
-                            fill="transparent"
-                            onPointerDown={(e) => onPoiPointerDown(poi.id, e)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPoiContextMenu(poi.id, e); }}
-                            style={{ cursor: 'grab' }}
-                        />
+                        {/* "Enter" badge for enterable POIs */}
+                        {enterable && (
+                            <g>
+                                <rect
+                                    x={cx - 16}
+                                    y={cy + 24}
+                                    width={32}
+                                    height={14}
+                                    rx={3}
+                                    fill="#FFD700"
+                                    opacity={0.9}
+                                />
+                                <text
+                                    x={cx}
+                                    y={cy + 35}
+                                    textAnchor="middle"
+                                    fill="#1a1a1a"
+                                    fontSize="8"
+                                    fontWeight="bold"
+                                >
+                                    Enter
+                                </text>
+                            </g>
+                        )}
+
+                        {/* Hit area for drag and context menu (non-enterable) or click-to-enter */}
+                        {enterable ? (
+                            <rect
+                                x={cx - 18}
+                                y={cy - 18}
+                                width={36}
+                                height={50}
+                                fill="transparent"
+                                style={{ cursor: 'pointer' }}
+                                onClick={() => onPoiEnter(poi)}
+                                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPoiContextMenu(poi.id, e); }}
+                            />
+                        ) : (
+                            <rect
+                                x={cx - 18}
+                                y={cy - 18}
+                                width={36}
+                                height={36}
+                                fill="transparent"
+                                onPointerDown={(e) => onPoiPointerDown(poi.id, e)}
+                                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPoiContextMenu(poi.id, e); }}
+                                style={{ cursor: 'grab' }}
+                            />
+                        )}
 
                         {/* Drag highlight */}
                         {isDragging && (

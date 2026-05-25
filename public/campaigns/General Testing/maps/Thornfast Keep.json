@@ -1,6 +1,6 @@
 {
   "name": "Thornfast Keep",
-  "description": "## Large Keep \u2014 Main Fortress of Thornfast Keep\n\nThe heart of Thornfast Keep is a sprawling fortress complex of great halls, ceremonial chambers, armories, and living quarters. This is where the Emerald Wardens governed the Feywild crossing for millennia \u2014 and where the Thorned Court has now established its base of operations. The Thorned One's influence is strongest here, manifesting as thorny vines that grow through the stonework and an oppressive weight in the air.\n\n**Zones:**\n- **Great Hall (south-central):** A vast chamber with a high vaulted ceiling. The elven shrine to the Summer Court has been desecrated and replaced with an altar of twisted thorns. Brother Aldric leads the cult from here. **Seal Anchor #2** is hidden behind the altar.\n- **War Room (east wing):** A round chamber with a large stone table and faded tactical maps. The specter of Theron Moonshadow, the last Emerald Warden, haunts this room. His tarnished silver crescent pendant is here.\n- **Guard Barracks (west wing):** Current living quarters for the Thorned Court cultists. Cots, supplies, and a locked cage holding **Thistle the Sprite**. The key is carried by the patrol leader.\n- **Armory (north wing):** Well-stocked with elven-crafted weapons and armor, now claimed by the cult. Contains a chest with 40 gp and a Potion of Healing.\n- **Library (upper mezzanine):** A circular library with shelves of elven histories. Kaelen would love this place. Scrolls detailing the original seal construction are hidden in a secret compartment.\n- **Deep Stairs (north end):** Descends to the Deep Foundations (Mega Dungeon). A secret passage (revealed by Thistle) provides a faster route past the patrols.\n\n**Atmosphere:** The air is heavy with incense burned by the cultists \u2014 a cloying, sweet scent that clings to the throat. Thorny vines pulse with faint amber light along the walls. The Thorned One's whispered promises echo faintly in the minds of those who linger too long.",
+  "description": "## Large Keep — Main Fortress of Thornfast Keep\n\nThe heart of Thornfast Keep is a sprawling fortress complex of great halls, ceremonial chambers, armories, and living quarters. This is where the Emerald Wardens governed the Feywild crossing for millennia — and where the Thorned Court has now established its base of operations. The Thorned One's influence is strongest here, manifesting as thorny vines that grow through the stonework and an oppressive weight in the air.\n\n**Zones:**\n- **Great Hall (south-central):** A vast chamber with a high vaulted ceiling. The elven shrine to the Summer Court has been desecrated and replaced with an altar of twisted thorns. Brother Aldric leads the cult from here. **Seal Anchor #2** is hidden behind the altar.\n- **War Room (east wing):** A round chamber with a large stone table and faded tactical maps. The specter of Theron Moonshadow, the last Emerald Warden, haunts this room. His tarnished silver crescent pendant is here.\n- **Guard Barracks (west wing):** Current living quarters for the Thorned Court cultists. Cots, supplies, and a locked cage holding **Thistle the Sprite**. The key is carried by the patrol leader.\n- **Armory (north wing):** Well-stocked with elven-crafted weapons and armor, now claimed by the cult. Contains a chest with 40 gp and a Potion of Healing.\n- **Library (upper mezzanine):** A circular library with shelves of elven histories. Kaelen would love this place. Scrolls detailing the original seal construction are hidden in a secret compartment.\n- **Deep Stairs (north end):** Descends to the Deep Foundations (Mega Dungeon). A secret passage (revealed by Thistle) provides a faster route past the patrols.\n\n**Atmosphere:** The air is heavy with incense burned by the cultists — a cloying, sweet scent that clings to the throat. Thorny vines pulse with faint amber light along the walls. The Thorned One's whispered promises echo faintly in the minds of those who linger too long.",
   "gridSize": 30,
   "walls": [
     "0,0",
@@ -1159,14 +1159,7 @@
       "rotation": 0
     }
   ],
-  "players": [
-    {
-      "id": "player-1",
-      "name": "Adventurer 1",
-      "gridX": 11,
-      "gridY": 21
-    }
-  ],
+  "players": [],
   "zoom": 1,
   "panX": 0,
   "panY": 0,

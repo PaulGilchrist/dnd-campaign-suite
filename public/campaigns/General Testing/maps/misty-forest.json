@@ -919,7 +919,8 @@
       "q": 14,
       "r": 21,
       "visible": true,
-      "label": "Thornfast Keep Entrance"
+      "label": "Thornfast Keep Entrance",
+      "linkedMap": "Thornfast Keep"
     },
     {
       "id": "gleaming-glade",
@@ -970,9 +971,9 @@
       "label": "Ancient Elven Road"
     }
   ],
-  "zoom": 2.44140625,
-  "panX": 946.4912460031685,
-  "panY": 509.94415765037,
+  "zoom": 3.0517578125,
+  "panX": 944.706615214985,
+  "panY": 655.4105778003523,
   "marchingOrder": [
     "Monk",
     "Paladin",

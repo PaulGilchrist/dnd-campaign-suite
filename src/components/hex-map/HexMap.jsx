@@ -29,7 +29,7 @@ import Subscriber from '../common/Subscriber.jsx';
 import useHexMapSSESync from './hooks/useHexMapSSESync.js';
 import './HexMap.css';
 
-function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated }) {
+function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered }) {
     const [loading, setLoading] = useState(true);
     const [mapData, setMapData] = useState(null);       // full map data object from server
     const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE); // hex grid dimensions
@@ -50,6 +50,9 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const [selectedPoiMenu, setSelectedPoiMenu] = useState(null); // { id, q, r }
     const [showRename, setShowRename] = useState(null);
     const [poiDragging, setPoiDragging] = useState(null); // { poiId, startQ, startR } | null
+    const [indoorMaps, setIndoorMaps] = useState([]); // available indoor maps for linking
+    const validLinkedMapsRef = useRef(new Set()); // Set of linked map names that exist on server
+    const [validLinkedMaps, setValidLinkedMaps] = useState(new Set()); // triggers re-render
 
     // Painting state
     const paintingRef = useRef(false); // whether we're in the middle of a paint/erase stroke
@@ -68,6 +71,50 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const accumulatedDeltaRef = useRef(0);
     const isInitialized = useRef(false);
     const hasLoaded = useRef(false);
+
+    // Fetch available indoor maps for POI linking
+    useEffect(() => {
+        let cancelled = false;
+        mapsService.loadMaps(campaignName).then(result => {
+            if (cancelled) return;
+            const indoor = result.maps
+                .filter(m => m.type === 'indoor')
+                .map(m => m.name);
+            setIndoorMaps(indoor);
+        }).catch(err => console.error('[HexMap] Failed to load indoor maps:', err));
+        return () => { cancelled = true; };
+    }, [campaignName]);
+
+    // Verify that linked POI maps exist on the server
+    useEffect(() => {
+        const linkedMaps = pois
+            .filter(p => p.linkedMap)
+            .map(p => p.linkedMap);
+        const unique = [...new Set(linkedMaps)];
+        if (unique.length === 0) {
+            validLinkedMapsRef.current = new Set();
+            setValidLinkedMaps(new Set());
+            return;
+        }
+        let cancelled = false;
+        Promise.allSettled(
+            unique.map(name =>
+                mapsService.loadMapData(campaignName, name)
+                    .then(() => name)
+                    .catch(() => null)
+            )
+        ).then(results => {
+            if (cancelled) return;
+            const valid = new Set(
+                results
+                    .filter(r => r.status === 'fulfilled' && r.value)
+                    .map(r => r.value)
+            );
+            validLinkedMapsRef.current = valid;
+            setValidLinkedMaps(valid);
+        });
+        return () => { cancelled = true; };
+    }, [campaignName, pois]);
 
     const { handleSSEEvent } = useHexMapSSESync({
         campaignName, mapName, setGridSize, setTerrain, setRivers, setPois,
@@ -373,6 +420,26 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         setSelectedPoiMenu(null);
     }, []);
 
+    const handleLinkMap = useCallback((poiId, mapName) => {
+        setPois(prev => prev.map(p =>
+            p.id === poiId ? { ...p, linkedMap: mapName } : p
+        ));
+        setSelectedPoiMenu(null);
+    }, []);
+
+    const handleUnlinkMap = useCallback((poiId) => {
+        setPois(prev => prev.map(p =>
+            p.id === poiId ? { ...p, linkedMap: undefined } : p
+        ));
+        setSelectedPoiMenu(null);
+    }, []);
+
+    const handlePoiEnter = useCallback((poi) => {
+        if (poi.linkedMap && validLinkedMapsRef.current.has(poi.linkedMap) && onPoiEntered) {
+            onPoiEntered(poi.linkedMap);
+        }
+    }, [onPoiEntered]);
+
     // ─── Hex hover tracking ─────────────────────────────────────────────
 
     const handleHexHover = useCallback((e) => {
@@ -519,6 +586,13 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             .catch(err => console.error('Failed to save hex map data:', err));
     }, [campaignName, mapName, terrain, rivers, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition]);
 
+    const viewPortBounds = useMemo(() => ({
+        left: panX,
+        top: panY,
+        right: panX + svgWidth / zoom,
+        bottom: panY + svgHeight / zoom,
+    }), [panX, panY, svgWidth, svgHeight, zoom]);
+
     // ─── Sync state to refs for use in event handlers ──────────────────
 
     useEffect(() => { zoomValueRef.current = zoom; }, [zoom]);
@@ -623,6 +697,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             onPoiContextMenu={handlePoiContextMenu}
                             poiDragging={poiDragging}
                             poiHover={null}
+                            isLocalhost={isLocalhost}
+                            partyPosition={partyPosition}
+                            onPoiEnter={handlePoiEnter}
+                            validLinkedMaps={validLinkedMaps}
                         />
                         <PartyMarkerLayer
                             position={partyPosition}
@@ -675,8 +753,12 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             onToggleVisibility={handleTogglePoiVisibility}
                             onDelete={handleDeletePoi}
                             onRename={handleRenamePoi}
+                            onLinkMap={handleLinkMap}
+                            onUnlinkMap={handleUnlinkMap}
                             onClose={() => { setSelectedPoiMenu(null); setShowRename(null); }}
                             setShowRename={setShowRename}
+                            indoorMaps={indoorMaps}
+                            viewPortBounds={viewPortBounds}
                         />
                     </svg>
 

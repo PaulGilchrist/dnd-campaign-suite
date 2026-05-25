@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cloneDeep } from 'lodash';
 import './App.css';
 import CharSheet from './components/char-sheet/CharSheet.jsx';
@@ -60,6 +60,24 @@ function App() {
   // activeView: null | 'charSheet' | 'mapsManager' | 'encounter' | 'notes' | 'npcs' | 'initiative'
   // type: 'none' | 'manager' | 'map'
   // When type is 'map', mapName holds the sanitized map filename (e.g. 'dungeon-level-1')
+  // Navigation stack for indoor map entry (POI, encounter) — push on enter, pop on back
+  const mapHistoryRef = useRef([]);
+
+  const handleEnterMap = useCallback((mapName) => {
+    if (mapsView.type === 'map' && mapsView.mapName) {
+      mapHistoryRef.current.push(mapsView.mapName);
+    }
+    setMapsView({ type: 'map', mapName });
+  }, [mapsView]);
+
+  const handleBackFromMap = useCallback(() => {
+    if (mapHistoryRef.current.length > 0) {
+      const prevMap = mapHistoryRef.current.pop();
+      setMapsView({ type: 'map', mapName: prevMap });
+    } else {
+      setMapsView({ type: isLocalhost ? 'manager' : 'none' });
+    }
+  }, [isLocalhost]);
 
   const [theme, setTheme] = useState(() => {
     try {
@@ -100,6 +118,7 @@ function App() {
       // Already viewing a map — go back to the manager listing (GM only)
       if (isLocalhost) {
         setMapsView({ type: 'manager' });
+        mapHistoryRef.current = []; // clear history when going back to manager
       }
       // Players: already on their only view, do nothing
     } else if (activeView === 'mapsManager') {
@@ -267,8 +286,9 @@ function App() {
             npcs={npcs}
             isLocalhost={isLocalhost}
             mapName={mapsView.mapName}
-            onBack={() => setMapsView({ type: isLocalhost ? 'manager' : 'none' })}
-            onEncounterCreated={(mapName) => setMapsView({ type: 'map', mapName })}
+            onBack={handleBackFromMap}
+            onEncounterCreated={handleEnterMap}
+            onPoiEntered={handleEnterMap}
           />
         )}
         {activeView === 'encounter' && (

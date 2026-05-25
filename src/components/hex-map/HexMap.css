@@ -261,6 +261,29 @@
     outline: none;
 }
 
+/* Context menu list picker (e.g. Link to Map) */
+.context-menu-list {
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 3px;
+    overflow-y: auto;
+}
+
+.context-menu-list-item {
+    padding: 4px 8px;
+    color: #ccc;
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.context-menu-list-item:hover {
+    background: #4a4a4a;
+    color: #fff;
+}
+
 /* Marching Order Panel */
 .marching-order-panel {
     position: absolute;
@@ -509,4 +532,9 @@
     color: #ccc;
     font-size: 14px;
     font-weight: bold;
+}
+
+/* Enterable POI cursor */
+.poi-item-enterable {
+    cursor: pointer;
 }

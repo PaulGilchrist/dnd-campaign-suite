@@ -42,7 +42,7 @@ import '../hex-map/HexMap.css';
 
 const CELL_SIZE = 40;
 
-function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onEncounterCreated }) {
+function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onEncounterCreated, onPoiEntered }) {
     const [gridSize, setGridSize] = useState(20);
     const SVG_SIZE = gridSize * CELL_SIZE;
     const [mapData, setMapData] = useState(null);
@@ -531,7 +531,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
 
     // Outdoor map dispatcher — render HexMap for outdoor terrain maps
     if (mapData?.type === 'outdoor') {
-        return <HexMap campaignName={campaignName} mapName={mapName} onBack={onBack} characters={characters} onEncounterCreated={onEncounterCreated} />;
+        return <HexMap campaignName={campaignName} mapName={mapName} onBack={onBack} characters={characters} onEncounterCreated={onEncounterCreated} isLocalhost={isLocalhost} onPoiEntered={onPoiEntered} />;
     }
 
     const { players, walls } = mapData;
@@ -551,6 +551,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
                 zoomIn={zoomIn}
                 zoomOut={zoomOut}
                 resetView={resetView}
+                onBack={onBack}
             />
             <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
             <svg
