@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { TRAVEL_PACES, formatTravelTime, getHexTravelTime } from '../../services/travelService.js';
+import { EVENT_FREQUENCIES } from '../../services/randomEventService.js';
 
 function TravelPanel({
   travelMode,
@@ -12,7 +13,9 @@ function TravelPanel({
   lastMessage,
   hexesRemaining,
   isTravelActive,
+  pendingEvent,
   terrain,
+  eventFrequency,
   onChangePace,
   onAdvance,
   onCancel,
@@ -20,6 +23,7 @@ function TravelPanel({
   onForcedMarch,
   weather,
   onReRollWeather,
+  onSetEventFrequency,
 }) {
   const panelRef = useRef(null);
   const dragState = useRef(null);
@@ -64,7 +68,7 @@ function TravelPanel({
   const budgetPct = dailyBudget > 0 ? Math.min(100, (accruedCost / dailyBudget) * 100) : 0;
   const budgetRemaining = Math.max(0, dailyBudget - accruedCost);
 
-  const advanceDisabled = dayExhausted || pathIndex >= path.length;
+  const advanceDisabled = dayExhausted || pathIndex >= path.length || !!pendingEvent;
 
   const currentHex = path[pathIndex];
   const currentTerrain = currentHex ? terrain[`${currentHex.q},${currentHex.r}`] || 'plains' : null;
@@ -111,6 +115,22 @@ function TravelPanel({
           </button>
         </div>
       )}
+
+      <div className="travel-panel-frequency">
+        <span className="travel-panel-label">Events:</span>
+        <div className="travel-frequency-buttons">
+          {Object.entries(EVENT_FREQUENCIES).map(([key, f]) => (
+            <button
+              key={key}
+              className={`travel-frequency-btn ${eventFrequency === key ? 'active' : ''}`}
+              onClick={() => onSetEventFrequency(key)}
+              title={`${f.label}: ${Math.round(f.chance * 100)}% chance per hex`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="travel-panel-pace">
         <span className="travel-panel-label">Pace:</span>

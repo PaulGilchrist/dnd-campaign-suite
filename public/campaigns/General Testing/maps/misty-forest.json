@@ -988,8 +988,8 @@
     }
   ],
   "zoom": 2.44140625,
-  "panX": 1240.378178833358,
-  "panY": 381.9699192980523,
+  "panX": 872.616177958088,
+  "panY": 502.2494185997528,
   "marchingOrder": [
     "Monk",
     "Paladin",
@@ -997,8 +997,8 @@
     "Warlock"
   ],
   "partyPosition": {
-    "q": 28,
-    "r": 13
+    "q": 18,
+    "r": 21
   },
   "weather": {
     "condition": "wind",

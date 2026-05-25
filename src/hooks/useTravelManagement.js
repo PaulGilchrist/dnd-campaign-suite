@@ -5,6 +5,11 @@ import {
   getHexMoveCost,
   TRAVEL_PACES,
 } from '../services/travelService.js';
+import {
+  shouldTriggerEvent,
+  generateRandomEvent,
+} from '../services/randomEventService.js';
+import { generateEncounterSuggestions } from '../services/encounterGenerator.js';
 
 const MODES = {
   INACTIVE: 'inactive',
@@ -13,7 +18,21 @@ const MODES = {
   PAUSED: 'paused',
 };
 
-export default function useTravelManagement({ gridSize, terrain, partyPosition, onPartyMove, weather }) {
+const TERRAIN_TO_ENVIRONMENT = {
+  plains: ['grassland', 'desert'],
+  forest: ['forest'],
+  hills: ['hills', 'grassland'],
+  mountains: ['mountain'],
+  desert: ['desert'],
+  swamp: ['swamp'],
+  tundra: ['arctic'],
+  beach: ['coastal'],
+};
+
+export default function useTravelManagement({
+  gridSize, terrain, partyPosition, onPartyMove, weather,
+  monsters, playerLevels,
+}) {
   const [travelMode, setTravelMode] = useState(MODES.INACTIVE);
   const [travelPace, setTravelPace] = useState('normal');
   const [destination, setDestination] = useState(null);
@@ -24,6 +43,9 @@ export default function useTravelManagement({ gridSize, terrain, partyPosition, 
   const [dayExhausted, setDayExhausted] = useState(false);
   const [travelLog, setTravelLog] = useState([]);
   const [lastMessage, setLastMessage] = useState(null);
+  const [pendingEvent, setPendingEvent] = useState(null);
+  const [eventFrequency, setEventFrequency] = useState('normal');
+  const [rerollsRemaining, setRerollsRemaining] = useState(3);
 
   const pathRef = useRef([]);
   const pathIndexRef = useRef(0);
@@ -43,6 +65,31 @@ export default function useTravelManagement({ gridSize, terrain, partyPosition, 
     if (mod === null) return null;
     return base * (mod ?? 1);
   }, []);
+
+  const enhanceCombatEvent = useCallback((event, terrainType) => {
+    if (event.type !== 'combat' || !monsters || monsters.length === 0 || !playerLevels || playerLevels.length === 0) {
+      return event;
+    }
+    const environments = TERRAIN_TO_ENVIRONMENT[terrainType] || ['grassland'];
+    const suggestions = generateEncounterSuggestions({
+      monsters,
+      playerLevels,
+      difficulty: 1,
+      environments,
+      count: 1,
+    });
+    if (suggestions.length === 0) return event;
+
+    const enc = suggestions[0];
+    return {
+      ...event,
+      encounter: {
+        monsters: enc.monsters.map(m => ({ index: m.index, name: m.name, qty: m.qty })),
+        difficultyLabel: enc.difficultyLabel,
+        totalXP: enc.totalXP,
+      },
+    };
+  }, [monsters, playerLevels]);
 
   const startPlanning = useCallback(() => {
     setTravelMode(MODES.PLANNING);
@@ -85,7 +132,7 @@ export default function useTravelManagement({ gridSize, terrain, partyPosition, 
     const nextIdx = currentIdx + 1;
 
     if (!currentPath || currentPath.length < 2 || nextIdx >= currentPath.length) {
-      return false;
+      return { moved: false };
     }
 
     const nextHex = currentPath[nextIdx];
@@ -96,14 +143,14 @@ export default function useTravelManagement({ gridSize, terrain, partyPosition, 
       if (weather?.moveCostMod === null) {
         setLastMessage(`Extreme ${weather.label?.toLowerCase() || 'weather'} makes travel impossible. Camp and wait it out.`);
       }
-      return false;
+      return { moved: false };
     }
 
     const newAccrued = accruedCost + cost;
     if (newAccrued > dailyBudget) {
       setDayExhausted(true);
       setLastMessage(`The party has exhausted their travel budget for the day. Camp for the night or push into forced march?`);
-      return false;
+      return { moved: false };
     }
 
     if (onPartyMove) onPartyMove(nextHex);
@@ -116,17 +163,30 @@ export default function useTravelManagement({ gridSize, terrain, partyPosition, 
     if (arrived) {
       setTravelMode(MODES.INACTIVE);
       setLastMessage('The party has arrived at their destination.');
+      return { moved: true, arrived: true };
     }
 
-    return true;
-  }, [accruedCost, dailyBudget, terrain, onPartyMove, weather]);
+    if (shouldTriggerEvent(tileTerrain, weather, eventFrequency)) {
+      let event = generateRandomEvent(tileTerrain);
+      event = enhanceCombatEvent(event, tileTerrain);
+      setPendingEvent(event);
+      setTravelMode(MODES.PAUSED);
+      setLastMessage(`⚡ ${event.title}`);
+      return { moved: true, event };
+    }
+
+    return { moved: true };
+  }, [accruedCost, dailyBudget, terrain, onPartyMove, weather, eventFrequency, enhanceCombatEvent]);
 
   const forceCamp = useCallback(() => {
     setAccruedCost(0);
     setDayExhausted(false);
     setDailyBudget(effectiveBudgetForPace(travelPace, weather));
+    setRerollsRemaining(3);
+    setPendingEvent(null);
+    if (travelMode === MODES.PAUSED) setTravelMode(MODES.PLANNING);
     setLastMessage('A new day dawns. Travel budget refreshed.');
-  }, [travelPace, effectiveBudgetForPace, weather]);
+  }, [travelPace, effectiveBudgetForPace, weather, travelMode]);
 
   const forcedMarch = useCallback(() => {
     setDayExhausted(false);
@@ -149,6 +209,41 @@ export default function useTravelManagement({ gridSize, terrain, partyPosition, 
 
   const hexesRemaining = Math.max(0, path.length - 1 - pathIndex);
 
+  const clearEvent = useCallback(() => {
+    setPendingEvent(null);
+    if (travelMode === MODES.PAUSED) {
+      setTravelMode(MODES.PLANNING);
+    }
+    setLastMessage(null);
+  }, [travelMode]);
+
+  const acceptEvent = useCallback(() => {
+    const evt = pendingEvent;
+    clearEvent();
+    return evt;
+  }, [pendingEvent, clearEvent]);
+
+  const skipEvent = useCallback(() => {
+    clearEvent();
+  }, [clearEvent]);
+
+  const rerollEvent = useCallback(() => {
+    if (rerollsRemaining <= 0) return;
+    setRerollsRemaining(prev => prev - 1);
+    const pos = currentPosition || partyPosition;
+    if (!pos) return;
+    const key = `${pos.q},${pos.r}`;
+    const tileTerrain = terrain[key] || 'plains';
+    let newEvent = generateRandomEvent(tileTerrain);
+    newEvent = enhanceCombatEvent(newEvent, tileTerrain);
+    setPendingEvent(newEvent);
+    setLastMessage(`⚡ ${newEvent.title}`);
+  }, [rerollsRemaining, currentPosition, partyPosition, terrain, enhanceCombatEvent]);
+
+  const handleSetEventFrequency = useCallback((freq) => {
+    setEventFrequency(freq);
+  }, []);
+
   return {
     travelMode,
     travelPace,
@@ -160,6 +255,9 @@ export default function useTravelManagement({ gridSize, terrain, partyPosition, 
     dayExhausted,
     travelLog,
     lastMessage,
+    pendingEvent,
+    eventFrequency,
+    rerollsRemaining,
     currentPosition,
     remainingSteps,
     paceInfo,
@@ -173,6 +271,10 @@ export default function useTravelManagement({ gridSize, terrain, partyPosition, 
     advanceOneHex,
     forceCamp,
     forcedMarch,
+    acceptEvent,
+    skipEvent,
+    rerollEvent,
+    setEventFrequency: handleSetEventFrequency,
     setTravelLog,
     setLastMessage,
   };

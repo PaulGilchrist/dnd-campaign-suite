@@ -995,6 +995,259 @@
     95.6% { opacity: 0; }
 }
 
+/* ── Event Frequency ─────────────────────────────────────── */
+
+.travel-panel-frequency {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.travel-frequency-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.travel-frequency-btn {
+    background: #333;
+    border: 1px solid #555;
+    color: #bbb;
+    padding: 3px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 10px;
+    transition: all 0.15s;
+}
+
+.travel-frequency-btn:hover {
+    background: #444;
+    color: #eee;
+}
+
+.travel-frequency-btn.active {
+    background: #8a5a3a;
+    border-color: #b87a4a;
+    color: #fff;
+}
+
+/* ── Event Dialog ────────────────────────────────────────── */
+
+.event-dialog-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 30;
+}
+
+.event-dialog {
+    background: #1e1e1e;
+    border: 1px solid #555;
+    border-radius: 10px;
+    width: 460px;
+    max-width: 90%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+    overflow: hidden;
+}
+
+.event-dialog-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    background: #2a2a2a;
+    border-left: 4px solid #888;
+}
+
+.event-dialog-icon {
+    font-size: 22px;
+    width: 32px;
+    text-align: center;
+}
+
+.event-dialog-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.event-dialog-type {
+    font-size: 10px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.event-dialog-title {
+    font-size: 15px;
+    color: #e0e0e0;
+    font-weight: 600;
+}
+
+.event-dialog-body {
+    padding: 16px;
+}
+
+.event-dialog-description {
+    color: #ccc;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 0 0 8px 0;
+}
+
+.event-dialog-terrain {
+    color: #777;
+    font-size: 11px;
+    font-style: italic;
+}
+
+.event-encounter-info {
+    background: #2a1520;
+    border: 1px solid #4a2a35;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 10px 0;
+}
+
+.event-encounter-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.event-encounter-difficulty {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 3px;
+}
+
+.event-encounter-difficulty[data-difficulty="Easy"] {
+    color: #6a6;
+    background: rgba(100, 160, 100, 0.15);
+}
+
+.event-encounter-difficulty[data-difficulty="Medium"] {
+    color: #cc0;
+    background: rgba(200, 200, 0, 0.15);
+}
+
+.event-encounter-difficulty[data-difficulty="Hard"] {
+    color: #e87040;
+    background: rgba(220, 120, 60, 0.15);
+}
+
+.event-encounter-difficulty[data-difficulty="Deadly"] {
+    color: #d44;
+    background: rgba(200, 50, 50, 0.15);
+}
+
+.event-encounter-xp {
+    color: #999;
+    font-size: 11px;
+    margin-left: auto;
+}
+
+.event-monster-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.event-monster-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #bbb;
+    font-size: 12px;
+}
+
+.event-monster-item i {
+    color: #b44;
+    font-size: 11px;
+    width: 14px;
+    text-align: center;
+}
+
+.event-monster-qty {
+    color: #e0e0e0;
+    font-weight: 700;
+    min-width: 24px;
+}
+
+.event-monster-name {
+    color: #ddd;
+}
+
+.event-dialog-actions {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid #333;
+    justify-content: flex-end;
+}
+
+.event-btn {
+    padding: 7px 16px;
+    border-radius: 5px;
+    border: 1px solid #555;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+}
+
+.event-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.event-btn-accept {
+    background: #2d5a2d;
+    border-color: #3a8a3a;
+    color: #fff;
+}
+
+.event-btn-accept:hover:not(:disabled) {
+    background: #3a7a3a;
+}
+
+.event-btn-skip {
+    background: #444;
+    border-color: #666;
+    color: #ddd;
+}
+
+.event-btn-skip:hover:not(:disabled) {
+    background: #555;
+    color: #fff;
+}
+
+.event-btn-reroll {
+    background: #5a3a1a;
+    border-color: #8a6a2a;
+    color: #ffd700;
+}
+
+.event-btn-reroll:hover:not(:disabled) {
+    background: #7a4a2a;
+}
+
+.reroll-count {
+    font-size: 10px;
+    opacity: 0.8;
+}
+
 /* ── Travel Path Layer ───────────────────────────────────── */
 
 .travel-path-layer {

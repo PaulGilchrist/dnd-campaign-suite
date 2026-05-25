@@ -29,9 +29,11 @@ import LandmarkSVG from './svg/LandmarkSVG.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import useHexMapSSESync from './hooks/useHexMapSSESync.js';
 import useTravelManagement from '../../hooks/useTravelManagement.js';
+import { useMonstersData } from '../../hooks/useMonstersData.js';
 import TravelPanel from './TravelPanel.jsx';
 import TravelPathLayer from './TravelPathLayer.jsx';
 import WeatherOverlay from './WeatherOverlay.jsx';
+import EventDialog from './EventDialog.jsx';
 import './HexMap.css';
 
 function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered }) {
@@ -49,6 +51,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
 
     // Travel state
     const [weather, setWeather] = useState(null);
+    const { monsters } = useMonstersData();
+    const playerLevels = React.useMemo(
+        () => characters.map(c => c.level || 1),
+        [characters]
+    );
 
     const travelMgmt = useTravelManagement({
         gridSize,
@@ -56,6 +63,8 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         partyPosition,
         onPartyMove: setPartyPosition,
         weather,
+        monsters,
+        playerLevels,
     });
 
     const handleGenerateWeather = useCallback(() => {
@@ -75,6 +84,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             travelMgmt.changePace(travelMgmt.travelPace);
         }
     }, [handleGenerateWeather, travelMgmt]);
+
+    const handleAdvance = useCallback(() => {
+        const result = travelMgmt.advanceOneHex();
+        return result;
+    }, [travelMgmt]);
 
     // Tool state
     const [tool, setTool] = useState(TOOL_NONE);         // current tool mode
@@ -419,12 +433,17 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         setRivers(result);
     }, [terrain, gridSize]);
 
-    const handleStartEncounter = useCallback(async (q, r) => {
+    const handleStartEncounter = useCallback(async (q, r, extraPlacedItems = []) => {
         const terrainType = terrain[hexKey(q, r)] || 'plains';
         const grid = 30;
         const encounterData = generateOutdoorEncounter(terrainType, grid, marchingOrder, q, r);
         const baseMapName = mapName.replace(/\.json$/, '');
         const encounterName = `${baseMapName}-encounter-at-${q}-${r}`;
+
+        // Merge extra items (monsters) into placed items
+        if (extraPlacedItems.length > 0) {
+            encounterData.placedItems = [...encounterData.placedItems, ...extraPlacedItems];
+        }
 
         try {
             const result = await mapsService.createMap(campaignName, encounterName, {
@@ -451,6 +470,70 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             console.error('[handleStartEncounter] FAILED:', err);
         }
     }, [campaignName, mapName, terrain, marchingOrder, onEncounterCreated]);
+
+    function generateMonsterPlacements(monsters, gridSize) {
+        const center = Math.floor(gridSize / 2);
+        const items = [];
+        let idCounter = 0;
+        const occupied = new Set();
+
+        for (const group of monsters) {
+            for (let i = 0; i < group.qty; i++) {
+                let attempts = 0;
+                let gx, gy, key;
+                do {
+                    const angle = Math.random() * Math.PI * 2;
+                    const distance = 6 + Math.random() * 6;
+                    gx = Math.round(center + Math.cos(angle) * distance);
+                    gy = Math.round(center + Math.sin(angle) * distance);
+                    gx = Math.max(1, Math.min(gridSize - 2, gx));
+                    gy = Math.max(1, Math.min(gridSize - 2, gy));
+                    key = `${gx},${gy}`;
+                    attempts++;
+                } while (occupied.has(key) && attempts < 20);
+
+                occupied.add(key);
+                items.push({
+                    id: `enc-monster-${idCounter++}`,
+                    type: 'npc',
+                    name: group.name,
+                    gridX: gx,
+                    gridY: gy,
+                    visible: true,
+                });
+            }
+        }
+
+        return items;
+    }
+
+    const handleEventAccept = useCallback(() => {
+        const evt = travelMgmt.acceptEvent();
+        if (evt?.type === 'combat') {
+            const pos = travelMgmt.currentPosition || partyPosition;
+            if (pos && evt.encounter?.monsters) {
+                const grid = 30;
+                const monsterItems = generateMonsterPlacements(evt.encounter.monsters, grid);
+                handleStartEncounter(pos.q, pos.r, monsterItems);
+            } else if (pos) {
+                handleStartEncounter(pos.q, pos.r);
+            }
+        }
+        if (evt?.type === 'weatherChange') {
+            handleGenerateWeather();
+            if (travelMgmt.isTravelActive) {
+                travelMgmt.changePace(travelMgmt.travelPace);
+            }
+        }
+    }, [travelMgmt, partyPosition, handleStartEncounter, handleGenerateWeather]);
+
+    const handleEventSkip = useCallback(() => {
+        travelMgmt.skipEvent();
+    }, [travelMgmt]);
+
+    const handleEventReroll = useCallback(() => {
+        travelMgmt.rerollEvent();
+    }, [travelMgmt]);
 
     const handlePoiContextMenu = useCallback((poiId, e) => {
         const poi = pois.find(p => p.id === poiId);
@@ -786,7 +869,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             contextMenuOpen={partyContextMenu !== null && partyContextMenu.q === (partyPosition?.q) && partyContextMenu.r === (partyPosition?.r)}
                             onContextMenu={(q, r) => setPartyContextMenu({ q, r })}
                             travelMode={travelMgmt.travelMode}
-                            onAdvance={travelMgmt.advanceOneHex}
+                            onAdvance={handleAdvance}
                             onCancelTravel={travelMgmt.cancelTravel}
                         />
 
@@ -891,14 +974,25 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 paceInfo={travelMgmt.paceInfo}
                 hexesRemaining={travelMgmt.hexesRemaining}
                 isTravelActive={travelMgmt.isTravelActive}
+                pendingEvent={travelMgmt.pendingEvent}
                 terrain={terrain}
+                eventFrequency={travelMgmt.eventFrequency}
                 onChangePace={travelMgmt.changePace}
-                onAdvance={travelMgmt.advanceOneHex}
+                onAdvance={handleAdvance}
                 onCancel={travelMgmt.cancelTravel}
                 onForceCamp={handleForceCamp}
                 onForcedMarch={travelMgmt.forcedMarch}
                 weather={weather}
                 onReRollWeather={handleReRollWeather}
+                onSetEventFrequency={travelMgmt.setEventFrequency}
+            />
+
+            <EventDialog
+                event={travelMgmt.pendingEvent}
+                rerollsRemaining={travelMgmt.rerollsRemaining}
+                onAccept={handleEventAccept}
+                onSkip={handleEventSkip}
+                onReroll={handleEventReroll}
             />
         </div>
     );
