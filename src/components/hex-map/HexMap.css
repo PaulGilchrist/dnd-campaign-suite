@@ -538,3 +538,251 @@
 .poi-item-enterable {
     cursor: pointer;
 }
+
+/* ── Travel Panel ────────────────────────────────────────── */
+
+.travel-panel {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 520px;
+    max-width: 90%;
+    max-width: 90%;
+    background: #1e1e1e;
+    border: 1px solid #FFD700;
+    border-radius: 8px;
+    z-index: 20;
+    padding: 10px 14px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.travel-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: grab;
+    user-select: none;
+}
+
+.travel-panel-title {
+    color: #FFD700;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.travel-panel-message {
+    flex: 1;
+    color: #8cf;
+    font-size: 11px;
+    font-style: italic;
+    text-align: center;
+}
+
+.travel-panel-close {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 2px 6px;
+}
+
+.travel-panel-close:hover {
+    color: #fff;
+}
+
+.travel-panel-exhausted {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #3a2a0a;
+    border: 1px solid #886600;
+    border-radius: 4px;
+    padding: 6px 10px;
+    color: #ffd700;
+    font-size: 11px;
+}
+
+.travel-panel-exhausted button {
+    background: #555;
+    border: 1px solid #777;
+    color: #eee;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+.travel-panel-exhausted button:hover {
+    background: #666;
+}
+
+.travel-btn-camp {
+    background: #2d5a2d !important;
+    border-color: #3a8a3a !important;
+}
+
+.travel-btn-camp:hover {
+    background: #3a7a3a !important;
+}
+
+.travel-btn-march {
+    background: #5a3a1a !important;
+    border-color: #8a6a2a !important;
+}
+
+.travel-btn-march:hover {
+    background: #7a4a2a !important;
+}
+
+.travel-panel-pace {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.travel-panel-label {
+    color: #aaa;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.travel-pace-buttons {
+    display: flex;
+    gap: 4px;
+}
+
+.travel-pace-btn {
+    background: #333;
+    border: 1px solid #555;
+    color: #bbb;
+    padding: 3px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.15s;
+}
+
+.travel-pace-btn:hover {
+    background: #444;
+    color: #eee;
+}
+
+.travel-pace-btn.active {
+    background: #4a90d9;
+    border-color: #357abd;
+    color: #fff;
+}
+
+.travel-panel-stats {
+    display: flex;
+    gap: 16px;
+}
+
+.travel-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.travel-stat-label {
+    color: #888;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.travel-stat-value {
+    color: #e0e0e0;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.travel-panel-budget-bar {
+    position: relative;
+    height: 14px;
+    background: #333;
+    border-radius: 7px;
+    overflow: hidden;
+}
+
+.travel-budget-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4a90d9, #FFD700);
+    border-radius: 7px;
+    transition: width 0.3s ease;
+    min-width: 0;
+}
+
+.travel-budget-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+
+.travel-panel-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.travel-btn-advance {
+    flex: 1;
+    background: #2d5a2d;
+    border: 1px solid #3a8a3a;
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.travel-btn-advance:hover:not(:disabled) {
+    background: #3a7a3a;
+}
+
+.travel-btn-advance:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.travel-btn-cancel {
+    background: #444;
+    border: 1px solid #666;
+    color: #ddd;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.travel-btn-cancel:hover {
+    background: #555;
+    color: #fff;
+}
+
+/* ── Travel Path Layer ───────────────────────────────────── */
+
+.travel-path-layer {
+    pointer-events: none;
+}

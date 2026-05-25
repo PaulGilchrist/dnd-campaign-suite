@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import * as mapsService from '../../services/mapsService.js';
 import {
     HEX_SIZE, DEFAULT_GRID_SIZE, DEFAULT_TERRAIN, MIN_ZOOM, MAX_ZOOM,
-    TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_PAN,
+    TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_PAN, TOOL_TRAVEL,
     TERRAIN_TYPES, POI_TYPES
 } from '../../config/outdoorConfig.js';
 import { generateRiversFromTerrain } from '../../services/hexTerrainGenerator.js';
@@ -27,6 +27,9 @@ import NaturalWonderSVG from './svg/NaturalWonderSVG.jsx';
 import LandmarkSVG from './svg/LandmarkSVG.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import useHexMapSSESync from './hooks/useHexMapSSESync.js';
+import useTravelManagement from '../../hooks/useTravelManagement.js';
+import TravelPanel from './TravelPanel.jsx';
+import TravelPathLayer from './TravelPathLayer.jsx';
 import './HexMap.css';
 
 function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered }) {
@@ -41,6 +44,14 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const [marchingOrder, setMarchingOrder] = useState([]);  // ordered character names
     const [partyPosition, setPartyPosition] = useState(null); // {hexQ, hexR} | null
     const [marchingOpen, setMarchingOpen] = useState(false);  // panel toggle
+
+    // Travel state
+    const travelMgmt = useTravelManagement({
+        gridSize,
+        terrain,
+        partyPosition,
+        onPartyMove: setPartyPosition,
+    });
 
     // Tool state
     const [tool, setTool] = useState(TOOL_NONE);         // current tool mode
@@ -71,6 +82,26 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const accumulatedDeltaRef = useRef(0);
     const isInitialized = useRef(false);
     const hasLoaded = useRef(false);
+    const toolInitRef = useRef(true);
+
+    // Sync tool ↔ travel management state
+    useEffect(() => {
+        if (toolInitRef.current) {
+            toolInitRef.current = false;
+            return;
+        }
+        if (tool === TOOL_TRAVEL && travelMgmt.travelMode === 'inactive') {
+            travelMgmt.startPlanning();
+        } else if (tool !== TOOL_TRAVEL && travelMgmt.isTravelActive) {
+            travelMgmt.cancelTravel();
+        }
+    }, [tool]);
+
+    useEffect(() => {
+        if (travelMgmt.travelMode === 'inactive' && tool === TOOL_TRAVEL) {
+            setTool(TOOL_NONE);
+        }
+    }, [travelMgmt.travelMode]);
 
     // Fetch available indoor maps for POI linking
     useEffect(() => {
@@ -662,7 +693,21 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={handleDrop}
                         onContextMenu={(e) => e.preventDefault()}
-                        onClick={() => { setSelectedPoiMenu(null); setShowRename(null); setPartyContextMenu(null); }}
+                        onClick={(e) => {
+                            setSelectedPoiMenu(null);
+                            setShowRename(null);
+                            setPartyContextMenu(null);
+                            if (tool === TOOL_TRAVEL && partyPosition) {
+                                const hex = getHexFromEvent(e);
+                                if (!hex) return;
+                                if (hex.q < 0 || hex.q >= gridSize || hex.r < 0 || hex.r >= gridSize) return;
+                                if (hex.q === partyPosition.q && hex.r === partyPosition.r) return;
+                                if (!travelMgmt.isTravelActive || travelMgmt.travelMode === travelMgmt.MODES.INACTIVE) {
+                                    travelMgmt.startPlanning();
+                                }
+                                travelMgmt.setDestinationAndPath(hex);
+                            }
+                        }}
                         style={{
                             cursor: panning
                                 ? 'grabbing'
@@ -711,6 +756,15 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             onEncounter={handleStartEncounter}
                             contextMenuOpen={partyContextMenu !== null && partyContextMenu.q === (partyPosition?.q) && partyContextMenu.r === (partyPosition?.r)}
                             onContextMenu={(q, r) => setPartyContextMenu({ q, r })}
+                            travelMode={travelMgmt.travelMode}
+                            onAdvance={travelMgmt.advanceOneHex}
+                            onCancelTravel={travelMgmt.cancelTravel}
+                        />
+
+                        <TravelPathLayer
+                            path={travelMgmt.path}
+                            pathIndex={travelMgmt.pathIndex}
+                            partyPosition={partyPosition}
                         />
 
                     {/* Hovered hex highlight (only when paint/erase active) */}
@@ -791,6 +845,28 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     characters={characters}
                 />
             )}
+
+            {/* Travel Panel overlay */}
+            <TravelPanel
+                travelMode={travelMgmt.travelMode}
+                travelPace={travelMgmt.travelPace}
+                destination={travelMgmt.destination}
+                path={travelMgmt.path}
+                pathIndex={travelMgmt.pathIndex}
+                accruedCost={travelMgmt.accruedCost}
+                dailyBudget={travelMgmt.dailyBudget}
+                dayExhausted={travelMgmt.dayExhausted}
+                lastMessage={travelMgmt.lastMessage}
+                paceInfo={travelMgmt.paceInfo}
+                hexesRemaining={travelMgmt.hexesRemaining}
+                isTravelActive={travelMgmt.isTravelActive}
+                terrain={terrain}
+                onChangePace={travelMgmt.changePace}
+                onAdvance={travelMgmt.advanceOneHex}
+                onCancel={travelMgmt.cancelTravel}
+                onForceCamp={travelMgmt.forceCamp}
+                onForcedMarch={travelMgmt.forcedMarch}
+            />
         </div>
     );
 }

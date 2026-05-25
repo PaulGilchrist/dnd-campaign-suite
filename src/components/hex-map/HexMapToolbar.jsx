@@ -1,5 +1,5 @@
 import React from 'react';
-import { TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER } from '../../config/outdoorConfig';
+import { TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_TRAVEL } from '../../config/outdoorConfig';
 
 function HexMapToolbar({
     onBack,
@@ -71,6 +71,15 @@ function HexMapToolbar({
                 title="Auto-generate rivers from terrain elevation"
             >
                 <i className="fa-solid fa-wand-magic-sparkles"></i>
+            </button>
+
+            {/* Travel tool */}
+            <button
+                className={tool === TOOL_TRAVEL ? 'active' : ''}
+                onClick={() => setTool(tool === TOOL_TRAVEL ? TOOL_NONE : TOOL_TRAVEL)}
+                title="Travel mode — plan and execute overland travel"
+            >
+                <i className="fa-solid fa-route"></i>
             </button>
 
             {/* POI panel toggle */}

@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { hexToPixel, pixelToHexSnapped, hexToSVGPath } from '../../services/hexMapUtils.js';
 
-function PartyMarkerLayer({ position, HEX_SIZE, gridSize, onPositionChange, svgRef, onEncounter, contextMenuOpen, onContextMenu }) {
+function PartyMarkerLayer({ position, HEX_SIZE, gridSize, onPositionChange, svgRef, onEncounter, contextMenuOpen, onContextMenu, travelMode, onAdvance, onCancelTravel }) {
     const draggingRef = useRef(false);
 
     if (!position) return null;
@@ -24,7 +24,7 @@ function PartyMarkerLayer({ position, HEX_SIZE, gridSize, onPositionChange, svgR
     };
 
     const handlePointerDown = (e) => {
-        if (e.button === 2) return;
+        if (e.button === 2 || disabled) return;
         e.preventDefault();
         e.stopPropagation();
         draggingRef.current = true;
@@ -57,6 +57,16 @@ function PartyMarkerLayer({ position, HEX_SIZE, gridSize, onPositionChange, svgR
         if (onEncounter) onEncounter(position.q, position.r);
     };
 
+    const handleAdvance = () => {
+        if (onAdvance) onAdvance();
+    };
+
+    const handleCancelTravel = () => {
+        if (onCancelTravel) onCancelTravel();
+    };
+
+    const disabled = travelMode && travelMode !== 'inactive';
+
     return (
         <g className="party-marker-layer">
             <path
@@ -83,7 +93,7 @@ function PartyMarkerLayer({ position, HEX_SIZE, gridSize, onPositionChange, svgR
             >
                 P
             </text>
-            {contextMenuOpen && (() => {
+            {contextMenuOpen && travelMode === 'inactive' && (() => {
                 const menuW = 140;
                 const menuH = 30;
                 const menuX = cx + 15;
@@ -101,6 +111,40 @@ function PartyMarkerLayer({ position, HEX_SIZE, gridSize, onPositionChange, svgR
                             pointerEvents="none"
                         >
                             Start Encounter
+                        </text>
+                    </g>
+                );
+            })()}
+
+            {contextMenuOpen && travelMode !== 'inactive' && (() => {
+                const menuW = 160;
+                const menuH = 70;
+                const menuX = cx + 15;
+                const menuY = cy - 35;
+                return (
+                    <g className="party-context-menu">
+                        <rect x={menuX} y={menuY} width={menuW} height={menuH} rx="4" fill="#2a2a2a" stroke="#FFD700" strokeWidth="1" />
+                        <rect x={menuX} y={menuY} width={menuW} height={menuH / 2 - 2} rx="4" fill="transparent" className="party-menu-hit" onClick={handleAdvance} />
+                        <text
+                            x={menuX + 8}
+                            y={menuY + 20}
+                            fill="#FFD700"
+                            fontSize="11"
+                            className="party-menu-text"
+                            pointerEvents="none"
+                        >
+                            Advance One Hex
+                        </text>
+                        <rect x={menuX} y={menuY + menuH / 2 + 2} width={menuW} height={menuH / 2 - 2} rx="4" fill="transparent" className="party-menu-hit" onClick={handleCancelTravel} />
+                        <text
+                            x={menuX + 8}
+                            y={menuY + menuH / 2 + 22}
+                            fill="#e88"
+                            fontSize="11"
+                            className="party-menu-text"
+                            pointerEvents="none"
+                        >
+                            Cancel Travel
                         </text>
                     </g>
                 );
