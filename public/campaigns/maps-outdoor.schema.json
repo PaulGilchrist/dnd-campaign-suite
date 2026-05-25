@@ -129,6 +129,24 @@
             },
             "description": "Characters in marching order by name"
         },
+        "weather": {
+            "type": "object",
+            "description": "Current weather conditions affecting travel",
+            "properties": {
+                "condition": {
+                    "type": "string",
+                    "enum": ["clear", "cloudy", "rain", "storm", "fog", "wind", "snow", "mist", "extreme"],
+                    "description": "Weather condition identifier"
+                },
+                "label": { "type": "string" },
+                "icon": { "type": "string" },
+                "visibility": { "type": ["number", "null"], "description": "Visibility limit in hexes, null = unlimited" },
+                "moveCostMod": { "type": ["number", "null"], "description": "Terrain cost multiplier" },
+                "budgetMod": { "type": "number", "description": "Daily budget multiplier" },
+                "encounterMod": { "type": "number", "description": "Encounter chance modifier" },
+                "description": { "type": "string" }
+            }
+        },
         "partyPosition": {
             "type": "object",
             "properties": {

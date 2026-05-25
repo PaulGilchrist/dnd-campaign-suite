@@ -1,17 +1,15 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { TRAVEL_PACES, formatTravelTime, getHexTravelTime } from '../../services/travelService.js';
 
 function TravelPanel({
   travelMode,
   travelPace,
-  destination,
   path,
   pathIndex,
   accruedCost,
   dailyBudget,
   dayExhausted,
   lastMessage,
-  paceInfo,
   hexesRemaining,
   isTravelActive,
   terrain,
@@ -20,6 +18,8 @@ function TravelPanel({
   onCancel,
   onForceCamp,
   onForcedMarch,
+  weather,
+  onReRollWeather,
 }) {
   const panelRef = useRef(null);
   const dragState = useRef(null);
@@ -93,6 +93,21 @@ function TravelPanel({
           </button>
           <button onClick={onForcedMarch} className="travel-btn-march">
             <i className="fa-solid fa-person-running"></i> Forced March
+          </button>
+        </div>
+      )}
+
+      {/* Weather section */}
+      {weather && (
+        <div className="travel-panel-weather">
+          <span className="travel-panel-label">Weather:</span>
+          <span className="travel-weather-icon">
+            <i className={`fa-solid fa-${weather.icon}`}></i>
+          </span>
+          <span className="travel-weather-label">{weather.label}</span>
+          <span className="travel-weather-desc">{weather.description}</span>
+          <button className="travel-weather-reroll" onClick={onReRollWeather} title="Re-roll weather">
+            <i className="fa-solid fa-dice"></i>
           </button>
         </div>
       )}

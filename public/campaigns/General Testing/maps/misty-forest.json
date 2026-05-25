@@ -903,7 +903,23 @@
     "28,29": "water",
     "29,29": "water"
   },
-  "rivers": [],
+  "rivers": [
+    "12,2",
+    "12,1",
+    "12,0",
+    "13,2",
+    "13,1",
+    "13,0",
+    "14,2",
+    "14,1",
+    "14,0",
+    "15,2",
+    "15,1",
+    "15,0",
+    "12,3",
+    "11,3",
+    "10,3"
+  ],
   "pois": [
     {
       "id": "kaelens-camp",
@@ -971,9 +987,9 @@
       "label": "Ancient Elven Road"
     }
   ],
-  "zoom": 3.0517578125,
-  "panX": 939.8317683077621,
-  "panY": 658.6604865713146,
+  "zoom": 2.44140625,
+  "panX": 1240.378178833358,
+  "panY": 381.9699192980523,
   "marchingOrder": [
     "Monk",
     "Paladin",
@@ -981,7 +997,17 @@
     "Warlock"
   ],
   "partyPosition": {
-    "q": 18,
-    "r": 16
+    "q": 28,
+    "r": 13
+  },
+  "weather": {
+    "condition": "wind",
+    "label": "High Wind",
+    "icon": "wind",
+    "visibility": null,
+    "moveCostMod": 1,
+    "budgetMod": 0.8,
+    "encounterMod": 5,
+    "description": "Strong winds — daily budget -20%"
   }
 }

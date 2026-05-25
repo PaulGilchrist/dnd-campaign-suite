@@ -6,6 +6,7 @@ import {
     TERRAIN_TYPES, POI_TYPES
 } from '../../config/outdoorConfig.js';
 import { generateRiversFromTerrain } from '../../services/hexTerrainGenerator.js';
+import { generateWeather } from '../../services/weatherService.js';
 import { hexKey, hexToPixel, pixelToHexSnapped, hexToSVGPath } from '../../services/hexMapUtils.js';
 import { generateOutdoorEncounter } from '../../services/outdoorEncounterGenerator.js';
 import TerrainLayer from './TerrainLayer.jsx';
@@ -30,6 +31,7 @@ import useHexMapSSESync from './hooks/useHexMapSSESync.js';
 import useTravelManagement from '../../hooks/useTravelManagement.js';
 import TravelPanel from './TravelPanel.jsx';
 import TravelPathLayer from './TravelPathLayer.jsx';
+import WeatherOverlay from './WeatherOverlay.jsx';
 import './HexMap.css';
 
 function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered }) {
@@ -46,12 +48,33 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const [marchingOpen, setMarchingOpen] = useState(false);  // panel toggle
 
     // Travel state
+    const [weather, setWeather] = useState(null);
+
     const travelMgmt = useTravelManagement({
         gridSize,
         terrain,
         partyPosition,
         onPartyMove: setPartyPosition,
+        weather,
     });
+
+    const handleGenerateWeather = useCallback(() => {
+        const terrainKey = partyPosition ? hexKey(partyPosition.q, partyPosition.r) : null;
+        const currentTerrain = terrainKey ? terrain[terrainKey] || 'plains' : 'plains';
+        setWeather(generateWeather(currentTerrain));
+    }, [partyPosition, terrain]);
+
+    const handleForceCamp = useCallback(() => {
+        travelMgmt.forceCamp();
+        handleGenerateWeather();
+    }, [travelMgmt, handleGenerateWeather]);
+
+    const handleReRollWeather = useCallback(() => {
+        handleGenerateWeather();
+        if (travelMgmt.isTravelActive) {
+            travelMgmt.changePace(travelMgmt.travelPace);
+        }
+    }, [handleGenerateWeather, travelMgmt]);
 
     // Tool state
     const [tool, setTool] = useState(TOOL_NONE);         // current tool mode
@@ -92,10 +115,13 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         }
         if (tool === TOOL_TRAVEL && travelMgmt.travelMode === 'inactive') {
             travelMgmt.startPlanning();
+            if (!weather) {
+                handleGenerateWeather();
+            }
         } else if (tool !== TOOL_TRAVEL && travelMgmt.isTravelActive) {
             travelMgmt.cancelTravel();
         }
-    }, [tool]);
+    }, [tool, weather, handleGenerateWeather]);
 
     useEffect(() => {
         if (travelMgmt.travelMode === 'inactive' && tool === TOOL_TRAVEL) {
@@ -150,6 +176,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const { handleSSEEvent } = useHexMapSSESync({
         campaignName, mapName, setGridSize, setTerrain, setRivers, setPois,
         setZoom, setPanX, setPanY, setMarchingOrder, setPartyPosition, setMapData,
+        setWeather,
     });
 
     // Computed SVG dimensions — corrected to account for full axial extent + hex shape
@@ -523,6 +550,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     setZoom(loadedZoom);
                     setPanX(loadedPanX);
                     setPanY(loadedPanY);
+                    if (existing.weather) setWeather(existing.weather);
 
                     // Initialize marching order from characters if empty
                     const loadOrder = existing.marchingOrder ||
@@ -611,11 +639,12 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             panX,
             panY,
             marchingOrder,
-            partyPosition
+            partyPosition,
+            weather,
         };
         mapsService.saveMapData(campaignName, mapName, dataToSave)
             .catch(err => console.error('Failed to save hex map data:', err));
-    }, [campaignName, mapName, terrain, rivers, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition]);
+    }, [campaignName, mapName, terrain, rivers, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition, weather]);
 
     const viewPortBounds = useMemo(() => ({
         left: panX,
@@ -824,6 +853,8 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             <text x="24" y="15" textAnchor="middle" fill="#c44" fontSize="6" fontWeight="bold">N</text>
                         </svg>
                     </div>
+
+                    <WeatherOverlay weather={weather} />
                 </div>
             )}
 
@@ -864,8 +895,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 onChangePace={travelMgmt.changePace}
                 onAdvance={travelMgmt.advanceOneHex}
                 onCancel={travelMgmt.cancelTravel}
-                onForceCamp={travelMgmt.forceCamp}
+                onForceCamp={handleForceCamp}
                 onForcedMarch={travelMgmt.forcedMarch}
+                weather={weather}
+                onReRollWeather={handleReRollWeather}
             />
         </div>
     );
