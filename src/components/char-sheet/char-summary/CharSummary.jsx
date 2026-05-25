@@ -11,7 +11,7 @@ import CharFeats from '../char-feats/CharFeats.jsx'
 import Popup from '../../common/Popup.jsx'
 import AvatarImage from '../../common/AvatarImage.jsx'
 import useTrackedResource from '../../../hooks/useTrackedResource.js'
-import useDiceRoll from '../../../hooks/useDiceRoll.js'
+import useLoggedDiceRoll from '../../../hooks/useLoggedDiceRoll.js'
 import LongRestButton from '../LongRestButton.jsx'
 import ShortRestButton from '../ShortRestButton.jsx'
 import ShortRestModal from '../ShortRestModal.jsx'
@@ -21,7 +21,7 @@ import CharConditions from './CharConditions.jsx'
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
 function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, onLongRest }) {
-    const { popupHtml, setPopupHtml, rollInitiative } = useDiceRoll();
+    const { popupHtml, setPopupHtml, rollInitiative } = useLoggedDiceRoll(playerStats.name, campaignName);
     const [showShortRest, setShowShortRest] = React.useState(false);
     const [showXpModal, setShowXpModal] = React.useState(false);
     const [xpDelta, setXpDelta] = React.useState('');

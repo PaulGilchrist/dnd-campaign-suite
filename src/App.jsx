@@ -19,6 +19,7 @@ import Notes from './components/notes/Notes.jsx';
 import Quests from './components/quests/Quests.jsx';
 import NPCs from './components/npcs/NPCs.jsx';
 import Factions from './components/factions/Factions.jsx';
+import Log from './components/log/Log.jsx';
 
 function App() {
   const appData = useAppData();
@@ -168,8 +169,14 @@ function App() {
   const handleFactionsClick = () => {
     if (activeView !== 'factions') {
       setActiveView('factions');
-    }
-  };
+      }
+    };
+
+  const handleLogClick = () => {
+    if (activeView !== 'campaignLog') {
+      setActiveView('campaignLog');
+       }
+     };
 
   const handleRenameCampaign = async () => {
     try {
@@ -221,9 +228,10 @@ function App() {
           theme={theme}
           toggleTheme={toggleTheme}
           isLocalhost={isLocalhost}
-          onNPCsClick={handleNPCsClick}
-          onFactionsClick={handleFactionsClick}
-        />
+           onNPCsClick={handleNPCsClick}
+         onFactionsClick={handleFactionsClick}
+         onLogClick={handleLogClick}
+          />
         {activeView === 'charSheet' && activeCharacter && (
           <CharSheet
             allAbilityScores={abilityScores}
@@ -288,15 +296,23 @@ function App() {
             onBack={handleBackFromNPCs}
           />
         )}
-        {activeView === 'factions' && (
-          <Factions
-            campaignName={campaignName}
-            characters={characters}
-            isLocalhost={isLocalhost}
-            onBack={() => setActiveView(null)}
-          />
-        )}
-        <br />
+          {activeView === 'factions' && (
+            <Factions
+             campaignName={campaignName}
+             characters={characters}
+             isLocalhost={isLocalhost}
+              onBack={() => setActiveView(null)}
+               />
+                 ) }
+
+                  { activeView === 'campaignLog' && (
+                       <Log
+                         campaignName={campaignName}
+                          characters={characters}
+                           />
+                            ) }
+
+                             <br />
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allRaces={races} allRaces2024={races2024} allClasses={classes} allSpells={spells} allSpells2024={spells2024} />}
         {showEditCharacterWizard && <CharacterCreationWizard onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allRaces={races} allClasses={classes} allSpells={spells} allSpells2024={spells2024} characterData={activeCharacter} isEditing={true} />}
       </div>

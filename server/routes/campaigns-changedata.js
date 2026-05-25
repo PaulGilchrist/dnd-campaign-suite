@@ -4,8 +4,9 @@ import { publish, characterChangeData, saveFile } from '../utils/changeData.js';
 const router = express.Router();
 
 // GET /api/campaigns/:campaign/:key - Generic GET from in-memory change data store
-router.get('/api/campaigns/:campaign/:key', (req, res) => {
+router.get('/api/campaigns/:campaign/:key', (req, res, next) => {
     const { campaign, key } = req.params;
+    if (key === 'log') return next();
     const data = characterChangeData.get(campaign);
 
     if (!data || !(key in data)) {
@@ -16,8 +17,9 @@ router.get('/api/campaigns/:campaign/:key', (req, res) => {
 });
 
 // POST /api/campaigns/:campaign/:key - Generic POST to in-memory change data store
-router.post('/api/campaigns/:campaign/:key', (req, res) => {
+router.post('/api/campaigns/:campaign/:key', (req, res, next) => {
     const { campaign, key } = req.params;
+    if (key === 'log') return next();
     const value = req.body.value || req.body;
 
 if (!characterChangeData.has(campaign)) {

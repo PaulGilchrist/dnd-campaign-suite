@@ -17,6 +17,7 @@ import campaignsCharacter from './server/routes/campaigns-character.js';
 import campaignsPositioning from './server/routes/campaigns-positioning.js';
 import campaignsChangedata from './server/routes/campaigns-changedata.js';
 import campaignsAdmin from './server/routes/campaigns-admin.js';
+import logRoutes from './server/routes/log.js';
 
 const PORT = process.env.PORT || 80;
 const persistDataDebounceMilliseconds = 1 * 60 * 1000; // 1 minute in milliseconds
@@ -101,3 +102,6 @@ app.use(campaignsChangedata);
 
 // Campaign admin routes (create, rename, delete campaign)
 app.use(campaignsAdmin);
+
+// Campaign log routes (must be before wildcard catch-all in sseRoutes)
+app.use(logRoutes);

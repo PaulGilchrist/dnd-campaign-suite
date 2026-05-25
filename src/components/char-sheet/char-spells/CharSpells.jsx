@@ -2,7 +2,7 @@
 import React from 'react'
 import { cloneDeep } from 'lodash';
 import useActionPopup from '../../../hooks/useActionPopup.js'
-import useDiceRoll from '../../../hooks/useDiceRoll.js'
+import useLoggedDiceRoll from '../../../hooks/useLoggedDiceRoll.js'
 import Popup from '../../common/Popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
@@ -11,7 +11,7 @@ import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName }) {
     const { showPopup, popupHtml, setPopupHtml } = useActionPopup('spell');
-    const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage } = useDiceRoll();
+    const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName);
 
     const getDamageFormula = (effect) => {
         const match = effect.match(/^(\d+d\d+(?:[+-]\d+)?)/);

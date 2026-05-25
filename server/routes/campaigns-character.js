@@ -9,8 +9,9 @@ const router = express.Router();
 // API endpoint to get a specific character file in a campaign
 // NOTE: This wildcard route must be mounted AFTER all specific resource routes
 // (maps, encounters, notes, npcs, quests, factions) to avoid intercepting them
-router.get('/api/campaigns/:campaign/:file', (req, res) => {
+router.get('/api/campaigns/:campaign/:file', (req, res, next) => {
     const { campaign, file } = req.params;
+    if (file === 'log') return next();
     const campaignDir = path.join(process.cwd(), 'public', 'campaigns', campaign);
     const filePath = path.join(campaignDir, file);
     
@@ -28,8 +29,9 @@ router.get('/api/campaigns/:campaign/:file', (req, res) => {
 });
 
 // API endpoint to update an existing character in a campaign
-router.put('/api/campaigns/:campaign/:file', (req, res) => {
+router.put('/api/campaigns/:campaign/:file', (req, res, next) => {
     const { campaign, file } = req.params;
+    if (file === 'log') return next();
     const character = req.body;
     
     if (!campaign || !file || !character) {
@@ -113,8 +115,9 @@ router.put('/api/campaigns/:campaign/:file', (req, res) => {
 });
 
 // API endpoint to delete a character file and its associated image
-router.delete('/api/campaigns/:campaign/:file', (req, res) => {
+router.delete('/api/campaigns/:campaign/:file', (req, res, next) => {
     const { campaign, file } = req.params;
+    if (file === 'log') return next();
     const campaignDir = path.join(process.cwd(), 'public', 'campaigns', campaign);
     const filePath = path.join(campaignDir, file);
     

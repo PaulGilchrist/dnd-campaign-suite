@@ -1,5 +1,5 @@
 
-import useDiceRoll from '../../hooks/useDiceRoll.js'
+import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import { buildAbilityDetailHtml } from '../../hooks/useActionPopup.js'
@@ -7,9 +7,9 @@ import './CharAbilities.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
-function CharAbilities({ allAbilityScores, playerStats }) {
-    const abilityDesc = buildAbilityDetailHtml(allAbilityScores);
-    const { popupHtml, setPopupHtml, rollAbilityCheck, rollSavingThrow, rollSkillCheck } = useDiceRoll();
+function CharAbilities({ allAbilityScores, playerStats, campaignName }) {
+     const abilityDesc = buildAbilityDetailHtml(allAbilityScores);
+     const { popupHtml, setPopupHtml, rollAbilityCheck, rollSavingThrow, rollSkillCheck } = useLoggedDiceRoll(playerStats.name, campaignName);
     return (
         <div className='abilities-popup-parent'>
                 {popupHtml && (

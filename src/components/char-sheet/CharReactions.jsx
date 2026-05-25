@@ -4,10 +4,10 @@ import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
-import useDiceRoll from '../../hooks/useDiceRoll.js'
+import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 
-function CharReactions({ playerStats }) {
-    const { popupHtml, setPopupHtml, rollAttack } = useDiceRoll();
+function CharReactions({ playerStats, campaignName }) {
+    const { popupHtml, setPopupHtml, rollAttack } = useLoggedDiceRoll(playerStats.name, campaignName);
      // Build reactions list immutably
     let reactions = [...(playerStats.reactions || [])];
 

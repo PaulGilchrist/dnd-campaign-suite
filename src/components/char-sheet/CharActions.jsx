@@ -4,7 +4,7 @@ import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { parseMagicItemName } from '../../services/attackCalc.js';
-import useDiceRoll from '../../hooks/useDiceRoll.js'
+import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import { rollExpression } from '../../services/diceRoller.js'
 import './CharActions.css'
@@ -14,16 +14,16 @@ const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats);
 
-const CharActions = React.memo(function CharActions({ playerStats }) {
+const CharActions = React.memo(function CharActions({ playerStats, campaignName }) {
   const [actions, setActions] = useState([]);
 
-  useEffect(() => {
-    fetch('/data/actions.json')
-          .then(response => response.json())
-          .then(data => setActions(data))
+   useEffect(() => {
+     fetch('/data/actions.json')
+            .then(response => response.json())
+             .then(data => setActions(data))
           .catch(error => console.error('Error loading actions:', error));
-    }, []);
-    const { popupHtml, setPopupHtml, rollAttack, rollDamage } = useDiceRoll();
+       }, []);
+    const { popupHtml, setPopupHtml, rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName);
 
     const handleDamageClick = (attack) => {
         const result = rollExpression(attack.damage);

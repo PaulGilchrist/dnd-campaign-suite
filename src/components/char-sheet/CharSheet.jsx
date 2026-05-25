@@ -101,10 +101,10 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     return (<React.Fragment>
         {playerStats && <div className='char-sheet' data-testid='char-sheet'>
             <CharSummary playerStats={playerStats} onDeleteCharacter={onDeleteCharacter} onEditCharacter={onEditCharacter} onUploadClick={onUploadClick} onSaveClick={onSaveClick} campaignName={campaignName} onLongRest={() => setForceRefresh(utils.guid())}></CharSummary><hr />
-            <CharAbilities allAbilityScores={allAbilityScores} playerStats={playerStats}></CharAbilities><hr />
-            
-            <CharActions playerStats={playerStats}></CharActions><hr />
-            <CharReactions playerStats={playerStats}></CharReactions>
+              <CharAbilities allAbilityScores={allAbilityScores} playerStats={playerStats} campaignName={campaignName}></CharAbilities><hr />
+
+              <CharActions playerStats={playerStats} campaignName={campaignName}></CharActions><hr />
+              <CharReactions playerStats={playerStats} campaignName={campaignName}></CharReactions>
             {playerSummary.rules === '2024' 
   ? <CharSpells playerStats={playerStats} campaignName={campaignName}></CharSpells>
   : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName}></CharSpells>

@@ -74,7 +74,14 @@ export const VIEWS = {
     type: 'string',
     component: 'NPCs',
     description: 'NPC management'
-  },
+   },
+  CAMPAIGN_LOG: {
+    name: 'campaignLog',
+    stateVar: 'activeView',
+    type: 'string',
+    component: 'Log',
+    description: 'Campaign dice roll and activity log'
+   },
   CAMPAIGN_SELECTION: {
     name: 'campaignSelection',
     stateVar: 'showCampaignSelection',
@@ -113,11 +120,12 @@ export const SIDEBAR_BUTTONS = [
   { label: 'Initiative', icon: 'fa-gavel', view: 'initiative' },
   { label: 'Maps', icon: 'fa-map', view: 'mapsManager' },
   { label: 'Notes', icon: 'fa-sticky-note', view: 'notes' },
-  { label: 'Quests', icon: 'fa-scroll', view: 'quests' },
-  { label: 'NPCs', icon: 'fa-users', view: 'npcs' }
+{ label: 'Quests', icon: 'fa-scroll', view: 'quests' },
+    { label: 'NPCs', icon: 'fa-users', view: 'npcs' },
+    { label: 'Log', icon: 'fa-book-journal-whills', view: 'campaignLog' }
 ];
 
 /**
  * All sidebar views — mutually exclusive via single activeView variable.
  */
-export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'npcs'];
+export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'npcs', 'campaignLog'];
