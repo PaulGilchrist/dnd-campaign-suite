@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-function useHexMapSSESync({ campaignName, mapName, setGridSize, setTerrain, setRivers, setPois, setZoom, setPanX, setPanY, setMarchingOrder, setPartyPosition, setMapData, setWeather }) {
+function useHexMapSSESync({ campaignName, mapName, setGridSize, setTerrain, setRivers, setRoads, setPois, setZoom, setPanX, setPanY, setMarchingOrder, setPartyPosition, setMapData, setWeather }) {
     const handleSSEEvent = useCallback((event) => {
         if (!event || !event.data) return;
         const expectedKey = `map-data-${campaignName}-${mapName}`;
@@ -18,6 +18,9 @@ function useHexMapSSESync({ campaignName, mapName, setGridSize, setTerrain, setR
         }
         if (data.pois !== undefined) {
             setPois(data.pois);
+        }
+        if (data.roads !== undefined) {
+            setRoads(data.roads);
         }
         if (data.zoom !== undefined) {
             setZoom(data.zoom);

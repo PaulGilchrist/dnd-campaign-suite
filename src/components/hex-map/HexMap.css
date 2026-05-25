@@ -1248,6 +1248,12 @@
     opacity: 0.8;
 }
 
+/* ── Road Layer ──────────────────────────────────────────── */
+
+.road-layer {
+    pointer-events: none;
+}
+
 /* ── Travel Path Layer ───────────────────────────────────── */
 
 .travel-path-layer {

@@ -65,6 +65,19 @@ export function getHexMoveCost(terrainType) {
   return TERRAIN_MOVE_COST[terrainType] ?? null;
 }
 
+export function isHexOnRoad(q, r, roads) {
+    if (!roads || roads.length === 0) return false;
+    const key = `${q},${r}`;
+    return roads.some(road => road.hexes && road.hexes.includes(key));
+}
+
+export function getHexMoveCostWithRoad(terrainType, q, r, roads) {
+    const base = TERRAIN_MOVE_COST[terrainType];
+    if (base === null) return null;
+    if (!isHexOnRoad(q, r, roads)) return base;
+    return Math.max(1, base - 0.5);
+}
+
 export function getDailyHexBudget(paceId) {
   const pace = TRAVEL_PACES.find(p => p.id === paceId);
   if (!pace) return null;
@@ -86,7 +99,7 @@ export function getTotalTravelTime(path, terrain) {
   };
 }
 
-export function calculatePath(from, to, gridSize, terrain) {
+export function calculatePath(from, to, gridSize, terrain, roads) {
   if (!from || !to) return [];
   if (from.q === to.q && from.r === to.r) return [];
 
@@ -122,8 +135,9 @@ export function calculatePath(from, to, gridSize, terrain) {
       if (nb.q < 0 || nb.q >= gridSize || nb.r < 0 || nb.r >= gridSize) continue;
 
       const terrainType = terrain[nk] || DEFAULT_TERRAIN;
-      const cost = TERRAIN_MOVE_COST[terrainType];
-      if (cost === null) continue;
+      const baseCost = TERRAIN_MOVE_COST[terrainType];
+      if (baseCost === null) continue;
+      const cost = roads ? getHexMoveCostWithRoad(terrainType, nb.q, nb.r, roads) : baseCost;
 
       const tentativeG = current.g + cost;
       if (openKeys.has(nk)) {

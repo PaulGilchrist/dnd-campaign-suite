@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import {
   calculatePath,
   getDailyHexBudget,
-  getHexMoveCost,
+  getHexMoveCostWithRoad,
   TRAVEL_PACES,
 } from '../services/travelService.js';
 import {
@@ -31,7 +31,7 @@ const TERRAIN_TO_ENVIRONMENT = {
 
 export default function useTravelManagement({
   gridSize, terrain, partyPosition, onPartyMove, weather,
-  monsters, playerLevels,
+  monsters, playerLevels, roads = [],
 }) {
   const [travelMode, setTravelMode] = useState(MODES.INACTIVE);
   const [travelPace, setTravelPace] = useState('normal');
@@ -58,13 +58,13 @@ export default function useTravelManagement({
     return Math.floor(base * mod);
   }, []);
 
-  const effectiveHexCost = useCallback((terrainType, w) => {
-    const base = getHexMoveCost(terrainType);
+  const effectiveHexCost = useCallback((terrainType, q, r, w) => {
+    const base = getHexMoveCostWithRoad(terrainType, q, r, roads);
     if (base === null) return null;
     const mod = w?.moveCostMod;
     if (mod === null) return null;
     return base * (mod ?? 1);
-  }, []);
+  }, [roads]);
 
   const enhanceCombatEvent = useCallback((event, terrainType) => {
     if (event.type !== 'combat' || !monsters || monsters.length === 0 || !playerLevels || playerLevels.length === 0) {
@@ -109,7 +109,7 @@ export default function useTravelManagement({
 
   const setDestinationAndPath = useCallback((to) => {
     if (!partyPosition) return;
-    const newPath = calculatePath(partyPosition, to, gridSize, terrain);
+    const newPath = calculatePath(partyPosition, to, gridSize, terrain, roads);
     if (newPath.length === 0) return;
     setDestination(to);
     setPath(newPath);
@@ -118,7 +118,7 @@ export default function useTravelManagement({
     pathIndexRef.current = 0;
     setLastMessage(null);
     setTravelMode(MODES.PLANNING);
-  }, [partyPosition, gridSize, terrain]);
+  }, [partyPosition, gridSize, terrain, roads]);
 
   const changePace = useCallback((paceId) => {
     setTravelPace(paceId);
@@ -138,7 +138,7 @@ export default function useTravelManagement({
     const nextHex = currentPath[nextIdx];
     const key = `${nextHex.q},${nextHex.r}`;
     const tileTerrain = terrain[key] || 'plains';
-    const cost = effectiveHexCost(tileTerrain, weather);
+    const cost = effectiveHexCost(tileTerrain, nextHex.q, nextHex.r, weather);
     if (cost === null) {
       if (weather?.moveCostMod === null) {
         setLastMessage(`Extreme ${weather.label?.toLowerCase() || 'weather'} makes travel impossible. Camp and wait it out.`);
@@ -176,7 +176,7 @@ export default function useTravelManagement({
     }
 
     return { moved: true };
-  }, [accruedCost, dailyBudget, terrain, onPartyMove, weather, eventFrequency, enhanceCombatEvent]);
+  }, [accruedCost, dailyBudget, terrain, onPartyMove, weather, eventFrequency, enhanceCombatEvent, effectiveHexCost]);
 
   const forceCamp = useCallback(() => {
     setAccruedCost(0);

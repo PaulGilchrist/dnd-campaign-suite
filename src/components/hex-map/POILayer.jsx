@@ -2,7 +2,7 @@ import React from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig';
 import { hexToPixel, hexDistance } from '../../services/hexMapUtils';
 
-function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHover, isLocalhost = false, partyPosition, onPoiEnter, validLinkedMaps }) {
+function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHover, isLocalhost = false, partyPosition, onPoiEnter, validLinkedMaps, roadStartPoiId }) {
     const isAdjacentToParty = (poi) => {
         if (!partyPosition) return false;
         const dist = hexDistance(partyPosition, { q: poi.q, r: poi.r });
@@ -34,6 +34,21 @@ function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHo
                         className={`poi-item${enterable ? ' poi-item-enterable' : ''}`}
                         opacity={poi.visible !== false ? 1 : 0.4}
                     >
+                        {/* Road-start selection ring */}
+                        {roadStartPoiId === poi.id && (
+                            <circle
+                                cx={cx}
+                                cy={cy}
+                                r={22}
+                                fill="none"
+                                stroke="#A08060"
+                                strokeWidth={2.5}
+                                strokeDasharray="4 3"
+                                opacity={0.9}
+                                pointerEvents="none"
+                            />
+                        )}
+
                         {/* Golden glow ring for enterable POIs */}
                         {enterable && (
                             <circle
@@ -101,7 +116,7 @@ function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHo
                                 height={50}
                                 fill="transparent"
                                 style={{ cursor: 'pointer' }}
-                                onClick={() => onPoiEnter(poi)}
+                                onClick={(e) => { e.stopPropagation(); onPoiEnter(poi); }}
                                 onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPoiContextMenu(poi.id, e); }}
                             />
                         ) : (
@@ -112,6 +127,7 @@ function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHo
                                 height={36}
                                 fill="transparent"
                                 onPointerDown={(e) => onPoiPointerDown(poi.id, e)}
+                                onClick={(e) => e.stopPropagation()}
                                 onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onPoiContextMenu(poi.id, e); }}
                                 style={{ cursor: 'grab' }}
                             />

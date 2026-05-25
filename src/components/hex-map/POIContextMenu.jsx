@@ -3,7 +3,7 @@ import { HEX_SIZE } from '../../config/outdoorConfig';
 import { hexToPixel } from '../../services/hexMapUtils';
 import * as mapsService from '../../services/mapsService.js';
 
-function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onDelete, onRename, onLinkMap, onUnlinkMap, setShowRename, onClose, indoorMaps = [], viewPortBounds }) {
+function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onDelete, onRename, onLinkMap, onUnlinkMap, onRemoveRoads, setShowRename, onClose, indoorMaps = [], viewPortBounds, roads = [] }) {
     const [showLinkPicker, setShowLinkPicker] = useState(false);
 
     if (!selectedPoi) return null;
@@ -15,7 +15,9 @@ function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onD
     if (!selectedItem) return null;
 
     const hasLink = !!selectedItem.linkedMap;
-    const rowCount = hasLink ? 5 : 4; // Hide/Show + Rename + Link/Unlink + Delete = 4 or 5
+    const connectedRoads = roads.filter(r => r.fromPoiId === selectedPoi.id || r.toPoiId === selectedPoi.id);
+    const hasRoads = connectedRoads.length > 0;
+    const rowCount = (hasLink ? 5 : 4) + (hasRoads ? 1 : 0);
     const baseMenuHeight = rowCount * 22 + 8; // 22px per row + padding
     const pickerItemCount = showLinkPicker ? (indoorMaps.length === 0 ? 1 : Math.min(indoorMaps.length, 6)) : 0;
     const menuHeight = baseMenuHeight + (showLinkPicker ? pickerItemCount * 20 + 8 : 0);
@@ -142,7 +144,7 @@ function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onD
                 {/* Delete */}
                 <text
                     x={menuX + 8}
-                    y={showLinkPicker ? menuY + 86 + pickerItemCount * 20 : (hasLink ? menuY + 86 : menuY + 86)}
+                    y={showLinkPicker ? menuY + 86 + pickerItemCount * 20 : menuY + 86}
                     fill="#ccc"
                     fontSize="11"
                     className="menu-option"
@@ -150,6 +152,20 @@ function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onD
                 >
                     Delete
                 </text>
+
+                {/* Remove Roads */}
+                {hasRoads && (
+                    <text
+                        x={menuX + 8}
+                        y={showLinkPicker ? menuY + 108 + pickerItemCount * 20 : menuY + 108}
+                        fill="#e8a040"
+                        fontSize="11"
+                        className="menu-option"
+                        onClick={() => { onRemoveRoads(selectedPoi.id); onClose(); }}
+                    >
+                        Remove Roads ({connectedRoads.length})
+                    </text>
+                )}
 
                 {/* Close button */}
                 <text

@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import * as mapsService from '../../services/mapsService.js';
 import {
     HEX_SIZE, DEFAULT_GRID_SIZE, DEFAULT_TERRAIN, MIN_ZOOM, MAX_ZOOM,
-    TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_PAN, TOOL_TRAVEL,
+    TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_PAN, TOOL_TRAVEL, TOOL_ROAD,
     TERRAIN_TYPES, POI_TYPES
 } from '../../config/outdoorConfig.js';
 import { generateRiversFromTerrain } from '../../services/hexTerrainGenerator.js';
 import { generateWeather } from '../../services/weatherService.js';
-import { hexKey, hexToPixel, pixelToHexSnapped, hexToSVGPath } from '../../services/hexMapUtils.js';
+import { hexKey, hexToPixel, pixelToHexSnapped, hexToSVGPath, isRoadConnectable, findHexPath } from '../../services/hexMapUtils.js';
 import { generateOutdoorEncounter } from '../../services/outdoorEncounterGenerator.js';
 import TerrainLayer from './TerrainLayer.jsx';
 import HexGridLayer from './HexGridLayer.jsx';
@@ -18,6 +18,7 @@ import POIContextMenu from './POIContextMenu.jsx';
 import MarchingOrderPanel from './MarchingOrderPanel.jsx';
 import PartyMarkerLayer from './PartyMarkerLayer.jsx';
 import RiverLayer from './RiverLayer.jsx';
+import RoadLayer from './RoadLayer.jsx';
 import SettlementSVG from './svg/SettlementSVG.jsx';
 import CitySVG from './svg/CitySVG.jsx';
 import DungeonSVG from './svg/DungeonSVG.jsx';
@@ -44,6 +45,8 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const [terrain, setTerrain] = useState({});          // Record<hexKey, terrainType>
     const [rivers, setRivers] = useState([]);            // array of "q,r" strings
     const [pois, setPois] = useState([]);                // array of POI objects
+    const [roads, setRoads] = useState([]);              // array of road objects { id, fromPoiId, toPoiId, hexes }
+    const [roadStartPoiId, setRoadStartPoiId] = useState(null); // POI id selected as road start
 
     // Marching order state
     const [marchingOrder, setMarchingOrder] = useState([]);  // ordered character names
@@ -66,6 +69,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         weather,
         monsters,
         playerLevels,
+        roads,
     });
 
     const handleGenerateWeather = useCallback(() => {
@@ -189,7 +193,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     }, [campaignName, pois]);
 
     const { handleSSEEvent } = useHexMapSSESync({
-        campaignName, mapName, setGridSize, setTerrain, setRivers, setPois,
+        campaignName, mapName, setGridSize, setTerrain, setRivers, setRoads, setPois,
         setZoom, setPanX, setPanY, setMarchingOrder, setPartyPosition, setMapData,
         setWeather,
     });
@@ -405,10 +409,56 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const handlePoiPointerDown = useCallback((poiId, e) => {
         e.preventDefault();
         e.stopPropagation();
+
+        if (tool === TOOL_ROAD) {
+            const poi = pois.find(p => p.id === poiId);
+            if (!poi) return;
+            if (!isRoadConnectable(poi.type, poi.type)) {
+                setRoadStartPoiId(null);
+                return;
+            }
+
+                if (roadStartPoiId === null) {
+                setRoadStartPoiId(poiId);
+            } else if (roadStartPoiId === poiId) {
+                setRoadStartPoiId(null);
+            } else {
+                const fromPoi = pois.find(p => p.id === roadStartPoiId);
+                const toPoi = poi;
+                if (!fromPoi || !toPoi) { setRoadStartPoiId(null); return; }
+
+                const exists = roads.some(r =>
+                    (r.fromPoiId === roadStartPoiId && r.toPoiId === poiId) ||
+                    (r.toPoiId === roadStartPoiId && r.fromPoiId === poiId)
+                );
+                if (exists) {
+                    setRoads(prev => prev.filter(r =>
+                        !((r.fromPoiId === roadStartPoiId && r.toPoiId === poiId) ||
+                          (r.toPoiId === roadStartPoiId && r.fromPoiId === poiId))
+                    ));
+                    setRoadStartPoiId(null);
+                    return;
+                }
+
+                const path = findHexPath(fromPoi, toPoi, gridSize, terrain);
+                if (path) {
+                    const newRoad = {
+                        id: `road-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+                        fromPoiId: roadStartPoiId,
+                        toPoiId: poiId,
+                        hexes: path.map(h => `${h.q},${h.r}`),
+                    };
+                    setRoads(prev => [...prev, newRoad]);
+                }
+                setRoadStartPoiId(null);
+            }
+            return;
+        }
+
         const poi = pois.find(p => p.id === poiId);
         if (!poi) return;
         setPoiDragging({ poiId, startQ: poi.q, startR: poi.r });
-    }, [pois]);
+    }, [pois, tool, roadStartPoiId, roads, gridSize, terrain]);
 
     const handlePoiPointerMove = useCallback((e) => {
         if (!poiDragging) return;
@@ -426,8 +476,26 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     }, [poiDragging, pois, gridSize, getHexFromEvent]);
 
     const handlePoiPointerUp = useCallback(() => {
+        if (poiDragging) {
+            const draggedId = poiDragging.poiId;
+            // Recalculate roads connected to the moved POI
+            setRoads(prev => prev.map(road => {
+                if (road.fromPoiId === draggedId || road.toPoiId === draggedId) {
+                    const otherPoiId = road.fromPoiId === draggedId ? road.toPoiId : road.fromPoiId;
+                    const movedPoi = pois.find(p => p.id === draggedId);
+                    const otherPoi = pois.find(p => p.id === otherPoiId);
+                    if (movedPoi && otherPoi) {
+                        const path = findHexPath(movedPoi, otherPoi, gridSize, terrain);
+                        if (path) {
+                            return { ...road, hexes: path.map(h => `${h.q},${h.r}`) };
+                        }
+                    }
+                }
+                return road;
+            }));
+        }
         setPoiDragging(null);
-    }, []);
+    }, [poiDragging, pois, gridSize, terrain]);
 
     const handleGenerateRivers = useCallback(() => {
         const result = generateRiversFromTerrain(terrain, gridSize);
@@ -551,6 +619,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
 
     const handleDeletePoi = useCallback((poiId) => {
         setPois(prev => prev.filter(p => p.id !== poiId));
+        setRoads(prev => prev.filter(r => r.fromPoiId !== poiId && r.toPoiId !== poiId));
         setSelectedPoiMenu(null);
     }, []);
 
@@ -574,6 +643,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             p.id === poiId ? { ...p, linkedMap: undefined } : p
         ));
         setSelectedPoiMenu(null);
+    }, []);
+
+    const handleRemoveRoads = useCallback((poiId) => {
+        setRoads(prev => prev.filter(r => r.fromPoiId !== poiId && r.toPoiId !== poiId));
     }, []);
 
     const handlePoiEnter = useCallback((poi) => {
@@ -613,6 +686,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     // Load path — existing map data found
                     const loadedTerrain = existing.terrain || {};
                     const loadedRivers = existing.rivers || [];
+                    const loadedRoads = existing.roads || [];
                     const loadedPois = existing.pois || [];
                     const loadedGridSize = existing.gridSize || DEFAULT_GRID_SIZE;
                     const loadedZoom = existing.zoom != null ? existing.zoom : 1;
@@ -630,6 +704,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     setGridSize(loadedGridSize);
                     setTerrain(loadedTerrain);
                     setRivers(loadedRivers);
+                    setRoads(loadedRoads);
                     setPois(loadedPois);
                     setZoom(loadedZoom);
                     setPanX(loadedPanX);
@@ -675,6 +750,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 gridSize: DEFAULT_GRID_SIZE,
                 terrain: initialTerrain,
                 pois: [],
+                roads: [],
                 zoom: 1,
                 panX: -(HEX_SIZE * Math.sqrt(3) / 2),
                 panY: -HEX_SIZE,
@@ -718,6 +794,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             gridSize,
             terrain,
             rivers,
+            roads,
             pois,
             zoom,
             panX,
@@ -728,7 +805,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         };
         mapsService.saveMapData(campaignName, mapName, dataToSave)
             .catch(err => console.error('Failed to save hex map data:', err));
-    }, [campaignName, mapName, terrain, rivers, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition, weather]);
+    }, [campaignName, mapName, terrain, rivers, roads, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition, weather]);
 
     const viewPortBounds = useMemo(() => ({
         left: panX,
@@ -810,7 +887,9 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             setSelectedPoiMenu(null);
                             setShowRename(null);
                             setPartyContextMenu(null);
-                            if (tool === TOOL_TRAVEL && partyPosition) {
+                            if (tool === TOOL_ROAD) {
+                                setRoadStartPoiId(null);
+                            } else if (tool === TOOL_TRAVEL && partyPosition) {
                                 const hex = getHexFromEvent(e);
                                 if (!hex) return;
                                 if (hex.q < 0 || hex.q >= gridSize || hex.r < 0 || hex.r >= gridSize) return;
@@ -850,6 +929,9 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                         <HexGridLayer
                             gridSize={gridSize}
                         />
+                        <RoadLayer
+                            roads={roads}
+                        />
                         <POILayer
                             pois={pois}
                             onPoiPointerDown={handlePoiPointerDown}
@@ -860,6 +942,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             partyPosition={partyPosition}
                             onPoiEnter={handlePoiEnter}
                             validLinkedMaps={validLinkedMaps}
+                            roadStartPoiId={roadStartPoiId}
                         />
                         <PartyMarkerLayer
                             position={partyPosition}
@@ -923,10 +1006,12 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             onRename={handleRenamePoi}
                             onLinkMap={handleLinkMap}
                             onUnlinkMap={handleUnlinkMap}
+                            onRemoveRoads={handleRemoveRoads}
                             onClose={() => { setSelectedPoiMenu(null); setShowRename(null); }}
                             setShowRename={setShowRename}
                             indoorMaps={indoorMaps}
                             viewPortBounds={viewPortBounds}
+                            roads={roads}
                         />
                     </svg>
 

@@ -38,6 +38,7 @@ export const TOOL_ERASE = 'erase';
 export const TOOL_POI = 'poi';
 export const TOOL_RIVER = 'river';
 export const TOOL_PAN = 'pan';
+export const TOOL_ROAD = 'road';
 export const TOOL_TRAVEL = 'travel';
 
 // Zoom limits
