@@ -30,7 +30,6 @@ describe('HexMapToolbar', () => {
       marchingOrderOpen: false,
       setMarchingOrderOpen: vi.fn(),
       marchingOrder: [],
-      onGenerateRivers: vi.fn(),
     };
   });
 
@@ -63,11 +62,6 @@ describe('HexMapToolbar', () => {
   it('should render river button', () => {
     render(<HexMapToolbar {...props} />);
     expect(screen.getByTitle('Paint rivers')).toBeInTheDocument();
-  });
-
-  it('should render generate rivers button', () => {
-    render(<HexMapToolbar {...props} />);
-    expect(screen.getByTitle('Auto-generate rivers from terrain elevation')).toBeInTheDocument();
   });
 
   it('should render POI panel toggle', () => {
@@ -221,12 +215,6 @@ describe('HexMapToolbar', () => {
     render(<HexMapToolbar {...props} marchingOrder={[]} />);
     const indicator = document.querySelector('.hex-map-poi-indicator');
     expect(indicator).not.toBeInTheDocument();
-  });
-
-  it('should call onGenerateRivers when generate rivers clicked', () => {
-    render(<HexMapToolbar {...props} />);
-    fireEvent.click(screen.getByTitle('Auto-generate rivers from terrain elevation'));
-    expect(props.onGenerateRivers).toHaveBeenCalled();
   });
 
   it('should add active class to paint button when paint tool active', () => {

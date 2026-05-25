@@ -5,7 +5,6 @@ import {
     TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_PAN, TOOL_TRAVEL, TOOL_ROAD,
     TERRAIN_TYPES, POI_TYPES
 } from '../../config/outdoorConfig.js';
-import { generateRiversFromTerrain } from '../../services/hexTerrainGenerator.js';
 import { generateWeather } from '../../services/weatherService.js';
 import { hexKey, hexToPixel, pixelToHexSnapped, hexToSVGPath, isRoadConnectable, findHexPath } from '../../services/hexMapUtils.js';
 import { generateOutdoorEncounter } from '../../services/outdoorEncounterGenerator.js';
@@ -497,11 +496,6 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         setPoiDragging(null);
     }, [poiDragging, pois, gridSize, terrain]);
 
-    const handleGenerateRivers = useCallback(() => {
-        const result = generateRiversFromTerrain(terrain, gridSize);
-        setRivers(result);
-    }, [terrain, gridSize]);
-
     const handleStartEncounter = useCallback(async (q, r, extraPlacedItems = []) => {
         const terrainType = terrain[hexKey(q, r)] || 'plains';
         const grid = 30;
@@ -844,7 +838,6 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 marchingOrderOpen={marchingOpen}
                 setMarchingOrderOpen={setMarchingOpen}
                 marchingOrder={marchingOrder}
-                onGenerateRivers={handleGenerateRivers}
             />
 
             {loading ? (
@@ -856,7 +849,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                         viewBox={`${panX} ${panY} ${svgWidth / zoom} ${svgHeight / zoom}`}
                         className="hex-svg"
                         onPointerDown={(e) => {
-                            if (tool === TOOL_PAINT || tool === TOOL_ERASE) {
+                            if (tool === TOOL_PAINT || tool === TOOL_ERASE || tool === TOOL_RIVER) {
                                 handleTerrainPointerDown(e);
                             } else {
                                 handlePanStart(e);

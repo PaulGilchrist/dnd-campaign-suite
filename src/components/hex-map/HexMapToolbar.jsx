@@ -18,7 +18,6 @@ function HexMapToolbar({
     marchingOrderOpen,
     setMarchingOrderOpen,
     marchingOrder,
-    onGenerateRivers,
 }) {
     return (
         <div className="hex-map-toolbar">
@@ -66,13 +65,6 @@ function HexMapToolbar({
             >
                 <i className="fa-solid fa-water"></i>
             </button>
-            <button
-                onClick={onGenerateRivers}
-                title="Auto-generate rivers from terrain elevation"
-            >
-                <i className="fa-solid fa-wand-magic-sparkles"></i>
-            </button>
-
             {/* Road tool */}
             <button
                 className={tool === TOOL_ROAD ? 'active' : ''}
