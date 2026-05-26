@@ -34,6 +34,7 @@ import GridAndWalls from './GridAndWalls.jsx';
 import Players from './Players.jsx';
 import FogOverlay from './FogOverlay.jsx';
 import BarrelContextMenu from './BarrelContextMenu.jsx';
+import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx';
 import usePlacedItems from './hooks/usePlacedItems.js';
 import usePlayerDragging from './hooks/usePlayerDragging';
 import useItemDragging from './hooks/useItemDragging';
@@ -81,7 +82,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
     // Barrel context menu state
     const [selectedBarrel, setSelectedBarrel] = useState(null); // { id, gridX, gridY }
-    const [showRename, setShowRename] = useState(null);
+    const [renamePopover, setRenamePopover] = useState(null); // { barrelId, name } | null
 
     // Monster card modal state
     const [viewingMonster, setViewingMonster] = useState(null);
@@ -519,7 +520,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 item.id === itemId ? { ...item, name: newName.trim() } : item
             )
         );
-        setShowRename(null);
+        setRenamePopover(null);
         setSelectedBarrel(null);
         // Clear the cached image so it gets recomputed
         setNpcImages(prev => ({ ...prev, [itemId]: null }));
@@ -547,11 +548,33 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         setSelectedPlayer(null);
     }, []);
 
-    // Close context menu
+// Close context menu
     const handleCloseMenu = useCallback(() => {
         setSelectedBarrel(null);
         setSelectedPlayer(null);
-    }, []);
+        setRenamePopover(null);
+       }, []);
+
+    // Open rename autocomplete as HTML overlay positioned near the context menu
+        const handleRenameClicked = (event, barrel, defaultName) => {
+            if (!svgRef.current) return;
+            const svgRect = svgRef.current.getBoundingClientRect();
+
+             // Convert SVG coords to DOM position
+            const vbX = panX;
+            const vbY = panY;
+            const scaleX = svgRect.width / (SVG_SIZE / zoom);
+            const scaleY = svgRect.height / (SVG_SIZE / zoom);
+
+            const menuSvgX = gridCenterX(barrel.gridX) + 10;
+            const menuSvgY = gridCenterY(barrel.gridY) + 10;
+
+            const domX = svgRect.left + (menuSvgX - vbX) * scaleX;
+            const domY = svgRect.top + (menuSvgY - vbY) * scaleY + 80;
+
+            setSelectedBarrel(null);
+            setRenamePopover({ barrelId: barrel.id, name: defaultName || 'NPC', position: { left: `${domX}px`, top: `${domY}px` } });
+             };
 
     // Sync state to refs so handleWheel always reads latest values
     useEffect(() => { zoomValueRef.current = zoom; }, [zoom]);
@@ -669,30 +692,28 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     fogDragEnd={fogDragEnd}
                 />
 
-                {/* Item context menu */}
-                <BarrelContextMenu
-                    selectedBarrel={selectedBarrel}
-                    showRename={showRename}
-                    placedItems={placedItems}
-                    gridCenterX={gridCenterX}
-                    gridCenterY={gridCenterY}
-                    handleToggleItemVisibility={handleToggleItemVisibility}
-                    handleDeleteItem={handleDeleteItem}
-                    handleRotateTable={handleRotateTable}
-                    handleRotateBed={handleRotateBed}
-                    handleRotateDoor={handleRotateDoor}
-                    handleRotateSecretDoor={handleRotateSecretDoor}
-                    handleRotateStairs={handleRotateStairs}
-                    handleRotateAltar={handleRotateAltar}
-                    handleRotateBookshelf={handleRotateBookshelf}
-                    handleRotateTorch={handleRotateTorch}
-                    handleRotateChair={handleRotateChair}
-                    handleRenameItem={handleRenameItem}
-                    handleViewStats={handleViewStats}
-                    monsterFound={monsterFound}
-                    setShowRename={setShowRename}
-                    setSelectedBarrel={setSelectedBarrel}
-                />
+                 {/* Item context menu */}
+                  <BarrelContextMenu
+                     selectedBarrel={selectedBarrel}
+                     placedItems={placedItems}
+                     gridCenterX={gridCenterX}
+                     gridCenterY={gridCenterY}
+                     handleToggleItemVisibility={handleToggleItemVisibility}
+                     handleDeleteItem={handleDeleteItem}
+                     handleRotateTable={handleRotateTable}
+                     handleRotateBed={handleRotateBed}
+                     handleRotateDoor={handleRotateDoor}
+                     handleRotateSecretDoor={handleRotateSecretDoor}
+                     handleRotateStairs={handleRotateStairs}
+                     handleRotateAltar={handleRotateAltar}
+                     handleRotateBookshelf={handleRotateBookshelf}
+                     handleRotateTorch={handleRotateTorch}
+                     handleRotateChair={handleRotateChair}
+                     handleViewStats={handleViewStats}
+                     monsterFound={monsterFound}
+                     onRenameClicked={handleRenameClicked}
+                    onClose={handleCloseMenu}
+                   />
 
                 {/* Player context menu */}
                 {selectedPlayer && (() => {
@@ -728,18 +749,28 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 })()}
             </svg>
 
-            {/* Items panel sidebar */}
-            {isLocalhost && itemsPanelOpen && (
-                <ItemsPanel
-                    itemsPanelOpen={itemsPanelOpen}
-                    placedItems={placedItems}
-                    onToggleItemVisibility={handleToggleItemVisibility}
-                    onClose={() => setItemsPanelOpen(false)}
-                    characters={characters}
-                    players={players}
-                    mapVariant={mapData.parentHex ? 'outdoor' : 'indoor'}
-                />
-            )}
+              {/* NPC Rename Autocomplete Overlay */}
+                  {renamePopover && (
+                      <MonsterNameAutocomplete
+                        key={renamePopover.barrelId}
+                        value={renamePopover.name}
+                        position={renamePopover.position}
+                        onCommit={(newName) => handleRenameItem(renamePopover.barrelId, newName)}
+                    />
+                 )}
+
+                 {/* Items panel sidebar */}
+                  {isLocalhost && itemsPanelOpen && (
+                      <ItemsPanel
+                         itemsPanelOpen={itemsPanelOpen}
+                         placedItems={placedItems}
+                         onToggleItemVisibility={handleToggleItemVisibility}
+                         onClose={() => setItemsPanelOpen(false)}
+                         characters={characters}
+                         players={players}
+                         mapVariant={mapData.parentHex ? 'outdoor' : 'indoor'}
+                      />
+                  )}
 
             {/* Monster Card Modal for NPC context menu */}
             {viewingMonster && (

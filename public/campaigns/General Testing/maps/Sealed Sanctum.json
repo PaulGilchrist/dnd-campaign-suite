@@ -1096,7 +1096,7 @@
     },
     {
       "id": "npc-4",
-      "gridX": 17,
+      "gridX": 16,
       "gridY": 7,
       "type": "npc",
       "visible": false,

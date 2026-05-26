@@ -1,0 +1,69 @@
+.monster-autocomplete {
+    display: inline-block;
+    position: relative;
+}
+
+.monster-autocomplete-fixed {
+    position: fixed;
+    z-index: 2000;
+    width: 180px;
+}
+
+.monster-autocomplete-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    text-align: center;
+    outline: none;
+}
+
+.monster-autocomplete-fixed .monster-autocomplete-input {
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 2px;
+    padding: 2px 4px;
+    font-size: 11px;
+    text-align: left;
+    color: #fff;
+}
+
+.monster-autocomplete-fixed .monster-autocomplete-input:focus {
+    border-color: #4a90d9;
+}
+
+.monster-autocomplete-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    max-height: 160px;
+    overflow-y: auto;
+    background: #2a2a2a;
+    border: 1px solid #555;
+    border-radius: 2px;
+    margin: 2px 0 0 0;
+    padding: 0;
+    list-style: none;
+    z-index: 1000;
+}
+
+.monster-autocomplete-item {
+    padding: 4px 6px;
+    color: #ccc;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+}
+
+.monster-autocomplete-item:hover {
+    background: #3a3a3a;
+    color: #fff;
+}
+
+.monster-autocomplete-item.highlighted {
+    background: #4a90d9;
+    color: #fff;
+}

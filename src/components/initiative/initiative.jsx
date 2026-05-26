@@ -7,6 +7,7 @@ import { getMonsterImageUrl, getMonsterData } from '../../services/monsterUtils.
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx';
 import AvatarImage from '../common/AvatarImage.jsx';
 import Subscriber from '../common/Subscriber.jsx';
+import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx';
 import './initiative.css'
 
 function NpcAvatar({ name, imageUrl, onClick }) {
@@ -301,14 +302,12 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
                                 )}
                             </div>
                             <div className='creature-name'>
-                                {creature.type === 'npc' ? (
-                                    <input
-                                       onChange={(event) => handleNameChange(creature.id, event.target.value)}
-                                       type="text"
-                                       value={creature.name}
-                                       className="npc-name-input"
-                                      />
-                                ) : (
+                              {creature.type === 'npc' ? (
+                                      <MonsterNameAutocomplete
+                                        value={creature.name}
+                                        onChange={(newVal) => handleNameChange(creature.id, newVal)}
+                                       />
+                                  ) : (
                                     <span>{creature.name}</span>
                                 )}
                             </div>
