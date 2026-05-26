@@ -13,7 +13,7 @@ import fs from 'fs';
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const FIVE_E_PATH = 'public/data/monsters.json';
-const TWENTY_TW_PATH = 'public/data/2024/monsters.json';
+const TWENTY_TW_PATH = 'public/data/monsters.json';
 
 const ABILITY_MAP = { str: 'strength', dex: 'dexterity', con: 'constitution', int: 'intelligence', wis: 'wisdom', cha: 'charisma' };
 const FULL_ABILITY = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };

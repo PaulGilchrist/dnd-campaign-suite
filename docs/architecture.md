@@ -158,7 +158,7 @@ JSON catalogs loaded at runtime by `dataLoader.js` with per-ruleset caching:
 | Spells | `data/spells.json` | `data/2024/spells.json` | 507KB / 523KB |
 | Feats | `data/feats.json` | `data/2024/feats.json` | 26KB / 162KB |
 | Magic Items | `data/magic-items.json` | `data/2024/magic-items.json` | 250KB / 515KB |
-| Monsters | `data/monsters.json` | `data/2024/monsters.json` | 1.8MB / 1.5MB |
+| Monsters | `data/monsters.json` | (shared) | 1.8MB / 1.5MB |
 | Backgrounds | — | `data/2024/backgrounds.json` | — / 13KB |
 | Ability Scores | `data/ability-scores.json` | (shared) | 18KB |
 | Equipment | `data/equipment.json` | (shared) | 125KB |

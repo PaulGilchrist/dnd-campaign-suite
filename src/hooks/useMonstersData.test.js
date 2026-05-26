@@ -38,7 +38,7 @@ describe('useMonstersData', () => {
 
     expect(result.current.monsters).toEqual(mockMonsters);
     expect(result.current.error).toBeNull();
-    expect(fetch).toHaveBeenCalledWith('/data/2024/monsters.json');
+    expect(fetch).toHaveBeenCalledWith('/data/monsters.json');
   });
 
   it('should handle fetch error', async () => {
@@ -97,7 +97,7 @@ describe('useMonstersData', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(fetch).toHaveBeenCalledWith('/data/2024/monsters.json');
+    expect(fetch).toHaveBeenCalledWith('/data/monsters.json');
   });
 
   it('should not update state after unmount', async () => {

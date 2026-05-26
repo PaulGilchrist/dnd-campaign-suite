@@ -488,7 +488,7 @@ describe('dataLoader', () => {
             const result = await loadMonsters();
 
             expect(result).toEqual(mockData);
-            expect(mockFetch).toHaveBeenCalledWith('/data/2024/monsters.json');
+            expect(mockFetch).toHaveBeenCalledWith('/data/monsters.json');
         });
 
         it('should cache monsters data', async () => {

@@ -5,7 +5,7 @@ const cache = {};
 
 /**
  * Custom hook to load monster data from local JSON files.
- * Fetches from /data/2024/monsters.json.
+ * Fetches from /data/monsters.json.
  * Results are cached in-memory so re-fetching returns instantly.
  *
  * @returns {{ monsters: object[], loading: boolean, error: string|null }}
@@ -33,7 +33,7 @@ export function useMonstersData() {
             setError(null);
 
             try {
-                const path = '/data/2024/monsters.json';
+                const path = '/data/monsters.json';
 
                 const response = await fetch(path);
 
