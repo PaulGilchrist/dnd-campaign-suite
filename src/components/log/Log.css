@@ -246,3 +246,65 @@
   font-size: 0.88rem;
   word-break: break-word;
 }
+
+/* Travel entries */
+.log-travel {
+  border-left: 3px solid #4a90d9;
+}
+
+.log-travel-action {
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.log-travel-coords {
+  font-family: 'Courier New', monospace;
+  font-size: 0.82rem;
+  color: var(--color-text);
+  background: var(--background-color-input);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.log-travel-details {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-left: 28px;
+  margin-top: 2px;
+}
+
+.log-travel-terrain,
+.log-travel-weather {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.log-travel-event {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 28px;
+  margin-top: 4px;
+  font-size: 0.85rem;
+}
+
+.log-travel-event-type {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #e87040;
+  background: rgba(232, 112, 64, 0.12);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.log-travel-event-title {
+  color: var(--color-text);
+}

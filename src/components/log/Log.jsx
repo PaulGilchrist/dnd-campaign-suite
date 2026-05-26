@@ -68,6 +68,58 @@ function NoteEntry({ entry }) {
   );
 }
 
+const TRAVEL_ACTION_CONFIG = {
+  advance:           { icon: 'fa-person-walking',     label: 'Advanced to',        color: '#4a90d9' },
+  advance_with_event:{ icon: 'fa-bolt',               label: 'Event triggered at', color: '#e87040' },
+  arrived:           { icon: 'fa-flag-checkered',     label: 'Arrived at',         color: '#4CAF50' },
+  camp:              { icon: 'fa-campground',          label: 'Camped at',          color: '#8ab' },
+  forced_march:      { icon: 'fa-person-running',     label: 'Forced march at',    color: '#e87040' },
+  event_accept:      { icon: 'fa-check',              label: 'Accepted event at',  color: '#4CAF50' },
+  event_skip:        { icon: 'fa-xmark',              label: 'Skipped event at',   color: '#888' },
+  event_reroll:      { icon: 'fa-dice',               label: 'Re-rolled event at', color: '#b99' },
+  extreme_weather:   { icon: 'fa-triangle-exclamation', label: 'Weather halted travel at', color: '#f44336' },
+  day_exhausted:     { icon: 'fa-tent',               label: 'Budget exhausted at', color: '#e87040' },
+  cancel:            { icon: 'fa-ban',                label: 'Travel cancelled at', color: '#888' },
+};
+
+function TravelEntry({ entry }) {
+  const config = TRAVEL_ACTION_CONFIG[entry.action] || TRAVEL_ACTION_CONFIG.advance;
+  const hexStr = entry.hex ? `(${entry.hex.q}, ${entry.hex.r})` : '';
+
+  return (
+    <div className="log-entry log-travel" style={{ borderLeftColor: config.color }}>
+      <div className="log-entry-header">
+        <span className="log-icon" style={{ color: config.color }}>
+          <i className={`fas ${config.icon}`}></i>
+        </span>
+        <span className="log-travel-action" style={{ color: config.color }}>
+          {config.label}
+        </span>
+        {hexStr && <span className="log-travel-coords">{hexStr}</span>}
+        <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
+      </div>
+      <div className="log-travel-details">
+        {entry.terrain && (
+          <span className="log-travel-terrain">
+            <i className="fas fa-mountain"></i> {entry.terrain}
+          </span>
+        )}
+        {entry.weather && (
+          <span className="log-travel-weather">
+            <i className={`fas fa-${entry.weatherIcon || 'sun'}`}></i> {entry.weather}
+          </span>
+        )}
+      </div>
+      {entry.eventTitle && (
+        <div className="log-travel-event">
+          <span className="log-travel-event-type">{entry.eventType}</span>
+          <span className="log-travel-event-title">{entry.eventTitle}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Log({ campaignName, characters }) {
   const { logEntries, initialized, addEntry } = useLog(campaignName);
   const [noteText, setNoteText] = useState('');
@@ -127,7 +179,9 @@ export default function Log({ campaignName, characters }) {
       <div className="log-entries">
         {!initialized ? null : [...logEntries].reverse().map(entry => (
           <div key={entry.id}>
-            {entry.type === 'roll' ? <RollEntry entry={entry}/> : <NoteEntry entry={entry}/>}
+            {entry.type === 'roll' && <RollEntry entry={entry}/>}
+            {entry.type === 'note' && <NoteEntry entry={entry}/>}
+            {entry.type === 'travel' && <TravelEntry entry={entry}/>}
           </div>
         ))}
       </div>

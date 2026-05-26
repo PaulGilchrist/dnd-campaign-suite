@@ -33,6 +33,7 @@ import useTravelManagement from '../../hooks/useTravelManagement.js';
 import { useMonstersData } from '../../hooks/useMonstersData.js';
 import TravelPanel from './TravelPanel.jsx';
 import TravelPathLayer from './TravelPathLayer.jsx';
+import useLog from '../../hooks/useLog.js';
 import WeatherOverlay from './WeatherOverlay.jsx';
 import EventDialog from './EventDialog.jsx';
 import './HexMap.css';
@@ -62,6 +63,8 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         [characters]
     );
 
+    const { addEntry } = useLog(campaignName);
+
     const travelMgmt = useTravelManagement({
         hexCols,
         hexRows,
@@ -80,10 +83,25 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         setWeather(generateWeather(currentTerrain));
     }, [partyPosition, terrain]);
 
+    const logTravel = useCallback((action, hex, tileTerrain, w, evt) => {
+        addEntry({
+            type: 'travel',
+            action,
+            hex: hex || null,
+            terrain: tileTerrain || null,
+            weather: w?.label || null,
+            weatherIcon: w?.icon || null,
+            eventType: evt?.type || null,
+            eventTitle: evt?.title || null,
+        });
+    }, [addEntry]);
+
     const handleForceCamp = useCallback(() => {
         travelMgmt.forceCamp();
         handleGenerateWeather();
-    }, [travelMgmt, handleGenerateWeather]);
+        const pos = travelMgmt.currentPosition || partyPosition;
+        logTravel('camp', pos, null, weather);
+    }, [travelMgmt, handleGenerateWeather, partyPosition, weather, logTravel]);
 
     const handleReRollWeather = useCallback(() => {
         handleGenerateWeather();
@@ -93,9 +111,23 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     }, [handleGenerateWeather, travelMgmt]);
 
     const handleAdvance = useCallback(() => {
+        const nextIdx = travelMgmt.pathIndex + 1;
+        const nextHex = travelMgmt.path[nextIdx];
         const result = travelMgmt.advanceOneHex();
+
+        if (result.moved) {
+            const terrainKey = nextHex ? hexKey(nextHex.q, nextHex.r) : null;
+            const tileTerrain = terrainKey ? terrain[terrainKey] || 'plains' : null;
+            const action = result.event ? 'advance_with_event' : (result.arrived ? 'arrived' : 'advance');
+            logTravel(action, nextHex, tileTerrain, weather, result.event);
+        } else if (travelMgmt.dayExhausted) {
+            logTravel('day_exhausted', null, null, weather);
+        } else if (weather?.moveCostMod === null) {
+            logTravel('extreme_weather', null, null, weather);
+        }
+
         return result;
-    }, [travelMgmt]);
+    }, [travelMgmt, weather, terrain, logTravel]);
 
     // Tool state
     const [tool, setTool] = useState(TOOL_NONE);         // current tool mode
@@ -130,26 +162,27 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const toolInitRef = useRef(true);
 
     // Sync tool ↔ travel management state
+    const prevToolRef = useRef(TOOL_NONE);
     useEffect(() => {
         if (toolInitRef.current) {
             toolInitRef.current = false;
+            prevToolRef.current = tool;
             return;
         }
-        if (tool === TOOL_TRAVEL && travelMgmt.travelMode === 'inactive') {
+        const toolJustActivated = tool === TOOL_TRAVEL && prevToolRef.current !== TOOL_TRAVEL;
+        prevToolRef.current = tool;
+
+        if (toolJustActivated && travelMgmt.travelMode === 'inactive') {
             travelMgmt.startPlanning();
             if (!weather) {
                 handleGenerateWeather();
             }
+        } else if (travelMgmt.travelMode === 'inactive' && tool === TOOL_TRAVEL) {
+            setTool(TOOL_NONE);
         } else if (tool !== TOOL_TRAVEL && travelMgmt.isTravelActive) {
             travelMgmt.cancelTravel();
         }
     }, [tool, weather, handleGenerateWeather, travelMgmt]);
-
-    useEffect(() => {
-        if (travelMgmt.travelMode === 'inactive' && tool === TOOL_TRAVEL) {
-            setTool(TOOL_NONE);
-        }
-    }, [travelMgmt.travelMode, tool]);
 
     // Fetch available indoor maps for POI linking
     useEffect(() => {
@@ -663,8 +696,8 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
 
     const handleEventAccept = useCallback(() => {
         const evt = travelMgmt.acceptEvent();
+        const pos = travelMgmt.currentPosition || partyPosition;
         if (evt?.type === 'combat') {
-            const pos = travelMgmt.currentPosition || partyPosition;
             if (pos && evt.encounter?.monsters) {
                 const grid = 30;
                 const monsterItems = generateMonsterPlacements(evt.encounter.monsters, grid);
@@ -679,15 +712,30 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 travelMgmt.changePace(travelMgmt.travelPace);
             }
         }
-    }, [travelMgmt, partyPosition, handleStartEncounter, handleGenerateWeather]);
+        const terrainKey = pos ? hexKey(pos.q, pos.r) : null;
+        const tileTerrain = terrainKey ? terrain[terrainKey] || 'plains' : null;
+        logTravel('event_accept', pos, tileTerrain, weather, evt);
+    }, [travelMgmt, partyPosition, handleStartEncounter, handleGenerateWeather, terrain, weather, logTravel]);
 
     const handleEventSkip = useCallback(() => {
+        const evt = travelMgmt.pendingEvent;
         travelMgmt.skipEvent();
-    }, [travelMgmt]);
+        const pos = travelMgmt.currentPosition || partyPosition;
+        logTravel('event_skip', pos, null, weather, evt);
+    }, [travelMgmt, partyPosition, weather, logTravel]);
 
     const handleEventReroll = useCallback(() => {
+        const evt = travelMgmt.pendingEvent;
         travelMgmt.rerollEvent();
-    }, [travelMgmt]);
+        const pos = travelMgmt.currentPosition || partyPosition;
+        logTravel('event_reroll', pos, null, weather, evt);
+    }, [travelMgmt, partyPosition, weather, logTravel]);
+
+    const handleForcedMarch = useCallback(() => {
+        travelMgmt.forcedMarch();
+        const pos = travelMgmt.currentPosition || partyPosition;
+        logTravel('forced_march', pos, null, weather);
+    }, [travelMgmt, partyPosition, weather, logTravel]);
 
     const handlePoiContextMenu = useCallback((poiId) => {
         const poi = pois.find(p => p.id === poiId);
@@ -1171,7 +1219,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 onAdvance={handleAdvance}
                 onCancel={travelMgmt.cancelTravel}
                 onForceCamp={handleForceCamp}
-                onForcedMarch={travelMgmt.forcedMarch}
+                onForcedMarch={handleForcedMarch}
                 weather={weather}
                 onReRollWeather={handleReRollWeather}
                 onSetEventFrequency={travelMgmt.setEventFrequency}
