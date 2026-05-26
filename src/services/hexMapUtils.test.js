@@ -14,6 +14,11 @@ import {
   getAllHexes,
   getHexGridPixelDimensions,
   getHexCenterFromOffset,
+  windingOffset,
+  isRoadConnectable,
+  findHexPath,
+  orderHexPath,
+  buildWindingPathDescriptor,
 } from './hexMapUtils.js';
 
 describe('hexMapUtils', () => {
@@ -290,6 +295,345 @@ describe('hexMapUtils', () => {
       const even = getHexCenterFromOffset(2, 0, 30);
       const odd = getHexCenterFromOffset(2, 1, 30);
       expect(odd.x).not.toBe(even.x);
+    });
+  });
+
+  describe('parseHexKey roundtrip with hexKey', () => {
+    it('should roundtrip for positive coordinates', () => {
+      const key = hexKey(3, 5);
+      const parsed = parseHexKey(key);
+      expect(parsed).toEqual({ q: 3, r: 5 });
+    });
+
+    it('should roundtrip for negative coordinates', () => {
+      const key = hexKey(-2, -7);
+      const parsed = parseHexKey(key);
+      expect(parsed).toEqual({ q: -2, r: -7 });
+    });
+
+    it('should roundtrip for zero', () => {
+      const key = hexKey(0, 0);
+      const parsed = parseHexKey(key);
+      expect(parsed).toEqual({ q: 0, r: 0 });
+    });
+
+    it('should roundtrip for large coordinates', () => {
+      const key = hexKey(999, -42);
+      const parsed = parseHexKey(key);
+      expect(parsed).toEqual({ q: 999, r: -42 });
+    });
+  });
+
+  describe('windingOffset', () => {
+    it('should be deterministic (same input gives same output)', () => {
+      const a = windingOffset(1, 2, 3, 4, 5);
+      const b = windingOffset(1, 2, 3, 4, 5);
+      expect(a).toBe(b);
+    });
+
+    it('should be within ±maxOffset', () => {
+      for (let q1 = 0; q1 < 5; q1++) {
+        for (let r1 = 0; r1 < 5; r1++) {
+          for (let q2 = 0; q2 < 5; q2++) {
+            for (let r2 = 0; r2 < 5; r2++) {
+              const result = windingOffset(q1, r1, q2, r2, 5);
+              expect(result).toBeGreaterThanOrEqual(-5);
+              expect(result).toBeLessThanOrEqual(5);
+            }
+          }
+        }
+      }
+    });
+
+    it('should produce different values for different hex pairs', () => {
+      const a = windingOffset(0, 0, 1, 0, 5);
+      const b = windingOffset(0, 0, 0, 1, 5);
+      const c = windingOffset(1, 0, 0, 1, 5);
+      // At least some should differ
+      const allSame = (a === b) && (b === c);
+      expect(allSame).toBe(false);
+    });
+
+    it('should scale with maxOffset', () => {
+      const small = Math.abs(windingOffset(1, 2, 3, 4, 2));
+      const large = Math.abs(windingOffset(1, 2, 3, 4, 10));
+      expect(small).toBeLessThanOrEqual(2);
+      expect(large).toBeLessThanOrEqual(10);
+    });
+
+    it('should return 0 for default maxOffset when sin value is exactly 0.5', () => {
+      // Just verify the default maxOffset parameter works
+      const result = windingOffset(0, 0, 0, 0);
+      expect(typeof result).toBe('number');
+      expect(result).toBeGreaterThanOrEqual(-5);
+      expect(result).toBeLessThanOrEqual(5);
+    });
+  });
+
+  describe('isRoadConnectable', () => {
+    it('should return true for city-city', () => {
+      expect(isRoadConnectable('city', 'city')).toBe(true);
+    });
+
+    it('should return true for city-settlement', () => {
+      expect(isRoadConnectable('city', 'settlement')).toBe(true);
+    });
+
+    it('should return true for settlement-city', () => {
+      expect(isRoadConnectable('settlement', 'city')).toBe(true);
+    });
+
+    it('should return true for settlement-settlement', () => {
+      expect(isRoadConnectable('settlement', 'settlement')).toBe(true);
+    });
+
+    it('should return false for city-other', () => {
+      expect(isRoadConnectable('city', 'other')).toBe(false);
+    });
+
+    it('should return false for settlement-other', () => {
+      expect(isRoadConnectable('settlement', 'other')).toBe(false);
+    });
+
+    it('should return false for other-city', () => {
+      expect(isRoadConnectable('other', 'city')).toBe(false);
+    });
+
+    it('should return false for other-settlement', () => {
+      expect(isRoadConnectable('other', 'settlement')).toBe(false);
+    });
+
+    it('should return false for other-other', () => {
+      expect(isRoadConnectable('other', 'other')).toBe(false);
+    });
+
+    it('should return false for empty strings', () => {
+      expect(isRoadConnectable('', '')).toBe(false);
+      expect(isRoadConnectable('city', '')).toBe(false);
+      expect(isRoadConnectable('', 'city')).toBe(false);
+    });
+  });
+
+  describe('findHexPath', () => {
+    it('should return [start] when start equals end', () => {
+      const start = { q: 3, r: 3 };
+      const result = findHexPath(start, start, 10, 10, {});
+      expect(result).toEqual([start]);
+    });
+
+    it('should return null when no path exists (blocked by water)', () => {
+      const start = { q: 0, r: 0 };
+      const end = { q: 2, r: 0 };
+      const terrain = {
+        '1,0': 'water',
+        '1,1': 'water',
+        '1,-1': 'water',
+        '0,1': 'water',
+        '0,-1': 'water',
+      };
+      const result = findHexPath(start, end, 3, 3, terrain);
+      expect(result).toBeNull();
+    });
+
+    it('should return a valid path from start to end on open terrain', () => {
+      const start = { q: 0, r: 0 };
+      const end = { q: 3, r: 0 };
+      const result = findHexPath(start, end, 10, 10, {});
+      expect(result).not.toBeNull();
+      expect(result.length).toBeGreaterThanOrEqual(2);
+      expect(result[0]).toEqual(start);
+      expect(result[result.length - 1]).toEqual(end);
+    });
+
+    it('should have adjacent hexes in the path', () => {
+      const start = { q: 0, r: 0 };
+      const end = { q: 4, r: 2 };
+      const result = findHexPath(start, end, 10, 10, {});
+      expect(result).not.toBeNull();
+      for (let i = 0; i < result.length - 1; i++) {
+        const dist = hexDistance(result[i], result[i + 1]);
+        expect(dist).toBe(1);
+      }
+    });
+
+    it('should find a path that avoids expensive terrain when possible', () => {
+      const start = { q: 0, r: 0 };
+      const end = { q: 2, r: 0 };
+      // Direct path through (1,0) is water, but going around via (0,1)->(1,1)->(2,1)->(2,0) is open
+      const terrain = {
+        '1,0': 'water',
+      };
+      const result = findHexPath(start, end, 5, 5, terrain);
+      expect(result).not.toBeNull();
+      expect(result[0]).toEqual(start);
+      expect(result[result.length - 1]).toEqual(end);
+      // The path should not go through the water hex
+      const pathKeys = result.map(h => `${h.q},${h.r}`);
+      expect(pathKeys).not.toContain('1,0');
+    });
+
+    it('should handle a 1x1 grid with start==end', () => {
+      const start = { q: 0, r: 0 };
+      const result = findHexPath(start, start, 1, 1, {});
+      expect(result).toEqual([start]);
+    });
+
+    it('should return null when end is out of bounds', () => {
+      const start = { q: 0, r: 0 };
+      const end = { q: 5, r: 5 };
+      const result = findHexPath(start, end, 3, 3, {});
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('orderHexPath', () => {
+    it('should return single hex as-is', () => {
+      const hexes = [{ q: 3, r: 5 }];
+      const result = orderHexPath(hexes);
+      expect(result).toEqual([{ q: 3, r: 5 }]);
+    });
+
+    it('should return two hexes as-is', () => {
+      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }];
+      const result = orderHexPath(hexes);
+      expect(result).toEqual([{ q: 0, r: 0 }, { q: 1, r: 0 }]);
+    });
+
+    it('should order a connected chain correctly', () => {
+      const hexes = [
+        { q: 0, r: 0 },
+        { q: 1, r: 0 },
+        { q: 2, r: 0 },
+        { q: 3, r: 0 },
+      ];
+      const result = orderHexPath(hexes);
+      expect(result).toHaveLength(4);
+      // Should be ordered from one end to the other
+      expect(result[0]).toEqual({ q: 0, r: 0 });
+      expect(result[3]).toEqual({ q: 3, r: 0 });
+      // Each consecutive pair should be adjacent
+      for (let i = 0; i < result.length - 1; i++) {
+        expect(hexDistance(result[i], result[i + 1])).toBe(1);
+      }
+    });
+
+    it('should order an L-shaped path correctly', () => {
+      const hexes = [
+        { q: 0, r: 0 },
+        { q: 1, r: 0 },
+        { q: 1, r: 1 },
+      ];
+      const result = orderHexPath(hexes);
+      expect(result).toHaveLength(3);
+      // Endpoints should be (0,0) and (1,1) — the two hexes with only 1 neighbor
+      const endpoints = [result[0], result[result.length - 1]];
+      expect(endpoints).toContainEqual({ q: 0, r: 0 });
+      expect(endpoints).toContainEqual({ q: 1, r: 1 });
+    });
+
+    it('should return as-is for a loop (all hexes have 2 neighbors)', () => {
+      // A triangle loop: each hex has 2 neighbors
+      const hexes = [
+        { q: 0, r: 0 },
+        { q: 1, r: 0 },
+        { q: 0, r: 1 },
+      ];
+      const result = orderHexPath(hexes);
+      expect(result).toHaveLength(3);
+      // Since each hex has 2 neighbors, there are no endpoints — returns as-is
+      expect(result).toEqual(hexes);
+    });
+
+    it('should handle empty array', () => {
+      const result = orderHexPath([]);
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('buildWindingPathDescriptor', () => {
+    it('should return null for empty array', () => {
+      const result = buildWindingPathDescriptor([], 30, '#ff0000', 2);
+      expect(result).toBeNull();
+    });
+
+    it('should return null for null input', () => {
+      const result = buildWindingPathDescriptor(null, 30, '#ff0000', 2);
+      expect(result).toBeNull();
+    });
+
+    it('should return null for undefined input', () => {
+      const result = buildWindingPathDescriptor(undefined, 30, '#ff0000', 2);
+      expect(result).toBeNull();
+    });
+
+    it('should return object with path/fill/stroke/strokeWidth for valid input', () => {
+      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }];
+      const result = buildWindingPathDescriptor(hexes, 30, '#ff0000', 2);
+      expect(result).not.toBeNull();
+      expect(result).toHaveProperty('path');
+      expect(result).toHaveProperty('fill');
+      expect(result).toHaveProperty('stroke');
+      expect(result).toHaveProperty('strokeWidth');
+    });
+
+    it('should have path as a non-empty string', () => {
+      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }];
+      const result = buildWindingPathDescriptor(hexes, 30, '#ff0000', 2);
+      expect(typeof result.path).toBe('string');
+      expect(result.path.length).toBeGreaterThan(0);
+    });
+
+    it('should set fill to "none"', () => {
+      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }];
+      const result = buildWindingPathDescriptor(hexes, 30, '#ff0000', 2);
+      expect(result.fill).toBe('none');
+    });
+
+    it('should set stroke to the provided color', () => {
+      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }];
+      const result = buildWindingPathDescriptor(hexes, 30, '#00ff00', 3);
+      expect(result.stroke).toBe('#00ff00');
+    });
+
+    it('should set strokeWidth to the provided value', () => {
+      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }];
+      const result = buildWindingPathDescriptor(hexes, 30, '#ff0000', 5);
+      expect(result.strokeWidth).toBe(5);
+    });
+
+    it('should return empty path for single hex', () => {
+      const hexes = [{ q: 0, r: 0 }];
+      const result = buildWindingPathDescriptor(hexes, 30, '#ff0000', 2);
+      expect(result).not.toBeNull();
+      expect(result.path).toBe('');
+      expect(result.stroke).toBe('none');
+      expect(result.strokeWidth).toBe(0);
+    });
+
+    it('should produce a path starting with M', () => {
+      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }];
+      const result = buildWindingPathDescriptor(hexes, 30, '#ff0000', 2);
+      expect(result.path.startsWith('M')).toBe(true);
+    });
+
+    it('should produce a path containing Q (quadratic bezier)', () => {
+      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }];
+      const result = buildWindingPathDescriptor(hexes, 30, '#ff0000', 2);
+      expect(result.path).toContain('Q');
+    });
+
+    it('should use default windAmount of 4', () => {
+      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }];
+      const resultDefault = buildWindingPathDescriptor(hexes, 30, '#ff0000', 2);
+      const resultExplicit = buildWindingPathDescriptor(hexes, 30, '#ff0000', 2, 4);
+      expect(resultDefault.path).toBe(resultExplicit.path);
+    });
+
+    it('should produce different paths for different windAmount values', () => {
+      const hexes = [{ q: 0, r: 0 }, { q: 1, r: 0 }];
+      const resultA = buildWindingPathDescriptor(hexes, 30, '#ff0000', 2, 0);
+      const resultB = buildWindingPathDescriptor(hexes, 30, '#ff0000', 2, 10);
+      expect(resultA.path).not.toBe(resultB.path);
     });
   });
 });

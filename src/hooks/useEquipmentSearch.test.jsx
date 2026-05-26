@@ -1,10 +1,13 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useEquipmentSearch } from './useEquipmentSearch.js';
-import { loadEquipment } from '../services/dataLoader.js';
 
 vi.mock('../services/dataLoader.js', () => ({
-  loadEquipment: vi.fn(),
+  loadEquipment: vi.fn(async () => [
+    { index: 'longsword', name: 'Longsword', equipment_category: 'Weapon' },
+    { index: 'shield', name: 'Shield', equipment_category: 'Armor' },
+    { index: 'rope', name: 'Rope', equipment_category: 'Adventuring Gear' },
+  ]),
 }));
 
 const equipmentData = [
@@ -31,6 +34,7 @@ describe('useEquipmentSearch', () => {
         <div data-testid="search-field">{hookResult.searchField || 'null'}</div>
         <div data-testid="show-backpack">{hookResult.showOnlySelectedBackpack ? 'true' : 'false'}</div>
         <div data-testid="show-equipped">{hookResult.showOnlySelectedEquipped ? 'true' : 'false'}</div>
+        <div data-testid="equipment-data-count">{hookResult.equipmentData.length}</div>
         <input
           data-testid="search-input"
           value={hookResult.searchQuery}
@@ -47,7 +51,7 @@ describe('useEquipmentSearch', () => {
           ))}
         </select>
         <button data-testid="focus-backpack" onClick={() => hookResult.handleSearchFieldFocus('backpack')}>Focus Backpack</button>
-        <button data-testid="focus-equipped" onClick={() => hookResult.handleSearchFieldFocus('equip')}>Focus Equipped</button>
+        <button data-testid="focus-equipped" onClick={() => hookResult.handleSearchFieldFocus('equipped')}>Focus Equipped</button>
         <button data-testid="select-item" onClick={() => hookResult.handleEquipmentSelect({ name: 'Longsword', index: 'longsword' })}>Select</button>
         <button data-testid="add-custom" onClick={() => hookResult.handleAddCustomItem('Custom Item')}>Add Custom</button>
         <button data-testid="toggle-backpack" onClick={() => hookResult.setShowOnlySelectedBackpack(!hookResult.showOnlySelectedBackpack)}>Toggle BP</button>
@@ -62,12 +66,32 @@ describe('useEquipmentSearch', () => {
   };
 
   beforeEach(() => {
-    vi.mocked(loadEquipment).mockResolvedValue(equipmentData);
+    vi.mocked((await import('../services/dataLoader.js')).loadEquipment).mockResolvedValue(equipmentData);
   });
 
   it('should start with empty search query', () => {
     render(<Wrapper />);
     expect(screen.getByTestId('search-query').textContent).toBe('');
+  });
+
+  it('should start with empty equipmentData', () => {
+    render(<Wrapper />);
+    expect(screen.getByTestId('equipment-data-count').textContent).toBe('0');
+  });
+
+  it('should start with empty filteredEquipment', () => {
+    render(<Wrapper />);
+    expect(screen.getByTestId('filtered-count').textContent).toBe('0');
+  });
+
+  it('should load equipment data after effect runs', async () => {
+    const { loadEquipment } = await import('../services/dataLoader.js');
+    vi.mocked(loadEquipment).mockResolvedValue(equipmentData);
+
+    render(<Wrapper />);
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('equipment-data-count').textContent).toBe('4');
+    });
   });
 
   it('should start with All category', () => {
@@ -99,20 +123,24 @@ describe('useEquipmentSearch', () => {
   it('should filter by category', async () => {
     render(<Wrapper />);
     await vi.waitFor(() => {
-      fireEvent.change(screen.getByTestId('search-input'), { target: { value: '' } });
       fireEvent.change(screen.getByTestId('category-select'), { target: { value: 'Weapon' } });
     });
+    // With empty query, filteredEquipment is empty regardless of category
     await vi.waitFor(() => {
       expect(screen.getByTestId('filtered-count').textContent).toBe('0');
     });
   });
 
-  it('should show unique categories', async () => {
+  it('should show unique categories including All', async () => {
+    const { loadEquipment } = await import('../services/dataLoader.js');
+    vi.mocked(loadEquipment).mockResolvedValue(equipmentData);
+
     render(<Wrapper />);
     await vi.waitFor(() => {
       expect(screen.getByTestId('categories').textContent).toContain('All');
       expect(screen.getByTestId('categories').textContent).toContain('Weapon');
       expect(screen.getByTestId('categories').textContent).toContain('Armor');
+      expect(screen.getByTestId('categories').textContent).toContain('Adventuring Gear');
     });
   });
 
@@ -179,6 +207,27 @@ describe('useEquipmentSearch', () => {
     expect(onTempInventoryChange).not.toHaveBeenCalled();
   });
 
+  it('should add equipment to equipped on select', async () => {
+    const onTempInventoryChange = vi.fn();
+    const onInventoryChange = vi.fn();
+    render(<Wrapper
+      tempInventory={{ backpack: [], equipped: [] }}
+      onTempInventoryChange={onTempInventoryChange}
+      onInventoryChange={onInventoryChange}
+    />);
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('categories').textContent).toContain('Weapon');
+    });
+    fireEvent.click(screen.getByTestId('focus-equipped'));
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'shield' } });
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('filtered-count').textContent).toBe('1');
+    });
+    fireEvent.click(screen.getByTestId('select-item'));
+    expect(onTempInventoryChange).toHaveBeenCalledWith('equipped', ['Shield']);
+    expect(onInventoryChange).toHaveBeenCalledWith('equipped', ['Shield']);
+  });
+
   it('should handle custom item add', () => {
     const onTempInventoryChange = vi.fn();
     render(<Wrapper
@@ -217,6 +266,9 @@ describe('useEquipmentSearch', () => {
   });
 
   it('should handle category change', async () => {
+    const { loadEquipment } = await import('../services/dataLoader.js');
+    vi.mocked(loadEquipment).mockResolvedValue(equipmentData);
+
     render(<Wrapper />);
     await vi.waitFor(() => {
       expect(screen.getByTestId('categories').textContent).toContain('Weapon');
@@ -237,5 +289,24 @@ describe('useEquipmentSearch', () => {
     expect(screen.getByTestId('show-equipped').textContent).toBe('false');
     fireEvent.click(screen.getByTestId('toggle-equipped'));
     expect(screen.getByTestId('show-equipped').textContent).toBe('true');
+  });
+
+  it('showOnlySelectedBackpack should filter to selected items', async () => {
+    const { loadEquipment } = await import('../services/dataLoader.js');
+    vi.mocked(loadEquipment).mockResolvedValue(equipmentData);
+
+    render(<Wrapper
+      tempInventory={{ backpack: ['Longsword'], equipped: [] }}
+    />);
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('equipment-data-count').textContent).toBe('4');
+    });
+    // Focus backpack, enable filter, then search
+    fireEvent.click(screen.getByTestId('focus-backpack'));
+    fireEvent.click(screen.getByTestId('toggle-backpack'));
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'long' } });
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('filtered-count').textContent).toBe('1');
+    });
   });
 });

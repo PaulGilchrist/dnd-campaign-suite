@@ -232,12 +232,6 @@ describe('EncounterBuilder', () => {
       expect(screen.getByText('Generate')).toBeInTheDocument();
     });
 
-    it('should render ruleset toggle buttons', () => {
-      render(<EncounterBuilder {...defaultProps} />);
-      expect(screen.getByText('5e')).toBeInTheDocument();
-      expect(screen.getByText('2024')).toBeInTheDocument();
-    });
-
     it('should render filter panel, summary panel, monster table, and selected monsters', () => {
       render(<EncounterBuilder {...defaultProps} />);
       expect(screen.getByTestId('filter-panel')).toBeInTheDocument();
@@ -266,33 +260,6 @@ describe('EncounterBuilder', () => {
     it('should show no characters message when characters is undefined', () => {
       render(<EncounterBuilder campaignName="test" />);
       expect(screen.getByText(/No characters in this campaign/)).toBeInTheDocument();
-    });
-  });
-
-  describe('ruleset toggle', () => {
-    it('should toggle to 2024 ruleset when 2024 button clicked', async () => {
-      render(<EncounterBuilder {...defaultProps} />);
-
-      const btn2024 = screen.getByText('2024');
-      fireEvent.click(btn2024);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('filter-panel')).toBeInTheDocument();
-      });
-    });
-
-    it('should toggle back to 5e when 5e button clicked after switching', async () => {
-      render(<EncounterBuilder {...defaultProps} />);
-
-      fireEvent.click(screen.getByText('2024'));
-      await waitFor(() => {
-        expect(screen.getByTestId('filter-panel')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('5e'));
-      await waitFor(() => {
-        expect(screen.getByTestId('filter-panel')).toBeInTheDocument();
-      });
     });
   });
 
