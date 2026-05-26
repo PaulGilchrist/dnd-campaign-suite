@@ -11,6 +11,7 @@ import MonsterCardModal from './MonsterCardModal.jsx';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import { formatEncounterName } from '../../services/encountersService.js';
 import { loadEncounterToInitiative } from '../../services/encounterToInitiative.js';
+import { generateLootSuggestions } from '../../services/lootGenerator.js';
 import './EncounterBuilder.css';
 
 // XP thresholds per level [Easy, Medium, Hard, Deadly] for levels 0-20
@@ -149,15 +150,8 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
     };
   });
 
-  // When characters change (e.g., campaign switch), update player levels
-  useEffect(() => {
-    if (characters && characters.length > 0) {
-      setFilter(prev => ({
-        ...prev,
-        playerLevels: characters.map(c => c.level || 1),
-      }));
-    }
-  }, [characters]);
+    // When characters change (e.g., campaign switch), show in party summary for display purposes only
+   // Player levels filter is not auto-overwritten so loaded encounters preserve their settings
 
   // Save difficulty to localStorage when it changes
   useEffect(() => {
@@ -190,8 +184,10 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
   const [encounterTitle, setEncounterTitle] = useState('Encounter Builder');
   const [currentEncounterName, setCurrentEncounterName] = useState(null);
   const [description, setDescription] = useState('');
+  const [lootSuggestions, setLootSuggestions] = useState([]);
+  const [generatingLoot, setGeneratingLoot] = useState(false);
 
-  // Sort state for monster table
+ // Sort state for monster table
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
 
@@ -232,10 +228,18 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
     [effectiveXP, totalThreshold]
   );
 
-  const filteredMonsters = useMemo(
-    () => {
-      const result = filterMonsters(monsters, searchQuery, filter.playerLevels, filter.difficulty, totalThreshold);
-      result.sort((a, b) => {
+   const filteredMonsters = useMemo(
+      () => {
+       // Ensure selected monsters always appear in the table, even if they don't match current filters
+       const result = filterMonsters(monsters, searchQuery, filter.playerLevels, filter.difficulty, totalThreshold);
+       for (const sm of selectedMonsters) {
+         if (!result.some(m => m.index === sm.index)) {
+           const full = (monsters || []).find(m => m.index === sm.index);
+           if (full) result.unshift(full);
+          }
+         }
+
+       result.sort((a, b) => {
         let valA, valB;
         switch (sortField) {
           case 'name':
@@ -258,13 +262,13 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
             valA = a.name.toLowerCase();
             valB = b.name.toLowerCase();
         }
-        if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+         if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
         if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
         return 0;
-      });
-      return result;
-    },
-    [monsters, searchQuery, filter.playerLevels, filter.difficulty, totalThreshold, sortField, sortDirection]
+         });
+       return result;
+      },
+      [monsters, searchQuery, filter.playerLevels, filter.difficulty, totalThreshold, selectedMonsters, sortField, sortDirection]
   );
 
   // --- Handlers ---
@@ -285,8 +289,20 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
   };
 
   const handleClearMonsters = () => {
-    setSelectedMonsters([]);
+   setSelectedMonsters([]);
   };
+
+  const handleGenerateLoot = async () => {
+    setGeneratingLoot(true);
+    try {
+      const loot = await generateLootSuggestions(selectedMonsters);
+      setLootSuggestions(loot);
+     } catch (error) {
+      console.error('Failed to generate loot:', error);
+     } finally {
+      setGeneratingLoot(false);
+     }
+   };
 
   const handleSaveEncounter = () => {
     const data = {
@@ -294,7 +310,8 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
       playerLevels: filter.playerLevels,
       selectedMonsters: stripMonsters(selectedMonsters),
       description: description,
-    };
+      lootSuggestions,
+     };
     if (currentEncounterName) {
       // Update existing encounter — no modal needed
       updateEncounter(currentEncounterName, data);
@@ -315,19 +332,20 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
   };
 
   const handleLoadEncounter = async (name) => {
-    try {
-      const data = await loadEncounterData(name);
-      if (data) {
-        setEncounterTitle(formatEncounterName(name));
-        setCurrentEncounterName(name);
+   try {
+     const data = await loadEncounterData(name);
+     if (data) {
+       setEncounterTitle(formatEncounterName(name));
+       setCurrentEncounterName(name);
 
-        setFilter({
-          difficulty: data.difficulty ?? 2,
-          playerLevels: data.playerLevels || [1],
+       setFilter({
+         difficulty: data.difficulty ?? 2,
+         playerLevels: data.playerLevels || [1],
         });
-        setDescription(data.description || '');
+       setDescription(data.description || '');
+       setLootSuggestions(data.lootSuggestions || []);
 
-        const monsterRefs = data.selectedMonsters || [];
+       const monsterRefs = data.selectedMonsters || [];
         const resolvedMonsters = monsterRefs.map(ref => {
           const fullMonster = (monsters || []).find(m => m.index === ref.index);
           if (fullMonster) {
@@ -336,16 +354,11 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
           return { ...ref, qty: ref.qty || 1 };
         });
 
-        setSelectedMonsters(resolvedMonsters);
-        setTimeout(() => {
-          setSelectedMonsters(resolvedMonsters);
-         }, 0);
+         setSelectedMonsters(resolvedMonsters);
 
-         if (onStartCombat) {
-            loadEncounterToInitiative(resolvedMonsters, characters, campaignName);
-            onStartCombat();
+        // Pre-populate initiative tracker silently (no redirect)
+        loadEncounterToInitiative(resolvedMonsters, characters, campaignName);
           }
-        }
       } catch (error) {
        console.error('Failed to load encounter:', error);
       }
@@ -359,16 +372,17 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
     setEncounterTitle('Encounter Builder');
     setCurrentEncounterName(null);
     setPendingEncounterData(null);
+    setLootSuggestions([]);
     setFilter({
       difficulty: 2,
       playerLevels: (characters && characters.length > 0)
-        ? characters.map(c => c.level || 1)
-        : [1],
-    });
+          ? characters.map(c => c.level || 1)
+          : [1],
+      });
     setSelectedMonsters([]);
     setSearchQuery('');
     setDescription('');
-  };
+   };
 
   const handleDeleteEncounter = async (name) => {
     if (window.confirm(`Delete "${name}"?`)) {
@@ -450,20 +464,20 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
           >
             <i className="fa-solid fa-wand-magic-sparkles" /> Generate
           </button>
-          {currentEncounterName && (
-            <button
-              className="encounter-btn encounter-btn-secondary"
-              onClick={handleReset}
-              aria-label="Reset encounter"
-              title="Reset to blank"
-            >
-              <i className="fa-solid fa-rotate-left" /> Reset
-            </button>
-          )}
-        </div>
-      </div>
+              {currentEncounterName && (
+               <button
+               className="encounter-btn encounter-btn-secondary"
+               onClick={handleReset}
+               aria-label="Reset encounter"
+               title="Reset to blank"
+               >
+                 <i className="fa-solid fa-rotate-left" /> Reset
+                </button>
+              )}
+           </div>
+         </div>
 
-      {/* Party Composition Summary */}
+        {/* Party Composition Summary */}
       {characters && characters.length > 0 && (
         <div className="party-summary">
           <span className="party-summary-label">
@@ -483,17 +497,48 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
         </div>
       )}
 
-      {/* Encounter Description */}
+       {/* Encounter Description */}
       <div className="encounter-description-section">
         <PreviewToggle
-          id="encounter-description"
-          value={description}
-          onChange={setDescription}
-          placeholder="Describe this encounter..."
-          label="Description"
-          minHeight="100px"
+         id="encounter-description"
+         value={description}
+         onChange={setDescription}
+         placeholder="Describe this encounter..."
+         label="Description"
+         minHeight="100px"
         />
+        {selectedMonsters.length > 0 && (
+          <button
+           className="encounter-btn encounter-btn-loot"
+           onClick={handleGenerateLoot}
+           disabled={generatingLoot}
+           title="Generate loot suggestions for selected monsters"
+          >
+            <i className="fa-solid fa-coins"></i>&nbsp; {generatingLoot ? 'Generating...' : 'Generate Loot'}
+          </button>
+        )}
       </div>
+
+       {/* Loot Suggestions */}
+      {lootSuggestions.length > 0 && (
+        <div className="encounter-loot-section">
+          <div className="encounter-loot-title">
+            <i className="fa-solid fa-gem"></i>&nbsp; Loot Suggestions
+            <button
+              className="encounter-btn encounter-btn-secondary encounter-btn-sm"
+              onClick={() => setLootSuggestions([])}
+              title="Clear loot suggestions"
+            >
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <ul className="encounter-loot-list">
+            {lootSuggestions.map((item, i) => (
+              <li key={i} className="encounter-loot-item">{item}</li>
+             ))}
+          </ul>
+        </div>
+       )}
 
       {/* Top Row: Filters + Summary */}
       <div className="encounter-top-row">
@@ -523,27 +568,28 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
         />
       </div>
 
-      {/* Monster Selection Table */}
-      <EncounterMonsterTable
-        filteredMonsters={filteredMonsters}
-        selectedMonsters={selectedMonsters}
-        onToggleMonster={handleToggleMonster}
-        onIncreaseQty={handleIncreaseQty}
-        onDecreaseQty={handleDecreaseQty}
-        onRemoveMonster={handleRemoveMonster}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        onSort={handleSort}
-        sortField={sortField}
-        sortDirection={sortDirection}
-        onViewDetails={setViewingMonster}
-      />
+         {/* Selected Monsters Detail */}
+         <EncounterSelectedMonsters
+         selectedMonsters={selectedMonsters}
+         onRemoveMonster={handleRemoveMonster}
+         onViewDetails={setViewingMonster}
+         />
 
-      {/* Selected Monsters Detail */}
-      <EncounterSelectedMonsters
-        selectedMonsters={selectedMonsters}
-        onRemoveMonster={handleRemoveMonster}
-      />
+        {/* Monster Selection Table */}
+        <EncounterMonsterTable
+         filteredMonsters={filteredMonsters}
+         selectedMonsters={selectedMonsters}
+         onToggleMonster={handleToggleMonster}
+         onIncreaseQty={handleIncreaseQty}
+         onDecreaseQty={handleDecreaseQty}
+         onRemoveMonster={handleRemoveMonster}
+         searchQuery={searchQuery}
+         onSearchQueryChange={setSearchQuery}
+         onSort={handleSort}
+         sortField={sortField}
+         sortDirection={sortDirection}
+         onViewDetails={setViewingMonster}
+        />
 
       {/* Encounter Save/Load Modal */}
       <EncounterModal

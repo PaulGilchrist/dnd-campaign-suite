@@ -744,6 +744,57 @@
   margin-bottom: 16px;
 }
 
+/* ============ Loot Suggestions ============ */
+.encounter-builder .encounter-loot-section {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--background-color-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.encounter-builder .encounter-loot-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.encounter-builder .encounter-loot-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.encounter-builder .encounter-loot-item {
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--border-color-light);
+}
+
+.encounter-builder .encounter-loot-item:last-child {
+  border-bottom: none;
+}
+
+.encounter-builder .encounter-btn-loot {
+  background: rgba(255, 193, 7, 0.15);
+  color: var(--color-warning);
+  border-color: var(--color-warning);
+}
+
+.encounter-builder .encounter-btn-loot:hover:not(:disabled) {
+  background: rgba(255, 193, 7, 0.25);
+}
+
+.encounter-builder .encounter-btn-loot:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Encounter list description preview */
 .encounter-builder .encounter-list-description {
   margin-top: 4px;
