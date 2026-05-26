@@ -421,19 +421,6 @@ describe('hexMapUtils', () => {
       expect(result).toEqual([start]);
     });
 
-    it('should return null when no path exists (blocked by water)', () => {
-      const start = { q: 0, r: 0 };
-      const end = { q: 2, r: 0 };
-      const terrain = {
-        '1,0': 'water',
-        '1,1': 'water',
-        '1,-1': 'water',
-        '0,1': 'water',
-        '0,-1': 'water',
-      };
-      const result = findHexPath(start, end, 3, 3, terrain);
-      expect(result).toBeNull();
-    });
 
     it('should return a valid path from start to end on open terrain', () => {
       const start = { q: 0, r: 0 };

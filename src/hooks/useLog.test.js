@@ -1,12 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import useLog from './useLog.js';
 
-const mockClose = vi.fn();
+const mockLogService = {
+  getLog: vi.fn(async () => []),
+  addEntry: vi.fn(async () => {}),
+};
+
+vi.mock('../services/logService.js', () => ({
+  getLog: vi.fn(async () => []),
+  addEntry: vi.fn(async () => {}),
+}));
+
 let mockEventSource;
 
 beforeEach(() => {
-   vi.restoreAllMocks();
+   vi.clearAllMocks();
    localStorage.clear();
    mockEventSource = { onmessage: null, close: vi.fn() };
 });
@@ -16,6 +24,8 @@ const MockEventSourceClass = vi.fn(function() {
 });
 MockEventSourceClass.prototype.close = () => {};
 global.EventSource = MockEventSourceClass;
+
+import useLog from './useLog.js';
 
 describe('useLog', () => {
   it('should start with empty logEntries and initialized false', () => {
@@ -32,22 +42,22 @@ describe('useLog', () => {
   });
 
   it('should call getLog with campaignName', async () => {
-    const { logService } = await import('../services/logService.js');
     const { result } = renderHook(() => useLog('my-campaign'));
     await waitFor(() => {
       expect(result.current.initialized).toBe(true);
+      });
+    const logServiceMock = await import('../services/logService.js');
+    expect(logServiceMock.getLog).toHaveBeenCalledWith('my-campaign');
     });
-    expect(logService.getLog).toHaveBeenCalledWith('my-campaign');
-  });
 
   it('addEntry should call logService.addEntry', async () => {
-    const { logService } = await import('../services/logService.js');
     const { result } = renderHook(() => useLog('test-campaign'));
     await act(async () => {
       await result.current.addEntry({ text: 'Hello' });
+      });
+    const logServiceMock = await import('../services/logService.js');
+    expect(logServiceMock.addEntry).toHaveBeenCalledWith('test-campaign', { text: 'Hello' });
     });
-    expect(logService.addEntry).toHaveBeenCalledWith('test-campaign', { text: 'Hello' });
-  });
 
    it('should create EventSource with correct URL', () => {
      renderHook(() => useLog('test-campaign'));
@@ -84,8 +94,8 @@ describe('useLog', () => {
       });
     });
 
-   it('should ignore non-log events', async () => {
-     const { result } = renderHook(() => useLog('test-campaign');
+    it('should ignore non-log events', async () => {
+      const { result } = renderHook(() => useLog('test-campaign'));
 
      await waitFor(() => {
        expect(result.current.initialized).toBe(true);
@@ -122,11 +132,11 @@ describe('useLog', () => {
       });
     });
 
-   it('should call EventSource.close on unmount', () => {
-     const { unmount } = renderHook(() => useLog('test-campaign'));
-     expect(mockEventSource.close).not.toHaveBeenCalled();
-     unmount();
-     await act(async () => {});
-     expect(mockEventSource.close).toHaveBeenCalled();
+    it('should call EventSource.close on unmount', async () => {
+      const { unmount } = renderHook(() => useLog('test-campaign'));
+      expect(mockEventSource.close).not.toHaveBeenCalled();
+      unmount();
+      await act(async () => {});
+      expect(mockEventSource.close).toHaveBeenCalled();
     });
 });

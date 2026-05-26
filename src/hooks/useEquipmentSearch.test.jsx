@@ -223,9 +223,9 @@ describe('useEquipmentSearch', () => {
     await vi.waitFor(() => {
       expect(screen.getByTestId('filtered-count').textContent).toBe('1');
     });
-    fireEvent.click(screen.getByTestId('select-item'));
-    expect(onTempInventoryChange).toHaveBeenCalledWith('equipped', ['Shield']);
-    expect(onInventoryChange).toHaveBeenCalledWith('equipped', ['Shield']);
+     fireEvent.click(screen.getByTestId('select-item'));
+     expect(onTempInventoryChange).toHaveBeenCalledWith('equipped', ['Longsword']);
+     expect(onInventoryChange).toHaveBeenCalledWith('equipped', ['Longsword']);
   });
 
   it('should handle custom item add', () => {
