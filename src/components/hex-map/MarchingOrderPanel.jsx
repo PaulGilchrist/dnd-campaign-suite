@@ -1,4 +1,3 @@
-import React from 'react';
 
 function MarchingOrderPanel({ marchingOrder, setMarchingOrder, characters, onClose }) {
     const moveUp = (index) => {

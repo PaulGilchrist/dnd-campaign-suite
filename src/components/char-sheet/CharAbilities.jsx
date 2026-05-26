@@ -2,7 +2,8 @@
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
-import { buildAbilityDetailHtml } from '../../hooks/useActionPopup.js'
+import { buildAbilityDetailHtml } from '../../hooks/useActionPopup.js';
+import { sanitizeHtml } from '../../services/sanitize.js';
 import './CharAbilities.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });

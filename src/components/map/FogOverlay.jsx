@@ -1,4 +1,3 @@
-import React from 'react';
 
 const CELL_SIZE = 40;
 

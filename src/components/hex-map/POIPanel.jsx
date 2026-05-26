@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { POI_TYPES } from '../../config/outdoorConfig';
 import SettlementSVG from './svg/SettlementSVG';
 import CitySVG from './svg/CitySVG';

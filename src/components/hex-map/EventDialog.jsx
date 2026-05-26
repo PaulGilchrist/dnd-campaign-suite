@@ -1,4 +1,3 @@
-import React from 'react';
 
 const EVENT_ICONS = {
   combat: 'fa-solid fa-crosshairs',

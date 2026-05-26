@@ -6,7 +6,8 @@ import useLoggedDiceRoll from '../../../hooks/useLoggedDiceRoll.js'
 import Popup from '../../common/Popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
-import { rollExpression } from '../../../services/diceRoller.js'
+import { rollExpression } from '../../../services/diceRoller.js';
+import { sanitizeHtml } from '../../../services/sanitize.js';
 import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName }) {

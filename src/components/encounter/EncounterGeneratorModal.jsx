@@ -47,7 +47,6 @@ function EncounterGeneratorModal({ monsters, playerLevels, difficulty, onApply, 
 
   const handleGenerate = () => {
     setGenerating(true);
-    const partySize = playerLevels.length;
 
     // Run synchronously — the service is pure logic
     const results = generateEncounterSuggestions({
@@ -98,8 +97,6 @@ function EncounterGeneratorModal({ monsters, playerLevels, difficulty, onApply, 
             </div>
             <div className="gen-env-groups">
               {ENVIRONMENT_GROUPS.map(group => {
-                const allSelected = group.environments.every(e => selectedEnvs.has(e));
-                const someSelected = group.environments.some(e => selectedEnvs.has(e));
                 return (
                   <div key={group.label} className="gen-env-group">
                     <div className="gen-env-group-label">{group.label}</div>

@@ -46,7 +46,7 @@ function extract5eRaceResistances(raceData, subraceName) {
   // Check subrace traits
   if (subraceName && raceData.subraces) {
     const subrace = raceData.subraces.find(sr =>
-      sr.name === subraceStr || sr.index === subraceStr.toLowerCase()
+      sr.name === subraceName || sr.index === subraceName.toLowerCase()
     );
     if (subrace && subrace.racial_traits) {
       subrace.racial_traits.forEach(trait => {
@@ -285,7 +285,6 @@ export async function getResistanceLimits(formData) {
   const className = formData.class?.name || '';
   const raceName = formData.race?.name || '';
   const subraceName = formData.race?.subrace?.name || formData.race?.subrace || '';
-  const subraceStr = typeof subraceName === 'string' ? subraceName : String(subraceName || '');
   const level = formData.level || 1;
 
   let resistances = [];

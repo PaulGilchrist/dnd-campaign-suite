@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import useQuestsManagement from '../../hooks/useQuestsManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import './Quests.css';
@@ -12,9 +12,7 @@ const STATUS_COLORS = {
 };
 
 function Quests({ campaignName, isLocalhost, onBack }) {
-  if (!isLocalhost) return null;
-
-  const { quests, loading, loadQuestsList, saveQuestsList, deleteQuestAction } = useQuestsManagement(campaignName);
+  const { quests, loading, saveQuestsList, deleteQuestAction } = useQuestsManagement(campaignName);
   const [searchQuery, setSearchQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingQuest, setEditingQuest] = useState(null);
@@ -27,6 +25,8 @@ function Quests({ campaignName, isLocalhost, onBack }) {
     const query = searchQuery.toLowerCase();
     return quests.filter(q => q.name?.toLowerCase().includes(query));
   }, [quests, searchQuery]);
+
+  if (!isLocalhost) return null;
 
   const handleNewQuest = () => {
     setFormData({ name: '', status: 'active', description: '', rewards: '', notes: '' });

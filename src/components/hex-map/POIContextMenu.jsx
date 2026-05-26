@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig';
 import { hexToPixel } from '../../services/hexMapUtils';
 import * as mapsService from '../../services/mapsService.js';

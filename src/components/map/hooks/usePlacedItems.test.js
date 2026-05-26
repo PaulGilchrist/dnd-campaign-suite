@@ -27,9 +27,8 @@ describe('usePlacedItems', () => {
 
   it('should toggle item visibility', () => {
     const result = getHook();
-    let updated;
     act(() => {
-      updated = result.current.handleToggleItemVisibility('item1');
+      result.current.handleToggleItemVisibility('item1');
     });
     expect(setPlacedItems).toHaveBeenCalled();
   });

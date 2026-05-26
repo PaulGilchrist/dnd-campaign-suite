@@ -1,19 +1,13 @@
-import React from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig';
 import { hexToPixel } from '../../services/hexMapUtils';
 
-function TravelPathLayer({ path, pathIndex, partyPosition }) {
+function TravelPathLayer({ path, pathIndex }) {
   if (!path || path.length === 0) return null;
 
   const getHexCenter = (h) => {
     const p = hexToPixel(h.q, h.r, HEX_SIZE);
     return { x: p.x, y: p.y };
   };
-
-  const linePoints = path.map(h => {
-    const p = hexToPixel(h.q, h.r, HEX_SIZE);
-    return `${p.x},${p.y}`;
-  }).join(' ');
 
   const currentStep = pathIndex < path.length ? path[pathIndex] : null;
   const currentCenter = currentStep ? getHexCenter(currentStep) : null;

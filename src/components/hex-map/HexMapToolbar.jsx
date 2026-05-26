@@ -1,4 +1,3 @@
-import React from 'react';
 import { TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_TRAVEL, TOOL_ROAD } from '../../config/outdoorConfig';
 
 function HexMapToolbar({

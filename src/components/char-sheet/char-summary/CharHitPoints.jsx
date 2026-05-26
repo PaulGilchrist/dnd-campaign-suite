@@ -10,7 +10,7 @@ function CharHitPoints({ playerStats, campaignName }) {
     React.useEffect(() => {
         let value = storage.getProperty(playerStats.name, 'currentHitPoints', campaignName);
         setCurrentHitPoints(value != null ? value : playerStats.hitPoints);
-    }, [playerStats]);
+    }, [playerStats, campaignName]);
     const handleInputToggleCurrentHitPoints = () => {
         setShowInputCurrentHitPoints((showInputCurrentHitPoints) => !showInputCurrentHitPoints);
     };

@@ -3,8 +3,7 @@
 import express from 'express';
 import os from 'os';
 import path from 'path';
-import guid from 'guid';
-import { activeMaps, subscribers, characterChangeData, readFile, saveFile, keepAlive } from './server/utils/changeData.js';
+import { readFile, keepAlive } from './server/utils/changeData.js';
 import sseRoutes from './server/routes/sse.js';
 import mapsRoutes from './server/routes/maps.js';
 import encountersRoutes from './server/routes/encounters.js';
@@ -14,13 +13,11 @@ import questsRoutes from './server/routes/quests.js';
 import factionsRoutes from './server/routes/factions.js';
 import campaignsBasic from './server/routes/campaigns-basic.js';
 import campaignsCharacter from './server/routes/campaigns-character.js';
-import campaignsPositioning from './server/routes/campaigns-positioning.js';
 import campaignsChangedata from './server/routes/campaigns-changedata.js';
 import campaignsAdmin from './server/routes/campaigns-admin.js';
 import logRoutes from './server/routes/log.js';
 
 const PORT = process.env.PORT || 80;
-const persistDataDebounceMilliseconds = 1 * 60 * 1000; // 1 minute in milliseconds
 
 const app = express();
 

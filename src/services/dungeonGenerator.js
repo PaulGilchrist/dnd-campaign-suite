@@ -61,7 +61,7 @@ class BSPNode {
     this.room = null;
   }
 
-  split(rng, minSize, _maxSize) {
+  split(rng, minSize) {
     minSize = minSize || 4;
     if (this.left || this.right) return false;
 

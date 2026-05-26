@@ -12,7 +12,7 @@ function useSSESync({ campaignName, mapName, setGridSize, setMapData, setPlacedI
         }
         setMapData((prev) => ({
             ...prev,
-            players: (data.players || prev?.players || []).map(({ imagePath, ...rest }) => rest),
+            players: (data.players || prev?.players || []).map(({ ...rest }) => rest),
             walls: data.walls ? new Set(data.walls) : (prev?.walls || new Set())
         }));
         if (data.placedItems !== undefined) {
@@ -21,7 +21,7 @@ function useSSESync({ campaignName, mapName, setGridSize, setMapData, setPlacedI
         if (data.fog !== undefined) {
             setFog(new Set(data.fog));
         }
-    }, [campaignName, mapName]);
+    }, [campaignName, mapName, setFog, setGridSize, setMapData, setPlacedItems]);
 
     return { handleSSEEvent };
 }

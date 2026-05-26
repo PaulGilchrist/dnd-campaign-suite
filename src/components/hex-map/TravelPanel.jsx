@@ -1,9 +1,8 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { TRAVEL_PACES, formatTravelTime, getHexTravelTime } from '../../services/travelService.js';
 import { EVENT_FREQUENCIES } from '../../services/randomEventService.js';
 
 function TravelPanel({
-  travelMode,
   travelPace,
   path,
   pathIndex,
@@ -33,7 +32,6 @@ function TravelPanel({
     e.preventDefault();
     const panel = panelRef.current;
     if (!panel) return;
-    const rect = panel.getBoundingClientRect();
     dragState.current = {
       startX: e.clientX,
       startY: e.clientY,

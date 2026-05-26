@@ -4,8 +4,6 @@ import { getAttacks } from './attackCalc2024.js';
 // References to mocked functions (filled in beforeEach)
 let findEquippedWeapons;
 let buildWeaponAttack;
-let buildMonkAttacks;
-let buildSpellAttacks;
 
 // Mock all dependencies from attackCalc.js
 vi.mock('./attackCalc.js', () => {
@@ -81,8 +79,6 @@ describe('attackCalc2024', () => {
     const attackCalc = await import('./attackCalc.js');
     findEquippedWeapons = attackCalc.findEquippedWeapons;
     buildWeaponAttack = attackCalc.buildWeaponAttack;
-    buildMonkAttacks = attackCalc.buildMonkAttacks;
-    buildSpellAttacks = attackCalc.buildSpellAttacks;
     vi.clearAllMocks();
   });
 

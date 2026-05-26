@@ -39,7 +39,7 @@ import './HexMap.css';
 
 function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered }) {
     const [loading, setLoading] = useState(true);
-    const [mapData, setMapData] = useState(null);       // full map data object from server
+    const [, setMapData] = useState(null);       // full map data object from server
     const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE);
     const hexCols = gridSize * GRID_COLS_MULTIPLIER;
     const hexRows = gridSize;
@@ -143,13 +143,13 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         } else if (tool !== TOOL_TRAVEL && travelMgmt.isTravelActive) {
             travelMgmt.cancelTravel();
         }
-    }, [tool, weather, handleGenerateWeather]);
+    }, [tool, weather, handleGenerateWeather, travelMgmt]);
 
     useEffect(() => {
         if (travelMgmt.travelMode === 'inactive' && tool === TOOL_TRAVEL) {
             setTool(TOOL_NONE);
         }
-    }, [travelMgmt.travelMode]);
+    }, [travelMgmt.travelMode, tool]);
 
     // Fetch available indoor maps for POI linking
     useEffect(() => {
@@ -254,7 +254,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             x: Math.min(maxPanX, Math.max(minPanX, px)),
             y: Math.min(maxPanY, Math.max(minPanY, py)),
         };
-    }, [gridPixelBounds]);
+    }, [gridPixelBounds, MARGIN_X, MARGIN_Y]);
 
     useLayoutEffect(() => {
         if (needsResetViewRef.current) {
@@ -424,7 +424,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             return next;
         });
         paintingRef.current = true;
-    }, [tool, selectedTerrain, gridSize, getHexFromEvent]);
+    }, [tool, selectedTerrain, getHexFromEvent, hexCols, hexRows]);
 
     const handleTerrainPointerMove = useCallback((e) => {
         if (!paintingRef.current) return;
@@ -445,7 +445,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             }
             return next;
         });
-    }, [tool, selectedTerrain, gridSize, getHexFromEvent]);
+    }, [tool, selectedTerrain, getHexFromEvent, hexCols, hexRows]);
 
     const handleTerrainPointerUp = useCallback(() => {
         paintingRef.current = false;
@@ -492,7 +492,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             label: poiType.name,
         };
         setPois(prev => [...prev, newPoi]);
-    }, [pois, gridSize, getHexFromEvent]);
+    }, [pois, getHexFromEvent, hexCols, hexRows]);
 
     // ─── POI interaction handlers ──────────────────────────────────────
 
@@ -548,7 +548,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         const poi = pois.find(p => p.id === poiId);
         if (!poi) return;
         setPoiDragging({ poiId, startQ: poi.q, startR: poi.r });
-    }, [pois, tool, roadStartPoiId, roads, gridSize, terrain]);
+    }, [pois, tool, roadStartPoiId, roads, terrain, hexCols, hexRows]);
 
     const handlePoiPointerMove = useCallback((e) => {
         if (!poiDragging) return;
@@ -563,7 +563,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         setPois(prev => prev.map(p =>
             p.id === poiDragging.poiId ? { ...p, q: hex.q, r: hex.r } : p
         ));
-    }, [poiDragging, pois, gridSize, getHexFromEvent]);
+    }, [poiDragging, pois, getHexFromEvent, hexCols, hexRows]);
 
     const handlePoiPointerUp = useCallback(() => {
         if (poiDragging) {
@@ -585,7 +585,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             }));
         }
         setPoiDragging(null);
-    }, [poiDragging, pois, gridSize, terrain]);
+    }, [poiDragging, pois, terrain, hexCols, hexRows]);
 
     const handleStartEncounter = useCallback(async (q, r, extraPlacedItems = []) => {
         const terrainType = terrain[hexKey(q, r)] || 'plains';
@@ -689,7 +689,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         travelMgmt.rerollEvent();
     }, [travelMgmt]);
 
-    const handlePoiContextMenu = useCallback((poiId, e) => {
+    const handlePoiContextMenu = useCallback((poiId) => {
         const poi = pois.find(p => p.id === poiId);
         if (!poi) return;
         setSelectedPoiMenu({ id: poi.id, q: poi.q, r: poi.r });
@@ -756,7 +756,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         } else {
             setHoveredHex(null);
         }
-    }, [gridSize]);
+    }, [hexCols, hexRows]);
 
     // ─── Load / initialize map data on mount ────────────────────────────
 
@@ -874,7 +874,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         };
 
         loadMap();
-    }, [campaignName, mapName]);
+    }, [campaignName, mapName, characters]);
 
     // ─── Auto-save when data changes ────────────────────────────────────
     // Guard: only save for the mapName this HexMap was initialized with.

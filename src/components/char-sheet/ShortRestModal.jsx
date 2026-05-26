@@ -1,9 +1,7 @@
 
 import React from 'react'
 import storage from '../../services/storage.js'
-import { rollDice } from '../../services/diceRoller.js'
-
-const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
+import { rollDice } from '../../services/diceRoller.js';
 
 function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [remainingHitDice, setRemainingHitDice] = React.useState(() => {

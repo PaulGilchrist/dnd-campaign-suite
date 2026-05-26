@@ -21,7 +21,7 @@ import TrapSVG from './TrapSVG.jsx';
 import TreeSVG from './TreeSVG.jsx';
 import WebSVG from './WebSVG.jsx';
 
-function ItemsPanel({ itemsPanelOpen, placedItems, onToggleItemVisibility, onClose, characters = [], players = [], mapVariant = 'indoor' }) {
+function ItemsPanel({ itemsPanelOpen, onClose, characters = [], players = [], mapVariant = 'indoor' }) {
     const createDragGhost = (e) => {
         const svgEl = e.currentTarget.querySelector('svg');
         if (!svgEl) return;

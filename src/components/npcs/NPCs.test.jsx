@@ -1,7 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import NPCs from './NPCs.jsx';
-import useNPCsManagement from '../../hooks/useNPCsManagement.js';
 
 let mockNPCsFactory = () => ({
   npcs: [],
@@ -122,7 +121,7 @@ describe('NPCs', () => {
 
   it('should open modal when New NPC clicked', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     expect(
       screen.getByRole('heading', { name: 'New NPC' })
     ).toBeInTheDocument();
@@ -130,13 +129,13 @@ describe('NPCs', () => {
 
   it('should show "New NPC" heading in modal', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     expect(screen.getByRole('heading', { name: 'New NPC' })).toBeInTheDocument();
   });
 
   it('should close modal when Cancel clicked', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     expect(
       screen.getByRole('heading', { name: 'New NPC' })
     ).toBeInTheDocument();
@@ -148,7 +147,7 @@ describe('NPCs', () => {
 
   it('should close modal when X button clicked', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     fireEvent.click(screen.getByLabelText('Close'));
     expect(
       screen.queryByRole('heading', { name: 'New NPC' })
@@ -157,7 +156,7 @@ describe('NPCs', () => {
 
   it('should close modal when overlay clicked', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     const overlay = document.querySelector('.ct-modal-overlay');
     fireEvent.click(overlay);
     expect(
@@ -167,7 +166,7 @@ describe('NPCs', () => {
 
   it('should not close modal when modal content clicked', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     const modal = document.querySelector('.ct-modal');
     fireEvent.click(modal);
     expect(
@@ -179,7 +178,7 @@ describe('NPCs', () => {
 
   it('should render all form fields in modal', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
 
     // Standard inputs
     expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
@@ -198,13 +197,13 @@ describe('NPCs', () => {
 
   it('should render required asterisk for name field', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     expect(screen.getByText('*')).toBeInTheDocument();
   });
 
   it('should render all attitude options in select', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
 
     const attitudeSelect = screen.getByLabelText(/Attitude/);
     const options = attitudeSelect.querySelectorAll('option');
@@ -220,7 +219,7 @@ describe('NPCs', () => {
 
   it('should handle name field changes', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     const nameInput = screen.getByLabelText(/Name/);
     fireEvent.change(nameInput, { target: { value: 'Gandalf' } });
     expect(nameInput.value).toBe('Gandalf');
@@ -228,7 +227,7 @@ describe('NPCs', () => {
 
   it('should handle race field changes', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     const raceInput = screen.getByLabelText(/Race/);
     fireEvent.change(raceInput, { target: { value: 'Human' } });
     expect(raceInput.value).toBe('Human');
@@ -236,7 +235,7 @@ describe('NPCs', () => {
 
   it('should handle classRole field changes', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     const classInput = screen.getByLabelText(/Class \/ Role/);
     fireEvent.change(classInput, { target: { value: 'Wizard' } });
     expect(classInput.value).toBe('Wizard');
@@ -244,7 +243,7 @@ describe('NPCs', () => {
 
   it('should handle attitude select changes', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     const attitudeSelect = screen.getByLabelText(/Attitude/);
     fireEvent.change(attitudeSelect, { target: { value: 'positive' } });
     expect(attitudeSelect.value).toBe('positive');
@@ -252,7 +251,7 @@ describe('NPCs', () => {
 
   it('should handle tags field changes', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     const tagsInput = screen.getByLabelText(/Tags/);
     fireEvent.change(tagsInput, { target: { value: 'ally, quest-giver' } });
     expect(tagsInput.value).toBe('ally, quest-giver');
@@ -260,7 +259,7 @@ describe('NPCs', () => {
 
   it('should handle PreviewToggle field changes', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     const appearanceField = screen.getByTestId('field-npc-appearance');
     fireEvent.change(appearanceField, {
       target: { value: 'Tall with a long beard' },
@@ -272,14 +271,14 @@ describe('NPCs', () => {
 
   it('should disable save button when name is empty', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     const saveButton = screen.getByText('Save').closest('button');
     expect(saveButton.disabled).toBe(true);
   });
 
   it('should enable save button when name has text', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     const nameInput = screen.getByLabelText(/Name/);
     fireEvent.change(nameInput, { target: { value: 'Gandalf' } });
     const saveButton = screen.getByText('Save').closest('button');
@@ -453,7 +452,7 @@ describe('NPCs', () => {
 
   it('should not show delete button in new NPC modal', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();;
+    clickNewNPC();
     expect(screen.queryByText(/^Delete$/)).not.toBeInTheDocument();
   });
 

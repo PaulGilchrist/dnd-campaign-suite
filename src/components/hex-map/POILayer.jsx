@@ -1,4 +1,3 @@
-import React from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig';
 import { hexToPixel, hexDistance } from '../../services/hexMapUtils';
 

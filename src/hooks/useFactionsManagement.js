@@ -7,7 +7,7 @@ import {
 
 function useFactionsManagement(campaignName) {
   const [factions, setFactions] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
 
   const loadFactionsList = useCallback(async () => {
     if (!campaignName) return;

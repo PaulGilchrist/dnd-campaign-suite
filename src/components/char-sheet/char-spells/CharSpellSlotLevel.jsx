@@ -10,7 +10,7 @@ function CharSpellSlotLevel({ level, totalSlots, playerStats, campaignName }) {
     React.useEffect(() => {
         let value = storage.getProperty(playerStats.name, `spell_slots_level_${level}`, campaignName);
         setAvailableSlots(value != null ? value : totalSlots);
-    }, [level, totalSlots, playerStats]);
+    }, [level, totalSlots, playerStats, campaignName]);
 
     const handleClick = (event) => {
         if (event.key !== "Tab") {

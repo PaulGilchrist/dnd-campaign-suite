@@ -37,7 +37,8 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                 seed: seedValue,
             });
 
-            const { name: _generatedName, ...mapData } = result;
+            const { name: generatedName, ...mapData } = result;
+            void generatedName;
             await mapsService.createMap(campaignName, name, mapData);
 
             onMapCreated();

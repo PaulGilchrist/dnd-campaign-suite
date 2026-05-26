@@ -199,10 +199,6 @@ export default function useTravelManagement({
     ? path[pathIndex]
     : null;
 
-  const nextStep = path.length > 0 && pathIndex < path.length - 1
-    ? path[pathIndex + 1]
-    : null;
-
   const remainingSteps = path.length > 0 ? path.slice(pathIndex + 1) : [];
 
   const paceInfo = TRAVEL_PACES.find(p => p.id === travelPace) || TRAVEL_PACES[1];

@@ -7,7 +7,7 @@ import {
 
 function useNPCsManagement(campaignName) {
   const [npcs, setNpcs] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
 
   const loadNPCsList = useCallback(async () => {
     if (!campaignName) return;

@@ -1,4 +1,3 @@
-import React from 'react';
 import * as mapsService from '../../services/mapsService.js';
 
 const MapToolbar = ({
@@ -8,7 +7,6 @@ const MapToolbar = ({
     setTool,
     gridSize,
     setGridSize,
-    itemsPanelOpen,
     setItemsPanelOpen,
     handleClearWalls,
     zoomIn,

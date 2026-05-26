@@ -90,8 +90,9 @@ export const publish = (key, data) => {
         if (targetCampaign && client.campaignName && client.campaignName !== targetCampaign) return;
         try {
             client.res.write(eventData);
-         } catch (e) {
-         }
+        } catch (e) {
+            // client disconnected
+        }
      });
  }
 
@@ -105,6 +106,7 @@ export const keepAlive = () => {
                 console.warn(`Keep-alive: server returned status ${res.statusCode}`);
             }
         }).on('error', (err) => {
+            console.error('Keep-alive health check failed:', err.message);
         });
     }, 60 * 1000);
 }

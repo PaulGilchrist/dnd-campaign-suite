@@ -14,7 +14,7 @@ function useTrackedResource(storageKey, playerName, maxGetter, deps, campaignNam
     } else {
       setCurrent(maxGetter());
     }
-  }, [deps, maxGetter, playerName, storageKey]);
+  }, [deps, maxGetter, playerName, storageKey, campaignName]);
 
   const update = (val) => {
     storage.setProperty(playerName, storageKey, val, campaignName);

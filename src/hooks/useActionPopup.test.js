@@ -6,7 +6,7 @@ import useActionPopup, {
 } from './useActionPopup.js';
 
 vi.mock('./usePopup.js', () => ({
-  default: (buildHtml) => {
+  default: function usePopupMock(buildHtml) {
     const React = require('react');
     const [popupHtml, setPopupHtml] = React.useState(null);
     const showPopup = React.useCallback((entity) => {

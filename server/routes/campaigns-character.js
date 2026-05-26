@@ -2,7 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { processImageUpload, deleteCharacterImage } from '../utils/imageUtils.js';
-import { publish, characterChangeData } from '../utils/changeData.js';
+import { publish } from '../utils/changeData.js';
 
 const router = express.Router();
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import useNPCsManagement from '../../hooks/useNPCsManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import './NPCs.css';
@@ -19,7 +19,7 @@ const ATTITUDE_COLORS = {
   'extreme opposition': { bg: '#5c030e', color: '#ff6b6b', border: '#8b0000' },
 };
 
-function NPCs({ campaignName, characters, onBack }) {
+function NPCs({ campaignName, onBack }) {
   const { npcs, loading, loadNPCsList, saveNPCsList, deleteNPCAction } =
     useNPCsManagement(campaignName);
 
@@ -123,13 +123,6 @@ function NPCs({ campaignName, characters, onBack }) {
     } finally {
       setDeleting(false);
     }
-  };
-
-  // Truncate text for preview
-  const truncateText = (text, maxLength) => {
-    if (!text) return '';
-    if (text.length <= maxLength) return text;
-    return text.slice(0, maxLength) + '…';
   };
 
   // Get attitude badge styles

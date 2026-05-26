@@ -82,7 +82,7 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
         setNumOfNpc(numOfNpc + 1);
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
-    }, [combatSummary, numOfNpc]);
+    }, [combatSummary, numOfNpc, campaignName]);
 
     const handleRemoveNpc = React.useCallback(() => {
         if (!combatSummary) return;
@@ -97,21 +97,21 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
                 break;
             }
         }
-    }, [combatSummary, numOfNpc]);
+    }, [combatSummary, numOfNpc, campaignName]);
 
     const handleAddCombatRound = React.useCallback(() => {
         if (!combatSummary) return;
         combatSummary.round++;
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary({...combatSummary});
-    }, [combatSummary]);
+    }, [combatSummary, campaignName]);
 
     const handleRemoveCombatRound = React.useCallback(() => {
         if (!combatSummary) return;
         combatSummary.round = Math.max(0, combatSummary.round - 1);
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary({...combatSummary});
-    }, [combatSummary]);
+    }, [combatSummary, campaignName]);
 
     const handleNextCreature = React.useCallback(() => {
         const cs = combatSummaryRef.current;
@@ -148,7 +148,7 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
         const stored = localStorage.getItem('combatSummary');
         let initialSummary = null;
         if (stored) {
-            try { initialSummary = JSON.parse(stored); } catch {}
+            try { initialSummary = JSON.parse(stored); } catch { /* ignore */ }
         }
 
         // Always regenerate creatures from the current characters to pick up new characters
@@ -187,7 +187,7 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
             storage.set('activeCreatureId', firstId, campaignName);
             setActiveCreatureId(firstId);
         }
-    }, [characters]);
+    }, [characters, campaignName, setupCreatures]);
 
     React.useEffect(() => {
         if (!combatSummary || !onNpcsChange) return;

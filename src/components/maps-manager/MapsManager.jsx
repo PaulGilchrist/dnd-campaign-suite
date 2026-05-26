@@ -298,7 +298,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                     <div className="maps-manager-modal" onClick={e => e.stopPropagation()}>
                         <h3>Delete Map</h3>
                         <p>
-                            This will permanently delete the map '<strong>{mapsService.formatMapName(deletingMapName)}</strong>' and all its
+                            This will permanently delete the map &apos;<strong>{mapsService.formatMapName(deletingMapName)}</strong>&apos; and all its
                             contents (walls, items, creature positions). This <strong>cannot be undone</strong>.
                         </p>
                         <div className="maps-manager-modal-actions">

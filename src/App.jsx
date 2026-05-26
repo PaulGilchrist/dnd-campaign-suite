@@ -10,7 +10,6 @@ import Map from './components/map/Map.jsx';
 import MapsManager from './components/maps-manager/MapsManager.jsx';
 import EncounterBuilder from './components/encounter/EncounterBuilder.jsx';
 import * as mapsService from './services/mapsService.js';
-import utils from './services/utils.js';
 import useAppData from './hooks/useAppData.js';
 import useCharacterManagement from './hooks/useCharacterManagement.js';
 import useCampaignManagement from './hooks/useCampaignManagement.js';
@@ -51,7 +50,7 @@ function App() {
   }, []);
 
   const { showCampaignSelection, campaignName, isLocalhost, handleCampaignSelect, handleRenameCampaign: handleRenameCampaignRaw, handleDeleteCampaign: handleDeleteCampaignRaw, handleBackToCampaigns } = campaignMgmt;
-  const { characters, activeCharacter, setActiveCharacter, handleInitiativeClick: handleInitiativeClickRaw, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, inputRef } = charMgmt;
+  const { characters, activeCharacter, setActiveCharacter, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, inputRef } = charMgmt;
   const { showCharacterWizard, showEditCharacterWizard, handleAddCharacter, handleWizardComplete, handleWizardCancel, handleEditCharacter, handleEditWizardComplete, handleEditWizardCancel } = wizard;
 
   const [mapsView, setMapsView] = useState({ type: 'none' });
@@ -91,7 +90,7 @@ function App() {
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
-    try { localStorage.setItem('theme', newTheme); } catch {}
+    try { localStorage.setItem('theme', newTheme); } catch { /* ignore */ }
   };
 
   useEffect(() => {

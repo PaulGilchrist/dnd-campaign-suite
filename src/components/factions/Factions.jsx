@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import useFactionsManagement from '../../hooks/useFactionsManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import './Factions.css';

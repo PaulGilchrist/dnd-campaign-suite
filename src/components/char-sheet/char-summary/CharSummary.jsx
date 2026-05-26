@@ -11,7 +11,8 @@ import CharFeats from '../char-feats/CharFeats.jsx'
 import Popup from '../../common/Popup.jsx'
 import AvatarImage from '../../common/AvatarImage.jsx'
 import useTrackedResource from '../../../hooks/useTrackedResource.js'
-import useLoggedDiceRoll from '../../../hooks/useLoggedDiceRoll.js'
+import useLoggedDiceRoll from '../../../hooks/useLoggedDiceRoll.js';
+import { sanitizeHtml } from '../../../services/sanitize.js';
 import LongRestButton from '../LongRestButton.jsx'
 import ShortRestButton from '../ShortRestButton.jsx'
 import ShortRestModal from '../ShortRestModal.jsx'

@@ -7,7 +7,7 @@ import {
 
 function useNotesManagement(campaignName) {
   const [notes, setNotes] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
 
   const loadNotesList = useCallback(async () => {
     if (!campaignName) return;

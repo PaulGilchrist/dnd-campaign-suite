@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { formatEncounterName } from '../../services/encountersService.js';
 import MarkdownPreview from '../common/MarkdownPreview.jsx';
 import './EncounterBuilder.css';

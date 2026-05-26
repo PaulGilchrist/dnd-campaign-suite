@@ -6,8 +6,6 @@ export default function usePlayerDragging({
     svgRef,
     mapData,
     gridSize,
-    panX,
-    panY,
     setMapData,
     gridCenterX,
     gridCenterY,
@@ -36,7 +34,7 @@ export default function usePlayerDragging({
             offsetX: svgX - cx,
             offsetY: svgY - cy
         });
-    }, [mapData, gridSize, panX, panY]);
+    }, [mapData, gridCenterX, gridCenterY, svgRef]);
 
     const handlePointerMove = useCallback((e) => {
         if (!dragging) return;
@@ -68,7 +66,7 @@ export default function usePlayerDragging({
                 c.id === dragging.playerId ? { ...c, gridX: clampedGridX, gridY: clampedGridY } : c
             )
         }));
-    }, [dragging, mapData, gridSize, panX, panY]);
+    }, [dragging, mapData, gridSize, setMapData, svgRef]);
 
     const handlePointerUp = useCallback((e) => {
         if (!dragging) return;
@@ -126,7 +124,6 @@ export default function usePlayerDragging({
                     [x, y - 1],
                 ];
                 for (const [nx, ny] of neighbors) {
-                    const key = `${nx},${ny}`;
                     const clampedNx = Math.max(0, Math.min(gridSize - 1, nx));
                     const clampedNy = Math.max(0, Math.min(gridSize - 1, ny));
                     const clampedKey = `${clampedNx},${clampedNy}`;
@@ -146,7 +143,7 @@ export default function usePlayerDragging({
         }));
 
         setDragging(null);
-    }, [dragging, mapData, gridSize, panX, panY]);
+    }, [dragging, mapData, gridSize, setMapData, svgRef]);
 
     const handlePointerLeave = useCallback(() => {
         setDragging(null);

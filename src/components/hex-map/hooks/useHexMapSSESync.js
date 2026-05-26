@@ -43,7 +43,7 @@ function useHexMapSSESync({ campaignName, mapName, setGridSize, setTerrain, setR
         if (data.type) {
             setMapData(prev => ({ ...prev, ...data }));
         }
-    }, [campaignName, mapName]);
+    }, [campaignName, mapName, setGridSize, setTerrain, setRivers, setRoads, setPois, setZoom, setPanX, setPanY, setMarchingOrder, setPartyPosition, setMapData, setWeather]);
 
     return { handleSSEEvent };
 }

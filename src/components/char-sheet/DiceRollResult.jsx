@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import './diceRollResult.css';
 
 function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0 }) {
@@ -8,7 +8,6 @@ function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier =
     const isD20 = type === 'd20';
     
     // Calculate current result based on mode
-    let displayRolls = [...rolls];
     let finalRoll = rolls[0] || 0;
 
     if (isD20) {

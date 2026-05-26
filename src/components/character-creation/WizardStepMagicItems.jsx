@@ -92,7 +92,7 @@ function WizardStepMagicItems({ formData, allMagicItems, onArrayFieldChange }) {
     return (
              <SelectableList
           items={allMagicItems}
-	  fieldName="inventory.magicItems"
+          fieldName="inventory.magicItems"
           formData={formData}
           onArrayFieldChange={onArrayFieldChange}
           title="Step 10: Magic Items"

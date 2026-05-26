@@ -89,9 +89,6 @@ export function generateEncounterSuggestions({
 
   // Build a suggestion from a given anchor monster
   function buildSuggestion(anchor) {
-    const anchorCr = crToNumber(anchor.challenge_rating);
-    const monstersUsed = [];
-
     // Try adding allies first for variety
     let workingMonsters = [{ monster: anchor, qty: 1 }];
     let totalXP = anchor.xp;

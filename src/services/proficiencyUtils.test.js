@@ -40,7 +40,7 @@ describe('proficiencyUtils', () => {
       };
 
       const getChoiceCount = () => 0;
-      const [allowed, proficiencies] = getProficiencies(playerStats, false, getChoiceCount, defaultConfig);
+      const [, proficiencies] = getProficiencies(playerStats, false, getChoiceCount, defaultConfig);
 
       expect(proficiencies).toContain('Light Armor');
       expect(proficiencies).toContain('Medium Armor');

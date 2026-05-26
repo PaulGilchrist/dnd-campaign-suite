@@ -36,7 +36,7 @@ export default function useItemDragging({
             offsetX: svgX - cx,
             offsetY: svgY - cy,
         });
-    }, [placedItems, gridSize]);
+    }, [placedItems, gridCenterX, gridCenterY, svgRef]);
 
     const handleItemPointerMove = useCallback((e) => {
         if (!itemDragging) return;
@@ -66,7 +66,7 @@ export default function useItemDragging({
                     : item
             )
         );
-    }, [itemDragging, gridSize]);
+    }, [itemDragging, gridSize, setPlacedItems, svgRef]);
 
     const handleItemPointerUp = useCallback(() => {
         if (!itemDragging) return;

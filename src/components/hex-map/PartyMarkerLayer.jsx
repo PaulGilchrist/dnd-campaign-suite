@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import { useRef } from 'react';
 import { hexToPixel, pixelToHexSnapped, hexToSVGPath } from '../../services/hexMapUtils.js';
 
 function PartyMarkerLayer({ position, HEX_SIZE, hexCols, hexRows, onPositionChange, svgRef, onEncounter, contextMenuOpen, onContextMenu, travelMode, onAdvance, onCancelTravel }) {

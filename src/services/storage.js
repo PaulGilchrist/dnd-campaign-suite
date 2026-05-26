@@ -23,6 +23,7 @@ const storage = {
         });
     },
     getProperty: (name, propertyName, campaignName) => {
+        void campaignName;
         const firstName = utils.getFirstName(name);
         const obj = storage.get(firstName);
         if(obj && obj[propertyName] != null) {

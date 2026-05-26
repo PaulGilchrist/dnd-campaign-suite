@@ -1,4 +1,3 @@
-import React from 'react';
 import './EncounterBuilder.css';
 
 const DIFFICULTY_VALUE_CLASSES = ['summary-value-easy', 'summary-value-medium', 'summary-value-hard', 'summary-value-deadly'];
@@ -10,7 +9,6 @@ function EncounterSummaryPanel({
   effectiveXP,
   difficultyIndex,
   difficultyLabels,
-  difficultyColors,
   selectedMonsters,
   onClearMonsters,
 }) {

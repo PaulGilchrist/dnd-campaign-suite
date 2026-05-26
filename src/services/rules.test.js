@@ -2327,7 +2327,7 @@ describe('rules', () => {
             race: { traits: [], starting_proficiencies: [] },
             proficiencies: []
           };
-          const [_allowed, proficiencies] = rules.getProficiencies(playerStats, true);
+          const [, proficiencies] = rules.getProficiencies(playerStats, true);
           expect(proficiencies).toContain('Arcana');
           expect(proficiencyUtils2024.getProficiencies).toHaveBeenCalled();
         });
@@ -2352,7 +2352,7 @@ describe('rules', () => {
             },
             skillProficiencies: []
           };
-          const [_allowed, proficiencies] = rules.getProficiencies(playerStats, true);
+          const [, proficiencies] = rules.getProficiencies(playerStats, true);
           expect(proficiencies).toContain('Nature');
           expect(proficiencies).toContain('Religion');
           expect(proficiencies).toContain('History');
@@ -2420,7 +2420,7 @@ describe('rules', () => {
             specialActions: ['Special String Action'],
             magicSpecialActions: [{ name: 'Magic Special' }]
           };
-          const [_actions, _bonusActions, _reactions, specialActions] = rules.getActions(playerStats);
+          const [, , , specialActions] = rules.getActions(playerStats);
           expect(specialActions).toContainEqual(expect.objectContaining({ name: 'Special String Action', description: '' }));
           expect(specialActions).toContainEqual(expect.objectContaining({ name: 'Magic Special' }));
         });

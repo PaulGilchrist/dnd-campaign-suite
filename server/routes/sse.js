@@ -1,6 +1,5 @@
 import express from 'express';
 import path from 'path';
-import os from 'os';
 import guid from 'guid';
 import { subscribers, characterChangeData } from '../utils/changeData.js';
 

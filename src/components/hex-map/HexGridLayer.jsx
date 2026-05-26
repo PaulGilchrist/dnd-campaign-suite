@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig.js';
 import { getAllHexes, hexToPixel, hexToSVGPath } from '../../services/hexMapUtils.js';
 

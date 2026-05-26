@@ -1,4 +1,3 @@
-import React from 'react';
 import './EncounterBuilder.css';
 
 function EncounterFilterPanel({

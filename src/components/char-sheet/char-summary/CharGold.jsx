@@ -12,7 +12,7 @@ function CharGold({ playerStats, campaignName }) {
     React.useEffect(() => {
         let value = storage.getProperty(playerStats.name, 'gold', campaignName);
         setGold(value ? value : playerStats.inventory.gold);
-    }, [playerStats]);
+    }, [playerStats, campaignName]);
     
     const handleInputToggleGold = () => {
         setShowInputGold((showInputGold) => !showInputGold);
