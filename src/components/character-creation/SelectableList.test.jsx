@@ -444,7 +444,7 @@ describe('SelectableList', () => {
       { field: 'type', defaultLabel: 'All', label: 'Type', sortFn: (a, b) => b.localeCompare(a) },
     ];
 
-    mockRenderItem.mockImplementation((item, index, opts) => (
+    mockRenderItem.mockImplementation((item, index) => (
         <div data-testid={`item-${index}`}>
          <span>{item.name}</span>
         </div>

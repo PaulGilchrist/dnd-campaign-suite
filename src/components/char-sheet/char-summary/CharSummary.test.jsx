@@ -666,7 +666,7 @@ describe('CharSummary', () => {
 
   it('should show feat benefits HTML in popup', () => {
     const originalImpl = vi.mocked(CharFeats).getMockImplementation();
-    vi.mocked(CharFeats).mockImplementation(({ playerStats, showPopup }) => (
+    vi.mocked(CharFeats).mockImplementation(({ showPopup }) => (
       <div data-testid="char-feats">
         <button onClick={() => showPopup({
           name: 'Feat with Benefits',

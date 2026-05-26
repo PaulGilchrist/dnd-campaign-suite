@@ -108,7 +108,7 @@ describe('PreviewToggle', () => {
 
     it('calls onChange with updated value', () => {
         const handleChange = vi.fn();
-        const { rerender } = render(
+        render(
             <PreviewToggle value="initial" onChange={handleChange} />
         );
         const textarea = screen.getByRole('textbox');

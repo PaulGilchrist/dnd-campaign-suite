@@ -174,7 +174,7 @@ vi.mock('./WizardFooter.jsx', () => ({
 }));
 
 vi.mock('./WizardSidebar.jsx', () => ({
-  default: function WizardSidebarMock({ currentStep, isEditing, getStepEnabled, goToStep, isSaveEnabled, onSave }) {
+  default: function WizardSidebarMock() {
     return <div data-testid="wizard-sidebar">Sidebar</div>;
   },
 }));

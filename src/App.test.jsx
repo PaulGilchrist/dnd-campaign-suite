@@ -164,7 +164,7 @@ const { MockEncounterBuilder } = vi.hoisted(() => ({
 }));
 
 const { MockNotes } = vi.hoisted(() => ({
-  MockNotes: vi.fn(({ campaignName, characters, isLocalhost, onBack }) => (
+  MockNotes: vi.fn(({ campaignName, isLocalhost, onBack }) => (
     <div data-testid="notes-view">
       <span data-testid="notes-campaign">{campaignName}</span>
       <span data-testid="notes-localhost">{String(isLocalhost)}</span>
@@ -194,7 +194,7 @@ const { MockNPCs } = vi.hoisted(() => ({
 }));
 
 const { MockFactions } = vi.hoisted(() => ({
-  MockFactions: vi.fn(({ campaignName, characters, isLocalhost, onBack }) => (
+  MockFactions: vi.fn(({ campaignName, isLocalhost, onBack }) => (
     <div data-testid="factions-view">
       <span data-testid="factions-campaign">{campaignName}</span>
       <span data-testid="factions-localhost">{String(isLocalhost)}</span>
