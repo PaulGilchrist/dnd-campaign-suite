@@ -178,7 +178,8 @@
     ],
     "enemies": [
       "gargoyle"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "aarakocra-skirmisher",
@@ -246,7 +247,8 @@
     ],
     "enemies": [
       "gargoyle"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "aberrant-cultist",
@@ -564,7 +566,8 @@
     ],
     "book": "Monster Manual",
     "page": 306,
-    "desc": "An abominable yeti is larger than a normal yeti, standing three times as tall as a human. It typically lives and hunts alone, though a pair of abominable yetis might live together long enough to raise young. These towering yetis are highly territorial and savage, attacking and devouring any warm-blooded creatures they encounter, then scattering the bones across the ice and snow."
+    "desc": "An abominable yeti is larger than a normal yeti, standing three times as tall as a human. It typically lives and hunts alone, though a pair of abominable yetis might live together long enough to raise young. These towering yetis are highly territorial and savage, attacking and devouring any warm-blooded creatures they encounter, then scattering the bones across the ice and snow.",
+    "image": true
   },
   {
     "index": "acolyte",
@@ -5517,7 +5520,8 @@
     ],
     "enemies": [
       "salamander"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "azer-sentinel",
@@ -5587,7 +5591,8 @@
     ],
     "enemies": [
       "salamander"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "baboon",
@@ -5882,7 +5887,8 @@
     ],
     "book": "Monster Manual",
     "page": 343,
-    "desc": "Bandits rove in gangs and are sometimes led by thugs, veterans, or spellcasters. Not all bandits are evil. Oppression, drought, disease, or famine can often drive otherwise honest folk to a life of banditry.<br/>Pirates are bandits of the high seas. They might be freebooters interested only in treasure and murder, or they might be privateers sanctioned by the crown to attack and plunder an enemy nation's vessels."
+    "desc": "Bandits rove in gangs and are sometimes led by thugs, veterans, or spellcasters. Not all bandits are evil. Oppression, drought, disease, or famine can often drive otherwise honest folk to a life of banditry.<br/>Pirates are bandits of the high seas. They might be freebooters interested only in treasure and murder, or they might be privateers sanctioned by the crown to attack and plunder an enemy nation's vessels.",
+    "image": true
   },
   {
     "index": "bandit-captain",
@@ -6093,7 +6099,8 @@
       "guard",
       "knight",
       "warrior-veteran"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "bandit-deceiver",
@@ -6192,7 +6199,8 @@
       "guard",
       "knight",
       "warrior-veteran"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "banshee",
@@ -8511,7 +8519,8 @@
     "environments": [
       "desert",
       "mountain"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "bronze-dragon-wyrmling",
@@ -9060,7 +9069,8 @@
     "environments": [
       "forest",
       "underdark"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "bugbear-warrior",
@@ -9162,7 +9172,8 @@
     "environments": [
       "forest",
       "underdark"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "bulette",
@@ -9350,7 +9361,8 @@
       "grassland",
       "hill",
       "mountain"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "bullywug",
@@ -9578,7 +9590,8 @@
     "allies": [
       "frog",
       "giant-frog"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "bullywug-warrior",
@@ -9673,7 +9686,8 @@
     "allies": [
       "frog",
       "giant-frog"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "cambion",
@@ -10269,7 +10283,8 @@
     "environments": [
       "forest",
       "grassland"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "centaur-warden",
@@ -10386,7 +10401,8 @@
     "environments": [
       "forest",
       "grassland"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "chain-devil",
@@ -11377,7 +11393,8 @@
     "artist": "",
     "environments": [
       "grassland"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "colossus",
@@ -12775,7 +12792,8 @@
       "coastal",
       "grassland",
       "mountain"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "cyclops-sentry",
@@ -12870,7 +12888,8 @@
       "coastal",
       "grassland",
       "mountain"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "dao",
@@ -13572,7 +13591,8 @@
       "skeleton",
       "warhorse",
       "warhorse-skeleton"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "death-slaad",
@@ -14480,7 +14500,8 @@
     "environments": [
       "forest",
       "mountain"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "displacer-beast",
@@ -14966,7 +14987,8 @@
       "underdark",
       "coastal",
       "mountain"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "draft-horse",
@@ -17623,7 +17645,8 @@
     "environments": [
       "mountain",
       "urban"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "erinyes",
@@ -19762,7 +19785,8 @@
     "environments": [
       "mountain",
       "hill"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "galib-duhr",
@@ -20161,7 +20185,8 @@
     "allies": [
       "beholder",
       "death-tyrant"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "gazer",
@@ -20594,7 +20619,8 @@
     ],
     "allies": [
       "ghoul"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "ghost",
@@ -23832,7 +23858,8 @@
     "environments": [
       "mountain",
       "urban"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "githyanki-knight",
@@ -23924,7 +23951,8 @@
     "environments": [
       "underdark"
     ],
-    "desc": "The githyanki plunder countless worlds from the decks of their astral vessels and the backs of red dragons. Feathers, beads, gems, and precious metals decorate their armor and weapons-the legendary silver swords with which they cut through their foes. Since winning their freedom from the mind flayers, the githyanki have become ruthless conquerors under the rulership of their dread lich-queen, Vlaakith.<br/><br/><b>Astral Raiders</b>. The githyanki despise all other races, undertaking devastating raids that take them from their strongholds in the Astral Plane to the farflung corners of the multiverse. War is the ultimate expression of githyanki culture, and their pitiless black eyes know no mercy. After a raid, they leave shattered survivors enough food and resources to weakly endure. Later, the githyanki return to their conquered foes, plundering them again and again.<br/><br/><b>Followers of Gith</b>. In their own language, githyanki means &quot;followers of Gith.&quot; Under the guidance of Gith, the githyanki stratified into a militaristic society, with a strict caste system, dedicated to the ongoing fight against the victims and sworn enemies of their race. When their leader Gith perished, she was replaced by her undead adviser, Vlaakith. The lich-queen forbade worship of all beings except herself.<br/>Of all their enemies, the githyanki most hate their former masters, the mind flayers. Their close kin, the githzerai, are second in their enmity. All other creatures are treated with simple contempt by the githyanki, whose xenophobic pride defines their view of inferior races.<br/><br/><b>Silver Swords</b>. In ancient times, gith knights created special weapons to combat their mind flayer masters. These silver swords channel the force of the wielder's will, dealing psychic as well as physical damage. A githyanki can't become a knight until it masters the singular discipline needed to will such a blade into existence. A silver sword is equivalent to a greatsword, and takes on the properties of a +3 greatsword in the hands of its creator.<br/>In the eyes of the githyanki, each silver sword is a priceless relic and a work of art. Githyanki knights will hunt down and destroy any non-githyanki that dares to carry or wield a silver sword, reclaiming it for their people.<br/><br/><b>Red Dragon Riders</b>. In the uprising against the illithids, Gith sought allies. Her adviser Vlaakith appealed to Tiamat, the goddess of evil dragonkind, and Gith ventured into the Nine Hells to meet with her. Only Tiamat now knows what passed between them, but Vlaakith returned to the Astral Plane with the Dragon Queen's red dragon consort Ephelomon, who proclaimed that his kind would forever act as allies to the githyanki. Not all red dragons honor the alliance kindled so long ago, but most at least don't consider the githyanki their enemies.<br/><br/><b>Outposts in the Mortal Realm</b>. Since creatures that dwell on the Astral Plane don't age, the githyanki establish creches in remote areas of the Material Plane to raise their young. Doubling as military academies, these creches train young githyanki to harness their psychic and combat abilities. When a githyanki grows to adulthood and slays a mind flayer as part of a sacred rite of passage, it is permitted to rejoin its people on the Astral Plane."
+    "desc": "The githyanki plunder countless worlds from the decks of their astral vessels and the backs of red dragons. Feathers, beads, gems, and precious metals decorate their armor and weapons-the legendary silver swords with which they cut through their foes. Since winning their freedom from the mind flayers, the githyanki have become ruthless conquerors under the rulership of their dread lich-queen, Vlaakith.<br/><br/><b>Astral Raiders</b>. The githyanki despise all other races, undertaking devastating raids that take them from their strongholds in the Astral Plane to the farflung corners of the multiverse. War is the ultimate expression of githyanki culture, and their pitiless black eyes know no mercy. After a raid, they leave shattered survivors enough food and resources to weakly endure. Later, the githyanki return to their conquered foes, plundering them again and again.<br/><br/><b>Followers of Gith</b>. In their own language, githyanki means &quot;followers of Gith.&quot; Under the guidance of Gith, the githyanki stratified into a militaristic society, with a strict caste system, dedicated to the ongoing fight against the victims and sworn enemies of their race. When their leader Gith perished, she was replaced by her undead adviser, Vlaakith. The lich-queen forbade worship of all beings except herself.<br/>Of all their enemies, the githyanki most hate their former masters, the mind flayers. Their close kin, the githzerai, are second in their enmity. All other creatures are treated with simple contempt by the githyanki, whose xenophobic pride defines their view of inferior races.<br/><br/><b>Silver Swords</b>. In ancient times, gith knights created special weapons to combat their mind flayer masters. These silver swords channel the force of the wielder's will, dealing psychic as well as physical damage. A githyanki can't become a knight until it masters the singular discipline needed to will such a blade into existence. A silver sword is equivalent to a greatsword, and takes on the properties of a +3 greatsword in the hands of its creator.<br/>In the eyes of the githyanki, each silver sword is a priceless relic and a work of art. Githyanki knights will hunt down and destroy any non-githyanki that dares to carry or wield a silver sword, reclaiming it for their people.<br/><br/><b>Red Dragon Riders</b>. In the uprising against the illithids, Gith sought allies. Her adviser Vlaakith appealed to Tiamat, the goddess of evil dragonkind, and Gith ventured into the Nine Hells to meet with her. Only Tiamat now knows what passed between them, but Vlaakith returned to the Astral Plane with the Dragon Queen's red dragon consort Ephelomon, who proclaimed that his kind would forever act as allies to the githyanki. Not all red dragons honor the alliance kindled so long ago, but most at least don't consider the githyanki their enemies.<br/><br/><b>Outposts in the Mortal Realm</b>. Since creatures that dwell on the Astral Plane don't age, the githyanki establish creches in remote areas of the Material Plane to raise their young. Doubling as military academies, these creches train young githyanki to harness their psychic and combat abilities. When a githyanki grows to adulthood and slays a mind flayer as part of a sacred rite of passage, it is permitted to rejoin its people on the Astral Plane.",
+    "image": true
   },
   {
     "index": "githyanki-warrior",
@@ -24226,7 +24254,8 @@
     "environments": [
       "mountain",
       "urban"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "githzerai-zerth",
@@ -24779,7 +24808,8 @@
       "gnoll-fang-of-yeenoghu",
       "gnoll-pack-lord",
       "hyena"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "gnoll-fang-of-yeenoghu",
@@ -24880,7 +24910,8 @@
       "gnoll-pack-lord",
       "hyena"
     ],
-    "desc": "Gnolls celebrate their victories by performing demonic rituals and making blood offerings to Yeenoghu. Sometimes the demon lord rewards his worshipers by allowing one of them to be possessed by a demonic spirit. Marked as Yeenoghu's favorite, the lucky recipient becomes a fang of Yeenoghu, the chosen of the Gnoll Lord. In much the same way Yeenoghu created the first gnolls, a hyena that feasts on a fang's slain foe undergoes a horrible transformation, becoming a full­ grown adult gnoll. Depending on the number of hyenas in a region, a fang of Yeenoghu can lead to a startling increase in the gnoll population. Finding and killing the fang is the only way to keep that population in check."
+    "desc": "Gnolls celebrate their victories by performing demonic rituals and making blood offerings to Yeenoghu. Sometimes the demon lord rewards his worshipers by allowing one of them to be possessed by a demonic spirit. Marked as Yeenoghu's favorite, the lucky recipient becomes a fang of Yeenoghu, the chosen of the Gnoll Lord. In much the same way Yeenoghu created the first gnolls, a hyena that feasts on a fang's slain foe undergoes a horrible transformation, becoming a full­ grown adult gnoll. Depending on the number of hyenas in a region, a fang of Yeenoghu can lead to a startling increase in the gnoll population. Finding and killing the fang is the only way to keep that population in check.",
+    "image": true
   },
   {
     "index": "gnoll-pack-lord",
@@ -25082,7 +25113,8 @@
       "gnoll-fang-of-yeenoghu",
       "gnoll-pack-lord",
       "hyena"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "goat",
@@ -25497,7 +25529,8 @@
       "swarm-of-rats",
       "wolf",
       "worg"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "goblin-minion",
@@ -25593,7 +25626,8 @@
       "swarm-of-rats",
       "wolf",
       "worg"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "goblin-warrior",
@@ -25700,7 +25734,8 @@
       "swarm-of-rats",
       "wolf",
       "worg"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "gold-dragon-wyrmling",
@@ -26150,7 +26185,8 @@
     "environments": [
       "urban",
       "underdark"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "gray-ooze",
@@ -27166,7 +27202,8 @@
     "environments": [
       "forest",
       "underdark"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "griffon",
@@ -28447,7 +28484,8 @@
     "environments": [
       "urban",
       "underdark"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "hawk",
@@ -29586,7 +29624,8 @@
       "owlbear",
       "raven",
       "worg"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "homunculus",
@@ -32066,7 +32105,8 @@
     ],
     "allies": [
       "giant-centipede"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "kraken",
@@ -32528,7 +32568,8 @@
     "environments": [
       "underdark",
       "underwater"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "kuo-toa-archpriest",
@@ -32772,7 +32813,8 @@
     "environments": [
       "underdark",
       "underwater"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "kuotoa-whip",
@@ -32898,7 +32940,8 @@
     "environments": [
       "underdark",
       "underwater"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "kuo-toa-whip",
@@ -33153,7 +33196,8 @@
     "environments": [
       "underdark",
       "coastal"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "lamia",
@@ -34324,7 +34368,8 @@
       "crocodile",
       "giant-lizard",
       "lizard"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "lizardfolk-shaman",
@@ -34447,7 +34492,7 @@
     "book": "Monster Manual",
     "page": 205,
     "desc": "Lizardfolk shamans lead their tribes, overseeing rites and ceremonies performed to honor Semuanya. From time to time, however, a lizardfolk tribe produces a powerful figure touched not by Semuanya but by Sess'inek-a reptilian demon lord who seeks to corrupt and control the lizardfolk. ",
-    "image": null
+    "image": true
   },
   {
     "index": "lizardfolk-sovereign",
@@ -34585,7 +34630,8 @@
       "crocodile",
       "giant-lizard",
       "lizard"
-    ]
+    ],
+    "image": true
   },
   {
     "index": "mage",
