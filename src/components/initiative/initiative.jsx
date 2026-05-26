@@ -303,12 +303,11 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
                             <div className='creature-name'>
                                 {creature.type === 'npc' ? (
                                     <input
-                                        onChange={(event) => handleNameChange(creature.id, event.target.value)}
-                                        type="text"
-                                        value={creature.name}
-                                        readOnly={!isActive}
-                                        className="npc-name-input"
-                                    />
+                                       onChange={(event) => handleNameChange(creature.id, event.target.value)}
+                                       type="text"
+                                       value={creature.name}
+                                       className="npc-name-input"
+                                      />
                                 ) : (
                                     <span>{creature.name}</span>
                                 )}
