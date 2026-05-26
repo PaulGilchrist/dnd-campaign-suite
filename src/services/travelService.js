@@ -48,17 +48,19 @@ export const TRAVEL_PACES = [
 
 export const MAX_TRAVEL_HOURS_PER_DAY = 8;
 export const MAX_FORCED_MARCH_HOURS = 12;
+export const HORSEBACK_SPEED_MULTIPLIER = 2;
 
 export function isTerrainPassable(terrainType) {
   return TERRAIN_MOVE_COST[terrainType] !== null;
 }
 
-export function getHexTravelTime(terrainType, paceId) {
+export function getHexTravelTime(terrainType, paceId, horseback = false) {
   const pace = TRAVEL_PACES.find(p => p.id === paceId);
   if (!pace) return null;
   const cost = TERRAIN_MOVE_COST[terrainType];
   if (cost === null) return null;
-  return pace.hoursPerHex * cost;
+  const time = pace.hoursPerHex * cost;
+  return horseback ? time / HORSEBACK_SPEED_MULTIPLIER : time;
 }
 
 export function getHexMoveCost(terrainType) {
@@ -84,7 +86,7 @@ export function getDailyHexBudget(paceId) {
   return Math.floor(pace.hexesPerHour * MAX_TRAVEL_HOURS_PER_DAY);
 }
 
-export function getTotalTravelTime(path, terrain) {
+export function getTotalTravelTime(path, terrain, horseback = false) {
   if (!path || path.length === 0) return { hours: 0, days: 0 };
   let totalHours = 0;
   for (const hex of path) {
@@ -93,6 +95,7 @@ export function getTotalTravelTime(path, terrain) {
     const cost = TERRAIN_MOVE_COST[t];
     if (cost !== null) totalHours += cost / 3; // hours at normal pace
   }
+  if (horseback) totalHours /= HORSEBACK_SPEED_MULTIPLIER;
   return {
     hours: totalHours,
     days: totalHours / MAX_TRAVEL_HOURS_PER_DAY,

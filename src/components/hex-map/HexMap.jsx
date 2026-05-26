@@ -1223,6 +1223,8 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 weather={weather}
                 onReRollWeather={handleReRollWeather}
                 onSetEventFrequency={travelMgmt.setEventFrequency}
+                horseback={travelMgmt.horseback}
+                onToggleHorseback={travelMgmt.toggleHorseback}
             />
 
             <EventDialog

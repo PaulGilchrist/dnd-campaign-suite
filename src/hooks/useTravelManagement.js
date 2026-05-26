@@ -3,6 +3,7 @@ import {
   calculatePath,
   getDailyHexBudget,
   getHexMoveCostWithRoad,
+  HORSEBACK_SPEED_MULTIPLIER,
   TRAVEL_PACES,
 } from '../services/travelService.js';
 import {
@@ -46,11 +47,16 @@ export default function useTravelManagement({
   const [pendingEvent, setPendingEvent] = useState(null);
   const [eventFrequency, setEventFrequency] = useState('normal');
   const [rerollsRemaining, setRerollsRemaining] = useState(3);
+  const [horseback, setHorseback] = useState(false);
 
   const pathRef = useRef([]);
   const pathIndexRef = useRef(0);
 
   const isTravelActive = travelMode !== MODES.INACTIVE;
+
+  const toggleHorseback = useCallback(() => {
+    setHorseback(prev => !prev);
+  }, []);
 
   const effectiveBudgetForPace = useCallback((paceId, w) => {
     const base = getDailyHexBudget(paceId);
@@ -58,12 +64,13 @@ export default function useTravelManagement({
     return Math.floor(base * mod);
   }, []);
 
-  const effectiveHexCost = useCallback((terrainType, q, r, w) => {
+  const effectiveHexCost = useCallback((terrainType, q, r, w, hb) => {
     const base = getHexMoveCostWithRoad(terrainType, q, r, roads);
     if (base === null) return null;
     const mod = w?.moveCostMod;
     if (mod === null) return null;
-    return base * (mod ?? 1);
+    const cost = base * (mod ?? 1);
+    return hb ? cost / HORSEBACK_SPEED_MULTIPLIER : cost;
   }, [roads]);
 
   const enhanceCombatEvent = useCallback((event, terrainType) => {
@@ -138,7 +145,7 @@ export default function useTravelManagement({
     const nextHex = currentPath[nextIdx];
     const key = `${nextHex.q},${nextHex.r}`;
     const tileTerrain = terrain[key] || 'plains';
-    const cost = effectiveHexCost(tileTerrain, nextHex.q, nextHex.r, weather);
+    const cost = effectiveHexCost(tileTerrain, nextHex.q, nextHex.r, weather, horseback);
     if (cost === null) {
       if (weather?.moveCostMod === null) {
         setLastMessage(`Extreme ${weather.label?.toLowerCase() || 'weather'} makes travel impossible. Camp and wait it out.`);
@@ -176,7 +183,7 @@ export default function useTravelManagement({
     }
 
     return { moved: true };
-  }, [accruedCost, dailyBudget, terrain, onPartyMove, weather, eventFrequency, enhanceCombatEvent, effectiveHexCost]);
+  }, [accruedCost, dailyBudget, terrain, onPartyMove, weather, eventFrequency, enhanceCombatEvent, effectiveHexCost, horseback]);
 
   const forceCamp = useCallback(() => {
     setAccruedCost(0);
@@ -258,11 +265,13 @@ export default function useTravelManagement({
     remainingSteps,
     paceInfo,
     hexesRemaining,
+    horseback,
     isTravelActive,
     MODES,
     startPlanning,
     cancelTravel,
     setDestinationAndPath,
+    toggleHorseback,
     changePace,
     advanceOneHex,
     forceCamp,

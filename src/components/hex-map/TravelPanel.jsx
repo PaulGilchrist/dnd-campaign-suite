@@ -23,6 +23,8 @@ function TravelPanel({
   weather,
   onReRollWeather,
   onSetEventFrequency,
+  horseback,
+  onToggleHorseback,
 }) {
   const panelRef = useRef(null);
   const dragState = useRef(null);
@@ -70,7 +72,7 @@ function TravelPanel({
 
   const currentHex = path[pathIndex];
   const currentTerrain = currentHex ? terrain[`${currentHex.q},${currentHex.r}`] || 'plains' : null;
-  const currentTravelTime = currentTerrain ? getHexTravelTime(currentTerrain, travelPace) : null;
+  const currentTravelTime = currentTerrain ? getHexTravelTime(currentTerrain, travelPace, horseback) : null;
 
   return (
     <div className="travel-panel" ref={panelRef}>
@@ -144,6 +146,18 @@ function TravelPanel({
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="travel-panel-horseback">
+        <span className="travel-panel-label">Mount:</span>
+        <button
+          className={`travel-horseback-btn ${horseback ? 'active' : ''}`}
+          onClick={onToggleHorseback}
+          title={horseback ? 'Riding horses — double travel speed' : 'Not riding — normal travel speed'}
+        >
+          <i className="fa-solid fa-horse"></i>
+          {horseback ? 'Horseback' : 'Walking'}
+        </button>
       </div>
 
       <div className="travel-panel-stats">
