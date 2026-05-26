@@ -331,6 +331,18 @@
 .encounter-builder .col-details { width: 36px; text-align: center; }
 .encounter-builder .col-remove { width: 30px; text-align: center; }
 
+/* Header alignment - overrides default th{text-align:left} */
+.encounter-builder .monster-table th.col-check,
+.encounter-builder .monster-table th.col-cr,
+.encounter-builder .monster-table th.col-qty,
+.encounter-builder .monster-table th.col-details,
+.encounter-builder .monster-table th.col-remove {
+  text-align: center;
+}
+.encounter-builder .monster-table th.col-xp {
+  text-align: right;
+}
+
 /* ============ Sortable Columns ============ */
 .encounter-builder .sortable {
   cursor: pointer;
