@@ -10,6 +10,7 @@ import EncounterGeneratorModal from './EncounterGeneratorModal.jsx';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import { formatEncounterName } from '../../services/encountersService.js';
+import { loadEncounterToInitiative } from '../../services/encounterToInitiative.js';
 import './EncounterBuilder.css';
 
 // XP thresholds per level [Easy, Medium, Hard, Deadly] for levels 0-20
@@ -134,7 +135,7 @@ function stripMonsters(monsters) {
   }));
 }
 
-function EncounterBuilder({ characters, campaignName }) {
+function EncounterBuilder({ characters, campaignName, onStartCombat }) {
   const { monsters, loading } = useMonstersData();
 
   const [filter, setFilter] = useState(() => {
@@ -338,12 +339,17 @@ function EncounterBuilder({ characters, campaignName }) {
         setSelectedMonsters(resolvedMonsters);
         setTimeout(() => {
           setSelectedMonsters(resolvedMonsters);
-        }, 0);
+         }, 0);
+
+         if (onStartCombat) {
+            loadEncounterToInitiative(resolvedMonsters, characters, campaignName);
+            onStartCombat();
+          }
+        }
+      } catch (error) {
+       console.error('Failed to load encounter:', error);
       }
-    } catch (error) {
-      console.error('Failed to load encounter:', error);
-    }
-  };
+    };
 
   const handleApplySuggestion = (monsters) => {
     setSelectedMonsters(monsters);

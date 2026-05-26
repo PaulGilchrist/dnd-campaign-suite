@@ -290,9 +290,9 @@ function App() {
             onPoiEntered={handleEnterMap}
           />
         )}
-        {activeView === 'encounter' && (
-          <EncounterBuilder characters={characters} campaignName={campaignName} />
-        )}
+          {activeView === 'encounter' && (
+            <EncounterBuilder characters={characters} campaignName={campaignName} onStartCombat={() => setActiveView('initiative')} />
+          )}
         {activeView === 'notes' && (
           <Notes
             campaignName={campaignName}
