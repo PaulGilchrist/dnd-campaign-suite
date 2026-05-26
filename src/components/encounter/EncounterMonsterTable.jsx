@@ -1,4 +1,3 @@
-import React from 'react';
 import './EncounterBuilder.css';
 
 function EncounterMonsterTable({
@@ -13,6 +12,7 @@ function EncounterMonsterTable({
   onSort,
   sortField,
   sortDirection,
+  onViewDetails,
 }) {
   const isSelected = (monsterIndex) => {
     return selectedMonsters.some((m) => m.index === monsterIndex);
@@ -92,9 +92,10 @@ function EncounterMonsterTable({
                     {sortField === 'xp' ? (sortDirection === 'asc' ? ' \u25B2' : ' \u25BC') : ''}
                   </span>
                 </th>
-                <th className="col-qty">Qty</th>
-                <th className="col-remove" />
-              </tr>
+                 <th className="col-qty">Qty</th>
+                 <th className="col-details" />
+                 <th className="col-remove" />
+               </tr>
             </thead>
             <tbody>
               {filteredMonsters.map((monster) => {
@@ -120,32 +121,42 @@ function EncounterMonsterTable({
                     <td className="col-name">{monster.name}</td>
                     <td className="col-cr">{monster.challenge_rating}</td>
                     <td className="col-xp">{monster.xp.toLocaleString()}</td>
-                    <td className="col-qty">
-                      {qty > 0 ? (
-                        <span className="qty-controls">
-                          <button
-                            type="button"
-                            className="qty-btn"
-                            onClick={(e) => { e.stopPropagation(); onDecreaseQty(monster.index); }}
-                            aria-label={`Decrease quantity of ${monster.name}`}
-                          >
-                            &minus;
-                          </button>
-                          <span className="qty-value">{qty}</span>
-                          <button
-                            type="button"
-                            className="qty-btn"
-                            onClick={(e) => { e.stopPropagation(); onIncreaseQty(monster.index); }}
-                            aria-label={`Increase quantity of ${monster.name}`}
-                          >
-                            +
-                          </button>
-                        </span>
-                      ) : (
-                        <span className="qty-value">&mdash;</span>
-                      )}
-                    </td>
-                    <td className="col-remove">
+                     <td className="col-qty">
+                       {qty > 0 ? (
+                         <span className="qty-controls">
+                           <button
+                             type="button"
+                             className="qty-btn"
+                             onClick={(e) => { e.stopPropagation(); onDecreaseQty(monster.index); }}
+                             aria-label={`Decrease quantity of ${monster.name}`}
+                           >
+                             &minus;
+                           </button>
+                           <span className="qty-value">{qty}</span>
+                           <button
+                             type="button"
+                             className="qty-btn"
+                             onClick={(e) => { e.stopPropagation(); onIncreaseQty(monster.index); }}
+                             aria-label={`Increase quantity of ${monster.name}`}
+                           >
+                             +
+                           </button>
+                         </span>
+                       ) : (
+                         <span className="qty-value">&mdash;</span>
+                       )}
+                     </td>
+                     <td className="col-details">
+                       <button
+                         type="button"
+                         className="details-btn"
+                         onClick={(e) => { e.stopPropagation(); onViewDetails?.(monster); }}
+                         aria-label={`View details for ${monster.name}`}
+                       >
+                         <i className="fa-solid fa-info-circle" />
+                       </button>
+                     </td>
+                     <td className="col-remove">
                       {qty > 0 && (
                         <button
                           type="button"

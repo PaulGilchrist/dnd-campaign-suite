@@ -274,15 +274,15 @@ export async function loadEquipment() {
 }
 
 /**
-  * Fetches monsters data (with caching) - version agnostic
-  * @returns {Promise<object[]>} - Array of monster data from /data/monsters.json
+  * Fetches monsters data (with caching)
+  * @returns {Promise<object[]>} - Array of monster data from /data/2024/monsters.json
   */
 export async function loadMonsters() {
     if (sharedDataCache.monsters) {
         return sharedDataCache.monsters;
     }
     try {
-        const response = await fetch('/data/monsters.json');
+        const response = await fetch('/data/2024/monsters.json');
         if (response.ok) {
             const data = await response.json();
             sharedDataCache.monsters = data;

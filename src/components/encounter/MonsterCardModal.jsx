@@ -1,0 +1,386 @@
+import { useMemo } from 'react';
+import { sanitizeHtml } from '../../services/sanitize.js';
+import { rollExpression } from '../../services/diceRoller.js';
+import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
+import Popup from '../common/Popup.jsx';
+import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
+import './MonsterCardModal.css';
+
+function MonsterCardModal({ monster, onClose, campaignName }) {
+  const { popupHtml, setPopupHtml, rollAttack, rollDamage, rollAbilityCheck, rollSavingThrow, rollSkillCheck, rollInitiative } = useLoggedDiceRoll(
+    monster?.name || 'Monster',
+    campaignName
+  );
+
+  const handleAttack = (name, bonus) => rollAttack(name, bonus);
+
+  const handleDamage = (name, formula) => {
+    const result = rollExpression(formula);
+    if (result) {
+      rollDamage(name, formula, result.total, result.rolls, result.modifier);
+    }
+  };
+
+  const handleAbilityCheck = (abbr, mod) => {
+    const fullName = abilityNameMap[abbr] || abbr.toUpperCase();
+    rollAbilityCheck(fullName, mod);
+  };
+
+  const handleSaveThrow = (ability, mod) => rollSavingThrow(saveAbilityAbbr(ability), mod);
+
+  const handleSkillCheck = (name, mod) => rollSkillCheck(name, mod);
+
+  const handleInitiative = (bonus) => rollInitiative(bonus);
+
+  const renderAction = (action, i) => (
+    <div key={i} className="mc-action">
+      <strong>{action.name}.</strong>{' '}
+      {action.attack_bonus != null && (
+        <span className="mc-dice-link" onClick={() => handleAttack(action.name, action.attack_bonus)} role="button" tabIndex={0}>
+          <i className="fa-solid fa-dice-d20" /> +{action.attack_bonus}
+        </span>
+      )}
+      {action.damage_dice && (
+        <span className="mc-dice-link" onClick={() => handleDamage(action.name, action.damage_dice)} role="button" tabIndex={0}>
+          <i className="fa-solid fa-dice" /> {action.damage_dice}
+        </span>
+      )}
+      {parseExtraDamageDice(action.damage, action.damage_dice).map((formula, idx) => (
+        <span key={idx} className="mc-dice-link" onClick={() => handleDamage(action.name, formula)} role="button" tabIndex={0}>
+          <i className="fa-solid fa-dice" /> {formula}
+        </span>
+      ))}
+      {action.save_dc != null && (
+        <span className="mc-dice-link mc-dice-link-save">
+          DC {action.save_dc} {action.save_type}
+        </span>
+      )}
+      <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }} />
+      {action.usage && <em> ({action.usage})</em>}
+      {action.recharge && <em> ({action.recharge})</em>}
+    </div>
+  );
+
+  const content = useMemo(() => {
+    if (!monster) return null;
+    return (
+      <div className="mc-card" onClick={(e) => e.stopPropagation()}>
+        <div className="mc-header" onClick={onClose}>
+          <div className="mc-header-info">
+            <div className="mc-name">{monster.name}</div>
+            <div className="mc-type-line">
+              {monster.size} {monster.type}
+              {monster.subtype ? ` (${monster.subtype})` : ''}, {monster.alignment}
+            </div>
+          </div>
+          <button className="mc-close" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+
+        <div className="mc-body">
+          <div className="mc-stats">
+            <div className="mc-stat">
+              <span className="mc-stat-label">Armor Class</span>
+              <span className="mc-stat-value">{monster.armor_class}</span>
+            </div>
+            <div className="mc-stat">
+              <span className="mc-stat-label">Hit Points</span>
+              <span className="mc-stat-value">
+                {monster.hit_points}{monster.hit_dice ? ` (${monster.hit_dice})` : ''}
+              </span>
+            </div>
+            <div className="mc-stat mc-stat-speed">
+              <span className="mc-stat-label">Speed</span>
+              <span className="mc-stat-value">
+                {Object.entries(monster.speed || {}).map(([k, v]) => `${k} ${v}`).join(', ')}
+              </span>
+            </div>
+            {monster.initiative_details && (
+              <div className="mc-stat">
+                <span className="mc-stat-label">Initiative</span>
+                <span className="mc-stat-value">
+                  {(() => {
+                    const initBonus = parseInitiativeBonus(monster.initiative_details);
+                    return initBonus != null ? (
+                      <span className="mc-dice-link" onClick={() => handleInitiative(initBonus)} role="button" tabIndex={0}>
+                        {monster.initiative_details}
+                      </span>
+                    ) : (
+                      monster.initiative_details
+                    );
+                  })()}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <hr />
+
+          <div className="mc-abilities">
+            {(['str', 'dex', 'con', 'int', 'wis', 'cha']).map(ab => (
+              <div key={ab} className="mc-ability">
+                <div className="mc-ability-name">{ab.toUpperCase()}</div>
+                <div className="mc-ability-score">{monster.ability_scores?.[ab] ?? '-'}</div>
+                <div
+                  className="mc-ability-mod mc-dice-link"
+                  onClick={() => handleAbilityCheck(ab, monster.ability_score_modifiers?.[ab] ?? 0)}
+                  role="button"
+                  tabIndex={0}
+                >
+                  {monster.ability_score_modifiers?.[ab] != null
+                    ? (monster.ability_score_modifiers[ab] >= 0 ? '+' : '') + monster.ability_score_modifiers[ab]
+                    : '-'}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <hr />
+
+          <div className="mc-defenses">
+            {hasEntries(monster.saving_throws) && (
+              <div className="mc-defense-row">
+                <span className="mc-defense-label">Saving Throws</span>
+                <span>
+                  {Object.entries(monster.saving_throws).map(([ab, s], idx) => (
+                    <span key={ab}>
+                      {idx > 0 && ', '}
+                      <span className="mc-dice-link" onClick={() => handleSaveThrow(ab, s.modifier)} role="button" tabIndex={0}>
+                        {saveAbilityAbbr(ab)} {s.modifier >= 0 ? '+' : ''}{s.modifier}
+                      </span>
+                    </span>
+                  ))}
+                </span>
+              </div>
+            )}
+            {hasEntries(monster.skills) && (
+              <div className="mc-defense-row">
+                <span className="mc-defense-label">Skills</span>
+                <span>
+                  {Object.entries(monster.skills).map(([name, s], idx) => (
+                    <span key={name}>
+                      {idx > 0 && ', '}
+                      <span className="mc-dice-link" onClick={() => handleSkillCheck(name, s.modifier)} role="button" tabIndex={0}>
+                        {name} {s.modifier >= 0 ? '+' : ''}{s.modifier}
+                      </span>
+                    </span>
+                  ))}
+                </span>
+              </div>
+            )}
+            {hasSenseEntries(monster.senses) && (
+              <div className="mc-defense-row">
+                <span className="mc-defense-label">Senses</span>
+                <span>{formatSenses(monster.senses)}</span>
+              </div>
+            )}
+            {monster.languages && (
+              <div className="mc-defense-row">
+                <span className="mc-defense-label">Languages</span>
+                <span>{monster.languages}</span>
+              </div>
+            )}
+            {hasEntries(monster.damage_vulnerabilities) && (
+              <div className="mc-defense-row">
+                <span className="mc-defense-label">Damage Vuln.</span>
+                <span>{monster.damage_vulnerabilities.join(', ')}</span>
+              </div>
+            )}
+            {hasEntries(monster.damage_resistances) && (
+              <div className="mc-defense-row">
+                <span className="mc-defense-label">Damage Resist.</span>
+                <span>{monster.damage_resistances.join(', ')}</span>
+              </div>
+            )}
+            {hasEntries(monster.damage_immunities) && (
+              <div className="mc-defense-row">
+                <span className="mc-defense-label">Damage Imm</span>
+                <span>{monster.damage_immunities.join(', ')}</span>
+              </div>
+            )}
+            {hasEntries(monster.condition_immunities) && (
+              <div className="mc-defense-row">
+                <span className="mc-defense-label">Condition Imm</span>
+                <span>{monster.condition_immunities.join(', ')}</span>
+              </div>
+            )}
+            <div className="mc-defense-row mc-defense-cr">
+              <span className="mc-defense-label">CR</span>
+              <span>{monster.challenge_rating} ({monster.xp?.toLocaleString()} XP)</span>
+            </div>
+            {monster.legendary_resistance != null && (
+              <div className="mc-defense-row">
+                <span className="mc-defense-label">Legendary Resist.</span>
+                <span>{monster.legendary_resistance}/day</span>
+              </div>
+            )}
+          </div>
+
+          {monster.traits?.length > 0 && (
+            <>
+              <hr />
+              <div className="mc-section">
+                {monster.traits.map((t, i) => (
+                  renderAction(t, i)
+                ))}
+              </div>
+            </>
+          )}
+
+          {monster.actions?.length > 0 && (
+            <>
+              <hr />
+              <h5 className="mc-section-title">Actions</h5>
+              <div className="mc-section">
+                {monster.actions.map((a, i) => (
+                  renderAction(a, i)
+                ))}
+              </div>
+            </>
+          )}
+
+          {monster.reactions?.length > 0 && (
+            <>
+              <hr />
+              <h5 className="mc-section-title">Reactions</h5>
+              <div className="mc-section">
+                {monster.reactions.map((r, i) => (
+                  renderAction(r, i)
+                ))}
+              </div>
+            </>
+          )}
+
+          {monster.legendary_actions?.length > 0 && (
+            <>
+              <hr />
+              <h5 className="mc-section-title">Legendary Actions</h5>
+              <div className="mc-section">
+                {monster.legendary_actions.map((la, i) => (
+                  renderAction(la, i)
+                ))}
+              </div>
+            </>
+          )}
+
+          {(Array.isArray(monster.lair_actions) ? monster.lair_actions.length > 0 : monster.lair_actions?.actions?.length > 0) && (
+            <>
+              <hr />
+              <h5 className="mc-section-title">Lair Actions</h5>
+              <div className="mc-section">
+                {(Array.isArray(monster.lair_actions) ? monster.lair_actions : monster.lair_actions.actions).map((la, i) => (
+                  <div key={i} className="mc-action">
+                    {typeof la === 'string' ? (
+                      <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la) }} />
+                    ) : (
+                      <>
+                        <strong>{la.name}.</strong>{' '}
+                        <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(la.description) }} />
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {(monster.regional_effects?.effects?.length > 0 || (Array.isArray(monster.regional_effects) && monster.regional_effects.length > 0)) && (
+            <>
+              <hr />
+              <h5 className="mc-section-title">Regional Effects</h5>
+              <div className="mc-section">
+                {(Array.isArray(monster.regional_effects) ? monster.regional_effects : monster.regional_effects.effects).map((re, i) => (
+                  <div key={i} className="mc-action">
+                    {typeof re === 'string' ? (
+                      <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(re) }} />
+                    ) : (
+                      <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(re.description) }} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {monster.desc && (
+            <>
+              <hr />
+              <div className="mc-section">
+                <h5 className="mc-section-title">Description</h5>
+                <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(monster.desc) }} />
+                {monster.book && (
+                  <div className="mc-source"><em>{monster.book}{monster.page ? ` (page ${monster.page})` : ''}</em></div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }, [monster, onClose, handleAttack, handleDamage, handleAbilityCheck, handleSaveThrow, handleSkillCheck, handleInitiative]);
+
+  if (!monster) return null;
+
+  return (
+    <div className="mc-overlay" onClick={onClose}>
+      {content}
+      {popupHtml && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
+            {typeof popupHtml === 'string'
+              ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }} />
+              : <DiceRollResult {...popupHtml} />}
+          </Popup>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function hasEntries(obj) {
+  return obj && Object.keys(obj).length > 0;
+}
+
+function hasSenseEntries(senses) {
+  if (!senses) return false;
+  return senses.blindsight || senses.darkvision || senses.truesight || senses.tremorsense || senses.passive_perception;
+}
+
+function saveAbilityAbbr(full) {
+  const map = { Strength: 'STR', Dexterity: 'DEX', Constitution: 'CON', Intelligence: 'INT', Wisdom: 'WIS', Charisma: 'CHA' };
+  return map[full] || full?.substring(0, 3).toUpperCase();
+}
+
+const abilityNameMap = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
+
+function parseInitiativeBonus(initStr) {
+  if (!initStr) return null;
+  const match = initStr.match(/^([+-]\d+)/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+function parseExtraDamageDice(damageStr, excludeFormula) {
+  if (!damageStr) return [];
+  const re = /(\d+d\d+(?:\s*\+\s*\d+)?)/g;
+  const matches = [];
+  let m;
+  const exclude = (excludeFormula || '').replace(/\s+/g, '');
+  while ((m = re.exec(damageStr)) !== null) {
+    const formula = m[1].trim();
+    if (formula.replace(/\s+/g, '') !== exclude) {
+      matches.push(formula);
+    }
+  }
+  return matches;
+}
+
+function formatSenses(senses) {
+  const parts = [];
+  if (senses.blindsight) parts.push(`blindsight ${senses.blindsight}`);
+  if (senses.darkvision) parts.push(`darkvision ${senses.darkvision}`);
+  if (senses.truesight) parts.push(`truesight ${senses.truesight}`);
+  if (senses.tremorsense) parts.push(`tremorsense ${senses.tremorsense}`);
+  if (senses.passive_perception) parts.push(`passive Perception ${senses.passive_perception}`);
+  return parts.join(', ');
+}
+
+export default MonsterCardModal;

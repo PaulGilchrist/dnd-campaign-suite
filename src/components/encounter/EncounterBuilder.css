@@ -268,7 +268,7 @@
 }
 
 .encounter-builder .monster-table-wrapper {
-  max-height: 350px;
+  max-height: 700px;
   overflow-y: auto;
   border: 1px solid var(--border-color);
   border-radius: 6px;
@@ -328,6 +328,7 @@
 .encounter-builder .col-cr { width: 50px; text-align: center; }
 .encounter-builder .col-xp { width: 70px; text-align: right; font-family: monospace; }
 .encounter-builder .col-qty { width: 90px; text-align: center; }
+.encounter-builder .col-details { width: 36px; text-align: center; }
 .encounter-builder .col-remove { width: 30px; text-align: center; }
 
 /* ============ Sortable Columns ============ */
@@ -398,6 +399,22 @@
 .encounter-builder .remove-btn:hover {
   color: var(--color-error);
   background: var(--background-color-error);
+}
+
+.encounter-builder .details-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 2px 4px;
+  line-height: 1;
+  border-radius: 3px;
+}
+
+.encounter-builder .details-btn:hover {
+  color: var(--color-primary);
+  background: var(--background-color-surface);
 }
 
 .encounter-builder .empty-state {
@@ -493,37 +510,6 @@
 
 .encounter-builder .party-member-level {
   color: var(--color-primary);
-  font-weight: 600;
-}
-
-/* ============ Ruleset Toggle ============ */
-.encounter-builder .ruleset-toggle {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  margin: 0;
-}
-
-.encounter-builder .ruleset-btn {
-  padding: 6px 18px;
-  font-size: 0.85rem;
-  border-radius: 4px;
-  border: 1px solid var(--border-color);
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.encounter-builder .ruleset-btn:hover {
-  border-color: var(--color-primary);
-  color: var(--color-text);
-}
-
-.encounter-builder .ruleset-btn-active {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  border-color: var(--color-primary);
   font-weight: 600;
 }
 

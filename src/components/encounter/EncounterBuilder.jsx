@@ -7,6 +7,7 @@ import EncounterMonsterTable from './EncounterMonsterTable.jsx';
 import EncounterSelectedMonsters from './EncounterSelectedMonsters.jsx';
 import EncounterModal from './EncounterModal.jsx';
 import EncounterGeneratorModal from './EncounterGeneratorModal.jsx';
+import MonsterCardModal from './MonsterCardModal.jsx';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import { formatEncounterName } from '../../services/encountersService.js';
 import './EncounterBuilder.css';
@@ -103,21 +104,10 @@ function updateQty(selected, index, delta) {
   ).filter(m => m.qty > 0);
 }
 
-// --- Determine majority ruleset from characters ---
-function inferRuleset(characters) {
-  if (!characters || characters.length === 0) return '5e';
-  const counts = { '5e': 0, '2024': 0 };
-  characters.forEach(c => {
-    if (c.rules === '2024') counts['2024']++;
-    else counts['5e']++;
-  });
-  return counts['2024'] > counts['5e'] ? '2024' : '5e';
-}
-
 // --- Load saved filter from localStorage ---
-function loadSavedFilter(rulesVersion) {
+function loadSavedFilter() {
   try {
-    const key = `encounterFilter-${rulesVersion}`;
+    const key = 'encounterFilter-2024';
     const saved = localStorage.getItem(key);
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -129,9 +119,9 @@ function loadSavedFilter(rulesVersion) {
   return null;
 }
 
-function saveFilter(filter, rulesVersion) {
+function saveFilter(filter) {
   try {
-    const key = `encounterFilter-${rulesVersion}`;
+    const key = 'encounterFilter-2024';
     localStorage.setItem(key, JSON.stringify({ difficulty: filter.difficulty }));
   } catch { /* storage full, ignore */ }
 }
@@ -145,20 +135,15 @@ function stripMonsters(monsters) {
 }
 
 function EncounterBuilder({ characters, campaignName }) {
-  // Infer initial ruleset from characters
-  const [rulesVersion, setRulesVersion] = useState(() => inferRuleset(characters));
+  const { monsters, loading } = useMonstersData();
 
-  // Load monsters for the selected ruleset
-  const { monsters, loading } = useMonstersData(rulesVersion);
-
-  // Initialize filter: difficulty from localStorage, player levels from characters
   const [filter, setFilter] = useState(() => {
-    const saved = loadSavedFilter(rulesVersion);
+    const saved = loadSavedFilter();
     const playerLevels = (characters && characters.length > 0)
       ? characters.map(c => c.level || 1)
       : (saved ? saved.playerLevels : [1]);
     return {
-      difficulty: saved ? saved.difficulty : 2, // default: Hard
+      difficulty: saved ? saved.difficulty : 2,
       playerLevels,
     };
   });
@@ -175,10 +160,9 @@ function EncounterBuilder({ characters, campaignName }) {
 
   // Save difficulty to localStorage when it changes
   useEffect(() => {
-    saveFilter(filter, rulesVersion);
-  }, [filter.difficulty, rulesVersion]);
+    saveFilter(filter);
+  }, [filter.difficulty]);
 
-  // Reset selected monsters when rules change
   const [selectedMonsters, setSelectedMonsters] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -201,6 +185,7 @@ function EncounterBuilder({ characters, campaignName }) {
 
   const [pendingEncounterData, setPendingEncounterData] = useState(null);
   const [showGenerator, setShowGenerator] = useState(false);
+  const [viewingMonster, setViewingMonster] = useState(null);
   const [encounterTitle, setEncounterTitle] = useState('Encounter Builder');
   const [currentEncounterName, setCurrentEncounterName] = useState(null);
   const [description, setDescription] = useState('');
@@ -208,11 +193,6 @@ function EncounterBuilder({ characters, campaignName }) {
   // Sort state for monster table
   const [sortField, setSortField] = useState('name');
   const [sortDirection, setSortDirection] = useState('asc');
-
-  useEffect(() => {
-    setSelectedMonsters([]);
-    setSearchQuery('');
-  }, [rulesVersion]);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -309,7 +289,6 @@ function EncounterBuilder({ characters, campaignName }) {
 
   const handleSaveEncounter = () => {
     const data = {
-      rulesVersion,
       difficulty: filter.difficulty,
       playerLevels: filter.playerLevels,
       selectedMonsters: stripMonsters(selectedMonsters),
@@ -341,27 +320,22 @@ function EncounterBuilder({ characters, campaignName }) {
         setEncounterTitle(formatEncounterName(name));
         setCurrentEncounterName(name);
 
-        // Set rulesVersion first — this triggers the useEffect that clears
-        // selectedMonsters, so we defer monster population with setTimeout(0)
-        setRulesVersion(data.rulesVersion || '5e');
         setFilter({
           difficulty: data.difficulty ?? 2,
           playerLevels: data.playerLevels || [1],
         });
         setDescription(data.description || '');
 
-        // Re-populate full monster objects from the catalog using index
         const monsterRefs = data.selectedMonsters || [];
         const resolvedMonsters = monsterRefs.map(ref => {
           const fullMonster = (monsters || []).find(m => m.index === ref.index);
           if (fullMonster) {
             return { ...fullMonster, qty: ref.qty || 1 };
           }
-          // Fallback: keep at least name and index
           return { ...ref, qty: ref.qty || 1 };
         });
 
-        // Defer to let the rulesVersion useEffect clear happen first
+        setSelectedMonsters(resolvedMonsters);
         setTimeout(() => {
           setSelectedMonsters(resolvedMonsters);
         }, 0);
@@ -379,7 +353,6 @@ function EncounterBuilder({ characters, campaignName }) {
     setEncounterTitle('Encounter Builder');
     setCurrentEncounterName(null);
     setPendingEncounterData(null);
-    setRulesVersion(inferRuleset(characters));
     setFilter({
       difficulty: 2,
       playerLevels: (characters && characters.length > 0)
@@ -424,24 +397,12 @@ function EncounterBuilder({ characters, campaignName }) {
     });
   };
 
-  const handleRulesVersionChange = (version) => {
-    setRulesVersion(version);
-    setFilter(prev => {
-      const saved = loadSavedFilter(version);
-      return {
-        difficulty: saved ? saved.difficulty : prev.difficulty,
-        playerLevels: prev.playerLevels,
-      };
-    });
-  };
-
   // --- Loading State ---
   if (loading) {
     return (
       <div className="encounter-builder">
         <div className="encounter-header-row">
           <h2 className="encounter-title">Encounter Builder</h2>
-          <div className="ruleset-toggle"></div>
         </div>
         <div className="encounter-loading">
           <i className="fa-solid fa-spinner fa-spin"></i>&nbsp; Loading monsters...
@@ -493,22 +454,6 @@ function EncounterBuilder({ characters, campaignName }) {
               <i className="fa-solid fa-rotate-left" /> Reset
             </button>
           )}
-        </div>
-
-        {/* Ruleset Toggle */}
-        <div className="ruleset-toggle">
-          <button
-            className={`ruleset-btn${rulesVersion === '5e' ? ' ruleset-btn-active' : ''}`}
-            onClick={() => handleRulesVersionChange('5e')}
-          >
-            5e
-          </button>
-          <button
-            className={`ruleset-btn${rulesVersion === '2024' ? ' ruleset-btn-active' : ''}`}
-            onClick={() => handleRulesVersionChange('2024')}
-          >
-            2024
-          </button>
         </div>
       </div>
 
@@ -585,6 +530,7 @@ function EncounterBuilder({ characters, campaignName }) {
         onSort={handleSort}
         sortField={sortField}
         sortDirection={sortDirection}
+        onViewDetails={setViewingMonster}
       />
 
       {/* Selected Monsters Detail */}
@@ -614,6 +560,15 @@ function EncounterBuilder({ characters, campaignName }) {
           difficulty={filter.difficulty}
           onApply={handleApplySuggestion}
           onClose={() => setShowGenerator(false)}
+        />
+      )}
+
+      {/* Monster Card Modal */}
+      {viewingMonster && (
+        <MonsterCardModal
+          monster={viewingMonster}
+          onClose={() => setViewingMonster(null)}
+          campaignName={campaignName}
         />
       )}
     </div>

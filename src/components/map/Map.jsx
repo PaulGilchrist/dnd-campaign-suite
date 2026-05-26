@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import utils from '../../services/utils.js';
 import * as mapsService from '../../services/mapsService.js';
 import Subscriber from '../common/Subscriber.jsx';
 import MapToolbar from './MapToolbar.jsx';
+import { loadMonsters } from '../../services/dataLoader.js';
+import MonsterCardModal from '../encounter/MonsterCardModal.jsx';
 import './Map.css';
 import ItemsPanel from './ItemsPanel.jsx';
 import BarrelSVG from './BarrelSVG.jsx';
@@ -42,7 +44,7 @@ import '../hex-map/HexMap.css';
 
 const CELL_SIZE = 40;
 
-function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onEncounterCreated, onPoiEntered }) {
+function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncounterCreated, onPoiEntered }) {
     const [gridSize, setGridSize] = useState(20);
     const SVG_SIZE = gridSize * CELL_SIZE;
     const [mapData, setMapData] = useState(null);
@@ -81,6 +83,38 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
     const [selectedBarrel, setSelectedBarrel] = useState(null); // { id, gridX, gridY }
     const [showRename, setShowRename] = useState(null);
 
+    // Monster card modal state
+    const [viewingMonster, setViewingMonster] = useState(null);
+    const [monstersLoaded, setMonstersLoaded] = useState([]);
+
+    // Load monster data for NPC context menu
+    useEffect(() => {
+        loadMonsters().then(setMonstersLoaded).catch(() => {});
+    }, []);
+
+    // Handle "View Stats" for NPC context menu
+    const handleViewStats = useCallback((barrelId) => {
+        const item = placedItems.find(i => i.id === barrelId);
+        if (!item || item.type !== 'npc') return;
+        const baseName = (item.name || '').replace(/\s+\d+$/, '');
+        const monster = (monstersLoaded || []).find(
+            m => m.name.toLowerCase() === baseName.toLowerCase()
+        );
+        if (monster) {
+            setViewingMonster(monster);
+        }
+    }, [placedItems, monstersLoaded]);
+
+    const monsterFound = useMemo(() => {
+        if (!selectedBarrel) return false;
+        const item = placedItems.find(i => i.id === selectedBarrel.id);
+        if (!item || item.type !== 'npc') return false;
+        const baseName = (item.name || '').replace(/\s+\d+$/, '');
+        return (monstersLoaded || []).some(
+            m => m.name.toLowerCase() === baseName.toLowerCase()
+        );
+    }, [selectedBarrel, placedItems, monstersLoaded]);
+
     // Player context menu state
     const [selectedPlayer, setSelectedPlayer] = useState(null); // { id, name, gridX, gridY } | null
 
@@ -98,7 +132,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
         const gridX = Math.max(0, Math.min(gridSize - 1, Math.floor(svgX / CELL_SIZE)));
         const gridY = Math.max(0, Math.min(gridSize - 1, Math.floor(svgY / CELL_SIZE)));
         return { gridX, gridY };
-    }, [gridSize, panX, panY]);
+    }, [gridSize]);
 
     const MIN_ZOOM = 0.25;
     const MAX_ZOOM = 4;
@@ -115,6 +149,107 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
         setZoom(1);
         setPanX(0);
         setPanY(0);
+    }, []);
+
+    const handleFogPointerDown = useCallback((e) => {
+        if (!isLocalhost) return;
+        if (tool !== 'fog' && tool !== 'clearFog') return;
+        e.preventDefault();
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+        setFogDragStart(grid);
+        setFogDragEnd(grid);
+    }, [isLocalhost, tool, getGridFromEvent]);
+
+    const handleFogPointerMove = useCallback((e) => {
+        if (!isLocalhost) return;
+        if (!fogDragStart || (tool !== 'fog' && tool !== 'clearFog')) return;
+        e.preventDefault();
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+        setFogDragEnd(grid);
+    }, [tool, isLocalhost, fogDragStart, getGridFromEvent]);
+
+    const handleFogPointerUp = useCallback(() => {
+        if (!fogDragStart || !fogDragEnd) {
+            setFogDragStart(null);
+            setFogDragEnd(null);
+            return;
+        }
+
+        const minX = Math.min(fogDragStart.gridX, fogDragEnd.gridX);
+        const maxX = Math.max(fogDragStart.gridX, fogDragEnd.gridX);
+        const minY = Math.min(fogDragStart.gridY, fogDragEnd.gridY);
+        const maxY = Math.max(fogDragStart.gridY, fogDragEnd.gridY);
+
+        setFog((prev) => {
+            const newFog = new Set(prev);
+            for (let y = minY; y <= maxY; y++) {
+                for (let x = minX; x <= maxX; x++) {
+                    const key = `${x},${y}`;
+                    if (tool === 'fog') {
+                        newFog.add(key);
+                    } else if (tool === 'clearFog') {
+                        newFog.delete(key);
+                    }
+                }
+            }
+            return newFog;
+        });
+
+        setFogDragStart(null);
+        setFogDragEnd(null);
+    }, [tool, fogDragStart, fogDragEnd]);
+
+    // Handle grid pointer down (paint/erase mode)
+    const handleGridPointerDown = useCallback((e) => {
+        if (!isLocalhost) return;
+        if (tool === 'none') return;
+        e.preventDefault();
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+
+        const key = `${grid.gridX},${grid.gridY}`;
+        setMapData((prev) => {
+            const newWalls = new Set(prev.walls);
+            if (tool === 'paint') {
+                newWalls.add(key);
+            } else if (tool === 'erase') {
+                newWalls.delete(key);
+            }
+            return { ...prev, walls: newWalls };
+        });
+        setPainting(grid);
+    }, [isLocalhost, tool, getGridFromEvent]);
+
+    // Handle grid pointer move (paint/erase drag)
+    const handleGridPointerMove = useCallback((e) => {
+        if (!isLocalhost) return;
+        if (!painting || (tool !== 'paint' && tool !== 'erase')) return;
+        e.preventDefault();
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+
+        const key = `${grid.gridX},${grid.gridY}`;
+        setMapData((prev) => {
+            const newWalls = new Set(prev.walls);
+            if (tool === 'paint') {
+                newWalls.add(key);
+            } else if (tool === 'erase') {
+                newWalls.delete(key);
+            }
+            return { ...prev, walls: newWalls };
+        });
+    }, [painting, tool, isLocalhost, getGridFromEvent]);
+
+    // Handle grid pointer up (end paint/erase)
+    const handleGridPointerUp = useCallback(() => {
+        setPainting(null);
+    }, []);
+
+    // Handle pointer leaving SVG during paint/erase
+    const handleGridPointerLeave = useCallback(() => {
+        setPainting(null);
     }, []);
 
     const handlePanStart = useCallback((e) => {
@@ -140,7 +275,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
             startPanX: panX,
             startPanY: panY
         });
-    }, [tool, panX, panY]);
+    }, [tool, panX, panY, handleFogPointerDown, handleGridPointerDown]);
 
     const handlePanMove = useCallback((e) => {
         if (!panning) return;
@@ -267,7 +402,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
         };
 
         loadMap().finally(() => { loadInProgressRef.current = false; });
-    }, [campaignName, characters, mapName]);
+    }, [campaignName, characters, mapName, gridSize]);
 
     // Save map data whenever it changes
     useEffect(() => {
@@ -295,109 +430,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
         setFog,
     });
 
-    function handleFogPointerDown(e) {
-        if (!isLocalhost) return;
-        if (tool !== 'fog' && tool !== 'clearFog') return;
-        e.preventDefault();
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-        setFogDragStart(grid);
-        setFogDragEnd(grid);
-    }
-
-    const handleFogPointerMove = useCallback((e) => {
-        if (!isLocalhost) return;
-        if (!fogDragStart || (tool !== 'fog' && tool !== 'clearFog')) return;
-        e.preventDefault();
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-        setFogDragEnd(grid);
-    }, [tool, isLocalhost, fogDragStart, getGridFromEvent]);
-
-    const handleFogPointerUp = useCallback(() => {
-        if (!fogDragStart || !fogDragEnd) {
-            setFogDragStart(null);
-            setFogDragEnd(null);
-            return;
-        }
-
-        // Calculate rectangle bounds regardless of drag direction
-        const minX = Math.min(fogDragStart.gridX, fogDragEnd.gridX);
-        const maxX = Math.max(fogDragStart.gridX, fogDragEnd.gridX);
-        const minY = Math.min(fogDragStart.gridY, fogDragEnd.gridY);
-        const maxY = Math.max(fogDragStart.gridY, fogDragEnd.gridY);
-
-        setFog((prev) => {
-            const newFog = new Set(prev);
-            for (let y = minY; y <= maxY; y++) {
-                for (let x = minX; x <= maxX; x++) {
-                    const key = `${x},${y}`;
-                    if (tool === 'fog') {
-                        newFog.add(key);
-                    } else if (tool === 'clearFog') {
-                        newFog.delete(key);
-                    }
-                }
-            }
-            return newFog;
-        });
-
-        setFogDragStart(null);
-        setFogDragEnd(null);
-    }, [tool, fogDragStart, fogDragEnd]);
-
-    // Handle grid pointer down (paint/erase mode)
-    function handleGridPointerDown(e) {
-        if (!isLocalhost) return;
-        if (tool === 'none') return;
-        e.preventDefault();
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-
-        const key = `${grid.gridX},${grid.gridY}`;
-        setMapData((prev) => {
-            const newWalls = new Set(prev.walls);
-            if (tool === 'paint') {
-                newWalls.add(key);
-            } else if (tool === 'erase') {
-                newWalls.delete(key);
-            }
-            return { ...prev, walls: newWalls };
-        });
-        setPainting(grid);
-    }
-
-    // Handle grid pointer move (paint/erase drag)
-    const handleGridPointerMove = useCallback((e) => {
-        if (!isLocalhost) return;
-        if (!painting || (tool !== 'paint' && tool !== 'erase')) return;
-        e.preventDefault();
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-
-        const key = `${grid.gridX},${grid.gridY}`;
-        setMapData((prev) => {
-            const newWalls = new Set(prev.walls);
-            if (tool === 'paint') {
-                newWalls.add(key);
-            } else if (tool === 'erase') {
-                newWalls.delete(key);
-            }
-            return { ...prev, walls: newWalls };
-        });
-    }, [painting, tool, isLocalhost, gridSize]);
-
-    // Handle grid pointer up (end paint/erase)
-    const handleGridPointerUp = useCallback(() => {
-        setPainting(null);
-    }, []);
-
-    // Handle pointer leaving SVG during paint/erase
-    const handleGridPointerLeave = useCallback(() => {
-        setPainting(null);
-    }, []);
-
-    const { dragging, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerLeave } = usePlayerDragging({
+    const { dragging, handlePointerDown, handlePointerMove, handlePointerUp } = usePlayerDragging({
         svgRef,
         mapData,
         gridSize,
@@ -475,7 +508,9 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
             rotation: (dragData === 'table' || dragData === 'bed' || dragData === 'stairs' || dragData === 'altar' || dragData === 'bookshelf' || dragData === 'torch' || dragData === 'chair') ? 0 : undefined
         };
         setPlacedItems(prev => [...prev, newItem]);
-    }, [isLocalhost, gridSize]);
+    }, [isLocalhost, getGridFromEvent]);
+
+    const { npcImages, setNpcImages } = useNpcImageCache(placedItems);
 
     const handleRenameItem = useCallback((itemId, newName) => {
         if (!newName || !newName.trim()) return;
@@ -488,7 +523,7 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
         setSelectedBarrel(null);
         // Clear the cached image so it gets recomputed
         setNpcImages(prev => ({ ...prev, [itemId]: null }));
-    }, []);
+    }, [setNpcImages]);
 
     const {
         handleToggleItemVisibility,
@@ -517,8 +552,6 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
         setSelectedBarrel(null);
         setSelectedPlayer(null);
     }, []);
-
-    const { npcImages, setNpcImages } = useNpcImageCache(placedItems);
 
     // Sync state to refs so handleWheel always reads latest values
     useEffect(() => { zoomValueRef.current = zoom; }, [zoom]);
@@ -655,6 +688,8 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
                     handleRotateTorch={handleRotateTorch}
                     handleRotateChair={handleRotateChair}
                     handleRenameItem={handleRenameItem}
+                    handleViewStats={handleViewStats}
+                    monsterFound={monsterFound}
                     setShowRename={setShowRename}
                     setSelectedBarrel={setSelectedBarrel}
                 />
@@ -703,6 +738,15 @@ function Map({ campaignName, characters, npcs, isLocalhost, mapName, onBack, onE
                     characters={characters}
                     players={players}
                     mapVariant={mapData.parentHex ? 'outdoor' : 'indoor'}
+                />
+            )}
+
+            {/* Monster Card Modal for NPC context menu */}
+            {viewingMonster && (
+                <MonsterCardModal
+                    monster={viewingMonster}
+                    onClose={() => setViewingMonster(null)}
+                    campaignName={campaignName}
                 />
             )}
         </div>
