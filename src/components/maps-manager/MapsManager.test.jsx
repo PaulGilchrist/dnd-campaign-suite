@@ -843,7 +843,7 @@ describe('MapsManager', () => {
     mapsService.loadMaps.mockResolvedValue({
       maps: [
         { fileName: 'map1.json', name: 'Dungeon Level 1', type: 'indoor', isActive: true },
-        { fileName: 'map2.json', name: 'Forest', type: 'outdoor', isActive: false },
+        { fileName: 'map2.json', name: 'forest', type: 'outdoor', isActive: false },
       ],
     });
 

@@ -7,6 +7,21 @@ vi.mock('../../../hooks/useActionPopup.js', () => ({
   default: vi.fn(),
 }));
 
+// Mock the useLoggedDiceRoll hook
+vi.mock('../../../hooks/useLoggedDiceRoll.js', () => ({
+  default: vi.fn(() => ({
+    popupHtml: null,
+    setPopupHtml: vi.fn(),
+    rollAttack: vi.fn(),
+    rollDamage: vi.fn(),
+  })),
+}));
+
+// Mock sanitizeHtml
+vi.mock('../../../services/sanitize.js', () => ({
+  sanitizeHtml: vi.fn((html) => html),
+}));
+
 // Mock the CharSpellSlots component
 vi.mock('./CharSpellSlots.jsx', () => ({
   default: function MockCharSpellSlots() {
@@ -498,12 +513,11 @@ describe('CharSpells', () => {
     });
 
   it('should render PopupElement in the container', () => {
-    const mockPopupHtml = '<div>Popup Content</div>';
     useActionPopup.mockImplementation(() => ({
       showPopup: vi.fn(),
-      popupHtml: mockPopupHtml,
+      popupHtml: { type: 'd20', name: 'Test', rolls: [1, 2], bonus: 3 },
       setPopupHtml: vi.fn(),
-      }));
+    }));
 
     render(
         <CharSpells

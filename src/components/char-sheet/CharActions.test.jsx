@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js';
 
-vi.mock('../../hooks/useDiceRoll.js', () => ({
+vi.mock('../../hooks/useLoggedDiceRoll.js', () => ({
   default: vi.fn(),
 }));
 
@@ -11,7 +11,7 @@ vi.mock('../../services/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-import useDiceRoll from '../../hooks/useDiceRoll.js';
+import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
 
 const mockPlayerStats = {
   rules: '5e',
@@ -57,7 +57,7 @@ describe('CharActions', () => {
       json: () => Promise.resolve(['Dash', 'Disengage', 'Dodge', 'Hide', 'Withdraw']),
     });
 
-    useDiceRoll.mockImplementation(() => ({
+    useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: null,
       setPopupHtml: vi.fn(),
       rollAttack: vi.fn(),
@@ -108,7 +108,7 @@ describe('CharActions', () => {
 
   it('should call rollAttack when hit bonus is clicked', async () => {
     const mockRollAttack = vi.fn();
-    useDiceRoll.mockImplementation(() => ({
+    useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: null,
       setPopupHtml: vi.fn(),
       rollAttack: mockRollAttack,
@@ -125,7 +125,7 @@ describe('CharActions', () => {
 
   it('should call rollDamage when damage is clicked', async () => {
     const mockRollDamage = vi.fn();
-    useDiceRoll.mockImplementation(() => ({
+    useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: null,
       setPopupHtml: vi.fn(),
       rollAttack: vi.fn(),
@@ -261,7 +261,7 @@ describe('CharActions', () => {
 
   it('should show popup when action with details is clicked', async () => {
     const mockSetPopupHtml = vi.fn();
-    useDiceRoll.mockImplementation(() => ({
+    useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
       rollAttack: vi.fn(),
@@ -331,7 +331,7 @@ describe('CharActions', () => {
   });
 
   it('should render popupHtml in the actions section', async () => {
-    useDiceRoll.mockImplementation(() => ({
+    useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: '<div>Popup Content</div>',
       setPopupHtml: vi.fn(),
       rollAttack: vi.fn(),

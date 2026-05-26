@@ -13,8 +13,7 @@ describe('useDiceRoll', () => {
     act(() => {
       result.current.rollAbilityCheck('Strength', 5);
     });
-    expect(result.current.popupHtml).toContain('Strength');
-    expect(result.current.popupHtml).toContain('dice-roll-total');
+    expect(result.current.popupHtml).toMatchObject({ name: 'Strength', bonus: 5 });
   });
 
   it('rollSavingThrow sets popupHtml', () => {
@@ -22,7 +21,7 @@ describe('useDiceRoll', () => {
     act(() => {
       result.current.rollSavingThrow('Dexterity', 3);
     });
-    expect(result.current.popupHtml).toContain('Dexterity Saving Throw');
+    expect(result.current.popupHtml).toMatchObject({ name: 'Dexterity', bonus: 3 });
   });
 
   it('rollSkillCheck sets popupHtml', () => {
@@ -30,7 +29,7 @@ describe('useDiceRoll', () => {
     act(() => {
       result.current.rollSkillCheck('Stealth', 7);
     });
-    expect(result.current.popupHtml).toContain('Stealth');
+    expect(result.current.popupHtml).toMatchObject({ name: 'Stealth', bonus: 7 });
   });
 
   it('rollInitiative sets popupHtml', () => {
@@ -38,7 +37,7 @@ describe('useDiceRoll', () => {
     act(() => {
       result.current.rollInitiative(2);
     });
-    expect(result.current.popupHtml).toContain('Initiative');
+    expect(result.current.popupHtml).toMatchObject({ name: 'Initiative', bonus: 2 });
   });
 
   it('rollAttack sets popupHtml with attack name', () => {
@@ -46,8 +45,7 @@ describe('useDiceRoll', () => {
     act(() => {
       result.current.rollAttack('Longsword', 7);
     });
-    expect(result.current.popupHtml).toContain('Longsword');
-    expect(result.current.popupHtml).toContain('dice-roll-total');
+    expect(result.current.popupHtml).toMatchObject({ name: 'Longsword', bonus: 7 });
   });
 
   it('rollDamage sets popupHtml', () => {
@@ -55,8 +53,7 @@ describe('useDiceRoll', () => {
     act(() => {
       result.current.rollDamage('Longsword', '1d8+3', 7, [5], 3);
     });
-    expect(result.current.popupHtml).toContain('Longsword');
-    expect(result.current.popupHtml).toContain('1d8+3');
+    expect(result.current.popupHtml).toMatchObject({ name: 'Longsword', formula: '1d8+3', type: 'damage' });
   });
 
   it('setPopupHtml can clear the popup', () => {

@@ -1,15 +1,18 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useEquipmentSearch } from './useEquipmentSearch.js';
+import { loadEquipment } from '../services/dataLoader.js';
 
-vi.mock('../../services/dataLoader.js', () => ({
-  loadEquipment: vi.fn(() => Promise.resolve([
-    { name: 'Longsword', index: 'longsword', equipment_category: 'Weapon' },
-    { name: 'Shield', index: 'shield', equipment_category: 'Armor' },
-    { name: 'Rope', index: 'rope', equipment_category: 'Adventuring Gear' },
-    { name: 'Quarterstaff', index: 'quarterstaff', equipment_category: 'Weapon' },
-  ])),
+vi.mock('../services/dataLoader.js', () => ({
+  loadEquipment: vi.fn(),
 }));
+
+const equipmentData = [
+  { name: 'Longsword', index: 'longsword', equipment_category: 'Weapon' },
+  { name: 'Shield', index: 'shield', equipment_category: 'Armor' },
+  { name: 'Rope', index: 'rope', equipment_category: 'Adventuring Gear' },
+  { name: 'Quarterstaff', index: 'quarterstaff', equipment_category: 'Weapon' },
+];
 
 describe('useEquipmentSearch', () => {
   const defaultTempInventory = { backpack: [], equipped: [] };
@@ -59,7 +62,7 @@ describe('useEquipmentSearch', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.mocked(loadEquipment).mockResolvedValue(equipmentData);
   });
 
   it('should start with empty search query', () => {
@@ -137,7 +140,7 @@ describe('useEquipmentSearch', () => {
     expect(screen.getByTestId('search-query').textContent).toBe('');
   });
 
-  it('should add equipment to backpack on select', () => {
+  it('should add equipment to backpack on select', async () => {
     const onTempInventoryChange = vi.fn();
     const onInventoryChange = vi.fn();
     render(<Wrapper
@@ -145,20 +148,33 @@ describe('useEquipmentSearch', () => {
       onTempInventoryChange={onTempInventoryChange}
       onInventoryChange={onInventoryChange}
     />);
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('categories').textContent).toContain('Weapon');
+    });
+    fireEvent.click(screen.getByTestId('focus-backpack'));
     fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'long' } });
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('filtered-count').textContent).toBe('1');
+    });
     fireEvent.click(screen.getByTestId('select-item'));
     expect(onTempInventoryChange).toHaveBeenCalledWith('backpack', ['Longsword']);
     expect(onInventoryChange).toHaveBeenCalledWith('backpack', ['Longsword']);
   });
 
-  it('should not add duplicate equipment to backpack', () => {
+  it('should not add duplicate equipment to backpack', async () => {
     const onTempInventoryChange = vi.fn();
     render(<Wrapper
       tempInventory={{ backpack: ['Longsword'], equipped: [] }}
       onTempInventoryChange={onTempInventoryChange}
       onInventoryChange={vi.fn()}
     />);
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('categories').textContent).toContain('Weapon');
+    });
     fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'long' } });
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('filtered-count').textContent).toBe('1');
+    });
     fireEvent.click(screen.getByTestId('select-item'));
     expect(onTempInventoryChange).not.toHaveBeenCalled();
   });
@@ -194,13 +210,17 @@ describe('useEquipmentSearch', () => {
       onTempInventoryChange={onTempInventoryChange}
       onInventoryChange={vi.fn()}
     />);
+    fireEvent.click(screen.getByTestId('focus-backpack'));
     fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'Magic Sword' } });
     fireEvent.keyDown(screen.getByTestId('search-input'), { key: 'Enter' });
     expect(onTempInventoryChange).toHaveBeenCalledWith('backpack', ['Magic Sword']);
   });
 
-  it('should handle category change', () => {
+  it('should handle category change', async () => {
     render(<Wrapper />);
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('categories').textContent).toContain('Weapon');
+    });
     fireEvent.change(screen.getByTestId('category-select'), { target: { value: 'Weapon' } });
     expect(screen.getByTestId('category-select').value).toBe('Weapon');
   });

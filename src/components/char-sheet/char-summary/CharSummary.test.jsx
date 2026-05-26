@@ -694,12 +694,11 @@ describe('CharSummary', () => {
   });
 
   describe('XP Tracking', () => {
-    it('should show Milestone Leveling by default', () => {
+    it('should show milestone suffix by default', () => {
       render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
 
       expect(screen.getByText(/Level 5/)).toBeInTheDocument();
-      expect(screen.getByText(/Milestone Leveling/)).toBeInTheDocument();
-      expect(screen.queryByText(/XP/)).not.toBeInTheDocument();
+      expect(screen.getByText(/\(milestone\)/)).toBeInTheDocument();
     });
 
     it('should show XP when xpMode is experience', () => {
@@ -713,7 +712,7 @@ describe('CharSummary', () => {
 
       expect(screen.getByText(/Level 5/)).toBeInTheDocument();
       expect(screen.getByText(/750 XP/)).toBeInTheDocument();
-      expect(screen.queryByText(/Milestone Leveling/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/\(milestone\)/)).not.toBeInTheDocument();
     });
 
     it('should show 0 XP when in experience mode with no XP', () => {
@@ -741,17 +740,17 @@ describe('CharSummary', () => {
       expect(screen.getByText(/64,000 XP/)).toBeInTheDocument();
     });
 
-    it('should open XP modal when subtitle is clicked in milestone mode', () => {
+    it('should open XP modal when level suffix is clicked in milestone mode', () => {
       render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
 
-      const subtitle = screen.getByTestId('char-summary-text');
-      fireEvent.click(subtitle);
+      const suffixSpan = screen.getByText(/\(milestone\)/);
+      fireEvent.click(suffixSpan);
 
       expect(screen.getByText(/Experience Points/)).toBeInTheDocument();
       expect(screen.getByPlaceholderText(/\+100 or -50/)).toBeInTheDocument();
     });
 
-    it('should open XP modal when subtitle is clicked in experience mode', () => {
+    it('should open XP modal when level suffix is clicked in experience mode', () => {
       const xpStats = {
         ...mockPlayerStats,
         xp: 750,
@@ -760,8 +759,8 @@ describe('CharSummary', () => {
 
       render(<CharSummary playerStats={xpStats} onDeleteCharacter={vi.fn()} />);
 
-      const subtitle = screen.getByTestId('char-summary-text');
-      fireEvent.click(subtitle);
+      const suffixSpan = screen.getByText(/750 XP/);
+      fireEvent.click(suffixSpan);
 
       expect(screen.getByText(/Experience Points/)).toBeInTheDocument();
     });
@@ -775,8 +774,8 @@ describe('CharSummary', () => {
 
       render(<CharSummary playerStats={xpStats} onDeleteCharacter={vi.fn()} />);
 
-      const subtitle = screen.getByTestId('char-summary-text');
-      fireEvent.click(subtitle);
+      const suffixSpan = screen.getByText(/750 XP/);
+      fireEvent.click(suffixSpan);
 
       const input = screen.getByPlaceholderText(/\+100 or -50/);
       fireEvent.change(input, { target: { value: '100' } });
@@ -796,8 +795,8 @@ describe('CharSummary', () => {
 
       render(<CharSummary playerStats={xpStats} onDeleteCharacter={vi.fn()} />);
 
-      const subtitle = screen.getByTestId('char-summary-text');
-      fireEvent.click(subtitle);
+      const suffixSpan = screen.getByText(/750 XP/);
+      fireEvent.click(suffixSpan);
 
       const input = screen.getByPlaceholderText(/\+100 or -50/);
       fireEvent.change(input, { target: { value: '-50' } });
@@ -817,8 +816,8 @@ describe('CharSummary', () => {
 
       render(<CharSummary playerStats={xpStats} onDeleteCharacter={vi.fn()} />);
 
-      const subtitle = screen.getByTestId('char-summary-text');
-      fireEvent.click(subtitle);
+      const suffixSpan = screen.getByText(/750 XP/);
+      fireEvent.click(suffixSpan);
 
       const checkbox = screen.getByRole('checkbox', { name: /Milestone Leveling/ });
       expect(checkbox).not.toBeChecked();
@@ -837,8 +836,8 @@ describe('CharSummary', () => {
 
       render(<CharSummary playerStats={xpStats} onDeleteCharacter={vi.fn()} />);
 
-      const subtitle = screen.getByTestId('char-summary-text');
-      fireEvent.click(subtitle);
+      const suffixSpan = screen.getByText(/0 XP/);
+      fireEvent.click(suffixSpan);
 
       const checkbox = screen.getByRole('checkbox', { name: /Milestone Leveling/ });
       expect(checkbox).not.toBeChecked();

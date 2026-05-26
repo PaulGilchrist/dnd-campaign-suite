@@ -2,11 +2,11 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities.jsx';
 
-vi.mock('../../hooks/useDiceRoll.js', () => ({
+vi.mock('../../hooks/useLoggedDiceRoll.js', () => ({
   default: vi.fn(),
 }));
 
-import useDiceRoll from '../../hooks/useDiceRoll.js';
+import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
 
 const mockPlayerStats = {
   abilities: [
@@ -46,7 +46,7 @@ const mockAllAbilityScores = [
 describe('CharAbilities', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useDiceRoll.mockImplementation(() => ({
+    useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: null,
       setPopupHtml: vi.fn(),
       rollAbilityCheck: vi.fn(),
@@ -123,7 +123,7 @@ describe('CharAbilities', () => {
 
   it('should call setPopupHtml with ability description when ability name is clicked', () => {
     const mockSetPopupHtml = vi.fn();
-    useDiceRoll.mockImplementation(() => ({
+    useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
       rollAbilityCheck: vi.fn(),
@@ -198,9 +198,8 @@ describe('CharAbilities', () => {
    });
 
   it('should render popup element container', () => {
-    const mockPopupHtml = '<div>Popup Content</div>';
-    useDiceRoll.mockImplementation(() => ({
-      popupHtml: mockPopupHtml,
+    useLoggedDiceRoll.mockImplementation(() => ({
+      popupHtml: { type: 'd20', name: 'Test', rolls: [1, 2], bonus: 3 },
       setPopupHtml: vi.fn(),
       rollAbilityCheck: vi.fn(),
       rollSavingThrow: vi.fn(),
@@ -219,7 +218,7 @@ describe('CharAbilities', () => {
 
   it('should call rollAbilityCheck when ability bonus is clicked', () => {
     const mockRollAbilityCheck = vi.fn();
-    useDiceRoll.mockImplementation(() => ({
+    useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: null,
       setPopupHtml: vi.fn(),
       rollAbilityCheck: mockRollAbilityCheck,
@@ -241,7 +240,7 @@ describe('CharAbilities', () => {
 
   it('should call rollSavingThrow when save value is clicked', () => {
     const mockRollSavingThrow = vi.fn();
-    useDiceRoll.mockImplementation(() => ({
+    useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: null,
       setPopupHtml: vi.fn(),
       rollAbilityCheck: vi.fn(),
@@ -263,7 +262,7 @@ describe('CharAbilities', () => {
 
   it('should call rollSkillCheck when skill is clicked', () => {
     const mockRollSkillCheck = vi.fn();
-    useDiceRoll.mockImplementation(() => ({
+    useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: null,
       setPopupHtml: vi.fn(),
       rollAbilityCheck: vi.fn(),
@@ -296,8 +295,8 @@ describe('CharAbilities', () => {
 
   it('should dismiss popup when overlay is clicked', () => {
     const mockSetPopupHtml = vi.fn();
-    useDiceRoll.mockImplementation(() => ({
-      popupHtml: '<div>Popup Content</div>',
+    useLoggedDiceRoll.mockImplementation(() => ({
+      popupHtml: { type: 'd20', name: 'Test', rolls: [1, 2], bonus: 3 },
       setPopupHtml: mockSetPopupHtml,
       rollAbilityCheck: vi.fn(),
       rollSavingThrow: vi.fn(),

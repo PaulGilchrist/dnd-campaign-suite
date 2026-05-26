@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharReactions from './CharReactions.jsx';
 
-vi.mock('../../hooks/useDiceRoll.js', () => ({
+vi.mock('../../hooks/useLoggedDiceRoll.js', () => ({
   default: vi.fn(),
 }));
 
@@ -10,7 +10,7 @@ vi.mock('../../services/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-import useDiceRoll from '../../hooks/useDiceRoll.js';
+import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
 import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js';
 
 const mockPlayerStats = {
@@ -42,12 +42,12 @@ const mockPlayerStatsWithNoReactions = {
 describe('CharReactions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useDiceRoll.mockImplementation(() => ({
+    useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: null,
       setPopupHtml: vi.fn(),
       rollAttack: vi.fn(),
     }));
-   });
+  });
 
   it('should render reactions header', () => {
     render(
@@ -164,7 +164,7 @@ describe('CharReactions', () => {
 
   it('should call setPopupHtml when reaction with details is clicked', () => {
     const mockSetPopupHtml = vi.fn();
-    useDiceRoll.mockImplementation(() => ({
+    useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: null,
       setPopupHtml: mockSetPopupHtml,
       rollAttack: vi.fn(),
@@ -197,7 +197,7 @@ describe('CharReactions', () => {
 
   it('should call rollAttack when Opportunity Attack is clicked', () => {
     const mockRollAttack = vi.fn();
-    useDiceRoll.mockImplementation(() => ({
+    useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: null,
       setPopupHtml: vi.fn(),
       rollAttack: mockRollAttack,
@@ -232,7 +232,7 @@ describe('CharReactions', () => {
 
   it('should render popup element container', () => {
     const mockPopupHtml = '<div>Popup Content</div>';
-    useDiceRoll.mockImplementation(() => ({
+    useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: mockPopupHtml,
       setPopupHtml: vi.fn(),
       rollAttack: vi.fn(),

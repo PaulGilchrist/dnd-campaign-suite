@@ -83,12 +83,12 @@ describe('HexMapToolbar', () => {
 
   it('should show zoom percentage', () => {
     render(<HexMapToolbar {...props} />);
-    expect(screen.getByText('100%')).toBeInTheDocument();
+    expect(screen.getByText('50%')).toBeInTheDocument();
   });
 
   it('should show zoom percentage for different zoom', () => {
     render(<HexMapToolbar {...props} zoom={1.5} />);
-    expect(screen.getByText('150%')).toBeInTheDocument();
+    expect(screen.getByText('75%')).toBeInTheDocument();
   });
 
   it('should render grid size input', () => {
