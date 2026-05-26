@@ -93,8 +93,8 @@ function EncounterMonsterTable({
                   </span>
                 </th>
                  <th className="col-qty">Qty</th>
-                 <th className="col-details" />
-                 <th className="col-remove" />
+                 <th className="col-details">Details</th>
+                 <th className="col-remove">Remove</th>
                </tr>
             </thead>
             <tbody>
