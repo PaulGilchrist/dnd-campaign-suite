@@ -1888,8 +1888,8 @@
     }
   ],
   "zoom": 3.125,
-  "panX": 1412.104167107425,
-  "panY": 424.5221959717235,
+  "panX": 1426.10613906242,
+  "panY": 378.45751945477406,
   "marchingOrder": [
     "Cleric",
     "Fighter",
@@ -1897,9 +1897,17 @@
     "Wizard"
   ],
   "partyPosition": {
-    "q": 30,
-    "r": 15
+    "q": 36,
+    "r": 13
   },
-  "weather": null,
-  "name": "Chult Jungle"
+  "weather": {
+    "condition": "storm",
+    "label": "Storm",
+    "icon": "bolt",
+    "visibility": 3,
+    "moveCostMod": 1.5,
+    "budgetMod": 0.75,
+    "encounterMod": 20,
+    "description": "Thunderstorm — terrain costs +50%, visibility limited, daily budget -25%"
+  }
 }

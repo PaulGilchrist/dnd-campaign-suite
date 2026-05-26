@@ -14,11 +14,11 @@ function PartyMarkerLayer({ position, HEX_SIZE, hexCols, hexRows, onPositionChan
     const getHexFromEvent = (e) => {
         const svg = svgRef?.current;
         if (!svg) return null;
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
-        const hex = pixelToHexSnapped(svgX, svgY, HEX_SIZE);
+        const pt = svg.createSVGPoint();
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+        const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+        const hex = pixelToHexSnapped(svgP.x, svgP.y, HEX_SIZE);
         if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return null;
         return hex;
     };

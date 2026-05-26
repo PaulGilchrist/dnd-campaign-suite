@@ -1839,9 +1839,9 @@
       "label": "Tavern"
     }
   ],
-  "zoom": 4.8828125,
-  "panX": 1610.7015608659394,
-  "panY": 538.9945491095567,
+  "zoom": 3.90625,
+  "panX": 1414.0809203153826,
+  "panY": 477.78,
   "marchingOrder": [
     "Barbarian",
     "Bard",
@@ -1849,9 +1849,17 @@
     "Ranger"
   ],
   "partyPosition": {
-    "q": 30,
-    "r": 15
+    "q": 28,
+    "r": 13
   },
-  "weather": null,
-  "name": "Ironhaven Town"
+  "weather": {
+    "condition": "fog",
+    "label": "Fog",
+    "icon": "smog",
+    "visibility": 1,
+    "moveCostMod": 1,
+    "budgetMod": 1,
+    "encounterMod": -10,
+    "description": "Thick fog — visibility limited to adjacent hexes"
+  }
 }

@@ -1,18 +1,27 @@
 # 🐉 D&D Character Sheet
 
-**Your Digital Adventurer's Toolkit — Where Strategy Meets Storytelling**
+**A complete, self-hosted D&D toolkit — character sheets, real-time party sync, and a full GM campaign suite. No accounts, no database, no subscriptions. Just your browser and your imagination.**
+
+<p>
+  <strong>✨ Real-time party sharing</strong> &nbsp;·&nbsp;
+  <strong>📖 Dual ruleset support (5e &amp; 2024)</strong> &nbsp;·&nbsp;
+  <strong>🗺️ Indoor &amp; outdoor maps</strong> &nbsp;·&nbsp;
+  <strong>🎲 Encounter &amp; dungeon generators</strong> &nbsp;·&nbsp;
+  <strong>📜 Quest, faction &amp; NPC tracking</strong> &nbsp;·&nbsp;
+  <strong>🖨️ Print-ready character sheets</strong>
+</p>
 
 ---
 
 ## 🌟 What Is This?
 
-This app is your **complete D&D character sheet solution** — whether you want it on your screen or on paper.
+A **complete D&D character sheet and campaign management suite** that runs on your local network. One player (the DM) starts the app, shares a link, and everyone — on their own phone, tablet, or laptop — sees the same characters, maps, and combat tracker in real time.
 
 **As a digital sheet:** Everything is organized, calculated automatically, and **shared instantly with your entire party**. No more lost notes, no more math errors, no more "wait, what's your AC?" mid-combat.
 
-**As a printable sheet:** The app is carefully designed to create **beautiful, well-organized character sheets that fit on a single page** (in most cases!). All the critical stats you need during combat are front and center. Print it out, keep it at the table, and have everything you need at a glance — no flipping through rulebooks.
+**As a printable sheet:** The app creates **beautiful, well-organized character sheets that fit on a single page**. All the critical stats you need during combat are front and center. Print it out, keep it at the table, and have everything you need at a glance — no flipping through rulebooks.
 
-Whether you're a Dungeon Master running epic battles or a player ready for adventure, this app handles the mechanics so you can focus on what matters: **the story**.
+**As a GM toolkit:** Indoor maps with fog of war, outdoor hex maps with procedural terrain, encounter builders, a procedural dungeon generator, quest tracking, faction management, NPC management, campaign notes, and a full activity log — everything you need to run a campaign from one app.
 
 > **No computer expertise required.** If you can open a web browser, you can use this app. The setup instructions at the bottom are written for complete beginners.
 
@@ -27,24 +36,51 @@ Here's what makes this app special: **everyone sees the same thing, instantly**.
 2. The DM shares a **link** with players (via text, email, or group chat)
 3. Players open the link on their own devices (phone, tablet, laptop)
 4. **Everyone views the same character sheets and campaign tools**
-5. When anyone makes a change—spending hit points, using a spell slot, rolling initiative—**everyone sees it right away**
+5. When anyone makes a change — spending hit points, using a spell slot, rolling initiative — **everyone sees it right away**
+
+Changes sync via **Server-Sent Events (SSE)**, so there's no refresh lag and no polling. The moment one person acts, every connected screen updates.
 
 No more "Wait, how many hit points do you have?" mid-combat! No more passing around a single phone! No more lost notes!
 
 ---
 
-## 🎯 What Can This App Do for You?
+## 🎯 Feature Overview
 
-### 📜 **Campaign Management**
+| Feature | Description |
+|---------|-------------|
+| 📜 **Campaign Management** | Multiple campaigns, switch/rename/delete, auto-saved |
+| 👤 **12-Step Character Wizard** | Ruleset, race, class, abilities, skills, spells, feats, inventory, and more |
+| 📊 **Digital Character Sheet** | Live-updating, click-to-roll, resource tracking, rest mechanics |
+| 🖨️ **Print-Ready Sheets** | Single-page, clean layout, critical stats front and center |
+| ⚔️ **Initiative Tracker** | Turn order, round counter, NPC management, keyboard shortcuts |
+| 👾 **Encounter Builder** | Monster selection, XP budgets, difficulty ratings, save/load |
+| 🗺️ **Indoor Maps** | Grid-based, fog of war, drag-and-drop tokens, 23+ furniture types |
+| 🏔️ **Outdoor Hex Maps** | Procedural terrain, POIs, rivers, roads, weather, random encounters |
+| 🏚️ **Dungeon Generator** | BSP algorithm, configurable rooms, corridors, doors |
+| 📝 **Campaign Notes** | Markdown-supported story notes and clues |
+| 🧙 **NPC Management** | Create, edit, and place NPCs on maps |
+| 📜 **Quest Tracking** | Status tracking, color-coded badges, markdown descriptions |
+| 🤝 **Faction Management** | Influence levels, goals, markdown notes |
+| 📋 **Campaign Activity Log** | Dice roll history, event tracking, audit trail |
+| 🎲 **Built-In Dice Roller** | Advantage, disadvantage, custom expressions, animated rolls |
+| 📥 **Character Import/Export** | Download/upload JSON files for between-session work |
+| 🎨 **Dark/Light Theme** | Toggle for late-night sessions |
+| 📖 **Dual Ruleset Support** | 5e and 2024 Essentials, even mixed within one campaign |
+
+---
+
+## 📜 Campaign Management
 
 A **campaign** is one adventure story with its own party of heroes. This app lets you:
 
 - **Run multiple campaigns at once** — Keep your epic fantasy saga separate from your one-shot dungeon crawl
 - **Switch between campaigns** with one click
 - **Rename or delete campaigns** when the story ends
-- **Never lose your characters** — Everything is saved automatically
+- **Never lose your characters** — Everything is saved automatically to JSON files
 
-### 👤 **Character Creation (12-Step Wizard)**
+---
+
+## 👤 Character Creation (12-Step Wizard)
 
 Creating a character doesn't have to be overwhelming. The app guides you step by step:
 
@@ -66,7 +102,9 @@ Creating a character doesn't have to be overwhelming. The app guides you step by
 
 <img src="public/character-creation.png" alt="Character Creation" width="800" />
 
-### 📊 **Character Sheet — Digital & Printable**
+---
+
+## 📊 Character Sheet — Digital & Printable
 
 Your character sheet works two ways:
 
@@ -74,13 +112,14 @@ Your character sheet works two ways:
 Your sheet becomes a **living document** that updates as you play. Click any stat to roll dice, see detailed breakdowns, track resources, and share everything in real time with your party.
 
 **On Paper (Printed Mode):**
-The app is carefully designed to create **beautiful, well-organized character sheets that fit on a single page** (in most cases!). When you print:
+The app creates **beautiful, well-organized character sheets that fit on a single page**. When you print:
 - **All critical combat stats are on the first page** — AC, HP, speed, initiative, attacks, saving throws, and skills are front and center
 - **Clean, easy-to-read layout** — No clutter, no wasted space. Find what you need in seconds during combat
 - **Management sections hide automatically** — Campaign buttons, audit warnings, and other digital-only features disappear when printing
 - **Fits on one page** — The layout is optimized so most characters fit on a single sheet of paper
 
-**Core Stats (All Calculated Automatically):**
+### Core Stats (All Calculated Automatically)
+
 - Ability scores and modifiers
 - Armor Class (click to see the formula!)
 - Hit Points and Hit Dice
@@ -90,7 +129,8 @@ The app is carefully designed to create **beautiful, well-organized character sh
 - Proficiency bonus
 - Inspiration tracker (toggle on/off)
 
-**Class-Specific Resources (Tracked During Play):**
+### Class-Specific Resources (Tracked During Play)
+
 - **Barbarian**: Rage points (max/current), extra attacks, rage damage bonus, weapon mastery
 - **Bard**: Bardic Inspiration uses, bardic performance
 - **Cleric**: Channel Divinity charges
@@ -104,22 +144,26 @@ The app is carefully designed to create **beautiful, well-organized character sh
 - **Warlock**: Mystic Arcanum, eldritch blast, pact magic
 - **Wizard**: Arcane Recovery uses, spell preparation
 
-**Spell Management:**
+### Spell Management
+
 - **Visual spell slot tracking** — Click a spell slot to use it, click again to reset after a long rest
 - **Prepare spells** — Toggle which spells are prepared for the day
 - **Filter spells** — Show only prepared spells, or sort by level or name
 - **Spell details** — Click any spell to see its full description, higher-level effects, casting time, range, and duration
 - **Spell attack bonus and save DC** — Automatically calculated and displayed
 
-**Combat Readiness:**
+### Combat Readiness
+
 - **Actions** — See your attacks, hit bonuses, damage, and damage types (click to see the formula!)
 - **Bonus actions** — Clearly separated from regular actions
 - **Reactions** — See your available reactions, including opportunity attacks and reaction spells
 - **Special actions** — Class features, fighting styles, and custom abilities
 - **Short and Long Rests** — One-click rest mechanics. Short rest with interactive hit die rolling (Con bonus applied, min 1 HP per die, full roll log). Long rest restores all HP, spell slots, hit dice, and class resources
+- **Death Saving Throws** — Track successes and failures with clear visual indicators
 - **Built-in dice roller** — Click any stat to roll ability checks, saving throws, skill checks, attack rolls, or damage. Supports advantage, disadvantage, and dice expressions like "2d6+3"
 
-**Inventory & Wealth:**
+### Inventory & Wealth
+
 - **Gold pieces** — Track your wealth
 - **Equipped items** — See what your character is wearing and wielding
 - **Backpack items** — Track everything in your pack
@@ -127,94 +171,130 @@ The app is carefully designed to create **beautiful, well-organized character sh
 - **Magic items** — See your magic items with type, rarity, attunement status, and full descriptions
 - **Search equipment** — Browse the full equipment list by category during character creation
 
-**Example character sheet**
+### Character Portability
+
+- **Download your character** as a JSON file for backup or between-session editing
+- **Upload characters** to any instance of the app — share with your DM or move between campaigns
 
 <img src="public/character-sheet.png" alt="Character Sheet" width="800" />
 
-### ⚔️ **Combat Tracking System**
+---
+
+## ⚔️ Combat Tracking System
 
 When battle erupts, the app becomes your **tactical command center**:
 
-**Initiative & Turn Order:**
+### Initiative & Turn Order
+
 - All party members and enemies listed in initiative order
 - Add or remove NPCs as needed
 - Edit creature names and add battle notes
 - Clear visual indicator of whose turn it is
 
-**Round Tracking:**
+### Round Tracking
+
 - Visual combat round counter
 - Advance or go back rounds easily
 
-**Keyboard Shortcuts** (for fast combat):
+### Keyboard Shortcuts (for fast combat)
+
 - **↑ ↓** — Move to the next/previous creature
 - **← →** — Go back/forward one round
 - **+ -** — Add/remove NPCs
 
-**Battle Notes:**
+### Battle Notes
+
 - Add notes to any creature (track conditions, remember tactics, etc.)
 
 <img src="public/initiative.png" alt="Combat Tracking" width="800" />
 
-### 🏰 **Campaign Tools (GM Features)**
+---
 
-The app includes powerful tools for Dungeon Masters to manage their campaigns:
+## 🏰 Campaign Tools (GM Features)
 
-**🎲 Initiative Tracker**
-- Turn order, round counter, NPC management, battle notes, and keyboard shortcuts — all in one panel
+The app includes a comprehensive suite of tools for Dungeon Masters. GM features (encounter builder, map editing, quest/faction/NPC management) are automatically enabled when the app runs on localhost — players connecting over the network get a read-only view.
 
-**👾 Encounter Builder**
-- Select monsters from the compendium, adjust quantities, calculate XP thresholds, assess difficulty, and save/load encounters for quick battle setup
+### 🎲 Initiative Tracker
 
-**🗺️ Indoor Maps**
-- Grid-based maps with zoom and pan
+Turn order, round counter, NPC management, battle notes, and keyboard shortcuts — all in one panel.
+
+### 👾 Encounter Builder
+
+- Select monsters from the full compendium
+- Adjust quantities and see XP totals in real time
+- Automatic difficulty rating based on party size and level
+- Save and load encounters for quick battle setup
+- Auto-generate balanced encounters by XP budget
+
+### 🗺️ Indoor Maps
+
+- Grid-based dungeon maps with zoom and pan
 - Paint and erase walls
 - Fog of war with drag-to-select rectangular area fogging
 - Drag-and-drop creature tokens and character tokens onto the grid
-- 23+ SVG furniture and prop types — barrels, beds, bookshelves, chairs, chests, crates, doors, fire pits, tables, torches, traps, and more
-- Rotate furniture items in 90° increments (tables, beds, doors, chairs, bookshelves, altars, and more)
+- **23+ SVG furniture and prop types** — barrels, beds, bookshelves, chairs, chests, crates, doors, fire pits, tables, torches, traps, altars, and more
+- Rotate furniture items in 90° increments
 - Smart collision detection — dragging a character auto-finds the nearest empty cell
+- Real-time position sync across all connected devices via SSE
 
-    <img src="public/map-indoor-example.png" alt="Indoor Map Example" width="800" />
+<img src="public/map-indoor-example.png" alt="Indoor Map Example" width="800" />
 
-**🏔️ Outdoor Hex Maps**
+### 🏔️ Outdoor Hex Maps
+
 - Hex-grid overland maps with zoom (1x–8x) and pan, compass rose overlay
-- 9 terrain types — Plains, Hills, Forest, Mountains, Desert, Swamp, Tundra, Water, Beach
-- Paint and erase terrain on individual hexes; paint rivers manually or auto-generate them from elevation data
-- Procedural terrain generation using fractal noise — configurable seed, grid size, and biome weights
-- 8 Point of Interest types — Settlement, Dungeon, Camp, Tower, Lore Site, Hazard, Natural Wonder, Landmark — with custom SVG icons
+- **9 terrain types** — Plains, Hills, Forest, Mountains, Desert, Swamp, Tundra, Water, Beach
+- Paint and erase terrain on individual hexes; paint rivers manually or auto-generate from elevation data
+- **Procedural terrain generation** using fractal noise — configurable seed, grid size, and biome weights
+- **8 Point of Interest types** — Settlement, Dungeon, Camp, Tower, Lore Site, Hazard, Natural Wonder, Landmark — with custom SVG icons
 - Drag POIs from a panel onto the map; right-click to rename, hide, or delete
-- Party marker with drag-to-move — right-click to start an encounter at the party's hex, auto-generating a linked indoor encounter map with biome-appropriate features
-- Marching order panel with reorderable character list, persisted across sessions
+- **Party marker** with drag-to-move — right-click to start an encounter at the party's hex, auto-generating a linked indoor encounter map with biome-appropriate features
+- **Marching order panel** with reorderable character list, persisted across sessions
+- **Weather system** — biome-based weather generation that changes as the party travels
+- **Random encounter generation** — terrain-appropriate encounters triggered by travel
 
-    <img src="public/map-outdoor-example.png" alt="Outdoor Map Example" width="800" />
+<img src="public/map-outdoor-example.png" alt="Outdoor Map Example" width="800" />
 
-**🏚️ Procedural Dungeon Generator**
-- Generate random dungeon maps using a BSP (Binary Space Partitioning) algorithm — configurable grid size, room count, corridor width, and door placement. Perfect for inspiration or when you need a map in minutes
+### 🏚️ Procedural Dungeon Generator
 
-**📝 Campaign Notes**
-- Record story details, clues, and important information for your campaign
+Generate random dungeon maps using a **BSP (Binary Space Partitioning) algorithm** — configurable grid size, room count, corridor width, and door placement. Perfect for inspiration or when you need a map in minutes.
 
-**🧙 NPC Management**
-- Create and manage NPCs with images, and track them on maps
+### 📝 Campaign Notes
 
-**📜 Quest Tracking**
-- Create and manage quests with status tracking (active, completed, failed), color-coded badges, search, and rich markdown descriptions and rewards
+Record story details, clues, and important information with full **markdown support**.
 
-**🤝 Faction Management**
-- Track campaign factions with influence levels (1–4), goals, markdown notes, and search
+### 🧙 NPC Management
 
-**🗂️ Map Management**
-- Create, rename, activate, and delete maps — multiple maps per campaign
+Create and manage NPCs with images, descriptions, and map placement.
 
-### 🎨 **Designed for Gaming Tables**
+### 📜 Quest Tracking
 
-**On Screen:**
+Create and manage quests with status tracking (active, completed, failed), color-coded badges, search, and rich markdown descriptions and rewards.
+
+### 🤝 Faction Management
+
+Track campaign factions with influence levels (1–4), goals, markdown notes, and search.
+
+### 📋 Campaign Activity Log
+
+A running audit trail of dice rolls, events, and actions during play. Every roll made from the character sheet is logged with timestamp, character name, and result — perfect for settling disputes or remembering what happened three sessions ago.
+
+### 🗂️ Map Management
+
+Create, rename, activate, and delete maps — multiple maps per campaign, switch between them on the fly.
+
+---
+
+## 🎨 Designed for Gaming Tables
+
+### On Screen
+
 - **Clean, organized layout** — Find what you need quickly during play
 - **Dark/Light theme toggle** — Easy on the eyes during late-night sessions
 - **Works on any device** — Phone, tablet, laptop, or desktop
-- **Real-time updates** — Everyone sees changes instantly
+- **Real-time updates** — Everyone sees changes instantly via SSE
 
-**On Paper:**
+### On Paper
+
 - **Print-ready sheets** — One-click printing with a beautiful, professional layout
 - **Single-page design** — Most characters fit on one sheet of paper
 - **Critical stats front and center** — AC, HP, attacks, saving throws, and skills are all on the first page
@@ -230,7 +310,7 @@ The app includes powerful tools for Dungeon Masters to manage their campaigns:
 
 ## 📖 Two Rule Sets, One App
 
-This app supports **both** the classic 5th Edition rules and the new 2024 Essentials rules:
+This app supports **both** the classic 5th Edition rules and the new 2024 Essentials rules, with parallel calculation engines for each:
 
 | Feature | 5th Edition (5e) | 2024 Essentials |
 |---------|-----------------|-----------------|
@@ -246,27 +326,30 @@ This app supports **both** the classic 5th Edition rules and the new 2024 Essent
 - Use **5e** if you play with the original 5th Edition rulebooks
 - Use **2024** if you play with the new Essentials rulebooks
 
-You can even mix and match—different characters in the same campaign can use different rulesets!
+You can even **mix and match** — different characters in the same campaign can use different rulesets!
 
 ---
 
 ## 🎲 How to Use It During a Game
 
-### **Before the Game**
+### Before the Game
+
 1. The DM starts the app on their computer (see setup instructions below)
 2. The DM creates a campaign and adds characters (or uploads player characters)
 3. The DM shares the **Network link** with players
 
-### **During the Game**
+### During the Game
+
 - **Everyone** views character sheets and campaign tools from their own device
 - The **DM** manages combat, builds encounters, runs maps, and tracks rounds
 - **Players** can see their character's stats, spells, inventory, and abilities
 - When anyone makes a change, **everyone sees it instantly**
 
-### **Between Games**
+### Between Games
+
 Want to level up, buy gear, or prepare spells between sessions?
 
-1. **Download your character** — Click the download button on your character sheet to save a file to your computer
+1. **Download your character** — Click the download button on your character sheet to save a JSON file
 2. **Work on your character at home** — Run the app on your own computer, upload your character file, make changes, then download it again
 3. **Share with the DM** — Send the updated file to your DM before the next session, or upload it yourself if you have access
 
@@ -274,23 +357,27 @@ Want to level up, buy gear, or prepare spells between sessions?
 
 ## 🏆 Why You'll Love This App
 
-**No More Lost Notes** — Everything is saved automatically. Close the browser, restart the app, and your characters are still there.
+**No More Lost Notes** — Everything is saved automatically to JSON files. Close the browser, restart the app, and your characters are still there.
 
-**No More Math Errors** — Armor class, hit bonuses, damage, spell save DCs—all calculated for you. Click any number to see the formula.
+**No More Math Errors** — Armor class, hit bonuses, damage, spell save DCs — all calculated for you. Click any number to see the formula.
 
 **No More Forgotten Features** — All your class features, spells, and abilities are right there on your sheet. No more flipping through rulebooks mid-combat.
 
 **No More Character Sheet Chaos** — One clean, organized view that works on screen OR on paper. Print a beautiful single-page sheet with all critical stats front and center.
 
-**No More "Wait, What's Your HP?"** — Everyone sees the same info in real time. No more passing around a single device.
+**No More "Wait, What's Your HP?"** — Everyone sees the same info in real time via SSE. No more passing around a single device.
 
 **No More Rules Confusion** — The app validates your character against the rules and shows warnings if something doesn't match.
 
-**No More Boring Maps** — Interactive maps with drag-and-drop creatures, fog of war, and a procedural dungeon generator make your table feel alive.
+**No More Boring Maps** — Interactive indoor maps with fog of war, outdoor hex maps with procedural terrain, and a BSP dungeon generator make your table feel alive.
 
-**No More Dice Hunt** — Roll ability checks, saving throws, attacks, damage, and resting hits right from your character sheet. Built-in dice roller supports advantage, disadvantage, and custom expressions.
+**No More Dice Hunt** — Roll ability checks, saving throws, attacks, damage, and resting hit dice right from your character sheet. Built-in dice roller supports advantage, disadvantage, and custom expressions.
 
 **No More Late-Night Eye Strain** — Toggle between dark and light themes to match your gaming environment.
+
+**No Database, No Problem** — No PostgreSQL, no MongoDB, no cloud sync. Characters and campaigns are stored as plain JSON files on the host computer. Back them up by copying a folder. Move them by moving a file. It just works.
+
+**No Accounts, No Subscriptions** — The DM runs the app, players open a link. No sign-ups, no paywalls, no feature tiers. Everything is included.
 
 ---
 
@@ -340,10 +427,16 @@ Yes! You can add custom special actions, feats, and abilities during character c
 The app validates your character against the rules and shows warnings if something doesn't match. You can go back and fix it.
 
 **Can I work on my character between sessions?**
-Yes! Download your character, work on it at home, then upload it before the next session.
+Yes! Download your character as a JSON file, work on it at home, then upload it before the next session.
 
 **What campaign tools are available?**
-The app includes an initiative tracker, encounter builder, interactive indoor and outdoor maps with fog of war and terrain painting, a procedural dungeon generator, quest tracking, faction management, campaign notes, and NPC management — everything a DM needs to run a great session.
+The app includes an initiative tracker, encounter builder, interactive indoor and outdoor maps with fog of war and terrain painting, a procedural dungeon generator, quest tracking, faction management, NPC management, campaign notes, and a campaign activity log — everything a DM needs to run a great session.
+
+**How does real-time sync work?**
+The app uses Server-Sent Events (SSE) — a lightweight, one-way push protocol. When the DM or a player changes something (HP, spell slots, position on a map), the server broadcasts the update to every connected browser instantly. No polling, no refresh lag.
+
+**Is this open source?**
+Yes! The project is MIT licensed. Feel free to fork it, customize it, or contribute.
 
 ---
 
