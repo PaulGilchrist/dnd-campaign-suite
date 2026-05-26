@@ -85,13 +85,13 @@ describe('useWizardData', () => {
           ok: true,
           json: () => Promise.resolve([])
          });
-      } else if (url === '/data/2024/magic-items.json') {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve([])
-         });
-        }
-      return Promise.resolve({ ok: false });
+        } else if (url === '/data/magic-items.json') {
+         return Promise.resolve({
+           ok: true,
+           json: () => Promise.resolve([])
+           });
+          }
+       return Promise.resolve({ ok: false });
       });
 
     global.fetch = mockFetch;

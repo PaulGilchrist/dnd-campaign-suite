@@ -1,7 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock the dataLoader module before importing useAppData
 vi.mock('../services/dataLoader.js', () => ({
   loadAbilityScores: vi.fn(),
   loadClassData: vi.fn(),
@@ -21,13 +20,11 @@ import {
   loadSpells,
 } from '../services/dataLoader.js';
 
-// Mock data
 const mockAbilityScores = [{ name: 'Strength' }];
 const mockClasses = [{ name: 'Fighter' }];
 const mockClasses2024 = [{ name: 'Fighter 2024' }];
 const mockEquipment = [{ name: 'Sword' }];
 const mockMagicItems = [{ name: 'Wand' }];
-const mockMagicItems2024 = [{ name: 'Wand 2024' }];
 const mockRaces = [{ name: 'Human' }];
 const mockRaces2024 = [{ name: 'Human 2024' }];
 const mockSpells = [{ name: 'Fireball' }];
@@ -37,17 +34,13 @@ describe('useAppData', () => {
   beforeEach(() => {
     vi.resetAllMocks();
 
-    // Set up default mock implementations
     loadAbilityScores.mockResolvedValue(mockAbilityScores);
     loadClassData.mockImplementation((version) => {
       if (version === '2024') return Promise.resolve(mockClasses2024);
       return Promise.resolve(mockClasses);
     });
     loadEquipment.mockResolvedValue(mockEquipment);
-    loadMagicItems.mockImplementation((version) => {
-      if (version === '2024') return Promise.resolve(mockMagicItems2024);
-      return Promise.resolve(mockMagicItems);
-    });
+    loadMagicItems.mockResolvedValue(mockMagicItems);
     loadRaceData.mockImplementation((version) => {
       if (version === '2024') return Promise.resolve(mockRaces2024);
       return Promise.resolve(mockRaces);
@@ -73,7 +66,6 @@ describe('useAppData', () => {
     expect(result.current.classes2024).toEqual([]);
     expect(result.current.equipment).toEqual([]);
     expect(result.current.magicItems).toEqual([]);
-    expect(result.current.magicItems2024).toEqual([]);
     expect(result.current.races).toEqual([]);
     expect(result.current.races2024).toEqual([]);
     expect(result.current.spells).toEqual([]);
@@ -96,7 +88,6 @@ describe('useAppData', () => {
     expect(result.current.classes2024).toEqual(mockClasses2024);
     expect(result.current.equipment).toEqual(mockEquipment);
     expect(result.current.magicItems).toEqual(mockMagicItems);
-    expect(result.current.magicItems2024).toEqual(mockMagicItems2024);
     expect(result.current.races).toEqual(mockRaces);
     expect(result.current.races2024).toEqual(mockRaces2024);
     expect(result.current.spells).toEqual(mockSpells);
@@ -197,7 +188,6 @@ describe('useAppData', () => {
     expect(result.current.classes2024).toEqual([]);
     expect(result.current.equipment).toEqual([]);
     expect(result.current.magicItems).toEqual([]);
-    expect(result.current.magicItems2024).toEqual([]);
     expect(result.current.races).toEqual([]);
     expect(result.current.races2024).toEqual([]);
     expect(result.current.spells).toEqual([]);
@@ -205,7 +195,7 @@ describe('useAppData', () => {
     expect(result.current.showButton).toBe(false);
   });
 
-  it('should call all 10 data-loader functions in a single batch via one useEffect', async () => {
+  it('should call all data-loader functions in a single batch via one useEffect', async () => {
     const { result } = renderHook(() => useAppData());
 
     await waitFor(() => {
@@ -217,9 +207,7 @@ describe('useAppData', () => {
     expect(loadClassData).toHaveBeenCalledWith('5e');
     expect(loadClassData).toHaveBeenCalledWith('2024');
     expect(loadEquipment).toHaveBeenCalledTimes(1);
-    expect(loadMagicItems).toHaveBeenCalledTimes(2);
-    expect(loadMagicItems).toHaveBeenCalledWith('5e');
-    expect(loadMagicItems).toHaveBeenCalledWith('2024');
+    expect(loadMagicItems).toHaveBeenCalledTimes(1);
     expect(loadRaceData).toHaveBeenCalledTimes(2);
     expect(loadRaceData).toHaveBeenCalledWith('5e');
     expect(loadRaceData).toHaveBeenCalledWith('2024');

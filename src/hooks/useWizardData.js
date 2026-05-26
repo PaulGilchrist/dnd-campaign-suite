@@ -26,23 +26,23 @@ function useWizardData(ruleset) {
         setClassSubtypes(data.map(cls => ({
           className: cls.name,
           subtypes: cls.subclasses || cls.majors || []
-         })));
-        });
+          })));
+       });
       loadData('/data/2024/feats.json', setFeats);
-      loadData('/data/2024/magic-items.json', setMagicItems);
-     } else {
+      loadData('/data/magic-items.json', setMagicItems);
+      } else {
       setBackgrounds([]);
       loadData('/data/races.json', setRacesData);
       loadData('/data/classes.json', (data) => {
         setClassSubtypes(data.map(cls => ({
           className: cls.name,
           subtypes: cls.subclasses || []
-         })));
-        });
+          })));
+       });
       loadData('/data/feats.json', setFeats);
       loadData('/data/magic-items.json', setMagicItems);
-     }
-     }, [ruleset, loadData]);
+      }
+      }, [ruleset, loadData]);
 
   return {
     backgrounds,

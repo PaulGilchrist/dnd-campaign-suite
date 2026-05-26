@@ -5,35 +5,34 @@
  */
 
 // Single shared cache for all data types across all rulesets
-const dataCache = {
-    '5e': {
-     classes: null,
-     races: null,
-     backgrounds: null,
-     feats: null,
-     'rules-validation': null,
-     magicItems: null,
-     spells: null
-    },
-    '2024': {
-     classes: null,
-     races: null,
-     backgrounds: null,
-     feats: null,
-     'rules-validation': null,
-     magicItems: null,
-     spells: null
-    }
-};
+   const dataCache = {
+      '5e': {
+         classes: null,
+      races: null,
+         backgrounds: null,
+       feats: null,
+        'rules-validation': null,
+       spells: null
+       },
+      '2024': {
+         classes: null,
+      races: null,
+       backgrounds: null,
+       feats: null,
+        'rules-validation': null,
+       spells: null
+       }
+    };
 
-// Shared cache for version-agnostic data (files in /data/ not /data/2024/)
-const sharedDataCache = {
-    skills: null,
-    abilityScores: null,
-    passiveSkills: null,
-    equipment: null,
-    monsters: null
-};
+   // Shared cache for version-agnostic data (files in /data/ not /data/2024/)
+    const sharedDataCache = {
+      skills: null,
+       abilityScores: null,
+     passiveSkills: null,
+      equipment: null,
+     monsters: null,
+     magicItems: null
+     };
 
 /**
  * Builds the correct file path for a given data type and version
@@ -294,32 +293,27 @@ export async function loadMonsters() {
     return [];
 }
 
-/**
-  * Fetches magic items data (with caching)
-  * @param {string} version - '5e' or '2024'
-  * @returns {Promise<object[]>} - Array of magic items data
-  */
-export async function loadMagicItems(version = '5e') {
-    const cacheKey = 'magicItems';
-    const versionCache = dataCache[version];
-
-    if (versionCache[cacheKey]) {
-        return versionCache[cacheKey];
-    }
-
-    try {
-        const path = getDataPath('magic-items', version);
-        const response = await fetch(path);
-        if (response.ok) {
-            const data = await response.json();
-            versionCache[cacheKey] = data;
-            return data;
+   /**
+        * Fetches magic items data (with caching) - version agnostic
+       * @returns {Promise<object[]>} - Array of magic items data
+       */
+    export async function loadMagicItems() {
+        if (sharedDataCache.magicItems) {
+          return sharedDataCache.magicItems;
         }
-    } catch (error) {
-        console.error(`Error loading ${version} magic-items.json:`, error);
-    }
-    return [];
-}
+
+        try {
+            const response = await fetch('/data/magic-items.json');
+             if (response.ok) {
+               const data = await response.json();
+            sharedDataCache.magicItems = data;
+               return data;
+                }
+           } catch (error) {
+              console.error('Error loading magic items:', error);
+               }
+        return [];
+      }
 
 /**
   * Fetches spells data (with caching)
@@ -419,29 +413,29 @@ export async function loadPassiveSkills() {
   */
 export function clearDataCache() {
     dataCache['5e'] = {
-     classes: null,
-     races: null,
-     backgrounds: null,
-     feats: null,
-     'rules-validation': null,
-     magicItems: null,
-     spells: null
-     };
-    dataCache['2024'] = {
-     classes: null,
-     races: null,
-     backgrounds: null,
-     feats: null,
-     'rules-validation': null,
-     magicItems: null,
-     spells: null
-     };
-    sharedDataCache.skills = null;
-    sharedDataCache.abilityScores = null;
-    sharedDataCache.passiveSkills = null;
+      classes: null,
+        races: null,
+       backgrounds: null,
+         feats: null,
+         'rules-validation': null,
+         spells: null
+        };
+      dataCache['2024'] = {
+         classes: null,
+          races: null,
+           backgrounds: null,
+         feats: null,
+        'rules-validation': null,
+        spells: null
+       };
+   sharedDataCache.skills = null;
+     sharedDataCache.abilityScores = null;
+   sharedDataCache.passiveSkills = null;
     sharedDataCache.equipment = null;
-    sharedDataCache.monsters = null;
- }
+  sharedDataCache.monsters = null;
+sharedDataCache.magicItems = null;
+  }
+
 
 /**
  * Gets the current cache state (useful for debugging)

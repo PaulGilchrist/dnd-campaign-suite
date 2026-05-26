@@ -519,61 +519,42 @@ describe('dataLoader', () => {
     });
 
     describe('loadMagicItems', () => {
-        it('should load magic items for 5e', async () => {
-            const mockData = [{ name: 'Bag of Holding' }];
-            mockFetch.mockResolvedValue(mockSuccessResponse(mockData));
+         it('should load magic items (merged, version agnostic)', async () => {
+             const mockData = [{ name: 'Bag of Holding' }];
+             mockFetch.mockResolvedValue(mockSuccessResponse(mockData));
 
-            const result = await loadMagicItems('5e');
+             const result = await loadMagicItems();
 
-            expect(result).toEqual(mockData);
-            expect(mockFetch).toHaveBeenCalledWith('/data/magic-items.json');
-        });
+             expect(result).toEqual(mockData);
+             expect(mockFetch).toHaveBeenCalledWith('/data/magic-items.json');
+          });
 
-        it('should load magic items for 2024', async () => {
-            const mockData = [{ name: 'Bag of Holding' }];
-            mockFetch.mockResolvedValue(mockSuccessResponse(mockData));
+         it('should cache magic items on subsequent calls', async () => {
+             const mockData = [{ name: 'Bag of Holding' }];
+             mockFetch.mockResolvedValue(mockSuccessResponse(mockData));
 
-            const result = await loadMagicItems('2024');
+             await loadMagicItems();
+             await loadMagicItems();
 
-            expect(result).toEqual(mockData);
-            expect(mockFetch).toHaveBeenCalledWith('/data/2024/magic-items.json');
-        });
-
-        it('should cache magic items per version', async () => {
-            const mockData5e = [{ name: 'Bag of Holding' }];
-            const mockData2024 = [{ name: 'Portable Hole' }];
-            mockFetch
-                .mockResolvedValueOnce(mockSuccessResponse(mockData5e))
-                .mockResolvedValueOnce(mockSuccessResponse(mockData2024));
-
-            const result5e = await loadMagicItems('5e');
-            const result2024 = await loadMagicItems('2024');
-
-            expect(result5e).toEqual(mockData5e);
-            expect(result2024).toEqual(mockData2024);
-
-            // Third call should use cache
-            const result5eAgain = await loadMagicItems('5e');
-            expect(result5eAgain).toEqual(mockData5e);
-            expect(mockFetch).toHaveBeenCalledTimes(2);
-        });
+             expect(mockFetch).toHaveBeenCalledTimes(1);
+          });
 
         it('should return empty array on error', async () => {
-            mockFetch.mockResolvedValue(mockErrorResponse(500));
+              mockFetch.mockResolvedValue(mockErrorResponse(500));
 
-            const result = await loadMagicItems('5e');
+            const result = await loadMagicItems();
+
+           expect(result).toEqual([]);
+          });
+
+          it('should return empty array on network error', async () => {
+          mockFetch.mockRejectedValue(new Error('Network error'));
+
+            const result = await loadMagicItems();
 
             expect(result).toEqual([]);
-        });
-
-        it('should return empty array on network error', async () => {
-            mockFetch.mockRejectedValue(new Error('Network error'));
-
-            const result = await loadMagicItems('5e');
-
-            expect(result).toEqual([]);
-        });
-    });
+            });
+      });
 
     describe('loadSpells', () => {
         it('should load spells for 5e', async () => {
@@ -787,7 +768,7 @@ describe('dataLoader', () => {
             expect(cacheState['5e']).toHaveProperty('backgrounds');
             expect(cacheState['5e']).toHaveProperty('feats');
             expect(cacheState['5e']).toHaveProperty('rules-validation');
-            expect(cacheState['5e']).toHaveProperty('magicItems');
+            expect(getCacheState()).not.toHaveProperty('magicItems');
             expect(cacheState['5e']).toHaveProperty('spells');
         });
 

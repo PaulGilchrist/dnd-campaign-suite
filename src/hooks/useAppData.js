@@ -14,7 +14,6 @@ function useAppData() {
   const [classes2024, setClasses2024] = useState([]);
   const [equipment, setEquipment] = useState([]);
   const [magicItems, setMagicItems] = useState([]);
-  const [magicItems2024, setMagicItems2024] = useState([]);
   const [races, setRaces] = useState([]);
   const [races2024, setRaces2024] = useState([]);
   const [spells, setSpells] = useState([]);
@@ -30,7 +29,6 @@ function useAppData() {
           classes2024Data,
           equipmentData,
           magicItemsData,
-          magicItems2024Data,
           racesData,
           races2024Data,
           spellsData,
@@ -40,8 +38,7 @@ function useAppData() {
           loadClassData('5e'),
           loadClassData('2024'),
           loadEquipment(),
-          loadMagicItems('5e'),
-          loadMagicItems('2024'),
+          loadMagicItems(),
           loadRaceData('5e'),
           loadRaceData('2024'),
           loadSpells('5e'),
@@ -53,7 +50,6 @@ function useAppData() {
         setClasses2024(classes2024Data);
         setEquipment(equipmentData);
         setMagicItems(magicItemsData);
-        setMagicItems2024(magicItems2024Data);
         setRaces(racesData);
         setRaces2024(races2024Data);
         setSpells(spellsData);
@@ -74,7 +70,6 @@ function useAppData() {
     classes2024,
     equipment,
     magicItems,
-    magicItems2024,
     races,
     races2024,
     spells,
