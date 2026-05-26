@@ -1,5 +1,7 @@
 import useDiceRoll from './useDiceRoll.js';
 import { rollD20 } from '../services/diceRoller.js';
+import utils from '../services/utils.js';
+import storage from '../services/storage.js';
 
 export default function useLoggedDiceRoll(characterName, campaignName) {
   const { popupHtml, setPopupHtml } = useDiceRoll();
@@ -28,6 +30,25 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
         isNatural1: r1 === 1
          });
     setPopupHtml({ type: 'd20', rollType, name, rolls: [r1, r2], bonus });
+
+    if (rollType === 'initiative') {
+        const firstName = utils.getFirstName(characterName);
+        const stored = localStorage.getItem('combatSummary');
+        if (stored) {
+            try {
+                const combatSummary = JSON.parse(stored);
+                const creature = combatSummary.creatures.find(
+                    c => c.type === 'player' && c.name === firstName
+                );
+                if (creature) {
+                    creature.initiative = String(r1 + bonus);
+                    combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
+                    storage.set('combatSummary', combatSummary, campaignName);
+                    window.dispatchEvent(new CustomEvent('initiative-rolled'));
+                }
+            } catch (e) { /* ignore parse errors */ }
+        }
+    }
      }
 
    function logDamageAndShow(name, formula, total, rolls, modifier) {

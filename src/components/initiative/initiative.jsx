@@ -233,6 +233,21 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
         }
     }, [activeCreatureId]);
 
+    React.useEffect(() => {
+        const handler = () => {
+            const stored = localStorage.getItem('combatSummary');
+            if (stored) {
+                try {
+                    const summary = JSON.parse(stored);
+                    combatSummaryRef.current = summary;
+                    setCombatSummary(summary);
+                } catch (e) { /* ignore parse errors */ }
+            }
+        };
+        window.addEventListener('initiative-rolled', handler);
+        return () => window.removeEventListener('initiative-rolled', handler);
+    }, []);
+
     const handleClear = () => {
         if (window.confirm('Are you sure you want to clear all combat status?')) {
             const creatures = setupCreatures();
