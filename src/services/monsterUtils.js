@@ -21,3 +21,17 @@ export async function getMonsterImageUrl(npcName) {
     }
     return null;
 }
+
+/**
+ * Look up a monster data object by NPC name.
+ * Same lookup logic as getMonsterImageUrl but returns the full monster object.
+ * Strips trailing numbers for case-insensitive lookup.
+ */
+export async function getMonsterData(npcName) {
+    if (!npcName) return null;
+    if (!monstersCache) {
+        monstersCache = await loadMonsters();
+    }
+    const baseName = npcName.replace(/\s+\d+$/, '');
+    return monstersCache.find(m => m.name.toLowerCase() === baseName.toLowerCase()) || null;
+}

@@ -3,22 +3,23 @@ import React from 'react'
 import { cloneDeep } from 'lodash';
 import utils from '../../services/utils.js'
 import storage from '../../services/storage.js'
-import { getMonsterImageUrl } from '../../services/monsterUtils.js';
+import { getMonsterImageUrl, getMonsterData } from '../../services/monsterUtils.js';
+import MonsterCardModal from '../encounter/MonsterCardModal.jsx';
 import AvatarImage from '../common/AvatarImage.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import './initiative.css'
 
-function NpcAvatar({ name, imageUrl }) {
+function NpcAvatar({ name, imageUrl, onClick }) {
     if (imageUrl) {
         return (
-            <div className="npc-avatar">
+            <div className="npc-avatar" onClick={onClick}>
                 <img src={imageUrl} alt={name} className="avatar-image" />
             </div>
         );
     }
     const initial = name ? name.charAt(0).toUpperCase() : '?';
     return (
-        <div className="npc-avatar">
+        <div className="npc-avatar" onClick={onClick}>
             <span>{initial}</span>
         </div>
     );
@@ -29,6 +30,7 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
     const [numOfNpc, setNumOfNpc] = React.useState(4);
     const [activeCreatureId, setActiveCreatureId] = React.useState(null);
     const [npcImages, setNpcImages] = React.useState({});
+    const [viewingMonster, setViewingMonster] = React.useState(null);
     const carouselRef = React.useRef(null);
     const combatSummaryRef = React.useRef(null);
     combatSummaryRef.current = combatSummary;
@@ -275,6 +277,12 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
         setCombatSummary(cloneDeep(combatSummary));
         setNpcImages(prev => ({ ...prev, [id]: null }));
     };
+    const handleNpcClick = async (creature) => {
+        const monster = await getMonsterData(creature.name);
+        if (monster) {
+            setViewingMonster(monster);
+        }
+    };
     if (!combatSummary) return null;
     return (
         <div className='initiative'>
@@ -289,7 +297,7 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
                                 {creature.type === 'player' ? (
                                     <AvatarImage name={creature.name} imagePath={creature.imagePath} size={150} />
                                 ) : (
-                                    <NpcAvatar name={creature.name} imageUrl={npcImages[creature.id]} />
+                                    <NpcAvatar name={creature.name} imageUrl={npcImages[creature.id]} onClick={() => handleNpcClick(creature)} />
                                 )}
                             </div>
                             <div className='creature-name'>
@@ -327,6 +335,13 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
                 <button onClick={handlePreviousCreature}>← Prev</button>
                 <button onClick={handleNextCreature}>Next →</button>
             </div>
+            {viewingMonster && (
+                <MonsterCardModal
+                    monster={viewingMonster}
+                    onClose={() => setViewingMonster(null)}
+                    campaignName={campaignName}
+                />
+            )}
         </div>
     )
 }

@@ -119,6 +119,7 @@
     font-weight: bold;
     text-transform: uppercase;
     background-color: #e74c3c;
+    cursor: pointer;
 }
 
 .initiative .avatar-wrapper {
