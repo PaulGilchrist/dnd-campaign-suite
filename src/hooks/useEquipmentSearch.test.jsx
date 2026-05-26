@@ -65,7 +65,7 @@ describe('useEquipmentSearch', () => {
     );
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.mocked((await import('../services/dataLoader.js')).loadEquipment).mockResolvedValue(equipmentData);
   });
 
