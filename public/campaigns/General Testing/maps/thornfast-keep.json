@@ -96,11 +96,6 @@
     "0,3",
     "1,3",
     "2,3",
-    "3,3",
-    "7,3",
-    "8,3",
-    "9,3",
-    "10,3",
     "20,3",
     "21,3",
     "22,3",
@@ -114,7 +109,6 @@
     "0,4",
     "1,4",
     "2,4",
-    "3,4",
     "20,4",
     "21,4",
     "22,4",
@@ -128,9 +122,6 @@
     "0,5",
     "1,5",
     "2,5",
-    "3,5",
-    "8,5",
-    "9,5",
     "20,5",
     "21,5",
     "22,5",
@@ -148,7 +139,6 @@
     "15,6",
     "16,6",
     "18,6",
-    "19,6",
     "20,6",
     "21,6",
     "22,6",
@@ -162,7 +152,6 @@
     "0,7",
     "1,7",
     "2,7",
-    "11,7",
     "12,7",
     "13,7",
     "20,7",
@@ -178,7 +167,6 @@
     "0,8",
     "1,8",
     "2,8",
-    "11,8",
     "12,8",
     "13,8",
     "20,8",
@@ -446,8 +434,6 @@
     "3,20",
     "4,20",
     "5,20",
-    "6,20",
-    "8,20",
     "13,20",
     "14,20",
     "15,20",
@@ -469,7 +455,6 @@
     "3,21",
     "4,21",
     "5,21",
-    "6,21",
     "13,21",
     "14,21",
     "15,21",
@@ -682,14 +667,53 @@
     "21,29",
     "22,29",
     "23,29",
-    "24,29",
     "25,29",
     "26,29",
     "27,29",
     "28,29",
     "29,29",
     "17,6",
-    "10,4"
+    "13,6",
+    "12,6",
+    "23,11",
+    "23,12",
+    "23,13",
+    "23,14",
+    "23,15",
+    "23,16",
+    "23,17",
+    "23,18",
+    "23,19",
+    "23,20",
+    "23,21",
+    "19,6",
+    "17,12",
+    "17,13",
+    "17,14",
+    "17,15",
+    "17,16",
+    "17,17",
+    "17,18",
+    "17,19",
+    "17,20",
+    "17,21",
+    "17,22",
+    "17,23",
+    "20,21",
+    "21,21",
+    "21,22",
+    "21,23",
+    "20,23",
+    "20,24",
+    "21,24",
+    "22,23",
+    "22,24",
+    "22,22",
+    "22,21",
+    "20,22",
+    "3,11",
+    "6,11",
+    "24,29"
   ],
   "placedItems": [
     {
@@ -702,7 +726,7 @@
     },
     {
       "id": "torch-1-4-4",
-      "gridX": 4,
+      "gridX": 3,
       "gridY": 4,
       "type": "torch",
       "visible": true,
@@ -734,8 +758,8 @@
     },
     {
       "id": "table-2",
-      "gridX": 6,
-      "gridY": 25,
+      "gridX": 9,
+      "gridY": 21,
       "type": "table",
       "visible": true,
       "rotation": 0
@@ -750,7 +774,7 @@
     },
     {
       "id": "torch-3-6-11",
-      "gridX": 6,
+      "gridX": 7,
       "gridY": 11,
       "type": "torch",
       "visible": true,
@@ -774,47 +798,47 @@
     },
     {
       "id": "pillar-3-4-7",
-      "gridX": 4,
-      "gridY": 7,
+      "gridX": 5,
+      "gridY": 5,
       "type": "pillar",
       "visible": true
     },
     {
       "id": "pillar-3-8-7",
-      "gridX": 8,
-      "gridY": 7,
+      "gridX": 9,
+      "gridY": 5,
       "type": "pillar",
       "visible": true
     },
     {
       "id": "pillar-3-4-11",
-      "gridX": 4,
-      "gridY": 11,
+      "gridX": 5,
+      "gridY": 10,
       "type": "pillar",
       "visible": true
     },
     {
       "id": "pillar-3-8-11",
-      "gridX": 8,
-      "gridY": 11,
+      "gridX": 9,
+      "gridY": 10,
       "type": "pillar",
       "visible": true
     },
     {
       "id": "chest-3",
-      "gridX": 7,
-      "gridY": 9,
+      "gridX": 3,
+      "gridY": 6,
       "type": "chest",
       "visible": true,
       "rotation": 180
     },
     {
       "id": "bed-3",
-      "gridX": 4,
-      "gridY": 7,
+      "gridX": 18,
+      "gridY": 4,
       "type": "bed",
       "visible": true,
-      "rotation": 90
+      "rotation": 180
     },
     {
       "id": "torch-4-11-10",
@@ -841,7 +865,7 @@
     },
     {
       "id": "torch-5-15-3",
-      "gridX": 15,
+      "gridX": 13,
       "gridY": 3,
       "type": "torch",
       "visible": true,
@@ -849,8 +873,8 @@
     },
     {
       "id": "chest-6",
-      "gridX": 12,
-      "gridY": 5,
+      "gridX": 17,
+      "gridY": 11,
       "type": "chest",
       "visible": true,
       "rotation": 270
@@ -919,68 +943,12 @@
       "rotation": 90
     },
     {
-      "id": "torch-9-20-23",
-      "gridX": 20,
-      "gridY": 23,
-      "type": "torch",
-      "visible": true,
-      "rotation": 0
-    },
-    {
-      "id": "torch-9-22-23",
-      "gridX": 22,
-      "gridY": 23,
-      "type": "torch",
-      "visible": true,
-      "rotation": 180
-    },
-    {
       "id": "door-0",
       "gridX": 10,
       "gridY": 19,
       "type": "door",
       "visible": true,
       "rotation": 90
-    },
-    {
-      "id": "door-1",
-      "gridX": 11,
-      "gridY": 23,
-      "type": "door",
-      "visible": true,
-      "rotation": 90
-    },
-    {
-      "id": "door-2",
-      "gridX": 8,
-      "gridY": 21,
-      "type": "door",
-      "visible": true,
-      "rotation": 0
-    },
-    {
-      "id": "door-3",
-      "gridX": 4,
-      "gridY": 6,
-      "type": "door",
-      "visible": true,
-      "rotation": 0
-    },
-    {
-      "id": "door-4",
-      "gridX": 6,
-      "gridY": 6,
-      "type": "door",
-      "visible": true,
-      "rotation": 0
-    },
-    {
-      "id": "door-5",
-      "gridX": 7,
-      "gridY": 4,
-      "type": "door",
-      "visible": true,
-      "rotation": 0
     },
     {
       "id": "door-6",
@@ -999,30 +967,6 @@
       "rotation": 90
     },
     {
-      "id": "door-8",
-      "gridX": 9,
-      "gridY": 6,
-      "type": "door",
-      "visible": true,
-      "rotation": 0
-    },
-    {
-      "id": "door-9",
-      "gridX": 9,
-      "gridY": 8,
-      "type": "door",
-      "visible": true,
-      "rotation": 0
-    },
-    {
-      "id": "door-10",
-      "gridX": 9,
-      "gridY": 10,
-      "type": "door",
-      "visible": true,
-      "rotation": 0
-    },
-    {
       "id": "door-11",
       "gridX": 10,
       "gridY": 12,
@@ -1039,22 +983,6 @@
       "rotation": 90
     },
     {
-      "id": "door-13",
-      "gridX": 13,
-      "gridY": 4,
-      "type": "door",
-      "visible": true,
-      "rotation": 0
-    },
-    {
-      "id": "door-14",
-      "gridX": 10,
-      "gridY": 4,
-      "type": "secretDoor",
-      "visible": false,
-      "rotation": 0
-    },
-    {
       "id": "door-15",
       "gridX": 17,
       "gridY": 10,
@@ -1063,17 +991,9 @@
       "rotation": 90
     },
     {
-      "id": "door-16",
-      "gridX": 23,
-      "gridY": 21,
-      "type": "door",
-      "visible": true,
-      "rotation": 0
-    },
-    {
       "id": "entrance-stairs",
       "gridX": 11,
-      "gridY": 21,
+      "gridY": 23,
       "type": "stairs",
       "visible": true
     },
@@ -1097,8 +1017,8 @@
     },
     {
       "id": "npc-2",
-      "gridX": 6,
-      "gridY": 9,
+      "gridX": 9,
+      "gridY": 7,
       "type": "npc",
       "visible": false,
       "name": "Goblin",
@@ -1115,8 +1035,8 @@
     },
     {
       "id": "npc-4",
-      "gridX": 17,
-      "gridY": 17,
+      "gridX": 6,
+      "gridY": 6,
       "type": "npc",
       "visible": false,
       "name": "Specter",
@@ -1133,8 +1053,8 @@
     },
     {
       "id": "npc-6",
-      "gridX": 9,
-      "gridY": 21,
+      "gridX": 7,
+      "gridY": 5,
       "type": "npc",
       "visible": false,
       "name": "Cultist",
@@ -1142,8 +1062,8 @@
     },
     {
       "id": "npc-7",
-      "gridX": 22,
-      "gridY": 13,
+      "gridX": 12,
+      "gridY": 4,
       "type": "npc",
       "visible": true,
       "name": "Thistle",
@@ -1152,7 +1072,7 @@
     {
       "id": "npc-8",
       "gridX": 15,
-      "gridY": 14,
+      "gridY": 8,
       "type": "npc",
       "visible": true,
       "name": "Brother Aldric",

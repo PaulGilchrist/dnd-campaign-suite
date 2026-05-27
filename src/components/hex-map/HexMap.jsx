@@ -625,7 +625,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         const grid = 30;
         const encounterData = generateOutdoorEncounter(terrainType, grid, marchingOrder, q, r);
         const baseMapName = mapName.replace(/\.json$/, '');
-        const encounterName = `${baseMapName}-encounter-at-${q}-${r}`;
+        const encounterName = `${baseMapName} - Encounter at ${q},${r}`;
 
         // Merge extra items (monsters) into placed items
         if (extraPlacedItems.length > 0) {

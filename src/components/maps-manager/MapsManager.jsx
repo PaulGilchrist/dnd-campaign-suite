@@ -53,7 +53,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
             const { activeMap } = event.data;
             setMaps(prev => prev.map(m => ({
                 ...m,
-                isActive: m.name === activeMap
+                isActive: m.fileName.replace(/\.json$/, '') === activeMap
             })));
         }
     }, [campaignName, loadMapsList]);
@@ -91,7 +91,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
 
     const handleStartRename = (fileName, currentName) => {
         setRenamingMap(fileName);
-        setRenameValue(mapsService.formatMapName(currentName));
+        setRenameValue(currentName);
     };
 
     const handleRenameSave = async (oldFileName) => {
@@ -101,13 +101,13 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
             return;
         }
         const existingMap = maps.find(m => m.fileName === oldFileName);
-        if (existingMap && mapsService.formatMapName(existingMap.name) === newName) {
+        if (existingMap && existingMap.name === newName) {
             setRenamingMap(null);
             return;
         }
-        // Check for duplicates (sanitize user input to compare against stored kebab-case names)
-        const sanitizedNew = newName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-        if (maps.some(m => m.fileName !== oldFileName && m.name === sanitizedNew)) {
+        // Check for duplicates (compare display names directly)
+        const newKebab = newName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        if (maps.some(m => m.fileName !== oldFileName && m.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') === newKebab)) {
             setError('A map with that name already exists');
             setRenamingMap(null);
             return;
@@ -271,7 +271,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                                     />
                                 ) : (
                                     <span className="maps-manager-item-name">
-                                        {mapsService.formatMapName(map.name)}
+                                        {map.name}
                                         {map.type && (
                                             <span className={`map-type-badge ${map.type === 'outdoor' ? 'outdoor' : 'indoor'}`}>
                                                 {map.type === 'outdoor' ? 'Outdoor' : 'Indoor'}
@@ -298,7 +298,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                     <div className="maps-manager-modal" onClick={e => e.stopPropagation()}>
                         <h3>Delete Map</h3>
                         <p>
-                            This will permanently delete the map &apos;<strong>{mapsService.formatMapName(deletingMapName)}</strong>&apos; and all its
+                            This will permanently delete the map &apos;<strong>{deletingMapName}</strong>&apos; and all its
                             contents (walls, items, creature positions). This <strong>cannot be undone</strong>.
                         </p>
                         <div className="maps-manager-modal-actions">
@@ -335,7 +335,7 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
                 }}>
                     <div className="maps-manager-modal" onClick={e => e.stopPropagation()}>
                         <div className="ct-modal-header">
-                            <h3>Edit Description — {mapsService.formatMapName(editingMap.name)}</h3>
+                            <h3>Edit Description — {editingMap.name}</h3>
                             <button className="ct-modal-close" onClick={handleCancelDescription} aria-label="Close">
                                 &times;
                             </button>

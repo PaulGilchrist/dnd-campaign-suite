@@ -7,6 +7,7 @@ const router = express.Router();
 
 // Helper to sanitize map names to filenames
 const sanitizeMapName = (name) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '.json';
+const toKebabCase = (name) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
 // GET /api/campaigns/:campaign/maps - List all maps with active status
 router.get('/api/campaigns/:campaign/maps', (req, res) => {
@@ -27,15 +28,16 @@ router.get('/api/campaigns/:campaign/maps', (req, res) => {
     const activeMap = activeMaps.get(campaign) || null;
     
     const maps = mapFiles.map(f => {
-      // Read the type field from the map file
       let mapType = 'indoor';
+      let displayName = f.replace(/\.json$/, '');
       try {
         const mapContent = JSON.parse(fs.readFileSync(path.join(mapsDir, f), 'utf-8'));
         mapType = mapContent.type || 'indoor';
-      } catch (e) { /* ignore - default to indoor */ }
+        if (mapContent.displayName) displayName = mapContent.displayName;
+      } catch (e) { /* ignore */ }
 
       return {
-        name: f.replace(/\.json$/, ''),
+        name: displayName,
         fileName: f,
         type: mapType,
         isActive: f.replace(/\.json$/, '') === activeMap
@@ -74,7 +76,8 @@ router.post('/api/campaigns/:campaign/maps', (req, res) => {
     
     const defaultMapData = type === 'outdoor'
       ? {
-          name: name.trim(),
+          displayName: name.trim(),
+          name: toKebabCase(name.trim()),
           type,
           gridSize: Math.max(5, Math.min(100, gridSize ?? 20)),
           terrain,
@@ -84,7 +87,8 @@ router.post('/api/campaigns/:campaign/maps', (req, res) => {
           panY: 0,
         }
       : {
-          name: name.trim(),
+          displayName: name.trim(),
+          name: toKebabCase(name.trim()),
           type,
           gridSize: Math.max(5, Math.min(100, gridSize ?? 20)),
           walls: walls ?? [],
@@ -218,7 +222,8 @@ router.put('/api/campaigns/:campaign/maps/:mapname/rename', (req, res) => {
     
     // Read existing data and update name
     const mapData = JSON.parse(fs.readFileSync(oldFilePath, 'utf-8'));
-    mapData.name = newName.trim();
+    mapData.displayName = newName.trim();
+    mapData.name = toKebabCase(newName.trim());
     
     // Write with new name, delete old file
     fs.writeFileSync(newFilePath, JSON.stringify(mapData, null, 2));

@@ -1,6 +1,6 @@
 {
   "name": "Garrison Halls",
-  "description": "## Medium Dungeon \u2014 Garrison Halls of Thornfast Keep\n\nThe second level of Thornfast Keep was once a bustling garrison where elven soldiers trained, ate, and rested between their vigil over the Feywild crossing. Now, centuries later, nature has reclaimed the halls. Vines crawl through broken windows, bioluminescent fungi pulse on the walls, and the air is thick with earthy spores. The Thorned One's influence has twisted the Emerald Wardens' sacred meditation garden into a predatory thicket.\n\n**Zones:**\n- **Grand Hallway (north-south corridor):** A long central passage lined with faded tapestries depicting elven victories against shadow-beasts. The floor is cracked, with roots pushing through the flagstones.\n- **Former Barracks (west wing):** Sleeping quarters for the garrison. Broken cots and rotted bedding litter the floor. A vine-choked chest contains an elven journal with notes about the seal anchors.\n- **Meditation Garden (center-east):** Once a peaceful glade within the keep walls where Wardens communed with nature. Now overgrown with aggressive fey-touched flora. **Seal Anchor #1** glows from within a bramble thicket here.\n- **Armory (south wing):** Racks of rusted weapons and scattered arrows. A few serviceable shortswords and spears remain.\n- **Officer's Quarters (north wing):** Private rooms for the garrison commander. A desk still holds sealed orders from the last Warden, detailing emergency protocols for seal failure.\n- **Lower Stairs (south end):** Descends to the Main Keep (Large Keep) level.\n\n**Atmosphere:** The sound of dripping water echoes constantly. Strange, bioluminescent fungi pulse in rhythm with an unseen heartbeat. The fey corruption here manifests as wildly overgrown plants that shift and move when not directly observed.",
+  "description": "## Medium Dungeon — Garrison Halls of Thornfast Keep\n\nThe second level of Thornfast Keep was once a bustling garrison where elven soldiers trained, ate, and rested between their vigil over the Feywild crossing. Now, centuries later, nature has reclaimed the halls. Vines crawl through broken windows, bioluminescent fungi pulse on the walls, and the air is thick with earthy spores. The Thorned One's influence has twisted the Emerald Wardens' sacred meditation garden into a predatory thicket.\n\n**Zones:**\n- **Grand Hallway (north-south corridor):** A long central passage lined with faded tapestries depicting elven victories against shadow-beasts. The floor is cracked, with roots pushing through the flagstones.\n- **Former Barracks (west wing):** Sleeping quarters for the garrison. Broken cots and rotted bedding litter the floor. A vine-choked chest contains an elven journal with notes about the seal anchors.\n- **Meditation Garden (center-east):** Once a peaceful glade within the keep walls where Wardens communed with nature. Now overgrown with aggressive fey-touched flora. **Seal Anchor #1** glows from within a bramble thicket here.\n- **Armory (south wing):** Racks of rusted weapons and scattered arrows. A few serviceable shortswords and spears remain.\n- **Officer's Quarters (north wing):** Private rooms for the garrison commander. A desk still holds sealed orders from the last Warden, detailing emergency protocols for seal failure.\n- **Lower Stairs (south end):** Descends to the Main Keep (Large Keep) level.\n\n**Atmosphere:** The sound of dripping water echoes constantly. Strange, bioluminescent fungi pulse in rhythm with an unseen heartbeat. The fey corruption here manifests as wildly overgrown plants that shift and move when not directly observed.",
   "gridSize": 25,
   "walls": [
     "0,0",
@@ -228,9 +228,6 @@
     "24,9",
     "0,10",
     "1,10",
-    "2,10",
-    "3,10",
-    "4,10",
     "16,10",
     "17,10",
     "18,10",
@@ -242,9 +239,6 @@
     "24,10",
     "0,11",
     "1,11",
-    "2,11",
-    "3,11",
-    "4,11",
     "6,11",
     "7,11",
     "8,11",
@@ -471,21 +465,20 @@
     "23,24",
     "24,24",
     "11,10",
-    "18,15"
+    "18,15",
+    "20,3",
+    "20,4",
+    "20,5",
+    "6,17",
+    "9,16",
+    "7,12",
+    "6,12"
   ],
   "placedItems": [
     {
       "id": "torch-0-3-12",
       "gridX": 3,
-      "gridY": 12,
-      "type": "torch",
-      "visible": true,
-      "rotation": 90
-    },
-    {
-      "id": "torch-0-6-12",
-      "gridX": 6,
-      "gridY": 12,
+      "gridY": 10,
       "type": "torch",
       "visible": true,
       "rotation": 90
@@ -500,11 +493,11 @@
     },
     {
       "id": "altar-0",
-      "gridX": 5,
-      "gridY": 15,
+      "gridX": 2,
+      "gridY": 11,
       "type": "altar",
       "visible": true,
-      "rotation": 0
+      "rotation": 90
     },
     {
       "id": "torch-1-8-6",
@@ -517,23 +510,23 @@
     {
       "id": "chest-1",
       "gridX": 9,
-      "gridY": 6,
+      "gridY": 4,
       "type": "chest",
       "visible": true,
       "rotation": 270
     },
     {
       "id": "bookshelf-2",
-      "gridX": 10,
-      "gridY": 14,
+      "gridX": 11,
+      "gridY": 13,
       "type": "bookshelf",
       "visible": true,
       "rotation": 90
     },
     {
       "id": "trap-2",
-      "gridX": 10,
-      "gridY": 15,
+      "gridX": 3,
+      "gridY": 21,
       "type": "trap",
       "visible": false
     },
@@ -562,8 +555,8 @@
     },
     {
       "id": "web-4",
-      "gridX": 20,
-      "gridY": 16,
+      "gridX": 21,
+      "gridY": 14,
       "type": "web",
       "visible": true
     },
@@ -592,14 +585,6 @@
       "rotation": 0
     },
     {
-      "id": "torch-7-20-21",
-      "gridX": 20,
-      "gridY": 21,
-      "type": "torch",
-      "visible": true,
-      "rotation": 270
-    },
-    {
       "id": "torch-7-19-21",
       "gridX": 19,
       "gridY": 21,
@@ -624,44 +609,12 @@
       "rotation": 0
     },
     {
-      "id": "door-0",
-      "gridX": 5,
-      "gridY": 11,
-      "type": "door",
-      "visible": true,
-      "rotation": 90
-    },
-    {
-      "id": "door-1",
-      "gridX": 5,
-      "gridY": 18,
-      "type": "door",
-      "visible": true,
-      "rotation": 90
-    },
-    {
-      "id": "door-2",
-      "gridX": 8,
-      "gridY": 15,
-      "type": "door",
-      "visible": true,
-      "rotation": 0
-    },
-    {
       "id": "door-3",
       "gridX": 10,
       "gridY": 8,
       "type": "door",
       "visible": true,
       "rotation": 90
-    },
-    {
-      "id": "door-4",
-      "gridX": 10,
-      "gridY": 12,
-      "type": "door",
-      "visible": true,
-      "rotation": 0
     },
     {
       "id": "door-5",
@@ -677,14 +630,6 @@
       "gridY": 10,
       "type": "secretDoor",
       "visible": false,
-      "rotation": 0
-    },
-    {
-      "id": "door-7",
-      "gridX": 20,
-      "gridY": 18,
-      "type": "door",
-      "visible": true,
       "rotation": 0
     },
     {
@@ -704,19 +649,12 @@
       "rotation": 0
     },
     {
-      "id": "door-10",
-      "gridX": 5,
-      "gridY": 20,
-      "type": "door",
+      "id": "entrance-stairs",
+      "gridX": 7,
+      "gridY": 17,
+      "type": "stairs",
       "visible": true,
       "rotation": 0
-    },
-    {
-      "id": "entrance-stairs",
-      "gridX": 5,
-      "gridY": 15,
-      "type": "stairs",
-      "visible": true
     },
     {
       "id": "npc-0",
@@ -756,8 +694,8 @@
     },
     {
       "id": "npc-4",
-      "gridX": 12,
-      "gridY": 18,
+      "gridX": 18,
+      "gridY": 21,
       "type": "npc",
       "visible": false,
       "name": "Vine Blight",
@@ -783,8 +721,8 @@
     },
     {
       "id": "npc-7",
-      "gridX": 15,
-      "gridY": 18,
+      "gridX": 20,
+      "gridY": 19,
       "type": "npc",
       "visible": false,
       "name": "Twig Blight",
@@ -792,7 +730,7 @@
     },
     {
       "id": "npc-8",
-      "gridX": 12,
+      "gridX": 22,
       "gridY": 21,
       "type": "npc",
       "visible": false,
@@ -809,14 +747,7 @@
       "rotation": 0
     }
   ],
-  "players": [
-    {
-      "id": "player-1",
-      "name": "Adventurer 1",
-      "gridX": 5,
-      "gridY": 15
-    }
-  ],
+  "players": [],
   "zoom": 1,
   "panX": 0,
   "panY": 0,

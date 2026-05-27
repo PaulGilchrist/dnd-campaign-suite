@@ -25,6 +25,12 @@ const seed = get('--seed') ? parseInt(get('--seed'), 10) : undefined;
 const showAscii = args.includes('--ascii') || args.includes('-a');
 const output = get('--output') || get('-o');
 const count = parseInt(get('--count') || get('-c') || '1', 10);
+const displayName = get('--name') || get('-n');
+const toKebabCase = (s) => s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+const sanitizeFilename = (s) => {
+  const base = s.replace(/\.json$/, '');
+  return toKebabCase(base) + '.json';
+};
 
 for (let i = 0; i < count; i++) {
   const map = generateDungeon({
@@ -33,13 +39,18 @@ for (let i = 0; i < count; i++) {
     seed: seed != null ? seed + i : undefined,
   });
 
+  if (displayName) {
+    map.displayName = displayName;
+    map.name = toKebabCase(displayName);
+  }
+
   const json = JSON.stringify(map, null, 2);
 
   if (output) {
     const filename =
       count > 1
-        ? output.replace(/\.json$/, '-' + (i + 1) + '.json')
-        : output;
+        ? sanitizeFilename(output.replace(/\.json$/, '-' + (i + 1) + '.json'))
+        : sanitizeFilename(output);
     const fs = await import('fs');
     fs.writeFileSync(filename, json);
     console.log(

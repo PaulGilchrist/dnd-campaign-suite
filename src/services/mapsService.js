@@ -1,5 +1,6 @@
 // Helper to sanitize map names to filenames (mirrors server route)
-const sanitizeMapName = (name) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') + '.json';
+export const toKebabCase = (name) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+const sanitizeMapName = (name) => toKebabCase(name) + '.json';
 
 export const loadMaps = async (campaignName) => {
   try {
