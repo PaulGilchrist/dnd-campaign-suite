@@ -76,15 +76,15 @@ function POIPanel({ poiPanelOpen, onClose, characters = [] }) {
     if (!poiPanelOpen) return null;
 
     const svgComponents = {
-        settlement: SettlementSVG,
+        camp: CampSVG,
         city: CitySVG,
         dungeon: DungeonSVG,
-        camp: CampSVG,
-        tower: TowerSVG,
-        loreSite: LoreSiteSVG,
         hazard: HazardSVG,
-        naturalWonder: NaturalWonderSVG,
         landmark: LandmarkSVG,
+        loreSite: LoreSiteSVG,
+        naturalWonder: NaturalWonderSVG,
+        settlement: SettlementSVG,
+        tower: TowerSVG,
     };
 
     return (

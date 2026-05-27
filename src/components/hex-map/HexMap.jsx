@@ -1054,15 +1054,15 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                         }}
                     >
                         <defs>
-                            <SettlementSVG id="poi-settlement" />
+                            <CampSVG id="poi-camp" />
                             <CitySVG id="poi-city" />
                             <DungeonSVG id="poi-dungeon" />
-                            <CampSVG id="poi-camp" />
-                            <TowerSVG id="poi-tower" />
-                            <LoreSiteSVG id="poi-loreSite" />
                             <HazardSVG id="poi-hazard" />
-                            <NaturalWonderSVG id="poi-naturalWonder" />
                             <LandmarkSVG id="poi-landmark" />
+                            <LoreSiteSVG id="poi-loreSite" />
+                            <NaturalWonderSVG id="poi-naturalWonder" />
+                            <SettlementSVG id="poi-settlement" />
+                            <TowerSVG id="poi-tower" />
                         </defs>
 
                         <TerrainLayer

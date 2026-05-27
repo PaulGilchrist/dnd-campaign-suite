@@ -21,15 +21,15 @@ export const DEFAULT_TERRAIN = 'plains';
 
 // POI types
 export const POI_TYPES = [
-  { id: 'city',          name: 'City',          label: 'City',          svgId: 'poi-city',          description: 'Large city, metropolis' },
-  { id: 'settlement',    name: 'Settlement',    label: 'Settlement',    svgId: 'poi-settlement',    description: 'Village, town, keep' },
-  { id: 'dungeon',       name: 'Dungeon',       label: 'Dungeon',       svgId: 'poi-dungeon',       description: 'Ruins, cave, crypt' },
   { id: 'camp',          name: 'Camp',          label: 'Camp',          svgId: 'poi-camp',          description: 'Campsite, waystation' },
-  { id: 'tower',         name: 'Tower',         label: 'Tower',         svgId: 'poi-tower',         description: 'Watchtower, mage tower' },
-  { id: 'loreSite',      name: 'Lore Site',     label: 'Lore Site',     svgId: 'poi-lore-site',     description: 'Shrine, standing stones' },
+  { id: 'city',          name: 'City',          label: 'City',          svgId: 'poi-city',          description: 'Large city, metropolis' },
+  { id: 'dungeon',       name: 'Dungeon',       label: 'Dungeon',       svgId: 'poi-dungeon',       description: 'Ruins, cave, crypt' },
   { id: 'hazard',        name: 'Hazard',        label: 'Hazard',        svgId: 'poi-hazard',        description: 'Quicksand, toxic swamp' },
-  { id: 'naturalWonder', name: 'Natural Wonder', label: 'Natural Wonder', svgId: 'poi-natural-wonder', description: 'Waterfall, crystal formation' },
   { id: 'landmark',      name: 'Landmark',      label: 'Landmark',      svgId: 'poi-landmark',      description: 'Cliffs, monolith, lone tree' },
+  { id: 'loreSite',      name: 'Lore Site',     label: 'Lore Site',     svgId: 'poi-lore-site',     description: 'Shrine, standing stones' },
+  { id: 'naturalWonder', name: 'Natural Wonder', label: 'Natural Wonder', svgId: 'poi-natural-wonder', description: 'Waterfall, crystal formation' },
+  { id: 'settlement',    name: 'Settlement',    label: 'Settlement',    svgId: 'poi-settlement',    description: 'Village, town, keep' },
+  { id: 'tower',         name: 'Tower',         label: 'Tower',         svgId: 'poi-tower',         description: 'Watchtower, mage tower' },
 ];
 
 // Tool mode constants

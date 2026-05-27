@@ -106,12 +106,12 @@ function ItemsPanel({ itemsPanelOpen, onClose, characters = [], players = [], ma
             <div className="items-panel-content">
                 {isOutdoor ? (<>
                     <Item type="barrel" viewBox="0 0 36 36" width="36" label="Barrel"><BarrelSVG /></Item>
+                    <Item type="boulder" viewBox="0 0 36 36" width="36" label="Boulder"><BoulderSVG /></Item>
+                    <Item type="bush" viewBox="0 0 36 36" width="36" label="Bush"><BushSVG /></Item>
                     <Item type="crate" viewBox="0 0 36 36" width="36" label="Crate"><CrateSVG /></Item>
                     <Item type="firepit" viewBox="0 0 36 36" width="36" label="Fire Pit"><FirePitSVG /></Item>
                     <Item type="torch" viewBox="0 0 36 36" width="36" label="Torch"><TorchSVG /></Item>
                     <Item type="tree" viewBox="0 0 36 36" width="36" label="Tree"><TreeSVG /></Item>
-                    <Item type="boulder" viewBox="0 0 36 36" width="36" label="Boulder"><BoulderSVG /></Item>
-                    <Item type="bush" viewBox="0 0 36 36" width="36" label="Bush"><BushSVG /></Item>
                 </>) : (<>
                     <Item type="altar" viewBox="0 0 72 36" width="72" label="Altar"><AltarSVG /></Item>
                     <Item type="arrowSlitWall" viewBox="0 0 36 36" width="36" label="Arrow Slit Wall"><ArrowSlitWallSVG /></Item>
@@ -126,7 +126,7 @@ function ItemsPanel({ itemsPanelOpen, onClose, characters = [], players = [], ma
                     <Item type="fountain" viewBox="0 0 36 36" width="36" label="Fountain"><FountainSVG /></Item>
                     <Item type="pillar" viewBox="0 0 36 36" width="36" label="Pillar"><PillarSVG /></Item>
                     <Item type="secretDoor" viewBox="0 0 36 36" width="36" label="Secret Door"><SecretDoorSVG /></Item>
-                    <Item type="skeleton" viewBox="0 0 36 36" width="36" label="Skeleton"><SkeletonSVG /></Item>
+                    {/* <Item type="skeleton" viewBox="0 0 36 36" width="36" label="Skeleton"><SkeletonSVG /></Item> */}
                     <Item type="stairs" viewBox="0 0 36 36" width="36" label="Stairs"><StairsSVG /></Item>
                     <Item type="statue" viewBox="0 0 36 36" width="36" label="Statue"><StatueSVG /></Item>
                     <Item type="table" viewBox="0 0 72 36" width="72" label="Table"><TableSVG /></Item>
