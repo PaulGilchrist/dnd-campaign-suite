@@ -96,6 +96,15 @@ function usePlacedItems(setPlacedItems, setSelectedItem) {
         setSelectedItem(null);
     };
 
+    const handleRotateArrowSlitWall = (id) => {
+        setPlacedItems(prev => prev.map(item => {
+            if (item.id !== id) return item;
+            const currentRotation = item.rotation || 0;
+            const newRotation = (currentRotation + 90) % 360;
+            return { ...item, rotation: newRotation };
+        }));
+    };
+
     const handleRotateBookshelf = (id) => {
         setPlacedItems(prev => prev.map(item => {
             if (item.id !== id) return item;
@@ -115,10 +124,11 @@ function usePlacedItems(setPlacedItems, setSelectedItem) {
         handleRotateDoor,
         handleRotateSecretDoor,
         handleRotateStairs,
+        handleRotateAltar,
+        handleRotateArrowSlitWall,
+        handleRotateBookshelf,
         handleRotateTorch,
         handleRotateChair,
-        handleRotateAltar,
-        handleRotateBookshelf,
     };
 }
 

@@ -65,6 +65,7 @@
                         "type": "string",
                         "enum": [
                             "altar",
+                            "arrowSlitWall",
                             "bed",
                             "bookshelf",
                             "chair",

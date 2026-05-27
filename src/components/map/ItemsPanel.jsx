@@ -1,4 +1,5 @@
 import AltarSVG from './AltarSVG.jsx';
+import ArrowSlitWallSVG from './ArrowSlitWallSVG.jsx';
 import BarrelSVG from './BarrelSVG.jsx';
 import BedSVG from './BedSVG.jsx';
 import BookshelfSVG from './BookshelfSVG.jsx';
@@ -113,10 +114,12 @@ function ItemsPanel({ itemsPanelOpen, onClose, characters = [], players = [], ma
                     <Item type="bush" viewBox="0 0 36 36" width="36" label="Bush"><BushSVG /></Item>
                 </>) : (<>
                     <Item type="altar" viewBox="0 0 72 36" width="72" label="Altar"><AltarSVG /></Item>
+                    <Item type="arrowSlitWall" viewBox="0 0 36 36" width="36" label="Arrow Slit Wall"><ArrowSlitWallSVG /></Item>
                     <Item type="barrel" viewBox="0 0 36 36" width="36" label="Barrel"><BarrelSVG /></Item>
                     <Item type="bed" viewBox="0 0 72 36" width="72" label="Bed"><BedSVG /></Item>
                     <Item type="bookshelf" viewBox="0 0 72 36" width="72" label="Bookshelf"><BookshelfSVG /></Item>
                     <Item type="chair" viewBox="0 0 36 36" width="36" label="Chair"><ChairSVG /></Item>
+                    <Item type="chest" viewBox="0 0 36 36" width="36" label="Treasure Chest"><ChestSVG /></Item>
                     <Item type="crate" viewBox="0 0 36 36" width="36" label="Crate"><CrateSVG /></Item>
                     <Item type="door" viewBox="0 0 36 36" width="36" label="Door"><DoorSVG /></Item>
                     <Item type="firepit" viewBox="0 0 36 36" width="36" label="Fire Pit"><FirePitSVG /></Item>
@@ -124,13 +127,12 @@ function ItemsPanel({ itemsPanelOpen, onClose, characters = [], players = [], ma
                     <Item type="pillar" viewBox="0 0 36 36" width="36" label="Pillar"><PillarSVG /></Item>
                     <Item type="secretDoor" viewBox="0 0 36 36" width="36" label="Secret Door"><SecretDoorSVG /></Item>
                     <Item type="skeleton" viewBox="0 0 36 36" width="36" label="Skeleton"><SkeletonSVG /></Item>
-                    <Item type="web" viewBox="0 0 36 36" width="36" label="Spider Web"><WebSVG /></Item>
                     <Item type="stairs" viewBox="0 0 36 36" width="36" label="Stairs"><StairsSVG /></Item>
                     <Item type="statue" viewBox="0 0 36 36" width="36" label="Statue"><StatueSVG /></Item>
                     <Item type="table" viewBox="0 0 72 36" width="72" label="Table"><TableSVG /></Item>
                     <Item type="torch" viewBox="0 0 36 36" width="36" label="Torch"><TorchSVG /></Item>
                     <Item type="trap" viewBox="0 0 36 36" width="36" label="Trap"><TrapSVG /></Item>
-                    <Item type="chest" viewBox="0 0 36 36" width="36" label="Treasure Chest"><ChestSVG /></Item>
+                    <Item type="web" viewBox="0 0 36 36" width="36" label="Spider Web"><WebSVG /></Item>
                 </>)}
                 {/* NPC - single draggable icon */}
                 <div className="items-panel-item" draggable

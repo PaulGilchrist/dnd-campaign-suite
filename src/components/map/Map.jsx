@@ -17,6 +17,7 @@ import TrapSVG from './TrapSVG.jsx';
 import PillarSVG from './PillarSVG.jsx';
 import StairsSVG from './StairsSVG.jsx';
 import AltarSVG from './AltarSVG.jsx';
+import ArrowSlitWallSVG from './ArrowSlitWallSVG.jsx';
 import BookshelfSVG from './BookshelfSVG.jsx';
 import ChairSVG from './ChairSVG.jsx';
 import ChestSVG from './ChestSVG.jsx';
@@ -420,7 +421,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             gridX: grid.gridX,
             gridY: grid.gridY,
             visible: isLocalhost,
-            rotation: (dragData === 'table' || dragData === 'bed' || dragData === 'stairs' || dragData === 'altar' || dragData === 'bookshelf' || dragData === 'torch' || dragData === 'chair') ? 0 : undefined
+            rotation: (dragData === 'table' || dragData === 'bed' || dragData === 'stairs' || dragData === 'altar' || dragData === 'bookshelf' || dragData === 'torch' || dragData === 'chair' || dragData === 'arrowSlitWall') ? 0 : undefined
         };
         setPlacedItems(prev => [...prev, newItem]);
     }, [isLocalhost, getGridFromEvent]);
@@ -450,6 +451,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         handleRotateSecretDoor,
         handleRotateStairs,
         handleRotateAltar,
+        handleRotateArrowSlitWall,
         handleRotateBookshelf,
         handleRotateTorch,
         handleRotateChair,
@@ -551,6 +553,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     <PillarSVG id="pillar" />
                     <StairsSVG id="stairs" />
                     <AltarSVG id="altar" />
+                    <ArrowSlitWallSVG id="arrowSlitWall" />
                     <BookshelfSVG id="bookshelf" />
                     <ChairSVG id="chair" />
                     <ChestSVG id="chest" />
@@ -620,6 +623,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                       handleRotateSecretDoor={handleRotateSecretDoor}
                       handleRotateStairs={handleRotateStairs}
                       handleRotateAltar={handleRotateAltar}
+                      handleRotateArrowSlitWall={handleRotateArrowSlitWall}
                       handleRotateBookshelf={handleRotateBookshelf}
                       handleRotateTorch={handleRotateTorch}
                       handleRotateChair={handleRotateChair}

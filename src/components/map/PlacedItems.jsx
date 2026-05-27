@@ -562,6 +562,30 @@ function PlacedItems({
         );
     };
 
+    const renderArrowSlitWall = (item) => {
+        const cx = gridCenterX(item.gridX);
+        const cy = gridCenterY(item.gridY);
+        if (!isLocalhost && (!item.visible || fog?.has(`${item.gridX},${item.gridY}`))) return null;
+        return (
+            <g key={item.id} className="placed-item">
+                <use href="#arrowSlitWall" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1}
+                    transform={item.rotation ? `rotate(${item.rotation}, ${cx}, ${cy})` : undefined} />
+                {isLocalhost && (
+                    <>
+                        <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
+                            className="item-hit-area"
+                            onPointerDown={(e) => handleItemPointerDown(e, item.id)}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            style={{ cursor: 'grab' }} />
+                        {itemDragging?.itemId === item.id && (
+                            <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
+                        )}
+                    </>
+                )}
+            </g>
+        );
+    };
+
     const renderTree = (item) => {
         const cx = gridCenterX(item.gridX);
         const cy = gridCenterY(item.gridY);
@@ -634,6 +658,7 @@ function PlacedItems({
     return (
         <>
             {placedItems.filter(item => item.type === 'altar').map(renderAltar)}
+            {placedItems.filter(item => item.type === 'arrowSlitWall').map(renderArrowSlitWall)}
             {placedItems.filter(item => item.type === 'barrel').map(renderBarrel)}
             {placedItems.filter(item => item.type === 'bed').map(renderBed)}
             {placedItems.filter(item => item.type === 'bookshelf').map(renderBookshelf)}

@@ -12,6 +12,7 @@ function ItemContextMenu({
     handleRotateSecretDoor,
     handleRotateStairs,
     handleRotateAltar,
+    handleRotateArrowSlitWall,
     handleRotateBookshelf,
     handleRotateTorch,
     handleRotateChair,
@@ -28,7 +29,7 @@ function ItemContextMenu({
     const item = placedItems.find(i => i.id === selectedItem.id);
     const isNpc = item && item.type === 'npc';
     const isDoor = item && item.type === 'door';
-    const hasRotation = item && (item.type === 'table' || item.type === 'bed' || item.type === 'door' || item.type === 'secretDoor' || item.type === 'stairs' || item.type === 'altar' || item.type === 'bookshelf' || item.type === 'torch' || item.type === 'chair');
+    const hasRotation = item && (item.type === 'table' || item.type === 'bed' || item.type === 'door' || item.type === 'secretDoor' || item.type === 'stairs' || item.type === 'altar' || item.type === 'arrowSlitWall' || item.type === 'bookshelf' || item.type === 'torch' || item.type === 'chair');
     const showRenameOption = isNpc;
     const showViewStats = isNpc && monsterFound;
     const hasExtra = showRenameOption || showViewStats || hasRotation || isDoor;
@@ -69,7 +70,8 @@ function ItemContextMenu({
                         else if (item.type === 'door') handleRotateDoor(selectedItem.id);
                         else if (item.type === 'secretDoor') handleRotateSecretDoor(selectedItem.id);
                         else if (item.type === 'stairs') handleRotateStairs(selectedItem.id);
-                        else if (item.type === 'altar') handleRotateAltar(selectedItem.id);
+                         else if (item.type === 'altar') handleRotateAltar(selectedItem.id);
+                         else if (item.type === 'arrowSlitWall') handleRotateArrowSlitWall(selectedItem.id);
                         else if (item.type === 'bookshelf') handleRotateBookshelf(selectedItem.id);
                         else if (item.type === 'torch') handleRotateTorch(selectedItem.id);
                         else if (item.type === 'chair') handleRotateChair(selectedItem.id);
