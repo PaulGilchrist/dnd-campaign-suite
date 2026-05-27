@@ -4,7 +4,7 @@
     "description": "Schema for D&D indoor map data",
     "type": "object",
     "required": [
-        "name",
+        "displayName",
         "gridSize",
         "walls",
         "placedItems",
@@ -17,7 +17,11 @@
     "properties": {
         "name": {
             "type": "string",
-            "description": "The map name"
+            "description": "The map name (defaults to file name if not set)"
+        },
+        "displayName": {
+            "type": "string",
+            "description": "Human-readable display name for the map"
         },
         "description": {
             "type": "string",

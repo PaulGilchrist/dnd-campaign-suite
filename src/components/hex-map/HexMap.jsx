@@ -844,6 +844,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     setPanY(loadedPanY);
                     panXValueRef.current = loadedPanX;
                     panYValueRef.current = loadedPanY;
+                    hexMapDisplayNameRef.current = existing.displayName || mapName;
                     if (existing.weather) setWeather(existing.weather);
 
                     // If pan was never set (old default 0,0), reset view to center
@@ -930,6 +931,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     // when mapName changes (via onEncounterCreated) before Map.jsx switches.
 
     const hexMapNameRef = useRef(mapName);
+    const hexMapDisplayNameRef = useRef(mapName);
 
     useEffect(() => {
         if (!hasLoaded.current) return;
@@ -937,6 +939,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
 
         const dataToSave = {
             type: 'outdoor',
+            displayName: hexMapDisplayNameRef.current,
             gridSize,
             terrain,
             rivers,

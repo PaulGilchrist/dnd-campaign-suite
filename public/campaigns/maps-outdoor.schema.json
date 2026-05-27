@@ -5,6 +5,7 @@
     "type": "object",
     "required": [
         "type",
+        "displayName",
         "gridSize",
         "terrain",
         "pois",
@@ -19,6 +20,10 @@
                 "outdoor"
             ],
             "description": "Map type identifier"
+        },
+        "displayName": {
+            "type": "string",
+            "description": "Human-readable display name for the map"
         },
         "description": {
             "type": "string",
