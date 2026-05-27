@@ -678,6 +678,35 @@
     user-select: none;
 }
 
+/* Selection group overlay styles */
+.map .selection-preview {
+    fill: rgba(74, 144, 217, 0.15);
+    stroke: #4a90d9;
+    stroke-width: 2;
+    stroke-dasharray: 6 3;
+    pointer-events: none;
+}
+
+.map .selection-outline {
+    fill: none;
+    stroke: #4a90d9;
+    stroke-width: 2;
+    pointer-events: none;
+}
+
+.map .selection-wall {
+    fill: rgba(74, 144, 217, 0.3);
+    pointer-events: none;
+}
+
+.map .selection-item-highlight {
+    fill: none;
+    stroke: #4a90d9;
+    stroke-width: 2;
+    stroke-dasharray: 4 3;
+    pointer-events: none;
+}
+
 
 
 

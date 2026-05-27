@@ -50,6 +50,12 @@ const MapToolbar = ({
                         >
                             <i className="fa-solid fa-eraser"></i> Erase
                         </button>
+                        <button
+                            className={tool === 'select' ? 'active' : ''}
+                            onClick={() => setTool(tool === 'select' ? 'none' : 'select')}
+                        >
+                            <i className="fa-solid fa-arrow-pointer"></i> Select
+                        </button>
                         <button onClick={handleClearWalls}>
                             <i className="fa-solid fa-trash"></i> Clear Walls
                         </button>

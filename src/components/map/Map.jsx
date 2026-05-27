@@ -66,11 +66,29 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const panYValueRef = useRef(0);
     // Accumulate deltaY for smooth zoom thresholding
     const accumulatedDeltaRef = useRef(0);
-    // Tool state: 'none' | 'paint' | 'erase'
+    // Selection/move refs for stale-closure-free access
+    const selectedWallsRef = useRef(new Set());
+    const selectedItemsRef = useRef(new Set());
+    const placedItemsRef = useRef([]);
+    const selectStart = useRef(null);
+    const moveStartGrid = useRef(null);
+    const moveOffsetRef = useRef(null);
+    const selectionRectRef = useRef(null);
+    const mapDataRef = useRef(null);
+    const selectionBoundsRef = useRef(null);
+    const lastSavedWallsRef = useRef(null);
+    // Tool state: 'none' | 'paint' | 'erase' | 'select'
     const [tool, setTool] = useState('none');
     // Paint state: tracks grid coords during active paint/erase
     const [painting, setPainting] = useState(null);
     const [panning, setPanning] = useState(null); // { startX, startY, startPanX, startPanY }
+
+    // Selection state
+    const [selectionRect, setSelectionRect] = useState(null);
+    const [selectedWalls, setSelectedWalls] = useState(new Set());
+    const [selectedItems, setSelectedItems] = useState(new Set());
+    // Move state
+    const [moveOffset, setMoveOffset] = useState(null);
 
     // Items panel state
     const [itemsPanelOpen, setItemsPanelOpen] = useState(false);
@@ -216,9 +234,180 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         setPainting(null);
     }, []);
 
+    // Select/move handlers
+    const handleSelectPointerDown = useCallback((e) => {
+        if (!isLocalhost || tool !== 'select') return;
+        e.preventDefault();
+        const svg = svgRef.current;
+        if (svg) svg.setPointerCapture(e.pointerId);
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+
+        const key = `${grid.gridX},${grid.gridY}`;
+        const curSelWalls = selectedWallsRef.current;
+        const curSelItems = selectedItemsRef.current;
+        const curPlaced = placedItemsRef.current;
+
+        const onSelectedWall = curSelWalls.has(key);
+        const onSelectedItem = curSelItems.size > 0 && curPlaced.some(
+            it => curSelItems.has(it.id) && it.gridX === grid.gridX && it.gridY === grid.gridY
+        );
+        const selBounds = selectionBoundsRef.current;
+        const withinBounds = selBounds &&
+            grid.gridX >= selBounds.minX && grid.gridX <= selBounds.maxX &&
+            grid.gridY >= selBounds.minY && grid.gridY <= selBounds.maxY;
+
+        if ((onSelectedWall || onSelectedItem || withinBounds) && (curSelWalls.size > 0 || curSelItems.size > 0)) {
+            moveStartGrid.current = grid;
+            moveOffsetRef.current = { dx: 0, dy: 0 };
+            setMoveOffset({ dx: 0, dy: 0 });
+            selectStart.current = null;
+        } else {
+            selectStart.current = grid;
+            setSelectionRect({ minX: grid.gridX, maxX: grid.gridX, minY: grid.gridY, maxY: grid.gridY });
+            setSelectedWalls(new Set());
+            setSelectedItems(new Set());
+            setMoveOffset(null);
+            moveStartGrid.current = null;
+            moveOffsetRef.current = null;
+            selectionBoundsRef.current = null;
+        }
+    }, [isLocalhost, tool, getGridFromEvent]);
+
+    const handleSelectPointerMove = useCallback((e) => {
+        if (!isLocalhost || tool !== 'select') return;
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+
+        if (selectStart.current) {
+            e.preventDefault();
+            const minX = Math.min(selectStart.current.gridX, grid.gridX);
+            const maxX = Math.max(selectStart.current.gridX, grid.gridX);
+            const minY = Math.min(selectStart.current.gridY, grid.gridY);
+            const maxY = Math.max(selectStart.current.gridY, grid.gridY);
+            const rect = { minX, maxX, minY, maxY };
+            selectionRectRef.current = rect;
+            setSelectionRect(rect);
+        } else if (moveStartGrid.current) {
+            e.preventDefault();
+            const dx = grid.gridX - moveStartGrid.current.gridX;
+            const dy = grid.gridY - moveStartGrid.current.gridY;
+            moveOffsetRef.current = { dx, dy };
+            setMoveOffset({ dx, dy });
+        }
+    }, [isLocalhost, tool, getGridFromEvent]);
+
+    const handleSelectPointerUp = useCallback((e) => {
+        if (!isLocalhost) return;
+        const svg = svgRef.current;
+        if (svg) svg.releasePointerCapture(e.pointerId);
+
+        if (selectStart.current) {
+            const rect = selectionRectRef.current;
+            if (rect) {
+                const { minX, maxX, minY, maxY } = rect;
+                const walls = mapDataRef.current?.walls || new Set();
+                const items = placedItemsRef.current || [];
+
+                const newSelWalls = new Set();
+                for (let y = minY; y <= maxY; y++) {
+                    for (let x = minX; x <= maxX; x++) {
+                        const key = `${x},${y}`;
+                        if (walls.has(key)) newSelWalls.add(key);
+                    }
+                }
+                const newSelItems = new Set();
+                for (const item of items) {
+                    if (item.gridX >= minX && item.gridX <= maxX &&
+                        item.gridY >= minY && item.gridY <= maxY) {
+                        newSelItems.add(item.id);
+                    }
+                }
+                setSelectedWalls(newSelWalls);
+                setSelectedItems(newSelItems);
+                selectionBoundsRef.current = { minX, maxX, minY, maxY };
+            }
+            selectStart.current = null;
+            selectionRectRef.current = null;
+            setSelectionRect(null);
+        } else if (moveStartGrid.current) {
+            const offset = moveOffsetRef.current;
+            if (offset && (offset.dx !== 0 || offset.dy !== 0)) {
+                const curSelWalls = selectedWallsRef.current;
+                const curSelItems = selectedItemsRef.current;
+                const bounds = selectionBoundsRef.current;
+                const dstBounds = bounds && {
+                    minX: bounds.minX + offset.dx,
+                    maxX: bounds.maxX + offset.dx,
+                    minY: bounds.minY + offset.dy,
+                    maxY: bounds.maxY + offset.dy,
+                };
+
+                const beforeCount = mapDataRef.current?.walls?.size || 0;
+                setMapData((prev) => {
+                    const oldCount = prev.walls?.size || 0;
+                    const newWalls = new Set(prev.walls);
+                    // Step 1: clear the entire destination rect
+                    if (dstBounds) {
+                        for (let y = dstBounds.minY; y <= dstBounds.maxY; y++) {
+                            for (let x = dstBounds.minX; x <= dstBounds.maxX; x++) {
+                                newWalls.delete(`${x},${y}`);
+                            }
+                        }
+                    }
+                    const afterClear = newWalls.size;
+                    // Step 2: remove all source positions first, then add all destinations
+                    // (Two phases prevent later deletes from undoing earlier adds)
+                    for (const key of curSelWalls) {
+                        newWalls.delete(key);
+                    }
+                    for (const key of curSelWalls) {
+                        const [x, y] = key.split(',').map(Number);
+                        newWalls.add(`${x + offset.dx},${y + offset.dy}`);
+                    }
+                    const afterMove = newWalls.size;
+                    return { ...prev, walls: newWalls };
+                });
+
+                setSelectedWalls((prev) => {
+                    const next = new Set();
+                    for (const key of prev) {
+                        const [x, y] = key.split(',').map(Number);
+                        next.add(`${x + offset.dx},${y + offset.dy}`);
+                    }
+                    return next;
+                });
+
+                if (bounds) {
+                    selectionBoundsRef.current = {
+                        minX: bounds.minX + offset.dx,
+                        maxX: bounds.maxX + offset.dx,
+                        minY: bounds.minY + offset.dy,
+                        maxY: bounds.maxY + offset.dy,
+                    };
+                }
+
+                setPlacedItems((prev) =>
+                    prev.map(item =>
+                        curSelItems.has(item.id)
+                            ? { ...item, gridX: item.gridX + offset.dx, gridY: item.gridY + offset.dy }
+                            : item
+                    )
+                );
+            }
+            moveStartGrid.current = null;
+            moveOffsetRef.current = null;
+            setMoveOffset(null);
+        }
+    }, [isLocalhost]);
+
     const handlePanStart = useCallback((e) => {
         if (tool === 'paint' || tool === 'erase') {
             handleGridPointerDown(e);
+            return;
+        }
+        if (tool === 'select') {
+            handleSelectPointerDown(e);
             return;
         }
         if (e.button !== 0) return;
@@ -233,7 +422,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             startPanX: panX,
             startPanY: panY
         });
-    }, [tool, panX, panY, handleGridPointerDown, clientToSVG]);
+    }, [tool, panX, panY, handleGridPointerDown, handleSelectPointerDown, clientToSVG]);
 
     const handlePanMove = useCallback((e) => {
         if (!panning) return;
@@ -341,6 +530,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             walls: Array.from(mapData.walls || []),
             placedItems: placedItems,
         };
+        lastSavedWallsRef.current = dataToSave.walls;
         mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save map data:', err));
     }, [mapData, campaignName, gridSize, placedItems, mapName]);
 
@@ -351,6 +541,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         setGridSize,
         setMapData,
         setPlacedItems,
+        lastSavedWallsRef,
     });
 
     const { dragging, handlePointerDown, handlePointerMove, handlePointerUp } = usePlayerDragging({
@@ -507,6 +698,12 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     useEffect(() => { panXValueRef.current = panX; }, [panX]);
     useEffect(() => { panYValueRef.current = panY; }, [panY]);
 
+    // Sync refs for selection/move handlers
+    useEffect(() => { placedItemsRef.current = placedItems; }, [placedItems]);
+    useEffect(() => { selectedWallsRef.current = selectedWalls; }, [selectedWalls]);
+    useEffect(() => { selectedItemsRef.current = selectedItems; }, [selectedItems]);
+    useEffect(() => { mapDataRef.current = mapData; }, [mapData]);
+
 
 
     if (!mapData) return null;
@@ -541,15 +738,15 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 viewBox={`${panX} ${panY} ${SVG_SIZE / zoom} ${SVG_SIZE / zoom}`}
                 className="grid-svg"
                 onPointerDown={handlePanStart}
-                onPointerMove={(e) => { handlePointerMove(e); handleItemPointerMove(e); handleGridPointerMove(e); handlePanMove(e); }}
-                onPointerUp={(e) => { handlePointerUp(e); handleItemPointerUpHook(e); handleGridPointerUp(e); handlePanEnd(e); }}
-                onPointerLeave={(e) => { handleItemPointerLeave(); handleGridPointerLeave(e); }}
+                onPointerMove={(e) => { handlePointerMove(e); handleItemPointerMove(e); handleGridPointerMove(e); handleSelectPointerMove(e); handlePanMove(e); }}
+                onPointerUp={(e) => { handlePointerUp(e); handleItemPointerUpHook(e); handleGridPointerUp(e); handleSelectPointerUp(e); handlePanEnd(e); }}
+                onPointerLeave={(e) => { handleItemPointerLeave(); handleGridPointerLeave(e); handleSelectPointerUp(e); }}
                 onWheel={handleWheel}
                 onContextMenu={(e) => e.preventDefault()}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
                 onClick={(e) => { if (e.button === 0) handleCloseMenu(); }}
-                style={{ cursor: panning ? 'grabbing' : (tool === 'none' ? 'grab' : 'default') }}
+                style={{ cursor: panning ? 'grabbing' : (tool === 'none' ? 'grab' : tool === 'select' ? (moveOffset ? 'grabbing' : 'crosshair') : 'default') }}
             >
                 <defs>
                     <BarrelSVG id="barrel" />
@@ -616,6 +813,108 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     fog={fog}
                     isLocalhost={isLocalhost}
                 />
+
+                {/* Selection overlay */}
+                {/* Live selection drag preview (dashed rect) */}
+                {selectStart.current && selectionRect && (() => {
+                    const { minX, maxX, minY, maxY } = selectionRect;
+                    return (
+                        <rect
+                            x={minX * CELL_SIZE}
+                            y={minY * CELL_SIZE}
+                            width={(maxX - minX + 1) * CELL_SIZE}
+                            height={(maxY - minY + 1) * CELL_SIZE}
+                            className="selection-preview"
+                        />
+                    );
+                })()}
+
+                {/* Committed selection outline (solid rect) */}
+                {!selectStart.current && !moveStartGrid.current && (selectedWalls.size > 0 || selectedItems.size > 0) && (() => {
+                    let mnX = Infinity, mxX = -Infinity, mnY = Infinity, mxY = -Infinity;
+                    for (const key of selectedWalls) {
+                        const [x, y] = key.split(',').map(Number);
+                        mnX = Math.min(mnX, x); mxX = Math.max(mxX, x);
+                        mnY = Math.min(mnY, y); mxY = Math.max(mxY, y);
+                    }
+                    for (const id of selectedItems) {
+                        const item = placedItems.find(i => i.id === id);
+                        if (item) {
+                            mnX = Math.min(mnX, item.gridX); mxX = Math.max(mxX, item.gridX);
+                            mnY = Math.min(mnY, item.gridY); mxY = Math.max(mxY, item.gridY);
+                        }
+                    }
+                    if (mnX === Infinity) return null;
+                    return (
+                        <rect
+                            x={mnX * CELL_SIZE}
+                            y={mnY * CELL_SIZE}
+                            width={(mxX - mnX + 1) * CELL_SIZE}
+                            height={(mxY - mnY + 1) * CELL_SIZE}
+                            className="selection-outline"
+                        />
+                    );
+                })()}
+
+                {/* Selected wall highlights */}
+                {selectedWalls.size > 0 && Array.from(selectedWalls).map(key => {
+                    const [gx, gy] = key.split(',').map(Number);
+                    return (
+                        <rect
+                            key={`sel-wall-${key}`}
+                            x={gx * CELL_SIZE}
+                            y={gy * CELL_SIZE}
+                            width={CELL_SIZE}
+                            height={CELL_SIZE}
+                            className="selection-wall"
+                        />
+                    );
+                })}
+
+                {/* Selected item highlights */}
+                {selectedItems.size > 0 && placedItems.filter(item => selectedItems.has(item.id)).map(item => {
+                    const w = (item.type === 'table' || item.type === 'bed' || item.type === 'altar' || item.type === 'bookshelf')
+                        && item.rotation !== 90 && item.rotation !== 270 ? CELL_SIZE * 2 : CELL_SIZE;
+                    const h = (item.type === 'table' || item.type === 'bed' || item.type === 'altar' || item.type === 'bookshelf')
+                        && (item.rotation === 90 || item.rotation === 270) ? CELL_SIZE * 2 : CELL_SIZE;
+                    return (
+                        <rect
+                            key={`sel-item-${item.id}`}
+                            x={item.gridX * CELL_SIZE}
+                            y={item.gridY * CELL_SIZE}
+                            width={w}
+                            height={h}
+                            className="selection-item-highlight"
+                        />
+                    );
+                })}
+
+                {/* Move drag preview (dashed rect at offset) */}
+                {moveOffset && (moveOffset.dx !== 0 || moveOffset.dy !== 0) && (selectedWalls.size > 0 || selectedItems.size > 0) && (() => {
+                    let mnX = Infinity, mxX = -Infinity, mnY = Infinity, mxY = -Infinity;
+                    for (const key of selectedWalls) {
+                        const [x, y] = key.split(',').map(Number);
+                        mnX = Math.min(mnX, x); mxX = Math.max(mxX, x);
+                        mnY = Math.min(mnY, y); mxY = Math.max(mxY, y);
+                    }
+                    for (const id of selectedItems) {
+                        const item = placedItems.find(i => i.id === id);
+                        if (item) {
+                            mnX = Math.min(mnX, item.gridX); mxX = Math.max(mxX, item.gridX);
+                            mnY = Math.min(mnY, item.gridY); mxY = Math.max(mxY, item.gridY);
+                        }
+                    }
+                    if (mnX === Infinity) return null;
+                    return (
+                        <rect
+                            x={(mnX + moveOffset.dx) * CELL_SIZE}
+                            y={(mnY + moveOffset.dy) * CELL_SIZE}
+                            width={(mxX - mnX + 1) * CELL_SIZE}
+                            height={(mxY - mnY + 1) * CELL_SIZE}
+                            className="selection-preview"
+                        />
+                    );
+                })()}
 
                   {/* Item context menu */}
                    <ItemContextMenu
