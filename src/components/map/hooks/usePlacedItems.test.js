@@ -42,78 +42,36 @@ describe('usePlacedItems', () => {
     expect(setSelectedItem).toHaveBeenCalledWith(null);
   });
 
-  it('should rotate table 90 degrees', () => {
+  it('should rotate item by 90 degrees', () => {
     const result = getHook();
     act(() => {
-      result.current.handleRotateTable('item1');
+      result.current.handleRotate('item1');
+    });
+    expect(setPlacedItems).toHaveBeenCalled();
+  });
+
+  it('should rotate item from 90 to 180 degrees', () => {
+    const result = getHook();
+    act(() => {
+      result.current.handleRotate('item2');
+    });
+    expect(setPlacedItems).toHaveBeenCalled();
+  });
+
+  it('should not close context menu on rotate', () => {
+    const result = getHook();
+    act(() => {
+      result.current.handleRotate('item1');
+    });
+    expect(setSelectedItem).not.toHaveBeenCalledWith(null);
+  });
+
+  it('should toggle door open/closed', () => {
+    const result = getHook();
+    act(() => {
+      result.current.handleToggleDoor('item1');
     });
     expect(setPlacedItems).toHaveBeenCalled();
     expect(setSelectedItem).toHaveBeenCalledWith(null);
-  });
-
-  it('should rotate bed by 90 degrees', () => {
-    const result = getHook();
-    act(() => {
-      result.current.handleRotateBed('item1');
-    });
-    expect(setPlacedItems).toHaveBeenCalled();
-    expect(setSelectedItem).toHaveBeenCalledWith(null);
-  });
-
-  it('should rotate door by 90 degrees', () => {
-    const result = getHook();
-    act(() => {
-      result.current.handleRotateDoor('item1');
-    });
-    expect(setPlacedItems).toHaveBeenCalled();
-  });
-
-  it('should rotate secret door by 90 degrees', () => {
-    const result = getHook();
-    act(() => {
-      result.current.handleRotateSecretDoor('item1');
-    });
-    expect(setPlacedItems).toHaveBeenCalled();
-  });
-
-  it('should rotate stairs by 90 degrees', () => {
-    const result = getHook();
-    act(() => {
-      result.current.handleRotateStairs('item1');
-    });
-    expect(setPlacedItems).toHaveBeenCalled();
-  });
-
-  it('should rotate torch by 90 degrees', () => {
-    const result = getHook();
-    act(() => {
-      result.current.handleRotateTorch('item1');
-    });
-    expect(setPlacedItems).toHaveBeenCalled();
-  });
-
-  it('should rotate chair by 90 degrees', () => {
-    const result = getHook();
-    act(() => {
-      result.current.handleRotateChair('item1');
-    });
-    expect(setPlacedItems).toHaveBeenCalled();
-  });
-
-  it('should rotate altar 90 degrees', () => {
-    const result = getHook();
-    act(() => {
-      result.current.handleRotateAltar('item1');
-    });
-    expect(setPlacedItems).toHaveBeenCalled();
-    expect(setSelectedItem).toHaveBeenCalledWith(null);
-  });
-
-  it('should rotate bookshelf by 90 degrees', () => {
-    const result = getHook();
-    act(() => {
-      result.current.handleRotateBookshelf('item1');
-    });
-    expect(setPlacedItems).toHaveBeenCalled();
   });
 });

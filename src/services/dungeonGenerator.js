@@ -444,21 +444,12 @@ export function generateDungeon(opts) {
       const spanWidth = isNorthSouth ? span.x2 - span.x1 + 1 : span.y2 - span.y1 + 1;
 
       // Build list of door positions for this span.
-      // Width 1 → single door at center. Width 2 → double doors.
-      // Width >= 3 → skip entirely (a corridor running past the room,
-      // not an entrance).
+      // Width 1 → single door at center.
+      // Width >= 2 → skip (corridor running past room, not a discrete entrance).
       const positions = [];
       if (spanWidth === 1) {
         const pos = spanCenter(span);
         positions.push({ x: pos.x, y: pos.y });
-      } else if (spanWidth === 2) {
-        if (isNorthSouth) {
-          positions.push({ x: span.x1, y: span.y });
-          positions.push({ x: span.x2, y: span.y });
-        } else {
-          positions.push({ x: span.x, y: span.y1 });
-          positions.push({ x: span.x, y: span.y2 });
-        }
       }
 
       for (let pi = 0; pi < positions.length; pi++) {
@@ -610,12 +601,14 @@ export function generateDungeon(opts) {
 
   function wallRotation(wall) {
     // Bookshelf SVG is 72x36 (wide). Wall-side of SVG is at top (y=2..18).
-    // rot=0: horizontal, wall-side up. rot=180: horizontal, wall-side down.
-    // rot=90: vertical, wall-side left. rot=270: vertical, wall-side right.
-    if (wall === "n") return 0;    // wall above → wall-side up
-    if (wall === "s") return 180;  // wall below → wall-side down
-    if (wall === "w") return 90;   // wall left → wall-side left
-    return 270;                     // wall right → wall-side right
+    // rot=0: horizontal, wall-side up (north wall). 
+    // rot=180: horizontal, wall-side down (south wall).
+    // rot=90: vertical, wall-side right (east wall). CW in SVG Y-down = top→right
+    // rot=270: vertical, wall-side left (west wall). CCW = top→left
+    if (wall === "n") return 0;
+    if (wall === "s") return 180;
+    if (wall === "e") return 90;
+    return 270; // west
   }
 
   function pickWall(room, rng, usedWalls) {
@@ -1009,36 +1002,28 @@ export function generateDungeon(opts) {
     }
   }
 
-  // Break up any runs of 3+ consecutive doors in the same row or column.
-  // This can happen when two rooms have adjacent door spans.
-  const doorPosSet = {};
+  // Remove adjacent door pairs from opposite sides of corridors.
+  // When a corridor separates two rooms, both place a door producing
+  // side-by-side doors. Remove the second door of each adjacent pair.
+  const doorPosSet2 = {};
   for (const d of uniqueDoors) {
-    const key = d.x + "," + d.y;
-    doorPosSet[key] = d;
+    doorPosSet2[d.x + "," + d.y] = d;
   }
-  const toRemove = new Set();
+  const toRemoveAdj = new Set();
   for (const d of uniqueDoors) {
-    // Check horizontal run starting at this door
-    let run = 1;
-    let cx = d.x;
-    while (doorPosSet[(cx + 1) + "," + d.y]) { run++; cx++; }
-    if (run >= 3) {
-      // Remove interior doors, keeping the first two
-      for (let rx = d.x + 2; rx <= cx; rx++) {
-        toRemove.add(rx + "," + d.y);
-      }
+    if (toRemoveAdj.has(d.x + "," + d.y)) continue;
+    // Check right neighbor
+    const rightKey = (d.x + 1) + "," + d.y;
+    if (doorPosSet2[rightKey] && !toRemoveAdj.has(rightKey)) {
+      toRemoveAdj.add(rightKey);
     }
-    // Check vertical run starting at this door
-    run = 1;
-    let cy = d.y;
-    while (doorPosSet[d.x + "," + (cy + 1)]) { run++; cy++; }
-    if (run >= 3) {
-      for (let ry = d.y + 2; ry <= cy; ry++) {
-        toRemove.add(d.x + "," + ry);
-      }
+    // Check bottom neighbor
+    const bottomKey = d.x + "," + (d.y + 1);
+    if (doorPosSet2[bottomKey] && !toRemoveAdj.has(bottomKey)) {
+      toRemoveAdj.add(bottomKey);
     }
   }
-  const trimmedDoors = uniqueDoors.filter(d => !toRemove.has(d.x + "," + d.y));
+  const trimmedDoors = uniqueDoors.filter(d => !toRemoveAdj.has(d.x + "," + d.y));
 
   const doorPairs = {};
   for (let d = 0; d < trimmedDoors.length; d++) {
