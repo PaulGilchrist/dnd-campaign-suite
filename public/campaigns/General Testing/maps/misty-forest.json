@@ -1919,5 +1919,6 @@
     "budgetMod": 0.8,
     "encounterMod": 5,
     "description": "Strong winds — daily budget -20%"
-  }
+  },
+  "displayName": "Misty Forest"
 }

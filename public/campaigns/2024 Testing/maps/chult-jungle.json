@@ -1909,5 +1909,7 @@
     "budgetMod": 0.75,
     "encounterMod": 20,
     "description": "Thunderstorm — terrain costs +50%, visibility limited, daily budget -25%"
-  }
+  },
+  "displayName": "Chult Jungle",
+  "name": "chult-jungle"
 }
