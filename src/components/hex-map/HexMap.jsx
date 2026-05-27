@@ -1194,7 +1194,6 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 <POIPanel
                     poiPanelOpen={poiPanelOpen}
                     onClose={() => setPoiPanelOpen(false)}
-                    characters={characters}
                 />
             )}
 
