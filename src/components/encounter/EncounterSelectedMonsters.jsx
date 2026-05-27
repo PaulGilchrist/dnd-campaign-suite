@@ -1,21 +1,23 @@
 import './EncounterBuilder.css';
 
-   function EncounterSelectedMonsters({ selectedMonsters, onRemoveMonster, onViewDetails }) {
-  if (!selectedMonsters || selectedMonsters.length === 0) {
-    return null;
-   }
+    function EncounterSelectedMonsters({ selectedMonsters, onRemoveMonster, onViewDetails }) {
+   if (!selectedMonsters || selectedMonsters.length === 0) {
+     return null;
+     }
 
-  return (
-     <div className="encounter-selected">
-       <div className="encounter-selected-title">
-        Selected Monsters ({selectedMonsters.length})
-       </div>
-       <div className="selected-list">
-         {selectedMonsters.map((monster) => (
-           <div key={monster.index} className="selected-item">
-             <span className="selected-xp">{monster.xp?.toLocaleString() ?? '-'} XP</span>
-             <span className="selected-cr">CR {monster.challenge_rating}</span>
-             <span className="selected-name">{monster.name}</span>
+   const totalMonsters = selectedMonsters.reduce((sum, m) => sum + (m.qty || 1), 0);
+
+   return (
+       <div className="encounter-selected">
+         <div className="encounter-selected-title">
+         Selected Monsters ({totalMonsters})
+         </div>
+         <div className="selected-list">
+           {selectedMonsters.map((monster) => (
+             <div key={monster.index} className="selected-item">
+               <span className="selected-xp">{(monster.xp * (monster.qty || 1)).toLocaleString()} XP</span>
+               <span className="selected-cr">CR {monster.challenge_rating}</span>
+               <span className="selected-name">{monster.name}{(monster.qty || 1) > 1 ? ` (${monster.qty})` : ''}</span>
              {onViewDetails && (
                <button
                 type="button"

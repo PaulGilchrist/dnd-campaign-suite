@@ -292,12 +292,16 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
     [monsterCount]
   );
 
-  const effectiveXP = Math.round(totalMonsterXP * difficultyMultiplier);
+   const effectiveXP = Math.round(totalMonsterXP * difficultyMultiplier);
 
-  const difficultyIndex = useMemo(
-    () => calculateDifficultyIndex(effectiveXP, totalThreshold),
-    [effectiveXP, totalThreshold]
-  );
+    // Dropdown-selected difficulty index — used only for filtering the monster table
+   const filterDifficultyIndex = parseInt(filter.difficulty, 10) || 0;
+
+    // Actual difficulty is calculated independently of the dropdown selection.
+   const actualDifficultyIndex = useMemo(() => {
+      const mediumThreshold = calculateXPThreshold(filter.playerLevels, 1);
+      return calculateDifficultyIndex(effectiveXP, mediumThreshold);
+    }, [effectiveXP, filter.playerLevels]);
 
    const filteredMonsters = useMemo(
       () => {
@@ -378,8 +382,6 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
 
   const handleSaveEncounter = () => {
     const data = {
-      difficulty: filter.difficulty,
-      playerLevels: filter.playerLevels,
       selectedMonsters: stripMonsters(selectedMonsters),
       description: description,
       lootData,
@@ -408,14 +410,10 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
    try {
      const data = await loadEncounterData(name);
      if (data) {
-       setEncounterTitle(formatEncounterName(name));
-       setCurrentEncounterName(name);
+      setEncounterTitle(formatEncounterName(name));
+      setCurrentEncounterName(name);
 
-       setFilter({
-         difficulty: data.difficulty ?? 2,
-         playerLevels: data.playerLevels || [1],
-        });
-       setDescription(data.description || '');
+      setDescription(data.description || '');
         setLootData(data.lootData || { lootEntries: [], totalEncounterXp: 0 });
                setEncounterCompleted(false);
                setCombatStarted(false);
@@ -693,7 +691,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
           filter={{
             ...filter,
             totalThreshold,
-            difficultyIndex,
+             difficultyIndex: filterDifficultyIndex,
             difficultyLabels,
             difficultyColors: ['var(--color-success)', 'var(--color-warning)', '#fd7e14', 'var(--color-error)'],
           }}
@@ -702,12 +700,12 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
           onRemovePlayer={handleRemovePlayer}
           onPlayerLevelChange={handlePlayerLevelChange}
         />
-        <EncounterSummaryPanel
-          totalMonsterXP={totalMonsterXP}
-          monsterCount={monsterCount}
-          difficultyMultiplier={difficultyMultiplier}
-          effectiveXP={effectiveXP}
-          difficultyIndex={difficultyIndex}
+          <EncounterSummaryPanel
+           totalMonsterXP={totalMonsterXP}
+           monsterCount={monsterCount}
+           difficultyMultiplier={difficultyMultiplier}
+           effectiveXP={effectiveXP}
+           difficultyIndex={actualDifficultyIndex}
           difficultyLabels={difficultyLabels}
           difficultyColors={['var(--color-success)', 'var(--color-warning)', '#fd7e14', 'var(--color-error)']}
           selectedMonsters={selectedMonsters}
