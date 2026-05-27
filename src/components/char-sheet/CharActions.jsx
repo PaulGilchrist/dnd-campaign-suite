@@ -52,7 +52,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName 
     const is2024Rules = playerStats.rules === '2024';
 
     return (
-        <div>
+        <div className="char-actions">
             <div>
                 <span className='sectionHeader'>Actions</span>
                 <div className={`attacks ${is2024Rules ? 'mastery-enabled' : ''}`}>

@@ -45,7 +45,7 @@ function WizardStepAbilities({
   const pointsRemaining = pointsAllowed - totalPointsSpent;
 
   return (
-     <div className="wizard-step wizard-step-4">
+     <div className="wizard-step wizard-step-abilities wizard-step-4">
        <h2>Step 5: Ability Scores</h2>
        <div className="step-description">
        Use point buy: Each ability base score minimum is 8 and maximum is 15. You have <span className="points-remaining">{Math.max(0, pointsRemaining)} points</span> remaining to spend.

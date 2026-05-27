@@ -223,7 +223,9 @@
     "11,13",
     "11,15",
     "15,6",
-    "16,7"
+    "16,7",
+    "14,17",
+    "17,17"
   ],
   "placedItems": [
     {
@@ -437,29 +439,29 @@
     {
       "id": "1872f3df-dfa5-45f7-993b-32072b9b0537",
       "type": "crate",
-      "gridX": 17,
-      "gridY": 17,
+      "gridX": 16,
+      "gridY": 9,
       "visible": true
     },
     {
       "id": "1dce29a3-316f-4124-9fec-e1f568da6662",
       "type": "crate",
-      "gridX": 14,
-      "gridY": 17,
+      "gridX": 17,
+      "gridY": 11,
       "visible": true
     },
     {
       "id": "91820deb-74ff-490d-b484-2ad48939ef31",
       "type": "barrel",
-      "gridX": 14,
-      "gridY": 16,
+      "gridX": 17,
+      "gridY": 10,
       "visible": true
     },
     {
       "id": "c183c062-19a8-49ba-b78f-2b9a81c407df",
       "type": "barrel",
-      "gridX": 17,
-      "gridY": 16,
+      "gridX": 16,
+      "gridY": 10,
       "visible": true
     },
     {
@@ -483,11 +485,52 @@
       "gridX": 15,
       "gridY": 6,
       "visible": true
+    },
+    {
+      "id": "c8860f5d-73ba-4bba-9963-e98b040bef67",
+      "type": "door",
+      "gridX": 16,
+      "gridY": 17,
+      "visible": true,
+      "rotation": 90
+    },
+    {
+      "id": "9c14b7ee-27a1-4c10-9c0f-da1c29409756",
+      "type": "door",
+      "gridX": 15,
+      "gridY": 17,
+      "visible": true,
+      "rotation": 90
     }
   ],
   "paintCells": [],
   "items": [],
-  "players": [],
+  "players": [
+    {
+      "id": "barbarian",
+      "name": "Barbarian",
+      "gridX": 17,
+      "gridY": 19
+    },
+    {
+      "id": "bard",
+      "name": "Bard",
+      "gridX": 16,
+      "gridY": 19
+    },
+    {
+      "id": "druid",
+      "name": "Druid",
+      "gridX": 15,
+      "gridY": 19
+    },
+    {
+      "id": "ranger",
+      "name": "Ranger",
+      "gridX": 14,
+      "gridY": 19
+    }
+  ],
   "fog": [
     "0,0",
     "1,0",

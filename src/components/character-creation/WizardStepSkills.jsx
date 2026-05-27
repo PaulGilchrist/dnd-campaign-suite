@@ -55,7 +55,7 @@ const WizardStepSkills = React.memo(function WizardStepSkills({ formData, errors
 	const isPreSelected = (skill) => (preSelectedSkills || []).includes(skill);
 
 	return (
-		<div className="wizard-step">
+		<div className="wizard-step wizard-step-skills">
 			<h2>Step 6: Skill Proficiencies</h2>
 
 			{/* Display skill limits info */}

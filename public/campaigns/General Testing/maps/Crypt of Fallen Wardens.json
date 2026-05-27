@@ -299,8 +299,8 @@
     },
     {
       "id": "chest-0",
-      "gridX": 4,
-      "gridY": 10,
+      "gridX": 3,
+      "gridY": 4,
       "type": "chest",
       "visible": true,
       "rotation": 270
@@ -354,8 +354,8 @@
     },
     {
       "id": "crate-4",
-      "gridX": 12,
-      "gridY": 3,
+      "gridX": 9,
+      "gridY": 7,
       "type": "crate",
       "visible": true
     },
@@ -369,8 +369,8 @@
     },
     {
       "id": "chest-5",
-      "gridX": 8,
-      "gridY": 8,
+      "gridX": 7,
+      "gridY": 2,
       "type": "chest",
       "visible": true,
       "rotation": 180
@@ -390,14 +390,6 @@
       "type": "door",
       "visible": true,
       "rotation": 90
-    },
-    {
-      "id": "door-2",
-      "gridX": 10,
-      "gridY": 4,
-      "type": "door",
-      "visible": true,
-      "rotation": 0
     },
     {
       "id": "door-3",
@@ -449,8 +441,8 @@
     },
     {
       "id": "npc-1",
-      "gridX": 12,
-      "gridY": 10,
+      "gridX": 11,
+      "gridY": 9,
       "type": "npc",
       "visible": false,
       "name": "Skeleton",

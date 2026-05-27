@@ -41,7 +41,7 @@
 }
 
 /* Textarea override: Notes uses taller textarea */
-.ct-textarea {
+.notes-container .ct-textarea {
   min-height: 200px;
 }
 

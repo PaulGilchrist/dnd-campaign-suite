@@ -25,7 +25,7 @@ function HiddenInput({ handleInputToggle, handleValueChange, showInput, value, d
     };
 
     return (
-         <span className='clickable'>
+          <span className='hidden-input clickable'>
              {
                 showInput ? (
                     <input

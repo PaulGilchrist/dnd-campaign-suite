@@ -1,25 +1,25 @@
-.attacks {
+.char-actions .attacks {
     display: grid;
     grid-template-columns: 120px 80px 40px 80px 70px;
     text-align: center;
 }
-.attacks > div {
+.char-actions .attacks > div {
     padding-right: 10px;
 }
 
 /* Add extra column for Mastery when using 2024 rules */
-.attacks.mastery-enabled {
+.char-actions .attacks.mastery-enabled {
     grid-template-columns: 120px 80px 40px 80px 70px 80px;
 }
 
 @media print {
-    .attacks {
+    .char-actions .attacks {
         grid-template-columns: 160px 120px 60px 120px 1fr;
     }
-    .attacks.mastery-enabled {
+    .char-actions .attacks.mastery-enabled {
         grid-template-columns: 140px 100px 50px 110px 80px 1fr;
     }
-    .attacks > div {
+    .char-actions .attacks > div {
         padding-right: 4px;
     }
 }

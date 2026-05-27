@@ -126,7 +126,7 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
   };
 
   return (
-    <div className="ct-container">
+    <div className="ct-container notes-container">
       {/* Header */}
       <div className="ct-header">
         <button className="ct-back-btn" onClick={onBack}>
