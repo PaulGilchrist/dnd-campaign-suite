@@ -812,39 +812,43 @@
   font-size: 0.85rem;
 }
 
-  .encounter-builder .encounter-xp-summary {
-    margin-top: 12px;
-    padding: 10px 12px;
-    background: rgba(255, 193, 7, 0.08);
-    border: 1px solid rgba(255, 193, 7, 0.25);
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
+    .encounter-builder .encounter-xp-summary {
+     margin-top: 12px;
+     padding: 10px 12px;
+     background: rgba(255, 193, 7, 0.08);
+     border: 1px solid rgba(255, 193, 7, 0.25);
+     border-radius: 6px;
+     display: flex;
+     align-items: center;
+     justify-content: space-between;
+     gap: 12px;
+     flex-wrap: wrap;
+    }
 
-  .encounter-builder .encounter-xp-label {
-    font-size: 0.88rem;
-    color: var(--color-warning);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
+    .encounter-builder .encounter-xp-label {
+     font-size: 0.88rem;
+     color: var(--color-warning);
+     display: flex;
+     align-items: center;
+     gap: 6px;
+    }
 
-  .encounter-builder .encounter-btn-complete {
-    background: rgba(255, 193, 7, 0.2);
-    color: var(--color-warning);
-    border-color: var(--color-warning);
-    padding: 6px 14px;
-    font-size: 0.85rem;
-    white-space: nowrap;
-  }
+    .encounter-builder .encounter-btn-complete {
+     display: inline-flex !important;
+     align-items: center !important;
+     justify-content: center !important;
+     gap: 6px !important;
+     background: rgba(255, 193, 7, 0.2) !important;
+     color: var(--color-warning) !important;
+     border-color: var(--color-warning) !important;
+     padding: 6px 14px !important;
+     font-size: 0.85rem !important;
+     white-space: nowrap !important;
+    }
 
-  .encounter-builder .encounter-btn-complete:hover {
-    background: rgba(255, 193, 7, 0.35);
-  }
+    .encounter-builder .encounter-btn-complete:hover {
+     background: rgba(255, 193, 7, 0.35) !important;
+    }
 
   .encounter-builder .encounter-xp-complete {
     color: var(--color-success);
