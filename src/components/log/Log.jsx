@@ -56,19 +56,45 @@ function RollEntry({ entry }) {
 }
 
 function NoteEntry({ entry }) {
-  return (
-    <div className="log-entry log-note">
-      <div className="log-entry-header">
-        <span className="log-icon"><i className="fas fa-comment-dots"></i></span>
-        <span className="log-character">{entry.characterName}</span>
-        <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
+   return (
+      <div className="log-entry log-note">
+        <div className="log-entry-header">
+          <span className="log-icon"><i className="fas fa-comment-dots"></i></span>
+          <span className="log-character">{entry.characterName}</span>
+          <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
+        </div>
+        <div className="log-note-text">{entry.noteText}</div>
       </div>
-      <div className="log-note-text">{entry.message}</div>
-    </div>
-  );
+   );
 }
 
-const TRAVEL_ACTION_CONFIG = {
+ function LootEntry({ entry }) {
+   return (
+      <div className="log-entry log-loot">
+        <div className="log-entry-header">
+          <span className="log-icon"><i className="fas fa-coins"></i></span>
+          <span className="log-name">Loot &amp; XP Awarded</span>
+          <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
+        </div>
+        <div className="log-loot-details">
+           {entry.xpPerChar && entry.xpPerChar > 0 && (
+             <span className="log-loot-xp">
+               <i className="fas fa-star"></i>&nbsp;{entry.xpPerChar.toLocaleString()} XP per character
+             </span>
+            )}
+          {entry.lootItems && entry.lootItems.length > 0 && (
+            <ul className="log-loot-items">
+              {entry.lootItems.map((item, i) => (
+                <li key={i} className="log-loot-item">{item}</li>
+                 ))}
+             </ul>
+            )}
+        </div>
+      </div>
+     );
+    }
+
+ const TRAVEL_ACTION_CONFIG = {
   advance:           { icon: 'fa-person-walking',     label: 'Advanced to',        color: '#4a90d9' },
   advance_with_event:{ icon: 'fa-bolt',               label: 'Event triggered at', color: '#e87040' },
   arrived:           { icon: 'fa-flag-checkered',     label: 'Arrived at',         color: '#4CAF50' },
@@ -181,8 +207,9 @@ export default function Log({ campaignName, characters }) {
           <div key={entry.id}>
             {entry.type === 'roll' && <RollEntry entry={entry}/>}
             {entry.type === 'note' && <NoteEntry entry={entry}/>}
-            {entry.type === 'travel' && <TravelEntry entry={entry}/>}
-          </div>
+              {entry.type === 'travel' && <TravelEntry entry={entry}/>}
+              {entry.type === 'loot' && <LootEntry entry={entry}/>}
+              </div>
         ))}
       </div>
     </div>

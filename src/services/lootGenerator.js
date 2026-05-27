@@ -50,6 +50,31 @@ function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+export function normalizeCurrency(totalGP) {
+  const totalCP = Math.round(totalGP * 100);
+  const cpRemainder = totalCP % 10;
+  let spTotal = Math.floor(totalCP / 10);
+  const spRemainder = spTotal % 10;
+  let gpTotal = Math.floor(spTotal / 10);
+  const gpRemainder = gpTotal % 10;
+  const pp = Math.floor(gpTotal / 10);
+  return { pp, gp: gpRemainder, sp: spRemainder, cp: cpRemainder };
+}
+
+export function formatCurrencyString(currency) {
+  const parts = [];
+  if (currency.pp) parts.push(`${currency.pp} platinum piece${currency.pp !== 1 ? 's' : ''}`);
+  if (currency.gp) parts.push(`${currency.gp} gold piece${currency.gp !== 1 ? 's' : ''}`);
+  if (currency.sp) parts.push(`${currency.sp} silver coin${currency.sp !== 1 ? 's' : ''}`);
+  if (currency.cp) parts.push(`${currency.cp} copper coin${currency.cp !== 1 ? 's' : ''}`);
+  return parts.length ? parts.join(', ') : '0 platinum pieces';
+}
+
+export function calculateEncounterXp(selectedMonsters) {
+  if (!selectedMonsters || !selectedMonsters.length) return 0;
+  return selectedMonsters.reduce((sum, m) => sum + (m.xp || 0) * (m.qty || 1), 0);
+}
+
 function pick(arr) {
   if (!arr || !arr.length) return null;
   return arr[randInt(0, arr.length - 1)];
@@ -105,22 +130,22 @@ function generateCurrencyEntry(tier, totalValueGP) {
   if (units.length === 0) return null;
 
   const unit = weightedPick(units, weights);
-  const pluralNames = { cp: 'copper coins', sp: 'silver coins', gp: 'gold pieces', pp: 'platinum pieces' };
+  const toGP = { cp: 0.01, sp: 0.1, gp: 1, pp: 100 };
 
   let qty;
   if (unit === 'pp') {
     const maxPP = Math.max(1, Math.floor(totalValueGP / 100));
     qty = randInt(Math.max(1, Math.floor(maxPP * 0.3)), maxPP);
-  } else if (unit === 'gp') {
+   } else if (unit === 'gp') {
     qty = randInt(Math.max(1, Math.floor(totalValueGP * 0.2)), Math.max(1, Math.floor(totalValueGP)));
-  } else if (unit === 'sp') {
+   } else if (unit === 'sp') {
     qty = randInt(Math.max(1, Math.floor(totalValueGP * 2)), Math.max(1, Math.floor(totalValueGP * 10)));
-  } else {
+   } else {
     const maxCP = Math.max(1, Math.floor(totalValueGP * 100));
     qty = randInt(Math.max(1, Math.floor(maxCP * 0.3)), maxCP);
-  }
+   }
 
-  return `${qty} ${pluralNames[unit]}`;
+  return qty * (toGP[unit] || 0);
 }
 
 function generateGemEntry(tier) {
@@ -238,14 +263,17 @@ async function loadJSONData(file) {
 }
 
 export async function generateLootSuggestions(selectedMonsters) {
-  if (!selectedMonsters || !selectedMonsters.length) return [];
+  if (!selectedMonsters || !selectedMonsters.length) {
+    return { lootEntries: [], totalEncounterXp: 0 };
+  }
 
   const [magicItemsData, equipmentData] = await Promise.all([
     loadJSONData('magic-items.json'),
     loadJSONData('equipment.json'),
-  ]);
+    ]);
 
-  const lootEntries = [];
+  const currencyGP = [];
+  const otherEntries = [];
 
   for (const monster of selectedMonsters) {
     const qty = monster.qty || 1;
@@ -266,22 +294,39 @@ export async function generateLootSuggestions(selectedMonsters) {
       if (roll < 0.65) {
         const share = totalValueForTier(tier) / numEntries;
         entry = generateCurrencyEntry(tier, share);
-      } else if (roll < 0.82) {
+        if (typeof entry === 'number' && entry > 0) currencyGP.push(entry);
+        } else if (roll < 0.82) {
         entry = generateGemEntry(tier);
-      } else if (roll < 0.94) {
+        if (entry) otherEntries.push(entry);
+        } else if (roll < 0.94) {
         entry = generateEquipmentEntry(equipmentData, tier);
-      } else {
-        entry = generateMagicItemEntry(magicItemsData);
+        if (entry) otherEntries.push(entry);
+          } else {
+         entry = generateMagicItemEntry(magicItemsData);
+         if (entry) otherEntries.push(entry);
+         }
+        }
       }
 
-      if (entry) lootEntries.push(entry);
+   const lootEntries = [];
+   if (currencyGP.length > 0) {
+     const totalCurrencyGP = currencyGP.reduce((s, v) => s + v, 0);
+     const normalized = normalizeCurrency(totalCurrencyGP);
+     const formatted = formatCurrencyString(normalized);
+     if (formatted && formatted !== '0 platinum pieces') lootEntries.push(formatted);
     }
-  }
 
-  if (lootEntries.length === 0) {
-    lootEntries.push('No loot for these monsters');
-   }
-  return lootEntries;
+   for (const entry of otherEntries) {
+     lootEntries.push(entry);
+    }
+
+   if (lootEntries.length === 0) {
+     lootEntries.push('No loot for these monsters');
+    }
+
+   const totalEncounterXp = calculateEncounterXp(selectedMonsters);
+
+   return { lootEntries, totalEncounterXp };
 }
 
 function getTreasureFrequency(cr) {
