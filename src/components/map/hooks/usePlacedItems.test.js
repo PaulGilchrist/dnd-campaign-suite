@@ -4,7 +4,7 @@ import usePlacedItems from './usePlacedItems.js';
 
 describe('usePlacedItems', () => {
   let setPlacedItems;
-  let setSelectedBarrel;
+  let setSelectedItem;
 
   beforeEach(() => {
     setPlacedItems = vi.fn((fn) => {
@@ -17,11 +17,11 @@ describe('usePlacedItems', () => {
       }
       return fn;
     });
-    setSelectedBarrel = vi.fn();
+    setSelectedItem = vi.fn();
   });
 
   const getHook = () => {
-    const { result } = renderHook(() => usePlacedItems(setPlacedItems, setSelectedBarrel));
+    const { result } = renderHook(() => usePlacedItems(setPlacedItems, setSelectedItem));
     return result;
   };
 
@@ -39,7 +39,7 @@ describe('usePlacedItems', () => {
       result.current.handleDeleteItem('item1');
     });
     expect(setPlacedItems).toHaveBeenCalled();
-    expect(setSelectedBarrel).toHaveBeenCalledWith(null);
+    expect(setSelectedItem).toHaveBeenCalledWith(null);
   });
 
   it('should rotate table 90 degrees', () => {
@@ -48,7 +48,7 @@ describe('usePlacedItems', () => {
       result.current.handleRotateTable('item1');
     });
     expect(setPlacedItems).toHaveBeenCalled();
-    expect(setSelectedBarrel).toHaveBeenCalledWith(null);
+    expect(setSelectedItem).toHaveBeenCalledWith(null);
   });
 
   it('should rotate bed by 90 degrees', () => {
@@ -57,7 +57,7 @@ describe('usePlacedItems', () => {
       result.current.handleRotateBed('item1');
     });
     expect(setPlacedItems).toHaveBeenCalled();
-    expect(setSelectedBarrel).toHaveBeenCalledWith(null);
+    expect(setSelectedItem).toHaveBeenCalledWith(null);
   });
 
   it('should rotate door by 90 degrees', () => {
@@ -106,7 +106,7 @@ describe('usePlacedItems', () => {
       result.current.handleRotateAltar('item1');
     });
     expect(setPlacedItems).toHaveBeenCalled();
-    expect(setSelectedBarrel).toHaveBeenCalledWith(null);
+    expect(setSelectedItem).toHaveBeenCalledWith(null);
   });
 
   it('should rotate bookshelf by 90 degrees', () => {

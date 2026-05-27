@@ -340,7 +340,7 @@
 }
 
 /* Barrel hit area for context menu (localhost only) */
-.map .barrel-hit-area {
+.map .item-hit-area {
     fill: transparent;
     cursor: pointer;
     pointer-events: all;
@@ -361,17 +361,17 @@
 }
 
 /* Active drag cursor for item hit areas */
-.map .barrel-hit-area:active {
+.map .item-hit-area:active {
     cursor: grabbing;
 }
 
 /* Barrel context menu */
-.map .barrel-context-menu {
+.map .item-context-menu {
     pointer-events: all;
     cursor: default;
 }
 
-.map .barrel-context-menu rect {
+.map .item-context-menu rect {
     rx: 4;
 }
 

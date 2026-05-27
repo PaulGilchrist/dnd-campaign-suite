@@ -33,7 +33,7 @@ import PlacedItems from './PlacedItems.jsx';
 import GridAndWalls from './GridAndWalls.jsx';
 import Players from './Players.jsx';
 import FogOverlay from './FogOverlay.jsx';
-import BarrelContextMenu from './BarrelContextMenu.jsx';
+import ItemContextMenu from './ItemContextMenu.jsx';
 import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx';
 import usePlacedItems from './hooks/usePlacedItems.js';
 import usePlayerDragging from './hooks/usePlayerDragging';
@@ -75,9 +75,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const [itemsPanelOpen, setItemsPanelOpen] = useState(false);
     const [placedItems, setPlacedItems] = useState([]);
 
-    // Barrel context menu state
-    const [selectedBarrel, setSelectedBarrel] = useState(null); // { id, gridX, gridY }
-    const [renamePopover, setRenamePopover] = useState(null); // { barrelId, name } | null
+    // Item context menu state
+    const [selectedItem, setSelectedItem] = useState(null); // { id, gridX, gridY }
+    const [renamePopover, setRenamePopover] = useState(null); // { itemId, name } | null
 
     // Monster card modal state
     const [viewingMonster, setViewingMonster] = useState(null);
@@ -89,8 +89,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     }, []);
 
     // Handle "View Stats" for NPC context menu
-    const handleViewStats = useCallback((barrelId) => {
-        const item = placedItems.find(i => i.id === barrelId);
+    const handleViewStats = useCallback((itemId) => {
+        const item = placedItems.find(i => i.id === itemId);
         if (!item || item.type !== 'npc') return;
         const baseName = (item.name || '').replace(/\s+\d+$/, '');
         const monster = (monstersLoaded || []).find(
@@ -102,14 +102,14 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     }, [placedItems, monstersLoaded]);
 
     const monsterFound = useMemo(() => {
-        if (!selectedBarrel) return false;
-        const item = placedItems.find(i => i.id === selectedBarrel.id);
+        if (!selectedItem) return false;
+        const item = placedItems.find(i => i.id === selectedItem.id);
         if (!item || item.type !== 'npc') return false;
         const baseName = (item.name || '').replace(/\s+\d+$/, '');
         return (monstersLoaded || []).some(
             m => m.name.toLowerCase() === baseName.toLowerCase()
         );
-    }, [selectedBarrel, placedItems, monstersLoaded]);
+    }, [selectedItem, placedItems, monstersLoaded]);
 
     // Player context menu state
     const [selectedPlayer, setSelectedPlayer] = useState(null); // { id, name, gridX, gridY } | null
@@ -435,7 +435,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             )
         );
         setRenamePopover(null);
-        setSelectedBarrel(null);
+        setSelectedItem(null);
         // Clear the cached image so it gets recomputed
         setNpcImages(prev => ({ ...prev, [itemId]: null }));
     }, [setNpcImages]);
@@ -453,7 +453,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         handleRotateBookshelf,
         handleRotateTorch,
         handleRotateChair,
-    } = usePlacedItems(setPlacedItems, setSelectedBarrel);
+    } = usePlacedItems(setPlacedItems, setSelectedItem);
 
     const handleRemovePlayer = useCallback((playerId) => {
         setMapData(prev => ({
@@ -465,13 +465,13 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
 // Close context menu
     const handleCloseMenu = useCallback(() => {
-        setSelectedBarrel(null);
+        setSelectedItem(null);
         setSelectedPlayer(null);
         setRenamePopover(null);
        }, []);
 
     // Open rename autocomplete as HTML overlay positioned near the context menu
-        const handleRenameClicked = (event, barrel, defaultName) => {
+        const handleRenameClicked = (event, item, defaultName) => {
             if (!svgRef.current) return;
             const svgRect = svgRef.current.getBoundingClientRect();
 
@@ -481,14 +481,14 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             const scaleX = svgRect.width / (SVG_SIZE / zoom);
             const scaleY = svgRect.height / (SVG_SIZE / zoom);
 
-            const menuSvgX = gridCenterX(barrel.gridX) + 10;
-            const menuSvgY = gridCenterY(barrel.gridY) + 10;
+            const menuSvgX = gridCenterX(item.gridX) + 10;
+            const menuSvgY = gridCenterY(item.gridY) + 10;
 
             const domX = svgRect.left + (menuSvgX - vbX) * scaleX;
             const domY = svgRect.top + (menuSvgY - vbY) * scaleY + 80;
 
-            setSelectedBarrel(null);
-            setRenamePopover({ barrelId: barrel.id, name: defaultName || 'NPC', position: { left: `${domX}px`, top: `${domY}px` } });
+            setSelectedItem(null);
+            setRenamePopover({ itemId: item.id, name: defaultName || 'NPC', position: { left: `${domX}px`, top: `${domY}px` } });
              };
 
     // Sync state to refs so handleWheel always reads latest values
@@ -594,7 +594,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     fog={fog}
                     gridCenterX={gridCenterX}
                     gridCenterY={gridCenterY}
-                    setSelectedBarrel={setSelectedBarrel}
+                    setSelectedItem={setSelectedItem}
                     npcImages={npcImages}
                     itemDragging={itemDragging}
                     handleItemPointerDown={handleItemPointerDown}
@@ -606,8 +606,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 />
 
                   {/* Item context menu */}
-                   <BarrelContextMenu
-                      selectedBarrel={selectedBarrel}
+                   <ItemContextMenu
+                      selectedItem={selectedItem}
                       placedItems={placedItems}
                       gridCenterX={gridCenterX}
                       gridCenterY={gridCenterY}
@@ -634,7 +634,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     const menuX = gridCenterX(selectedPlayer.gridX) + 10;
                     const menuY = gridCenterY(selectedPlayer.gridY) + 10;
                     return (
-                        <g className="barrel-context-menu" onClick={(e) => e.stopPropagation()}>
+                        <g className="item-context-menu" onClick={(e) => e.stopPropagation()}>
                             <g>
                                 <rect x={menuX} y={menuY} width="120" height="36" rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
                                 <text
@@ -666,10 +666,10 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
               {/* NPC Rename Autocomplete Overlay */}
                   {renamePopover && (
                       <MonsterNameAutocomplete
-                        key={renamePopover.barrelId}
+                        key={renamePopover.itemId}
                         value={renamePopover.name}
                         position={renamePopover.position}
-                        onCommit={(newName) => handleRenameItem(renamePopover.barrelId, newName)}
+                        onCommit={(newName) => handleRenameItem(renamePopover.itemId, newName)}
                     />
                  )}
 

@@ -8,7 +8,7 @@ function PlacedItems({
     fog,
     gridCenterX,
     gridCenterY,
-    setSelectedBarrel,
+    setSelectedItem,
     npcImages,
     itemDragging,
     handleItemPointerDown,
@@ -22,9 +22,9 @@ function PlacedItems({
                 <use href="#barrel" x={cx - 18} y={cy - 18} opacity={isLocalhost ? (item.visible ? 1 : 0.5) : 1} />
                 {isLocalhost && (
                     <>
-                        <circle cx={cx} cy={cy} r={RADIUS} fill="transparent" className="barrel-hit-area"
+                        <circle cx={cx} cy={cy} r={RADIUS} fill="transparent" className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <circle cx={cx} cy={cy} r={RADIUS + 4} fill="none" className="reposition-highlight" />
@@ -49,9 +49,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - tableW / 2} y={cy - tableH / 2} width={tableW} height={tableH} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - tableW / 2} y={cy - tableH / 2} width={tableW} height={tableH} fill="none" className="reposition-highlight" />
@@ -76,9 +76,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - bedW / 2} y={cy - bedH / 2} width={bedW} height={bedH} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - bedW / 2} y={cy - bedH / 2} width={bedW} height={bedH} fill="none" className="reposition-highlight" />
@@ -99,9 +99,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <circle cx={cx} cy={cy} r={18} fill="none" className="reposition-highlight" />
@@ -140,9 +140,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
@@ -164,9 +164,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
@@ -187,9 +187,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
@@ -210,9 +210,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
@@ -234,9 +234,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
@@ -261,9 +261,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - altarW / 2} y={cy - altarH / 2} width={altarW} height={altarH} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - altarW / 2} y={cy - altarH / 2} width={altarW} height={altarH} fill="none" className="reposition-highlight" />
@@ -289,9 +289,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} fill="none" className="reposition-highlight" />
@@ -313,9 +313,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
@@ -336,9 +336,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
@@ -359,9 +359,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
@@ -382,9 +382,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
@@ -405,9 +405,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
@@ -428,9 +428,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
@@ -452,9 +452,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
@@ -475,9 +475,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
@@ -550,7 +550,7 @@ function PlacedItems({
                             height={RADIUS * 2}
                             fill="transparent"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }}
                         />
                         {itemDragging?.itemId === item.id && (
@@ -572,9 +572,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
@@ -595,9 +595,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />
@@ -618,9 +618,9 @@ function PlacedItems({
                 {isLocalhost && (
                     <>
                         <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="transparent"
-                            className="barrel-hit-area"
+                            className="item-hit-area"
                             onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedBarrel({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
+                            onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItem({ id: item.id, gridX: item.gridX, gridY: item.gridY }); }}
                             style={{ cursor: 'grab' }} />
                         {itemDragging?.itemId === item.id && (
                             <rect x={cx - 18} y={cy - 18} width={36} height={36} fill="none" className="reposition-highlight" />

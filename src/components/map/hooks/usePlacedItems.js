@@ -1,4 +1,4 @@
-function usePlacedItems(setPlacedItems, setSelectedBarrel) {
+function usePlacedItems(setPlacedItems, setSelectedItem) {
     const handleToggleItemVisibility = (itemId) => {
         setPlacedItems(prev =>
             prev.map(item =>
@@ -9,7 +9,7 @@ function usePlacedItems(setPlacedItems, setSelectedBarrel) {
 
     const handleDeleteItem = (itemId) => {
         setPlacedItems(prev => prev.filter(item => item.id !== itemId));
-        setSelectedBarrel(null);
+        setSelectedItem(null);
     };
 
 
@@ -19,7 +19,7 @@ function usePlacedItems(setPlacedItems, setSelectedBarrel) {
                 item.id === itemId ? { ...item, rotation: (item.rotation || 0) === 0 ? 90 : 0 } : item
             )
         );
-        setSelectedBarrel(null);
+        setSelectedItem(null);
     };
 
     const handleRotateBed = (itemId) => {
@@ -28,7 +28,7 @@ function usePlacedItems(setPlacedItems, setSelectedBarrel) {
                 item.id === itemId ? { ...item, rotation: ((item.rotation || 0) + 90) % 360 } : item
             )
         );
-        setSelectedBarrel(null);
+        setSelectedItem(null);
     };
 
     const handleToggleDoor = (itemId) => {
@@ -39,7 +39,7 @@ function usePlacedItems(setPlacedItems, setSelectedBarrel) {
                     : item
             )
         );
-        setSelectedBarrel(null);
+        setSelectedItem(null);
     };
 
     const handleRotateDoor = (id) => {
@@ -93,7 +93,7 @@ function usePlacedItems(setPlacedItems, setSelectedBarrel) {
                 item.id === itemId ? { ...item, rotation: (item.rotation || 0) === 0 ? 90 : 0 } : item
             )
         );
-        setSelectedBarrel(null);
+        setSelectedItem(null);
     };
 
     const handleRotateBookshelf = (id) => {

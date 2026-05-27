@@ -796,16 +796,7 @@ export function generateDungeon(opts) {
     players: [],
     zoom: 1,
     panX: 0,
-    panY: 0,
-    fog: (function() {
-      const allCells = [];
-      for (let y = 0; y < gridSize; y++) {
-        for (let x = 0; x < gridSize; x++) {
-          allCells.push(x + "," + y);
-        }
-      }
-      return allCells;
-    })(),
+    panY: 0
   };
 }
 

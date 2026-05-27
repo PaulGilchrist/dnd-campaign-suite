@@ -273,7 +273,7 @@ main.jsx
         ├── EncounterBuilder → EncounterFilterPanel, EncounterGeneratorModal, EncounterModal, EncounterMonsterTable, EncounterSelectedMonsters, EncounterSummaryPanel
         ├── HexMap → HexGridLayer, TerrainLayer, POILayer, RiverLayer, RoadLayer, PartyMarkerLayer, TravelPathLayer, WeatherOverlay, MarchingOrderPanel, TravelPanel, EventDialog, POIContextMenu, POIPanel, 9 SVG icons
         │     └── useHexMapSSESync
-        ├── Map → GridAndWalls, PlacedItems, Players, ItemsPanel, FogOverlay, MapToolbar, 20+ SVG components, BarrelContextMenu
+        ├── Map → GridAndWalls, PlacedItems, Players, ItemsPanel, FogOverlay, MapToolbar, 20+ SVG components, ItemContextMenu
         │     ├── useItemDragging, useNpcImageCache, usePlacedItems, usePlayerDragging, useSSESync
         ├── MapsManager → GenerateDungeonModal, GenerateTerrainModal
         ├── Factions

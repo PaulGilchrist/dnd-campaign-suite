@@ -221,7 +221,9 @@
     "10,11",
     "9,11",
     "11,13",
-    "11,15"
+    "11,15",
+    "15,6",
+    "16,7"
   ],
   "placedItems": [
     {
@@ -467,6 +469,20 @@
       "gridY": 4,
       "visible": true,
       "rotation": 90
+    },
+    {
+      "id": "94103d03-c0b8-4404-bbda-30361cd9aa6a",
+      "type": "secretDoor",
+      "gridX": 16,
+      "gridY": 7,
+      "visible": true
+    },
+    {
+      "id": "eb255009-d8ef-46a8-861c-128a2baeb3b5",
+      "type": "secretDoor",
+      "gridX": 15,
+      "gridY": 6,
+      "visible": true
     }
   ],
   "paintCells": [],
