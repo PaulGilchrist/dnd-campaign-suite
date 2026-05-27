@@ -7,7 +7,7 @@ import * as mapsService from '../../services/mapsService.js';
 vi.mock('../../services/dungeonGenerator.js', () => ({
   generateDungeon: vi.fn(() => ({
     name: 'test-dungeon',
-    gridSize: 20,
+    gridSize: 30,
     walls: [],
     doors: [],
   })),
@@ -47,29 +47,21 @@ describe('GenerateDungeonModal', () => {
 
   it('should render grid size input with default value', () => {
     render(<GenerateDungeonModal {...props} />);
-    const inputs = screen.getAllByDisplayValue('20');
+    const inputs = screen.getAllByDisplayValue('30');
     expect(inputs[0]).toBeInTheDocument();
     expect(inputs[0].type).toBe('number');
   });
 
-  it('should render room range inputs', () => {
+  it('should render density slider', () => {
     render(<GenerateDungeonModal {...props} />);
-    const inputs = document.querySelectorAll('.dungeon-gen-room-range input');
-    expect(inputs.length).toBe(2);
+    const slider = document.querySelector('input[type="range"]');
+    expect(slider).toBeInTheDocument();
+    expect(slider.value).toBe('50');
   });
 
   it('should render seed input', () => {
     render(<GenerateDungeonModal {...props} />);
     expect(screen.getByPlaceholderText('Random if empty')).toBeInTheDocument();
-  });
-
-  it('should update room range when grid size changes', () => {
-    render(<GenerateDungeonModal {...props} />);
-    const gridInput = screen.getAllByDisplayValue('20')[0];
-    fireEvent.change(gridInput, { target: { value: '30' } });
-    const rangeInputs = document.querySelectorAll('.dungeon-gen-room-range input');
-    expect(rangeInputs[0].value).toBe('12');
-    expect(rangeInputs[1].value).toBe('30');
   });
 
   it('should disable generate button when map name is empty', () => {
@@ -82,21 +74,6 @@ describe('GenerateDungeonModal', () => {
     render(<GenerateDungeonModal {...props} />);
     fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), {
       target: { value: 'My Dungeon' },
-    });
-    const btn = screen.getByText('Generate').closest('button');
-    expect(btn.disabled).toBe(false);
-  });
-
-  it('should disable generate button when name is empty', () => {
-    render(<GenerateDungeonModal {...props} />);
-    const btn = screen.getByText('Generate').closest('button');
-    expect(btn.disabled).toBe(true);
-  });
-
-  it('should enable generate button when name is provided', () => {
-    render(<GenerateDungeonModal {...props} />);
-    fireEvent.change(screen.getByPlaceholderText('e.g. Goblin Hideout'), {
-      target: { value: 'Test Map' },
     });
     const btn = screen.getByText('Generate').closest('button');
     expect(btn.disabled).toBe(false);
@@ -165,6 +142,6 @@ describe('GenerateDungeonModal', () => {
 
   it('should show grid size hint', () => {
     render(<GenerateDungeonModal {...props} />);
-    expect(screen.getByText(/20 ft/)).toBeInTheDocument();
+    expect(screen.getByText(/30 ft/)).toBeInTheDocument();
   });
 });

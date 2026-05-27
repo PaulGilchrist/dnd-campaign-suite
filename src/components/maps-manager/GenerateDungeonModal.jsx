@@ -1,19 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { generateDungeon } from '../../services/dungeonGenerator.js';
 import * as mapsService from '../../services/mapsService.js';
 import './GenerateDungeonModal.css';
 
 function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCreated }) {
     const [mapName, setMapName] = useState(initialMapName || '');
-    const [gridSize, setGridSize] = useState(20);
-    const [numRooms, setNumRooms] = useState({ min: Math.round(4*gridSize/10), max: Math.round(10*gridSize/10) });
+    const [gridSize, setGridSize] = useState(30);
+    const [density, setDensity] = useState(50);
     const [seed, setSeed] = useState('');
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState(null);
-
-    useEffect(() => {
-        setNumRooms({ min: Math.round(4 * gridSize / 10), max: Math.round(10 * gridSize / 10) });
-    }, [gridSize]);
 
     const handleGenerate = async () => {
         const name = mapName.trim();
@@ -33,7 +29,7 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
             const seedValue = seed ? parseInt(seed, 10) : Math.floor(Math.random() * 2147483647);
             const result = generateDungeon({
                 gridSize: safeGridSize,
-                numRooms: [numRooms.min, numRooms.max],
+                density: density / 100,
                 seed: seedValue,
             });
 
@@ -84,24 +80,20 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                     </label>
 
                     <label className="dungeon-gen-field">
-                        <span>Rooms (min &ndash; max)</span>
-                        <div className="dungeon-gen-room-range">
-                            <input
-                                type="number"
-                                min={2}
-                                max={numRooms.max}
-                                value={numRooms.min}
-                                onChange={e => setNumRooms(prev => ({ ...prev, min: Math.max(2, Number(e.target.value)) }))}
-                            />
-                            <span className="dungeon-gen-range-sep">&ndash;</span>
-                            <input
-                                type="number"
-                                min={numRooms.min}
-                                max={50}
-                                value={numRooms.max}
-                                onChange={e => setNumRooms(prev => ({ ...prev, max: Number(e.target.value) }))}
-                            />
-                        </div>
+                        <span>Density: {density}%</span>
+                        <input
+                            type="range"
+                            min={10}
+                            max={100}
+                            step={10}
+                            value={density}
+                            onChange={e => setDensity(Number(e.target.value))}
+                        />
+                        <span className="dungeon-gen-hint">
+                            {density <= 30 ? 'Sparse — wide halls, fewer rooms' :
+                             density <= 60 ? 'Moderate — balanced layout' :
+                             'Dense — many rooms, tight corridors'}
+                        </span>
                     </label>
 
                     <label className="dungeon-gen-field">

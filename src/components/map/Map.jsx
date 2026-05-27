@@ -48,7 +48,7 @@ import '../hex-map/HexMap.css';
 const CELL_SIZE = 40;
 
 function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncounterCreated, onPoiEntered }) {
-    const [gridSize, setGridSize] = useState(20);
+    const [gridSize, setGridSize] = useState(30);
     const SVG_SIZE = gridSize * CELL_SIZE;
     const [mapData, setMapData] = useState(null);
     const svgRef = useRef(null);
@@ -483,7 +483,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                         ? new Set(existing.walls)
                         : new Set();
                     setMapData({ ...existing, walls });
-                    setGridSize(existing.gridSize || 20);
+                    setGridSize(existing.gridSize || 30);
                     setPlacedItems(existing.placedItems || []);
 
                     // Remove players whose characters no longer exist in the campaign

@@ -5,9 +5,9 @@
  * src/services/dungeonGenerator.js. All generation logic lives there.
  *
  * Usage:
- *   node dungeon-generator.mjs --grid-size 30 --rooms 6-10 --seed 42 --ascii
- *   node dungeon-generator.mjs --grid-size 30 --rooms 6-10 --seed 42 --output dungeon.json
- *   node dungeon-generator.mjs --grid-size 30 --rooms 6-10 --count 5 --output batch.json
+ *   node dungeon-generator.mjs --grid-size 30 --density 0.5 --seed 42 --ascii
+ *   node dungeon-generator.mjs --grid-size 30 --density 0.5 --seed 42 --output dungeon.json
+ *   node dungeon-generator.mjs --grid-size 30 --density 0.5 --count 5 --output batch.json
  */
 
 const { generateDungeon, visualize } = await import('./src/services/dungeonGenerator.js');
@@ -19,8 +19,7 @@ const get = function (flag) {
 };
 
 const gridSize = parseInt(get('--grid-size') || get('-g') || '30', 10);
-const roomStr = get('--rooms') || get('-r') || '6-10';
-const parts = roomStr.split('-').map(Number);
+const density = parseFloat(get('--density') || get('-d') || '0.5');
 const seed = get('--seed') ? parseInt(get('--seed'), 10) : undefined;
 const showAscii = args.includes('--ascii') || args.includes('-a');
 const output = get('--output') || get('-o');
@@ -35,7 +34,7 @@ const sanitizeFilename = (s) => {
 for (let i = 0; i < count; i++) {
   const map = generateDungeon({
     gridSize,
-    numRooms: [parts[0], parts[1] || parts[0]],
+    density,
     seed: seed != null ? seed + i : undefined,
   });
 
