@@ -17,11 +17,14 @@ export default function usePlayerDragging({
         e.preventDefault();
         const svg = svgRef.current;
         if (!svg) return;
+        svg.setPointerCapture(e.pointerId);
 
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
+        const pt = svg.createSVGPoint();
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+        const ctm = svg.getScreenCTM();
+        if (!ctm) return;
+        const svgPt = pt.matrixTransform(ctm.inverse());
 
         const player = mapData.players.find((c) => c.id === playerId);
         if (!player) return;
@@ -31,8 +34,9 @@ export default function usePlayerDragging({
 
         setDragging({
             playerId,
-            offsetX: svgX - cx,
-            offsetY: svgY - cy
+            pointerId: e.pointerId,
+            offsetX: svgPt.x - cx,
+            offsetY: svgPt.y - cy
         });
     }, [mapData, gridCenterX, gridCenterY, svgRef]);
 
@@ -43,16 +47,18 @@ export default function usePlayerDragging({
         const svg = svgRef.current;
         if (!svg) return;
 
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
+        const pt = svg.createSVGPoint();
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+        const ctm = svg.getScreenCTM();
+        if (!ctm) return;
+        const svgPt = pt.matrixTransform(ctm.inverse());
 
         const player = mapData.players.find((c) => c.id === dragging.playerId);
         if (!player) return;
 
-        const cx = svgX - dragging.offsetX;
-        const cy = svgY - dragging.offsetY;
+        const cx = svgPt.x - dragging.offsetX;
+        const cy = svgPt.y - dragging.offsetY;
 
         const gridX = Math.floor(cx / CELL_SIZE);
         const gridY = Math.floor(cy / CELL_SIZE);
@@ -73,12 +79,13 @@ export default function usePlayerDragging({
         e.preventDefault();
 
         const svg = svgRef.current;
-        if (!svg) return;
 
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
+        const pt = svg.createSVGPoint();
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+        const ctm = svg.getScreenCTM();
+        if (!ctm) { setDragging(null); return; }
+        const svgPt = pt.matrixTransform(ctm.inverse());
 
         const player = mapData.players.find((c) => c.id === dragging.playerId);
         if (!player) {
@@ -86,8 +93,8 @@ export default function usePlayerDragging({
             return;
         }
 
-        const cx = svgX - dragging.offsetX;
-        const cy = svgY - dragging.offsetY;
+        const cx = svgPt.x - dragging.offsetX;
+        const cy = svgPt.y - dragging.offsetY;
 
         const gridX = Math.floor(cx / CELL_SIZE);
         const gridY = Math.floor(cy / CELL_SIZE);
@@ -142,12 +149,16 @@ export default function usePlayerDragging({
             )
         }));
 
+        if (svg) svg.releasePointerCapture(e.pointerId);
         setDragging(null);
     }, [dragging, mapData, gridSize, setMapData, svgRef]);
 
-    const handlePointerLeave = useCallback(() => {
+    const handlePointerLeave = useCallback((e) => {
+        if (!dragging) return;
+        const svg = svgRef.current;
+        if (svg) svg.releasePointerCapture(e.pointerId);
         setDragging(null);
-    }, []);
+    }, [dragging, svgRef]);
 
     return { dragging, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerLeave };
 }

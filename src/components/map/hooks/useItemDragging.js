@@ -19,11 +19,14 @@ export default function useItemDragging({
 
         const svg = svgRef.current;
         if (!svg) return;
+        svg.setPointerCapture(e.pointerId);
 
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
+        const pt = svg.createSVGPoint();
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+        const ctm = svg.getScreenCTM();
+        if (!ctm) return;
+        const svgPt = pt.matrixTransform(ctm.inverse());
 
         const item = placedItems.find((i) => i.id === itemId);
         if (!item) return;
@@ -33,8 +36,9 @@ export default function useItemDragging({
 
         setItemDragging({
             itemId,
-            offsetX: svgX - cx,
-            offsetY: svgY - cy,
+            pointerId: e.pointerId,
+            offsetX: svgPt.x - cx,
+            offsetY: svgPt.y - cy,
         });
     }, [placedItems, gridCenterX, gridCenterY, svgRef]);
 
@@ -45,13 +49,15 @@ export default function useItemDragging({
         const svg = svgRef.current;
         if (!svg) return;
 
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
+        const pt = svg.createSVGPoint();
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+        const ctm = svg.getScreenCTM();
+        if (!ctm) return;
+        const svgPt = pt.matrixTransform(ctm.inverse());
 
-        const cx = svgX - itemDragging.offsetX;
-        const cy = svgY - itemDragging.offsetY;
+        const cx = svgPt.x - itemDragging.offsetX;
+        const cy = svgPt.y - itemDragging.offsetY;
 
         const gridX = Math.floor(cx / CELL_SIZE);
         const gridY = Math.floor(cy / CELL_SIZE);
@@ -68,14 +74,19 @@ export default function useItemDragging({
         );
     }, [itemDragging, gridSize, setPlacedItems, svgRef]);
 
-    const handleItemPointerUp = useCallback(() => {
+    const handleItemPointerUp = useCallback((e) => {
         if (!itemDragging) return;
+        const svg = svgRef.current;
+        if (svg) svg.releasePointerCapture(e.pointerId);
         setItemDragging(null);
-    }, [itemDragging]);
+    }, [itemDragging, svgRef]);
 
-    const handleItemPointerLeave = useCallback(() => {
+    const handleItemPointerLeave = useCallback((e) => {
+        if (!itemDragging) return;
+        const svg = svgRef.current;
+        if (svg) svg.releasePointerCapture(e.pointerId);
         setItemDragging(null);
-    }, []);
+    }, [itemDragging, svgRef]);
 
     return {
         itemDragging,
