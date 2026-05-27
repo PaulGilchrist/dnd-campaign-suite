@@ -31,6 +31,17 @@ function usePlacedItems(setPlacedItems, setSelectedBarrel) {
         setSelectedBarrel(null);
     };
 
+    const handleToggleDoor = (itemId) => {
+        setPlacedItems(prev =>
+            prev.map(item =>
+                item.id === itemId && item.type === 'door'
+                    ? { ...item, open: !item.open }
+                    : item
+            )
+        );
+        setSelectedBarrel(null);
+    };
+
     const handleRotateDoor = (id) => {
         setPlacedItems(prev => prev.map(item => {
             if (item.id !== id) return item;
@@ -97,6 +108,7 @@ function usePlacedItems(setPlacedItems, setSelectedBarrel) {
     return {
         handleToggleItemVisibility,
         handleDeleteItem,
+        handleToggleDoor,
 
         handleRotateTable,
         handleRotateBed,

@@ -53,18 +53,6 @@ const MapToolbar = ({
                         <button onClick={handleClearWalls}>
                             <i className="fa-solid fa-trash"></i> Clear Walls
                         </button>
-                        <button
-                            className={tool === 'fog' ? 'active' : ''}
-                            onClick={() => setTool(tool === 'fog' ? 'none' : 'fog')}
-                        >
-                            <i className="fa-solid fa-cloud"></i> Fog
-                        </button>
-                        <button
-                            className={tool === 'clearFog' ? 'active' : ''}
-                            onClick={() => setTool(tool === 'clearFog' ? 'none' : 'clearFog')}
-                        >
-                            <i className="fa-solid fa-sun"></i> Clear Fog
-                        </button>
                     </>
                 )}
                 {isLocalhost && (

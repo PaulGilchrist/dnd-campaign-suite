@@ -678,13 +678,6 @@
     user-select: none;
 }
 
-/* Fog drag selection rectangle preview */
-.map .fog-preview {
-    fill: rgba(74, 144, 217, 0.15);
-    stroke: #4a90d9;
-    stroke-width: 2;
-    stroke-dasharray: 6 3;
-    pointer-events: none;
-}
+
 
 

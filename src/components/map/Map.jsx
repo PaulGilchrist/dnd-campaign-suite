@@ -40,6 +40,7 @@ import usePlayerDragging from './hooks/usePlayerDragging';
 import useItemDragging from './hooks/useItemDragging';
 import useNpcImageCache from './hooks/useNpcImageCache';
 import useSSESync from './hooks/useSSESync';
+import useFogOfWar from './hooks/useFogOfWar';
 import HexMap from '../hex-map/HexMap';
 import '../hex-map/HexMap.css';
 
@@ -64,7 +65,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const panYValueRef = useRef(0);
     // Accumulate deltaY for smooth zoom thresholding
     const accumulatedDeltaRef = useRef(0);
-    // Tool state: 'none' | 'paint' | 'erase' | 'fog' | 'clearFog'
+    // Tool state: 'none' | 'paint' | 'erase'
     const [tool, setTool] = useState('none');
     // Paint state: tracks grid coords during active paint/erase
     const [painting, setPainting] = useState(null);
@@ -73,12 +74,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     // Items panel state
     const [itemsPanelOpen, setItemsPanelOpen] = useState(false);
     const [placedItems, setPlacedItems] = useState([]);
-
-    // Fog of war: Set of "gridX,gridY" strings for cells that are fogged
-    const [fog, setFog] = useState(null);
-    // Fog rectangle drag state: start/end grid coords during drag
-    const [fogDragStart, setFogDragStart] = useState(null); // { gridX, gridY } | null
-    const [fogDragEnd, setFogDragEnd] = useState(null);     // { gridX, gridY } | null
 
     // Barrel context menu state
     const [selectedBarrel, setSelectedBarrel] = useState(null); // { id, gridX, gridY }
@@ -152,56 +147,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         setPanY(0);
     }, []);
 
-    const handleFogPointerDown = useCallback((e) => {
-        if (!isLocalhost) return;
-        if (tool !== 'fog' && tool !== 'clearFog') return;
-        e.preventDefault();
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-        setFogDragStart(grid);
-        setFogDragEnd(grid);
-    }, [isLocalhost, tool, getGridFromEvent]);
-
-    const handleFogPointerMove = useCallback((e) => {
-        if (!isLocalhost) return;
-        if (!fogDragStart || (tool !== 'fog' && tool !== 'clearFog')) return;
-        e.preventDefault();
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-        setFogDragEnd(grid);
-    }, [tool, isLocalhost, fogDragStart, getGridFromEvent]);
-
-    const handleFogPointerUp = useCallback(() => {
-        if (!fogDragStart || !fogDragEnd) {
-            setFogDragStart(null);
-            setFogDragEnd(null);
-            return;
-        }
-
-        const minX = Math.min(fogDragStart.gridX, fogDragEnd.gridX);
-        const maxX = Math.max(fogDragStart.gridX, fogDragEnd.gridX);
-        const minY = Math.min(fogDragStart.gridY, fogDragEnd.gridY);
-        const maxY = Math.max(fogDragStart.gridY, fogDragEnd.gridY);
-
-        setFog((prev) => {
-            const newFog = new Set(prev);
-            for (let y = minY; y <= maxY; y++) {
-                for (let x = minX; x <= maxX; x++) {
-                    const key = `${x},${y}`;
-                    if (tool === 'fog') {
-                        newFog.add(key);
-                    } else if (tool === 'clearFog') {
-                        newFog.delete(key);
-                    }
-                }
-            }
-            return newFog;
-        });
-
-        setFogDragStart(null);
-        setFogDragEnd(null);
-    }, [tool, fogDragStart, fogDragEnd]);
-
     // Handle grid pointer down (paint/erase mode)
     const handleGridPointerDown = useCallback((e) => {
         if (!isLocalhost) return;
@@ -258,10 +203,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             handleGridPointerDown(e);
             return;
         }
-        if (tool === 'fog' || tool === 'clearFog') {
-            handleFogPointerDown(e);
-            return;
-        }
         if (e.button !== 0) return;
         e.preventDefault();
         const svg = svgRef.current;
@@ -276,7 +217,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             startPanX: panX,
             startPanY: panY
         });
-    }, [tool, panX, panY, handleFogPointerDown, handleGridPointerDown]);
+    }, [tool, panX, panY, handleGridPointerDown]);
 
     const handlePanMove = useCallback((e) => {
         if (!panning) return;
@@ -346,23 +287,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     setGridSize(existing.gridSize || 20);
                     setPlacedItems(existing.placedItems || []);
 
-                    // Load fog data: if no fog data or empty array, fog all cells
-                    // (Skip for outdoor encounter maps — they have parentHex metadata)
-                    if (existing.parentHex) {
-                        setFog(new Set());
-                    } else if (!existing.fog || existing.fog.length === 0) {
-                        const gs = existing.gridSize ||20;
-                        const allFogged = new Set();
-                        for (let x = 0; x < gs; x++) {
-                            for (let y = 0; y < gs; y++) {
-                                allFogged.add(`${x},${y}`);
-                            }
-                        }
-                        setFog(allFogged);
-                    } else {
-                        setFog(new Set(existing.fog));
-                    }
-
                     // Remove players whose characters no longer exist in the campaign
                     if (characters && characters.length > 0) {
                         const charNames = new Set(characters.map(c => c.name));
@@ -381,23 +305,13 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
             const newData = { players: [], walls: new Set() };
 
-            // Fog all cells for new map
-            const allFogged = new Set();
-            for (let y = 0; y < gridSize; y++) {
-                for (let x = 0; x < gridSize; x++) {
-                    allFogged.add(`${x},${y}`);
-                }
-            }
-
             setMapData(newData);
-            setFog(allFogged);
             // Save initial data
             const dataToSave = {
                 ...newData,
                 gridSize,
                 walls: [],
                 placedItems: [],
-                fog: Array.from(allFogged)
             };
             mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save initial map data:', err));
         };
@@ -416,10 +330,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             gridSize,
             walls: Array.from(mapData.walls || []),
             placedItems: placedItems,
-            fog: Array.from(fog || [])
         };
         mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save map data:', err));
-    }, [mapData, campaignName, gridSize, placedItems, mapName, fog]);
+    }, [mapData, campaignName, gridSize, placedItems, mapName]);
 
     // SSE handler for real-time updates from other clients
     const { handleSSEEvent } = useSSESync({
@@ -428,7 +341,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         setGridSize,
         setMapData,
         setPlacedItems,
-        setFog,
     });
 
     const { dragging, handlePointerDown, handlePointerMove, handlePointerUp } = usePlayerDragging({
@@ -450,6 +362,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         gridCenterX,
         gridCenterY,
     });
+
+    const fog = useFogOfWar(mapData?.players, mapData?.walls, placedItems, gridSize);
 
     // Clear all walls and reset tool
     const handleClearWalls = useCallback(() => {
@@ -529,6 +443,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const {
         handleToggleItemVisibility,
         handleDeleteItem,
+        handleToggleDoor,
         handleRotateTable,
         handleRotateBed,
         handleRotateDoor,
@@ -615,9 +530,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 viewBox={`${panX} ${panY} ${SVG_SIZE / zoom} ${SVG_SIZE / zoom}`}
                 className="grid-svg"
                 onPointerDown={handlePanStart}
-                onPointerMove={(e) => { handlePointerMove(e); handleItemPointerMove(e); handleGridPointerMove(e); handleFogPointerMove(e); handlePanMove(e); }}
-                onPointerUp={(e) => { handlePointerUp(e); handleItemPointerUpHook(e); handleGridPointerUp(e); handleFogPointerUp(e); handlePanEnd(e); }}
-                onPointerLeave={(e) => { handleItemPointerLeave(); handleGridPointerLeave(e); handleFogPointerUp(); }}
+                onPointerMove={(e) => { handlePointerMove(e); handleItemPointerMove(e); handleGridPointerMove(e); handlePanMove(e); }}
+                onPointerUp={(e) => { handlePointerUp(e); handleItemPointerUpHook(e); handleGridPointerUp(e); handlePanEnd(e); }}
+                onPointerLeave={(e) => { handleItemPointerLeave(); handleGridPointerLeave(e); }}
                 onWheel={handleWheel}
                 onContextMenu={(e) => e.preventDefault()}
                 onDragOver={(e) => e.preventDefault()}
@@ -688,32 +603,31 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 <FogOverlay
                     fog={fog}
                     isLocalhost={isLocalhost}
-                    fogDragStart={fogDragStart}
-                    fogDragEnd={fogDragEnd}
                 />
 
-                 {/* Item context menu */}
-                  <BarrelContextMenu
-                     selectedBarrel={selectedBarrel}
-                     placedItems={placedItems}
-                     gridCenterX={gridCenterX}
-                     gridCenterY={gridCenterY}
-                     handleToggleItemVisibility={handleToggleItemVisibility}
-                     handleDeleteItem={handleDeleteItem}
-                     handleRotateTable={handleRotateTable}
-                     handleRotateBed={handleRotateBed}
-                     handleRotateDoor={handleRotateDoor}
-                     handleRotateSecretDoor={handleRotateSecretDoor}
-                     handleRotateStairs={handleRotateStairs}
-                     handleRotateAltar={handleRotateAltar}
-                     handleRotateBookshelf={handleRotateBookshelf}
-                     handleRotateTorch={handleRotateTorch}
-                     handleRotateChair={handleRotateChair}
-                     handleViewStats={handleViewStats}
-                     monsterFound={monsterFound}
-                     onRenameClicked={handleRenameClicked}
-                    onClose={handleCloseMenu}
-                   />
+                  {/* Item context menu */}
+                   <BarrelContextMenu
+                      selectedBarrel={selectedBarrel}
+                      placedItems={placedItems}
+                      gridCenterX={gridCenterX}
+                      gridCenterY={gridCenterY}
+                      handleToggleItemVisibility={handleToggleItemVisibility}
+                      handleDeleteItem={handleDeleteItem}
+                      handleToggleDoor={handleToggleDoor}
+                      handleRotateTable={handleRotateTable}
+                      handleRotateBed={handleRotateBed}
+                      handleRotateDoor={handleRotateDoor}
+                      handleRotateSecretDoor={handleRotateSecretDoor}
+                      handleRotateStairs={handleRotateStairs}
+                      handleRotateAltar={handleRotateAltar}
+                      handleRotateBookshelf={handleRotateBookshelf}
+                      handleRotateTorch={handleRotateTorch}
+                      handleRotateChair={handleRotateChair}
+                      handleViewStats={handleViewStats}
+                      monsterFound={monsterFound}
+                      onRenameClicked={handleRenameClicked}
+                     onClose={handleCloseMenu}
+                    />
 
                 {/* Player context menu */}
                 {selectedPlayer && (() => {
