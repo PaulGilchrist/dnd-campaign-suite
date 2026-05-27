@@ -477,7 +477,9 @@
     "7,27",
     "8,27",
     "6,27",
-    "6,2"
+    "6,2",
+    "27,28",
+    "24,28"
   ],
   "placedItems": [
     {
@@ -871,7 +873,119 @@
       "gridX": 24,
       "gridY": 28,
       "visible": true,
+      "rotation": 180
+    },
+    {
+      "id": "a8d9c75e-ed30-4f12-bcba-f52ce2f86800",
+      "type": "arrowSlitWall",
+      "gridX": 24,
+      "gridY": 1,
+      "visible": true,
       "rotation": 0
+    },
+    {
+      "id": "9bda3b6d-0391-4b76-b37d-f5d9c6ea660a",
+      "type": "arrowSlitWall",
+      "gridX": 27,
+      "gridY": 1,
+      "visible": true,
+      "rotation": 0
+    },
+    {
+      "id": "b924a958-8433-48ef-bb5a-d359242f4c7a",
+      "type": "arrowSlitWall",
+      "gridX": 28,
+      "gridY": 2,
+      "visible": true,
+      "rotation": 90
+    },
+    {
+      "id": "da7e927b-02d3-41a5-9803-eb38fb20de67",
+      "type": "arrowSlitWall",
+      "gridX": 28,
+      "gridY": 5,
+      "visible": true,
+      "rotation": 90
+    },
+    {
+      "id": "a96dca6d-3094-44f9-9900-5c1a5de146d2",
+      "type": "arrowSlitWall",
+      "gridX": 28,
+      "gridY": 24,
+      "visible": true,
+      "rotation": 90
+    },
+    {
+      "id": "783cad30-1944-4201-b667-42c517bdfe19",
+      "type": "arrowSlitWall",
+      "gridX": 28,
+      "gridY": 27,
+      "visible": true,
+      "rotation": 90
+    },
+    {
+      "id": "520b0428-87d5-493a-811f-b4bc50ba988d",
+      "type": "arrowSlitWall",
+      "gridX": 5,
+      "gridY": 1,
+      "visible": true,
+      "rotation": 0
+    },
+    {
+      "id": "2bc258a7-1d35-48cd-90e7-ae77450fd68b",
+      "type": "arrowSlitWall",
+      "gridX": 2,
+      "gridY": 1,
+      "visible": true,
+      "rotation": 0
+    },
+    {
+      "id": "c920883b-a0ba-4132-a74e-ba135a58781c",
+      "type": "arrowSlitWall",
+      "gridX": 1,
+      "gridY": 2,
+      "visible": true,
+      "rotation": 270
+    },
+    {
+      "id": "28903861-1298-42fa-8be1-098df14b0076",
+      "type": "arrowSlitWall",
+      "gridX": 1,
+      "gridY": 5,
+      "visible": true,
+      "rotation": 270
+    },
+    {
+      "id": "f451a160-3243-457a-b1ab-abe11a4fc04f",
+      "type": "arrowSlitWall",
+      "gridX": 1,
+      "gridY": 24,
+      "visible": true,
+      "rotation": 270
+    },
+    {
+      "id": "fb90fc33-2d6d-44a4-9345-be1f070f0d3b",
+      "type": "arrowSlitWall",
+      "gridX": 1,
+      "gridY": 27,
+      "visible": true,
+      "rotation": 270
+    },
+    {
+      "id": "d7e0a910-d0ab-4ae7-afa1-8ae539d147ef",
+      "type": "arrowSlitWall",
+      "gridX": 5,
+      "gridY": 28,
+      "visible": true,
+      "rotation": 180
+    },
+    {
+      "id": "a6615e2b-1262-43db-abc0-a2c0881891b9",
+      "type": "arrowSlitWall",
+      "gridX": 2,
+      "gridY": 28,
+      "visible": true,
+      "rotation": 180
     }
   ],
   "players": [],
