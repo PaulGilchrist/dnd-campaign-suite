@@ -566,13 +566,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
     const fog = useFogOfWar(mapData?.players, mapData?.walls, placedItems, gridSize);
 
-    // Clear all walls and reset tool
-    const handleClearWalls = useCallback(() => {
-        if (window.confirm('Clear all painted walls?')) {
-            setMapData((prev) => ({ ...prev, walls: new Set() }));
-            setTool('none');
-        }
-    }, []);
 
     // Handle drop from items panel onto grid
     const handleDrop = useCallback((e) => {
@@ -726,7 +719,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 setGridSize={setGridSize}
                 itemsPanelOpen={itemsPanelOpen}
                 setItemsPanelOpen={setItemsPanelOpen}
-                handleClearWalls={handleClearWalls}
                 zoomIn={zoomIn}
                 zoomOut={zoomOut}
                 resetView={resetView}

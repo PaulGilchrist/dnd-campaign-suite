@@ -8,7 +8,6 @@ const MapToolbar = ({
     gridSize,
     setGridSize,
     setItemsPanelOpen,
-    handleClearWalls,
     zoomIn,
     zoomOut,
     resetView,
@@ -56,9 +55,7 @@ const MapToolbar = ({
                         >
                             <i className="fa-solid fa-arrow-pointer"></i> Select
                         </button>
-                        <button onClick={handleClearWalls}>
-                            <i className="fa-solid fa-trash"></i> Clear Walls
-                        </button>
+
                     </>
                 )}
                 {isLocalhost && (
