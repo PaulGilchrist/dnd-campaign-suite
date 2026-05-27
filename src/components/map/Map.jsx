@@ -638,16 +638,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         handleToggleItemVisibility,
         handleDeleteItem,
         handleToggleDoor,
-        handleRotateTable,
-        handleRotateBed,
-        handleRotateDoor,
-        handleRotateSecretDoor,
-        handleRotateStairs,
-        handleRotateAltar,
-        handleRotateArrowSlitWall,
-        handleRotateBookshelf,
-        handleRotateTorch,
-        handleRotateChair,
+        handleRotate,
     } = usePlacedItems(setPlacedItems, setSelectedItem);
 
     const handleRemovePlayer = useCallback((playerId) => {
@@ -917,16 +908,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                       handleToggleItemVisibility={handleToggleItemVisibility}
                       handleDeleteItem={handleDeleteItem}
                       handleToggleDoor={handleToggleDoor}
-                      handleRotateTable={handleRotateTable}
-                      handleRotateBed={handleRotateBed}
-                      handleRotateDoor={handleRotateDoor}
-                      handleRotateSecretDoor={handleRotateSecretDoor}
-                      handleRotateStairs={handleRotateStairs}
-                      handleRotateAltar={handleRotateAltar}
-                      handleRotateArrowSlitWall={handleRotateArrowSlitWall}
-                      handleRotateBookshelf={handleRotateBookshelf}
-                      handleRotateTorch={handleRotateTorch}
-                      handleRotateChair={handleRotateChair}
+                      handleRotate={handleRotate}
                       handleViewStats={handleViewStats}
                       monsterFound={monsterFound}
                       onRenameClicked={handleRenameClicked}

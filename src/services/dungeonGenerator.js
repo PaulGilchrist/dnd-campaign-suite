@@ -609,11 +609,13 @@ export function generateDungeon(opts) {
   }
 
   function wallRotation(wall) {
-    if (wall === "w") return 0;
-    if (wall === "n") return 90;
-    if (wall === "e") return 180;
-    if (wall === "s") return 270;
-    return 0;
+    // Bookshelf SVG is 72x36 (wide). Wall-side of SVG is at top (y=2..18).
+    // rot=0: horizontal, wall-side up. rot=180: horizontal, wall-side down.
+    // rot=90: vertical, wall-side left. rot=270: vertical, wall-side right.
+    if (wall === "n") return 0;    // wall above → wall-side up
+    if (wall === "s") return 180;  // wall below → wall-side down
+    if (wall === "w") return 90;   // wall left → wall-side left
+    return 270;                     // wall right → wall-side right
   }
 
   function pickWall(room, rng, usedWalls) {
@@ -647,7 +649,41 @@ export function generateDungeon(opts) {
   }
 
   function placeAgainstWall(room, wall, rng) {
-    return placeAlongWall(room, wall, rng, 0);
+    // Bookshelves are 2 squares. Horizontal (n/s wall) occupies x,x+1.
+    // Vertical (e/w wall) occupies y,y+1. Ensure the full item fits.
+    const rot = wallRotation(wall);
+    const isHorizontal = (wall === "n" || wall === "s");
+
+    // Build a set of door positions to avoid blocking doors
+    const doorCells = {};
+    for (let d = 0; d < finalDoors.length; d++) {
+      doorCells[finalDoors[d].x + "," + finalDoors[d].y] = true;
+    }
+
+    let candidates = [];
+    if (isHorizontal) {
+      // Horizontal bookshelf: needs x and x+1 inside room, neither on a door
+      const y = wall === "n" ? room.rect.y : room.rect.y + room.rect.h - 1;
+      const wy = wall === "n" ? room.rect.y - 1 : room.rect.y + room.rect.h;
+      for (let x = room.rect.x; x < room.rect.x + room.rect.w - 1; x++) {
+        if (wy >= 0 && wy < gridSize && grid[wy][x] &&
+            !doorCells[x + "," + y] && !doorCells[(x + 1) + "," + y]) {
+          candidates.push({ x, y, rotation: rot });
+        }
+      }
+    } else {
+      // Vertical bookshelf: needs y and y+1 inside room, neither on a door
+      const x = wall === "w" ? room.rect.x : room.rect.x + room.rect.w - 1;
+      const wx = wall === "w" ? room.rect.x - 1 : room.rect.x + room.rect.w;
+      for (let y = room.rect.y; y < room.rect.y + room.rect.h - 1; y++) {
+        if (wx >= 0 && wx < gridSize && grid[y][wx] &&
+            !doorCells[x + "," + y] && !doorCells[x + "," + (y + 1)]) {
+          candidates.push({ x, y, rotation: rot });
+        }
+      }
+    }
+    if (candidates.length > 0) return pick(candidates, rng);
+    return null;
   }
 
   function addLargeRoomFurniture(room) {
@@ -692,12 +728,12 @@ export function generateDungeon(opts) {
           rotation: 0,
         });
         const chairDefs = [
-          { dx: 0, dy: -1, rot: 90 },
-          { dx: 1, dy: -1, rot: 90 },
-          { dx: 0, dy: 1, rot: 270 },
-          { dx: 1, dy: 1, rot: 270 },
-          { dx: -1, dy: 0, rot: 0 },
-          { dx: 2, dy: 0, rot: 180 },
+          { dx: 0, dy: -1, rot: 0 },
+          { dx: 1, dy: -1, rot: 0 },
+          { dx: 0, dy: 1, rot: 180 },
+          { dx: 1, dy: 1, rot: 180 },
+          { dx: -1, dy: 0, rot: 90 },
+          { dx: 2, dy: 0, rot: 270 },
         ];
         const numChairs = 2 + Math.floor(rng() * 3);
         const shuffled = chairDefs.slice().sort(function () { return rng() - 0.5; });
@@ -736,19 +772,19 @@ export function generateDungeon(opts) {
       if (wall === "n") {
         bx = room.rect.x + 1 + Math.floor(rng() * Math.max(1, room.rect.w - 2));
         by = room.rect.y + 1;
-        rotation = 90;
+        rotation = 0;
       } else if (wall === "s") {
         bx = room.rect.x + 1 + Math.floor(rng() * Math.max(1, room.rect.w - 2));
         by = room.rect.y + room.rect.h - 2;
-        rotation = 270;
+        rotation = 0;
       } else if (wall === "w") {
         bx = room.rect.x + 1;
         by = room.rect.y + 1 + Math.floor(rng() * Math.max(1, room.rect.h - 2));
-        rotation = 0;
+        rotation = 90;
       } else {
         bx = room.rect.x + room.rect.w - 2;
         by = room.rect.y + 1 + Math.floor(rng() * Math.max(1, room.rect.h - 2));
-        rotation = 180;
+        rotation = 90;
       }
       placedItems.push({
         id: "bed-" + room.id,
@@ -761,16 +797,26 @@ export function generateDungeon(opts) {
     }
 
     if (rng() < 0.3) {
-      const wall = pickWall(room, rng, usedWalls);
-      const pos = placeAgainstWall(room, wall, rng);
-      placedItems.push({
-        id: "bookshelf-" + room.id,
-        gridX: pos.x, gridY: pos.y,
-        type: "bookshelf",
-        visible: true,
-        rotation: pos.rotation,
+      const walls = ["n", "s", "w", "e"].filter(function (w) {
+        return !usedWalls.includes(w);
       });
-      usedWalls.push(wall);
+      let placed = false;
+      for (let wi = 0; wi < walls.length && !placed; wi++) {
+        const idx = Math.floor(rng() * walls.length);
+        const w = walls.splice(idx, 1)[0];
+        const pos = placeAgainstWall(room, w, rng);
+        if (pos) {
+          placedItems.push({
+            id: "bookshelf-" + room.id,
+            gridX: pos.x, gridY: pos.y,
+            type: "bookshelf",
+            visible: true,
+            rotation: pos.rotation,
+          });
+          usedWalls.push(w);
+          placed = true;
+        }
+      }
     }
 
     placeRoomTrap(room);
@@ -798,7 +844,7 @@ export function generateDungeon(opts) {
             gridX: c[0], gridY: c[1] - 1,
             type: "chair",
             visible: true,
-            rotation: 90,
+            rotation: 0,
           });
         }
       }
@@ -821,15 +867,23 @@ export function generateDungeon(opts) {
         rotation: 0,
       });
     } else if (roll < 0.85) {
-      const wall = pickWall(room, rng, usedWalls);
-      const pos = placeAgainstWall(room, wall, rng);
-      placedItems.push({
-        id: "bookshelf-" + room.id,
-        gridX: pos.x, gridY: pos.y,
-        type: "bookshelf",
-        visible: true,
-        rotation: pos.rotation,
-      });
+      const walls = ["n", "s", "w", "e"];
+      let placed = false;
+      for (let wi = 0; wi < walls.length && !placed; wi++) {
+        const idx = Math.floor(rng() * walls.length);
+        const w = walls.splice(idx, 1)[0];
+        const pos = placeAgainstWall(room, w, rng);
+        if (pos) {
+          placedItems.push({
+            id: "bookshelf-" + room.id,
+            gridX: pos.x, gridY: pos.y,
+            type: "bookshelf",
+            visible: true,
+            rotation: pos.rotation,
+          });
+          placed = true;
+        }
+      }
     }
 
     placeRoomTrap(room);
@@ -955,9 +1009,40 @@ export function generateDungeon(opts) {
     }
   }
 
+  // Break up any runs of 3+ consecutive doors in the same row or column.
+  // This can happen when two rooms have adjacent door spans.
+  const doorPosSet = {};
+  for (const d of uniqueDoors) {
+    const key = d.x + "," + d.y;
+    doorPosSet[key] = d;
+  }
+  const toRemove = new Set();
+  for (const d of uniqueDoors) {
+    // Check horizontal run starting at this door
+    let run = 1;
+    let cx = d.x;
+    while (doorPosSet[(cx + 1) + "," + d.y]) { run++; cx++; }
+    if (run >= 3) {
+      // Remove interior doors, keeping the first two
+      for (let rx = d.x + 2; rx <= cx; rx++) {
+        toRemove.add(rx + "," + d.y);
+      }
+    }
+    // Check vertical run starting at this door
+    run = 1;
+    let cy = d.y;
+    while (doorPosSet[d.x + "," + (cy + 1)]) { run++; cy++; }
+    if (run >= 3) {
+      for (let ry = d.y + 2; ry <= cy; ry++) {
+        toRemove.add(d.x + "," + ry);
+      }
+    }
+  }
+  const trimmedDoors = uniqueDoors.filter(d => !toRemove.has(d.x + "," + d.y));
+
   const doorPairs = {};
-  for (let d = 0; d < uniqueDoors.length; d++) {
-    const door = uniqueDoors[d];
+  for (let d = 0; d < trimmedDoors.length; d++) {
+    const door = trimmedDoors[d];
     let paired = false;
     for (let key in doorPairs) {
       const existing = doorPairs[key];
@@ -1085,6 +1170,7 @@ export function generateDungeon(opts) {
     name: generateName(rng),
     description: generateDescription(rng),
     gridSize: gridSize,
+    seed: opts.seed != null ? opts.seed : Math.floor(Math.random() * 2147483647),
     walls: walls,
     placedItems: dedupedItems,
     players: [],

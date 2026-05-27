@@ -6,16 +6,7 @@ function ItemContextMenu({
     gridCenterY,
     handleToggleItemVisibility,
     handleDeleteItem,
-    handleRotateTable,
-    handleRotateBed,
-    handleRotateDoor,
-    handleRotateSecretDoor,
-    handleRotateStairs,
-    handleRotateAltar,
-    handleRotateArrowSlitWall,
-    handleRotateBookshelf,
-    handleRotateTorch,
-    handleRotateChair,
+    handleRotate,
     handleToggleDoor,
     handleViewStats,
     monsterFound,
@@ -29,14 +20,16 @@ function ItemContextMenu({
     const item = placedItems.find(i => i.id === selectedItem.id);
     const isNpc = item && item.type === 'npc';
     const isDoor = item && item.type === 'door';
-    const hasRotation = item && (item.type === 'table' || item.type === 'bed' || item.type === 'door' || item.type === 'secretDoor' || item.type === 'stairs' || item.type === 'altar' || item.type === 'arrowSlitWall' || item.type === 'bookshelf' || item.type === 'torch' || item.type === 'chair');
     const showRenameOption = isNpc;
     const showViewStats = isNpc && monsterFound;
-    const hasExtra = showRenameOption || showViewStats || hasRotation || isDoor;
-    const menuHeight = hasExtra ? (showViewStats ? 98 : 80) : 58;
-    const doorMenuHeight = isDoor ? 98 : 0;
+    const hasExtra = showRenameOption || showViewStats || isDoor;
+    const menuHeight = hasExtra ? (showViewStats ? 116 : 98) : 76;
+    const doorMenuHeight = isDoor ? 116 : 0;
 
     const effectiveHeight = isDoor ? doorMenuHeight : menuHeight;
+
+    const yRotate = isDoor ? 86 : 64;
+    const yClose = menuY + 12;
 
     return (
           <g className="item-context-menu" onClick={(e) => e.stopPropagation()}>
@@ -63,23 +56,10 @@ function ItemContextMenu({
                           )}
                       </>
                   )}
-                  {hasRotation && (
-                      <text x={menuX + 8} y={menuY + (isDoor ? 86 : 64)} fill="#ccc" fontSize="11" className="menu-option" onClick={() => {
-                        if (item.type === 'table') handleRotateTable(selectedItem.id);
-                        else if (item.type === 'bed') handleRotateBed(selectedItem.id);
-                        else if (item.type === 'door') handleRotateDoor(selectedItem.id);
-                        else if (item.type === 'secretDoor') handleRotateSecretDoor(selectedItem.id);
-                        else if (item.type === 'stairs') handleRotateStairs(selectedItem.id);
-                         else if (item.type === 'altar') handleRotateAltar(selectedItem.id);
-                         else if (item.type === 'arrowSlitWall') handleRotateArrowSlitWall(selectedItem.id);
-                        else if (item.type === 'bookshelf') handleRotateBookshelf(selectedItem.id);
-                        else if (item.type === 'torch') handleRotateTorch(selectedItem.id);
-                        else if (item.type === 'chair') handleRotateChair(selectedItem.id);
-                      }}>
-                        Rotate
-                      </text>
-                  )}
-                  <text x={menuX + 108} y={menuY + 12} fill="#999" fontSize="10" className="menu-close" onClick={() => onClose(menuX, menuY)}>✕</text>
+                  <text x={menuX + 8} y={menuY + yRotate} fill="#ccc" fontSize="11" className="menu-option" onClick={() => handleRotate(selectedItem.id)}>
+                    Rotate
+                  </text>
+                  <text x={menuX + 108} y={yClose} fill="#999" fontSize="10" className="menu-close" onClick={() => onClose(menuX, menuY)}>✕</text>
               </g>
           </g>
       );

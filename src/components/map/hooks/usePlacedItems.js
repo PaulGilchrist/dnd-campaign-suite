@@ -12,23 +12,12 @@ function usePlacedItems(setPlacedItems, setSelectedItem) {
         setSelectedItem(null);
     };
 
-
-    const handleRotateTable = (itemId) => {
-        setPlacedItems(prev =>
-            prev.map(item =>
-                item.id === itemId ? { ...item, rotation: (item.rotation || 0) === 0 ? 90 : 0 } : item
-            )
-        );
-        setSelectedItem(null);
-    };
-
-    const handleRotateBed = (itemId) => {
+    const handleRotate = (itemId) => {
         setPlacedItems(prev =>
             prev.map(item =>
                 item.id === itemId ? { ...item, rotation: ((item.rotation || 0) + 90) % 360 } : item
             )
         );
-        setSelectedItem(null);
     };
 
     const handleToggleDoor = (itemId) => {
@@ -42,93 +31,11 @@ function usePlacedItems(setPlacedItems, setSelectedItem) {
         setSelectedItem(null);
     };
 
-    const handleRotateDoor = (id) => {
-        setPlacedItems(prev => prev.map(item => {
-            if (item.id !== id) return item;
-            const currentRotation = item.rotation || 0;
-            const newRotation = (currentRotation + 90) % 360;
-            return { ...item, rotation: newRotation };
-        }));
-    };
-
-    const handleRotateSecretDoor = (id) => {
-        setPlacedItems(prev => prev.map(item => {
-            if (item.id !== id) return item;
-            const currentRotation = item.rotation || 0;
-            const newRotation = (currentRotation + 90) % 360;
-            return { ...item, rotation: newRotation };
-        }));
-    };
-
-    const handleRotateStairs = (id) => {
-        setPlacedItems(prev => prev.map(item => {
-            if (item.id !== id) return item;
-            const currentRotation = item.rotation || 0;
-            const newRotation = (currentRotation + 90) % 360;
-            return { ...item, rotation: newRotation };
-        }));
-    };
-
-    const handleRotateTorch = (id) => {
-        setPlacedItems(prev => prev.map(item => {
-            if (item.id !== id) return item;
-            const currentRotation = item.rotation || 0;
-            const newRotation = (currentRotation + 90) % 360;
-            return { ...item, rotation: newRotation };
-        }));
-    };
-
-    const handleRotateChair = (id) => {
-        setPlacedItems(prev => prev.map(item => {
-            if (item.id !== id) return item;
-            const currentRotation = item.rotation || 0;
-            const newRotation = (currentRotation + 90) % 360;
-            return { ...item, rotation: newRotation };
-        }));
-    };
-
-    const handleRotateAltar = (itemId) => {
-        setPlacedItems(prev =>
-            prev.map(item =>
-                item.id === itemId ? { ...item, rotation: (item.rotation || 0) === 0 ? 90 : 0 } : item
-            )
-        );
-        setSelectedItem(null);
-    };
-
-    const handleRotateArrowSlitWall = (id) => {
-        setPlacedItems(prev => prev.map(item => {
-            if (item.id !== id) return item;
-            const currentRotation = item.rotation || 0;
-            const newRotation = (currentRotation + 90) % 360;
-            return { ...item, rotation: newRotation };
-        }));
-    };
-
-    const handleRotateBookshelf = (id) => {
-        setPlacedItems(prev => prev.map(item => {
-            if (item.id !== id) return item;
-            const currentRotation = item.rotation || 0;
-            const newRotation = (currentRotation + 90) % 360;
-            return { ...item, rotation: newRotation };
-        }));
-    };
-
     return {
         handleToggleItemVisibility,
         handleDeleteItem,
         handleToggleDoor,
-
-        handleRotateTable,
-        handleRotateBed,
-        handleRotateDoor,
-        handleRotateSecretDoor,
-        handleRotateStairs,
-        handleRotateAltar,
-        handleRotateArrowSlitWall,
-        handleRotateBookshelf,
-        handleRotateTorch,
-        handleRotateChair,
+        handleRotate,
     };
 }
 
