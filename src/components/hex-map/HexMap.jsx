@@ -1176,6 +1176,16 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             <polygon points="24,46 28,28 24,24 20,28" fill="#555" />
                             <text x="24" y="15" textAnchor="middle" fill="#c44" fontSize="6" fontWeight="bold">N</text>
                         </svg>
+                        <div className="hex-map-legend">
+                            <div className="hex-map-legend-line">
+                                <svg viewBox="0 0 30 12" width="30" height="12">
+                                    <line x1="0" y1="6" x2="30" y2="6" stroke="#ccc" strokeWidth="1.5" />
+                                    <line x1="0" y1="3" x2="0" y2="9" stroke="#ccc" strokeWidth="1" />
+                                    <line x1="30" y1="3" x2="30" y2="9" stroke="#ccc" strokeWidth="1" />
+                                </svg>
+                            </div>
+                            <span className="hex-map-legend-text">1 hex = 6 miles</span>
+                        </div>
                     </div>
 
                     <WeatherOverlay weather={weather} />
