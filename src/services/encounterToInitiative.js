@@ -53,7 +53,8 @@ export async function expandMonstersToCreatures(selectedMonsters, characters) {
         targetName: null,
         ac: await computePlayerAc(character),
         resistances: character.resistances || [],
-        immunities: character.immunities || []
+        immunities: character.immunities || [],
+        concentration: null
       };
       }));
     playerChars.sort((a, b) => a.name.localeCompare(b.name));
@@ -74,7 +75,8 @@ export async function expandMonstersToCreatures(selectedMonsters, characters) {
             targetName: null,
             ac: monster.armor_class || 10,
             resistances: monster.damage_resistances || [],
-            immunities: monster.damage_immunities || []
+            immunities: monster.damage_immunities || [],
+            concentration: null
           });
           npcRollResults.push({ name, rollResult });
           }

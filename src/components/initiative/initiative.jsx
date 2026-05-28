@@ -47,6 +47,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
     const [conditionPickerAbility, setConditionPickerAbility] = React.useState('con');
     const [conditionPickerSelected, setConditionPickerSelected] = React.useState(null);
 
+    const [concentrationPickerTarget, setConcentrationPickerTarget] = React.useState(null);
+    const [concentrationSpellName, setConcentrationSpellName] = React.useState('');
+    const [concentrationDc, setConcentrationDc] = React.useState(10);
+
     const handleEvent = React.useCallback((event) => {
         if (event.key == null || event.data == null) return;
         if (!event.key.startsWith(`change-${campaignName}-`)) return;
@@ -94,12 +98,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                 ac: computeAcEstimate(character),
                 resistances: character.resistances || [],
                 immunities: character.immunities || [],
-                conditions: []
+                conditions: [],
+                concentration: null
             };
         });
         creatureList.sort((a, b) => a.name.localeCompare(b.name)); // asc
         for (let i = 0; i < numOfNpc; i++) {
-            creatureList.push({ id: utils.guid(), name: `NPC ${i + 1}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [] });
+            creatureList.push({ id: utils.guid(), name: `NPC ${i + 1}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null });
         }
         return creatureList;
     }, [characters, numOfNpc]);
@@ -113,7 +118,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                 return match ? Math.max(max, parseInt(match[1])) : max;
             }, 0);
         const nextNum = maxNpcNum + 1;
-        combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${nextNum}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [] });
+        combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${nextNum}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null });
         setNumOfNpc(nextNum);
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
@@ -190,9 +195,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
             const mergedCreatures = initialSummary.creatures.map(c => {
                 if (c.type === 'player' && characterNameSet.has(c.name)) {
                     const character = characters.find(ch => utils.getFirstName(ch.name) === c.name);
-                    return { ...c, conditions: c.conditions || [], imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(character) };
+                    return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(character) };
                 }
-                return { ...c, conditions: c.conditions || [] };
+                return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null };
             });
 
             const npcCount = mergedCreatures.filter(c => c.type === 'npc').length;
@@ -460,6 +465,135 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
         }).catch(() => {});
     };
 
+    const openConcentrationPicker = (creature) => {
+        if (!isLocalhost) return;
+        setConcentrationPickerTarget(creature);
+        setConcentrationSpellName('');
+        setConcentrationDc(10);
+    };
+
+    const handleApplyConcentration = () => {
+        if (!concentrationPickerTarget || !concentrationSpellName.trim() || !combatSummary) return;
+        const creature = combatSummary.creatures.find(c => c.id === concentrationPickerTarget.id);
+        if (!creature) return;
+        creature.concentration = {
+            id: utils.guid(),
+            spell: concentrationSpellName.trim(),
+            dc: concentrationDc,
+        };
+        storage.set('combatSummary', combatSummary, campaignName);
+        setCombatSummary(cloneDeep(combatSummary));
+        setConcentrationPickerTarget(null);
+        setConcentrationSpellName('');
+        setConcentrationDc(10);
+
+        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'condition',
+                action: 'concentration-started',
+                characterName: creature.name,
+                condition: `Concentration: ${creature.concentration.spell}`,
+                dc: concentrationDc,
+                ability: 'con',
+                timestamp: Date.now(),
+                id: utils.guid(),
+            })
+        }).catch(() => {});
+    };
+
+    const handleRollConcentrationSave = async (creatureId) => {
+        if (!combatSummary) return;
+        const creature = combatSummary.creatures.find(c => c.id === creatureId);
+        if (!creature || !creature.concentration) return;
+
+        const concentration = creature.concentration;
+
+        let saveBonus = 0;
+        if (creature.type === 'player') {
+            const character = characters.find(c => utils.getFirstName(c.name) === creature.name);
+            saveBonus = getAbilitySaveBonus(character, 'con');
+        } else {
+            try {
+                const monster = await getMonsterData(creature.name);
+                if (monster?.saving_throws?.con) {
+                    saveBonus = monster.saving_throws.con.modifier;
+                } else if (monster?.ability_score_modifiers?.con) {
+                    saveBonus = monster.ability_score_modifiers.con;
+                }
+            } catch { /* ignore */ }
+        }
+
+        const r1 = rollD20();
+        const total = r1 + saveBonus;
+        const success = total >= concentration.dc;
+
+        if (!success) {
+            creature.concentration = null;
+        }
+
+        storage.set('combatSummary', combatSummary, campaignName);
+        setCombatSummary(cloneDeep(combatSummary));
+
+        setConditionPopup({
+            type: 'd20',
+            rollType: 'condition-save',
+            name: 'Concentration',
+            rolls: [r1],
+            bonus: saveBonus,
+            targetName: null,
+            targetAc: null,
+            hit: undefined,
+            condition: concentration.spell,
+            dc: concentration.dc,
+            success,
+        });
+
+        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'roll',
+                rollType: 'concentration-save',
+                characterName: creature.name,
+                name: 'Constitution',
+                rolls: [r1],
+                mode: 'normal',
+                total: r1,
+                bonus: saveBonus,
+                condition: `Concentration: ${concentration.spell}`,
+                dc: concentration.dc,
+                success,
+                timestamp: Date.now(),
+                id: utils.guid(),
+            })
+        }).catch(() => {});
+    };
+
+    const handleBreakConcentration = (creatureId) => {
+        if (!combatSummary) return;
+        const creature = combatSummary.creatures.find(c => c.id === creatureId);
+        if (!creature || !creature.concentration) return;
+        const spell = creature.concentration.spell;
+        creature.concentration = null;
+        storage.set('combatSummary', combatSummary, campaignName);
+        setCombatSummary(cloneDeep(combatSummary));
+
+        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'condition',
+                action: 'concentration-broken',
+                characterName: creature.name,
+                condition: `Concentration: ${spell}`,
+                timestamp: Date.now(),
+                id: utils.guid(),
+            })
+        }).catch(() => {});
+    };
+
     const handleAutoBreakCondition = (creatureId, condition) => {
         if (!isLocalhost || !combatSummary) return;
         const creature = combatSummary.creatures.find(c => c.id === creatureId);
@@ -509,7 +643,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                                     <span>{creature.name}</span>
                                 )}
                             </div>
-                            <div className='creature-initiative'>
+                            <div className='creature-initiative'>Initiative&nbsp;
                                 <input
                                     min="0"
                                     onChange={(event) => handleInitiativeChange(creature.id, event.target.value)}
@@ -570,6 +704,35 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                                         <i className='fa-solid fa-plus'></i>
                                     </button>
                                 )}
+                                {creature.concentration ? (
+                                    <div className='concentration-badge-wrapper'>
+                                        <button
+                                            className='initiative-concentration-badge'
+                                            onClick={() => handleRollConcentrationSave(creature.id)}
+                                            type='button'
+                                            title={`Concentration: ${creature.concentration.spell} (DC ${creature.concentration.dc} Constitution)`}
+                                        >
+                                            <i className='fa-solid fa-spinner'></i> {creature.concentration.spell} DC {creature.concentration.dc}
+                                        </button>
+                                        <button
+                                            className='concentration-break-btn'
+                                            onClick={() => handleBreakConcentration(creature.id)}
+                                            type='button'
+                                            title='Break concentration'
+                                        >
+                                            <i className='fa-solid fa-xmark'></i>
+                                        </button>
+                                    </div>
+                                ) : isLocalhost ? (
+                                    <button
+                                        className='concentration-add-btn'
+                                        onClick={() => openConcentrationPicker(creature)}
+                                        type='button'
+                                        title='Add concentration'
+                                    >
+                                        <i className='fa-solid fa-spinner'></i>
+                                    </button>
+                                ) : null}
                             </div>
                         </div>
                     );
@@ -639,6 +802,38 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                         <div className='condition-picker-actions'>
                             <button onClick={() => setConditionPickerTarget(null)} type='button'>Cancel</button>
                             <button onClick={handleApplyCondition} disabled={!conditionPickerSelected} type='button'>Apply</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {concentrationPickerTarget && (
+                <div className='condition-picker-overlay' onClick={() => setConcentrationPickerTarget(null)}>
+                    <div className='condition-picker-modal' onClick={e => e.stopPropagation()}>
+                        <h3>Concentration for {concentrationPickerTarget.name}</h3>
+                        <div className='condition-picker-fields'>
+                            <label>
+                                Spell
+                                <input
+                                    type='text'
+                                    value={concentrationSpellName}
+                                    onChange={e => setConcentrationSpellName(e.target.value)}
+                                    placeholder='Spell name'
+                                    autoFocus
+                                />
+                            </label>
+                            <label>
+                                DC
+                                <input
+                                    type='number'
+                                    min='1'
+                                    value={concentrationDc}
+                                    onChange={e => setConcentrationDc(parseInt(e.target.value) || 10)}
+                                />
+                            </label>
+                        </div>
+                        <div className='condition-picker-actions'>
+                            <button onClick={() => setConcentrationPickerTarget(null)} type='button'>Cancel</button>
+                            <button onClick={handleApplyConcentration} disabled={!concentrationSpellName.trim()} type='button'>Apply</button>
                         </div>
                     </div>
                 </div>

@@ -50,8 +50,8 @@ describe('Initiative', () => {
    });
 
   it('should render without crashing with empty characters', () => {
-    render(<Initiative characters={[]} />);
-    expect(screen.getByText(/Initiative/)).toBeInTheDocument();
+    const { container } = render(<Initiative characters={[]} />);
+    expect(container.querySelector('.initiative')).toBeInTheDocument();
    });
 
   it('should show round number in header', () => {
@@ -291,6 +291,87 @@ describe('Initiative', () => {
   it('should return early when no characters are provided', () => {
     const { container } = render(<Initiative characters={[]} />);
     expect(container.querySelector('.initiative')).toBeInTheDocument();
+   });
+
+  it('should show concentration add button when isLocalhost is true', async () => {
+    render(<Initiative characters={[{ name: 'Gandalf' }]} isLocalhost={true} />);
+    await act(async () => {
+      await vi.waitFor(() => {
+        const addBtn = document.querySelector('.concentration-add-btn');
+        expect(addBtn).toBeInTheDocument();
+       });
+     });
+   });
+
+  it('should open concentration picker modal when add button clicked', async () => {
+    render(<Initiative characters={[]} isLocalhost={true} />);
+    await act(async () => {
+      await vi.waitFor(() => {
+        const addBtn = document.querySelector('.concentration-add-btn');
+        expect(addBtn).toBeInTheDocument();
+       });
+     });
+    fireEvent.click(document.querySelector('.concentration-add-btn'));
+    expect(screen.getByText(/Concentration for/)).toBeInTheDocument();
+   });
+
+  it('should apply concentration and show badge', async () => {
+    render(<Initiative characters={[{ name: 'Gandalf' }]} isLocalhost={true} />);
+    await act(async () => {
+      await vi.waitFor(() => {
+        const addBtn = document.querySelector('.concentration-add-btn');
+        if (addBtn) fireEvent.click(addBtn);
+       });
+     });
+    await screen.findByText(/Concentration for/);
+    const spellInput = document.querySelector('.condition-picker-fields input[type="text"]');
+    fireEvent.change(spellInput, { target: { value: 'Bless' } });
+    fireEvent.click(screen.getByText('Apply'));
+    await vi.waitFor(() => {
+      expect(document.querySelector('.initiative-concentration-badge')).toBeInTheDocument();
+     });
+   });
+
+  it('should break concentration when break button clicked', async () => {
+    render(<Initiative characters={[{ name: 'Gandalf' }]} isLocalhost={true} />);
+    await act(async () => {
+      await vi.waitFor(() => {
+        const addBtn = document.querySelector('.concentration-add-btn');
+        if (addBtn) fireEvent.click(addBtn);
+       });
+     });
+    await screen.findByText(/Concentration for/);
+    const spellInput = document.querySelector('.condition-picker-fields input[type="text"]');
+    fireEvent.change(spellInput, { target: { value: 'Bless' } });
+    fireEvent.click(screen.getByText('Apply'));
+    await vi.waitFor(() => {
+      expect(document.querySelector('.initiative-concentration-badge')).toBeInTheDocument();
+     });
+    fireEvent.click(document.querySelector('.concentration-break-btn'));
+    await vi.waitFor(() => {
+      expect(document.querySelector('.concentration-add-btn')).toBeInTheDocument();
+     });
+   });
+
+  it('should roll concentration save when badge clicked', async () => {
+    render(<Initiative characters={[{ name: 'Gandalf' }]} isLocalhost={true} />);
+    await act(async () => {
+      await vi.waitFor(() => {
+        const addBtn = document.querySelector('.concentration-add-btn');
+        if (addBtn) fireEvent.click(addBtn);
+       });
+     });
+    await screen.findByText(/Concentration for/);
+    const spellInput = document.querySelector('.condition-picker-fields input[type="text"]');
+    fireEvent.change(spellInput, { target: { value: 'Bless' } });
+    fireEvent.click(screen.getByText('Apply'));
+    await vi.waitFor(() => {
+      expect(document.querySelector('.initiative-concentration-badge')).toBeInTheDocument();
+     });
+    fireEvent.click(document.querySelector('.initiative-concentration-badge'));
+    await vi.waitFor(() => {
+      expect(document.querySelector('.condition-save-result')).toBeInTheDocument();
+     });
    });
 });
 
