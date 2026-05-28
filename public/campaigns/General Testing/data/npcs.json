@@ -47,7 +47,31 @@
     "secrets": "Selena's predecessor as Warden of Thornfast was her older brother, who disappeared into the keep a decade ago. She has reason to believe he may still be alive — corrupted and transformed by the Thorned One's influence. The corrupted elven spirits the party fights might include remnants of the former Wardens.",
     "notes": "Potential ally. Selena has been tracking the corruption for weeks and can guide the party through the Misty Forest to Thornfast Keep's entrance. She knows the surface layout but has not ventured below the crypt level. She fights alongside the party in the Medium Dungeon encounter if they earn her trust.",
     "tags": "Ally, Ranger, Emerald Warden",
-    "attitude": "neutral"
+    "attitude": "neutral",
+    "imagePath": "campaigns/General Testing/images/Selena Moonshadow.png",
+    "hitPoints": "",
+    "hitDice": "",
+    "initiativeBonus": "",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "abilityScores": {
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 10,
+      "wis": 10,
+      "cha": 10
+    },
+    "savingThrowBonuses": {},
+    "skillBonuses": {},
+    "damageResistances": [],
+    "damageImmunities": [],
+    "conditionImmunities": [],
+    "actions": [],
+    "traits": "",
+    "reactions": "",
+    "armorClass": null
   },
   {
     "id": "d4e5f6a7-b890-1234-cdef-123456789012",
@@ -60,7 +84,31 @@
     "secrets": "Mother Thorn was once a noble archfey of the Summer Court, charged with guarding the Feywild crossing. When the elven builders of Thornfast Keep bound her to prevent a Feywild invasion, her rage and bitterness twisted her into what she is now. The Warlock's Archfey patron may know her as a fallen cousin, and the Sorcerer's Wild Magic is drawn to her presence like a beacon.",
     "notes": "Final antagonist. Uses Green Hag stat block (2024). She lairs in the Ancient Tomb, where the seal's central anchor is located. Her presence causes Wild Magic surges within the tomb. She can be negotiated with briefly before combat begins.",
     "tags": "Antagonist, Archfey, Boss",
-    "attitude": "extreme opposition"
+    "attitude": "extreme opposition",
+    "imagePath": "campaigns/General Testing/images/Mother Thorn.png",
+    "hitPoints": "",
+    "hitDice": "",
+    "initiativeBonus": "",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "abilityScores": {
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 10,
+      "wis": 10,
+      "cha": 10
+    },
+    "savingThrowBonuses": {},
+    "skillBonuses": {},
+    "damageResistances": [],
+    "damageImmunities": [],
+    "conditionImmunities": [],
+    "actions": [],
+    "traits": "",
+    "reactions": "",
+    "armorClass": null
   },
   {
     "id": "e5f6a7b8-c901-2345-defa-234567890123",
@@ -73,7 +121,31 @@
     "secrets": "Thistle knows the location of a hidden passage within the Large Keep that leads directly to the Mega Dungeon levels, bypassing several dangerous patrols. She also knows that the Thorned One can be weakened by disrupting the three seal anchors hidden throughout the dungeon.",
     "notes": "Captive/informant. Found in the Large Keep (held in a cage in the eastern guard room). If freed, she provides invaluable information about the fortress layout, the Thorned One's weaknesses, and the three seal anchors. She can also turn invisible for reconnaissance. She refuses to go deeper than the Mega Dungeon out of fear.",
     "tags": "Informant, Captive, Fey",
-    "attitude": "positive"
+    "attitude": "positive",
+    "imagePath": "campaigns/General Testing/images/Thistle.png",
+    "hitPoints": "",
+    "hitDice": "",
+    "initiativeBonus": "",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "abilityScores": {
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 10,
+      "wis": 10,
+      "cha": 10
+    },
+    "savingThrowBonuses": {},
+    "skillBonuses": {},
+    "damageResistances": [],
+    "damageImmunities": [],
+    "conditionImmunities": [],
+    "actions": [],
+    "traits": "",
+    "reactions": "",
+    "armorClass": null
   },
   {
     "id": "f6a7b8c9-d012-3456-efab-345678901234",
@@ -86,6 +158,30 @@
     "secrets": "Aldric is not actually loyal to the Thorned One — he is terrified of her and believes serving her is the only way to survive. If confronted and given a path to redemption, he can be persuaded to reveal the location of the three seal anchors and the password to bypass a magical ward in the Mega Dungeon. He does not know that the Thorned One plans to consume him once the seal falls.",
     "notes": "Social encounter NPC. Found in the Large Keep's great hall. Can be parleyed with — if the party succeeds on a DC 14 Persuasion or Intimidation check (or uses the Warlock's Mask of Many Faces cleverly), Aldric reveals key information. He is not a combatant (use Cultist stat block if forced to fight).",
     "tags": "Cult Leader, Social Encounter, Redeemable",
-    "attitude": "negative"
+    "attitude": "negative",
+    "imagePath": "campaigns/General Testing/images/Brother Aldric.png",
+    "hitPoints": "",
+    "hitDice": "",
+    "initiativeBonus": "",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "abilityScores": {
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 10,
+      "wis": 10,
+      "cha": 10
+    },
+    "savingThrowBonuses": {},
+    "skillBonuses": {},
+    "damageResistances": [],
+    "damageImmunities": [],
+    "conditionImmunities": [],
+    "actions": [],
+    "traits": "",
+    "reactions": "",
+    "armorClass": null
   }
 ]

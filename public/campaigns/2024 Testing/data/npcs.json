@@ -10,7 +10,31 @@
     "secrets": "Kito's younger sister was taken by the yuan-ti cult three moons ago. He has been receiving letters demanding tribute, and he suspects the yuan-ti are planning something major. He has secretly sent messages to the Jungle Hunters' Guild for help, but has not told his village, fearing panic.",
     "notes": "Kito can provide the party with information about the yuan-ti cult's activities, the missing villagers, and the general location of the sunken temple. He will offer the party supplies and a guide if they agree to help, but he cannot leave the village himself. He knows several ancient chulan prayers that may be useful in the temple.",
     "tags": "village leader, quest giver, chulan heritage, yuan-ti victim",
-    "attitude": "positive"
+    "attitude": "positive",
+    "imagePath": "campaigns/2024 Testing/images/Elder Kito.png",
+    "hitPoints": "",
+    "hitDice": "",
+    "initiativeBonus": "",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "abilityScores": {
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 10,
+      "wis": 10,
+      "cha": 10
+    },
+    "savingThrowBonuses": {},
+    "skillBonuses": {},
+    "damageResistances": [],
+    "damageImmunities": [],
+    "conditionImmunities": [],
+    "actions": [],
+    "traits": "",
+    "reactions": "",
+    "armorClass": null
   },
   {
     "id": "n2b3c4d5-e6f7-a8b9-c0d1-e2f3a4b5c6d7",
@@ -23,7 +47,31 @@
     "secrets": "Thornwood has discovered murals in a nearby ruin that depict the sunken temple of Omu and the ritual the yuan-ti are performing. He knows the ritual could awaken something ancient and dangerous, but he lacks the means to stop it alone. He has been tracking the yuan-ti cult for months and knows their numbers and general layout of the temple.",
     "notes": "Thornwood can provide the party with valuable information about the temple's layout, the yuan-ti cult's activities, and ancient chulan history. He offers to join the party as a guide and provides jungle survival gear. He knows several spells related to detection and protection against poison. He may become a valuable ally or even a permanent companion.",
     "tags": "guide, scholar, ally, jungle expert, spellcaster",
-    "attitude": "positive"
+    "attitude": "positive",
+    "imagePath": "campaigns/2024 Testing/images/Dr. Thornwood.png",
+    "hitPoints": "",
+    "hitDice": "",
+    "initiativeBonus": "",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "abilityScores": {
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 10,
+      "wis": 10,
+      "cha": 10
+    },
+    "savingThrowBonuses": {},
+    "skillBonuses": {},
+    "damageResistances": [],
+    "damageImmunities": [],
+    "conditionImmunities": [],
+    "actions": [],
+    "traits": "",
+    "reactions": "",
+    "armorClass": null
   },
   {
     "id": "n3c4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8",
@@ -36,7 +84,31 @@
     "secrets": "Vexia is a yuan-ti half-breed who was raised among the cult but never fully accepted by the purebloods. She knows the ritual's true purpose and the location of the four components needed to complete it. She also knows that Kethis plans to sacrifice her regardless of whether the ritual succeeds, as her mixed blood is considered 'impure' for the ceremony.",
     "notes": "Vexia can be found in the temple's outer chambers, pretending to be a captive. She will approach the party secretly and offer information about the temple's layout, the ritual, and Kethis's weaknesses. She knows where the ritual components are stored and can guide the party to Kethis's sanctum. However, she may try to steal magic items or lead the party into traps if she senses an opportunity.",
     "tags": "informant, yuan-ti half-breed, unreliable, captive, potential ally",
-    "attitude": "neutral"
+    "attitude": "neutral",
+    "imagePath": "campaigns/2024 Testing/images/Vexia.png",
+    "hitPoints": "",
+    "hitDice": "",
+    "initiativeBonus": "",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "abilityScores": {
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 10,
+      "wis": 10,
+      "cha": 10
+    },
+    "savingThrowBonuses": {},
+    "skillBonuses": {},
+    "damageResistances": [],
+    "damageImmunities": [],
+    "conditionImmunities": [],
+    "actions": [],
+    "traits": "",
+    "reactions": "",
+    "armorClass": null
   },
   {
     "id": "n4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8f9",
@@ -49,7 +121,31 @@
     "secrets": "Kethis was once a revered chulan hero who discovered the sunken temple and made a pact with the serpent gods to save his people from a great disaster. The pact granted him power but slowly transformed him into a yuan-ti. He has been waiting centuries for the ritual to be performed correctly, and he has spent years preparing the cult and gathering the necessary components. The serpent god's avatar is not a benevolent entity—it is a mindless force of destruction that Kethis does not fully understand.",
     "notes": "Kethis is the final boss of the adventure. He awaits in the temple's inner sanctum, performing the ritual. He has four yuan-ti infiltrators as guards. Kethis is immune to poison and has resistance to nonmagical weapon damage. He can cast spells like suggestion, hold person, and banishment. Defeating him requires destroying the ritual components or disrupting the ceremony. If the party succeeds, the temple begins to collapse, triggering the escape encounter.",
     "tags": "final boss, yuan-ti abomination, fallen hero, cult leader, ritual master",
-    "attitude": "extreme opposition"
+    "attitude": "extreme opposition",
+    "imagePath": "campaigns/2024 Testing/images/Kethis.png",
+    "hitPoints": "",
+    "hitDice": "",
+    "initiativeBonus": "",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "abilityScores": {
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 10,
+      "wis": 10,
+      "cha": 10
+    },
+    "savingThrowBonuses": {},
+    "skillBonuses": {},
+    "damageResistances": [],
+    "damageImmunities": [],
+    "conditionImmunities": [],
+    "actions": [],
+    "traits": "",
+    "reactions": "",
+    "armorClass": null
   },
   {
     "id": "n5e6f7-a8b9-c0d1-e2f3-a4b5c6d7e8f9",
@@ -62,6 +158,30 @@
     "secrets": "Sssira has been secretly undermining Kethis's plans, hoping to take control of the cult herself if the ritual succeeds. She has planted a trap in the sanctum that will activate if Kethis is defeated, designed to kill anyone who approaches the ritual altar.",
     "notes": "Sssira serves as Kethis's second-in-command and oversees the ritual preparations. She can be encountered in the inner chambers, directing cultist activities. She is a spellcaster who can cast entangle, fog cloud, darkness, and suggestion. If the party captures her alive, she may reveal information about the temple and Kethis's weaknesses in exchange for her life. However, she will try to poison or betray anyone who shows mercy.",
     "tags": "high priestess, spellcaster, antagonist, yuan-ti pureblood, ritual master",
-    "attitude": "extreme opposition"
+    "attitude": "extreme opposition",
+    "imagePath": "campaigns/2024 Testing/images/Sssira.png",
+    "hitPoints": "",
+    "hitDice": "",
+    "initiativeBonus": "",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "abilityScores": {
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 10,
+      "wis": 10,
+      "cha": 10
+    },
+    "savingThrowBonuses": {},
+    "skillBonuses": {},
+    "damageResistances": [],
+    "damageImmunities": [],
+    "conditionImmunities": [],
+    "actions": [],
+    "traits": "",
+    "reactions": "",
+    "armorClass": null
   }
 ]

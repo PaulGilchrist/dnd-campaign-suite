@@ -10,7 +10,31 @@
     "secrets": "Brunnilda knows more dwarven history than she lets on. Her family's signet ring grants her limited access to sealed dwarven chambers in the mountain — a fact she has kept hidden because she fears what might be sealed down there. She has heard the sounds from the deep and knows it is not natural.",
     "notes": "Brunnilda can provide the party with information about the mine layout, the town's resources, and dwarven history. She offers 500 gp total for the party's services. She cannot leave the town herself but can provide supplies, maps of the upper mine levels, and the clan signet ring if the party earns her trust.",
     "tags": "quest giver, town leader, dwarven heritage, information source",
-    "attitude": "positive"
+    "attitude": "positive",
+    "imagePath": "campaigns/5e Testing/images/Mayor Brunnilda Stonebeard.png",
+    "hitPoints": "",
+    "hitDice": "",
+    "initiativeBonus": "",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "abilityScores": {
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 10,
+      "wis": 10,
+      "cha": 10
+    },
+    "savingThrowBonuses": {},
+    "skillBonuses": {},
+    "damageResistances": [],
+    "damageImmunities": [],
+    "conditionImmunities": [],
+    "actions": [],
+    "traits": "",
+    "reactions": "",
+    "armorClass": null
   },
   {
     "id": "n2b3c4d5-e6f7-a8b9-c0d1-e2f3a4b5c6d7",
@@ -23,7 +47,31 @@
     "secrets": "Thorgar was betrayed by his own clan. He had been blessed by Moradin with unnatural strength and durability — a gift that his clan mistook for corruption. Out of fear, they sealed him alive in the ancient tomb. He does not fully remember this truth; his memory has been clouded by centuries of undeath and the corruption of the runes he once protected. The Clan Heart is not just powering his undeath — it is the source of his connection to Moradin's blessing.",
     "notes": "Thorgar is the final boss of the adventure. He awaits in the inner sanctum of the ancient tomb, flanked by wights and wraiths. His Undead Bastion legendary action allows him to regenerate 10 HP each turn. The party must destroy the Clan Heart to make him vulnerable. During the battle, he recognizes the Mountain Dwarf Ranger's clan bloodline and offers them a choice. He is immune to magical sleep and has resistance to nonmagical weapon damage. Destroying the Clan Heart requires a DC 15 Strength check or a spell like disintegrate.",
     "tags": "final boss, death knight, fallen champion, undead leader, tragic antagonist",
-    "attitude": "extreme opposition"
+    "attitude": "extreme opposition",
+    "imagePath": "campaigns/5e Testing/images/Thorgar Ironfist.png",
+    "hitPoints": "",
+    "hitDice": "",
+    "initiativeBonus": "",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "abilityScores": {
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 10,
+      "wis": 10,
+      "cha": 10
+    },
+    "savingThrowBonuses": {},
+    "skillBonuses": {},
+    "damageResistances": [],
+    "damageImmunities": [],
+    "conditionImmunities": [],
+    "actions": [],
+    "traits": "",
+    "reactions": "",
+    "armorClass": null
   },
   {
     "id": "n3c4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8",
@@ -36,7 +84,31 @@
     "secrets": "Kelda has been forced to stand near the Runes of Binding, and the corrupted magic has left her with faint visions of Thorgar's past. She can describe the sanctum layout in detail and knows that the runes weaken Thorgar's power when disrupted. She also knows that Thorgar's warhammer, the Anvil of Judgment, can shatter stone and is his most dangerous weapon.",
     "notes": "Kelda is held in the tomb's inner chambers, used as a living sacrifice to power Thorgar's undead army. The party can rescue her through stealth, combat, or negotiation (DC 15 Charisma (Persuasion) check). If rescued, she provides crucial information about the sanctum layout, the Runes of Binding, and Thorgar's patterns. She can guide the party through the escape during the mountain collapse.",
     "tags": "captive, survivor, informant, Brom's sister, potential ally",
-    "attitude": "positive"
+    "attitude": "positive",
+    "imagePath": "campaigns/5e Testing/images/Kelda.png",
+    "hitPoints": "",
+    "hitDice": "",
+    "initiativeBonus": "",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "abilityScores": {
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 10,
+      "wis": 10,
+      "cha": 10
+    },
+    "savingThrowBonuses": {},
+    "skillBonuses": {},
+    "damageResistances": [],
+    "damageImmunities": [],
+    "conditionImmunities": [],
+    "actions": [],
+    "traits": "",
+    "reactions": "",
+    "armorClass": null
   },
   {
     "id": "n4d5e6-f7a8-b9c0-d1e2-f3a4b5c6d7e8f9",
@@ -49,7 +121,31 @@
     "secrets": "Brom was expanding the mine to reach a new vein of iron ore when his pickaxe struck a hidden wall. Behind it was the sealed entrance to the ancient tomb. He tried to seal it back up, but the collapse had already begun. He has been hiding in the deep mines ever since, too terrified to return to the surface.",
     "notes": "Brom is found trapped behind a collapsed wall in the deep mines (Hour 2). He begs for forgiveness and offers to guide the party to Thorgar's chamber if they save his companions. He can navigate safe paths through the collapsed tunnels and knows where the mine cart tracks still reach. He is not combat-capable but can provide valuable information.",
     "tags": "survivor, guilt-ridden, guide, Brom's brother, quest giver",
-    "attitude": "positive"
+    "attitude": "positive",
+    "imagePath": "campaigns/5e Testing/images/Brom.png",
+    "hitPoints": "",
+    "hitDice": "",
+    "initiativeBonus": "",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "abilityScores": {
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 10,
+      "wis": 10,
+      "cha": 10
+    },
+    "savingThrowBonuses": {},
+    "skillBonuses": {},
+    "damageResistances": [],
+    "damageImmunities": [],
+    "conditionImmunities": [],
+    "actions": [],
+    "traits": "",
+    "reactions": "",
+    "armorClass": null
   },
   {
     "id": "n5e6f7-a8b9-c0d1-e2f3-a4b5c6d7e8f9",
@@ -62,6 +158,30 @@
     "secrets": "Varn remembers more of the truth than Thorgar does. He knows that the clan betrayed Thorgar out of fear, not justice. But he chose undeath anyway, believing that the living had proven unworthy of dwarven trust. He resents Thorgar's hesitation and wants to destroy the surface world without mercy.",
     "notes": "Lieutenant Varn leads the elite guard in the dwarven armory (Hour 2, Encounter 2). He uses Death Knight stats but with half HP (approximately 150 HP instead of 300). He is a tactical fighter who coordinates with wights and skeleton elites. He can be targeted first to weaken Thorgar's command structure. If defeated, the remaining undead suffer disadvantage on Wisdom saves for 1 minute as their coordination breaks down.",
     "tags": "lieutenant, death knight, undead commander, Thorgar's second, tactical fighter",
-    "attitude": "extreme opposition"
+    "attitude": "extreme opposition",
+    "imagePath": "campaigns/5e Testing/images/Lieutenant Varn.png",
+    "hitPoints": "",
+    "hitDice": "",
+    "initiativeBonus": "",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "abilityScores": {
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 10,
+      "wis": 10,
+      "cha": 10
+    },
+    "savingThrowBonuses": {},
+    "skillBonuses": {},
+    "damageResistances": [],
+    "damageImmunities": [],
+    "conditionImmunities": [],
+    "actions": [],
+    "traits": "",
+    "reactions": "",
+    "armorClass": null
   }
 ]
