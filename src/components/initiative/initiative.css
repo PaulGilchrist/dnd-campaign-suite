@@ -173,9 +173,9 @@
 
 .initiative .creature-initiative input[type="number"] {
     width: 30px;
-    padding: 4.5px 6px;
+    padding: 3px 4px;
     text-align: center;
-    font-size: 0.75em;
+    font-size: 0.8em;
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 4px;
 }
@@ -519,4 +519,118 @@
     color: #e74c3c;
 }
 
+/* Creature HP */
+.initiative .creature-hp {
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+.initiative .hp-bar-row {
+    width: 80%;
+    margin-bottom: 2px;
+}
+
+.initiative .hp-bar-container {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background-color: rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+}
+
+.initiative .hp-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.initiative .hp-inline-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 3px;
+    white-space: nowrap;
+}
+
+.initiative .hp-label {
+    font-size: 0.75em;
+    font-weight: 600;
+    opacity: 0.8;
+}
+
+.initiative .hp-sep {
+    font-size: 0.8em;
+    opacity: 0.7;
+}
+
+.initiative .hp-max-val {
+    font-size: 0.8em;
+    font-weight: 600;
+}
+
+.initiative .hp-inline-input {
+    width: 36px;
+    padding: 2px 3px;
+    text-align: center;
+    font-size: 0.8em;
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.2);
+    color: inherit;
+}
+
+.initiative .hp-inline-input:focus {
+    outline: 2px solid #ffcc00;
+    border-color: #ffcc00;
+}
+
+.initiative .hp-inline-input.hp-max-input {
+    width: 30px;
+}
+
+.initiative .hp-status {
+    display: flex;
+    gap: 4px;
+}
+
+.initiative .status-badge {
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.7em;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.initiative .status-badge.healthy {
+    background-color: rgba(46, 204, 113, 0.2);
+    border: 1px solid rgba(46, 204, 113, 0.4);
+    color: #2ecc71;
+}
+
+.initiative .status-badge.bloodied {
+    background-color: rgba(230, 126, 34, 0.2);
+    border: 1px solid rgba(230, 126, 34, 0.5);
+    color: #e67e22;
+}
+
+.initiative .status-badge.dead {
+    background-color: rgba(231, 76, 60, 0.2);
+    border: 1px solid rgba(231, 76, 60, 0.5);
+    color: #e74c3c;
+}
+
+/* Unconscious creature styling */
+.initiative .creature-card.creature-unconscious {
+    opacity: 0.55;
+    filter: grayscale(0.7);
+}
+
+.initiative .creature-card.creature-unconscious .creature-avatar {
+    filter: grayscale(0.8);
+}
 

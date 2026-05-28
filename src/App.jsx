@@ -14,6 +14,7 @@ import useAppData from './hooks/useAppData.js';
 import useCharacterManagement from './hooks/useCharacterManagement.js';
 import useCampaignManagement from './hooks/useCampaignManagement.js';
 import { useCharacterWizard } from './hooks/useCharacterWizard.js';
+import rulesFactory from './services/rulesFactory.js';
 import Notes from './components/notes/Notes.jsx';
 import Quests from './components/quests/Quests.jsx';
 import NPCs from './components/npcs/NPCs.jsx';
@@ -52,6 +53,40 @@ function App() {
   const { showCampaignSelection, campaignName, isLocalhost, handleCampaignSelect, handleRenameCampaign: handleRenameCampaignRaw, handleDeleteCampaign: handleDeleteCampaignRaw, handleBackToCampaigns } = campaignMgmt;
   const { characters, activeCharacter, setActiveCharacter, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, inputRef } = charMgmt;
   const { showCharacterWizard, showEditCharacterWizard, handleAddCharacter, handleWizardComplete, handleWizardCancel, handleEditCharacter, handleEditWizardComplete, handleEditWizardCancel } = wizard;
+
+  // Compute hitPoints for each character using the rules engine so Initiative has max HP
+   const [charactersWithHp, setCharactersWithHp] = useState([]);
+   const computedKeyRef = useRef('');
+   useEffect(() => {
+     if (!characters || characters.length === 0) {
+       setCharactersWithHp([]);
+       computedKeyRef.current = '';
+       return;
+     }
+     const key = characters.map(c => c.name).join(',');
+     if (key === computedKeyRef.current && charactersWithHp.length > 0) return;
+     computedKeyRef.current = key;
+     let cancelled = false;
+     (async () => {
+       const enriched = await Promise.all(characters.map(async (character) => {
+         if (character.hitPoints != null) return character;
+         try {
+           const is2024 = character.rules === '2024';
+           const effectiveClasses = is2024 ? classes2024 : classes;
+           const effectiveRaces = is2024 ? races2024 : races;
+           const effectiveMagicItems = is2024 ? magicItems2024 : magicItems;
+           const spellData = is2024 ? spells2024 : spells;
+           const playerStats = await rulesFactory.getPlayerStats(effectiveClasses, equipment, effectiveMagicItems, effectiveRaces, spellData, character);
+           return { ...character, hitPoints: playerStats.hitPoints };
+         } catch {
+           return character;
+         }
+       }));
+       if (!cancelled) setCharactersWithHp(enriched);
+     })();
+     return () => { cancelled = true; };
+   }, [characters, classes, classes2024, equipment, magicItems, magicItems2024, races, races2024, spells, spells2024]);
+
 
   const [mapsView, setMapsView] = useState({ type: 'none' });
   const [npcs, setNpcs] = useState([]);
@@ -270,7 +305,7 @@ function App() {
             onSaveClick={handleSaveClick}
           />
         )}
-        {activeView === 'initiative' && <Initiative characters={characters} campaignName={campaignName} onNpcsChange={setNpcs} isLocalhost={isLocalhost} />}
+        {activeView === 'initiative' && <Initiative characters={charactersWithHp} campaignName={campaignName} onNpcsChange={setNpcs} isLocalhost={isLocalhost} />}
         {activeView === 'mapsManager' && mapsView.type === 'manager' && (
           <MapsManager
             campaignName={campaignName}

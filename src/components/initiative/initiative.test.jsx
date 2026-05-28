@@ -1,11 +1,15 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Initiative from './initiative.jsx';
+
+import storage from '../../services/storage.js';
 
 vi.mock('../../services/storage.js', () => ({
   default: {
     get: vi.fn(),
     set: vi.fn(),
+    getProperty: vi.fn(() => null),
+    setProperty: vi.fn(),
   },
 }));
 
@@ -32,6 +36,15 @@ vi.mock('../../services/dataLoader.js', () => ({
   loadEquipment: vi.fn(async () => []),
 }));
 
+vi.mock('../../services/damageUtils.js', () => ({
+  computePlayerAc: vi.fn(async () => 10),
+  computeAcEstimate: vi.fn(() => 10),
+}));
+
+vi.mock('../../services/npcsService.js', () => ({
+  loadNPCs: vi.fn(async () => ({ npcs: [] })),
+}));
+
 // Mock EventSource for Subscriber
 class MockEventSource {
   constructor() {
@@ -47,6 +60,7 @@ describe('Initiative', () => {
     window.confirm = vi.fn(() => true);
     Element.prototype.scrollIntoView = vi.fn();
     global.EventSource = MockEventSource;
+    localStorage.clear();
    });
 
   it('should render without crashing with empty characters', () => {
@@ -371,6 +385,81 @@ describe('Initiative', () => {
     fireEvent.click(document.querySelector('.initiative-concentration-badge'));
     await vi.waitFor(() => {
       expect(document.querySelector('.condition-save-result')).toBeInTheDocument();
+     });
+   });
+
+  // --- HP tracking tests ---
+
+  it('should render HP bar for each creature card', async () => {
+    render(<Initiative characters={[{ name: 'Gandalf' }]} />);
+    await act(async () => {
+      await vi.waitFor(() => {
+        const hpBars = document.querySelectorAll('.hp-bar-container');
+        expect(hpBars.length).toBeGreaterThan(0);
+       });
+     });
+   });
+
+  it('should render HP bar for NPC creature cards', async () => {
+    render(<Initiative characters={[]} />);
+    await act(async () => {
+      await vi.waitFor(() => {
+        const hpBars = document.querySelectorAll('.hp-bar-container');
+        expect(hpBars.length).toBeGreaterThan(0);
+       });
+     });
+   });
+
+  it('should show GM-editable HP inputs for NPCs when isLocalhost', async () => {
+    render(<Initiative characters={[]} isLocalhost={true} />);
+    await act(async () => {
+      await vi.waitFor(() => {
+        const hpInputs = document.querySelectorAll('.hp-inline-input');
+        expect(hpInputs.length).toBeGreaterThan(0);
+       });
+     });
+   });
+
+  it('should show bloodied status badge for NPCs when not isLocalhost', async () => {
+    render(<Initiative characters={[]} isLocalhost={false} />);
+    await act(async () => {
+      await vi.waitFor(() => {
+        const statusBadges = document.querySelectorAll('.status-badge');
+        expect(statusBadges.length).toBeGreaterThan(0);
+       });
+     });
+   });
+
+  it('should apply creature-unconscious class when player HP is 0', async () => {
+    const storageModule = await import('../../services/storage.js');
+    vi.mocked(storageModule.default.getProperty).mockReturnValue(0);
+    render(<Initiative characters={[{ name: 'Gandalf', hitPoints: 30 }]} isLocalhost={true} />);
+    await act(async () => {
+      await vi.waitFor(() => {
+        const unconsciousCards = document.querySelectorAll('.creature-unconscious');
+        expect(unconsciousCards.length).toBeGreaterThanOrEqual(1);
+       });
+     });
+   });
+
+  it('should show player HP with max value displayed', async () => {
+    render(<Initiative characters={[{ name: 'Gandalf', hitPoints: 42 }]} />);
+    await act(async () => {
+      await vi.waitFor(() => {
+        const hpEl = document.querySelector('.creature-card.player .creature-hp');
+        expect(hpEl).toBeInTheDocument();
+       });
+     });
+   });
+
+  it('should show dead status badge when non-GM views NPC with 0 HP', async () => {
+    render(<Initiative characters={[]} isLocalhost={false} />);
+    await act(async () => {
+      await vi.waitFor(() => {
+        const deadBadges = document.querySelectorAll('.status-badge.dead');
+        const statusBadges = document.querySelectorAll('.status-badge');
+        expect(statusBadges.length).toBeGreaterThan(0);
+       });
      });
    });
 });

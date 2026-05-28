@@ -43,6 +43,9 @@ export async function expandMonstersToCreatures(selectedMonsters, characters) {
     const npcRollResults = [];
 
     const playerChars = await Promise.all(characters.map(async (character) => {
+      const maxHp = character.hitPoints || 0;
+      const currentHp = storage.getProperty(character.name, 'currentHitPoints', campaignName) ?? maxHp;
+      const storedMaxHp = storage.getProperty(character.name, 'hitPoints', campaignName);
       return {
         id: utils.guid(),
         name: utils.getFirstName(character.name),
@@ -54,7 +57,9 @@ export async function expandMonstersToCreatures(selectedMonsters, characters) {
         ac: await computePlayerAc(character),
         resistances: character.resistances || [],
         immunities: character.immunities || [],
-        concentration: null
+        concentration: null,
+        maxHp: storedMaxHp ?? maxHp,
+        currentHp: currentHp,
       };
       }));
     playerChars.sort((a, b) => a.name.localeCompare(b.name));
@@ -63,6 +68,7 @@ export async function expandMonstersToCreatures(selectedMonsters, characters) {
     selectedMonsters.forEach(monster => {
       const baseName = monster.name || 'Unnamed';
       const qty = monster.qty || 1;
+      const npcHp = monster.hit_points || 10;
       for (let i = 0; i < qty; i++) {
           const name = qty === 1 ? baseName : `${baseName} ${i + 1}`;
           const rollResult = rollNpcInitiative(monster);
@@ -76,7 +82,9 @@ export async function expandMonstersToCreatures(selectedMonsters, characters) {
             ac: monster.armor_class || 10,
             resistances: monster.damage_resistances || [],
             immunities: monster.damage_immunities || [],
-            concentration: null
+            concentration: null,
+            maxHp: npcHp,
+            currentHp: npcHp,
           });
           npcRollResults.push({ name, rollResult });
           }

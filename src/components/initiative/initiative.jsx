@@ -15,6 +15,7 @@ import { loadNPCs } from '../../services/npcsService.js';
 import { npcToMonsterFormat, npcHasStatBlock } from '../../services/npcStatBlockUtils.js';
 import Popup from '../common/Popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
+import HiddenInput from '../common/HiddenInput.jsx';
 import './initiative.css'
 
 function NpcAvatar({ name, imageUrl, imagePath, onClick }) {
@@ -30,6 +31,97 @@ function NpcAvatar({ name, imageUrl, imagePath, onClick }) {
     return (
         <div className="npc-avatar" onClick={onClick}>
             <span>{initial}</span>
+        </div>
+    );
+}
+
+function HpBar({ current, max }) {
+    const pct = max > 0 ? Math.max(0, Math.min(100, (current / max) * 100)) : 0;
+    const color = pct > 50 ? '#2ecc71' : pct > 25 ? '#f1c40f' : '#e74c3c';
+    return (
+        <div className="hp-bar-container">
+            <div className="hp-bar-fill" style={{ width: `${pct}%`, backgroundColor: color }} />
+        </div>
+    );
+}
+
+function CreatureHp({ creature, isLocalhost, onChange }) {
+    const { currentHp, maxHp, type } = creature;
+    const isDead = currentHp <= 0;
+    const isBloodied = currentHp > 0 && currentHp <= Math.floor(maxHp / 2);
+
+    if (type === 'npc' && !isLocalhost) {
+        return (
+            <div className="creature-hp">
+                <div className="hp-bar-row">
+                    <HpBar current={currentHp} max={maxHp} />
+                </div>
+                <div className="hp-inline-row">
+                    <span className="hp-status">
+                        {isDead && <span className="status-badge dead">DEAD</span>}
+                        {isBloodied && <span className="status-badge bloodied">BLOODIED</span>}
+                        {!isDead && !isBloodied && <span className="status-badge healthy">OK</span>}
+                    </span>
+                </div>
+            </div>
+        );
+    }
+
+    if (type === 'npc' && isLocalhost) {
+        return (
+            <div className="creature-hp">
+                <div className="hp-bar-row">
+                    <HpBar current={currentHp} max={maxHp} />
+                </div>
+                <div className="hp-inline-row">
+                    <span className="hp-label">HP</span>
+                    <input
+                        className="hp-inline-input"
+                        type="number"
+                        min="0"
+                        value={currentHp}
+                        onChange={(e) => onChange(creature.id, parseInt(e.target.value) || 0)}
+                        aria-label={`${creature.name} current HP`}
+                    />
+                    <span className="hp-sep">/</span>
+                    <input
+                        className="hp-inline-input hp-max-input"
+                        type="number"
+                        min="1"
+                        value={maxHp}
+                        onChange={(e) => {
+                            const newMax = parseInt(e.target.value) || 1;
+                            creature.maxHp = newMax;
+                            if (creature.currentHp > newMax) {
+                                creature.currentHp = newMax;
+                            }
+                            onChange(creature.id, creature.currentHp);
+                        }}
+                        aria-label={`${creature.name} max HP`}
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="creature-hp">
+            <div className="hp-bar-row">
+                <HpBar current={currentHp} max={maxHp} />
+            </div>
+            <div className="hp-inline-row">
+                <span className="hp-label">HP</span>
+                <input
+                    className="hp-inline-input"
+                    type="number"
+                    min={0}
+                    value={currentHp}
+                    onChange={(e) => onChange(creature.id, parseInt(e.target.value) || 0)}
+                    aria-label={`${creature.name} current HP`}
+                />
+                <span className="hp-sep">/</span>
+                <span className="hp-max-val">{maxHp}</span>
+            </div>
         </div>
     );
 }
@@ -56,6 +148,18 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
 
     const [campaignNpcs, setCampaignNpcs] = React.useState([]);
 
+    const loadCreatureHp = React.useCallback((characterName, fallbackMaxHp) => {
+        const stored = storage.getProperty(characterName, 'currentHitPoints', campaignName);
+        if (stored != null) return stored;
+        return fallbackMaxHp;
+    }, [campaignName]);
+
+    const loadCreatureMaxHp = React.useCallback((characterName, fallbackMaxHp) => {
+        const stored = storage.getProperty(characterName, 'hitPoints', campaignName);
+        if (stored != null) return stored;
+        return fallbackMaxHp;
+    }, [campaignName]);
+
     // Load campaign NPCs for stat block matching
     React.useEffect(() => {
         if (!campaignName) return;
@@ -78,6 +182,27 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
         } else if (dataKey === 'activeCreatureId') {
             localStorage.setItem('activeCreatureId', JSON.stringify(event.data));
             setActiveCreatureId(event.data);
+        } else {
+            const cs = combatSummaryRef.current;
+            if (!cs) return;
+            const charData = event.data;
+            let changed = false;
+            for (const creature of cs.creatures) {
+                if (creature.type !== 'player') continue;
+                if (creature.name !== dataKey) continue;
+                if (charData.currentHitPoints != null && creature.currentHp !== charData.currentHitPoints) {
+                    creature.currentHp = charData.currentHitPoints;
+                    changed = true;
+                }
+                if (charData.hitPoints != null && creature.maxHp !== charData.hitPoints) {
+                    creature.maxHp = charData.hitPoints;
+                    changed = true;
+                }
+            }
+            if (changed) {
+                storage.set('combatSummary', cs, campaignName);
+                setCombatSummary(cloneDeep(cs));
+            }
         }
     }, [campaignName]);
 
@@ -87,7 +212,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
         const promises = npcIds.map(async (id) => {
             const creature = combatSummary.creatures.find(c => c.id === id);
             if (creature) {
-                // Already has imagePath from campaign NPC
                 if (creature.imagePath) return { id, url: null };
                 const url = await getMonsterImageUrl(creature.name, campaignNpcs);
                 return { id, url };
@@ -103,6 +227,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
 
     const setupCreatures = React.useCallback(() => {
         const creatureList = characters.map((character) => {
+            const maxHp = character.hitPoints || 0;
+            const finalMaxHp = loadCreatureMaxHp(utils.getFirstName(character.name), maxHp);
+            const finalCurrentHp = loadCreatureHp(utils.getFirstName(character.name), maxHp);
             return {
                 id: utils.guid(),
                 name: utils.getFirstName(character.name),
@@ -115,15 +242,17 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                 resistances: character.resistances || [],
                 immunities: character.immunities || [],
                 conditions: [],
-                concentration: null
+                concentration: null,
+                maxHp: loadCreatureMaxHp(utils.getFirstName(character.name), maxHp),
+                currentHp: loadCreatureHp(utils.getFirstName(character.name), maxHp),
             };
         });
-        creatureList.sort((a, b) => a.name.localeCompare(b.name)); // asc
+        creatureList.sort((a, b) => a.name.localeCompare(b.name));
         for (let i = 0; i < numOfNpc; i++) {
-            creatureList.push({ id: utils.guid(), name: `NPC ${i + 1}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null });
+            creatureList.push({ id: utils.guid(), name: `NPC ${i + 1}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null, maxHp: 10, currentHp: 10 });
         }
         return creatureList;
-    }, [characters, numOfNpc]);
+    }, [characters, numOfNpc, loadCreatureHp, loadCreatureMaxHp]);
 
     const handleAddNpc = React.useCallback(() => {
         if (!combatSummary) return;
@@ -134,7 +263,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                 return match ? Math.max(max, parseInt(match[1])) : max;
             }, 0);
         const nextNum = maxNpcNum + 1;
-        combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${nextNum}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null });
+        combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${nextNum}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null, maxHp: 10, currentHp: 10 });
         setNumOfNpc(nextNum);
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
@@ -211,9 +340,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
             const mergedCreatures = initialSummary.creatures.map(c => {
                 if (c.type === 'player' && characterNameSet.has(c.name)) {
                     const character = characters.find(ch => utils.getFirstName(ch.name) === c.name);
-                    return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(character) };
+                    const maxHp = loadCreatureMaxHp(c.name, character?.hitPoints || c.maxHp || 0);
+                    return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(character), currentHp: loadCreatureHp(c.name, maxHp), maxHp };
                 }
-                return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null };
+                return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, currentHp: c.currentHp ?? c.maxHp ?? 10, maxHp: c.maxHp ?? 10 };
             });
 
             const npcCount = mergedCreatures.filter(c => c.type === 'npc').length;
@@ -239,7 +369,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
             storage.set('activeCreatureId', firstId, campaignName);
             setActiveCreatureId(firstId);
         }
-    }, [characters, campaignName, setupCreatures]);
+    }, [characters, campaignName, setupCreatures, loadCreatureHp, loadCreatureMaxHp]);
 
     React.useEffect(() => {
         if (!combatSummary || !onNpcsChange) return;
@@ -302,7 +432,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
             setCombatSummary(cloneDeep(combatSummary));
         })();
         return () => { cancelled = true; };
-    }, [combatSummary == null]); // only run once when combatSummary is first set
+    }, [combatSummary == null]);
 
     React.useEffect(() => {
         const handler = () => {
@@ -318,6 +448,18 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
         window.addEventListener('initiative-rolled', handler);
         return () => window.removeEventListener('initiative-rolled', handler);
     }, []);
+
+    const handleCreatureHpChange = React.useCallback((creatureId, newValue) => {
+        if (!combatSummary) return;
+        const creature = combatSummary.creatures.find(c => c.id === creatureId);
+        if (!creature) return;
+        creature.currentHp = newValue;
+        if (creature.type === 'player') {
+            storage.setProperty(creature.name, 'currentHitPoints', newValue, campaignName);
+        }
+        storage.set('combatSummary', combatSummary, campaignName);
+        setCombatSummary(cloneDeep(combatSummary));
+    }, [combatSummary, campaignName]);
 
     const handleClear = () => {
         if (window.confirm('Are you sure you want to clear all combat status?')) {
@@ -342,14 +484,14 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
         if (!combatSummary) return;
         const idx = combatSummary.creatures.findIndex((creature) => creature.id === id);
         combatSummary.creatures[idx].name = value;
-        // Look up monster data to update AC/resistances/immunities
         getMonsterData(value, campaignNpcs).then(monster => {
             if (monster) {
                 combatSummary.creatures[idx].ac = monster.armor_class || 10;
                 combatSummary.creatures[idx].resistances = monster.damage_resistances || [];
                 combatSummary.creatures[idx].immunities = monster.damage_immunities || [];
                 combatSummary.creatures[idx].initiativeBonus = monster.initiative_details ? parseInt(monster.initiative_details) || 0 : 0;
-                // Try to find matching campaign NPC for imagePath
+                combatSummary.creatures[idx].maxHp = monster.hit_points || 10;
+                combatSummary.creatures[idx].currentHp = monster.hit_points || 10;
                 const matchedNpc = campaignNpcs.find(n => n.name?.toLowerCase() === value.toLowerCase());
                 if (matchedNpc?.imagePath) {
                     combatSummary.creatures[idx].imagePath = matchedNpc.imagePath;
@@ -405,7 +547,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
 
     const handleNpcClick = async (creature) => {
         if (!isLocalhost) return;
-        // Check campaign NPCs first
         const npc = campaignNpcs.find(n => n.name?.toLowerCase() === creature.name?.toLowerCase());
         if (npc) {
             const formatted = npcToMonsterFormat(npc);
@@ -687,8 +828,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
             <div className='carousel-container' ref={carouselRef}>
                 {combatSummary?.creatures?.map((creature) => {
                     const isActive = creature.id === activeCreatureId;
+                    const isUnconscious = creature.currentHp <= 0;
                     return (
-                        <div key={creature.id} className={`creature-card ${creature.type} ${isActive ? 'active' : ''}`}>
+                        <div key={creature.id} className={`creature-card ${creature.type} ${isActive ? 'active' : ''} ${isUnconscious ? 'creature-unconscious' : ''}`}>
                             <div className='creature-avatar'>
                                 {creature.type === 'player' ? (
                                     <AvatarImage name={creature.name} imagePath={creature.imagePath} size={150} />
@@ -707,6 +849,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                                     <span>{creature.name}</span>
                                 )}
                             </div>
+                            <CreatureHp
+                                creature={creature}
+                                isLocalhost={isLocalhost}
+                                onChange={handleCreatureHpChange}
+                            />
                             <div className='creature-initiative'>Initiative&nbsp;
                                 {creature.type === 'npc' && creature.initiativeBonus != null && creature.initiativeBonus !== '' && creature.initiativeBonus !== 0 ? (
                                     <span

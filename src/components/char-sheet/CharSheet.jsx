@@ -58,6 +58,11 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         fetchData();
     }, [allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, forceRefresh, allRaces2024, allMagicItems2024]);
 
+    React.useEffect(() => {
+        if (!playerStats) return;
+        storage.setProperty(playerStats.name, 'hitPoints', playerStats.hitPoints, campaignName);
+    }, [playerStats, campaignName]);
+
     const handleEvent = (event) => {
             if (event.key == null || event.data == null) { return; }
             if (!event.key.startsWith('change-')) { return; }
