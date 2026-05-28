@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { loadMonsters } from '../../services/dataLoader.js';
 import './MonsterNameAutocomplete.css';
 
-function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, position, initialFocus = true }) {
+function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, position, initialFocus = true, npcs }) {
     const [monsters, setMonsters] = useState([]);
     const [query, setQuery] = useState(value || '');
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -15,6 +15,17 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
         loadMonsters().then(setMonsters).catch(() => {});
          }, []);
 
+    const allNames = useCallback(() => {
+        const monsterNames = monsters.map(m => ({ name: m.name, index: m.index, source: 'monster' }));
+        if (npcs?.length) {
+            const npcNames = npcs
+                .filter(n => n.name)
+                .map(n => ({ name: n.name, index: n.id, source: 'npc' }));
+            return [...npcNames, ...monsterNames];
+        }
+        return monsterNames;
+    }, [monsters, npcs]);
+
     useEffect(() => {
         setQuery(value || '');
          }, [value]);
@@ -24,15 +35,16 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
          }, []);
 
     const suggestions = useCallback(() => {
-        if (!query.trim() || !monsters.length) return [];
+        const names = allNames();
+        if (!query.trim() || !names.length) return [];
         const q = query.trim().toLowerCase();
-        const startedWith = monsters.filter(m => m.name.toLowerCase().startsWith(q)).slice(0, 8);
-        const remaining = monsters.filter(m => {
-            const name = m.name.toLowerCase();
+        const startedWith = names.filter(n => n.name.toLowerCase().startsWith(q)).slice(0, 8);
+        const remaining = names.filter(n => {
+            const name = n.name.toLowerCase();
             return name.includes(q) && !name.startsWith(q);
              }).slice(0, 8 - startedWith.length);
         return [...startedWith, ...remaining];
-         }, [query, monsters]);
+         }, [query, allNames]);
 
     useEffect(() => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -117,13 +129,14 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
                  />
                 {showSuggestions && list.length > 0 && (
                     <ul ref={listRef} className="monster-autocomplete-list">
-                        {list.map((monster, i) => (
+                        {list.map((entry, i) => (
                             <li
-                             key={monster.index}
+                             key={`${entry.source}-${entry.index}`}
                              className={`monster-autocomplete-item${i === highlightedIndex ? ' highlighted' : ''}`}
-                             onMouseDown={() => selectSuggestion(monster.name)}
+                             onMouseDown={() => selectSuggestion(entry.name)}
                             >
-                                {monster.name}
+                                {entry.name}
+                                {entry.source === 'npc' && <span className="monster-autocomplete-badge">NPC</span>}
                             </li>
                         ))}
                     </ul>

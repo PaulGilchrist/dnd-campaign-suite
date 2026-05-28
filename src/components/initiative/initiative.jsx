@@ -11,15 +11,18 @@ import AvatarImage from '../common/AvatarImage.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx';
 import { computePlayerAc, computeAcEstimate } from '../../services/damageUtils.js';
+import { loadNPCs } from '../../services/npcsService.js';
+import { npcToMonsterFormat, npcHasStatBlock } from '../../services/npcStatBlockUtils.js';
 import Popup from '../common/Popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 import './initiative.css'
 
-function NpcAvatar({ name, imageUrl, onClick }) {
-    if (imageUrl) {
+function NpcAvatar({ name, imageUrl, imagePath, onClick }) {
+    const src = imagePath || imageUrl;
+    if (src) {
         return (
             <div className="npc-avatar" onClick={onClick}>
-                <img src={imageUrl} alt={name} className="avatar-image" />
+                <AvatarImage name={name} imagePath={src} size={150} />
             </div>
         );
     }
@@ -51,6 +54,17 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
     const [concentrationSpellName, setConcentrationSpellName] = React.useState('');
     const [concentrationDc, setConcentrationDc] = React.useState(10);
 
+    const [campaignNpcs, setCampaignNpcs] = React.useState([]);
+
+    // Load campaign NPCs for stat block matching
+    React.useEffect(() => {
+        if (!campaignName) return;
+        loadNPCs(campaignName).then(response => {
+            const withStats = (response.npcs || []).filter(npcHasStatBlock);
+            setCampaignNpcs(withStats);
+        }).catch(() => {});
+    }, [campaignName]);
+
     const handleEvent = React.useCallback((event) => {
         if (event.key == null || event.data == null) return;
         if (!event.key.startsWith(`change-${campaignName}-`)) return;
@@ -71,9 +85,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
         if (!combatSummary) return;
         const npcIds = combatSummary.creatures.filter(c => c.type === 'npc').map(c => c.id);
         const promises = npcIds.map(async (id) => {
-            const npc = combatSummary.creatures.find(c => c.id === id);
-            if (npc) {
-                const url = await getMonsterImageUrl(npc.name);
+            const creature = combatSummary.creatures.find(c => c.id === id);
+            if (creature) {
+                // Already has imagePath from campaign NPC
+                if (creature.imagePath) return { id, url: null };
+                const url = await getMonsterImageUrl(creature.name, campaignNpcs);
                 return { id, url };
             }
             return { id, url: null };
@@ -83,7 +99,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
             results.forEach(({ id, url }) => { newImages[id] = url; });
             setNpcImages(newImages);
         });
-    }, [combatSummary]);
+    }, [combatSummary, campaignNpcs]);
 
     const setupCreatures = React.useCallback(() => {
         const creatureList = characters.map((character) => {
@@ -327,11 +343,17 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
         const idx = combatSummary.creatures.findIndex((creature) => creature.id === id);
         combatSummary.creatures[idx].name = value;
         // Look up monster data to update AC/resistances/immunities
-        getMonsterData(value).then(monster => {
+        getMonsterData(value, campaignNpcs).then(monster => {
             if (monster) {
                 combatSummary.creatures[idx].ac = monster.armor_class || 10;
                 combatSummary.creatures[idx].resistances = monster.damage_resistances || [];
                 combatSummary.creatures[idx].immunities = monster.damage_immunities || [];
+                combatSummary.creatures[idx].initiativeBonus = monster.initiative_details ? parseInt(monster.initiative_details) || 0 : 0;
+                // Try to find matching campaign NPC for imagePath
+                const matchedNpc = campaignNpcs.find(n => n.name?.toLowerCase() === value.toLowerCase());
+                if (matchedNpc?.imagePath) {
+                    combatSummary.creatures[idx].imagePath = matchedNpc.imagePath;
+                }
                 storage.set('combatSummary', combatSummary, campaignName);
                 setCombatSummary(cloneDeep(combatSummary));
             }
@@ -349,8 +371,49 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
     };
+    const handleRollNpcInitiative = (creatureId) => {
+        if (!combatSummary) return;
+        const creature = combatSummary.creatures.find(c => c.id === creatureId);
+        if (!creature || creature.type !== 'npc') return;
+        const bonus = creature.initiativeBonus || 0;
+        const roll = rollD20();
+        const total = roll + bonus;
+        creature.initiative = String(total);
+        combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
+        storage.set('combatSummary', combatSummary, campaignName);
+        setCombatSummary(cloneDeep(combatSummary));
+
+        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'roll',
+                characterName: creature.name,
+                rollType: 'initiative',
+                name: 'Initiative',
+                rolls: [roll],
+                total: roll,
+                bonus,
+                mode: 'normal',
+                isNatural20: roll === 20,
+                isNatural1: roll === 1,
+                timestamp: Date.now(),
+                id: utils.guid(),
+            })
+        }).catch(() => {});
+    };
+
     const handleNpcClick = async (creature) => {
         if (!isLocalhost) return;
+        // Check campaign NPCs first
+        const npc = campaignNpcs.find(n => n.name?.toLowerCase() === creature.name?.toLowerCase());
+        if (npc) {
+            const formatted = npcToMonsterFormat(npc);
+            if (formatted) {
+                setViewingMonster(formatted);
+                return;
+            }
+        }
         const monster = await getMonsterData(creature.name);
         if (monster) {
             setViewingMonster(monster);
@@ -630,7 +693,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                                 {creature.type === 'player' ? (
                                     <AvatarImage name={creature.name} imagePath={creature.imagePath} size={150} />
                                 ) : (
-                                    <NpcAvatar name={creature.name} imageUrl={npcImages[creature.id]} onClick={() => handleNpcClick(creature)} />
+                                    <NpcAvatar name={creature.name} imageUrl={npcImages[creature.id]} imagePath={creature.imagePath} onClick={() => handleNpcClick(creature)} />
                                 )}
                             </div>
                             <div className='creature-name'>
@@ -638,21 +701,34 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                                       <MonsterNameAutocomplete
                                         value={creature.name}
                                         onChange={(newVal) => handleNameChange(creature.id, newVal)}
+                                        npcs={campaignNpcs}
                                        />
                                   ) : (
                                     <span>{creature.name}</span>
                                 )}
                             </div>
                             <div className='creature-initiative'>Initiative&nbsp;
-                                <input
-                                    min="0"
-                                    onChange={(event) => handleInitiativeChange(creature.id, event.target.value)}
-                                    type="number"
-                                    value={creature.initiative}
-                                    placeholder="Init"
-                                />
+                                {creature.type === 'npc' && creature.initiativeBonus != null && creature.initiativeBonus !== '' && creature.initiativeBonus !== 0 ? (
+                                    <span
+                                        className="initiative-roll-link"
+                                        onClick={() => handleRollNpcInitiative(creature.id)}
+                                        role="button"
+                                        tabIndex={0}
+                                        title={`Roll initiative (d20 + ${creature.initiativeBonus})`}
+                                    >
+                                        {creature.initiative || <i className="fa-solid fa-dice-d20" />}
+                                    </span>
+                                ) : (
+                                    <input
+                                        min="0"
+                                        onChange={(event) => handleInitiativeChange(creature.id, event.target.value)}
+                                        type="number"
+                                        value={creature.initiative}
+                                        placeholder="Init"
+                                    />
+                                )}
                             </div>
-                            <div className='creature-target'>
+                            <div className='creature-target'>Target&nbsp;
                                 <select
                                     value={creature.targetId || ''}
                                     onChange={(e) => handleTargetChange(creature.id, e.target.value)}

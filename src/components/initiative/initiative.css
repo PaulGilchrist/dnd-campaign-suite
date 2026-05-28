@@ -190,7 +190,7 @@
     margin-top: 6px;
     width: 100%;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
     gap: 2px;
 }
@@ -486,6 +486,33 @@
 
 .initiative .condition-save-success {
     color: #2ecc71;
+}
+
+/* Roll-initiative link for NPCs with stat blocks */
+.initiative .initiative-roll-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    padding: 4px 8px;
+    border: 1px solid var(--color-link);
+    border-radius: 4px;
+    background: var(--background-color-surface);
+    color: var(--color-link);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s, color 0.15s;
+}
+
+.initiative .initiative-roll-link:hover {
+    background: var(--color-link);
+    color: var(--color-background);
+}
+
+.initiative .initiative-roll-link .fa-dice-d20 {
+    font-size: 1rem;
 }
 
 .initiative .condition-save-failure {

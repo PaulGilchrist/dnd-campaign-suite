@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import {
   loadNPCs,
   saveNPCs,
+  saveNPC,
   deleteNPC,
 } from '../services/npcsService.js';
 
@@ -29,6 +30,17 @@ function useNPCsManagement(campaignName) {
     }
   }, [campaignName, loadNPCsList]);
 
+  const saveNPCAction = useCallback(async (npc) => {
+    try {
+      const result = await saveNPC(campaignName, npc);
+      await loadNPCsList();
+      return result;
+    } catch (error) {
+      console.error('Failed to save NPC:', error);
+      throw error;
+    }
+  }, [campaignName, loadNPCsList]);
+
   const deleteNPCAction = useCallback(async (npcId) => {
     try {
       await deleteNPC(campaignName, npcId);
@@ -44,6 +56,7 @@ function useNPCsManagement(campaignName) {
     loading,
     loadNPCsList,
     saveNPCsList,
+    saveNPCAction,
     deleteNPCAction,
   };
 }

@@ -10,7 +10,31 @@
     "secrets": "Kaelen unknowingly carries a spark of fey magic within him — his grandmother was a fey-touched elven mage who helped build the original seal. This makes him vulnerable to the Thorned One's influence, but also gives him a unique connection to the seal's magic.",
     "notes": "Quest giver. Can provide the party with 2 Potions of Healing and a Scroll of Detect Magic before they enter. He waits at the entrance camp outside Thornfast Keep.",
     "tags": "Quest Giver, Scholar, Ally",
-    "attitude": "positive"
+    "attitude": "positive",
+    "imagePath": "campaigns/General Testing/images/Kaelen Ironoak.png",
+    "armorClass": 16,
+    "hitPoints": "",
+    "hitDice": "",
+    "initiativeBonus": "",
+    "speed": {
+      "walk": "30 ft."
+    },
+    "abilityScores": {
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 10,
+      "wis": 10,
+      "cha": 10
+    },
+    "savingThrowBonuses": {},
+    "skillBonuses": {},
+    "damageResistances": [],
+    "damageImmunities": [],
+    "conditionImmunities": [],
+    "actions": [],
+    "traits": "",
+    "reactions": ""
   },
   {
     "id": "c2b3d4e5-f6a7-8901- bcde-f12345678901",

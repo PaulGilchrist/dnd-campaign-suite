@@ -7,6 +7,7 @@ let mockNPCsFactory = () => ({
   loading: false,
   loadNPCsList: vi.fn(),
   saveNPCsList: vi.fn(),
+  saveNPCAction: vi.fn(),
   deleteNPCAction: vi.fn(),
 });
 
@@ -45,6 +46,7 @@ describe('NPCs', () => {
       loading: false,
       loadNPCsList: vi.fn(),
       saveNPCsList: vi.fn(),
+      saveNPCAction: vi.fn(),
       deleteNPCAction: vi.fn(),
     });
   });
@@ -154,14 +156,14 @@ describe('NPCs', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('should close modal when overlay clicked', () => {
+  it('should not close modal when overlay clicked', () => {
     render(<NPCs {...defaultProps} />);
     clickNewNPC();
     const overlay = document.querySelector('.ct-modal-overlay');
     fireEvent.click(overlay);
     expect(
-      screen.queryByRole('heading', { name: 'New NPC' })
-    ).not.toBeInTheDocument();
+      screen.getByRole('heading', { name: 'New NPC' })
+    ).toBeInTheDocument();
   });
 
   it('should not close modal when modal content clicked', () => {
@@ -1005,14 +1007,15 @@ describe('NPCs', () => {
 
   // ── Save action ───────────────────────────────────────────────────
 
-  it('should call saveNPCsList when save clicked with valid data', async () => {
+  it('should call saveNPCAction when save clicked with valid data', async () => {
     const mockSave = vi.fn();
 
     mockNPCsFactory = () => ({
       npcs: [],
       loading: false,
       loadNPCsList: vi.fn(),
-      saveNPCsList: mockSave,
+      saveNPCsList: vi.fn(),
+      saveNPCAction: mockSave,
       deleteNPCAction: vi.fn(),
     });
 

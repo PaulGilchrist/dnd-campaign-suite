@@ -1,7 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import useNPCsManagement from '../../hooks/useNPCsManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
+import AvatarImage from '../common/AvatarImage.jsx';
+import { npcHasStatBlock, calculateAbilityModifier } from '../../services/npcStatBlockUtils.js';
 import './NPCs.css';
+
+const ABILITY_ABBR = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+const ABILITY_LABELS = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' };
 
 const ATTITUDE_OPTIONS = [
   { value: 'deep bonds', label: 'Deep Bonds' },
@@ -20,24 +25,23 @@ const ATTITUDE_COLORS = {
 };
 
 function NPCs({ campaignName, onBack }) {
-  const { npcs, loading, loadNPCsList, saveNPCsList, deleteNPCAction } =
+  const { npcs, loading, loadNPCsList, saveNPCAction, deleteNPCAction } =
     useNPCsManagement(campaignName);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingNPC, setEditingNPC] = useState(null);
   const [formData, setFormData] = useState(null);
+  const [activeTab, setActiveTab] = useState('roleplay');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Load NPCs on mount
   useEffect(() => {
     if (campaignName) {
       loadNPCsList();
     }
   }, [campaignName, loadNPCsList]);
 
-  // Filtered NPCs based on search
   const filteredNPCs = useMemo(() => {
     if (!searchQuery.trim()) return npcs;
     const query = searchQuery.toLowerCase();
@@ -50,56 +54,148 @@ function NPCs({ campaignName, onBack }) {
     );
   }, [npcs, searchQuery]);
 
-  // Open modal for new NPC
+  const getDefaultFormData = (overrides = {}) => ({
+    id: crypto.randomUUID(),
+    name: '',
+    race: '',
+    classRole: '',
+    appearance: '',
+    personality: '',
+    goals: '',
+    secrets: '',
+    notes: '',
+    tags: '',
+    attitude: 'neutral',
+    image: '',
+    imageName: '',
+    imagePath: '',
+    armorClass: null,
+    hitPoints: '',
+    hitDice: '',
+    initiativeBonus: '',
+    speed: { walk: '30 ft.' },
+    abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+    savingThrowBonuses: {},
+    skillBonuses: {},
+    damageResistances: [],
+    damageImmunities: [],
+    conditionImmunities: [],
+    actions: [],
+    traits: '',
+    reactions: '',
+    ...overrides,
+  });
+
   const handleNewNPC = () => {
-    setFormData({
-      id: crypto.randomUUID(),
-      name: '',
-      race: '',
-      classRole: '',
-      appearance: '',
-      personality: '',
-      goals: '',
-      secrets: '',
-      notes: '',
-      tags: '',
-      attitude: 'neutral',
-    });
+    setFormData(getDefaultFormData());
     setEditingNPC(null);
+    setActiveTab('roleplay');
     setModalOpen(true);
   };
 
-  // Open modal for editing an NPC
   const handleEditNPC = (npc) => {
-    setFormData({ ...npc });
+    setFormData(getDefaultFormData(npc));
     setEditingNPC(npc);
+    setActiveTab('roleplay');
     setModalOpen(true);
   };
 
-  // Close modal and reset
   const handleCloseModal = () => {
     setModalOpen(false);
     setFormData(null);
     setEditingNPC(null);
   };
 
-  // Handle form field changes
   const handleFormChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Save NPC (create or update)
+  const handleAbilityScoreChange = (ability, value) => {
+    const score = parseInt(value) || 0;
+    setFormData((prev) => ({
+      ...prev,
+      abilityScores: { ...prev.abilityScores, [ability]: score },
+    }));
+  };
+
+  const handleSaveBonusChange = (ability, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      savingThrowBonuses: { ...prev.savingThrowBonuses, [ability]: value },
+    }));
+  };
+
+  const handleSkillBonusChange = (name, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      skillBonuses: { ...prev.skillBonuses, [name]: value },
+    }));
+  };
+
+  const handleRemoveSkill = (name) => {
+    setFormData((prev) => {
+      const updated = { ...prev.skillBonuses };
+      delete updated[name];
+      return { ...prev, skillBonuses: updated };
+    });
+  };
+
+  const handleArrayField = (field, value) => {
+    const items = value.split(',').map(s => s.trim()).filter(Boolean);
+    setFormData((prev) => ({ ...prev, [field]: items }));
+  };
+
+  const handleActionChange = (index, field, value) => {
+    setFormData((prev) => {
+      const actions = [...(prev.actions || [])];
+      actions[index] = { ...actions[index], [field]: value };
+      return { ...prev, actions };
+    });
+  };
+
+  const handleAddAction = () => {
+    setFormData((prev) => ({
+      ...prev,
+      actions: [...(prev.actions || []), { name: '', attack_bonus: '', damage_dice: '', description: '' }],
+    }));
+  };
+
+  const handleRemoveAction = (index) => {
+    setFormData((prev) => ({
+      ...prev,
+      actions: (prev.actions || []).filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      handleFormChange('image', event.target.result);
+      handleFormChange('imageName', file.name);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    handleFormChange('image', '');
+    handleFormChange('imageName', '');
+    handleFormChange('imagePath', '');
+  };
+
   const handleSave = async () => {
     if (!formData || !formData.name.trim()) return;
-
     setSaving(true);
     try {
-      const updated = { ...formData };
-      const updatedNPCs = editingNPC
-        ? npcs.map((n) => (n.id === editingNPC.id ? updated : n))
-        : [...npcs, updated];
-
-      await saveNPCsList(updatedNPCs);
+      const cleaned = { ...formData };
+      if (cleaned.armorClass === null || cleaned.armorClass === undefined || cleaned.armorClass === '') {
+        delete cleaned.armorClass;
+      }
+      if (cleaned.armorClass === undefined) {
+        cleaned.armorClass = null;
+      }
+      await saveNPCAction(cleaned);
       handleCloseModal();
     } catch (error) {
       console.error('Failed to save NPC:', error);
@@ -108,12 +204,9 @@ function NPCs({ campaignName, onBack }) {
     }
   };
 
-  // Delete NPC
   const handleDelete = async () => {
     if (!editingNPC) return;
-
     if (!window.confirm('Delete this NPC?')) return;
-
     setDeleting(true);
     try {
       await deleteNPCAction(editingNPC.id);
@@ -125,7 +218,37 @@ function NPCs({ campaignName, onBack }) {
     }
   };
 
-  // Get attitude badge styles
+  const handleAddToInitiative = async (npc) => {
+    if (!npcHasStatBlock(npc)) return;
+    try {
+      const initBonus = parseInt(npc.initiativeBonus) || 0;
+      const stored = localStorage.getItem('combatSummary');
+      let combatSummary = stored ? JSON.parse(stored) : null;
+      if (!combatSummary) {
+        combatSummary = { round: 1, creatures: [] };
+      }
+      combatSummary.creatures.push({
+        id: crypto.randomUUID(),
+        name: npc.name,
+        type: 'npc',
+        initiative: '',
+        targetId: null,
+        targetName: null,
+        ac: npc.armorClass || 10,
+        resistances: npc.damageResistances || [],
+        immunities: npc.damageImmunities || [],
+        conditions: [],
+        concentration: null,
+        imagePath: npc.imagePath || npc.image || '',
+        initiativeBonus: initBonus,
+      });
+      localStorage.setItem('combatSummary', JSON.stringify(combatSummary));
+      window.dispatchEvent(new CustomEvent('initiative-rolled'));
+    } catch (error) {
+      console.error('Failed to add NPC to initiative:', error);
+    }
+  };
+
   const getAttitudeStyle = (attitude) => {
     const colors = ATTITUDE_COLORS[attitude] || ATTITUDE_COLORS.neutral;
     return {
@@ -137,7 +260,6 @@ function NPCs({ campaignName, onBack }) {
 
   return (
     <div className="ct-container">
-      {/* Header */}
       <div className="ct-header">
         <button className="ct-back-btn" onClick={onBack}>
           <i className="fa-solid fa-arrow-left" /> Back
@@ -150,7 +272,6 @@ function NPCs({ campaignName, onBack }) {
         </button>
       </div>
 
-      {/* Search bar */}
       <div className="ct-search-row">
         <i className="fa-solid fa-magnifying-glass ct-search-icon" />
         <input
@@ -172,14 +293,12 @@ function NPCs({ campaignName, onBack }) {
         )}
       </div>
 
-      {/* Loading state */}
       {loading && (
         <div className="ct-empty-state">
           <i className="fa-solid fa-spinner fa-spin" /> Loading NPCs…
         </div>
       )}
 
-      {/* NPCs list */}
       {!loading && filteredNPCs.length === 0 && (
         <div className="ct-empty-state">
           {searchQuery ? (
@@ -212,12 +331,22 @@ function NPCs({ campaignName, onBack }) {
               }}
               aria-label={`Edit NPC: ${npc.name}`}
             >
-              <div className="ct-list-item-header">
-                <span className="ct-list-name">{npc.name}</span>
+              <div className="ct-list-item-header npcs-list-header">
+                <div className="npcs-list-name-row">
+                  {npc.imagePath && (
+                    <AvatarImage name={npc.name} imagePath={npc.imagePath} size={36} />
+                  )}
+                  <span className="ct-list-name">{npc.name}</span>
+                </div>
                 <div className="ct-list-meta">
+                  {npcHasStatBlock(npc) && (
+                    <span className="npcs-stat-badge" title="Has stat block">
+                      <i className="fa-solid fa-shield" />
+                    </span>
+                  )}
                   {npc.attitude && (
                     <span
-                      className="ct-list-attitude"
+                      className="ct-list-attitude npcs-list-attitude"
                       style={getAttitudeStyle(npc.attitude)}
                       title={npc.attitude}
                     >
@@ -228,29 +357,40 @@ function NPCs({ campaignName, onBack }) {
               </div>
               <div className="ct-list-details">
                 {(npc.race || npc.classRole) && (
-                  <span className="ct-list-subtitle">
+                  <span className="npcs-list-subtitle">
                     {npc.race && <span>{npc.race}</span>}
-                    {npc.race && npc.classRole && <span className="ct-list-separator"> / </span>}
+                    {npc.race && npc.classRole && <span className="npcs-list-separator"> / </span>}
                     {npc.classRole && <span>{npc.classRole}</span>}
                   </span>
                 )}
-                {npc.tags && (
-                  <span className="ct-list-tags">
-                    <i className="fa-solid fa-tags" /> {npc.tags}
-                  </span>
-                )}
+                <div className="npcs-list-actions-row">
+                  {npc.tags && (
+                    <span className="npcs-list-tags">
+                      <i className="fa-solid fa-tags" /> {npc.tags}
+                    </span>
+                  )}
+                  {npcHasStatBlock(npc) && (
+                    <button
+                      className="npcs-init-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddToInitiative(npc);
+                      }}
+                      title="Add to Initiative"
+                    >
+                      <i className="fa-solid fa-shield-alt" /> Add to Initiative
+                    </button>
+                  )}
+                </div>
               </div>
             </li>
           ))}
         </ul>
       )}
 
-      {/* Create/Edit Modal */}
       {modalOpen && formData && (
-        <div className="ct-modal-overlay" onClick={(e) => {
-          if (e.target === e.currentTarget) handleCloseModal();
-        }}>
-          <div className="ct-modal">
+        <div className="ct-modal-overlay">
+          <div className="ct-modal npcs-modal">
             <div className="ct-modal-header">
               <h3>{editingNPC ? 'Edit NPC' : 'New NPC'}</h3>
               <button
@@ -262,8 +402,45 @@ function NPCs({ campaignName, onBack }) {
               </button>
             </div>
 
+            {/* Avatar upload */}
+            <div className="npcs-avatar-section">
+              <AvatarImage name={formData.name} imagePath={formData.image || formData.imagePath} size={80} />
+              <div className="npcs-avatar-controls">
+                <label className="ct-btn ct-btn-sm">
+                  <i className="fa-solid fa-camera" /> Upload Avatar
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="npcs-avatar-input"
+                    onChange={handleImageUpload}
+                  />
+                </label>
+                {(formData.image || formData.imagePath) && (
+                  <button className="ct-btn ct-btn-sm ct-btn-danger" onClick={handleRemoveImage}>
+                    <i className="fa-solid fa-trash-can" /> Remove
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Tab navigation */}
+            <div className="npcs-tabs">
+              <button
+                className={`npcs-tab ${activeTab === 'roleplay' ? 'npcs-tab-active' : ''}`}
+                onClick={() => setActiveTab('roleplay')}
+              >
+                <i className="fa-solid fa-book" /> Roleplay
+              </button>
+              <button
+                className={`npcs-tab ${activeTab === 'stats' ? 'npcs-tab-active' : ''}`}
+                onClick={() => setActiveTab('stats')}
+              >
+                <i className="fa-solid fa-shield" /> Stats
+              </button>
+            </div>
+
             <div className="ct-modal-body">
-              {/* Name (required) */}
+              {/* Name (always visible) */}
               <label htmlFor="npc-name" className="ct-label">
                 Name <span className="ct-required">*</span>
               </label>
@@ -277,107 +454,307 @@ function NPCs({ campaignName, onBack }) {
                 autoFocus
               />
 
-              {/* Race */}
-              <label htmlFor="npc-race" className="ct-label">
-                Race
-              </label>
-              <input
-                id="npc-race"
-                type="text"
-                className="ct-input"
-                value={formData.race}
-                onChange={(e) => handleFormChange('race', e.target.value)}
-                placeholder="e.g., Human, Elf, Dwarf"
-              />
+              {activeTab === 'roleplay' && (
+                <>
+                  <label htmlFor="npc-race" className="ct-label">Race</label>
+                  <input
+                    id="npc-race"
+                    type="text"
+                    className="ct-input"
+                    value={formData.race}
+                    onChange={(e) => handleFormChange('race', e.target.value)}
+                    placeholder="e.g., Human, Elf, Dwarf"
+                  />
 
-              {/* Class / Role */}
-              <label htmlFor="npc-classRole" className="ct-label">
-                Class / Role
-              </label>
-              <input
-                id="npc-classRole"
-                type="text"
-                className="ct-input"
-                value={formData.classRole}
-                onChange={(e) => handleFormChange('classRole', e.target.value)}
-                placeholder="e.g., Fighter, Wizard, Merchant"
-              />
+                  <label htmlFor="npc-classRole" className="ct-label">Class / Role</label>
+                  <input
+                    id="npc-classRole"
+                    type="text"
+                    className="ct-input"
+                    value={formData.classRole}
+                    onChange={(e) => handleFormChange('classRole', e.target.value)}
+                    placeholder="e.g., Fighter, Wizard, Merchant"
+                  />
 
-              {/* Attitude */}
-              <label htmlFor="npc-attitude" className="ct-label">
-                Attitude
-              </label>
-              <select
-                id="npc-attitude"
-                className="ct-select"
-                value={formData.attitude}
-                onChange={(e) => handleFormChange('attitude', e.target.value)}
-              >
-                {ATTITUDE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                  <label htmlFor="npc-attitude" className="ct-label">Attitude</label>
+                  <select
+                    id="npc-attitude"
+                    className="ct-select"
+                    value={formData.attitude}
+                    onChange={(e) => handleFormChange('attitude', e.target.value)}
+                  >
+                    {ATTITUDE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
 
-              {/* Appearance */}
-              <PreviewToggle
-                id="npc-appearance"
-                value={formData.appearance}
-                onChange={(value) => handleFormChange('appearance', value)}
-                placeholder="Physical description…"
-                label="Appearance"
-              />
+                  <PreviewToggle
+                    id="npc-appearance"
+                    value={formData.appearance}
+                    onChange={(value) => handleFormChange('appearance', value)}
+                    placeholder="Physical description…"
+                    label="Appearance"
+                  />
+                  <PreviewToggle
+                    id="npc-personality"
+                    value={formData.personality}
+                    onChange={(value) => handleFormChange('personality', value)}
+                    placeholder="Personality traits, ideals, bonds, flaws…"
+                    label="Personality"
+                  />
+                  <PreviewToggle
+                    id="npc-goals"
+                    value={formData.goals}
+                    onChange={(value) => handleFormChange('goals', value)}
+                    placeholder="What does this NPC want?"
+                    label="Goals"
+                  />
+                  <PreviewToggle
+                    id="npc-secrets"
+                    value={formData.secrets}
+                    onChange={(value) => handleFormChange('secrets', value)}
+                    placeholder="Hidden truths about this NPC…"
+                    label="Secrets"
+                  />
+                  <PreviewToggle
+                    id="npc-notes"
+                    value={formData.notes}
+                    onChange={(value) => handleFormChange('notes', value)}
+                    placeholder="Additional notes…"
+                    label="Notes"
+                  />
 
-              {/* Personality */}
-              <PreviewToggle
-                id="npc-personality"
-                value={formData.personality}
-                onChange={(value) => handleFormChange('personality', value)}
-                placeholder="Personality traits, ideals, bonds, flaws…"
-                label="Personality"
-              />
+                  <label htmlFor="npc-tags" className="ct-label">Tags (comma separated)</label>
+                  <input
+                    id="npc-tags"
+                    type="text"
+                    className="ct-input"
+                    value={formData.tags}
+                    onChange={(e) => handleFormChange('tags', e.target.value)}
+                    placeholder="e.g., ally, enemy, quest-giver"
+                  />
+                </>
+              )}
 
-              {/* Goals */}
-              <PreviewToggle
-                id="npc-goals"
-                value={formData.goals}
-                onChange={(value) => handleFormChange('goals', value)}
-                placeholder="What does this NPC want?"
-                label="Goals"
-              />
+              {activeTab === 'stats' && (
+                <div className="npcs-stats-tab">
+                  <h4 className="npcs-section-title">Combat Stats</h4>
+                  <div className="npcs-stats-grid">
+                    <div className="npcs-stat-field">
+                      <label>AC</label>
+                      <input
+                        type="number"
+                        min="0"
+                        className="ct-input"
+                        value={formData.armorClass ?? ''}
+                        onChange={(e) => handleFormChange('armorClass', e.target.value ? parseInt(e.target.value) : null)}
+                        placeholder="10"
+                      />
+                    </div>
+                    <div className="npcs-stat-field">
+                      <label>HP</label>
+                      <input
+                        type="text"
+                        className="ct-input"
+                        value={formData.hitPoints}
+                        onChange={(e) => handleFormChange('hitPoints', e.target.value)}
+                        placeholder="e.g., 45"
+                      />
+                    </div>
+                    <div className="npcs-stat-field">
+                      <label>Hit Dice</label>
+                      <input
+                        type="text"
+                        className="ct-input"
+                        value={formData.hitDice}
+                        onChange={(e) => handleFormChange('hitDice', e.target.value)}
+                        placeholder="e.g., 6d8"
+                      />
+                    </div>
+                    <div className="npcs-stat-field">
+                      <label>Speed</label>
+                      <input
+                        type="text"
+                        className="ct-input"
+                        value={formData.speed?.walk || ''}
+                        onChange={(e) => handleFormChange('speed', { ...formData.speed, walk: e.target.value })}
+                        placeholder="30 ft."
+                      />
+                    </div>
+                    <div className="npcs-stat-field">
+                      <label>Initiative Bonus</label>
+                      <input
+                        type="number"
+                        className="ct-input"
+                        value={formData.initiativeBonus}
+                        onChange={(e) => handleFormChange('initiativeBonus', e.target.value)}
+                        placeholder="+0"
+                      />
+                    </div>
+                  </div>
 
-              {/* Secrets */}
-              <PreviewToggle
-                id="npc-secrets"
-                value={formData.secrets}
-                onChange={(value) => handleFormChange('secrets', value)}
-                placeholder="Hidden truths about this NPC…"
-                label="Secrets"
-              />
+                  <h4 className="npcs-section-title">Ability Scores</h4>
+                  <div className="npcs-abilities-grid">
+                    {ABILITY_ABBR.map((ab) => {
+                      const score = formData.abilityScores?.[ab] ?? 10;
+                      const mod = calculateAbilityModifier(score);
+                      const saveBonus = formData.savingThrowBonuses?.[ab] ?? '';
+                      return (
+                        <div key={ab} className="npcs-ability-group">
+                          <label className="npcs-ability-label">{ABILITY_LABELS[ab]}</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="30"
+                            className="ct-input npcs-ability-input"
+                            value={score}
+                            onChange={(e) => handleAbilityScoreChange(ab, e.target.value)}
+                          />
+                          <span className="npcs-ability-mod">{mod >= 0 ? '+' : ''}{mod}</span>
+                          <input
+                            type="text"
+                            className="ct-input npcs-save-input"
+                            value={saveBonus}
+                            onChange={(e) => handleSaveBonusChange(ab, e.target.value)}
+                            placeholder="Save"
+                            title="Saving throw bonus"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
 
-              {/* Notes */}
-              <PreviewToggle
-                id="npc-notes"
-                value={formData.notes}
-                onChange={(value) => handleFormChange('notes', value)}
-                placeholder="Additional notes…"
-                label="Notes"
-              />
+                  <h4 className="npcs-section-title">Skill Bonuses</h4>
+                  <div className="npcs-skills-section">
+                    {Object.entries(formData.skillBonuses || {}).map(([name, bonus], index) => (
+                      <div key={index} className="npcs-skill-row">
+                        <input
+                          type="text"
+                          className="ct-input npcs-skill-name"
+                          value={name}
+                          onChange={(e) => {
+                            const newName = e.target.value;
+                            if (newName !== name) {
+                              handleRemoveSkill(name);
+                              handleSkillBonusChange(newName, bonus);
+                            }
+                          }}
+                          placeholder="Skill name"
+                        />
+                        <input
+                          type="text"
+                          className="ct-input npcs-skill-bonus"
+                          value={bonus}
+                          onChange={(e) => handleSkillBonusChange(name, e.target.value)}
+                          placeholder="+0"
+                        />
+                        <button
+                          className="ct-btn ct-btn-sm ct-btn-danger"
+                          onClick={() => handleRemoveSkill(name)}
+                          title="Remove skill"
+                        >
+                          <i className="fa-solid fa-xmark" />
+                        </button>
+                      </div>
+                    ))}
+                    <button className="ct-btn ct-btn-sm" onClick={() => handleSkillBonusChange('', '')}>
+                      <i className="fa-solid fa-plus" /> Add Skill
+                    </button>
+                  </div>
 
-              {/* Tags */}
-              <label htmlFor="npc-tags" className="ct-label">
-                Tags (comma separated)
-              </label>
-              <input
-                id="npc-tags"
-                type="text"
-                className="ct-input"
-                value={formData.tags}
-                onChange={(e) => handleFormChange('tags', e.target.value)}
-                placeholder="e.g., ally, enemy, quest-giver"
-              />
+                  <h4 className="npcs-section-title">Defenses</h4>
+                  <label>Damage Resistances (comma separated)</label>
+                  <input
+                    type="text"
+                    className="ct-input"
+                    value={(formData.damageResistances || []).join(', ')}
+                    onChange={(e) => handleArrayField('damageResistances', e.target.value)}
+                    placeholder="fire, cold, poison"
+                  />
+                  <label>Damage Immunities (comma separated)</label>
+                  <input
+                    type="text"
+                    className="ct-input"
+                    value={(formData.damageImmunities || []).join(', ')}
+                    onChange={(e) => handleArrayField('damageImmunities', e.target.value)}
+                    placeholder="necrotic, psychic"
+                  />
+                  <label>Condition Immunities (comma separated)</label>
+                  <input
+                    type="text"
+                    className="ct-input"
+                    value={(formData.conditionImmunities || []).join(', ')}
+                    onChange={(e) => handleArrayField('conditionImmunities', e.target.value)}
+                    placeholder="charmed, frightened"
+                  />
 
+                  <h4 className="npcs-section-title">Actions</h4>
+                  <div className="npcs-actions-section">
+                    {(formData.actions || []).map((action, i) => (
+                      <div key={i} className="npcs-action-row">
+                        <div className="npcs-action-fields-row">
+                          <input
+                            type="text"
+                            className="ct-input npcs-action-name"
+                            value={action.name}
+                            onChange={(e) => handleActionChange(i, 'name', e.target.value)}
+                            placeholder="Action name"
+                          />
+                          <input
+                            type="text"
+                            className="ct-input npcs-action-bonus"
+                            value={action.attack_bonus}
+                            onChange={(e) => handleActionChange(i, 'attack_bonus', e.target.value)}
+                            placeholder="Atk bonus"
+                          />
+                          <input
+                            type="text"
+                            className="ct-input npcs-action-damage"
+                            value={action.damage_dice}
+                            onChange={(e) => handleActionChange(i, 'damage_dice', e.target.value)}
+                            placeholder="Damage"
+                          />
+                          <button
+                            className="ct-btn ct-btn-sm ct-btn-danger"
+                            onClick={() => handleRemoveAction(i)}
+                            title="Remove action"
+                          >
+                            <i className="fa-solid fa-trash-can" />
+                          </button>
+                        </div>
+                        <textarea
+                          className="ct-textarea npcs-action-desc"
+                          value={action.description || ''}
+                          onChange={(e) => handleActionChange(i, 'description', e.target.value)}
+                          placeholder="Description"
+                          rows={2}
+                        />
+                      </div>
+                    ))}
+                    <button className="ct-btn ct-btn-sm" onClick={handleAddAction}>
+                      <i className="fa-solid fa-plus" /> Add Action
+                    </button>
+                  </div>
+
+                  <h4 className="npcs-section-title">Traits</h4>
+                  <textarea
+                    className="ct-textarea"
+                    value={formData.traits}
+                    onChange={(e) => handleFormChange('traits', e.target.value)}
+                    placeholder="Special traits (one per line or markdown)"
+                    rows={3}
+                  />
+
+                  <h4 className="npcs-section-title">Reactions</h4>
+                  <textarea
+                    className="ct-textarea"
+                    value={formData.reactions}
+                    onChange={(e) => handleFormChange('reactions', e.target.value)}
+                    placeholder="Reactions (one per line or markdown)"
+                    rows={3}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="ct-modal-footer">
@@ -392,10 +769,62 @@ function NPCs({ campaignName, onBack }) {
                     {deleting ? 'Deleting…' : 'Delete'}
                   </button>
                 )}
+                {npcHasStatBlock(formData) && (
+                    <button
+                      className="ct-btn"
+                      onClick={async () => {
+                        setSaving(true);
+                        try {
+                          const snapshot = { ...formData };
+                          const cleaned = { ...snapshot };
+                          if (cleaned.armorClass === null || cleaned.armorClass === undefined || cleaned.armorClass === '') {
+                            delete cleaned.armorClass;
+                          }
+                          if (cleaned.armorClass === undefined) {
+                            cleaned.armorClass = null;
+                          }
+                          const result = await saveNPCAction(cleaned);
+                          const savedNpc = result?.npc || snapshot;
+                          const imagePath = savedNpc.imagePath || snapshot.image || '';
+                          handleCloseModal();
+                          const stored = localStorage.getItem('combatSummary');
+                          let combatSummary = stored ? JSON.parse(stored) : null;
+                          if (!combatSummary) {
+                            combatSummary = { round: 1, creatures: [] };
+                          }
+                          combatSummary.creatures.push({
+                            id: crypto.randomUUID(),
+                            name: snapshot.name,
+                            type: 'npc',
+                            initiative: '',
+                            targetId: null,
+                            targetName: null,
+                            ac: snapshot.armorClass || 10,
+                            resistances: snapshot.damageResistances || [],
+                            immunities: snapshot.damageImmunities || [],
+                            conditions: [],
+                            concentration: null,
+                            imagePath,
+                            initiativeBonus: parseInt(snapshot.initiativeBonus) || 0,
+                          });
+                          localStorage.setItem('combatSummary', JSON.stringify(combatSummary));
+                          window.dispatchEvent(new CustomEvent('initiative-rolled'));
+                        } catch (error) {
+                          console.error('Failed to save NPC:', error);
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      disabled={saving || !formData.name.trim()}
+                      title="Save and add to initiative"
+                    >
+                      <i className="fa-solid fa-shield-alt" /> Save & Add to Initiative
+                    </button>
+                )}
               </div>
               <div className="ct-modal-buttons">
                 <button
-                  className="ct-btn ct-btn"
+                  className="ct-btn"
                   onClick={handleCloseModal}
                   disabled={saving}
                 >

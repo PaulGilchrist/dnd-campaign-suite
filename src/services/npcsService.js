@@ -1,3 +1,21 @@
+export const saveNPC = async (campaignName, npc) => {
+  try {
+    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/npcs/${encodeURIComponent(npc.id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(npc),
+    });
+    if (!response.ok) {
+      const { error } = await response.json();
+      throw new Error(error || 'Failed to save NPC');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error saving NPC:', error);
+    throw error;
+  }
+};
+
 export const loadNPCs = async (campaignName) => {
   try {
     const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/npcs`, {
