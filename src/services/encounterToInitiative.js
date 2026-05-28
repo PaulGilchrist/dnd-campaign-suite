@@ -38,7 +38,7 @@ function logRoll(campaignName, name, rollResult) {
      }).catch(() => {});
 }
 
-export async function expandMonstersToCreatures(selectedMonsters, characters) {
+export async function expandMonstersToCreatures(selectedMonsters, characters, campaignName) {
     const creatureList = [];
     const npcRollResults = [];
 
@@ -94,7 +94,7 @@ export async function expandMonstersToCreatures(selectedMonsters, characters) {
 }
 
 export async function loadEncounterToInitiative(selectedMonsters, characters, campaignName) {
-    const { creatures, npcRollResults } = await expandMonstersToCreatures(selectedMonsters, characters);
+    const { creatures, npcRollResults } = await expandMonstersToCreatures(selectedMonsters, characters, campaignName);
     creatures.sort((a, b) => b.initiative - a.initiative);
 
     for (const { name, rollResult } of npcRollResults) {

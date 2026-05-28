@@ -33,6 +33,9 @@ export const processImageUpload = (campaignName, characterName, character, origi
 
         // Save the image file
         fs.writeFileSync(imageFilePath, base64Data, 'base64');
+        const fd = fs.openSync(imageFilePath, 'r');
+        fs.fsyncSync(fd);
+        fs.closeSync(fd);
 
         // Set the relative path from public/
         character.imagePath = path.join('campaigns', campaignName, 'images', imageFileName);

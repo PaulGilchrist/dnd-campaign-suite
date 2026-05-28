@@ -66,7 +66,11 @@ app.listen(PORT, () => {
 });
 
 // Serve static files from the public directory
-app.use(express.static(path.join(process.cwd(), 'public')));
+app.use(express.static(path.join(process.cwd(), 'public'), {
+    setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'no-store');
+    }
+}));
 
 // ====== API ROUTES (mounted in original order) ======
 

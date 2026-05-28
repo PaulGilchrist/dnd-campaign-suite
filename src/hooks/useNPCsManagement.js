@@ -33,13 +33,31 @@ function useNPCsManagement(campaignName) {
   const saveNPCAction = useCallback(async (npc) => {
     try {
       const result = await saveNPC(campaignName, npc);
-      await loadNPCsList();
+      if (result?.npc?.imagePath) {
+        const img = new Image();
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+          img.src = result.npc.imagePath;
+        });
+      }
+      if (result?.npc) {
+        setNpcs((prev) => {
+          const index = prev.findIndex((n) => n.id === result.npc.id);
+          if (index !== -1) {
+            const updated = [...prev];
+            updated[index] = result.npc;
+            return updated;
+          }
+          return [...prev, result.npc];
+        });
+      }
       return result;
     } catch (error) {
       console.error('Failed to save NPC:', error);
       throw error;
     }
-  }, [campaignName, loadNPCsList]);
+  }, [campaignName]);
 
   const deleteNPCAction = useCallback(async (npcId) => {
     try {
