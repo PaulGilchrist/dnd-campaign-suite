@@ -3,6 +3,8 @@ import useNPCsManagement from '../../hooks/useNPCsManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import AvatarImage from '../common/AvatarImage.jsx';
 import { npcHasStatBlock, calculateAbilityModifier } from '../../services/npcStatBlockUtils.js';
+import { rollD20 } from '../../services/diceRoller.js';
+import utils from '../../services/utils.js';
 import './NPCs.css';
 
 const ABILITY_ABBR = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
@@ -24,7 +26,7 @@ const ATTITUDE_COLORS = {
   'extreme opposition': { bg: '#5c030e', color: '#ff6b6b', border: '#8b0000' },
 };
 
-function NPCs({ campaignName, onBack }) {
+function NPCs({ campaignName, onBack, onViewInitiative }) {
   const { npcs, loading, loadNPCsList, saveNPCAction, deleteNPCAction } =
     useNPCsManagement(campaignName);
 
@@ -227,11 +229,17 @@ function NPCs({ campaignName, onBack }) {
       if (!combatSummary) {
         combatSummary = { round: 1, creatures: [] };
       }
+      const alreadyAdded = combatSummary.creatures.some(
+        c => c.type === 'npc' && c.name === npc.name
+      );
+      if (alreadyAdded) return;
+      const roll = rollD20();
+      const total = roll + initBonus;
       combatSummary.creatures.push({
         id: crypto.randomUUID(),
         name: npc.name,
         type: 'npc',
-        initiative: '',
+        initiative: String(total),
         targetId: null,
         targetName: null,
         ac: npc.armorClass || 10,
@@ -242,8 +250,29 @@ function NPCs({ campaignName, onBack }) {
         imagePath: npc.imagePath || npc.image || '',
         initiativeBonus: initBonus,
       });
+      combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
       localStorage.setItem('combatSummary', JSON.stringify(combatSummary));
       window.dispatchEvent(new CustomEvent('initiative-rolled'));
+
+      fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'roll',
+          characterName: npc.name,
+          rollType: 'initiative',
+          name: 'Initiative',
+          rolls: [roll],
+          total: roll,
+          bonus: initBonus,
+          mode: 'normal',
+          isNatural20: roll === 20,
+          isNatural1: roll === 1,
+          timestamp: Date.now(),
+          id: utils.guid(),
+        }),
+      }).catch(() => {});
+      if (onViewInitiative) onViewInitiative();
     } catch (error) {
       console.error('Failed to add NPC to initiative:', error);
     }
@@ -769,7 +798,7 @@ function NPCs({ campaignName, onBack }) {
                     {deleting ? 'Deleting…' : 'Delete'}
                   </button>
                 )}
-                {npcHasStatBlock(formData) && (
+              {npcHasStatBlock(formData) && (
                     <button
                       className="ct-btn"
                       onClick={async () => {
@@ -787,16 +816,26 @@ function NPCs({ campaignName, onBack }) {
                           const savedNpc = result?.npc || snapshot;
                           const imagePath = savedNpc.imagePath || snapshot.image || '';
                           handleCloseModal();
+                          const initBonus = parseInt(snapshot.initiativeBonus) || 0;
                           const stored = localStorage.getItem('combatSummary');
                           let combatSummary = stored ? JSON.parse(stored) : null;
                           if (!combatSummary) {
                             combatSummary = { round: 1, creatures: [] };
                           }
+                          const alreadyAdded = combatSummary.creatures.some(
+                            c => c.type === 'npc' && c.name === snapshot.name
+                          );
+                          if (alreadyAdded) {
+                            if (onViewInitiative) onViewInitiative();
+                            return;
+                          }
+                          const roll = rollD20();
+                          const total = roll + initBonus;
                           combatSummary.creatures.push({
                             id: crypto.randomUUID(),
                             name: snapshot.name,
                             type: 'npc',
-                            initiative: '',
+                            initiative: String(total),
                             targetId: null,
                             targetName: null,
                             ac: snapshot.armorClass || 10,
@@ -805,10 +844,31 @@ function NPCs({ campaignName, onBack }) {
                             conditions: [],
                             concentration: null,
                             imagePath,
-                            initiativeBonus: parseInt(snapshot.initiativeBonus) || 0,
+                            initiativeBonus: initBonus,
                           });
+                          combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
                           localStorage.setItem('combatSummary', JSON.stringify(combatSummary));
                           window.dispatchEvent(new CustomEvent('initiative-rolled'));
+
+                          fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              type: 'roll',
+                              characterName: snapshot.name,
+                              rollType: 'initiative',
+                              name: 'Initiative',
+                              rolls: [roll],
+                              total: roll,
+                              bonus: initBonus,
+                              mode: 'normal',
+                              isNatural20: roll === 20,
+                              isNatural1: roll === 1,
+                              timestamp: Date.now(),
+                              id: utils.guid(),
+                            }),
+                          }).catch(() => {});
+                        if (onViewInitiative) onViewInitiative();
                         } catch (error) {
                           console.error('Failed to save NPC:', error);
                         } finally {
@@ -820,7 +880,7 @@ function NPCs({ campaignName, onBack }) {
                     >
                       <i className="fa-solid fa-shield-alt" /> Save & Add to Initiative
                     </button>
-                )}
+                  )}
               </div>
               <div className="ct-modal-buttons">
                 <button

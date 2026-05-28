@@ -11,9 +11,12 @@
     "notes": "Brunnilda can provide the party with information about the mine layout, the town's resources, and dwarven history. She offers 500 gp total for the party's services. She cannot leave the town herself but can provide supplies, maps of the upper mine levels, and the clan signet ring if the party earns her trust.",
     "tags": "quest giver, town leader, dwarven heritage, information source",
     "attitude": "positive",
+    "image": "",
+    "imageName": "",
     "imagePath": "campaigns/5e Testing/images/Mayor Brunnilda Stonebeard.png",
-    "hitPoints": "",
-    "hitDice": "",
+    "armorClass": 10,
+    "hitPoints": "45",
+    "hitDice": "6d8",
     "initiativeBonus": "",
     "speed": {
       "walk": "30 ft."
@@ -33,8 +36,7 @@
     "conditionImmunities": [],
     "actions": [],
     "traits": "",
-    "reactions": "",
-    "armorClass": null
+    "reactions": ""
   },
   {
     "id": "n2b3c4d5-e6f7-a8b9-c0d1-e2f3a4b5c6d7",

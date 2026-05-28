@@ -348,6 +348,7 @@ function App() {
             campaignName={campaignName}
             characters={characters}
             onBack={handleBackFromNPCs}
+            onViewInitiative={() => setActiveView('initiative')}
           />
         )}
           {activeView === 'factions' && (
