@@ -1,19 +1,19 @@
 {
-  "name": "Cleric",
+  "name": "Vexiron",
   "level": 5,
-  "alignment": "Neutral Good",
+  "alignment": "Chaotic Good",
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 14,
+      "baseScore": 10,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
     {
       "name": "Dexterity",
-      "baseScore": 8,
+      "baseScore": 15,
       "abilityImprovements": 0,
-      "miscBonus": 0
+      "miscBonus": 1
     },
     {
       "name": "Constitution",
@@ -23,87 +23,86 @@
     },
     {
       "name": "Intelligence",
-      "baseScore": 10,
+      "baseScore": 12,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
     {
       "name": "Wisdom",
-      "baseScore": 15,
+      "baseScore": 13,
       "abilityImprovements": 0,
-      "miscBonus": 0
+      "miscBonus": 1
     },
     {
       "name": "Charisma",
-      "baseScore": 10,
+      "baseScore": 8,
       "abilityImprovements": 0,
       "miscBonus": 0
     }
   ],
-  "background": "Charlatan",
+  "background": "Hermit",
   "class": {
-    "name": "Cleric",
+    "name": "Rogue",
     "subclass": {
-      "name": "Trickery Domain",
-      "type": ""
-    }
+      "name": "Thief"
+    },
+    "expertise": [
+      "Sleight of Hand",
+      "Thieves' Tools"
+    ]
   },
   "expertSkills": [],
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Aasimar",
+    "name": "Tiefling",
     "subrace": {
-      "name": ""
+      "name": "Infernal Tiefling",
+      "description": ""
     }
   },
-  "immunities": [
-    "Magical Sleep"
-  ],
+  "immunities": [],
   "inventory": {
     "backpack": [
-      "Mess Kit",
+      "Crowbar",
+      "Dice Set",
       "Playing Card Set",
+      "Forgery Kit",
+      "Piton",
       "Rations (5 days)",
-      "Rope, Silk (50 feet)",
+      "Thieves' Tools",
       "Tinderbox",
       "Torch",
       "Waterskin"
     ],
     "equipped": [
       "Arrows",
-      "Chain Mail",
-      "Holy Symbol",
-      "Longbow",
-      "Longsword",
-      "Shield"
+      "Studded Leather",
+      "Crossbow, hand",
+      "Shortsword",
+      "Shortsword",
+      "Thieves' Tools"
     ],
     "gold": 10,
     "magicItems": []
   },
   "languages": [],
-  "resistances": [
-    "Poison",
-    "Necrotic",
-    "Radiant"
-  ],
+  "resistances": [],
   "skillProficiencies": [
+    "Acrobatics",
+    "Athletics",
+    "Deception",
     "Insight",
-    "Medicine",
-    "Religion",
-    "Survival"
+    "Investigation",
+    "Perception",
+    "Sleight of Hand",
+    "Stealth"
   ],
   "specialActions": [],
-  "spells": [
-    "Detect Magic",
-    "Guidance",
-    "Guiding Bolt",
-    "Healing Word",
-    "Inflict Wounds",
-    "Sacred Flame",
-    "Spare the Dying"
-  ],
+  "spells": [],
   "rules": "2024",
-  "imagePath": "campaigns/2024 Testing/images/Cleric.png",
-  "originalFileName": "cleric.json"
+  "xp": 0,
+  "xpMode": "milestone",
+  "imagePath": "campaigns/2024 Testing/images/Vexiron.png",
+  "originalFileName": "rogue.json"
 }

@@ -1,91 +1,111 @@
 {
-  "name": "Barbarian",
-  "level": 10,
+  "name": "Liora",
+  "level": 5,
   "alignment": "Neutral Good",
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 15,
+      "baseScore": 14,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
     {
       "name": "Dexterity",
-      "baseScore": 12,
+      "baseScore": 8,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
     {
       "name": "Constitution",
-      "baseScore": 15,
+      "baseScore": 14,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
     {
       "name": "Intelligence",
-      "baseScore": 9,
+      "baseScore": 10,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
     {
       "name": "Wisdom",
-      "baseScore": 11,
+      "baseScore": 15,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
     {
       "name": "Charisma",
-      "baseScore": 9,
+      "baseScore": 10,
       "abilityImprovements": 0,
       "miscBonus": 0
     }
   ],
-  "background": "",
+  "background": "Charlatan",
   "class": {
-    "name": "Barbarian",
+    "name": "Cleric",
     "subclass": {
-      "name": "Berserker"
+      "name": "Trickery Domain",
+      "type": ""
     }
   },
   "expertSkills": [],
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Half-Orc",
+    "name": "Aasimar",
     "subrace": {
       "name": ""
     }
   },
-  "immunities": [],
+  "immunities": [
+    "Magical Sleep"
+  ],
   "inventory": {
     "backpack": [
-      "Fishing Tackle",
-      "Grappling Hook",
+      "Mess Kit",
       "Playing Card Set",
       "Rations (5 days)",
       "Rope, Silk (50 feet)",
-      "String",
+      "Tinderbox",
+      "Torch",
       "Waterskin"
     ],
     "equipped": [
+      "Arrows",
+      "Chain Mail",
+      "Holy Symbol",
       "Longbow",
-      "Greatsword",
-      "Dagger"
+      "Longsword",
+      "Shield"
     ],
     "gold": 10,
     "magicItems": []
   },
   "languages": [],
-  "resistances": [],
+  "resistances": [
+    "Poison",
+    "Necrotic",
+    "Radiant"
+  ],
   "skillProficiencies": [
-    "Athletics",
-    "Intimidation",
-    "Perception",
+    "Insight",
+    "Medicine",
+    "Religion",
     "Survival"
   ],
   "specialActions": [],
-  "spells": [],
-  "rules": "5e",
-  "originalFileName": "barbarian.json",
-  "imagePath": "campaigns/5e Testing/images/Barbarian.png"
+  "spells": [
+    "Detect Magic",
+    "Guidance",
+    "Guiding Bolt",
+    "Healing Word",
+    "Inflict Wounds",
+    "Sacred Flame",
+    "Spare the Dying"
+  ],
+  "rules": "2024",
+  "xp": 0,
+  "xpMode": "milestone",
+  "imagePath": "campaigns/2024 Testing/images/Liora.png",
+  "originalFileName": "cleric.json"
 }

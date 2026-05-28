@@ -1,5 +1,5 @@
 {
-  "name": "Druid",
+  "name": "Maribelle",
   "level": 10,
   "alignment": "Neutral Good",
   "abilities": [
@@ -100,6 +100,8 @@
     "Shocking Grasp"
   ],
   "rules": "5e",
+  "xp": 0,
+  "xpMode": "milestone",
   "originalFileName": "druid.json",
-  "imagePath": "campaigns/5e Testing/images/Druid.png"
+  "imagePath": "campaigns/5e Testing/images/Maribelle.png"
 }

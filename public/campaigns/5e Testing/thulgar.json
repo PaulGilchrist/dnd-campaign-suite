@@ -1,83 +1,76 @@
 {
-  "name": "Ranger",
+  "name": "Thulgar",
   "level": 10,
   "alignment": "Neutral Good",
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 13,
+      "baseScore": 15,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
     {
       "name": "Dexterity",
-      "baseScore": 15,
-      "abilityImprovements": 0,
-      "miscBonus": 1
-    },
-    {
-      "name": "Constitution",
-      "baseScore": 15,
-      "abilityImprovements": 0,
-      "miscBonus": 1
-    },
-    {
-      "name": "Intelligence",
-      "baseScore": 8,
-      "abilityImprovements": 0,
-      "miscBonus": 0
-    },
-    {
-      "name": "Wisdom",
       "baseScore": 12,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
     {
+      "name": "Constitution",
+      "baseScore": 15,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 9,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 11,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
       "name": "Charisma",
-      "baseScore": 8,
+      "baseScore": 9,
       "abilityImprovements": 0,
       "miscBonus": 0
     }
   ],
   "background": "",
   "class": {
-    "name": "Ranger",
+    "name": "Barbarian",
     "subclass": {
-      "name": "Beast Master"
-    },
-    "fightingStyles": [
-      "Archery"
-    ]
+      "name": "Berserker"
+    }
   },
   "expertSkills": [],
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Dwarf",
+    "name": "Half-Orc",
     "subrace": {
-      "name": "Mountain Dwarf",
-      "description": ""
+      "name": ""
     }
   },
-  "immunities": [
-    "Magical Sleep"
-  ],
+  "immunities": [],
   "inventory": {
     "backpack": [
-      "Mess Kit",
+      "Fishing Tackle",
+      "Grappling Hook",
+      "Playing Card Set",
       "Rations (5 days)",
       "Rope, Silk (50 feet)",
-      "Tinderbox",
-      "Torch",
+      "String",
       "Waterskin"
     ],
     "equipped": [
-      "Arrows",
-      "Studded Leather",
       "Longbow",
-      "Scimitar",
-      "Scimitar"
+      "Greatsword",
+      "Dagger"
     ],
     "gold": 10,
     "magicItems": []
@@ -85,17 +78,16 @@
   "languages": [],
   "resistances": [],
   "skillProficiencies": [
-    "Animal Handling",
-    "Insight",
-    "Investigation",
-    "Nature",
+    "Athletics",
+    "Intimidation",
     "Perception",
-    "Stealth",
     "Survival"
   ],
   "specialActions": [],
   "spells": [],
   "rules": "5e",
-  "originalFileName": "ranger.json",
-  "imagePath": "campaigns/5e Testing/images/Ranger.png"
+  "xp": 0,
+  "xpMode": "milestone",
+  "originalFileName": "barbarian.json",
+  "imagePath": "campaigns/5e Testing/images/Thulgar.png"
 }

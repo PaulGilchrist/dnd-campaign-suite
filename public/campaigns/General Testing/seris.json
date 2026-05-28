@@ -1,5 +1,5 @@
 {
-  "name": "Monk",
+  "name": "Seris",
   "level": 3,
   "alignment": "Neutral Good",
   "abilities": [
@@ -90,6 +90,8 @@
   "specialActions": [],
   "spells": [],
   "rules": "2024",
-  "imagePath": "campaigns/General Testing/images/Monk.png",
+  "xp": 0,
+  "xpMode": "milestone",
+  "imagePath": "campaigns/General Testing/images/Seris.png",
   "originalFileName": "monk.json"
 }

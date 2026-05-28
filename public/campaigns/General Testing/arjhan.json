@@ -1,19 +1,19 @@
 {
-  "name": "Rogue",
-  "level": 5,
-  "alignment": "Chaotic Good",
+  "name": "Arjhan",
+  "level": 3,
+  "alignment": "Lawful Good",
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 10,
+      "baseScore": 14,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
     {
       "name": "Dexterity",
-      "baseScore": 15,
+      "baseScore": 10,
       "abilityImprovements": 0,
-      "miscBonus": 1
+      "miscBonus": 0
     },
     {
       "name": "Constitution",
@@ -23,84 +23,81 @@
     },
     {
       "name": "Intelligence",
-      "baseScore": 12,
+      "baseScore": 8,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
     {
       "name": "Wisdom",
-      "baseScore": 13,
+      "baseScore": 12,
       "abilityImprovements": 0,
-      "miscBonus": 1
+      "miscBonus": 0
     },
     {
       "name": "Charisma",
-      "baseScore": 8,
+      "baseScore": 14,
       "abilityImprovements": 0,
       "miscBonus": 0
     }
   ],
-  "background": "Hermit",
+  "background": "Guard",
   "class": {
-    "name": "Rogue",
+    "name": "Paladin",
     "subclass": {
-      "name": "Thief"
+      "name": "Oath of Glory",
+      "type": ""
     },
-    "expertise": [
-      "Sleight of Hand",
-      "Thieves' Tools"
+    "fightingStyles": [
+      "Defense"
     ]
   },
   "expertSkills": [],
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Tiefling",
+    "name": "Dragonborn",
     "subrace": {
-      "name": "Infernal Tiefling",
+      "name": "Black Dragonborn",
       "description": ""
     }
   },
   "immunities": [],
   "inventory": {
     "backpack": [
-      "Crowbar",
-      "Dice Set",
-      "Playing Card Set",
-      "Forgery Kit",
-      "Piton",
-      "Rations (5 days)",
-      "Thieves' Tools",
+      "Bedroll",
+      "Light Hammer",
+      "Mess Kit",
+      "Rations (10 days)",
+      "Rope, Hempen (50 feet)",
       "Tinderbox",
       "Torch",
       "Waterskin"
     ],
     "equipped": [
-      "Arrows",
-      "Studded Leather",
-      "Crossbow, hand",
-      "Shortsword",
-      "Shortsword",
-      "Thieves' Tools"
+      "Chain Mail",
+      "Shield",
+      "Crossbow, heavy",
+      "Longsword",
+      "Dagger"
     ],
-    "gold": 10,
+    "gold": 25,
     "magicItems": []
   },
-  "languages": [],
+  "languages": [
+    "Elvish"
+  ],
   "resistances": [],
   "skillProficiencies": [
-    "Acrobatics",
     "Athletics",
-    "Deception",
-    "Insight",
-    "Investigation",
-    "Perception",
-    "Sleight of Hand",
-    "Stealth"
+    "History",
+    "Intimidation",
+    "Persuasion"
   ],
   "specialActions": [],
   "spells": [],
   "rules": "2024",
-  "imagePath": "campaigns/2024 Testing/images/Rogue.png",
-  "originalFileName": "rogue.json"
+  "xp": 0,
+  "xpMode": "milestone",
+  "imagePath": "campaigns/General Testing/images/Arjhan.png",
+  "originalFileName": "paladin.json"
 }

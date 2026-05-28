@@ -1,11 +1,11 @@
 {
-  "name": "Fighter",
-  "level": 5,
+  "name": "Aeralyn",
+  "level": 10,
   "alignment": "Neutral Good",
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 12,
+      "baseScore": 10,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
@@ -17,7 +17,7 @@
     },
     {
       "name": "Constitution",
-      "baseScore": 15,
+      "baseScore": 12,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
@@ -35,33 +35,30 @@
     },
     {
       "name": "Charisma",
-      "baseScore": 9,
+      "baseScore": 14,
       "abilityImprovements": 0,
       "miscBonus": 0
     }
   ],
-  "background": "Entertainer",
+  "background": "",
   "class": {
-    "name": "Fighter",
+    "name": "Bard",
     "subclass": {
-      "name": "Eldritch Knight",
-      "maneuvers": [
-        "Parry",
-        "Riposte",
-        "Sweeping Attack"
-      ]
+      "name": "Lore"
     },
-    "fightingStyles": [
-      "Archery"
+    "expertise": [
+      "Performance",
+      "Persuasion"
     ]
   },
   "expertSkills": [],
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Orc",
+    "name": "Genasi",
     "subrace": {
-      "name": ""
+      "name": "Air Genasi",
+      "description": ""
     }
   },
   "immunities": [],
@@ -76,35 +73,37 @@
       "Waterskin"
     ],
     "equipped": [
-      "Chain Mail",
-      "Longbow",
-      "Scimitar",
-      "Scimitar"
+      "Studded Leather",
+      "Crossbow, hand",
+      "Rapier",
+      "Dagger"
     ],
     "gold": 10,
     "magicItems": []
   },
   "languages": [],
   "resistances": [
-    "Poison"
+    "Fire"
   ],
   "skillProficiencies": [
-    "Athletics",
-    "Intimidation",
+    "Insight",
+    "Performance",
     "Perception",
-    "Survival"
+    "Persuasion",
+    "Deception"
   ],
   "specialActions": [],
   "spells": [
-    "Detect Magic",
-    "Guidance",
-    "Guiding Bolt",
-    "Healing Word",
-    "Inflict Wounds",
-    "Sacred Flame",
-    "Spare the Dying"
+    "Charm Person",
+    "Disguise Self",
+    "Hideous Laughter",
+    "Mage Hand",
+    "Minor Illusion",
+    "Sleep"
   ],
-  "rules": "2024",
-  "imagePath": "campaigns/2024 Testing/images/Fighter.png",
-  "originalFileName": "fighter.json"
+  "rules": "5e",
+  "xp": 0,
+  "xpMode": "milestone",
+  "originalFileName": "bard.json",
+  "imagePath": "campaigns/5e Testing/images/Aeralyn.png"
 }

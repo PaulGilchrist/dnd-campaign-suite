@@ -1,11 +1,11 @@
 {
-  "name": "Bard",
-  "level": 10,
+  "name": "Grommok",
+  "level": 5,
   "alignment": "Neutral Good",
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 10,
+      "baseScore": 12,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
@@ -17,7 +17,7 @@
     },
     {
       "name": "Constitution",
-      "baseScore": 12,
+      "baseScore": 15,
       "abilityImprovements": 0,
       "miscBonus": 0
     },
@@ -35,30 +35,33 @@
     },
     {
       "name": "Charisma",
-      "baseScore": 14,
+      "baseScore": 9,
       "abilityImprovements": 0,
       "miscBonus": 0
     }
   ],
-  "background": "",
+  "background": "Entertainer",
   "class": {
-    "name": "Bard",
+    "name": "Fighter",
     "subclass": {
-      "name": "Lore"
+      "name": "Eldritch Knight",
+      "maneuvers": [
+        "Parry",
+        "Riposte",
+        "Sweeping Attack"
+      ]
     },
-    "expertise": [
-      "Performance",
-      "Persuasion"
+    "fightingStyles": [
+      "Archery"
     ]
   },
   "expertSkills": [],
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Genasi",
+    "name": "Orc",
     "subrace": {
-      "name": "Air Genasi",
-      "description": ""
+      "name": ""
     }
   },
   "immunities": [],
@@ -73,35 +76,37 @@
       "Waterskin"
     ],
     "equipped": [
-      "Studded Leather",
-      "Crossbow, hand",
-      "Rapier",
-      "Dagger"
+      "Chain Mail",
+      "Longbow",
+      "Scimitar",
+      "Scimitar"
     ],
     "gold": 10,
     "magicItems": []
   },
   "languages": [],
   "resistances": [
-    "Fire"
+    "Poison"
   ],
   "skillProficiencies": [
-    "Insight",
-    "Performance",
+    "Athletics",
+    "Intimidation",
     "Perception",
-    "Persuasion",
-    "Deception"
+    "Survival"
   ],
   "specialActions": [],
   "spells": [
-    "Charm Person",
-    "Disguise Self",
-    "Hideous Laughter",
-    "Mage Hand",
-    "Minor Illusion",
-    "Sleep"
+    "Detect Magic",
+    "Guidance",
+    "Guiding Bolt",
+    "Healing Word",
+    "Inflict Wounds",
+    "Sacred Flame",
+    "Spare the Dying"
   ],
-  "rules": "5e",
-  "originalFileName": "bard.json",
-  "imagePath": "campaigns/5e Testing/images/Bard.png"
+  "rules": "2024",
+  "xp": 0,
+  "xpMode": "milestone",
+  "imagePath": "campaigns/2024 Testing/images/Grommok.png",
+  "originalFileName": "fighter.json"
 }
