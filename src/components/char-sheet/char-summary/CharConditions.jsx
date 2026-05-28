@@ -30,7 +30,9 @@ function saveConditions(name, campaignName, conditions) {
   storage.setProperty(name, STORAGE_KEY, conditions, campaignName)
 }
 
-function CharConditions({ playerStats, campaignName }) {
+const EXHAUSTION_LEVELS = 6
+
+function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhaustionChange }) {
   const [activeConditions, setActiveConditions] = React.useState(() =>
     loadConditions(playerStats.name, campaignName)
   )
@@ -43,9 +45,23 @@ function CharConditions({ playerStats, campaignName }) {
     })
   }
 
+  const adjustExhaustion = (delta) => {
+    const next = Math.min(EXHAUSTION_LEVELS, Math.max(0, exhaustionLevel + delta))
+    storage.setProperty(playerStats.name, 'exhaustionLevel', next, campaignName)
+    onExhaustionChange(next)
+  }
+
+  const dead = exhaustionLevel >= EXHAUSTION_LEVELS
+  const active = exhaustionLevel > 0
+
   return (
     <div className="char-conditions">
       <div className="char-conditions-grid">
+        <span className={`exhaustion-badge ${dead ? 'exhaustion-badge--dead' : active ? 'exhaustion-badge--active' : ''}`}>
+          <button className="exhaustion-badge-btn" onClick={() => adjustExhaustion(-1)} type="button" disabled={exhaustionLevel <= 0}>−</button>
+          <span className="exhaustion-badge-label" title={`Exhaustion level ${exhaustionLevel}${dead ? ' - DEAD' : ''}`}>Exhaustion ({exhaustionLevel})</span>
+          <button className="exhaustion-badge-btn" onClick={() => adjustExhaustion(1)} type="button" disabled={dead}>+</button>
+        </span>
         {CONDITIONS.map(({ key, label }) => (
           <button
             key={key}

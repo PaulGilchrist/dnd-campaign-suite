@@ -34,6 +34,11 @@ function LongRestButton({ playerStats, campaignName, onLongRest }) {
       storage.setProperty(name, key, null, campaignName);
     });
 
+    const currentExhaustion = storage.getProperty(name, 'exhaustionLevel', campaignName);
+    if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
+      storage.setProperty(name, 'exhaustionLevel', currentExhaustion - 1, campaignName);
+    }
+
     onLongRest && onLongRest();
   };
 

@@ -20,6 +20,8 @@ import ShortRestModal from '../ShortRestModal.jsx'
 import storage from '../../../services/storage.js'
 import CharConditions from './CharConditions.jsx'
 
+const EXHAUSTION_LEVELS = 6
+
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
 function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, onLongRest }) {
@@ -30,6 +32,10 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const [displayXp, setDisplayXp] = React.useState(playerStats?.xp ?? 0);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const [showAvatarModal, setShowAvatarModal] = React.useState(false);
+    const [exhaustionLevel, setExhaustionLevel] = React.useState(() => {
+        const stored = storage.getProperty(playerStats.name, 'exhaustionLevel', campaignName);
+        return typeof stored === 'number' ? Math.min(EXHAUSTION_LEVELS, Math.max(0, stored)) : 0;
+    });
 
     React.useEffect(() => {
         setDisplayXp(playerStats?.xp ?? 0);
@@ -89,6 +95,10 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         const unarmoredMovement = classLevel?.class_specific?.unarmored_movement || 0;
         speed += unarmoredMovement;
     }
+    speed = Math.max(0, speed - (5 * exhaustionLevel));
+
+    const exhaustionPenalty = 2 * exhaustionLevel;
+    const effectiveInitiative = playerStats.initiative - exhaustionPenalty;
     const showArmorClassFormulaPopup = () => {
         const html = `Armor Class (${playerStats.armorClass}) = ${playerStats.armorClassFormula}`
         setPopupHtml(html);
@@ -151,7 +161,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 </div>
                 <div>
                     <b>Proficiency: </b>+{playerStats.proficiency}<br />
-                    <span className='clickable' onClick={() => rollInitiative(playerStats.initiative)}><b>Initiative: </b>{signFormatter.format(playerStats.initiative)}</span><br />
+                    <span className='clickable' onClick={() => rollInitiative(effectiveInitiative)}><b>Initiative: </b>{signFormatter.format(effectiveInitiative)}</span><br />
                     <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiration} /><br />
                 </div>
                 <div>
@@ -269,7 +279,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     onClose={() => setShowAvatarModal(false)}
                 />
             )}
-              <CharConditions playerStats={playerStats} campaignName={campaignName} />
+              <CharConditions playerStats={playerStats} campaignName={campaignName} exhaustionLevel={exhaustionLevel} onExhaustionChange={setExhaustionLevel} />
             </div>
   </div>
 )
