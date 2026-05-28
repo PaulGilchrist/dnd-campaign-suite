@@ -575,6 +575,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
         if (!conditionDef) return;
         const creature = combatSummary.creatures.find(c => c.id === conditionPickerTarget.id);
         if (!creature) return;
+        creature.conditions = creature.conditions.filter(c => c.key !== conditionDef.key);
         creature.conditions.push({
             id: utils.guid(),
             key: conditionDef.key,
