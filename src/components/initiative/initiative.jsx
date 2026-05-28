@@ -95,11 +95,18 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
 
     const handleAddNpc = React.useCallback(() => {
         if (!combatSummary) return;
-        combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${numOfNpc + 1}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [] });
-        setNumOfNpc(numOfNpc + 1);
+        const maxNpcNum = combatSummary.creatures
+            .filter(c => c.type === 'npc')
+            .reduce((max, c) => {
+                const match = c.name.match(/^NPC (\d+)$/);
+                return match ? Math.max(max, parseInt(match[1])) : max;
+            }, 0);
+        const nextNum = maxNpcNum + 1;
+        combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${nextNum}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [] });
+        setNumOfNpc(nextNum);
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
-    }, [combatSummary, numOfNpc, campaignName]);
+    }, [combatSummary, campaignName]);
 
     const handleRemoveNpc = React.useCallback(() => {
         if (!combatSummary) return;
@@ -167,19 +174,18 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
             try { initialSummary = JSON.parse(stored); } catch { /* ignore */ }
         }
 
-        const creatures = setupCreatures();
-
         if (initialSummary) {
-            const existingPlayerMap = new Map();
-            for (const c of initialSummary.creatures) {
-                if (c.type === 'player') existingPlayerMap.set(c.name, c);
-            }
-            const mergedCreatures = creatures.map(newC => {
-                const existing = existingPlayerMap.get(newC.name);
-                return existing ? { ...newC, initiative: existing.initiative } : newC;
+            const characterNameSet = new Set(characters.map(c => utils.getFirstName(c.name)));
+            const mergedCreatures = initialSummary.creatures.map(c => {
+                if (c.type === 'player' && characterNameSet.has(c.name)) {
+                    const character = characters.find(ch => utils.getFirstName(ch.name) === c.name);
+                    return { ...c, imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(character) };
+                }
+                return { ...c };
             });
-            const npcs = initialSummary.creatures.filter(c => c.type === 'npc');
-            mergedCreatures.push(...npcs);
+
+            const npcCount = mergedCreatures.filter(c => c.type === 'npc').length;
+            setNumOfNpc(npcCount);
 
             const summary = { round: initialSummary.round, creatures: mergedCreatures };
             setCombatSummary(summary);
@@ -192,6 +198,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                 setActiveCreatureId(mergedCreatures[0]?.id || null);
             }
         } else {
+            const creatures = setupCreatures();
             const newSummary = { round: 1, creatures };
             storage.set('combatSummary', newSummary, campaignName);
             setCombatSummary(newSummary);
