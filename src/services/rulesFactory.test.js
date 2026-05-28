@@ -288,12 +288,11 @@ describe('rulesFactory', () => {
 
   describe('getPlayerStats', () => {
     it('should gather all player stats', async () => {
-      const mockPlayerStats = {};
+      const mockPlayerStats = { senses: ['Darkvision'] };
       rules5e.default.getPlayerStats.mockResolvedValue(mockPlayerStats);
       raceRules5e.getImmunities.mockReturnValue([]);
       raceRules5e.getRace.mockReturnValue({ name: 'Human' });
       raceRules5e.getResistances.mockReturnValue([]);
-      raceRules5e.getSenses.mockReturnValue(['Darkvision']);
       classRules5e.default.getClass.mockReturnValue({ name: 'Fighter' });
 
       const allClasses = [];

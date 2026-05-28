@@ -130,7 +130,6 @@ const rulesFactory = {
         playerStats.race = rr.getRace(allRaces, playerStats);
         playerStats.immunities = rr.getImmunities(playerStats);
         playerStats.resistances = rr.getResistances(playerStats);
-        playerStats.senses = rr.getSenses(playerStats);
 
         return playerStats;
       }
