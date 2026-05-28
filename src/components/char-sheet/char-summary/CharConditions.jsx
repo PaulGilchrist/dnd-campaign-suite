@@ -30,7 +30,7 @@ function saveConditions(name, campaignName, conditions) {
   storage.setProperty(name, STORAGE_KEY, conditions, campaignName)
 }
 
-const EXHAUSTION_LEVELS = 6
+export const EXHAUSTION_LEVELS = 6
 
 function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhaustionChange }) {
   const [activeConditions, setActiveConditions] = React.useState(() =>

@@ -8,7 +8,7 @@ import './CharAbilities.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
-function CharAbilities({ allAbilityScores, playerStats, campaignName }) {
+function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0 }) {
      const abilityDesc = buildAbilityDetailHtml(allAbilityScores);
      const { popupHtml, setPopupHtml, rollAbilityCheck, rollSavingThrow, rollSkillCheck } = useLoggedDiceRoll(playerStats.name, campaignName);
     return (
@@ -30,11 +30,11 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName }) {
                 return <div key={ability.name} className='abilities'>
                     <div className='clickable left' onClick={() => setPopupHtml(abilityDesc(ability.name))}>{ability.name}</div>
                     <div>{ability.totalScore}</div>
-                    <div className='clickable' onClick={() => rollAbilityCheck(ability.name, ability.bonus)}>{signFormatter.format(ability.bonus)}</div>
-                    <div className='clickable' onClick={() => rollSavingThrow(ability.name, ability.save)}>{signFormatter.format(ability.save)}</div>
+                    <div className='clickable' onClick={() => rollAbilityCheck(ability.name, ability.bonus - exhaustionPenalty)}>{signFormatter.format(ability.bonus - exhaustionPenalty)}</div>
+                    <div className='clickable' onClick={() => rollSavingThrow(ability.name, ability.save - exhaustionPenalty)}>{signFormatter.format(ability.save - exhaustionPenalty)}</div>
                     <div className='left'>{ability.skills.map((skill) => {
                         return <span key={skill.name}>
-                            <span className='clickable' onClick={() => rollSkillCheck(skill.name, skill.bonus)}>{skill.name} ({signFormatter.format(skill.bonus)})</span>
+                            <span className='clickable' onClick={() => rollSkillCheck(skill.name, skill.bonus - exhaustionPenalty)}>{skill.name} ({signFormatter.format(skill.bonus - exhaustionPenalty)})</span>
                             {ability.skills.indexOf(skill) < ability.skills.length - 1 ? ', ' : ''}
                         </span>;
                     })}</div>

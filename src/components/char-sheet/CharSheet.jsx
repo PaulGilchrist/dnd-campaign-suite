@@ -12,12 +12,24 @@ import CharSpecialActions from './CharSpecialActions.jsx'
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx'
 import CharSpells from './char-spells/CharSpells.jsx'
 import CharSummary from './char-summary/CharSummary.jsx'
+import { EXHAUSTION_LEVELS } from './char-summary/CharConditions.jsx'
 import Subscriber from '../common/Subscriber.jsx';
 import './CharSheet.css'
 
 function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName }) {
     const [playerStats, setPlayerStats] = React.useState(null);
     const [forceRefresh, setForceRefresh] = React.useState(0);
+    const readExhaustionLevel = () => {
+        if (!playerSummary) return 0;
+        const stored = storage.getProperty(playerSummary.name, 'exhaustionLevel', campaignName);
+        return typeof stored === 'number' ? Math.min(EXHAUSTION_LEVELS, Math.max(0, stored)) : 0;
+    };
+
+    const [exhaustionLevel, setExhaustionLevel] = React.useState(readExhaustionLevel);
+
+    React.useEffect(() => {
+        setExhaustionLevel(readExhaustionLevel());
+    }, [forceRefresh]);
     React.useEffect(() => {
         const fetchData = async () => {
             // Use rules factory to get appropriate rules based on character's rules setting
@@ -103,16 +115,18 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         }
     }
 
+    const exhaustionPenalty = 2 * exhaustionLevel;
+
     return (<React.Fragment>
         {playerStats && <div className='char-sheet' data-testid='char-sheet'>
-            <CharSummary playerStats={playerStats} onDeleteCharacter={onDeleteCharacter} onEditCharacter={onEditCharacter} onUploadClick={onUploadClick} onSaveClick={onSaveClick} campaignName={campaignName} onLongRest={() => setForceRefresh(utils.guid())}></CharSummary><hr />
-              <CharAbilities allAbilityScores={allAbilityScores} playerStats={playerStats} campaignName={campaignName}></CharAbilities><hr />
+            <CharSummary playerStats={playerStats} onDeleteCharacter={onDeleteCharacter} onEditCharacter={onEditCharacter} onUploadClick={onUploadClick} onSaveClick={onSaveClick} campaignName={campaignName} onLongRest={() => setForceRefresh(utils.guid())} exhaustionLevel={exhaustionLevel} onExhaustionChange={setExhaustionLevel}></CharSummary><hr />
+              <CharAbilities allAbilityScores={allAbilityScores} playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty}></CharAbilities><hr />
 
-              <CharActions playerStats={playerStats} campaignName={campaignName}></CharActions><hr />
+              <CharActions playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty}></CharActions><hr />
               <CharReactions playerStats={playerStats} campaignName={campaignName}></CharReactions>
-            {playerSummary.rules === '2024' 
-  ? <CharSpells playerStats={playerStats} campaignName={campaignName}></CharSpells>
-  : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName}></CharSpells>
+            {playerSummary.rules === '2024'
+  ? <CharSpells playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty}></CharSpells>
+  : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty}></CharSpells>
 }<hr />
             <CharSpecialActions playerStats={playerStats}></CharSpecialActions><hr />
             <CharInventory playerStats={playerStats}></CharInventory><hr />
