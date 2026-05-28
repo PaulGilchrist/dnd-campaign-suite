@@ -61,6 +61,108 @@
                     "extreme opposition"
                 ],
                 "description": "The NPC's attitude toward the character"
+            },
+            "imagePath": {
+                "type": "string",
+                "description": "Path to the NPC's avatar image"
+            },
+            "armorClass": {
+                "type": ["integer", "null"],
+                "minimum": 0,
+                "description": "The NPC's armor class"
+            },
+            "hitPoints": {
+                "type": "string",
+                "description": "The NPC's hit points (can be a number or expression)"
+            },
+            "hitDice": {
+                "type": "string",
+                "description": "The NPC's hit dice (e.g., '2d8+4')"
+            },
+            "initiativeBonus": {
+                "type": "string",
+                "description": "The NPC's initiative bonus (can be empty string if not set)"
+            },
+            "speed": {
+                "type": "object",
+                "description": "The NPC's movement speeds",
+                "properties": {
+                    "walk": {
+                        "type": "string"
+                    },
+                    "fly": {
+                        "type": "string"
+                    },
+                    "swim": {
+                        "type": "string"
+                    },
+                    "climb": {
+                        "type": "string"
+                    },
+                    "burrow": {
+                        "type": "string"
+                    }
+                }
+            },
+            "abilityScores": {
+                "type": "object",
+                "description": "The NPC's six ability scores",
+                "properties": {
+                    "str": { "type": "integer", "minimum": 1, "maximum": 30 },
+                    "dex": { "type": "integer", "minimum": 1, "maximum": 30 },
+                    "con": { "type": "integer", "minimum": 1, "maximum": 30 },
+                    "int": { "type": "integer", "minimum": 1, "maximum": 30 },
+                    "wis": { "type": "integer", "minimum": 1, "maximum": 30 },
+                    "cha": { "type": "integer", "minimum": 1, "maximum": 30 }
+                }
+            },
+            "savingThrowBonuses": {
+                "type": "object",
+                "description": "Ability-specific saving throw bonuses",
+                "additionalProperties": {
+                    "type": "integer"
+                }
+            },
+            "skillBonuses": {
+                "type": "object",
+                "description": "Skill-specific bonuses (e.g., { perception: 5 })",
+                "additionalProperties": {
+                    "type": "integer"
+                }
+            },
+            "damageResistances": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Damage types the NPC resists"
+            },
+            "damageImmunities": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Damage types the NPC is immune to"
+            },
+            "conditionImmunities": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Conditions the NPC is immune to"
+            },
+            "actions": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": { "type": "string" },
+                        "desc": { "type": "string" }
+                    }
+                },
+                "description": "Actions the NPC can take"
+            },
+            "traits": {
+                "type": "string",
+                "description": "Special traits and features of the NPC"
+            },
+            "reactions": {
+                "type": "string",
+                "description": "Reactions the NPC can take"
             }
         }
     }
