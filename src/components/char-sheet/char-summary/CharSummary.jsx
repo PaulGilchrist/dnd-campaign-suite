@@ -10,6 +10,7 @@ import CharClassFeatures from './CharClassFeatures.jsx'
 import CharFeats from '../char-feats/CharFeats.jsx'
 import Popup from '../../common/Popup.jsx'
 import AvatarImage from '../../common/AvatarImage.jsx'
+import AvatarModal from '../../common/AvatarModal.jsx';
 import useTrackedResource from '../../../hooks/useTrackedResource.js'
 import useLoggedDiceRoll from '../../../hooks/useLoggedDiceRoll.js';
 import { sanitizeHtml } from '../../../services/sanitize.js';
@@ -28,6 +29,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const [xpDelta, setXpDelta] = React.useState('');
     const [displayXp, setDisplayXp] = React.useState(playerStats?.xp ?? 0);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const [showAvatarModal, setShowAvatarModal] = React.useState(false);
 
     React.useEffect(() => {
         setDisplayXp(playerStats?.xp ?? 0);
@@ -116,7 +118,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     </Popup>
                 )}
             <div className='char-header'>
-                <AvatarImage name={playerStats.name} imagePath={playerStats.imagePath} size={60} />
+                <AvatarImage name={playerStats.name} imagePath={playerStats.imagePath} size={60} onClick={() => setShowAvatarModal(true)} />
                 <div className='char-header-text'>
                     <div className='name-row'>
                         <span className='name'>{playerStats.name}</span>&nbsp;&nbsp;
@@ -260,6 +262,13 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
               </div>
             )}
             <div className='no-print'>
+            {showAvatarModal && playerStats.imagePath && (
+                <AvatarModal
+                    name={playerStats.name}
+                    imagePath={playerStats.imagePath}
+                    onClose={() => setShowAvatarModal(false)}
+                />
+            )}
               <CharConditions playerStats={playerStats} campaignName={campaignName} />
             </div>
   </div>

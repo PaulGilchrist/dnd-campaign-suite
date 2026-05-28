@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import useNPCsManagement from '../../hooks/useNPCsManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import AvatarImage from '../common/AvatarImage.jsx';
+import AvatarModal from '../common/AvatarModal.jsx';
 import { npcHasStatBlock, calculateAbilityModifier } from '../../services/npcStatBlockUtils.js';
 import { rollD20 } from '../../services/diceRoller.js';
 import utils from '../../services/utils.js';
@@ -37,6 +38,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   const [activeTab, setActiveTab] = useState('roleplay');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showNpcAvatarModal, setShowNpcAvatarModal] = useState(false);
 
   useEffect(() => {
     if (campaignName) {
@@ -433,7 +435,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
 
             {/* Avatar upload */}
             <div className="npcs-avatar-section">
-              <AvatarImage name={formData.name} imagePath={formData.image || formData.imagePath} size={80} />
+              <AvatarImage name={formData.name} imagePath={formData.image || formData.imagePath} size={80} onClick={(formData.image || formData.imagePath) ? () => setShowNpcAvatarModal(true) : undefined} />
               <div className="npcs-avatar-controls">
                 <label className="ct-btn ct-btn-sm">
                   <i className="fa-solid fa-camera" /> Upload Avatar
@@ -902,6 +904,13 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
             </div>
           </div>
         </div>
+      )}
+      {showNpcAvatarModal && formData && (formData.image || formData.imagePath) && (
+        <AvatarModal
+          name={formData.name}
+          imagePath={formData.image || formData.imagePath}
+          onClose={() => setShowNpcAvatarModal(false)}
+        />
       )}
     </div>
   );
