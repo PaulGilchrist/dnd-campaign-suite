@@ -110,7 +110,6 @@ describe('Initiative', () => {
     render(<Initiative characters={[]} />);
     expect(screen.getByText('Clear')).toBeInTheDocument();
     expect(screen.getByText('+ NPC')).toBeInTheDocument();
-    expect(screen.getByText('- NPC')).toBeInTheDocument();
     expect(screen.getByText('\u2191 Round')).toBeInTheDocument();
     expect(screen.getByText('Round \u2193')).toBeInTheDocument();
     expect(screen.getByText('\u2190 Prev')).toBeInTheDocument();
@@ -135,8 +134,8 @@ describe('Initiative', () => {
      });
    });
 
-  it('should remove NPC when - NPC clicked', async () => {
-    render(<Initiative characters={[]} />);
+  it('should remove NPC when npc-remove-btn clicked', async () => {
+    render(<Initiative characters={[]} isLocalhost={true} />);
     await act(async () => {
       await vi.waitFor(() => {
         const npcCards = document.querySelectorAll('.creature-card.npc');
@@ -144,7 +143,9 @@ describe('Initiative', () => {
        });
      });
     const initialCount = document.querySelectorAll('.creature-card.npc').length;
-    fireEvent.click(screen.getByText('- NPC'));
+    const removeBtns = document.querySelectorAll('.npc-remove-btn');
+    expect(removeBtns.length).toBeGreaterThan(0);
+    fireEvent.click(removeBtns[0]);
     await act(async () => {
       await vi.waitFor(() => {
         const newCount = document.querySelectorAll('.creature-card.npc').length;
@@ -258,24 +259,21 @@ describe('Initiative', () => {
      });
    });
 
-  it('should handle keyboard shortcut for removing NPC', async () => {
-    render(<Initiative characters={[]} />);
-    await act(async () => {
-      await vi.waitFor(() => {
-        const npcCards = document.querySelectorAll('.creature-card.npc');
-        expect(npcCards.length).toBeGreaterThan(0);
-       });
-     });
-    const initialCount = document.querySelectorAll('.creature-card.npc').length;
-    await act(async () => {
-      fireEvent.keyDown(window, { key: '-' });
-     });
-    await act(async () => {
-      await vi.waitFor(() => {
-        const newCount = document.querySelectorAll('.creature-card.npc').length;
-        expect(newCount).toBeLessThan(initialCount);
-       });
-     });
+   it('should show npc-remove-btn only when isLocalhost', async () => {
+     const { rerender } = render(<Initiative characters={[]} />);
+     await act(async () => {
+       await vi.waitFor(() => {
+         const npcCards = document.querySelectorAll('.creature-card.npc');
+         expect(npcCards.length).toBeGreaterThan(0);
+        });
+      });
+     expect(document.querySelector('.npc-remove-btn')).toBeNull();
+     rerender(<Initiative characters={[]} isLocalhost={true} />);
+     await act(async () => {
+       await vi.waitFor(() => {
+         expect(document.querySelector('.npc-remove-btn')).not.toBeNull();
+        });
+      });
    });
 
   it('should advance through creatures with right arrow', () => {
@@ -287,7 +285,7 @@ describe('Initiative', () => {
 
   it('should not remove NPC when confirm returns false and initiative is set', async () => {
     window.confirm = vi.fn(() => false);
-    render(<Initiative characters={[{ name: 'Hero' }]} />);
+    render(<Initiative characters={[{ name: 'Hero' }]} isLocalhost={true} />);
     await act(async () => {});
     const npcInitiativeInputs = document.querySelectorAll('.creature-card.npc .creature-initiative input');
     await act(async () => {
@@ -297,7 +295,9 @@ describe('Initiative', () => {
      });
     await act(async () => {});
     const beforeCount = document.querySelectorAll('.creature-card').length;
-    fireEvent.click(screen.getByText('- NPC'));
+    const removeBtns = document.querySelectorAll('.npc-remove-btn');
+    expect(removeBtns.length).toBeGreaterThan(0);
+    fireEvent.click(removeBtns[0]);
     const afterCount = document.querySelectorAll('.creature-card').length;
     expect(afterCount).toBe(beforeCount);
    });

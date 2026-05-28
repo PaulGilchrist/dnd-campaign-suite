@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { loadMonsters } from '../../services/dataLoader.js';
 import './MonsterNameAutocomplete.css';
 
-function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, position, initialFocus = true, npcs }) {
+function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, position, initialFocus = true, npcs, showBadge }) {
     const [monsters, setMonsters] = useState([]);
     const [query, setQuery] = useState(value || '');
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -127,21 +127,7 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
                  className="monster-autocomplete-input"
                  autoFocus={initialFocus}
                  />
-                {showSuggestions && list.length > 0 && (
-                    <ul ref={listRef} className="monster-autocomplete-list">
-                        {list.map((entry, i) => (
-                            <li
-                             key={`${entry.source}-${entry.index}`}
-                             className={`monster-autocomplete-item${i === highlightedIndex ? ' highlighted' : ''}`}
-                             onMouseDown={() => selectSuggestion(entry.name)}
-                            >
-                                {entry.name}
-                                {entry.source === 'npc' && <span className="monster-autocomplete-badge">NPC</span>}
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </div>
+             </div>
          );
 }
 

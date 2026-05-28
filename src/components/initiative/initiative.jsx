@@ -855,6 +855,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                                         value={creature.name}
                                         onChange={(newVal) => handleNameChange(creature.id, newVal)}
                                         npcs={campaignNpcs}
+                                        showBadge={campaignNpcs.some(n => n.name?.toLowerCase() === creature.name?.toLowerCase())}
                                        />
                                   ) : (
                                     <span>{creature.name}</span>
