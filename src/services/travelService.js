@@ -2,23 +2,23 @@ import { hexKey, hexDistance, hexNeighbors } from './hexMapUtils.js';
 import { DEFAULT_TERRAIN } from '../config/outdoorConfig.js';
 
 export const TERRAIN_MOVE_COST = {
-  plains: 1,
-  hills: 1.5,
-  forest: 1.5,
-  swamp: 2,
-  mountains: 2.5,
-  desert: 1.5,
+  plains: 0.75,
+  hills: 1,
+  forest: 1,
+  swamp: 1.5,
+  mountains: 2,
+  desert: 1,
   tundra: 1.5,
   beach: 1,
-  water: null,
+  water: 4,
 };
 
 export const TRAVEL_PACES = [
   {
     id: 'slow',
     name: 'Slow',
-    hexesPerHour: 2,
-    hoursPerHex: 0.5,
+    hexesPerHour: 1 / 3,
+    hoursPerHex: 3,
     perception: 5,
     stealthAdvantage: true,
     encounterMod: -2,
@@ -27,8 +27,8 @@ export const TRAVEL_PACES = [
   {
     id: 'normal',
     name: 'Normal',
-    hexesPerHour: 3,
-    hoursPerHex: 1 / 3,
+    hexesPerHour: 1 / 2,
+    hoursPerHex: 2,
     perception: 0,
     stealthAdvantage: false,
     encounterMod: 0,
@@ -37,8 +37,8 @@ export const TRAVEL_PACES = [
   {
     id: 'fast',
     name: 'Fast',
-    hexesPerHour: 4,
-    hoursPerHex: 0.25,
+    hexesPerHour: 2 / 3,
+    hoursPerHex: 1.5,
     perception: -5,
     stealthAdvantage: false,
     encounterMod: 2,
@@ -47,7 +47,7 @@ export const TRAVEL_PACES = [
 ];
 
 export const MAX_TRAVEL_HOURS_PER_DAY = 8;
-export const MAX_FORCED_MARCH_HOURS = 12;
+export const MAX_FORCED_MARCH_HOURS = 6;
 export const HORSEBACK_SPEED_MULTIPLIER = 2;
 
 export function isTerrainPassable(terrainType) {

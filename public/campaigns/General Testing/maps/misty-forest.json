@@ -1899,8 +1899,8 @@
     }
   ],
   "zoom": 3.125,
-  "panX": 1263.8479934663014,
-  "panY": 507.58307931113217,
+  "panX": 1256.4351847842452,
+  "panY": 509.49173072181094,
   "marchingOrder": [
     "Monk",
     "Paladin",
@@ -1908,17 +1908,17 @@
     "Warlock"
   ],
   "partyPosition": {
-    "q": 29,
-    "r": 16
+    "q": 28,
+    "r": 12
   },
   "weather": {
-    "condition": "wind",
-    "label": "High Wind",
-    "icon": "wind",
-    "visibility": null,
+    "condition": "fog",
+    "label": "Fog",
+    "icon": "smog",
+    "visibility": 1,
     "moveCostMod": 1,
-    "budgetMod": 0.8,
-    "encounterMod": 5,
-    "description": "Strong winds — daily budget -20%"
+    "budgetMod": 1,
+    "encounterMod": -10,
+    "description": "Thick fog — visibility limited to adjacent hexes"
   }
 }
