@@ -212,4 +212,211 @@
     cursor: not-allowed;
 }
 
+/* Condition badges on creature cards */
+.initiative .creature-conditions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-top: 6px;
+    justify-content: center;
+    width: 100%;
+}
+
+.initiative .condition-badge-wrapper {
+    position: relative;
+}
+
+.initiative .initiative-condition-badge {
+    padding: 2px 6px;
+    border: 1px solid rgba(220, 38, 38, 0.5);
+    border-radius: 4px;
+    background-color: rgba(220, 38, 38, 0.2);
+    color: inherit;
+    font-size: 0.7em;
+    cursor: pointer;
+    opacity: 1;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
+    white-space: nowrap;
+}
+
+.initiative .initiative-condition-badge:hover:not(:disabled) {
+    background-color: rgba(220, 38, 38, 0.35);
+}
+
+.initiative .initiative-condition-badge:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.initiative .condition-break-btn {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: 1px solid rgba(220, 38, 38, 0.7);
+    border-radius: 50%;
+    background-color: var(--background-color, #1a1a2e);
+    color: #e74c3c;
+    font-size: 0.6em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.initiative .condition-break-btn:hover {
+    background-color: rgba(220, 38, 38, 0.3);
+}
+
+.initiative .condition-add-btn {
+    padding: 2px 8px;
+    border: 1px dashed rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    background-color: transparent;
+    color: inherit;
+    font-size: 0.7em;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.15s ease;
+}
+
+.initiative .condition-add-btn:hover {
+    opacity: 1;
+}
+
+/* Condition picker modal */
+.initiative .condition-picker-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.initiative .condition-picker-modal {
+    background-color: var(--background-color, #1a1a2e);
+    border: 1px solid var(--border-color-light, #444);
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.initiative .condition-picker-modal h3 {
+    margin: 0 0 16px;
+    font-size: 1.2em;
+    text-align: center;
+}
+
+.initiative .condition-picker-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+.initiative .condition-picker-badge {
+    padding: 6px 12px;
+    border: 1px solid var(--border-color-light, #444);
+    border-radius: 6px;
+    background-color: transparent;
+    color: inherit;
+    font-size: 0.85em;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.initiative .condition-picker-badge:hover {
+    opacity: 0.85;
+}
+
+.initiative .condition-picker-badge--selected {
+    opacity: 1;
+    background-color: rgba(220, 38, 38, 0.2);
+    border-color: rgba(220, 38, 38, 0.5);
+}
+
+.initiative .condition-picker-fields {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    justify-content: center;
+}
+
+.initiative .condition-picker-fields label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.85em;
+    align-items: center;
+}
+
+.initiative .condition-picker-fields input[type="number"] {
+    width: 70px;
+    padding: 4px 8px;
+    text-align: center;
+    border: 1px solid var(--border-color-light, #444);
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.2);
+    color: inherit;
+}
+
+.initiative .condition-picker-fields select {
+    width: 140px;
+    padding: 4px 8px;
+    border: 1px solid var(--border-color-light, #444);
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.2);
+    color: inherit;
+}
+
+.initiative .condition-picker-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.initiative .condition-picker-actions button {
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95em;
+    color: var(--color-text);
+    background-color: var(--background-color-button-secondary);
+    border: 1px solid var(--border-color-light, #444);
+}
+
+.initiative .condition-picker-actions button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.initiative .condition-picker-actions button:hover:not(:disabled) {
+    background-color: var(--background-color-button-secondary-hover);
+}
+
+/* Condition save result in popup */
+.initiative .condition-save-result {
+    text-align: center;
+    font-size: 1.1em;
+    font-weight: bold;
+    padding: 8px 0 4px;
+}
+
+.initiative .condition-save-success {
+    color: #2ecc71;
+}
+
+.initiative .condition-save-failure {
+    color: #e74c3c;
+}
+
 

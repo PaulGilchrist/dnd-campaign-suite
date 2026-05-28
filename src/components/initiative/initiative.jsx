@@ -4,11 +4,15 @@ import { cloneDeep } from 'lodash';
 import utils from '../../services/utils.js'
 import storage from '../../services/storage.js'
 import { getMonsterImageUrl, getMonsterData } from '../../services/monsterUtils.js';
+import { rollD20 } from '../../services/diceRoller.js';
+import { getAbilitySaveBonus, getAbilityLabel, getDefaultAbility, CONDITIONS } from '../../services/conditionUtils.js';
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx';
 import AvatarImage from '../common/AvatarImage.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx';
 import { computePlayerAc, computeAcEstimate } from '../../services/damageUtils.js';
+import Popup from '../common/Popup.jsx';
+import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 import './initiative.css'
 
 function NpcAvatar({ name, imageUrl, onClick }) {
@@ -36,6 +40,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
     const carouselRef = React.useRef(null);
     const combatSummaryRef = React.useRef(null);
     combatSummaryRef.current = combatSummary;
+
+    const [conditionPickerTarget, setConditionPickerTarget] = React.useState(null);
+    const [conditionPopup, setConditionPopup] = React.useState(null);
+    const [conditionPickerDc, setConditionPickerDc] = React.useState(10);
+    const [conditionPickerAbility, setConditionPickerAbility] = React.useState('con');
+    const [conditionPickerSelected, setConditionPickerSelected] = React.useState(null);
 
     const handleEvent = React.useCallback((event) => {
         if (event.key == null || event.data == null) return;
@@ -83,12 +93,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                 targetName: null,
                 ac: computeAcEstimate(character),
                 resistances: character.resistances || [],
-                immunities: character.immunities || []
+                immunities: character.immunities || [],
+                conditions: []
             };
         });
         creatureList.sort((a, b) => a.name.localeCompare(b.name)); // asc
         for (let i = 0; i < numOfNpc; i++) {
-            creatureList.push({ id: utils.guid(), name: `NPC ${i + 1}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [] });
+            creatureList.push({ id: utils.guid(), name: `NPC ${i + 1}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [] });
         }
         return creatureList;
     }, [characters, numOfNpc]);
@@ -102,7 +113,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                 return match ? Math.max(max, parseInt(match[1])) : max;
             }, 0);
         const nextNum = maxNpcNum + 1;
-        combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${nextNum}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [] });
+        combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${nextNum}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [] });
         setNumOfNpc(nextNum);
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
@@ -179,9 +190,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
             const mergedCreatures = initialSummary.creatures.map(c => {
                 if (c.type === 'player' && characterNameSet.has(c.name)) {
                     const character = characters.find(ch => utils.getFirstName(ch.name) === c.name);
-                    return { ...c, imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(character) };
+                    return { ...c, conditions: c.conditions || [], imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(character) };
                 }
-                return { ...c };
+                return { ...c, conditions: c.conditions || [] };
             });
 
             const npcCount = mergedCreatures.filter(c => c.type === 'npc').length;
@@ -340,6 +351,137 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
             setViewingMonster(monster);
         }
     };
+
+    const openConditionPicker = (creature) => {
+        if (!isLocalhost) return;
+        setConditionPickerTarget(creature);
+        setConditionPickerDc(10);
+        setConditionPickerAbility('con');
+        setConditionPickerSelected(null);
+    };
+
+    const handleApplyCondition = () => {
+        if (!conditionPickerTarget || !conditionPickerSelected || !combatSummary) return;
+        const conditionDef = CONDITIONS.find(c => c.key === conditionPickerSelected);
+        if (!conditionDef) return;
+        const creature = combatSummary.creatures.find(c => c.id === conditionPickerTarget.id);
+        if (!creature) return;
+        creature.conditions.push({
+            id: utils.guid(),
+            key: conditionDef.key,
+            label: conditionDef.label,
+            dc: conditionPickerDc,
+            ability: conditionPickerAbility,
+        });
+        storage.set('combatSummary', combatSummary, campaignName);
+        setCombatSummary(cloneDeep(combatSummary));
+        setConditionPickerTarget(null);
+        setConditionPickerSelected(null);
+
+        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'condition',
+                action: 'applied',
+                characterName: creature.name,
+                condition: conditionDef.label,
+                dc: conditionPickerDc,
+                ability: conditionPickerAbility,
+                timestamp: Date.now(),
+                id: utils.guid(),
+            })
+        }).catch(() => {});
+    };
+
+    const handleRollConditionSave = async (creatureId, condition) => {
+        if (!combatSummary) return;
+        const creature = combatSummary.creatures.find(c => c.id === creatureId);
+        if (!creature) return;
+
+        let saveBonus = 0;
+        if (creature.type === 'player') {
+            const character = characters.find(c => utils.getFirstName(c.name) === creature.name);
+            saveBonus = getAbilitySaveBonus(character, condition.ability);
+        } else {
+            try {
+                const monster = await getMonsterData(creature.name);
+                if (monster?.saving_throws?.[condition.ability]) {
+                    saveBonus = monster.saving_throws[condition.ability].modifier;
+                } else if (monster?.ability_score_modifiers?.[condition.ability]) {
+                    saveBonus = monster.ability_score_modifiers[condition.ability];
+                }
+            } catch { /* ignore */ }
+        }
+
+        const r1 = rollD20();
+        const total = r1 + saveBonus;
+        const success = total >= condition.dc;
+
+        if (success) {
+            creature.conditions = creature.conditions.filter(c => c.id !== condition.id);
+        }
+
+        storage.set('combatSummary', combatSummary, campaignName);
+        setCombatSummary(cloneDeep(combatSummary));
+
+        setConditionPopup({
+            type: 'd20',
+            rollType: 'condition-save',
+            name: getAbilityLabel(condition.ability),
+            rolls: [r1],
+            bonus: saveBonus,
+            targetName: null,
+            targetAc: null,
+            hit: undefined,
+            condition: condition.label,
+            dc: condition.dc,
+            success,
+        });
+
+        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'roll',
+                rollType: 'condition-save',
+                characterName: creature.name,
+                name: getAbilityLabel(condition.ability),
+                rolls: [r1],
+                mode: 'normal',
+                total: r1,
+                bonus: saveBonus,
+                condition: condition.label,
+                dc: condition.dc,
+                success,
+                timestamp: Date.now(),
+                id: utils.guid(),
+            })
+        }).catch(() => {});
+    };
+
+    const handleAutoBreakCondition = (creatureId, condition) => {
+        if (!isLocalhost || !combatSummary) return;
+        const creature = combatSummary.creatures.find(c => c.id === creatureId);
+        if (!creature) return;
+        creature.conditions = creature.conditions.filter(c => c.id !== condition.id);
+        storage.set('combatSummary', combatSummary, campaignName);
+        setCombatSummary(cloneDeep(combatSummary));
+
+        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'condition',
+                action: 'broken',
+                characterName: creature.name,
+                condition: condition.label,
+                timestamp: Date.now(),
+                id: utils.guid(),
+            })
+        }).catch(() => {});
+    };
+
     if (!combatSummary) return null;
     return (
         <div className='initiative'>
@@ -391,6 +533,44 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                                     }
                                 </select>
                             </div>
+                            <div className='creature-conditions'>
+                                {creature.conditions?.map(cond => {
+                                    const canRoll = creature.type === 'player' || isLocalhost;
+                                    return (
+                                        <div key={cond.id} className='condition-badge-wrapper'>
+                                            <button
+                                                className='condition-badge initiative-condition-badge'
+                                                onClick={() => canRoll && handleRollConditionSave(creature.id, cond)}
+                                                disabled={!canRoll}
+                                                type='button'
+                                                title={`${cond.label} (DC ${cond.dc} ${getAbilityLabel(cond.ability)})`}
+                                            >
+                                                {cond.label} DC {cond.dc}
+                                            </button>
+                                            {isLocalhost && (
+                                                <button
+                                                    className='condition-break-btn'
+                                                    onClick={() => handleAutoBreakCondition(creature.id, cond)}
+                                                    type='button'
+                                                    title='Automatically break condition'
+                                                >
+                                                    <i className='fa-solid fa-xmark'></i>
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                                {isLocalhost && (
+                                    <button
+                                        className='condition-add-btn'
+                                        onClick={() => openConditionPicker(creature)}
+                                        type='button'
+                                        title='Add condition'
+                                    >
+                                        <i className='fa-solid fa-plus'></i>
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     );
                 })}
@@ -411,6 +591,74 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                     campaignName={campaignName}
                     creatures={combatSummary.creatures}
                 />
+            )}
+            {conditionPickerTarget && (
+                <div className='condition-picker-overlay' onClick={() => setConditionPickerTarget(null)}>
+                    <div className='condition-picker-modal' onClick={e => e.stopPropagation()}>
+                        <h3>Add Condition to {conditionPickerTarget.name}</h3>
+                        <div className='condition-picker-grid'>
+                            {CONDITIONS.map(({ key, label }) => (
+                                <button
+                                    key={key}
+                                    className={`condition-badge condition-picker-badge ${conditionPickerSelected === key ? 'condition-picker-badge--selected' : ''}`}
+                                    onClick={() => {
+                                        setConditionPickerSelected(key);
+                                        setConditionPickerAbility(getDefaultAbility(key) || 'str');
+                                    }}
+                                    type='button'
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                        <div className='condition-picker-fields'>
+                            <label>
+                                DC
+                                <input
+                                    type='number'
+                                    min='1'
+                                    value={conditionPickerDc}
+                                    onChange={e => setConditionPickerDc(parseInt(e.target.value) || 10)}
+                                />
+                            </label>
+                            <label>
+                                Save
+                                <select
+                                    value={conditionPickerAbility}
+                                    onChange={e => setConditionPickerAbility(e.target.value)}
+                                >
+                                    <option value='str'>Strength</option>
+                                    <option value='dex'>Dexterity</option>
+                                    <option value='con'>Constitution</option>
+                                    <option value='int'>Intelligence</option>
+                                    <option value='wis'>Wisdom</option>
+                                    <option value='cha'>Charisma</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div className='condition-picker-actions'>
+                            <button onClick={() => setConditionPickerTarget(null)} type='button'>Cancel</button>
+                            <button onClick={handleApplyCondition} disabled={!conditionPickerSelected} type='button'>Apply</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {conditionPopup && (
+                <Popup onClickOrKeyDown={() => setConditionPopup(null)}>
+                    <DiceRollResult
+                        name={conditionPopup.condition ? `${conditionPopup.condition} — ${conditionPopup.name}` : conditionPopup.name}
+                        type={conditionPopup.type}
+                        rolls={conditionPopup.rolls}
+                        bonus={conditionPopup.bonus}
+                        targetName={conditionPopup.targetName}
+                        targetAc={conditionPopup.targetAc}
+                        hit={conditionPopup.hit}
+                    >
+                    </DiceRollResult>
+                    <div className={`condition-save-result ${conditionPopup.success ? 'condition-save-success' : 'condition-save-failure'}`}>
+                        {conditionPopup.success ? 'SAVE SUCCESSFUL' : 'SAVE FAILED'} (DC {conditionPopup.dc})
+                    </div>
+                </Popup>
             )}
         </div>
     )

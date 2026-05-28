@@ -397,3 +397,61 @@
   border-radius: 4px;
   margin-top: 4px;
 }
+
+/* Condition entries */
+.log-condition {
+  border-left: 3px solid #e74c3c;
+}
+
+.log-condition-broken {
+  border-left-color: #2ecc71;
+}
+
+.log-condition-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 28px;
+}
+
+.log-condition-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.log-condition-dc {
+  font-size: 0.78rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(220, 38, 38, 0.15);
+  color: #e74c3c;
+  font-weight: 700;
+}
+
+.log-condition-ability {
+  font-size: 0.72rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(100, 149, 237, 0.2);
+  color: #6495ed;
+  font-weight: 600;
+}
+
+/* Condition save in roll entry */
+.log-condition-save {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.log-condition-save.log-condition-success {
+  color: #2ecc71;
+  background: rgba(46, 204, 113, 0.15);
+}
+
+.log-condition-save.log-condition-failure {
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.15);
+}
