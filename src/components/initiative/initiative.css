@@ -60,8 +60,35 @@
     scroll-behavior: smooth;
 }
 
+/* NPC remove button */
+.initiative .npc-remove-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid rgba(231, 76, 60, 0.7);
+    border-radius: 50%;
+    background-color: var(--background-color, #1a1a2e);
+    color: #e74c3c;
+    font-size: 0.7em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    z-index: 5;
+}
+
+.initiative .npc-remove-btn:hover {
+    background-color: rgba(231, 76, 60, 0.3);
+}
+
 /* Creature card */
 .initiative .creature-card {
+    position: relative;
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;

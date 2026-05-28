@@ -269,20 +269,23 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
         setCombatSummary(cloneDeep(combatSummary));
     }, [combatSummary, campaignName]);
 
-    const handleRemoveNpc = React.useCallback(() => {
+    const handleRemoveNpc = React.useCallback((creatureId) => {
         if (!combatSummary) return;
-        for (let i = combatSummary.creatures.length - 1; i >= 0; i--) {
-            if (combatSummary.creatures[i].type === 'npc') {
-                if (combatSummary.creatures[i].initiative == '' || window.confirm(`${combatSummary.creatures[i].name} has initiative assigned.  Remove anyway?`)) {
-                    combatSummary.creatures.splice(i, 1);
-                    setNumOfNpc(numOfNpc - 1);
-                    storage.set('combatSummary', combatSummary, campaignName);
-                    setCombatSummary(cloneDeep(combatSummary));
-                }
-                break;
-            }
+        const creature = combatSummary.creatures.find(c => c.id === creatureId);
+        if (!creature || creature.type !== 'npc') return;
+
+        const needsConfirmation = creature.currentHp > 0 || creature.initiative !== '';
+        if (needsConfirmation) {
+            const msg = creature.currentHp > 0
+                ? `${creature.name} has ${creature.currentHp} HP. Remove anyway?`
+                : `${creature.name} has initiative assigned. Remove anyway?`;
+            if (!window.confirm(msg)) return;
         }
-    }, [combatSummary, numOfNpc, campaignName]);
+
+        combatSummary.creatures = combatSummary.creatures.filter(c => c.id !== creatureId);
+        storage.set('combatSummary', combatSummary, campaignName);
+        setCombatSummary(cloneDeep(combatSummary));
+    }, [combatSummary, campaignName]);
 
     const handleAddCombatRound = React.useCallback(() => {
         if (!combatSummary) return;
@@ -397,15 +400,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
             } else if (event.key === '+') {
                 event.preventDefault();
                 handleAddNpc();
-            } else if (event.key === '-') {
-                event.preventDefault();
-                handleRemoveNpc();
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [combatSummary, activeCreatureId, handleAddCombatRound, handleAddNpc, handleNextCreature, handlePreviousCreature, handleRemoveCombatRound, handleRemoveNpc]);
+    }, [combatSummary, activeCreatureId, handleAddCombatRound, handleAddNpc, handleNextCreature, handlePreviousCreature, handleRemoveCombatRound]);
 
     React.useEffect(() => {
         if (!carouselRef.current || !activeCreatureId) return;
@@ -832,6 +832,16 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                     const isUnconscious = creature.currentHp <= 0;
                     return (
                         <div key={creature.id} className={`creature-card ${creature.type} ${isActive ? 'active' : ''} ${isUnconscious ? 'creature-unconscious' : ''}`}>
+                            {creature.type === 'npc' && isLocalhost && (
+                                <button
+                                    className="npc-remove-btn"
+                                    onClick={() => handleRemoveNpc(creature.id)}
+                                    type="button"
+                                    title="Remove NPC"
+                                >
+                                    <i className="fa-solid fa-xmark"></i>
+                                </button>
+                            )}
                             <div className='creature-avatar'>
                                 {creature.type === 'player' ? (
                                     <AvatarImage name={creature.name} imagePath={creature.imagePath} size={150} />
@@ -965,7 +975,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
             <div className='combat-controls'>
                 <button className='clear-button' onClick={handleClear}>Clear</button>
                 <button onClick={handleAddNpc}>+ NPC</button>
-                <button onClick={handleRemoveNpc}>- NPC</button>
                 <button onClick={handleAddCombatRound}>↑ Round</button>
                 <button onClick={handleRemoveCombatRound}>Round ↓</button>
                 <button onClick={handlePreviousCreature}>← Prev</button>
