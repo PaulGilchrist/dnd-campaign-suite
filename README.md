@@ -278,6 +278,9 @@ Track campaign factions with influence levels (1–4), goals, markdown notes, an
 
 A running audit trail of dice rolls, events, and actions during play. Every roll made from the character sheet is logged with timestamp, character name, and result — perfect for settling disputes or remembering what happened three sessions ago.
 
+<img src="public/logging.png" alt="Party Log Example" width="800" />
+
+
 ### 🗂️ Map Management
 
 Create, rename, activate, and delete maps — multiple maps per campaign, switch between them on the fly.
