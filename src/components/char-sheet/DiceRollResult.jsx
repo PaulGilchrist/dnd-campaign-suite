@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0 }) {
+function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice }) {
     const [mode, setMode] = useState('normal'); // 'normal', 'advantage', 'disadvantage'
 
     // Only d20 (single die, 20 sides) allows advantage/disadvantage
@@ -79,6 +79,14 @@ function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier =
              )}
 
             {isCrit && <div className="dice-roll-crit">Critical Hit!</div>}
+            {targetName && hit !== undefined && (
+              <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
+                {hit ? '✓ HIT' : '✗ MISS'} ({total} vs AC {targetAc})
+              </div>
+            )}
+            {resistanceNotice && (
+              <div className="dice-roll-resistance">{resistanceNotice}</div>
+            )}
             <div className="dice-roll-hint">click to dismiss</div>
         </div>
     );

@@ -1,23 +1,50 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { rollExpression } from '../../services/diceRoller.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
 import Popup from '../common/Popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
+import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResistanceNotice } from '../../services/damageUtils.js';
+import { getCombatContext } from '../../services/damageUtils.js';
+import { findCreatureByName } from '../../services/damageUtils.js';
 import './MonsterCardModal.css';
 
-function MonsterCardModal({ monster, onClose, campaignName }) {
+function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
+  const monsterName = monster?.name || 'Monster';
   const { popupHtml, setPopupHtml, rollAttack, rollDamage, rollAbilityCheck, rollSavingThrow, rollSkillCheck, rollInitiative } = useLoggedDiceRoll(
-    monster?.name || 'Monster',
+    monsterName,
     campaignName
   );
 
-  const handleAttack = (name, bonus) => rollAttack(name, bonus);
+  const getCombatTarget = useCallback(() => {
+    if (!creatures) {
+      const cs = getCombatContext();
+      return cs ? getTargetFromAttacker(cs, monsterName) : null;
+    }
+    const attacker = findCreatureByName({ creatures }, monsterName);
+    if (!attacker || !attacker.targetId) return null;
+    return creatures.find(c => c.id === attacker.targetId) || null;
+  }, [creatures, monsterName]);
 
-  const handleDamage = (name, formula) => {
+  const getDamageTypesForAction = useCallback((action) => {
+    const types = [];
+    if (action.damage_dice) {
+      types.push(...extractDamageTypes(action.description));
+    }
+    return types;
+  }, []);
+
+  const handleAttack = (name, bonus, action) => {
+    const target = getCombatTarget();
+    const damageTypes = action ? getDamageTypesForAction(action) : [];
+    const resistanceNotice = target ? getResistanceNotice(damageTypes, target.resistances, target.immunities, target.name) : null;
+    rollAttack(name, bonus, { damageType: formatDamageTypes(damageTypes), resistanceNotice });
+  };
+
+  const handleDamage = (name, formula, damageType, targetName) => {
     const result = rollExpression(formula);
     if (result) {
-      rollDamage(name, formula, result.total, result.rolls, result.modifier);
+      rollDamage(name, formula, result.total, result.rolls, result.modifier, { damageType, targetName });
     }
   };
 
@@ -32,21 +59,25 @@ function MonsterCardModal({ monster, onClose, campaignName }) {
 
   const handleInitiative = (bonus) => rollInitiative(bonus);
 
-  const renderAction = (action, i) => (
+  const renderAction = (action, i) => {
+    const target = getCombatTarget();
+    const damageTypes = getDamageTypesForAction(action);
+
+    return (
     <div key={i} className="mc-action">
       <strong>{action.name}.</strong>{' '}
       {action.attack_bonus != null && (
-        <span className="mc-dice-link" onClick={() => handleAttack(action.name, action.attack_bonus)} role="button" tabIndex={0}>
+        <span className="mc-dice-link" onClick={() => handleAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>
           <i className="fa-solid fa-dice-d20" /> +{action.attack_bonus}
         </span>
       )}
       {action.damage_dice && (
-        <span className="mc-dice-link" onClick={() => handleDamage(action.name, action.damage_dice)} role="button" tabIndex={0}>
+        <span className="mc-dice-link" onClick={() => handleDamage(action.name, action.damage_dice, formatDamageTypes(damageTypes), target?.name)} role="button" tabIndex={0}>
           <i className="fa-solid fa-dice" /> {action.damage_dice}
         </span>
       )}
       {parseExtraDamageDice(action.damage, action.damage_dice).map((formula, idx) => (
-        <span key={idx} className="mc-dice-link" onClick={() => handleDamage(action.name, formula)} role="button" tabIndex={0}>
+        <span key={idx} className="mc-dice-link" onClick={() => handleDamage(action.name, formula, formatDamageTypes(damageTypes), target?.name)} role="button" tabIndex={0}>
           <i className="fa-solid fa-dice" /> {formula}
         </span>
       ))}
@@ -60,6 +91,7 @@ function MonsterCardModal({ monster, onClose, campaignName }) {
       {action.recharge && <em> ({action.recharge})</em>}
     </div>
   );
+  };
 
   const content = useMemo(() => {
     if (!monster) return null;

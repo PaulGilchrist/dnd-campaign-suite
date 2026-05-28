@@ -8,6 +8,7 @@ import MonsterCardModal from '../encounter/MonsterCardModal.jsx';
 import AvatarImage from '../common/AvatarImage.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx';
+import { computePlayerAc, computeAcEstimate } from '../../services/damageUtils.js';
 import './initiative.css'
 
 function NpcAvatar({ name, imageUrl, onClick }) {
@@ -26,7 +27,7 @@ function NpcAvatar({ name, imageUrl, onClick }) {
     );
 }
 
-function Initiative({ characters, campaignName, onNpcsChange }) {
+function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
     const [numOfNpc, setNumOfNpc] = React.useState(4);
     const [activeCreatureId, setActiveCreatureId] = React.useState(null);
@@ -71,17 +72,30 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
     }, [combatSummary]);
 
     const setupCreatures = React.useCallback(() => {
-        const creatureList = characters.map((character) => { return { id: utils.guid(), name: utils.getFirstName(character.name), type: 'player', imagePath: character.imagePath || '', initiative: '' } });
+        const creatureList = characters.map((character) => {
+            return {
+                id: utils.guid(),
+                name: utils.getFirstName(character.name),
+                type: 'player',
+                imagePath: character.imagePath || '',
+                initiative: '',
+                targetId: null,
+                targetName: null,
+                ac: computeAcEstimate(character),
+                resistances: character.resistances || [],
+                immunities: character.immunities || []
+            };
+        });
         creatureList.sort((a, b) => a.name.localeCompare(b.name)); // asc
         for (let i = 0; i < numOfNpc; i++) {
-            creatureList.push({ id: utils.guid(), name: `NPC ${i + 1}`, type: 'npc', initiative: '' });
+            creatureList.push({ id: utils.guid(), name: `NPC ${i + 1}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [] });
         }
         return creatureList;
     }, [characters, numOfNpc]);
 
     const handleAddNpc = React.useCallback(() => {
         if (!combatSummary) return;
-        combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${numOfNpc + 1}`, type: 'npc', initiative: '' });
+        combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${numOfNpc + 1}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [] });
         setNumOfNpc(numOfNpc + 1);
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
@@ -147,18 +161,15 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
     }, [activeCreatureId, campaignName]);
 
     React.useEffect(() => {
-        // Load existing combatSummary from localStorage if available (fast startup)
         const stored = localStorage.getItem('combatSummary');
         let initialSummary = null;
         if (stored) {
             try { initialSummary = JSON.parse(stored); } catch { /* ignore */ }
         }
 
-        // Always regenerate creatures from the current characters to pick up new characters
         const creatures = setupCreatures();
 
         if (initialSummary) {
-            // Merge: keep existing creature data but add any new characters
             const existingPlayerMap = new Map();
             for (const c of initialSummary.creatures) {
                 if (c.type === 'player') existingPlayerMap.set(c.name, c);
@@ -167,7 +178,6 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
                 const existing = existingPlayerMap.get(newC.name);
                 return existing ? { ...newC, initiative: existing.initiative } : newC;
             });
-            // Keep NPCs from initial summary
             const npcs = initialSummary.creatures.filter(c => c.type === 'npc');
             mergedCreatures.push(...npcs);
 
@@ -237,6 +247,25 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
     }, [activeCreatureId]);
 
     React.useEffect(() => {
+        if (!combatSummary || characters.length === 0) return;
+        let cancelled = false;
+        (async () => {
+            for (const creature of combatSummary.creatures) {
+                if (creature.type !== 'player') continue;
+                const character = characters.find(c => utils.getFirstName(c.name) === creature.name);
+                if (character) {
+                    const ac = await computePlayerAc(character);
+                    if (cancelled) return;
+                    creature.ac = ac;
+                }
+            }
+            storage.set('combatSummary', combatSummary, campaignName);
+            setCombatSummary(cloneDeep(combatSummary));
+        })();
+        return () => { cancelled = true; };
+    }, [combatSummary == null]); // only run once when combatSummary is first set
+
+    React.useEffect(() => {
         const handler = () => {
             const stored = localStorage.getItem('combatSummary');
             if (stored) {
@@ -274,11 +303,31 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
         if (!combatSummary) return;
         const idx = combatSummary.creatures.findIndex((creature) => creature.id === id);
         combatSummary.creatures[idx].name = value;
+        // Look up monster data to update AC/resistances/immunities
+        getMonsterData(value).then(monster => {
+            if (monster) {
+                combatSummary.creatures[idx].ac = monster.armor_class || 10;
+                combatSummary.creatures[idx].resistances = monster.damage_resistances || [];
+                combatSummary.creatures[idx].immunities = monster.damage_immunities || [];
+                storage.set('combatSummary', combatSummary, campaignName);
+                setCombatSummary(cloneDeep(combatSummary));
+            }
+        });
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
         setNpcImages(prev => ({ ...prev, [id]: null }));
     };
+    const handleTargetChange = (id, targetId) => {
+        if (!combatSummary) return;
+        const idx = combatSummary.creatures.findIndex((creature) => creature.id === id);
+        combatSummary.creatures[idx].targetId = targetId || null;
+        const target = targetId ? combatSummary.creatures.find(c => c.id === targetId) : null;
+        combatSummary.creatures[idx].targetName = target ? target.name : null;
+        storage.set('combatSummary', combatSummary, campaignName);
+        setCombatSummary(cloneDeep(combatSummary));
+    };
     const handleNpcClick = async (creature) => {
+        if (!isLocalhost) return;
         const monster = await getMonsterData(creature.name);
         if (monster) {
             setViewingMonster(monster);
@@ -320,6 +369,21 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
                                     placeholder="Init"
                                 />
                             </div>
+                            <div className='creature-target'>
+                                <select
+                                    value={creature.targetId || ''}
+                                    onChange={(e) => handleTargetChange(creature.id, e.target.value)}
+                                    disabled={creature.type === 'npc' && !isLocalhost}
+                                >
+                                    <option value="">— No Target —</option>
+                                    {combatSummary.creatures
+                                        .filter(c => c.id !== creature.id)
+                                        .map(c => (
+                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                        ))
+                                    }
+                                </select>
+                            </div>
                         </div>
                     );
                 })}
@@ -338,6 +402,7 @@ function Initiative({ characters, campaignName, onNpcsChange }) {
                     monster={viewingMonster}
                     onClose={() => setViewingMonster(null)}
                     campaignName={campaignName}
+                    creatures={combatSummary.creatures}
                 />
             )}
         </div>

@@ -120,7 +120,9 @@ describe('CharActions', () => {
     const hitBonusElement = screen.getByText('+5');
     fireEvent.click(hitBonusElement);
 
-    expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5);
+    expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5, expect.objectContaining({
+      damageType: 'Slashing',
+    }));
   });
 
   it('should call rollDamage when damage is clicked', async () => {

@@ -7,6 +7,7 @@ import { parseMagicItemName } from '../../services/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import { rollExpression } from '../../services/diceRoller.js'
+import { getTargetFromAttacker, getCombatContext, getResistanceNotice } from '../../services/damageUtils.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';
 
@@ -25,10 +26,25 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName 
        }, []);
     const { popupHtml, setPopupHtml, rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName);
 
+    const getCombatTargetInfo = React.useCallback(() => {
+        const cs = getCombatContext();
+        if (!cs) return null;
+        const target = getTargetFromAttacker(cs, playerStats.name);
+        if (!target) return null;
+        return target;
+    }, [playerStats.name]);
+
+    const buildAttackContext = React.useCallback((attack) => {
+        const target = getCombatTargetInfo();
+        const resistanceNotice = target ? getResistanceNotice([attack.damageType], target.resistances, target.immunities, target.name) : null;
+        return { damageType: attack.damageType, resistanceNotice, targetName: target?.name };
+    }, [getCombatTargetInfo]);
+
     const handleDamageClick = (attack) => {
         const result = rollExpression(attack.damage);
         if (result) {
-            rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier);
+            const ctx = buildAttackContext(attack);
+            rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier, ctx);
         }
     };
 
@@ -67,7 +83,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName 
                         return <React.Fragment key={attack.name}>
                             <div className='left'>{attack.name}</div>
                             <div>{attack.range} ft.</div>
-                            <div className={attack.hitBonusFormula ? "clickable" : ""} onClick={() => rollAttack(attack.name, attack.hitBonus)}>{signFormatter.format(attack.hitBonus)}</div>
+                            <div className={attack.hitBonusFormula ? "clickable" : ""} onClick={() => rollAttack(attack.name, attack.hitBonus, buildAttackContext(attack))}>{signFormatter.format(attack.hitBonus)}</div>
                             <div className={attack.damage ? "clickable" : ""} onClick={() => handleDamageClick(attack)}>{attack.damage}</div>
                             <div className='left'>{attack.damageType}</div>
                             {is2024Rules && <div>{getWeaponMastery(attack.name) || ''}</div>}
@@ -104,7 +120,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName 
                             return <React.Fragment key={attack.name}>
                                 <div className='left'>{attack.name}</div>
                                 <div>{attack.range} ft.</div>
-                                <div className={attack.hitBonusFormula ? "clickable" : ""} onClick={() => rollAttack(attack.name, attack.hitBonus)}>{signFormatter.format(attack.hitBonus)}</div>
+                                <div className={attack.hitBonusFormula ? "clickable" : ""} onClick={() => rollAttack(attack.name, attack.hitBonus, buildAttackContext(attack))}>{signFormatter.format(attack.hitBonus)}</div>
                                 <div className={attack.damage ? "clickable" : ""} onClick={() => handleDamageClick(attack)}>{attack.damage}</div>
                                 <div className='left'>{attack.damageType}</div>
                                 {is2024Rules && <div>{getWeaponMastery(attack.name) || ''}</div>}

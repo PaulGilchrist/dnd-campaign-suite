@@ -24,6 +24,7 @@ vi.mock('lodash', () => ({
 
 vi.mock('../../services/monsterUtils.js', () => ({
   getMonsterImageUrl: vi.fn(() => Promise.resolve(null)),
+  getMonsterData: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../../services/dataLoader.js', () => ({
@@ -82,7 +83,8 @@ describe('Initiative', () => {
 
   it('should show player names as spans', () => {
     render(<Initiative characters={[{ name: 'Gandalf' }]} />);
-    expect(screen.getByText('Gandalf')).toBeInTheDocument();
+    const nameElements = screen.getAllByText('Gandalf');
+    expect(nameElements.length).toBeGreaterThanOrEqual(1);
    });
 
   it('should show avatar initials', () => {

@@ -26,3 +26,33 @@
     color: var(--color-text-inverse, #fff);
     border-color: var(--color-primary, #3b7dd8);
 }
+
+.dice-roll-hit-miss {
+    text-align: center;
+    font-size: 1.1em;
+    font-weight: bold;
+    margin: 8px 0;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.dice-roll-hit-miss.hit {
+    color: #4CAF50;
+    background: rgba(76, 175, 80, 0.15);
+}
+
+.dice-roll-hit-miss.miss {
+    color: #f44336;
+    background: rgba(244, 67, 54, 0.15);
+}
+
+.dice-roll-resistance {
+    text-align: center;
+    font-size: 0.85em;
+    font-weight: bold;
+    color: #ff9800;
+    background: rgba(255, 152, 0, 0.15);
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin: 4px 0;
+}

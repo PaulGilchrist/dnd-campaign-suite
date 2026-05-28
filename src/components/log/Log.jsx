@@ -31,6 +31,14 @@ function RollEntry({ entry }) {
         <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
       </div>
       <div className="log-roll-details">
+        {entry.targetName && (
+          <span className="log-target">→ {entry.targetName}</span>
+        )}
+        {entry.hit !== undefined && (
+          <span className={`log-hit-miss ${entry.hit ? 'log-hit' : 'log-miss'}`}>
+            {entry.hit ? 'HIT' : 'MISS'} (AC {entry.targetAc})
+          </span>
+        )}
         {showBothDice && (
           <span className={`log-mode-badge ${entry.mode || 'normal'}`}>
             {(entry.mode || 'normal').toUpperCase()}
@@ -38,6 +46,9 @@ function RollEntry({ entry }) {
         )}
         {entry.isNatural20 && <span className="log-nat-badge log-nat20">NAT 20</span>}
         {entry.isNatural1 && <span className="log-nat-badge log-nat1">FUMBLE</span>}
+        {entry.damageType && (
+          <span className="log-damage-type">{entry.damageType}</span>
+        )}
         <div className="log-dice-values">
           {!isDamage && (
             <>
@@ -50,6 +61,9 @@ function RollEntry({ entry }) {
           )}
           <span className="log-total"><b>{entry.total}{isDamage ? '' : (entry.bonus >= 0 ? `+${entry.bonus}` : `${entry.bonus}`)}</b></span>
         </div>
+        {entry.resistanceNotice && (
+          <div className="log-resistance-notice">{entry.resistanceNotice}</div>
+        )}
       </div>
     </div>
   );

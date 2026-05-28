@@ -2,6 +2,7 @@ import utils from './utils.js'
 import storage from './storage.js';
 import { cloneDeep } from 'lodash';
 import { rollD20 } from './diceRoller.js';
+import { computePlayerAc } from './damageUtils.js';
 
 function parseInitBonus(monster) {
     const initStr = monster.initiative_details;
@@ -37,13 +38,24 @@ function logRoll(campaignName, name, rollResult) {
      }).catch(() => {});
 }
 
-export function expandMonstersToCreatures(selectedMonsters, characters) {
+export async function expandMonstersToCreatures(selectedMonsters, characters) {
     const creatureList = [];
     const npcRollResults = [];
 
-    const playerChars = characters.map((character) => {
-      return { id: utils.guid(), name: utils.getFirstName(character.name), type: 'player', imagePath: character.imagePath || '', initiative: '' };
-      });
+    const playerChars = await Promise.all(characters.map(async (character) => {
+      return {
+        id: utils.guid(),
+        name: utils.getFirstName(character.name),
+        type: 'player',
+        imagePath: character.imagePath || '',
+        initiative: '',
+        targetId: null,
+        targetName: null,
+        ac: await computePlayerAc(character),
+        resistances: character.resistances || [],
+        immunities: character.immunities || []
+      };
+      }));
     playerChars.sort((a, b) => a.name.localeCompare(b.name));
     creatureList.push(...playerChars);
 
@@ -53,7 +65,17 @@ export function expandMonstersToCreatures(selectedMonsters, characters) {
       for (let i = 0; i < qty; i++) {
           const name = qty === 1 ? baseName : `${baseName} ${i + 1}`;
           const rollResult = rollNpcInitiative(monster);
-          creatureList.push({ id: utils.guid(), name, type: 'npc', initiative: String(rollResult.total) });
+          creatureList.push({
+            id: utils.guid(),
+            name,
+            type: 'npc',
+            initiative: String(rollResult.total),
+            targetId: null,
+            targetName: null,
+            ac: monster.armor_class || 10,
+            resistances: monster.damage_resistances || [],
+            immunities: monster.damage_immunities || []
+          });
           npcRollResults.push({ name, rollResult });
           }
       });
@@ -61,8 +83,8 @@ export function expandMonstersToCreatures(selectedMonsters, characters) {
     return { creatures: creatureList, npcRollResults };
 }
 
-export function loadEncounterToInitiative(selectedMonsters, characters, campaignName) {
-    const { creatures, npcRollResults } = expandMonstersToCreatures(selectedMonsters, characters);
+export async function loadEncounterToInitiative(selectedMonsters, characters, campaignName) {
+    const { creatures, npcRollResults } = await expandMonstersToCreatures(selectedMonsters, characters);
     creatures.sort((a, b) => b.initiative - a.initiative);
 
     for (const { name, rollResult } of npcRollResults) {

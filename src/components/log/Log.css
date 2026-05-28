@@ -346,3 +346,54 @@
   background: var(--background-color-input);
   border-radius: 4px;
 }
+
+/* Target name */
+.log-target {
+  font-size: 0.78rem;
+  color: #ffcc00;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255, 204, 0, 0.1);
+}
+
+/* Hit/Miss badges */
+.log-hit-miss {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.log-hit-miss.log-hit {
+  color: #4CAF50;
+  background: rgba(76, 175, 80, 0.2);
+}
+
+.log-hit-miss.log-miss {
+  color: #f44336;
+  background: rgba(244, 67, 54, 0.2);
+}
+
+/* Damage type pill */
+.log-damage-type {
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  background: rgba(100, 149, 237, 0.2);
+  color: #6495ed;
+  text-transform: capitalize;
+}
+
+/* Resistance/Immunity notice */
+.log-resistance-notice {
+  width: 100%;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #ff9800;
+  background: rgba(255, 152, 0, 0.12);
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
