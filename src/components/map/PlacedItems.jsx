@@ -126,13 +126,13 @@ function PlacedItems({
                     <>
                         {(!item.rotation || item.rotation === 0) ? (
                             <>
-                                <rect x={cx - 18} y={cy - 18} width={5} height={36} fill="#8B5A2B" opacity="0.5" rx="1" />
-                                <rect x={cx + 13} y={cy - 18} width={5} height={36} fill="#8B5A2B" opacity="0.5" rx="1" />
+                                <rect x={cx - 18} y={cy - 18} width={36} height={5} fill="#8B5A2B" opacity="0.5" rx="1" />
+                                <rect x={cx - 18} y={cy + 13} width={36} height={5} fill="#8B5A2B" opacity="0.5" rx="1" />
                             </>
                         ) : (
                             <>
-                                <rect x={cx - 18} y={cy - 18} width={36} height={5} fill="#8B5A2B" opacity="0.5" rx="1" />
-                                <rect x={cx - 18} y={cy + 13} width={36} height={5} fill="#8B5A2B" opacity="0.5" rx="1" />
+                                <rect x={cx - 18} y={cy - 18} width={5} height={36} fill="#8B5A2B" opacity="0.5" rx="1" />
+                                <rect x={cx + 13} y={cy - 18} width={5} height={36} fill="#8B5A2B" opacity="0.5" rx="1" />
                             </>
                         )}
                     </>
