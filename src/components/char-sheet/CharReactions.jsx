@@ -6,7 +6,7 @@ import { sanitizeHtml } from '../../services/sanitize.js';
 import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 
-function CharReactions({ playerStats, campaignName }) {
+function CharReactions({ playerStats, campaignName, cannotAct }) {
     const { popupHtml, setPopupHtml, rollAttack } = useLoggedDiceRoll(playerStats.name, campaignName);
      // Build reactions list immutably
     let reactions = [...(playerStats.reactions || [])];
@@ -28,12 +28,12 @@ function CharReactions({ playerStats, campaignName }) {
     }
 
     const handleReactionClick = (reaction) => {
+        if (cannotAct) return;
         if (reaction.name === 'Opportunity Attack') {
             const meleeAttacks = playerStats.attacks.filter(a => a.type === 'Action' && a.range === 5);
-            if (meleeAttacks.length > 0) {
-                rollAttack(meleeAttacks[0].name, meleeAttacks[0].hitBonus);
-            } else if (playerStats.attacks.length > 0) {
-                rollAttack(playerStats.attacks[0].name, playerStats.attacks[0].hitBonus);
+            const attackRoll = meleeAttacks.length > 0 ? meleeAttacks[0] : playerStats.attacks[0];
+            if (attackRoll) {
+                rollAttack(attackRoll.name, attackRoll.hitBonus, { forcedMode: undefined });
             }
         } else {
             const html = buildFeatureDetailHtml(reaction);

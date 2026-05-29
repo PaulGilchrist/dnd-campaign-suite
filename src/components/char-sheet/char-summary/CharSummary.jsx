@@ -24,7 +24,7 @@ const EXHAUSTION_LEVELS = 6
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
-function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, onLongRest, exhaustionLevel, onExhaustionChange }) {
+function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, onLongRest, exhaustionLevel, onExhaustionChange, conditionEffects, onConditionsChange }) {
     const { popupHtml, setPopupHtml, rollInitiative } = useLoggedDiceRoll(playerStats.name, campaignName);
     const [showShortRest, setShowShortRest] = React.useState(false);
     const [showXpModal, setShowXpModal] = React.useState(false);
@@ -91,6 +91,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         speed += unarmoredMovement;
     }
     speed = Math.max(0, speed - (5 * exhaustionLevel));
+    if (conditionEffects?.speedZero) speed = 0;
 
     const exhaustionPenalty = 2 * exhaustionLevel;
     const effectiveInitiative = playerStats.initiative - exhaustionPenalty;
@@ -151,7 +152,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 <div>
                     <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{playerStats.armorClass}</div>
                     <CharHitPoints playerStats={playerStats} campaignName={campaignName}></CharHitPoints>
-                    <b>Speed: </b><span className={exhaustionLevel > 0 ? 'stat--penalized' : ''}>{speed}</span> ft.<br />
+                    <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{speed}</span> ft.<br />
                     <CharGold playerStats={playerStats} campaignName={campaignName}></CharGold>
                 </div>
                 <div>
@@ -274,7 +275,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     onClose={() => setShowAvatarModal(false)}
                 />
             )}
-              <CharConditions playerStats={playerStats} campaignName={campaignName} exhaustionLevel={exhaustionLevel} onExhaustionChange={onExhaustionChange} />
+              <CharConditions playerStats={playerStats} campaignName={campaignName} exhaustionLevel={exhaustionLevel} onExhaustionChange={onExhaustionChange} onConditionsChange={onConditionsChange} />
             </div>
   </div>
 )

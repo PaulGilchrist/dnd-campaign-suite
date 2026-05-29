@@ -27,6 +27,20 @@
     border-color: var(--color-primary, #3b7dd8);
 }
 
+.forced-mode-badge {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid #a855f7;
+    background: rgba(168, 85, 247, 0.15);
+    color: #a855f7;
+    cursor: default;
+    pointer-events: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
 .dice-roll-hit-miss {
     text-align: center;
     font-size: 1.1em;

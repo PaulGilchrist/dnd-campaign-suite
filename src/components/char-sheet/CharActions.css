@@ -7,6 +7,21 @@
     padding-right: 10px;
 }
 
+.char-actions .disabled-attack {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.char-actions .disabled-attack-label {
+    display: inline;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #ef4444;
+    margin-left: 8px;
+    text-transform: uppercase;
+}
+
 /* Add extra column for Mastery when using 2024 rules */
 .char-actions .attacks.mastery-enabled {
     grid-template-columns: 120px 80px 40px 80px 70px 80px;

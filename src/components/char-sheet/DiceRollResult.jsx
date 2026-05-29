@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice }) {
-    const [mode, setMode] = useState('normal'); // 'normal', 'advantage', 'disadvantage'
+function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoCrit }) {
+    const [mode, setMode] = useState(forcedMode || 'normal');
 
     // Only d20 (single die, 20 sides) allows advantage/disadvantage
     const isD20 = type === 'd20';
@@ -29,7 +29,7 @@ function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier =
     }
 
     const total = finalRoll + bonus + modifier;
-    const isCrit = isD20 && finalRoll === 20;
+    const isCrit = isAutoCrit || (isD20 && finalRoll === 20);
 
     return (
         <div className="dice-roll-result">
@@ -55,30 +55,35 @@ function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier =
                  (bonus + modifier) < 0 ? ` ${bonus + modifier}` : ''}
             </div>
             
-             {isD20 && (
-                 <div className="dice-roll-toggles">
-                     <label className={`badge-toggle ${mode === 'advantage' ? 'active' : ''}`}>
-                         <input 
-                            type="checkbox" 
-                            checked={mode === 'advantage'} 
-                            onChange={() => setMode(mode === 'advantage' ? 'normal' : 'advantage')}
-                             style={{ display: 'none' }}
-                         />
-                         Advantage
-                     </label>
-                     <label className={`badge-toggle ${mode === 'disadvantage' ? 'active' : ''}`}>
-                         <input 
-                            type="checkbox" 
-                            checked={mode === 'disadvantage'} 
-                            onChange={() => setMode(mode === 'disadvantage' ? 'normal' : 'disadvantage')}
-                             style={{ display: 'none' }}
-                         />
-                         Disadvantage
-                     </label>
-                 </div>
-             )}
+              {isD20 && (
+                  <div className="dice-roll-toggles">
+                      <label className={`badge-toggle ${mode === 'advantage' ? 'active' : ''}`}>
+                          <input 
+                             type="checkbox" 
+                             checked={mode === 'advantage'} 
+                             onChange={() => setMode(mode === 'advantage' ? 'normal' : 'advantage')}
+                              style={{ display: 'none' }}
+                          />
+                          Advantage
+                      </label>
+                      <label className={`badge-toggle ${mode === 'disadvantage' ? 'active' : ''}`}>
+                          <input 
+                             type="checkbox" 
+                             checked={mode === 'disadvantage'} 
+                             onChange={() => setMode(mode === 'disadvantage' ? 'normal' : 'disadvantage')}
+                              style={{ display: 'none' }}
+                          />
+                          Disadvantage
+                      </label>
+                      {forcedMode && (
+                        <span className="badge-toggle forced-mode-badge" title="Automatically set by active conditions">
+                          <i className="fa-solid fa-asterisk"></i> {forcedMode === 'advantage' ? 'Adv' : 'Disadv'} (conditions)
+                        </span>
+                      )}
+                  </div>
+              )}
 
-            {isCrit && <div className="dice-roll-crit">Critical Hit!</div>}
+            {isCrit && <div className="dice-roll-crit">{isAutoCrit ? 'AUTO-CRIT (target condition)' : 'Critical Hit!'}</div>}
             {targetName && hit !== undefined && (
               <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
                 {hit ? '✓ HIT' : '✗ MISS'} ({total} vs AC {targetAc})

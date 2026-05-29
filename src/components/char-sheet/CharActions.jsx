@@ -15,7 +15,7 @@ const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats);
 
-const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0 }) {
+const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct }) {
   const [actions, setActions] = useState([]);
 
    useEffect(() => {
@@ -37,8 +37,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const buildAttackContext = React.useCallback((attack) => {
         const target = getCombatTargetInfo();
         const resistanceNotice = target ? getResistanceNotice([attack.damageType], target.resistances, target.immunities, target.name) : null;
-        return { damageType: attack.damageType, resistanceNotice, targetName: target?.name };
-    }, [getCombatTargetInfo]);
+        return { damageType: attack.damageType, resistanceNotice, targetName: target?.name, forcedMode: conditionAttackMode !== 'normal' ? conditionAttackMode : undefined };
+    }, [getCombatTargetInfo, conditionAttackMode]);
 
     const handleDamageClick = (attack) => {
         const result = rollExpression(attack.damage);
@@ -71,6 +71,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         <div className="char-actions">
             <div>
                 <span className='sectionHeader'>Actions</span>
+                {cannotAct && <span className='disabled-attack-label'>(Incapacitated)</span>}
                 <div className={`attacks ${is2024Rules ? 'mastery-enabled' : ''}`}>
                     <div className='left'><b>Name</b></div>
                     <div><b>Range</b></div>
@@ -83,8 +84,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         return <React.Fragment key={attack.name}>
                             <div className='left'>{attack.name}</div>
                             <div>{attack.range} ft.</div>
-                            <div className={(attack.hitBonusFormula ? "clickable" : "") + (exhaustionPenalty > 0 ? " stat--penalized" : "")} onClick={() => rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, buildAttackContext(attack))}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>
-                            <div className={attack.damage ? "clickable" : ""} onClick={() => handleDamageClick(attack)}>{attack.damage}</div>
+                            <div className={(attack.hitBonusFormula ? "clickable" : "") + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => !cannotAct && rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, buildAttackContext(attack))}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>
+                            <div className={attack.damage ? "clickable" : ""} onClick={() => !cannotAct && handleDamageClick(attack)}>{attack.damage}</div>
                             <div className='left'>{attack.damageType}</div>
                             {is2024Rules && <div>{getWeaponMastery(attack.name) || ''}</div>}
                         </React.Fragment>;
@@ -120,8 +121,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             return <React.Fragment key={attack.name}>
                                 <div className='left'>{attack.name}</div>
                                 <div>{attack.range} ft.</div>
-                            <div className={(attack.hitBonusFormula ? "clickable" : "") + (exhaustionPenalty > 0 ? " stat--penalized" : "")} onClick={() => rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, buildAttackContext(attack))}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>
-                                <div className={attack.damage ? "clickable" : ""} onClick={() => handleDamageClick(attack)}>{attack.damage}</div>
+                            <div className={(attack.hitBonusFormula ? "clickable" : "") + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => !cannotAct && rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, buildAttackContext(attack))}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>
+                                <div className={attack.damage ? "clickable" : ""} onClick={() => !cannotAct && handleDamageClick(attack)}>{attack.damage}</div>
                                 <div className='left'>{attack.damageType}</div>
                                 {is2024Rules && <div>{getWeaponMastery(attack.name) || ''}</div>}
                             </React.Fragment>;

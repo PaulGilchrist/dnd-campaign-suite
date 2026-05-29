@@ -12,7 +12,8 @@ import CharSpecialActions from './CharSpecialActions.jsx'
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx'
 import CharSpells from './char-spells/CharSpells.jsx'
 import CharSummary from './char-summary/CharSummary.jsx'
-import { EXHAUSTION_LEVELS } from './char-summary/CharConditions.jsx'
+import { EXHAUSTION_LEVELS, loadActiveConditions } from './char-summary/CharConditions.jsx'
+import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/conditionEffects.js'
 import Subscriber from '../common/Subscriber.jsx';
 import './CharSheet.css'
 
@@ -115,18 +116,53 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         }
     }
 
+    const handleConditionsChange = () => setForceRefresh(utils.guid())
+
     const exhaustionPenalty = 2 * exhaustionLevel;
+
+    const activeConditions = loadActiveConditions(playerSummary?.name, campaignName)
+    const conditionEffects = computeConditionEffects(activeConditions)
+    const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
+    const conditionAttackMode = getNetAttackMode(conditionEffects.attackAdvantageCount, conditionEffects.attackDisadvantageCount)
 
     return (<React.Fragment>
         {playerStats && <div className='char-sheet' data-testid='char-sheet'>
-            <CharSummary playerStats={playerStats} onDeleteCharacter={onDeleteCharacter} onEditCharacter={onEditCharacter} onUploadClick={onUploadClick} onSaveClick={onSaveClick} campaignName={campaignName} onLongRest={() => setForceRefresh(utils.guid())} exhaustionLevel={exhaustionLevel} onExhaustionChange={setExhaustionLevel}></CharSummary><hr />
-              <CharAbilities allAbilityScores={allAbilityScores} playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty}></CharAbilities><hr />
+            <CharSummary
+              playerStats={playerStats}
+              onDeleteCharacter={onDeleteCharacter}
+              onEditCharacter={onEditCharacter}
+              onUploadClick={onUploadClick}
+              onSaveClick={onSaveClick}
+              campaignName={campaignName}
+              onLongRest={() => setForceRefresh(utils.guid())}
+              exhaustionLevel={exhaustionLevel}
+              onExhaustionChange={setExhaustionLevel}
+              conditionEffects={conditionEffects}
+              onConditionsChange={handleConditionsChange}
+            ></CharSummary><hr />
+              <CharAbilities
+                allAbilityScores={allAbilityScores}
+                playerStats={playerStats}
+                campaignName={campaignName}
+                exhaustionPenalty={exhaustionPenalty}
+                conditionEffects={conditionEffects}
+              ></CharAbilities><hr />
 
-              <CharActions playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty}></CharActions><hr />
-              <CharReactions playerStats={playerStats} campaignName={campaignName}></CharReactions>
+              <CharActions
+                playerStats={playerStats}
+                campaignName={campaignName}
+                exhaustionPenalty={exhaustionPenalty}
+                conditionAttackMode={conditionAttackMode}
+                cannotAct={cannotAct}
+              ></CharActions><hr />
+              <CharReactions
+                playerStats={playerStats}
+                campaignName={campaignName}
+                cannotAct={cannotAct}
+              ></CharReactions>
             {playerSummary.rules === '2024'
-  ? <CharSpells playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty}></CharSpells>
-  : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty}></CharSpells>
+  ? <CharSpells playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct}></CharSpells>
+  : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct}></CharSpells>
 }<hr />
             <CharSpecialActions playerStats={playerStats}></CharSpecialActions><hr />
             <CharInventory playerStats={playerStats}></CharInventory><hr />

@@ -32,7 +32,11 @@ function saveConditions(name, campaignName, conditions) {
 
 export const EXHAUSTION_LEVELS = 6
 
-function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhaustionChange }) {
+export function loadActiveConditions(name, campaignName) {
+  return loadConditions(name, campaignName)
+}
+
+function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhaustionChange, onConditionsChange }) {
   const [activeConditions, setActiveConditions] = React.useState(() =>
     loadConditions(playerStats.name, campaignName)
    )
@@ -47,6 +51,7 @@ function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhausti
       saveConditions(playerStats.name, campaignName, next)
       return next
     })
+    onConditionsChange?.()
   }
 
   const adjustExhaustion = (delta) => {

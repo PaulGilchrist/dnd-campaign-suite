@@ -39,7 +39,7 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
        rolls: [r1, r2],
       mode: 'normal',
      total: r1,
-      bonus,
+       bonus,
        isNatural20: r1 === 20,
         isNatural1: r1 === 1,
         targetName,
@@ -57,7 +57,9 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
       targetName,
       targetAc,
       hit,
-      resistanceNotice: context?.resistanceNotice
+      resistanceNotice: context?.resistanceNotice,
+      forcedMode: context?.forcedMode,
+      isAutoCrit: context?.isAutoCrit
     });
 
     if (rollType === 'initiative') {

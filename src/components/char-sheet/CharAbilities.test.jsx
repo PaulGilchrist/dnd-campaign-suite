@@ -235,7 +235,7 @@ describe('CharAbilities', () => {
 
     const bonusElements = screen.getAllByText('+2');
     fireEvent.click(bonusElements[0]);
-    expect(mockRollAbilityCheck).toHaveBeenCalledWith('Strength', 2);
+    expect(mockRollAbilityCheck).toHaveBeenCalledWith('Strength', 2, undefined);
   });
 
   it('should call rollSavingThrow when save value is clicked', () => {
@@ -257,7 +257,7 @@ describe('CharAbilities', () => {
 
     const saveElements = screen.getAllByText('+2');
     fireEvent.click(saveElements[saveElements.length - 1]);
-    expect(mockRollSavingThrow).toHaveBeenCalledWith('Strength', 2);
+    expect(mockRollSavingThrow).toHaveBeenCalledWith('Strength', 2, { forcedMode: undefined, autoFail: undefined });
   });
 
   it('should call rollSkillCheck when skill is clicked', () => {
@@ -279,7 +279,7 @@ describe('CharAbilities', () => {
 
     const athleticsElement = screen.getByText(/Athletics/);
     fireEvent.click(athleticsElement);
-    expect(mockRollSkillCheck).toHaveBeenCalledWith('Athletics', 2);
+    expect(mockRollSkillCheck).toHaveBeenCalledWith('Athletics', 2, undefined);
   });
 
   it('should not render popup when popupHtml is null', () => {

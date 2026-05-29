@@ -10,7 +10,7 @@ import { rollExpression } from '../../../services/diceRoller.js';
 import { sanitizeHtml } from '../../../services/sanitize.js';
 import './CharSpells.css'
 
-const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0 }) {
+const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct }) {
     const { showPopup, popupHtml, setPopupHtml } = useActionPopup('spell');
     const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName);
 
@@ -79,7 +79,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
             <div className='spell-abilities'>
                 <div className="sectionHeader"><h4>&nbsp;Spells</h4></div>
                 <div>
-                    <b className="clickable" onClick={() => rollAttack('Spell Attack', playerStats.spellAbilities.toHit - exhaustionPenalty)}>Attack (to hit):</b> <span className={exhaustionPenalty > 0 ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.toHit - exhaustionPenalty}</span><br/>
+                    <b className={'clickable' + (cannotAct ? ' disabled-attack' : '') + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? ' stat--penalized' : '')} onClick={() => !cannotAct && rollAttack('Spell Attack', playerStats.spellAbilities.toHit - exhaustionPenalty, { forcedMode: conditionAttackMode !== 'normal' ? conditionAttackMode : undefined })}>Attack (to hit):</b> <span className={exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.toHit - exhaustionPenalty}</span><br/>
                     <b>Modifier:</b> <span className={exhaustionPenalty > 0 ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.modifier - exhaustionPenalty}</span><br/>
                     <b>Save DC:</b> {playerStats.spellAbilities.saveDc}
                 </div>

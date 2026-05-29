@@ -7,6 +7,7 @@ import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResistanceNotice } from '../../services/damageUtils.js';
 import { getCombatContext } from '../../services/damageUtils.js';
 import { findCreatureByName } from '../../services/damageUtils.js';
+import { computeConditionEffects, combineAttackModes, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/conditionEffects.js';
 import './MonsterCardModal.css';
 
 function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
@@ -15,6 +16,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
     monsterName,
     campaignName
   );
+
+  const getAttackerCreature = useCallback(() => {
+    if (creatures) {
+      return findCreatureByName({ creatures }, monsterName);
+    }
+    const cs = getCombatContext();
+    return cs ? findCreatureByName(cs, monsterName) : null;
+  }, [creatures, monsterName]);
 
   const getCombatTarget = useCallback(() => {
     if (!creatures) {
@@ -38,7 +47,29 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
     const target = getCombatTarget();
     const damageTypes = action ? getDamageTypesForAction(action) : [];
     const resistanceNotice = target ? getResistanceNotice(damageTypes, target.resistances, target.immunities, target.name) : null;
-    rollAttack(name, bonus, { damageType: formatDamageTypes(damageTypes), resistanceNotice });
+
+    const attacker = getAttackerCreature();
+    const attackerConditions = (attacker?.conditions || []).map(c => c.key)
+    const targetConditions = (target?.conditions || []).map(c => c.key)
+
+    const attackerEffects = computeConditionEffects(attackerConditions)
+    const attackerCannotAct = attackerConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
+    if (attackerCannotAct) return
+
+    const targetEffects = computeConditionEffects(targetConditions)
+
+    const attackRange = action?.range?.type === 'reach' || action?.range?.type === 'melee' ? 5 : 30
+    const forcedMode = combineAttackModes(attackerEffects, targetEffects, attackRange)
+
+    const isMelee = attackRange <= 5
+    const isAutoCrit = isMelee && targetEffects.autoCritWithin5ft
+
+    rollAttack(name, bonus, {
+      damageType: formatDamageTypes(damageTypes),
+      resistanceNotice,
+      forcedMode: forcedMode !== 'normal' ? forcedMode : undefined,
+      isAutoCrit,
+    });
   };
 
   const handleDamage = (name, formula, damageType, targetName) => {
@@ -64,9 +95,10 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
     const damageTypes = getDamageTypesForAction(action);
 
     return (
-    <div key={i} className="mc-action">
+    <div key={i} className={`mc-action ${attackerCannotAct ? 'mc-action-disabled' : ''}`}>
       <strong>{action.name}.</strong>{' '}
-      {action.attack_bonus != null && (
+      {attackerCannotAct && <span className="mc-incapacitated-label">(Incapacitated)</span>}
+      {action.attack_bonus != null && !attackerCannotAct && (
         <span className="mc-dice-link" onClick={() => handleAttack(action.name, action.attack_bonus, action)} role="button" tabIndex={0}>
           <i className="fa-solid fa-dice-d20" /> +{action.attack_bonus}
         </span>
@@ -93,8 +125,31 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
   );
   };
 
+  const attackerCannotAct = useMemo(() => {
+    const creature = getAttackerCreature();
+    if (!creature) return false;
+    return (creature.conditions || []).some(c => CONDITIONS_THAT_CANNOT_ACT.has(c.key));
+  }, [getAttackerCreature]);
+
   const content = useMemo(() => {
     if (!monster) return null;
+
+    const creature = getAttackerCreature();
+    const monsterConditions = creature?.conditions || [];
+    const condKeys = monsterConditions.map(c => c.key);
+    const condEffects = condKeys.length > 0 ? computeConditionEffects(condKeys) : null;
+    const condEffectBadges = [];
+    if (condEffects) {
+      if (condEffects.cannotAct) condEffectBadges.push({ label: "Can't Act", cls: 'effect-cannot-act', icon: 'fa-hand' });
+      if (condEffects.speedZero) condEffectBadges.push({ label: 'Speed 0', cls: 'effect-speed-zero', icon: 'fa-stop' });
+      if (condEffects.autoCritWithin5ft) condEffectBadges.push({ label: 'Auto-Crit', cls: 'effect-auto-crit', icon: 'fa-bolt' });
+      if (condEffects.concentrationBroken) condEffectBadges.push({ label: 'No Conc.', cls: 'effect-no-conc', icon: 'fa-spinner' });
+      if (condEffects.autoFailSaves.length > 0) condEffectBadges.push({ label: `Auto-Fail ${condEffects.autoFailSaves.join('/').toUpperCase()}`, cls: 'effect-auto-fail', icon: 'fa-shield' });
+      if (condEffects.resistantToAll) condEffectBadges.push({ label: 'Resist All', cls: 'effect-resist', icon: 'fa-shield-halved' });
+      if (condEffects.attackDisadvantageCount > 0 || condEffects.abilityCheckDisadvantage) condEffectBadges.push({ label: 'Disadv', cls: 'effect-disadvantage', icon: 'fa-arrow-down' });
+      if (condEffects.targetAdvantageCount > 0) condEffectBadges.push({ label: 'Adv vs', cls: 'effect-target-adv', icon: 'fa-arrow-up' });
+    }
+
     return (
       <div className="mc-card" onClick={(e) => e.stopPropagation()}>
         <div className="mc-header" onClick={onClose}>
@@ -122,8 +177,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
             </div>
             <div className="mc-stat mc-stat-speed">
               <span className="mc-stat-label">Speed</span>
-              <span className="mc-stat-value">
-                {Object.entries(monster.speed || {}).map(([k, v]) => `${k} ${v}`).join(', ')}
+              <span className={'mc-stat-value' + (condEffects?.speedZero ? ' mc-stat-penalized' : '')}>
+                {condEffects?.speedZero ? '0 ft.' : Object.entries(monster.speed || {}).map(([k, v]) => `${k} ${v}`).join(', ')}
               </span>
             </div>
             {monster.initiative_details && (
@@ -144,6 +199,23 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
               </div>
             )}
           </div>
+
+          {monsterConditions.length > 0 && (
+            <div className="mc-conditions-section">
+              <div className="mc-conditions-labels">
+                {monsterConditions.map(cond => (
+                  <span key={cond.id || cond.key} className="mc-condition-label-badge">{cond.label}</span>
+                ))}
+              </div>
+              <div className="mc-conditions-effects">
+                {condEffectBadges.map(b => (
+                  <span key={b.label} className={`mc-effect-badge ${b.cls}`}>
+                    <i className={`fa-solid ${b.icon}`}></i> {b.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           <hr />
 
@@ -348,7 +420,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
         </div>
       </div>
     );
-  }, [monster, onClose, handleAttack, handleDamage, handleAbilityCheck, handleSaveThrow, handleSkillCheck, handleInitiative]);
+  }, [monster, onClose, handleAttack, handleDamage, handleAbilityCheck, handleSaveThrow, handleSkillCheck, handleInitiative, attackerCannotAct]);
 
   if (!monster) return null;
 

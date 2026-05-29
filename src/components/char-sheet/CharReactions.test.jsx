@@ -218,7 +218,7 @@ describe('CharReactions', () => {
     const oaElement = screen.getByText(/Opportunity Attack/);
     fireEvent.click(oaElement);
 
-    expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5);
+    expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5, { forcedMode: undefined });
    });
 
   it('should handle empty playerStats gracefully', () => {
