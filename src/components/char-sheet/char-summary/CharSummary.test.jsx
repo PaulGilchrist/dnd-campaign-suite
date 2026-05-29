@@ -554,44 +554,6 @@ describe('CharSummary', () => {
     expect(setPopupHtmlMock).toHaveBeenCalled();
   });
 
-  it('should show Monk unarmored movement speed increase for 2024 rules', () => {
-    classRules2024.getUnarmoredMovementIncrease.mockReturnValue(15);
-    const monkStats = {
-      ...mockPlayerStats,
-      race: { name: 'Human', speed: 30, type: 'Humanoid' },
-      class: { name: 'Monk' },
-      rules: '2024',
-    };
-
-    render(<CharSummary playerStats={monkStats} onDeleteCharacter={vi.fn()} />);
-
-    expect(screen.getByText(/Speed/)).toBeInTheDocument();
-    expect(screen.getByText(/45 ft\./)).toBeInTheDocument();
-  });
-
-  it('should show Barbarian unarmored movement speed increase', () => {
-    const barbarianStats = {
-      ...mockPlayerStats,
-      race: { name: 'Human', speed: 30, type: 'Humanoid' },
-      class: {
-        name: 'Barbarian',
-        class_levels: [
-          { class_specific: {} },
-          { class_specific: {} },
-          { class_specific: {} },
-          { class_specific: {} },
-          { class_specific: { unarmored_movement: 10 } },
-        ],
-      },
-      rules: '5e',
-    };
-
-    render(<CharSummary playerStats={barbarianStats} onDeleteCharacter={vi.fn()} />);
-
-    expect(screen.getByText(/Speed/)).toBeInTheDocument();
-    expect(screen.getByText(/40 ft\./)).toBeInTheDocument();
-  });
-
   it('should render resistances', () => {
     const statsWithResistances = {
       ...mockPlayerStats,

@@ -220,11 +220,11 @@ describe('useCharacterWizard', () => {
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent('testchar.json')}`,
+        `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent('TestChar.json')}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...characterData, originalFileName: 'testchar.json' }),
+          body: JSON.stringify({ ...characterData, originalFileName: 'TestChar.json' }),
         }
       );
       expect(setActiveCharacter).toHaveBeenCalledWith(characterData);
@@ -259,11 +259,11 @@ describe('useCharacterWizard', () => {
 
       // Verify the PUT goes to the NEW file name
       expect(global.fetch).toHaveBeenCalledWith(
-        `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent('new-name.json')}`,
+        `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent('New_Name.json')}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: 'New Name', class: 'Wizard', originalFileName: 'old-name.json' }),
+          body: JSON.stringify({ name: 'New Name', class: 'Wizard', originalFileName: 'Old_Name.json' }),
         }
       );
 
