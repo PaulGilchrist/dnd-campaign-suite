@@ -9,10 +9,13 @@ export default function usePlayerDragging({
     setMapData,
     gridCenterX,
     gridCenterY,
+    rulerMode,
+    spellMode,
 }) {
     const [dragging, setDragging] = useState(null);
 
     const handlePointerDown = useCallback((e, playerId) => {
+        if (rulerMode || spellMode) return;
         e.stopPropagation();
         e.preventDefault();
         const svg = svgRef.current;
@@ -38,7 +41,7 @@ export default function usePlayerDragging({
             offsetX: svgPt.x - cx,
             offsetY: svgPt.y - cy
         });
-    }, [mapData, gridCenterX, gridCenterY, svgRef]);
+    }, [rulerMode, spellMode, mapData, gridCenterX, gridCenterY, svgRef]);
 
     const handlePointerMove = useCallback((e) => {
         if (!dragging) return;

@@ -9,10 +9,13 @@ export default function useItemDragging({
     gridSize,
     gridCenterX,
     gridCenterY,
+    rulerMode,
+    spellMode,
 }) {
     const [itemDragging, setItemDragging] = useState(null);
 
     const handleItemPointerDown = useCallback((e, itemId) => {
+        if (rulerMode || spellMode) return;
         e.stopPropagation();
         if (e.button !== 0) return;
         e.preventDefault();
@@ -40,7 +43,7 @@ export default function useItemDragging({
             offsetX: svgPt.x - cx,
             offsetY: svgPt.y - cy,
         });
-    }, [placedItems, gridCenterX, gridCenterY, svgRef]);
+    }, [rulerMode, spellMode, placedItems, gridCenterX, gridCenterY, svgRef]);
 
     const handleItemPointerMove = useCallback((e) => {
         if (!itemDragging) return;

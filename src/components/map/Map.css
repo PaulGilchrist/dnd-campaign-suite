@@ -880,8 +880,61 @@
     pointer-events: all;
 }
 
+/* Ruler overlay styles */
+.ruler-group {
+    pointer-events: none;
+}
 
+.ruler-line {
+    stroke: #ffcc00;
+    stroke-width: 2;
+    stroke-dasharray: 6 3;
+    fill: none;
+}
 
+.ruler-point {
+    fill: #ffcc00;
+    stroke: #333;
+    stroke-width: 1.5;
+}
 
+.ruler-label rect {
+    fill: rgba(0, 0, 0, 0.75);
+    stroke: #ffcc00;
+    stroke-width: 1;
+}
 
+.ruler-label text {
+    fill: #fff;
+    font-size: 11px;
+    font-family: Arial, sans-serif;
+    pointer-events: none;
+}
 
+[data-theme="light"] .ruler-label rect {
+    fill: rgba(255, 255, 255, 0.9);
+    stroke: #cc9900;
+}
+
+[data-theme="light"] .ruler-label text {
+    fill: #333;
+}
+
+.ruler-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    margin: 4px 0;
+    background: rgba(255, 204, 0, 0.12);
+    border: 1px solid rgba(255, 204, 0, 0.35);
+    border-radius: 4px;
+    color: #ffcc00;
+    font-size: 12px;
+}
+
+[data-theme="light"] .ruler-hint {
+    background: rgba(255, 204, 0, 0.08);
+    border-color: #cc9900;
+    color: #996600;
+}

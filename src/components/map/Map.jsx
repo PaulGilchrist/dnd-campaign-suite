@@ -44,6 +44,7 @@ import useSSESync from './hooks/useSSESync';
 import useFogOfWar from './hooks/useFogOfWar';
 import useSpellOverlay from './hooks/useSpellOverlay';
 import SpellOverlayRenderer from './SpellOverlayRenderer.jsx';
+import RulerOverlay from './RulerOverlay.jsx';
 import { OverlayShape, DEFAULTS, createOverlay, hitTestOverlay, svgOrigin } from '../../models/SpellOverlay.js';
 import HexMap from '../hex-map/HexMap';
 import '../hex-map/HexMap.css';
@@ -85,6 +86,12 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     // Paint state: tracks grid coords during active paint/erase
     const [painting, setPainting] = useState(null);
     const [panning, setPanning] = useState(null); // { startX, startY, startPanX, startPanY }
+
+    // Ruler state
+    const [rulerMode, setRulerMode] = useState(false);
+    const [rulerStart, setRulerStart] = useState(null); // { gridX, gridY } | null
+    const [rulerEnd, setRulerEnd] = useState(null); // { gridX, gridY } | null
+    const [rulerPreview, setRulerPreview] = useState(null); // { gridX, gridY } | null (live preview)
 
     // Spell overlay state
     const [spellMode, setSpellMode] = useState(null); // null | 'radius' | 'cone' | 'line'
@@ -267,7 +274,56 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         return degrees;
     }, []);
 
+    const handleRulerPointerDown = useCallback((e) => {
+        if (!rulerMode) return;
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+        e.preventDefault();
+        const svg = svgRef.current;
+        if (svg) svg.setPointerCapture(e.pointerId);
+
+        if (!rulerStart) {
+            setRulerStart(grid);
+            setRulerEnd(null);
+            setRulerPreview(null);
+        } else if (!rulerEnd) {
+            setRulerEnd(grid);
+            setRulerPreview(null);
+        } else {
+            setRulerStart(grid);
+            setRulerEnd(null);
+            setRulerPreview(null);
+        }
+    }, [rulerMode, rulerStart, rulerEnd, getGridFromEvent]);
+
+    const handleRulerPointerMove = useCallback((e) => {
+        if (!rulerMode || !rulerStart || rulerEnd) return;
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+        setRulerPreview(grid);
+    }, [rulerMode, rulerStart, rulerEnd, getGridFromEvent]);
+
+    const handleRulerPointerUp = useCallback((e) => {
+        if (!rulerMode) return;
+        const svg = svgRef.current;
+        if (svg) svg.releasePointerCapture(e.pointerId);
+    }, [rulerMode]);
+
+    const resetRuler = useCallback(() => {
+        setRulerStart(null);
+        setRulerEnd(null);
+        setRulerPreview(null);
+    }, []);
+
+    // When ruler mode toggled off, clear measurement
+    useEffect(() => {
+        if (!rulerMode) {
+            resetRuler();
+        }
+    }, [rulerMode, resetRuler]);
+
     const handleSpellPointerDown = useCallback((e) => {
+        if (rulerMode) return;
         const grid = getGridFromEvent(e);
         if (!grid) return;
 
@@ -330,7 +386,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 return;
             }
         }
-    }, [spellMode, overlays, getGridFromEvent, clientToSVG, computeAngle, addOverlay]);
+    }, [rulerMode, spellMode, overlays, getGridFromEvent, clientToSVG, computeAngle, addOverlay]);
 
     const handleSpellPointerMove = useCallback((e) => {
         if (!spellDraft) return;
@@ -740,6 +796,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         setMapData,
         gridCenterX,
         gridCenterY,
+        rulerMode,
+        spellMode,
     });
 
     const { itemDragging, handleItemPointerDown, handleItemPointerMove, handleItemPointerUp: handleItemPointerUpHook, handleItemPointerLeave } = useItemDragging({
@@ -749,6 +807,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         gridSize,
         gridCenterX,
         gridCenterY,
+        rulerMode,
+        spellMode,
     });
 
     const fog = useFogOfWar(mapData?.players, mapData?.walls, placedItems, gridSize);
@@ -901,6 +961,14 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 zoomOut={zoomOut}
                 resetView={resetView}
                 onBack={onBack}
+                rulerMode={rulerMode}
+                setRulerMode={(value) => {
+                    setRulerMode(value);
+                    if (value) {
+                        setSpellMode(null);
+                        resetRuler();
+                    }
+                }}
                 spellOverlayState={{
                     spellMode,
                     setSpellMode,
@@ -918,16 +986,16 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 ref={svgRef}
                 viewBox={`${panX} ${panY} ${SVG_SIZE / zoom} ${SVG_SIZE / zoom}`}
                 className="grid-svg"
-                onPointerDown={(e) => { handleSpellPointerDown(e); handlePanStart(e); }}
-                onPointerMove={(e) => { handlePointerMove(e); handleItemPointerMove(e); handleGridPointerMove(e); handleSelectPointerMove(e); handlePanMove(e); handleSpellPointerMove(e); handleSpellDragMove(e); }}
-                onPointerUp={(e) => { handlePointerUp(e); handleItemPointerUpHook(e); handleGridPointerUp(e); handleSelectPointerUp(e); handlePanEnd(e); handleSpellPointerUp(e); handleSpellDragEnd(e); }}
+                onPointerDown={(e) => { handleSpellPointerDown(e); handleRulerPointerDown(e); handlePanStart(e); }}
+                onPointerMove={(e) => { handlePointerMove(e); handleItemPointerMove(e); handleGridPointerMove(e); handleSelectPointerMove(e); handlePanMove(e); handleSpellPointerMove(e); handleSpellDragMove(e); handleRulerPointerMove(e); }}
+                onPointerUp={(e) => { handlePointerUp(e); handleItemPointerUpHook(e); handleGridPointerUp(e); handleSelectPointerUp(e); handlePanEnd(e); handleSpellPointerUp(e); handleSpellDragEnd(e); handleRulerPointerUp(e); }}
                 onPointerLeave={(e) => { handleItemPointerLeave(); handleGridPointerLeave(e); handleSelectPointerUp(e); }}
                 onWheel={handleWheel}
                 onContextMenu={(e) => e.preventDefault()}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
                 onClick={(e) => { if (e.button === 0) handleCloseMenu(); }}
-                style={{ cursor: panning ? 'grabbing' : (tool === 'none' ? 'grab' : tool === 'select' ? (moveOffset ? 'grabbing' : 'crosshair') : 'default') }}
+                style={{ cursor: panning ? 'grabbing' : rulerMode ? 'crosshair' : (tool === 'none' ? 'grab' : tool === 'select' ? (moveOffset ? 'grabbing' : 'crosshair') : 'default') }}
             >
                 <defs>
                     <BarrelSVG id="barrel" />
@@ -1150,6 +1218,13 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 <SpellOverlayRenderer
                     overlays={overlays}
                     pendingOverlay={spellDraft ? { ...spellDraft, shape: spellMode, ...shapeParams, id: 'pending' } : null}
+                />
+
+                {/* Ruler measurement overlay */}
+                <RulerOverlay
+                    start={rulerStart}
+                    end={rulerEnd || rulerPreview}
+                    cellSize={CELL_SIZE}
                 />
             </svg>
 

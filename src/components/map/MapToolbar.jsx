@@ -14,6 +14,8 @@ const MapToolbar = ({
     zoomOut,
     resetView,
     onBack,
+    rulerMode,
+    setRulerMode,
     spellOverlayState,
 }) => {
     const {
@@ -90,6 +92,12 @@ const MapToolbar = ({
                     >
                         <i className="fa-solid fa-wand-magic-sparkles"></i> Spell
                     </button>
+                    <button
+                        className={rulerMode ? 'active' : ''}
+                        onClick={() => setRulerMode(!rulerMode)}
+                    >
+                        <i className="fa-solid fa-ruler"></i> Ruler
+                    </button>
                     {isLocalhost && (
                         <button onClick={() => setItemsPanelOpen(prev => !prev)}>
                             <i className="fa-solid fa-box"></i> Items
@@ -121,6 +129,11 @@ const MapToolbar = ({
                     onCancelMode={() => setSpellMode(null)}
                     isActive={!!spellMode}
                 />
+            )}
+            {rulerMode && (
+                <div className="ruler-hint">
+                    <i className="fa-solid fa-ruler"></i> Click two points to measure distance
+                </div>
             )}
         </>
     );
