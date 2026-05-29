@@ -9,7 +9,7 @@ const FogOverlay = ({ fog, isLocalhost }) => {
             {Array.from(fog).map((key) => {
                 const [gx, gy] = key.split(',').map(Number);
                 return (
-                    <rect
+                    <rect className="no-print"
                         key={`fog-${key}`}
                         x={gx * CELL_SIZE}
                         y={gy * CELL_SIZE}

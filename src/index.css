@@ -470,7 +470,7 @@ th {
     }
 
     .no-print {
-        display: none;
+        display: none !important;
     }
 
     .app-body {
