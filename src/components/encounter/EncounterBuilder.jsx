@@ -169,7 +169,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
     modalMode,
     encounters,
     loading: encounterLoading,
-    loadEncounterList: () => {},
+    loadEncounterList,
     openSaveModal,
     openLoadModal,
     closeModal,
