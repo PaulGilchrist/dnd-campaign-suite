@@ -60,6 +60,25 @@
     background: rgba(244, 67, 54, 0.15);
 }
 
+.dice-roll-save-result {
+    text-align: center;
+    font-size: 1.1em;
+    font-weight: bold;
+    margin: 8px 0;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.dice-roll-save-result.save-success {
+    color: #4CAF50;
+    background: rgba(76, 175, 80, 0.15);
+}
+
+.dice-roll-save-result.save-failure {
+    color: #f44336;
+    background: rgba(244, 67, 54, 0.15);
+}
+
 .dice-roll-resistance {
     text-align: center;
     font-size: 0.85em;

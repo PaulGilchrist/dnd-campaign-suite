@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoCrit }) {
+function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoCrit, dc, success }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
 
     // Only d20 (single die, 20 sides) allows advantage/disadvantage
@@ -87,6 +87,11 @@ function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier =
             {targetName && hit !== undefined && (
               <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
                 {hit ? '✓ HIT' : '✗ MISS'} ({total} vs AC {targetAc})
+              </div>
+            )}
+            {dc !== undefined && success !== undefined && (
+              <div className={`dice-roll-save-result ${success ? 'save-success' : 'save-failure'}`}>
+                {success ? '✓ SAVE SUCCESS' : '✗ SAVE FAILURE'} ({total} vs DC {dc})
               </div>
             )}
             {resistanceNotice && (
