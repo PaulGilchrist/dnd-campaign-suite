@@ -5,10 +5,11 @@ import DiceRollResult from './DiceRollResult.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
+import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/baseCombatActions.js'
 
 function CharReactions({ playerStats, campaignName, cannotAct }) {
     const { popupHtml, setPopupHtml, rollAttack } = useLoggedDiceRoll(playerStats.name, campaignName);
-     // Build reactions list immutably
+       // Build reactions list immutably
     let reactions = [...(playerStats.reactions || [])];
 
     if (playerStats.spellAbilities && playerStats.spellAbilities.spells.length > 0) {
@@ -16,21 +17,21 @@ function CharReactions({ playerStats, campaignName, cannotAct }) {
         reactionSpells.forEach(spell => {
             if (!reactions.some((reaction) => reaction.name === spell.name)) {
                 reactions.push({
-                    "name": spell.name,
-                    "description": spell.desc
-                });
-            }
-        });
-    }
-    // Add base reactions to reaction list
-    if (!reactions.find((reaction) => reaction.name === 'Opportunity Attack')) {
-        reactions.push({ "name": "Opportunity Attack", "description": "Can attack creature that moves out of your reach" });
-    }
+                     "name": spell.name,
+                     "description": spell.desc
+                  });
+              }
+          });
+      }
+     // Add base reactions to reaction list
+    if (!reactions.find((reaction) => reaction.name === OPPORTUNITY_ATTACK.name)) {
+        reactions.push(OPPORTUNITY_ATTACK);
+       }
 
     const handleReactionClick = (reaction) => {
         if (cannotAct) return;
-        if (reaction.name === 'Opportunity Attack') {
-            const meleeAttacks = playerStats.attacks.filter(a => a.type === 'Action' && a.range === 5);
+        if (reaction.name === OPPORTUNITY_ATTACK.name) {
+            const meleeAttacks = playerStats.attacks.filter(a => a.type === 'Action' && a.range === MELEE_REACH_FEET);
             const attackRoll = meleeAttacks.length > 0 ? meleeAttacks[0] : playerStats.attacks[0];
             if (attackRoll) {
                 rollAttack(attackRoll.name, attackRoll.hitBonus, { forcedMode: undefined });
@@ -52,7 +53,7 @@ function CharReactions({ playerStats, campaignName, cannotAct }) {
             )}
               {reactions.map((reaction) => {
                 return <div key={reaction.name}>
-                     <b className={reaction.details || reaction.name === 'Opportunity Attack' ? "clickable" : ""} onClick={() => handleReactionClick(reaction)}>{reaction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(reaction.description) }}></span>
+                     <b className={reaction.details || reaction.name === OPPORTUNITY_ATTACK.name ? "clickable" : ""} onClick={() => handleReactionClick(reaction)}>{reaction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(reaction.description) }}></span>
                  </div>
              })}
         </div>

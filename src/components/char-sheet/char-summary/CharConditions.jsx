@@ -2,30 +2,12 @@
 import React from 'react'
 import storage from '../../../services/storage.js'
 import { rollD20 } from '../../../services/diceRoller.js'
-import { CONDITION_SAVE_MAP, getAbilityLabel, getAbilitySaveBonus } from '../../../services/conditionUtils.js'
+import { CONDITIONS, CONDITION_SAVE_DC, CONDITION_SAVE_MAP, getAbilityLabel, getAbilitySaveBonus } from '../../../services/conditionUtils.js'
+import { EXHAUSTION_LEVELS, isDeadFromExhaustion, getExhaustionSaveDC } from '../../../services/exhaustionRules.js'
 import usePopup from '../../../hooks/usePopup.js'
 import Popup from '../../common/Popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
 import './CharConditions.css'
-
-const CONDITIONS = [
-  { key: 'blinded', label: 'Blinded' },
-  { key: 'charmed', label: 'Charmed' },
-  { key: 'cursed', label: 'Cursed' },
-  { key: 'deafened', label: 'Deafened' },
-  { key: 'frightened', label: 'Frightened' },
-  { key: 'grappled', label: 'Grappled' },
-  { key: 'incapacitated', label: 'Incapacitated' },
-  { key: 'paralyzed', label: 'Paralyzed' },
-  { key: 'petrified', label: 'Petrified' },
-  { key: 'poisoned', label: 'Poisoned' },
-  { key: 'prone', label: 'Prone' },
-  { key: 'restrained', label: 'Restrained' },
-  { key: 'stunned', label: 'Stunned' },
-  { key: 'unconscious', label: 'Unconscious' },
-]
-
-const CONDITION_SAVE_DC = 10
 
 const STORAGE_KEY = 'activeConditions'
 
@@ -38,7 +20,7 @@ function saveConditions(name, campaignName, conditions) {
   storage.setProperty(name, STORAGE_KEY, conditions, campaignName)
 }
 
-export const EXHAUSTION_LEVELS = 6
+export { EXHAUSTION_LEVELS }
 
 export function loadActiveConditions(name, campaignName) {
   return loadConditions(name, campaignName)
@@ -124,7 +106,7 @@ function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhausti
   const adjustExhaustion = (delta) => {
     if (delta < 0 && exhaustionLevel > 0) {
       const conSaveBonus = getAbilitySaveBonus(playerStats, 'con')
-      const dc = 10 + exhaustionLevel
+      const dc = getExhaustionSaveDC(exhaustionLevel)
       const roll = rollD20()
       const total = roll + conSaveBonus
       const success = total >= dc
@@ -165,7 +147,7 @@ function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhausti
     }
   }
 
-  const dead = exhaustionLevel >= EXHAUSTION_LEVELS
+  const dead = isDeadFromExhaustion(exhaustionLevel)
   const active = exhaustionLevel > 0
 
   return (

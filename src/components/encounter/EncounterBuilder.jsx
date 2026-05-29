@@ -12,46 +12,16 @@ import PreviewToggle from '../common/PreviewToggle.jsx';
 import { formatEncounterName } from '../../services/encountersService.js';
 import { loadEncounterToInitiative } from '../../services/encounterToInitiative.js';
 import { generateLootSuggestions } from '../../services/lootGenerator.js';
+import { calculateXPThreshold, calculateDifficultyMultiplier } from '../../services/encounterGenerator.js';
 import storage from '../../services/storage.js';
 import * as logService from '../../services/logService.js';
 import './EncounterBuilder.css';
 
-// XP thresholds per level [Easy, Medium, Hard, Deadly] for levels 0-20
-const xpThresholds = [
-  [15, 25, 40, 50], [25, 50, 75, 100], [50, 100, 150, 200],
-  [75, 150, 225, 400], [125, 250, 375, 500], [250, 500, 750, 1100],
-  [300, 600, 900, 1400], [350, 750, 1100, 1700], [450, 900, 1400, 2100],
-  [550, 1100, 1600, 2400], [600, 1200, 1900, 2800], [800, 1600, 2400, 3600],
-  [1000, 2000, 3000, 4500], [1100, 2200, 3400, 5100], [1250, 2500, 3800, 5700],
-  [1400, 2800, 4300, 6400], [1600, 3200, 4800, 7200], [2000, 3900, 5900, 8800],
-  [2100, 4200, 6300, 9500], [2400, 4900, 7300, 10900], [2800, 5700, 8500, 12700]
-];
-
 const difficultyLabels = ['Easy', 'Medium', 'Hard', 'Deadly'];
 
-// --- Pure calculation functions (extracted for testability) ---
-
-function calculateXPThreshold(playerLevels, difficultyIndex) {
-  return playerLevels.reduce((sum, level) => {
-    const idx = parseInt(level, 10);
-    if (!isNaN(idx) && idx >= 0 && idx <= 20) {
-      return sum + (xpThresholds[idx][difficultyIndex] || 0);
-    }
-    return sum;
-  }, 0);
-}
-
+// Local helpers not available in the service
 function calculateMaxXP(playerLevels, difficultyIndex) {
   return calculateXPThreshold(playerLevels, difficultyIndex) * 2;
-}
-
-function calculateDifficultyMultiplier(monsterCount) {
-  if (monsterCount <= 1) return 1;
-  if (monsterCount === 2) return 1.5;
-  if (monsterCount <= 6) return 2;
-  if (monsterCount <= 10) return 2.5;
-  if (monsterCount <= 14) return 3;
-  return 4;
 }
 
 function calculateDifficultyIndex(effectiveXP, totalThreshold) {

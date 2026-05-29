@@ -1,3 +1,5 @@
+const CONDITION_SAVE_DC = 10
+
 const CONDITIONS = [
   { key: 'blinded', label: 'Blinded' },
   { key: 'charmed', label: 'Charmed' },
@@ -58,6 +60,7 @@ function getAbilitySaveBonus(character, abilityAbbr) {
 
 export {
   CONDITIONS,
+  CONDITION_SAVE_DC,
   CONDITION_SAVE_MAP,
   ABILITY_LABELS,
   getDefaultAbility,

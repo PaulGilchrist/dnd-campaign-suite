@@ -5,6 +5,7 @@ import utils from '../../services/utils.js'
 import storage from '../../services/storage.js'
 import { getMonsterImageUrl, getMonsterData } from '../../services/monsterUtils.js';
 import { rollD20 } from '../../services/diceRoller.js';
+import * as concentrationRules from '../../services/concentrationRules.js';
 import { getAbilitySaveBonus, getAbilityLabel, getDefaultAbility, CONDITIONS } from '../../services/conditionUtils.js';
 import { computeConditionEffects } from '../../services/conditionEffects.js';
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx';
@@ -770,9 +771,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
             } catch { /* ignore */ }
         }
 
-        const r1 = rollD20();
-        const total = r1 + saveBonus;
-        const success = total >= concentration.dc;
+        const { roll: r1, success } = concentrationRules.rollConcentrationSave(saveBonus, concentration.dc);
 
         if (!success) {
             creature.concentration = null;
@@ -821,7 +820,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
         const creature = combatSummary.creatures.find(c => c.id === creatureId);
         if (!creature || !creature.concentration) return;
         const spell = creature.concentration.spell;
-        creature.concentration = null;
+        creature.concentration = concentrationRules.breakConcentration(creature.concentration);
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
 

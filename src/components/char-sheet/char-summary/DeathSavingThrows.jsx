@@ -1,6 +1,6 @@
 import React from 'react'
 import storage from '../../../services/storage.js'
-import { rollD20 } from '../../../services/diceRoller.js'
+import * as deathSaveRules from '../../../services/deathSaveRules.js'
 import './CharSummary.css'
 
 function DeathSavingThrows({ playerStats, campaignName }) {
@@ -15,10 +15,8 @@ function DeathSavingThrows({ playerStats, campaignName }) {
         if (savedFailures) setFailures(savedFailures)
     }, [playerStats, campaignName])
 
-    const successCount = saves.filter(Boolean).length
-    const failureCount = failures.filter(Boolean).length
-    const isStable = successCount >= 3
-    const isDead = failureCount >= 3
+    const isStable = deathSaveRules.isStable(saves)
+    const isDead = deathSaveRules.isDead(failures)
 
     const logEntry = (entry) => {
         fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
@@ -31,55 +29,28 @@ function DeathSavingThrows({ playerStats, campaignName }) {
     const rollDeathSave = () => {
         if (isStable || isDead) return;
 
-        const r = rollD20();
-        const isNat20 = r === 20;
-        const isNat1 = r === 1;
-        const isSuccess = isNat20 || r >= 10;
-        const failMultiplier = isNat1 ? 2 : 1;
+        const result = deathSaveRules.rollDeathSave(saves, failures);
 
-        setLastRoll({ roll: r, success: isSuccess, isNat20, isNat1 });
+        setLastRoll({ roll: result.roll, success: result.result === 'success' || result.result === 'nat20' || result.result === 'stable', isNat20: result.isNat20, isNat1: result.isNat1 });
         setTimeout(() => setLastRoll(null), 2000);
 
         logEntry({
             type: 'death_save',
             characterName: playerStats.name,
-            roll: r,
-            isNatural20: isNat20,
-            isNatural1: isNat1,
-            success: isSuccess,
+            roll: result.roll,
+            isNatural20: result.isNat20,
+            isNatural1: result.isNat1,
+            success: result.result === 'success' || result.result === 'nat20' || result.result === 'stable',
         });
 
-        if (isNat20) {
-            storage.setProperty(playerStats.name, 'currentHitPoints', 1, campaignName);
-            storage.setProperty(playerStats.name, 'deathSaves', [false, false, false], campaignName);
-            storage.setProperty(playerStats.name, 'deathFailures', [false, false, false], campaignName);
-            setSaves([false, false, false]);
-            setFailures([false, false, false]);
-            return;
+        if (result.restoredToHp !== null) {
+            storage.setProperty(playerStats.name, 'currentHitPoints', result.restoredToHp, campaignName);
         }
 
-        if (isSuccess) {
-            const newSaves = [...saves];
-            const firstEmpty = newSaves.indexOf(false);
-            if (firstEmpty !== -1) newSaves[firstEmpty] = true;
-            setSaves(newSaves);
-            storage.setProperty(playerStats.name, 'deathSaves', newSaves, campaignName);
-
-            if (newSaves.filter(Boolean).length >= 3) {
-                storage.setProperty(playerStats.name, 'deathFailures', [false, false, false], campaignName);
-                setFailures([false, false, false]);
-            }
-        } else {
-            const newFailures = [...failures];
-            for (let i = 0; i < failMultiplier; i++) {
-                const firstEmpty = newFailures.indexOf(false);
-                if (firstEmpty !== -1) {
-                    newFailures[firstEmpty] = true;
-                }
-            }
-            setFailures(newFailures);
-            storage.setProperty(playerStats.name, 'deathFailures', newFailures, campaignName);
-        }
+        setSaves(result.newSaves);
+        setFailures(result.newFailures);
+        storage.setProperty(playerStats.name, 'deathSaves', result.newSaves, campaignName);
+        storage.setProperty(playerStats.name, 'deathFailures', result.newFailures, campaignName);
     }
 
     return (

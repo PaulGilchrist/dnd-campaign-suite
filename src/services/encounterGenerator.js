@@ -1,4 +1,4 @@
-// XP thresholds per level [Easy, Medium, Hard, Deadly] — mirrors EncounterBuilder
+// XP thresholds per level [Easy, Medium, Hard, Deadly]
 const xpThresholds = [
   [15, 25, 40, 50], [25, 50, 75, 100], [50, 100, 150, 200],
   [75, 150, 225, 400], [125, 250, 375, 500], [250, 500, 750, 1100],
@@ -19,17 +19,17 @@ function crToNumber(cr) {
   return parseFloat(cr) || 0;
 }
 
-function calculateXPThreshold(playerLevels, difficultyIndex) {
+export function calculateXPThreshold(playerLevels, difficultyIndex) {
   return playerLevels.reduce((sum, level) => {
     const idx = parseInt(level, 10);
     if (!isNaN(idx) && idx >= 0 && idx <= 20) {
       return sum + (xpThresholds[idx][difficultyIndex] || 0);
-    }
+     }
     return sum;
-  }, 0);
+   }, 0);
 }
 
-function calculateDifficultyMultiplier(monsterCount) {
+export function calculateDifficultyMultiplier(monsterCount) {
   if (monsterCount <= 1) return 1;
   if (monsterCount === 2) return 1.5;
   if (monsterCount <= 6) return 2;

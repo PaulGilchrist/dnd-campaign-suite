@@ -1,28 +1,29 @@
 
 import React from 'react'
 import storage from '../../services/storage.js'
-import { rollDice } from '../../services/diceRoller.js';
+import { rollDice } from '../../services/diceRoller.js'
+import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES } from '../../services/restRules.js'
 
 function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [remainingHitDice, setRemainingHitDice] = React.useState(() => {
         const stored = storage.getProperty(playerStats.name, 'shortRestHitDice', campaignName);
         return stored != null ? stored : playerStats.level;
-    });
+     });
     const [recoveredHp, setRecoveredHp] = React.useState(0);
     const [rollLog, setRollLog] = React.useState([]);
 
     const maxHitDice = playerStats.level;
-    const hitDie = playerStats.class?.class_levels?.[playerStats.level - 1]?.hit_die || 8;
+    const hitDie = getHitDieSize(playerStats);
     const conBonus = playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0;
 
     const handleRollOne = () => {
         if (remainingHitDice <= 0) return;
         const { total, rolls } = rollDice(1, hitDie);
-        const hp = Math.max(1, total + conBonus);
+        const hp = computeHitDieRecovery(total, conBonus);
         setRemainingHitDice(prev => prev - 1);
         setRecoveredHp(prev => prev + hp);
         setRollLog(prev => [...prev, { roll: rolls[0], hp }]);
-    };
+     };
 
     const handleRollAll = () => {
         if (remainingHitDice <= 0) return;
@@ -30,14 +31,14 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         let newRolls = [];
         for (let i = 0; i < remainingHitDice; i++) {
             const { total, rolls } = rollDice(1, hitDie);
-            const hp = Math.max(1, total + conBonus);
+            const hp = computeHitDieRecovery(total, conBonus);
             totalHp += hp;
             newRolls.push({ roll: rolls[0], hp });
-        }
+         }
         setRemainingHitDice(0);
         setRecoveredHp(prev => prev + totalHp);
         setRollLog(prev => [...prev, ...newRolls]);
-    };
+     };
 
     const handleComplete = () => {
         storage.setProperty(playerStats.name, 'shortRestHitDice', remainingHitDice, campaignName);
@@ -45,24 +46,17 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         let currentHp = storage.getProperty(playerStats.name, 'currentHitPoints', campaignName);
         if (currentHp == null || currentHp === '') {
             currentHp = playerStats.hitPoints;
-        } else {
+         } else {
             currentHp = Number(currentHp) + recoveredHp;
-        }
+         }
         storage.setProperty(playerStats.name, 'currentHitPoints', Math.min(playerStats.hitPoints, currentHp), campaignName);
 
-        const shortRestResources = [
-            'channelDivinityCharges',
-            'wildShapeUses',
-            'secondWindUses',
-            'psionicEnergy',
-            'focusPoints',
-        ];
-        shortRestResources.forEach((key) => {
+        SHORT_REST_RESOURCES.forEach((key) => {
             storage.setProperty(playerStats.name, key, null, campaignName);
         });
 
         onComplete && onComplete();
-    };
+     };
 
     React.useEffect(() => {
         const handleKey = (e) => {

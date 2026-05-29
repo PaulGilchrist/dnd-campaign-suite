@@ -3,19 +3,23 @@
 import useActionPopup from '../../hooks/useActionPopup.js'
 import Popup from '../common/Popup.jsx'
 import { renderMarkdownInline } from '../../services/sanitize.js';
+import { getFightingStyle } from '../../services/fightingStyles.js'
 
 function CharSpecialActions({ playerStats }) {
     const { showPopup, popupHtml, setPopupHtml } = useActionPopup('feature')
-     // Build specialActions list immutably
+      // Build specialActions list immutably
     let specialActions = [...(playerStats.specialActions || [])];
 
-     // Add fighting style special actions
+      // Add fighting style special actions
     if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Great Weapon Fighting') && !specialActions.find((specialAction) => specialAction.name === 'Great Weapon Fighting')) {
-        specialActions.push({ "name": "Great Weapon Fighting", "description": "When you roll a 1 or 2 on a damage die for an attack you make with a melee weapon that you are wielding with two hands, you can reroll the die and must use the new roll, even if the new roll is a 1 or a 2. The weapon must have the two-handed or versatile property for you to gain this benefit." });
-    } else if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Protection') && !specialActions.find((specialAction) => specialAction.name === 'Protection')) {
-        specialActions.push({ "name": "Protection", "description": "When a creature you can see attacks a target other than you that is within 5 feet of you, you can use your reaction to impose disadvantage on the attack roll. You must be wielding a shield." });
-      }
-   
+        const style = getFightingStyle('Great Weapon Fighting');
+        if (style) specialActions.push(style);
+     } else if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Protection') && !specialActions.find((specialAction) => specialAction.name === 'Protection')) {
+        const style = getFightingStyle('Protection');
+        if (style) specialActions.push(style);
+        }
+
+
     // Get names of features that should not be shown in Special Actions
     const actionNames = new Set(playerStats.actions?.map(action => action.name) || []);
     const bonusActionNames = new Set(playerStats.bonusActions?.map(action => action.name) || []);
