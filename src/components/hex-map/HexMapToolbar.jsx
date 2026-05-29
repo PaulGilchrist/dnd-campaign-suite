@@ -19,22 +19,22 @@ function HexMapToolbar({
     marchingOrder,
 }) {
     return (
-        <div className="hex-map-toolbar no-print">
-            <button onClick={onBack} title="Back to maps">
+        <div className="hex-map-toolbar">
+            <button onClick={onBack} title="Back to maps" className="no-print">
                 <i className="fa-solid fa-arrow-left"></i>
             </button>
             <span className="hex-map-title">{mapName}</span>
 
             {/* Terrain tools */}
             <button
-                className={tool === TOOL_PAINT ? 'active' : ''}
+                className={tool === TOOL_PAINT ? 'active no-print' : 'no-print'}
                 onClick={() => setTool(tool === TOOL_PAINT ? TOOL_NONE : TOOL_PAINT)}
                 title="Paint terrain"
             >
                 <i className="fa-solid fa-paint-brush"></i>
             </button>
             <button
-                className={tool === TOOL_ERASE ? 'active' : ''}
+                className={tool === TOOL_ERASE ? 'active no-print' : 'no-print'}
                 onClick={() => setTool(tool === TOOL_ERASE ? TOOL_NONE : TOOL_ERASE)}
                 title="Erase terrain"
             >
@@ -43,7 +43,7 @@ function HexMapToolbar({
 
             {/* Terrain selector — visible when paint or erase is active */}
             {(tool === TOOL_PAINT || tool === TOOL_ERASE) && (
-                <div className="terrain-selector">
+                <div className="terrain-selector no-print">
                     {terrainTypes.map(t => (
                         <div
                             key={t.id}
@@ -58,7 +58,7 @@ function HexMapToolbar({
 
             {/* River tool */}
             <button
-                className={tool === TOOL_RIVER ? 'active' : ''}
+                className={tool === TOOL_RIVER ? 'active no-print' : 'no-print'}
                 onClick={() => setTool(tool === TOOL_RIVER ? TOOL_NONE : TOOL_RIVER)}
                 title="Paint rivers"
             >
@@ -66,7 +66,7 @@ function HexMapToolbar({
             </button>
             {/* Road tool */}
             <button
-                className={tool === TOOL_ROAD ? 'active' : ''}
+                className={tool === TOOL_ROAD ? 'active no-print' : 'no-print'}
                 onClick={() => setTool(tool === TOOL_ROAD ? TOOL_NONE : TOOL_ROAD)}
                 title="Connect cities and settlements with roads"
             >
@@ -75,7 +75,7 @@ function HexMapToolbar({
 
             {/* Travel tool */}
             <button
-                className={tool === TOOL_TRAVEL ? 'active' : ''}
+                className={tool === TOOL_TRAVEL ? 'active no-print' : 'no-print'}
                 onClick={() => setTool(tool === TOOL_TRAVEL ? TOOL_NONE : TOOL_TRAVEL)}
                 title="Travel mode — plan and execute overland travel"
             >
@@ -86,7 +86,7 @@ function HexMapToolbar({
             <button
                 onClick={() => setPoiPanelOpen(!poiPanelOpen)}
                 title={poiPanelOpen ? 'Close POI panel' : 'Open POI panel'}
-                className={poiPanelOpen ? 'active' : ''}
+                className={poiPanelOpen ? 'active no-print' : 'no-print'}
             >
                 <i className="fa-solid fa-layer-group"></i>
             </button>
@@ -95,7 +95,7 @@ function HexMapToolbar({
             <button
                 onClick={() => setMarchingOrderOpen(!marchingOrderOpen)}
                 title={marchingOrderOpen ? 'Close marching order' : 'Manage marching order'}
-                className={marchingOrderOpen ? 'active' : ''}
+                className={marchingOrderOpen ? 'active no-print' : 'no-print'}
             >
                 <i className="fa-solid fa-people-group"></i>
                 {marchingOrder.length > 0 && (
@@ -104,12 +104,12 @@ function HexMapToolbar({
             </button>
 
             {/* Print */}
-            <button onClick={() => window.print()} title="Print map">
+            <button onClick={() => window.print()} title="Print map" className="no-print">
                 <i className="fa-solid fa-print"></i>
             </button>
 
             {/* Zoom controls */}
-            <div className="hex-map-zoom-controls">
+            <div className="hex-map-zoom-controls no-print">
                 <button onClick={zoomIn} title="Zoom in">
                     <i className="fa-solid fa-plus"></i>
                 </button>
@@ -123,7 +123,7 @@ function HexMapToolbar({
             </div>
 
             {/* Grid size */}
-            <div className="hex-map-grid-size">
+            <div className="hex-map-grid-size no-print">
                 <label>
                     Grid:
                     <input

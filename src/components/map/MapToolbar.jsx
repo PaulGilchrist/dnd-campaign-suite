@@ -34,15 +34,15 @@ const MapToolbar = ({
 
     return (
         <>
-            <div className="toolbar-row no-print">
+            <div className="toolbar-row">
                 {onBack && (
-                    <button onClick={onBack} title="Back" className="toolbar-back-btn">
+                    <button onClick={onBack} title="Back" className="toolbar-back-btn no-print">
                         <i className="fa-solid fa-arrow-left"></i>
                     </button>
                 )}
                 <h4>{mapsService.formatMapName(mapName) || 'Map'}</h4>
                 {isLocalhost && (
-                    <label className="grid-size-label">
+                    <label className="grid-size-label no-print">
                         Grid Size&nbsp;&nbsp;
                         <input
                             type="number"
@@ -54,7 +54,7 @@ const MapToolbar = ({
                         />
                     </label>
                 )}
-                <div className="toolbar">
+                <div className="toolbar no-print">
                     {isLocalhost && (
                         <>
                             <button

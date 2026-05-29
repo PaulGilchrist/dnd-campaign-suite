@@ -473,6 +473,10 @@ th {
         display: none !important;
     }
 
+    .force-print {
+        display: unset !important;
+    }
+
     .app-body {
         padding-left: 0;
     }
