@@ -2,7 +2,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
 import storage from '../../../services/storage.js';
-import classRules2024 from '../../../services/classRules2024.js';
 import CharFeats from '../char-feats/CharFeats.jsx';
 
 vi.mock('../../../services/storage.js', () => ({

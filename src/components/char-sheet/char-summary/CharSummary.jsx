@@ -20,8 +20,6 @@ import ShortRestModal from '../ShortRestModal.jsx'
 import storage from '../../../services/storage.js'
 import CharConditions from './CharConditions.jsx'
 
-const EXHAUSTION_LEVELS = 6
-
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
 function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, onLongRest, exhaustionLevel, onExhaustionChange, conditionEffects, onConditionsChange }) {

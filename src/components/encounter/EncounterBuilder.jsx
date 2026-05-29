@@ -169,7 +169,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
     modalMode,
     encounters,
     loading: encounterLoading,
-    loadEncounterList,
+    loadEncounterList: () => {},
     openSaveModal,
     openLoadModal,
     closeModal,
@@ -203,7 +203,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
        } catch { /* ignore */ }
      }
 
-    function clearSession() {
+function clearSession() {
       try { localStorage.removeItem(`encounterSession-${campaignName}`); } catch { /* ignore */ }
      }
 

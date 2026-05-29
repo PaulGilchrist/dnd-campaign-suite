@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { loadMonsters } from '../../services/dataLoader.js';
 import './MonsterNameAutocomplete.css';
 
-function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, position, initialFocus = true, npcs, showBadge }) {
+function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, position, initialFocus = true, npcs }) {
     const [monsters, setMonsters] = useState([]);
     const [query, setQuery] = useState(value || '');
     const [showSuggestions, setShowSuggestions] = useState(false);
@@ -112,8 +112,6 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
                  }
              }
          };
-
-    const list = suggestions();
 
     return (
             <div className={`monster-autocomplete${position ? ' monster-autocomplete-fixed' : ''}`} style={position}>
