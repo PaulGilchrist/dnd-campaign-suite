@@ -158,7 +158,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
   // Save difficulty to localStorage when it changes
   useEffect(() => {
     saveFilter(filter);
-  }, [filter.difficulty]);
+  }, [filter.difficulty]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [selectedMonsters, setSelectedMonsters] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -169,7 +169,6 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
     modalMode,
     encounters,
     loading: encounterLoading,
-    loadEncounterList,
     openSaveModal,
     openLoadModal,
     closeModal,
@@ -201,11 +200,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
        encounterTitle,
         }));
        } catch { /* ignore */ }
-     }
-
-function clearSession() {
-      try { localStorage.removeItem(`encounterSession-${campaignName}`); } catch { /* ignore */ }
-     }
+      }
 
   function loadSavedSession(existingsMonsters) {
     try {
@@ -238,8 +233,8 @@ function clearSession() {
            setFilter({ difficulty: session.filter.difficulty, playerLevels: session.filter.playerLevels || [1] });
                  }
        if (session.encounterTitle) setEncounterTitle(session.encounterTitle);
-         setSelectedMonsters(session.selectedMonsters);
-          }, [campaignName, monsters]);
+          setSelectedMonsters(session.selectedMonsters);
+           }, [campaignName, monsters]); // eslint-disable-line react-hooks/exhaustive-deps
 
 // Guard to skip persist effect on initial render - lets restore effect run first
    const persisted = useRef(false);
@@ -254,7 +249,7 @@ function clearSession() {
         if (combatStarted && !encounterCompleted && lootData.lootEntries.length > 0) {
              saveSession();
                 }
-           }, [campaignName, currentEncounterName, description, lootData, combatStarted, encounterCompleted, selectedMonsters, filter, encounterTitle]);
+           }, [campaignName, currentEncounterName, description, lootData, combatStarted, encounterCompleted, selectedMonsters, filter, encounterTitle]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 

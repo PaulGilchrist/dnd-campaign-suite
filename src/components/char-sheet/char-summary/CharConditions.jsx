@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react'
 import storage from '../../../services/storage.js'
 import { rollD20 } from '../../../services/diceRoller.js'

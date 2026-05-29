@@ -7,7 +7,7 @@ import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResistanceNotice } from '../../services/damageUtils.js';
 import { getCombatContext } from '../../services/damageUtils.js';
 import { findCreatureByName } from '../../services/damageUtils.js';
-import { computeConditionEffects, combineAttackModes, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/conditionEffects.js';
+import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT } from '../../services/conditionEffects.js';
 import './MonsterCardModal.css';
 
 function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
@@ -420,7 +420,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
         </div>
       </div>
     );
-  }, [monster, onClose, handleAttack, handleDamage, handleAbilityCheck, handleSaveThrow, handleSkillCheck, handleInitiative, attackerCannotAct]);
+      }, [monster, onClose, handleAttack, handleDamage, handleAbilityCheck, handleSaveThrow, handleSkillCheck, handleInitiative, attackerCannotAct]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!monster) return null;
 

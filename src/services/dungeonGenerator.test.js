@@ -157,7 +157,6 @@ describe('dungeonGenerator', () => {
         }
       }
       // Build room cell set
-      const roomCellSet = new Set();
       for (const item of map.placedItems) {
         if (item.type === 'torch' || item.type === 'stairs') {
           // Room items indicate nearby room presence; we can't easily detect room bounds

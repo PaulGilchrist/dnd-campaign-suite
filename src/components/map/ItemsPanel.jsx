@@ -13,7 +13,6 @@ import FirePitSVG from './FirePitSVG.jsx';
 import FountainSVG from './FountainSVG.jsx';
 import PillarSVG from './PillarSVG.jsx';
 import SecretDoorSVG from './SecretDoorSVG.jsx';
-import SkeletonSVG from './SkeletonSVG.jsx';
 import StairsSVG from './StairsSVG.jsx';
 import StatueSVG from './StatueSVG.jsx';
 import TableSVG from './TableSVG.jsx';

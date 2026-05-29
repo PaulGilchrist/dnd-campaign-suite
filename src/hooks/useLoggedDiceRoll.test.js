@@ -14,9 +14,9 @@ vi.mock('../services/utils.js', () => ({
 vi.mock('../services/storage.js', () => ({
   default: {
     get: vi.fn((key) => localStorage.getItem(key)),
-    set: vi.fn((key, val, campaign) => localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val))),
-    getProperty: vi.fn((char, prop, camp) => null),
-    setProperty: vi.fn((char, prop, val, camp) => {})
+    set: vi.fn((key, val) => localStorage.setItem(key, typeof val === 'string' ? val : JSON.stringify(val))),
+    getProperty: vi.fn(() => null),
+    setProperty: vi.fn(() => {})
   }
 }));
 

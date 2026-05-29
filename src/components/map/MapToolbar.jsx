@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import * as mapsService from '../../services/mapsService.js';
 import SpellOverlayControls from './SpellOverlayControls.jsx';
 
@@ -29,10 +28,6 @@ const MapToolbar = ({
         removeOverlay,
         clearOverlays,
     } = spellOverlayState || {};
-
-    const cancelSpellMode = useCallback(() => {
-        setSpellMode(null);
-    }, [setSpellMode]);
 
     return (
         <>

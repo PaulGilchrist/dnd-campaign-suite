@@ -2,8 +2,6 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Initiative from './initiative.jsx';
 
-import storage from '../../services/storage.js';
-
 vi.mock('../../services/storage.js', () => ({
   default: {
     get: vi.fn(),
@@ -456,7 +454,6 @@ describe('Initiative', () => {
     render(<Initiative characters={[]} isLocalhost={false} />);
     await act(async () => {
       await vi.waitFor(() => {
-        const deadBadges = document.querySelectorAll('.status-badge.dead');
         const statusBadges = document.querySelectorAll('.status-badge');
         expect(statusBadges.length).toBeGreaterThan(0);
        });

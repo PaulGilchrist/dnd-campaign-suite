@@ -1,11 +1,10 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   calculatePath,
   getDailyHexBudget,
   getHexMoveCostWithRoad,
   HORSEBACK_SPEED_MULTIPLIER,
   TRAVEL_PACES,
-  EXHAUSTION_SPEED_MULTIPLIER,
   EXHAUSTION_LEVELS,
   applyExhaustionSpeedPenaltyToBudget,
   getExhaustionMultiplierPercent,
@@ -38,7 +37,7 @@ const TERRAIN_TO_ENVIRONMENT = {
 export default function useTravelManagement({
   hexCols, hexRows, terrain, partyPosition, onPartyMove, weather,
   monsters, playerLevels, roads = [], characters = [], campaignName = '',
-  initialTravelState, onTravelStateChange,
+  initialTravelState,
 }) {
   const _init = initialTravelState || {};
 
@@ -323,13 +322,4 @@ export default function useTravelManagement({
     setTravelLog,
     setLastMessage,
   };
-
-  useEffect(() => {
-    if (onTravelStateChange) {
-      onTravelStateChange({
-        travelMode, travelPace, destination, path, pathIndex,
-        accruedCost, dailyBudget, dayExhausted, forcedMarchHours,
-      });
-    }
-  }, [travelMode, travelPace, destination, path, pathIndex, accruedCost, dailyBudget, dayExhausted, forcedMarchHours, onTravelStateChange]);
 }

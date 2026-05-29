@@ -9,7 +9,7 @@ import HazardSVG from './svg/HazardSVG';
 import NaturalWonderSVG from './svg/NaturalWonderSVG';
 import LandmarkSVG from './svg/LandmarkSVG';
 
-function POIPanel({ poiPanelOpen, onClose }) {
+function POIPanel({ onClose }) {
     const createDragGhost = (e) => {
         const svgEl = e.currentTarget.querySelector('svg');
         if (!svgEl) return;

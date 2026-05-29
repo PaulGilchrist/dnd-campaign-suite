@@ -30,7 +30,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
     React.useEffect(() => {
         setExhaustionLevel(readExhaustionLevel());
-    }, [forceRefresh, playerSummary]);
+    }, [forceRefresh, playerSummary]); // eslint-disable-line react-hooks/exhaustive-deps
     React.useEffect(() => {
         const fetchData = async () => {
             // Use rules factory to get appropriate rules based on character's rules setting

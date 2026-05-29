@@ -32,6 +32,7 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
 
     useEffect(() => {
         if (initialFocus && inputRef.current) inputRef.current.focus();
+         // eslint-disable-next-line react-hooks/exhaustive-deps
          }, []);
 
     const suggestions = useCallback(() => {

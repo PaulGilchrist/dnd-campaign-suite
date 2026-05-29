@@ -75,7 +75,7 @@ export async function computePlayerAc(character) {
   let hasArmor = false;
 
   for (const itemName of equipped) {
-    const { baseName, magicBonus } = parseMagicItemName(itemName);
+    const { baseName } = parseMagicItemName(itemName);
     const item = equipment.find(e => e.name === baseName);
     if (!item) continue;
 

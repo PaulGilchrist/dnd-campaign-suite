@@ -464,11 +464,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         if (svg) svg.releasePointerCapture(e.pointerId);
     }, [dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, computeAngle, updateOverlayImmediate]);
 
-    const cancelSpellMode = useCallback(() => {
-        setSpellMode(null);
-        setSpellDraft(null);
-    }, []);
-
     // Select/move handlers
     const handleSelectPointerDown = useCallback((e) => {
         if (spellDragActiveRef.current) return;
@@ -579,9 +574,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     maxY: bounds.maxY + offset.dy,
                 };
 
-                const beforeCount = mapDataRef.current?.walls?.size || 0;
                 setMapData((prev) => {
-                    const oldCount = prev.walls?.size || 0;
                     const newWalls = new Set(prev.walls);
                     // Step 1: clear the entire destination rect
                     if (dstBounds) {
@@ -591,7 +584,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                             }
                         }
                     }
-                    const afterClear = newWalls.size;
                     // Step 2: remove all source positions first, then add all destinations
                     // (Two phases prevent later deletes from undoing earlier adds)
                     for (const key of curSelWalls) {
@@ -601,7 +593,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                         const [x, y] = key.split(',').map(Number);
                         newWalls.add(`${x + offset.dx},${y + offset.dy}`);
                     }
-                    const afterMove = newWalls.size;
                     return { ...prev, walls: newWalls };
                 });
 
@@ -703,9 +694,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         setZoom(newZoom);
         setPanX(newPanX);
         setPanY(newPanY);
-    }, []);
-
-    // Load or initialize map data on mount
+   }, []); // eslint-disable-line react-hooks/exhaustive-deps
     useEffect(() => {
         if (loadedMapNameRef.current === mapName) return;
         loadedMapNameRef.current = mapName;

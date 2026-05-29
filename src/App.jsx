@@ -85,7 +85,7 @@ function App() {
        if (!cancelled) setCharactersWithHp(enriched);
      })();
      return () => { cancelled = true; };
-   }, [characters, classes, classes2024, equipment, magicItems, magicItems2024, races, races2024, spells, spells2024]);
+   }, [characters, classes, classes2024, equipment, magicItems, magicItems2024, races, races2024, spells, spells2024]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   const [mapsView, setMapsView] = useState({ type: 'none' });

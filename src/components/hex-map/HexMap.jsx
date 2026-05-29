@@ -6,7 +6,7 @@ import {
     TERRAIN_TYPES, POI_TYPES
 } from '../../config/outdoorConfig.js';
 import { generateWeather } from '../../services/weatherService.js';
-import { TRAVEL_PACES, getDailyHexBudget } from '../../services/travelService.js';
+import { getDailyHexBudget } from '../../services/travelService.js';
 import { hexKey, hexToPixel, pixelToHexSnapped, hexToSVGPath, isRoadConnectable, findHexPath } from '../../services/hexMapUtils.js';
 import { generateOutdoorEncounter } from '../../services/outdoorEncounterGenerator.js';
 import TerrainLayer from './TerrainLayer.jsx';
@@ -247,7 +247,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         onTravelStateChange: (ts) => {
             if (ts) {
                 setTravelInit(ts);
-                setTravelKey(prev => prev + 1);
+                setTravelSaveVersion(prev => prev + 1);
             }
         },
     });

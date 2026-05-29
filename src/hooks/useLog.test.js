@@ -1,11 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
-const mockLogService = {
-  getLog: vi.fn(async () => []),
-  addEntry: vi.fn(async () => {}),
-};
-
 vi.mock('../services/logService.js', () => ({
   getLog: vi.fn(async () => []),
   addEntry: vi.fn(async () => {}),
@@ -67,7 +62,6 @@ describe('useLog', () => {
     });
 
    it('onmessage handler should add entries to logEntries', async () => {
-     const logService = await vi.importActual('../services/logService.js');
      const mockLogService = {
        getLog: vi.fn(async () => []),
        addEntry: vi.fn(async () => {})

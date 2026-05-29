@@ -6,7 +6,7 @@ import storage from '../../services/storage.js'
 import { getMonsterImageUrl, getMonsterData } from '../../services/monsterUtils.js';
 import { rollD20 } from '../../services/diceRoller.js';
 import { getAbilitySaveBonus, getAbilityLabel, getDefaultAbility, CONDITIONS } from '../../services/conditionUtils.js';
-import { computeConditionEffects, CONDITIONS_THAT_CANNOT_ACT, CONDITIONS_THAT_SPEED_ZERO } from '../../services/conditionEffects.js';
+import { computeConditionEffects } from '../../services/conditionEffects.js';
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx';
 import AvatarImage from '../common/AvatarImage.jsx';
 import Subscriber from '../common/Subscriber.jsx';
@@ -16,7 +16,6 @@ import { loadNPCs } from '../../services/npcsService.js';
 import { npcToMonsterFormat, npcHasStatBlock } from '../../services/npcStatBlockUtils.js';
 import Popup from '../common/Popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
-import HiddenInput from '../common/HiddenInput.jsx';
 import './initiative.css'
 
 function NpcAvatar({ name, imageUrl, imagePath, onClick }) {
@@ -229,8 +228,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
     const setupCreatures = React.useCallback(() => {
         const creatureList = characters.map((character) => {
             const maxHp = character.hitPoints || 0;
-            const finalMaxHp = loadCreatureMaxHp(utils.getFirstName(character.name), maxHp);
-            const finalCurrentHp = loadCreatureHp(utils.getFirstName(character.name), maxHp);
             return {
                 id: utils.guid(),
                 name: utils.getFirstName(character.name),
@@ -433,7 +430,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
             setCombatSummary(cloneDeep(combatSummary));
         })();
         return () => { cancelled = true; };
-    }, [combatSummary == null]);
+    }, [combatSummary == null]); // eslint-disable-line react-hooks/exhaustive-deps
 
     React.useEffect(() => {
         const handler = () => {
