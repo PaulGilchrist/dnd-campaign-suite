@@ -344,3 +344,51 @@
   font-size: 0.78rem;
   padding: 4px 10px;
 }
+
+/* Print: hide inactive tabs in normal view */
+.npcs-tab-hidden {
+  display: none;
+}
+
+@media print {
+  .npcs-tab-hidden {
+    display: block;
+  }
+
+  .npcs-roleplay-tab {
+    page-break-after: always;
+  }
+
+  .npcs-stats-tab {
+    page-break-before: always;
+  }
+
+  .ct-container:has(.npcs-modal) > :not(.ct-modal-overlay) {
+    display: none !important;
+  }
+
+  .ct-container .ct-modal-overlay:has(.npcs-modal) {
+    position: static;
+    background: none;
+    display: block;
+    z-index: auto;
+  }
+
+  .ct-container .ct-modal.npcs-modal {
+    max-height: none;
+    height: auto;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    width: 100%;
+    max-width: 100%;
+    display: block;
+    background: none;
+  }
+
+  .ct-container .ct-modal.npcs-modal .ct-modal-body {
+    overflow: visible;
+    padding: 20px;
+    page-break-inside: auto;
+  }
+}

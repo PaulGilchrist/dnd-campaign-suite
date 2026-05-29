@@ -26,7 +26,7 @@ describe('PreviewToggle', () => {
         const button = screen.getByRole('button', { name: /preview/i });
         fireEvent.click(button);
 
-        expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+        expect(screen.getByRole('textbox')).toHaveClass('preview-toggle-textarea--hidden');
     });
 
     it('renders markdown preview when toggled to preview mode', () => {

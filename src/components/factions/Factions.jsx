@@ -238,8 +238,8 @@ function Factions({ campaignName, onBack }) {
         <div className="ct-modal-overlay" onClick={(e) => {
           if (e.target === e.currentTarget) handleCloseModal();
         }}>
-          <div className="ct-modal">
-            <div className="ct-modal-header">
+          <div className="ct-modal factions-modal">
+            <div className="ct-modal-header no-print">
               <h3>{editingFaction ? 'Edit Faction' : 'New Faction'}</h3>
               <button
                 className="ct-modal-close"
@@ -314,7 +314,7 @@ function Factions({ campaignName, onBack }) {
               />
             </div>
 
-            <div className="ct-modal-footer">
+            <div className="ct-modal-footer no-print">
               <div className="ct-modal-actions">
                 {editingFaction && (
                   <button

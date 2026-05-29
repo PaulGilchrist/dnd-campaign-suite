@@ -220,7 +220,7 @@ export default function Log({ campaignName, characters }) {
         <h2><i className="fas fa-scroll"></i> Campaign Log</h2>
       </div>
 
-        <div className="log-add-note">
+        <div className="log-add-note no-print">
             {characters.length > 0 && (
               <select
                 value={selectedCharacter}
@@ -242,9 +242,9 @@ export default function Log({ campaignName, characters }) {
             <button className="log-add-btn" onClick={handleAddNote}><i className="fas fa-plus"></i></button>
           </div>
 
-      {!initialized && <div className="log-loading">Loading log...</div>}
+      {!initialized && <div className="log-loading no-print">Loading log...</div>}
       {initialized && logEntries.length === 0 && (
-        <div className="log-empty">No entries yet. Roll dice or add a note to get started.</div>
+        <div className="log-empty no-print">No entries yet. Roll dice or add a note to get started.</div>
       )}
 
       <div className="log-entries">

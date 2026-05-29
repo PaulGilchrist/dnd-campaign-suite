@@ -160,3 +160,27 @@
     padding: 1px 4px;
     border-radius: 2px;
 }
+
+.preview-toggle-textarea--hidden {
+    display: none;
+}
+
+.preview-toggle-preview--hidden {
+    display: none;
+}
+
+@media print {
+    .preview-toggle-textarea,
+    .preview-toggle-textarea--hidden {
+        display: none;
+    }
+
+    .preview-toggle-preview,
+    .preview-toggle-preview--hidden {
+        display: block;
+    }
+
+    .preview-toggle-button {
+        display: none;
+    }
+}

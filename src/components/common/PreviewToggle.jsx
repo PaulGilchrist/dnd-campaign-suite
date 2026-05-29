@@ -33,21 +33,18 @@ function PreviewToggle({ value, onChange, id, className = '', placeholder = '', 
                     {toggleLabel}
                 </button>
             </div>
-            {previewing ? (
-                <div className="preview-toggle-preview" style={minHeight ? { minHeight } : undefined}>
-                    <MarkdownPreview text={value} />
-                </div>
-            ) : (
-                <textarea
-                    id={id}
-                    className={`preview-toggle-textarea ${className}`.trim()}
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    placeholder={placeholder}
-                    rows={rows}
-                    style={minHeight ? { minHeight } : undefined}
-                />
-            )}
+            <textarea
+                id={id}
+                className={`preview-toggle-textarea ${className}${previewing ? ' preview-toggle-textarea--hidden' : ''}`.trim()}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={placeholder}
+                rows={rows}
+                style={minHeight ? { minHeight } : undefined}
+            />
+            <div className={`preview-toggle-preview${!previewing ? ' preview-toggle-preview--hidden' : ''}`} style={minHeight ? { minHeight } : undefined}>
+                {value ? <MarkdownPreview text={value} /> : null}
+            </div>
         </div>
     );
 }

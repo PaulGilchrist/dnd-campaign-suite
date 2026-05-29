@@ -237,8 +237,8 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
         <div className="ct-modal-overlay" onClick={(e) => {
           if (e.target === e.currentTarget) handleCloseModal();
         }}>
-          <div className="ct-modal">
-            <div className="ct-modal-header">
+          <div className="ct-modal notes-modal">
+            <div className="ct-modal-header no-print">
               <h3>{editingNote ? 'Edit Note' : 'New Note'}</h3>
               <button
                 className="ct-modal-close"
@@ -308,7 +308,7 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
               )}
             </div>
 
-            <div className="ct-modal-footer">
+            <div className="ct-modal-footer no-print">
               <div className="ct-modal-actions">
                 {editingNote && (
                   <button

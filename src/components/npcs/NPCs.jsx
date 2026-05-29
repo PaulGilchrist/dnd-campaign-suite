@@ -422,7 +422,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       {modalOpen && formData && (
         <div className="ct-modal-overlay">
           <div className="ct-modal npcs-modal">
-            <div className="ct-modal-header">
+            <div className="ct-modal-header no-print">
               <h3>{editingNPC ? 'Edit NPC' : 'New NPC'}</h3>
               <button
                 className="ct-modal-close"
@@ -434,7 +434,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
             </div>
 
             {/* Avatar upload */}
-            <div className="npcs-avatar-section">
+            <div className="npcs-avatar-section no-print">
               <AvatarImage name={formData.name} imagePath={formData.image || formData.imagePath} size={80} onClick={(formData.image || formData.imagePath) ? () => setShowNpcAvatarModal(true) : undefined} />
               <div className="npcs-avatar-controls">
                 <label className="ct-btn ct-btn-sm">
@@ -455,7 +455,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
             </div>
 
             {/* Tab navigation */}
-            <div className="npcs-tabs">
+            <div className="npcs-tabs no-print">
               <button
                 className={`npcs-tab ${activeTab === 'roleplay' ? 'npcs-tab-active' : ''}`}
                 onClick={() => setActiveTab('roleplay')}
@@ -485,90 +485,87 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
                 autoFocus
               />
 
-              {activeTab === 'roleplay' && (
-                <>
-                  <label htmlFor="npc-race" className="ct-label">Race</label>
-                  <input
-                    id="npc-race"
-                    type="text"
-                    className="ct-input"
-                    value={formData.race}
-                    onChange={(e) => handleFormChange('race', e.target.value)}
-                    placeholder="e.g., Human, Elf, Dwarf"
-                  />
+              <div className={`npcs-roleplay-tab${activeTab !== 'roleplay' ? ' npcs-tab-hidden' : ''}`}>
+                <label htmlFor="npc-race" className="ct-label">Race</label>
+                <input
+                  id="npc-race"
+                  type="text"
+                  className="ct-input"
+                  value={formData.race}
+                  onChange={(e) => handleFormChange('race', e.target.value)}
+                  placeholder="e.g., Human, Elf, Dwarf"
+                />
 
-                  <label htmlFor="npc-classRole" className="ct-label">Class / Role</label>
-                  <input
-                    id="npc-classRole"
-                    type="text"
-                    className="ct-input"
-                    value={formData.classRole}
-                    onChange={(e) => handleFormChange('classRole', e.target.value)}
-                    placeholder="e.g., Fighter, Wizard, Merchant"
-                  />
+                <label htmlFor="npc-classRole" className="ct-label">Class / Role</label>
+                <input
+                  id="npc-classRole"
+                  type="text"
+                  className="ct-input"
+                  value={formData.classRole}
+                  onChange={(e) => handleFormChange('classRole', e.target.value)}
+                  placeholder="e.g., Fighter, Wizard, Merchant"
+                />
 
-                  <label htmlFor="npc-attitude" className="ct-label">Attitude</label>
-                  <select
-                    id="npc-attitude"
-                    className="ct-select"
-                    value={formData.attitude}
-                    onChange={(e) => handleFormChange('attitude', e.target.value)}
-                  >
-                    {ATTITUDE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
+                <label htmlFor="npc-attitude" className="ct-label">Attitude</label>
+                <select
+                  id="npc-attitude"
+                  className="ct-select"
+                  value={formData.attitude}
+                  onChange={(e) => handleFormChange('attitude', e.target.value)}
+                >
+                  {ATTITUDE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
 
-                  <PreviewToggle
-                    id="npc-appearance"
-                    value={formData.appearance}
-                    onChange={(value) => handleFormChange('appearance', value)}
-                    placeholder="Physical description…"
-                    label="Appearance"
-                  />
-                  <PreviewToggle
-                    id="npc-personality"
-                    value={formData.personality}
-                    onChange={(value) => handleFormChange('personality', value)}
-                    placeholder="Personality traits, ideals, bonds, flaws…"
-                    label="Personality"
-                  />
-                  <PreviewToggle
-                    id="npc-goals"
-                    value={formData.goals}
-                    onChange={(value) => handleFormChange('goals', value)}
-                    placeholder="What does this NPC want?"
-                    label="Goals"
-                  />
-                  <PreviewToggle
-                    id="npc-secrets"
-                    value={formData.secrets}
-                    onChange={(value) => handleFormChange('secrets', value)}
-                    placeholder="Hidden truths about this NPC…"
-                    label="Secrets"
-                  />
-                  <PreviewToggle
-                    id="npc-notes"
-                    value={formData.notes}
-                    onChange={(value) => handleFormChange('notes', value)}
-                    placeholder="Additional notes…"
-                    label="Notes"
-                  />
+                <PreviewToggle
+                  id="npc-appearance"
+                  value={formData.appearance}
+                  onChange={(value) => handleFormChange('appearance', value)}
+                  placeholder="Physical description…"
+                  label="Appearance"
+                />
+                <PreviewToggle
+                  id="npc-personality"
+                  value={formData.personality}
+                  onChange={(value) => handleFormChange('personality', value)}
+                  placeholder="Personality traits, ideals, bonds, flaws…"
+                  label="Personality"
+                />
+                <PreviewToggle
+                  id="npc-goals"
+                  value={formData.goals}
+                  onChange={(value) => handleFormChange('goals', value)}
+                  placeholder="What does this NPC want?"
+                  label="Goals"
+                />
+                <PreviewToggle
+                  id="npc-secrets"
+                  value={formData.secrets}
+                  onChange={(value) => handleFormChange('secrets', value)}
+                  placeholder="Hidden truths about this NPC…"
+                  label="Secrets"
+                />
+                <PreviewToggle
+                  id="npc-notes"
+                  value={formData.notes}
+                  onChange={(value) => handleFormChange('notes', value)}
+                  placeholder="Additional notes…"
+                  label="Notes"
+                />
 
-                  <label htmlFor="npc-tags" className="ct-label">Tags (comma separated)</label>
-                  <input
-                    id="npc-tags"
-                    type="text"
-                    className="ct-input"
-                    value={formData.tags}
-                    onChange={(e) => handleFormChange('tags', e.target.value)}
-                    placeholder="e.g., ally, enemy, quest-giver"
-                  />
-                </>
-              )}
+                <label htmlFor="npc-tags" className="ct-label">Tags (comma separated)</label>
+                <input
+                  id="npc-tags"
+                  type="text"
+                  className="ct-input"
+                  value={formData.tags}
+                  onChange={(e) => handleFormChange('tags', e.target.value)}
+                  placeholder="e.g., ally, enemy, quest-giver"
+                />
+              </div>
 
-              {activeTab === 'stats' && (
-                <div className="npcs-stats-tab">
+              <div className={`npcs-stats-tab${activeTab !== 'stats' ? ' npcs-tab-hidden' : ''}`.trim()}>
                   <h4 className="npcs-section-title">Combat Stats</h4>
                   <div className="npcs-stats-grid">
                     <div className="npcs-stat-field">
@@ -785,10 +782,9 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
                     rows={3}
                   />
                 </div>
-              )}
             </div>
 
-            <div className="ct-modal-footer">
+            <div className="ct-modal-footer no-print">
               <div className="ct-modal-actions">
                 {editingNPC && (
                   <button

@@ -182,8 +182,8 @@ function Quests({ campaignName, isLocalhost, onBack }) {
         <div className="ct-modal-overlay" onClick={(e) => {
           if (e.target === e.currentTarget) handleCloseModal();
         }}>
-          <div className="ct-modal">
-            <div className="ct-modal-header">
+          <div className="ct-modal quests-modal">
+            <div className="ct-modal-header no-print">
               <h3>{editingQuest ? 'Edit Quest' : 'New Quest'}</h3>
               <button
                 className="ct-modal-close"
@@ -247,7 +247,7 @@ function Quests({ campaignName, isLocalhost, onBack }) {
               />
             </div>
 
-            <div className="ct-modal-footer">
+            <div className="ct-modal-footer no-print">
               <div className="ct-modal-actions">
                 {editingQuest && (
                   <button
