@@ -1,5 +1,5 @@
 // Helper to sanitize map names to filenames (mirrors server route)
-export const toKebabCase = (name) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+export const toKebabCase = (name) => name.toLowerCase().replace(/\.json$/i, '').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 const sanitizeMapName = (name) => toKebabCase(name) + '.json';
 
 export const loadMaps = async (campaignName) => {
@@ -50,7 +50,7 @@ export const createMap = async (campaignName, mapName, options = {}) => {
 export const deleteMap = async (campaignName, mapName) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
-    const encodedMapName = encodeURIComponent(mapName);
+    const encodedMapName = encodeURIComponent(toKebabCase(mapName));
     const response = await fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}`, {
       method: 'DELETE',
     });
@@ -68,7 +68,7 @@ export const deleteMap = async (campaignName, mapName) => {
 export const renameMap = async (campaignName, oldMapName, newName) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
-    const encodedMapName = encodeURIComponent(oldMapName);
+    const encodedMapName = encodeURIComponent(toKebabCase(oldMapName));
     const response = await fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}/rename`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -88,7 +88,7 @@ export const renameMap = async (campaignName, oldMapName, newName) => {
 export const activateMap = async (campaignName, mapName) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
-    const encodedMapName = encodeURIComponent(mapName);
+    const encodedMapName = encodeURIComponent(toKebabCase(mapName));
     const response = await fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}/activate`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -107,7 +107,7 @@ export const activateMap = async (campaignName, mapName) => {
 export const saveMapData = async (campaignName, mapName, data) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
-    const encodedMapName = encodeURIComponent(mapName);
+    const encodedMapName = encodeURIComponent(toKebabCase(mapName));
     const response = await fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -127,7 +127,7 @@ export const saveMapData = async (campaignName, mapName, data) => {
 export const loadMapData = async (campaignName, mapName) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
-    const encodedMapName = encodeURIComponent(mapName);
+    const encodedMapName = encodeURIComponent(toKebabCase(mapName));
     const response = await fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
@@ -146,7 +146,7 @@ export const loadMapData = async (campaignName, mapName) => {
 export const updateMapDescription = async (campaignName, mapName, description) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
-    const encodedMapName = encodeURIComponent(mapName);
+    const encodedMapName = encodeURIComponent(toKebabCase(mapName));
     const response = await fetch(`/api/campaigns/${encodedCampaign}/maps/${encodedMapName}/description`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

@@ -51,6 +51,12 @@ export default function useTravelManagement({
   const [dailyBudget, setDailyBudget] = useState(typeof _init.dailyBudget === 'number' ? _init.dailyBudget : () => getDailyHexBudget('normal'));
   const [dayExhausted, setDayExhausted] = useState(!!_init.dayExhausted);
   const [forcedMarchHours, setForcedMarchHours] = useState(typeof _init.forcedMarchHours === 'number' ? _init.forcedMarchHours : 0);
+  const [travelLog, setTravelLog] = useState([]);
+  const [lastMessage, setLastMessage] = useState(null);
+  const [pendingEvent, setPendingEvent] = useState(null);
+  const [eventFrequency, setEventFrequency] = useState('normal');
+  const [rerollsRemaining, setRerollsRemaining] = useState(3);
+  const [horseback, setHorseback] = useState(false);
 
   const pathRef = useRef([]);
   const pathIndexRef = useRef(0);

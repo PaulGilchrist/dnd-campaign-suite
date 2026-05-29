@@ -1920,5 +1920,6 @@
     "budgetMod": 1,
     "encounterMod": -10,
     "description": "Thick fog — visibility limited to adjacent hexes"
-  }
+  },
+  "travelState": null
 }

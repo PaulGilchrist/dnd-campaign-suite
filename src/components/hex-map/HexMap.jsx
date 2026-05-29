@@ -65,6 +65,9 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         [characters]
     );
 
+    const { addEntry } = useLog(campaignName);
+
+    const travelStateRef = useRef(null);
     const setTravelStateRef = useCallback((ts) => {
         travelStateRef.current = ts;
         setTravelSaveVersion(prev => prev + 1);
@@ -165,7 +168,6 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const panXValueRef = useRef(0);
     const panYValueRef = useRef(0);
     const accumulatedDeltaRef = useRef(0);
-    const travelStateRef = useRef(null);
     const isInitialized = useRef(false);
     const hasLoaded = useRef(false);
     const needsResetViewRef = useRef(false);
