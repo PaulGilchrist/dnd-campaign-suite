@@ -1,10 +1,13 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 const SSE_EVENT_KEY_PREFIX = 'spell-overlay-';
+const UPDATE_DEBOUNCE_MS = 150;
 
 function useSpellOverlay(campaignName) {
     const [overlays, setOverlays] = useState([]);
     const [pendingOverlay, setPendingOverlay] = useState(null);
+    const debounceTimerRef = useRef(null);
+    const pendingRef = useRef(null);
 
     const sendAction = useCallback(async (action, data = {}) => {
         try {
@@ -25,6 +28,22 @@ function useSpellOverlay(campaignName) {
 
     const updateOverlay = useCallback((overlay) => {
         setOverlays(prev => prev.map(o => o.id === overlay.id ? overlay : o));
+        pendingRef.current = overlay;
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = setTimeout(() => {
+            if (pendingRef.current) {
+                sendAction('update', { overlays: [pendingRef.current] });
+            }
+        }, UPDATE_DEBOUNCE_MS);
+    }, [sendAction]);
+
+    const updateOverlayImmediate = useCallback((overlay) => {
+        setOverlays(prev => prev.map(o => o.id === overlay.id ? overlay : o));
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+            debounceTimerRef.current = null;
+        }
+        pendingRef.current = null;
         sendAction('update', { overlays: [overlay] });
     }, [sendAction]);
 
@@ -80,6 +99,7 @@ function useSpellOverlay(campaignName) {
         setPendingOverlay,
         addOverlay,
         updateOverlay,
+        updateOverlayImmediate,
         removeOverlay,
         clearOverlays,
         handleSSEEvent,

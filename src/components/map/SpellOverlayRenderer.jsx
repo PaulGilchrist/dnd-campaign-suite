@@ -1,28 +1,43 @@
-import { OverlayShape, toGrid } from '../../models/SpellOverlay.js';
+import { OverlayShape, toGrid, svgOrigin } from '../../models/SpellOverlay.js';
 
 const CELL_SIZE = 40;
 
+const HANDLE_RADIUS = 6;
+
+const DragHandle = ({ cx, cy, cursor = 'grab' }) => (
+    <circle
+        cx={cx}
+        cy={cy}
+        r={HANDLE_RADIUS}
+        fill="rgba(255,255,255,0.7)"
+        stroke="#333"
+        strokeWidth={1.5}
+        style={{ cursor }}
+        className="spell-overlay-handle"
+    />
+);
+
 const renderRadius = (overlay) => {
     const r = toGrid(overlay.radiusFt) * CELL_SIZE;
-    const cx = overlay.startGridX * CELL_SIZE + CELL_SIZE / 2;
-    const cy = overlay.startGridY * CELL_SIZE + CELL_SIZE / 2;
+    const { x: cx, y: cy } = svgOrigin(overlay);
     return (
-        <circle
-            key={overlay.id}
-            cx={cx}
-            cy={cy}
-            r={r}
-            fill={overlay.color}
-            stroke={overlay.color.replace('0.35', '0.8')}
-            strokeWidth={2}
-            className="spell-overlay"
-        />
+        <g key={overlay.id} className="spell-overlay-group">
+            <circle
+                cx={cx}
+                cy={cy}
+                r={r}
+                fill={overlay.color}
+                stroke={overlay.color.replace('0.35', '0.8')}
+                strokeWidth={2}
+                className="spell-overlay"
+            />
+            <DragHandle cx={cx} cy={cy} cursor="move" />
+        </g>
     );
 };
 
 const renderCone = (overlay) => {
-    const startX = overlay.startGridX * CELL_SIZE + CELL_SIZE / 2;
-    const startY = overlay.startGridY * CELL_SIZE + CELL_SIZE / 2;
+    const { x: startX, y: startY } = svgOrigin(overlay);
     const dist = toGrid(overlay.distanceFt) * CELL_SIZE;
     const halfSpread = (overlay.coneAngle / 2) * (Math.PI / 180);
     const angleRad = overlay.angle * (Math.PI / 180);
@@ -36,35 +51,43 @@ const renderCone = (overlay) => {
     const d = `M ${startX},${startY} L ${x1},${y1} A ${dist},${dist} 0 ${largeArc},1 ${x2},${y2} Z`;
 
     return (
-        <path
-            key={overlay.id}
-            d={d}
-            fill={overlay.color}
-            stroke={overlay.color.replace('0.35', '0.8')}
-            strokeWidth={2}
-            className="spell-overlay"
-        />
-    );
-};
-
-const renderLine = (overlay) => {
-    const startX = overlay.startGridX * CELL_SIZE + CELL_SIZE / 2;
-    const startY = overlay.startGridY * CELL_SIZE + CELL_SIZE / 2;
-    const dist = toGrid(overlay.distanceFt) * CELL_SIZE;
-    const w = toGrid(overlay.widthFt) * CELL_SIZE;
-
-    return (
-        <g key={overlay.id} transform={`rotate(${overlay.angle}, ${startX}, ${startY})`}>
-            <rect
-                x={startX}
-                y={startY - w / 2}
-                width={dist}
-                height={w}
+        <g key={overlay.id} className="spell-overlay-group">
+            <path
+                d={d}
                 fill={overlay.color}
                 stroke={overlay.color.replace('0.35', '0.8')}
                 strokeWidth={2}
                 className="spell-overlay"
             />
+            <DragHandle cx={startX} cy={startY} cursor="move" />
+            <DragHandle cx={x2} cy={y2} cursor="grab" />
+        </g>
+    );
+};
+
+const renderLine = (overlay) => {
+    const { x: startX, y: startY } = svgOrigin(overlay);
+    const dist = toGrid(overlay.distanceFt) * CELL_SIZE;
+    const w = toGrid(overlay.widthFt) * CELL_SIZE;
+    const endX = startX + dist * Math.cos(overlay.angle * (Math.PI / 180));
+    const endY = startY + dist * Math.sin(overlay.angle * (Math.PI / 180));
+
+    return (
+        <g key={overlay.id} className="spell-overlay-group">
+            <g transform={`rotate(${overlay.angle}, ${startX}, ${startY})`}>
+                <rect
+                    x={startX}
+                    y={startY - w / 2}
+                    width={dist}
+                    height={w}
+                    fill={overlay.color}
+                    stroke={overlay.color.replace('0.35', '0.8')}
+                    strokeWidth={2}
+                    className="spell-overlay"
+                />
+            </g>
+            <DragHandle cx={startX} cy={startY} cursor="move" />
+            <DragHandle cx={endX} cy={endY} cursor="grab" />
         </g>
     );
 };
@@ -84,7 +107,7 @@ const SpellOverlayRenderer = ({ overlays = [], pendingOverlay = null }) => {
     };
 
     return (
-        <g className="spell-overlay-group">
+        <g className="spell-overlay-layer">
             {overlays.map(renderOverlay)}
             {pendingOverlay && renderOverlay(pendingOverlay)}
         </g>

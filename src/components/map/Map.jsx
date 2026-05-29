@@ -44,7 +44,7 @@ import useSSESync from './hooks/useSSESync';
 import useFogOfWar from './hooks/useFogOfWar';
 import useSpellOverlay from './hooks/useSpellOverlay';
 import SpellOverlayRenderer from './SpellOverlayRenderer.jsx';
-import { OverlayShape, DEFAULTS, createOverlay } from '../../models/SpellOverlay.js';
+import { OverlayShape, DEFAULTS, createOverlay, hitTestOverlay, svgOrigin } from '../../models/SpellOverlay.js';
 import HexMap from '../hex-map/HexMap';
 import '../hex-map/HexMap.css';
 
@@ -91,9 +91,15 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const [selectedShape, setSelectedShape] = useState(OverlayShape.RADIUS);
     const [shapeParams, setShapeParams] = useState(DEFAULTS.radius);
     const [spellDraft, setSpellDraft] = useState(null); // { startGridX, startGridY, startScreenX, startScreenY, angle? }
+    // Overlay drag/rotate state
+    const [dragOverlay, setDragOverlay] = useState(null); // { overlayId, startGridX, startGridY, offsetGridX, offsetGridY } | null
+    const [rotateOverlay, setRotateOverlay] = useState(null); // { overlayId, originX, originY, startAngle, startScreenAngle } | null
+    const spellDragActiveRef = useRef(false);
     const {
         overlays,
         addOverlay,
+        updateOverlay,
+        updateOverlayImmediate,
         removeOverlay,
         clearOverlays,
         handleSSEEvent: handleSpellOverlayEvent,
@@ -195,6 +201,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
     // Handle grid pointer down (paint/erase mode)
     const handleGridPointerDown = useCallback((e) => {
+        if (spellDragActiveRef.current) return;
         if (!isLocalhost) return;
         if (tool === 'none') return;
         e.preventDefault();
@@ -261,25 +268,69 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     }, []);
 
     const handleSpellPointerDown = useCallback((e) => {
-        if (!spellMode) return;
         const grid = getGridFromEvent(e);
         if (!grid) return;
-        e.preventDefault();
 
-        if (spellMode === 'radius') {
-            const overlay = createOverlay(OverlayShape.RADIUS, grid.gridX, grid.gridY);
-            addOverlay(overlay);
-            setSpellMode(null);
-        } else {
-            setSpellDraft({
-                startGridX: grid.gridX,
-                startGridY: grid.gridY,
-                startScreenX: e.clientX,
-                startScreenY: e.clientY,
-                angle: 0,
-            });
+        if (spellMode) {
+            e.preventDefault();
+            if (spellMode === 'radius') {
+                const overlay = createOverlay(OverlayShape.RADIUS, grid.gridX, grid.gridY);
+                addOverlay(overlay);
+                setSpellMode(null);
+            } else {
+                setSpellDraft({
+                    startGridX: grid.gridX,
+                    startGridY: grid.gridY,
+                    startScreenX: e.clientX,
+                    startScreenY: e.clientY,
+                    angle: 0,
+                });
+            }
+            return;
         }
-    }, [spellMode, getGridFromEvent, addOverlay]);
+
+        for (let i = overlays.length - 1; i >= 0; i--) {
+            const overlay = overlays[i];
+            if (hitTestOverlay(overlay, grid.gridX, grid.gridY)) {
+                if (e.button !== 0) return;
+                e.preventDefault();
+                e.stopPropagation();
+                const origin = svgOrigin(overlay);
+                const screenPt = clientToSVG(e.clientX, e.clientY);
+                if (!screenPt) return;
+                const dx = screenPt.x - origin.x;
+                const dy = screenPt.y - origin.y;
+                const distFromOrigin = Math.sqrt(dx * dx + dy * dy);
+                const isAtOrigin = grid.gridX === overlay.startGridX && grid.gridY === overlay.startGridY;
+                const EDGE_FRACTION = 0.25;
+                const overlayDist = (overlay.distanceFt / 5) * 40;
+                const isNearEdge = !isAtOrigin && overlay.shape !== OverlayShape.RADIUS && distFromOrigin > overlayDist * EDGE_FRACTION;
+                if (isNearEdge && (overlay.shape === OverlayShape.CONE || overlay.shape === OverlayShape.LINE)) {
+                    const initialAngle = computeAngle(origin.x, origin.y, screenPt.x, screenPt.y);
+                    spellDragActiveRef.current = true;
+                    const svg = svgRef.current;
+                    if (svg) svg.setPointerCapture(e.pointerId);
+                    setRotateOverlay({
+                        overlayId: overlay.id,
+                        originX: origin.x,
+                        originY: origin.y,
+                        startAngle: overlay.angle,
+                        offsetAngle: initialAngle - overlay.angle,
+                    });
+                } else {
+                    spellDragActiveRef.current = true;
+                    const svg = svgRef.current;
+                    if (svg) svg.setPointerCapture(e.pointerId);
+                    setDragOverlay({
+                        overlayId: overlay.id,
+                        offsetX: grid.gridX - overlay.startGridX,
+                        offsetY: grid.gridY - overlay.startGridY,
+                    });
+                }
+                return;
+            }
+        }
+    }, [spellMode, overlays, getGridFromEvent, clientToSVG, computeAngle, addOverlay]);
 
     const handleSpellPointerMove = useCallback((e) => {
         if (!spellDraft) return;
@@ -298,6 +349,65 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         setSpellMode(null);
     }, [spellDraft, spellMode, computeAngle, addOverlay]);
 
+    const handleSpellDragMove = useCallback((e) => {
+        if (dragOverlay) {
+            e.preventDefault();
+            const grid = getGridFromEvent(e);
+            if (!grid) return;
+            const overlay = overlays.find(o => o.id === dragOverlay.overlayId);
+            if (!overlay) return;
+            const newPos = {
+                ...overlay,
+                startGridX: grid.gridX - dragOverlay.offsetX,
+                startGridY: grid.gridY - dragOverlay.offsetY,
+            };
+            updateOverlay(newPos);
+        } else if (rotateOverlay) {
+            e.preventDefault();
+            const overlay = overlays.find(o => o.id === rotateOverlay.overlayId);
+            if (!overlay) return;
+            const origin = svgOrigin(overlay);
+            const screenPt = clientToSVG(e.clientX, e.clientY);
+            if (!screenPt) return;
+            let newAngle = computeAngle(origin.x, origin.y, screenPt.x, screenPt.y) - rotateOverlay.offsetAngle;
+            if (newAngle < 0) newAngle += 360;
+            updateOverlay({ ...overlay, angle: newAngle });
+        }
+    }, [dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, computeAngle, updateOverlay]);
+
+    const handleSpellDragEnd = useCallback((e) => {
+        if (dragOverlay) {
+            const grid = getGridFromEvent(e);
+            if (grid) {
+                const overlay = overlays.find(o => o.id === dragOverlay.overlayId);
+                if (overlay) {
+                    const finalPos = {
+                        ...overlay,
+                        startGridX: grid.gridX - dragOverlay.offsetX,
+                        startGridY: grid.gridY - dragOverlay.offsetY,
+                    };
+                    updateOverlayImmediate(finalPos);
+                }
+            }
+            setDragOverlay(null);
+        } else if (rotateOverlay) {
+            const overlay = overlays.find(o => o.id === rotateOverlay.overlayId);
+            if (overlay) {
+                const origin = svgOrigin(overlay);
+                const screenPt = clientToSVG(e.clientX, e.clientY);
+                if (screenPt) {
+                    let newAngle = computeAngle(origin.x, origin.y, screenPt.x, screenPt.y) - rotateOverlay.offsetAngle;
+                    if (newAngle < 0) newAngle += 360;
+                    updateOverlayImmediate({ ...overlay, angle: newAngle });
+                }
+            }
+            setRotateOverlay(null);
+        }
+        spellDragActiveRef.current = false;
+        const svg = svgRef.current;
+        if (svg) svg.releasePointerCapture(e.pointerId);
+    }, [dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, computeAngle, updateOverlayImmediate]);
+
     const cancelSpellMode = useCallback(() => {
         setSpellMode(null);
         setSpellDraft(null);
@@ -305,6 +415,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
     // Select/move handlers
     const handleSelectPointerDown = useCallback((e) => {
+        if (spellDragActiveRef.current) return;
         if (!isLocalhost || tool !== 'select') return;
         e.preventDefault();
         const svg = svgRef.current;
@@ -471,6 +582,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     }, [isLocalhost]);
 
     const handlePanStart = useCallback((e) => {
+        if (spellDragActiveRef.current) return;
         if (tool === 'paint' || tool === 'erase') {
             handleGridPointerDown(e);
             return;
@@ -806,9 +918,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 ref={svgRef}
                 viewBox={`${panX} ${panY} ${SVG_SIZE / zoom} ${SVG_SIZE / zoom}`}
                 className="grid-svg"
-                onPointerDown={(e) => { handlePanStart(e); handleSpellPointerDown(e); }}
-                onPointerMove={(e) => { handlePointerMove(e); handleItemPointerMove(e); handleGridPointerMove(e); handleSelectPointerMove(e); handlePanMove(e); handleSpellPointerMove(e); }}
-                onPointerUp={(e) => { handlePointerUp(e); handleItemPointerUpHook(e); handleGridPointerUp(e); handleSelectPointerUp(e); handlePanEnd(e); handleSpellPointerUp(e); }}
+                onPointerDown={(e) => { handleSpellPointerDown(e); handlePanStart(e); }}
+                onPointerMove={(e) => { handlePointerMove(e); handleItemPointerMove(e); handleGridPointerMove(e); handleSelectPointerMove(e); handlePanMove(e); handleSpellPointerMove(e); handleSpellDragMove(e); }}
+                onPointerUp={(e) => { handlePointerUp(e); handleItemPointerUpHook(e); handleGridPointerUp(e); handleSelectPointerUp(e); handlePanEnd(e); handleSpellPointerUp(e); handleSpellDragEnd(e); }}
                 onPointerLeave={(e) => { handleItemPointerLeave(); handleGridPointerLeave(e); handleSelectPointerUp(e); }}
                 onWheel={handleWheel}
                 onContextMenu={(e) => e.preventDefault()}

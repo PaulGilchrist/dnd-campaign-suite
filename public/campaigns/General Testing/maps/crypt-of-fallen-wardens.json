@@ -306,8 +306,8 @@
     },
     {
       "id": "torch-1-7-4",
-      "gridX": 7,
-      "gridY": 4,
+      "gridX": 9,
+      "gridY": 6,
       "type": "torch",
       "visible": true,
       "rotation": 0
@@ -338,8 +338,8 @@
     },
     {
       "id": "torch-3-17-9",
-      "gridX": 17,
-      "gridY": 9,
+      "gridX": 7,
+      "gridY": 8,
       "type": "torch",
       "visible": true,
       "rotation": 180
@@ -400,8 +400,8 @@
     },
     {
       "id": "door-4",
-      "gridX": 16,
-      "gridY": 7,
+      "gridX": 9,
+      "gridY": 16,
       "type": "door",
       "visible": true,
       "rotation": 90

@@ -872,8 +872,12 @@
     color: #666;
 }
 
-.spell-overlay-group {
+.spell-overlay-group .spell-overlay {
     pointer-events: none;
+}
+
+.spell-overlay-handle {
+    pointer-events: all;
 }
 
 
