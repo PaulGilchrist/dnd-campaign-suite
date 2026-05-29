@@ -1,0 +1,84 @@
+[
+    {
+        "index": "blinded",
+        "name": "Blinded",
+        "desc": "While you have the Blinded condition, you experience the following effects.<br/><ul><br/><li><b>Can't See:</b> You can't see and automatically fail any ability check that requires sight.</li><li><b>Attacks Affected:</b> Attack rolls against you have Advantage, and your attack rolls have Disadvantage.</li></ul>"
+    },
+    {
+        "index": "charmed",
+        "name": "Charmed",
+        "desc": "While you have the Charmed condition, you experience the following effects.<br/><br/><ul><li><b>Can't Harm the Charmer:</b> You can't attack the charmer or target the charmer with damaging abilities or magical effects.</li><li><b>Social Advantage:</b> The charmer has Advantage on any ability check to interact with you socially.</li></ul>"
+    },
+    {
+        "index": "deafened",
+        "name": "Deafened",
+        "desc": "While you have the Deafened condition, your experience the following effect.<br/><br/><ul><li><b>Can't Hear:</b> You can't hear and automatically fail any ability check that requires hearing.</li></ul>"
+    },
+    {
+        "index": "exhaustion",
+        "name": "Exhaustion",
+        "desc": "Some special abilities and environmental hazards, such as starvation and the long-term effects of freezing or scorching temperatures, can lead to a special condition called exhaustion. Exhaustion is measured in six levels. An effect can give a creature one or more levels of exhaustion, as specified in the effect's description.<br/><br/><ol><li>Disadvantage on ability checks</li><li>Speed halved</li><li>Disadvantage on attack rolls and saving throws</li><li>Hit point maximum halved</li><li>Speed reduced to 0</li><li>Death</li></ol><ul><li>If an already exhausted creature suffers another effect that causes exhaustion, its current level of exhaustion increases by the amount specified in the effect's description.</li><li>A creature suffers the effect of its current level of exhaustion as well as all lower levels. For example, a creature suffering level 2 exhaustion has its speed halved and has disadvantage on ability checks.</li><li>An effect that removes exhaustion reduces its level as specified in the effect's description, with all exhaustion effects ending if a creature's exhaustion level is reduced below 1.</li><li>Finishing a long rest reduces a creature's exhaustion level by 1, provided that the creature has also ingested some food and drink.</li></ul>",
+        "rules": "5e"
+    },
+    {
+        "index": "exhaustion",
+        "name": "Exhaustion",
+        "desc": "While you have the Exhaustion condition vou experience the following effects.<br/><br/><ul><li><b>Exhaistion Levels:</b> This condition is cumulative.  Each time you receive it, you gain 1 Exhaustion level. You die if your Exhaustion level is 6.</li><li><b>D20 Tests Affected:</b> When you make a D20 Test, the roll is reduced by 2 times your Exhaustion level.</li><li><b>Speed Reduced:</b> Your Speed is reduced by a number of feet equal to 5 times your· Exhaustion level.</li><li><b>Removing Exhaustion Levels:</b> Finishing a Long Rest removes 1 of your Exhaustion levels. When your Exhaustion level reaches 0, the condition ends.</li></ul>",
+        "rules": "2024"
+    },
+    {
+        "index": "frightened",
+        "name": "Frightened",
+        "desc": "While you have the Frightened condition, you experience the following effects.<br/><br/><ul><li><b>Ability Checks and Attacks Affected:</b> You have Disadvantage on ability checks and attack rolls while the source of fear is within line of sight.</li><li><b>Can't Approach:</b> You can't willingly move closer to the source of fear.</li></ul>"
+    },
+    {
+        "index": "grappled",
+        "name": "Grappled",
+        "desc": "While you have the Grappled condition, you experience the following effects.<br/><br/><ul><li><b>Speed 0:</b> Your Speed is O and can't increase.</li><li><b>Attacks Affected:</b> You have Disadvantage on attack rolls against any target other than the grappler.</li><li><b>Movable:</b> The grappler can drag or carry you when it moves, but every foot of movement costs it 1 extra foot unless you a1·e Tiny or two or more sizes smaller than it.</li></ul><br/>A creature can grapple another creature. Characters typically grapple by using an Unarmed Strike. Many monsters have special attacks that allow them to quickly grapple prey. However a grapple is initiated, it follows these rules. See also 'Unarmed Strike' and 'Grappled'.<br/><br/><h5>Grappling</h5><ul><li><b>Grappled Condition.</b> Successfully grappling a creature gives it the Grappled condition.</li><li><b>One Grapple per Hand.</b>  A creature must have a hand free to grapple another creature. Some stat blocks and game effects allow a creature to grapple using a tentacle, a maw, or another body part. Whatever part a grappler uses, it can grapple only one creature at a time with that part, and the grappler can't use that part to target another creature unless it ends the grapple.</li><li><b>Escaping a Grapple.</b> A Grappled creature can use its action to make a Strength (Athletics) or Dexterity (Acrobatics) check against the grapple's escape DC, ending the condition on itself on a success. The condition also ends if the grappler has the Incapacitated condition or if the distance between the Grappled target and the grappler exceeds the grapple's range.</li></ul>"
+    },
+    {
+        "index": "incapacitated",
+        "name": "Incapacitated",
+        "desc": "While you have the Incapacitated condition, you experience the following effects.<br/><br/><ul><li><b>Inactive:</b> You can't take any action, Bonus Action, or Reaction.</li><li><b>No Concentration:</b> Your Concentration is broken.</li><li><b>Speechless:</b> You can't speak:</b>Surprised:</b> If you're Incapacitated when you roll Initiative, you have Disadvantage on the roll.</li></ul>"
+    },
+    {
+        "index": "invisible",
+        "name": "Invisible",
+        "desc": "While you have the Invisible condition, you experience the following effects.<br/><br/><ul><li><b>Surprise:</b> If you're lnvisible when you roll Initiative, you have Advantage on the roll.</li><li><b>Concealed:</b> You aren't affected by any effect that requires its target to be seen unless the effect's creator can somehow see you. Any equipment you are wearing or carrying is also concealed.</li><li><b>Attacks Affected:</b> Attack rolls against you have Disadvantage, and your attack rolls have Advantage. If a creature can somehow see you, you don't gain this benefit against that creature.</li></ul>"
+    },
+    {
+        "index": "paralyzed",
+        "name": "Paralyzed",
+        "desc": "While you have the Paralyzed condition you experience the following effects.<br/><br/><ul><li><b>Incapacitated:</b> You have the Incapacitated condition.</li><li><b>Speed 0:</b> Your Speed is O and can't increase.</li><li><b>Saving Throws Affected:</b> You automatically fail Strength and Dexterity saving throws.</li><li><b>Attacks Affected:</b> Attack rolls against you have Advantage.</li><li><b>Automatic Critical Hits:</b> Any attack roll that hits you is a Critical Hit if the attacker is within 5 feet of you.</li></ul>"
+    },
+    {
+        "index": "petrified",
+        "name": "Petrified",
+        "desc": "While you have the Petrified condition, you experience the following effects.<br/><br/><ul><li><b>Turned to Inanimate Substance:</b> You are transformed, along with any nonmagical objects you are wearing and carrying, into a solid inanimate substance (usually stone). Your weight increases by a factor of ten, and you cease aging.</li><li><b>Incapacitated:</b> You have the Incapacitated condition.</li><li><b>Speed 0:</b> Your Speed is O and can't increase.</li><li><b>Attacks Affected:</b> Attack rolls against you have Advantage.</li><li><b>Saving Throws Affected:</b> You automatically fail Strength and Dexterity saving throws.</li><li><b>Resist Damage:</b> You have Resistance to all damage.</li><li><b>Poison Immunity:</b> You have Immunity to the Poisoned condition.</li></ul>"
+    },
+    {
+        "index": "poisoned",
+        "name": "Poisoned",
+        "desc": "While you have the Poisoned condition, you experience the following effect.<br/><br/><ul><li><b>Ability Checks and Attacks Affected:</b> You have Disadvantage on attack rolls and ability checks.</li></ul>"
+    },
+    {
+        "index": "prone",
+        "name": "Prone",
+        "desc": "While you have the Prone condition, you experience the following effects.<br/><br/><ul><li><b>Restricted Movement:</b> Your only movement options are to crawl or to spend an amount of movement equal to half your Speed (round down) to right yourself and thereby end the condition. If your Speed is 0, you can't right yourself.</li><li><b>Attacks Affected:</b> You have Disadvantage on attack rolls. An attack roll against you has Advantage if the attacker is within 5 feet of you. Otherwise, that attack roll has Disadvantage.</li></ul>"
+    },
+    {
+        "index": "restrained",
+        "name": "Restrained",
+        "desc": "While you have the Restrained condition, you experience the following effects.<br/><br/><ul><li><b>Speed 0:</b> Your Speed is O and can't increase.</li><li><b>Attacks Affected:</b> Attack rolls against you have Advantage, and your attack rolls have Disadvantage.</li><li><b>Saving Throws Affected:</b> You have Disadvantage on Dexterity saving throws.</li></ul>"
+    },
+    {
+        "index": "stunned",
+        "name": "Stunned",
+        "desc": "While you have the Stunned condition, you experience the following effects.<br/><br/><ul><li><b>Incapacitated:</b> You have the Incapacitated condition.</li><li><b>Saving Throws Affected:</b> You automatically fail Strength and Dexterity saving throws.</li><li><b>Attacks Affected:</b> Attack rolls against you have Advantage.</li></ul>"
+    },
+    {
+        "index": "unconscious",
+        "name": "Unconscious",
+        "desc": "While you have the Unconscious condition, you experience the following effects.<br/><br/><ul><li><b>Inert:</b> You have the Incapacitated and Prone conditions, and you drop whatever· you're holding. When this condition ends, you remain Prone.</li><li><b>Speed 0:</b> Your Speed is O and can't increase.</li><li><b>Attacks Affected:</b> Attack rolls against you have Advantage.</li><li><b>Saving Throws Affected:</b> You automatically fail Strength and Dexterity saving throws.</li><li><b>Automatic Critical Hits:</b> Any attack roll that hits you is a Critical Hit if the attacker is within 5 feet of you.</li><li><b>Unaware:</b> You're unaware of your surroundings.</li></ul>"
+    }
+]

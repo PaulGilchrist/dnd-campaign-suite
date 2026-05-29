@@ -1,0 +1,75 @@
+{
+  "name": "Temp 1",
+  "level": 1,
+  "alignment": "True Neutral",
+  "abilities": [
+    {
+      "name": "Strength",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Dexterity",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Constitution",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Intelligence",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Wisdom",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    },
+    {
+      "name": "Charisma",
+      "baseScore": 8,
+      "abilityImprovements": 0,
+      "miscBonus": 0
+    }
+  ],
+  "background": "Acolyte",
+  "class": {
+    "name": "Fighter",
+    "subclass": {
+      "name": "Champion",
+      "type": ""
+    }
+  },
+  "expertSkills": [],
+  "feats": [],
+  "fightingStyles": [],
+  "race": {
+    "name": "Human",
+    "subrace": {
+      "name": ""
+    }
+  },
+  "immunities": [],
+  "inventory": {
+    "backpack": [],
+    "equipped": [],
+    "gold": 10,
+    "magicItems": []
+  },
+  "languages": [],
+  "resistances": [],
+  "skillProficiencies": [],
+  "specialActions": [],
+  "spells": [],
+  "rules": "2024",
+  "xp": 0,
+  "xpMode": "milestone"
+}

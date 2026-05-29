@@ -97,16 +97,33 @@ export const publish = (key, data) => {
 }
 
 /**
- * Self health-check via HTTP GET to /health, runs every 60s
+ * Removes change-data entries for a character that was deleted or renamed.
+ * Keeps reserved keys intact (combatSummary, activeCreatureId, log, positioning).
  */
+export const removeChangeDataKey = (campaign, characterName) => {
+    const firstName = characterName.split(/[^a-zA-Z0-9]/)[0] || characterName;
+    if (!characterChangeData.has(campaign)) return;
+
+    const data = characterChangeData.get(campaign);
+    const reservedKeys = ['combatSummary', 'activeCreatureId', 'log', 'positioning'];
+     /* Clean up any entry that matches the old name (case-insensitive) */
+    Object.keys(data).forEach(key => {
+        if (reservedKeys.includes(key)) return;
+        if (key.toLowerCase() === firstName.toLowerCase()) {
+            delete data[key];
+          }
+      });
+    debouncedSave();
+}
+
 export const keepAlive = () => {
     setInterval(() => {
         http.get('http://localhost:' + (process.env.PORT || 80) + '/health', { headers: { 'X-Accel-Buffering': 'no' } }, (res) => {
             if (res.statusCode !== 200) {
                 console.warn(`Keep-alive: server returned status ${res.statusCode}`);
-            }
-        }).on('error', (err) => {
+             }
+         }).on('error', (err) => {
             console.error('Keep-alive health check failed:', err.message);
-        });
-    }, 60 * 1000);
+         });
+     }, 60 * 1000);
 }

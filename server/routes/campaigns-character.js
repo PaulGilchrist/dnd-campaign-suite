@@ -2,7 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { processImageUpload, deleteCharacterImage } from '../utils/imageUtils.js';
-import { publish } from '../utils/changeData.js';
+import { publish, removeChangeDataKey } from '../utils/changeData.js';
 
 const router = express.Router();
 
@@ -43,31 +43,32 @@ router.put('/api/campaigns/:campaign/:file', (req, res, next) => {
     
     try {
         const isRename = character.originalFileName && character.originalFileName !== file;
-        
+        let originalCharacter = null;
+
         if (isRename) {
-            // Renaming: read from the original file path
+             // Renaming: read from the original file path
             const originalFilePath = path.join(campaignDir, character.originalFileName);
             if (!fs.existsSync(originalFilePath)) {
                 return res.status(404).json({ error: 'Character file not found' });
-            }
+              }
 
-            // Read the original character to get the imagePath for image cleanup
-            const originalCharacter = JSON.parse(fs.readFileSync(originalFilePath, 'utf-8'));
+             // Read the original character to get the imagePath for image cleanup
+            originalCharacter = JSON.parse(fs.readFileSync(originalFilePath, 'utf-8'));
             const originalImagePath = originalCharacter.imagePath;
 
-            // Delete the original character file
+             // Delete the original character file
             fs.unlinkSync(originalFilePath);
 
-            // Handle image changes
+             // Handle image changes
             if ((!character.imagePath || character.imagePath === '') && originalImagePath) {
-                // Image was cleared
+                 // Image was cleared
                 deleteCharacterImage(originalImagePath);
                 character.imagePath = '';
-            } else if (character.image && character.imageName) {
-                // New image uploaded
+              } else if (character.image && character.imageName) {
+                 // New image uploaded
                 processImageUpload(campaign, character.name, character, originalImagePath);
-            } else if (originalImagePath) {
-                // Image unchanged but character renamed — rename the image file
+              } else if (originalImagePath) {
+                 // Image unchanged but character renamed — rename the image file
                 const oldImageFullPath = path.join(process.cwd(), 'public', originalImagePath);
                 if (fs.existsSync(oldImageFullPath)) {
                     const ext = path.extname(oldImageFullPath);
@@ -78,33 +79,38 @@ router.put('/api/campaigns/:campaign/:file', (req, res, next) => {
                     if (oldImageFullPath !== newImageFullPath) {
                         fs.renameSync(oldImageFullPath, newImageFullPath);
                         character.imagePath = path.join('campaigns', campaign, 'images', newImageFileName);
-                    }
-                }
-            }
-        } else {
-            // Standard update: verify the file exists at the current path
+                     }
+                 }
+              }
+          } else {
+             // Standard update: verify the file exists at the current path
             if (!fs.existsSync(filePath)) {
                 return res.status(404).json({ error: 'Character file not found' });
-            }
+              }
 
-            // Read the original character to get the imagePath for image cleanup
-            const originalCharacter = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+             // Read the original character to get the imagePath for image cleanup
+            originalCharacter = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
             const originalImagePath = originalCharacter.imagePath;
 
-            // Handle image changes
+             // Handle image changes
             if ((!character.imagePath || character.imagePath === '') && originalImagePath) {
                 deleteCharacterImage(originalImagePath);
                 character.imagePath = '';
-            } else if (character.image && character.imageName) {
-                // New image uploaded
+              } else if (character.image && character.imageName) {
+                 // New image uploaded
                 processImageUpload(campaign, character.name, character, originalImagePath);
-            }
-        }
+              }
+          }
 
-        // Write the updated character data
+            // Write the updated character data
         fs.writeFileSync(filePath, JSON.stringify(character, null, 2));
 
-        // Broadcast character update
+           // Clean up stale change-data for renamed character (uses old name from file)
+        if (isRename && originalCharacter?.name) {
+            removeChangeDataKey(campaign, originalCharacter.name);
+           }
+
+         // Broadcast character update
         publish(`character-${campaign}-${file}`, character);
 
         res.json({ message: 'Character updated successfully' });
@@ -133,12 +139,15 @@ router.delete('/api/campaigns/:campaign/:file', (req, res, next) => {
         // Delete the character file
         fs.unlinkSync(filePath);
 
-        // Delete associated image if it exists
+         // Delete associated image if it exists
         if (imagePath) {
             deleteCharacterImage(imagePath);
-        }
+         }
 
-        // Broadcast character deletion
+          // Remove stale change-data for deleted character
+        removeChangeDataKey(campaign, character.name);
+
+          // Broadcast character deletion
         publish(`character-delete-${campaign}-${file}`, { file });
 
         res.json({ message: 'Character deleted successfully' });
@@ -149,13 +158,14 @@ router.delete('/api/campaigns/:campaign/:file', (req, res, next) => {
 });
 
 // API endpoint to create a new character (generates filename from name)
-router.post('/api/campaigns/character', (req, res) => {
-    const { campaign, character } = req.body;
+router.post('/api/campaigns/:campaign', (req, res) => {
+    const { campaign } = req.params;
+    const { character } = req.body;
     
     if (!campaign || !character) {
         return res.status(400).json({ error: 'Campaign and character data are required' });
-    }
-    
+     }
+     
     const campaignDir = path.join(process.cwd(), 'public', 'campaigns', campaign);
     
     try {
@@ -178,7 +188,7 @@ router.post('/api/campaigns/character', (req, res) => {
         // Broadcast character creation
         publish(`character-create-${campaign}-${fileName}`, character);
         
-        res.status(201).json({ message: 'Character created successfully', fileName });
+        res.status(201).json({ message: 'Character created successfully', character, fileName });
     } catch (error) {
         console.error('Error creating character:', error);
         res.status(500).json({ error: 'Failed to create character' });

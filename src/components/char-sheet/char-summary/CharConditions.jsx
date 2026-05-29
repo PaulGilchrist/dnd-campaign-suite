@@ -35,7 +35,11 @@ export const EXHAUSTION_LEVELS = 6
 function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhaustionChange }) {
   const [activeConditions, setActiveConditions] = React.useState(() =>
     loadConditions(playerStats.name, campaignName)
-  )
+   )
+
+  React.useEffect(() => {
+    setActiveConditions(loadConditions(playerStats.name, campaignName))
+  }, [playerStats.name, campaignName])
 
   const toggle = (key) => {
     setActiveConditions(prev => {
