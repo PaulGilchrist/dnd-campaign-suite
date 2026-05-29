@@ -1,16 +1,21 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   calculatePath,
   getDailyHexBudget,
   getHexMoveCostWithRoad,
   HORSEBACK_SPEED_MULTIPLIER,
   TRAVEL_PACES,
+  EXHAUSTION_SPEED_MULTIPLIER,
+  EXHAUSTION_LEVELS,
+  applyExhaustionSpeedPenaltyToBudget,
+  getExhaustionMultiplierPercent,
 } from '../services/travelService.js';
 import {
   shouldTriggerEvent,
   generateRandomEvent,
 } from '../services/randomEventService.js';
 import { generateEncounterSuggestions } from '../services/encounterGenerator.js';
+import storage from '../services/storage.js';
 
 const MODES = {
   INACTIVE: 'inactive',
@@ -32,22 +37,20 @@ const TERRAIN_TO_ENVIRONMENT = {
 
 export default function useTravelManagement({
   hexCols, hexRows, terrain, partyPosition, onPartyMove, weather,
-  monsters, playerLevels, roads = [],
+  monsters, playerLevels, roads = [], characters = [], campaignName = '',
+  initialTravelState, onTravelStateChange,
 }) {
-  const [travelMode, setTravelMode] = useState(MODES.INACTIVE);
-  const [travelPace, setTravelPace] = useState('normal');
-  const [destination, setDestination] = useState(null);
-  const [path, setPath] = useState([]);
-  const [pathIndex, setPathIndex] = useState(0);
-  const [accruedCost, setAccruedCost] = useState(0);
-  const [dailyBudget, setDailyBudget] = useState(() => getDailyHexBudget('normal'));
-  const [dayExhausted, setDayExhausted] = useState(false);
-  const [travelLog, setTravelLog] = useState([]);
-  const [lastMessage, setLastMessage] = useState(null);
-  const [pendingEvent, setPendingEvent] = useState(null);
-  const [eventFrequency, setEventFrequency] = useState('normal');
-  const [rerollsRemaining, setRerollsRemaining] = useState(3);
-  const [horseback, setHorseback] = useState(false);
+  const _init = initialTravelState || {};
+
+  const [travelMode, setTravelMode] = useState(_init.travelMode || MODES.INACTIVE);
+  const [travelPace, setTravelPace] = useState(_init.travelPace || 'normal');
+  const [destination, setDestination] = useState(_init.destination || null);
+  const [path, setPath] = useState(_init.path || []);
+  const [pathIndex, setPathIndex] = useState(_init.pathIndex || 0);
+  const [accruedCost, setAccruedCost] = useState(typeof _init.accruedCost === 'number' ? _init.accruedCost : 0);
+  const [dailyBudget, setDailyBudget] = useState(typeof _init.dailyBudget === 'number' ? _init.dailyBudget : () => getDailyHexBudget('normal'));
+  const [dayExhausted, setDayExhausted] = useState(!!_init.dayExhausted);
+  const [forcedMarchHours, setForcedMarchHours] = useState(typeof _init.forcedMarchHours === 'number' ? _init.forcedMarchHours : 0);
 
   const pathRef = useRef([]);
   const pathIndexRef = useRef(0);
@@ -61,8 +64,9 @@ export default function useTravelManagement({
   const effectiveBudgetForPace = useCallback((paceId, w) => {
     const base = getDailyHexBudget(paceId);
     const mod = w?.budgetMod ?? 1;
-    return Math.floor(base * mod);
-  }, []);
+    const weatherAdjusted = Math.floor(base * mod);
+    return applyExhaustionSpeedPenaltyToBudget(weatherAdjusted, forcedMarchHours);
+  }, [forcedMarchHours]);
 
   const effectiveHexCost = useCallback((terrainType, q, r, w, hb) => {
     const base = getHexMoveCostWithRoad(terrainType, q, r, roads);
@@ -131,6 +135,7 @@ export default function useTravelManagement({
     setTravelPace(paceId);
     setDailyBudget(effectiveBudgetForPace(paceId, weather));
     setDayExhausted(false);
+    setForcedMarchHours(0);
   }, [effectiveBudgetForPace, weather]);
 
   const advanceOneHex = useCallback(() => {
@@ -191,16 +196,43 @@ export default function useTravelManagement({
     setDailyBudget(effectiveBudgetForPace(travelPace, weather));
     setRerollsRemaining(3);
     setPendingEvent(null);
+    setForcedMarchHours(0);
     if (travelMode === MODES.PAUSED) setTravelMode(MODES.PLANNING);
     setLastMessage('A new day dawns. Travel budget refreshed.');
   }, [travelPace, effectiveBudgetForPace, weather, travelMode]);
 
+  const partyHasMaxExhaustion = useCallback(() => {
+    return characters.some(char => {
+      const name = char.name || char;
+      const level = storage.getProperty(name, 'exhaustionLevel', campaignName);
+      return (typeof level === 'number' ? level : 0) >= EXHAUSTION_LEVELS;
+    });
+  }, [characters, campaignName]);
+
+  const addExhaustionToAll = useCallback(() => {
+    characters.forEach(char => {
+      const name = char.name || char;
+      const current = storage.getProperty(name, 'exhaustionLevel', campaignName);
+      const level = typeof current === 'number' ? current : 0;
+      if (level < EXHAUSTION_LEVELS) {
+        storage.setProperty(name, 'exhaustionLevel', level + 1, campaignName);
+      }
+    });
+  }, [characters, campaignName]);
+
   const forcedMarch = useCallback(() => {
+    if (partyHasMaxExhaustion()) {
+      setLastMessage('Cannot forced march — a party member has reached maximum exhaustion.');
+      return false;
+    }
+    addExhaustionToAll();
+    setForcedMarchHours(prev => prev + 1);
     setDayExhausted(false);
     setAccruedCost(0);
-    setDailyBudget(prev => Math.max(0, prev - 8));
-    setLastMessage('The party pushes on with a forced march.');
-  }, []);
+    setDailyBudget(effectiveBudgetForPace(travelPace, weather));
+    setLastMessage(`Forced march — 1 exhaustion added to all party members. Speed reduced to ${getExhaustionMultiplierPercent(forcedMarchHours + 1)}%.`);
+    return true;
+  }, [partyHasMaxExhaustion, addExhaustionToAll, effectiveBudgetForPace, travelPace, weather, forcedMarchHours]);
 
   const currentPosition = path.length > 0 && pathIndex < path.length
     ? path[pathIndex]
@@ -266,8 +298,10 @@ export default function useTravelManagement({
     paceInfo,
     hexesRemaining,
     horseback,
+    forcedMarchHours,
+    exhaustionMultiplier: getExhaustionMultiplierPercent(forcedMarchHours),
+    partyHasMaxExhaustion: partyHasMaxExhaustion(),
     isTravelActive,
-    MODES,
     startPlanning,
     cancelTravel,
     setDestinationAndPath,
@@ -283,4 +317,13 @@ export default function useTravelManagement({
     setTravelLog,
     setLastMessage,
   };
+
+  useEffect(() => {
+    if (onTravelStateChange) {
+      onTravelStateChange({
+        travelMode, travelPace, destination, path, pathIndex,
+        accruedCost, dailyBudget, dayExhausted, forcedMarchHours,
+      });
+    }
+  }, [travelMode, travelPace, destination, path, pathIndex, accruedCost, dailyBudget, dayExhausted, forcedMarchHours, onTravelStateChange]);
 }

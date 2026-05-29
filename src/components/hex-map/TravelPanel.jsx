@@ -25,6 +25,9 @@ function TravelPanel({
   onSetEventFrequency,
   horseback,
   onToggleHorseback,
+  forcedMarchHours,
+  exhaustionMultiplier,
+  partyHasMaxExhaustion,
 }) {
   const panelRef = useRef(null);
   const dragState = useRef(null);
@@ -68,7 +71,7 @@ function TravelPanel({
   const budgetPct = dailyBudget > 0 ? Math.min(100, (accruedCost / dailyBudget) * 100) : 0;
   const budgetRemaining = Math.max(0, dailyBudget - accruedCost);
 
-  const advanceDisabled = dayExhausted || pathIndex >= path.length || !!pendingEvent;
+  const advanceDisabled = dayExhausted || pathIndex >= path.length || !!pendingEvent || partyHasMaxExhaustion;
 
   const currentHex = path[pathIndex];
   const currentTerrain = currentHex ? terrain[`${currentHex.q},${currentHex.r}`] || 'plains' : null;
@@ -95,9 +98,21 @@ function TravelPanel({
           <button onClick={onForceCamp} className="travel-btn-camp">
             <i className="fa-solid fa-campground"></i> Camp
           </button>
-          <button onClick={onForcedMarch} className="travel-btn-march">
+          <button onClick={onForcedMarch} className="travel-btn-march" disabled={partyHasMaxExhaustion}>
             <i className="fa-solid fa-person-running"></i> Forced March
           </button>
+        </div>
+      )}
+
+      {forcedMarchHours > 0 && (
+        <div className="travel-panel-exhaustion">
+          <span className="travel-exhaustion-label">
+            <i className="fa-solid fa-heart-pulse"></i> Forced March
+          </span>
+          <span className="travel-exhaustion-value">{forcedMarchHours} / 6 stacks</span>
+          <span className="travel-exhaustion-speed">
+            <i className="fa-solid fa-gauge"></i> Speed: {exhaustionMultiplier}%
+          </span>
         </div>
       )}
 

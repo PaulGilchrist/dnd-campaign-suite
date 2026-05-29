@@ -6,6 +6,7 @@ import {
     TERRAIN_TYPES, POI_TYPES
 } from '../../config/outdoorConfig.js';
 import { generateWeather } from '../../services/weatherService.js';
+import { TRAVEL_PACES, getDailyHexBudget } from '../../services/travelService.js';
 import { hexKey, hexToPixel, pixelToHexSnapped, hexToSVGPath, isRoadConnectable, findHexPath } from '../../services/hexMapUtils.js';
 import { generateOutdoorEncounter } from '../../services/outdoorEncounterGenerator.js';
 import TerrainLayer from './TerrainLayer.jsx';
@@ -55,15 +56,19 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const [partyPosition, setPartyPosition] = useState(null); // {hexQ, hexR} | null
     const [marchingOpen, setMarchingOpen] = useState(false);  // panel toggle
 
-    // Travel state
     const [weather, setWeather] = useState(null);
+    const [travelInit, setTravelInit] = useState(null);
+    const [travelSaveVersion, setTravelSaveVersion] = useState(0);
     const { monsters } = useMonstersData();
     const playerLevels = React.useMemo(
         () => characters.map(c => c.level || 1),
         [characters]
     );
 
-    const { addEntry } = useLog(campaignName);
+    const setTravelStateRef = useCallback((ts) => {
+        travelStateRef.current = ts;
+        setTravelSaveVersion(prev => prev + 1);
+    }, []);
 
     const travelMgmt = useTravelManagement({
         hexCols,
@@ -75,6 +80,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         monsters,
         playerLevels,
         roads,
+        characters,
+        campaignName,
+        initialTravelState: travelInit,
+        onTravelStateChange: setTravelStateRef,
     });
 
     const handleGenerateWeather = useCallback(() => {
@@ -156,6 +165,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
     const panXValueRef = useRef(0);
     const panYValueRef = useRef(0);
     const accumulatedDeltaRef = useRef(0);
+    const travelStateRef = useRef(null);
     const isInitialized = useRef(false);
     const hasLoaded = useRef(false);
     const needsResetViewRef = useRef(false);
@@ -232,6 +242,12 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         campaignName, mapName, setGridSize, setTerrain, setRivers, setRoads, setPois,
         setZoom, setPanX, setPanY, setMarchingOrder, setPartyPosition, setMapData,
         setWeather,
+        onTravelStateChange: (ts) => {
+            if (ts) {
+                setTravelInit(ts);
+                setTravelKey(prev => prev + 1);
+            }
+        },
     });
 
     // Computed SVG dimensions — corrected to account for full axial extent + hex shape
@@ -847,7 +863,23 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     hexMapDisplayNameRef.current = existing.displayName || mapName;
                     if (existing.weather) setWeather(existing.weather);
 
-                    // If pan was never set (old default 0,0), reset view to center
+                    const loadedTravel = existing.travelState || {};
+                    const travelInitData = {
+                        forcedMarchHours: typeof loadedTravel.forcedMarchHours === 'number' ? loadedTravel.forcedMarchHours : 0,
+                        accruedCost: typeof loadedTravel.accruedCost === 'number' ? loadedTravel.accruedCost : 0,
+                        dailyBudget: typeof loadedTravel.dailyBudget === 'number' ? loadedTravel.dailyBudget : getDailyHexBudget(loadedTravel.travelPace || 'normal'),
+                        travelMode: loadedTravel.travelMode || 'inactive',
+                        travelPace: loadedTravel.travelPace || 'normal',
+                        destination: loadedTravel.destination || null,
+                        path: Array.isArray(loadedTravel.path) ? loadedTravel.path : [],
+                        pathIndex: typeof loadedTravel.pathIndex === 'number' ? loadedTravel.pathIndex : 0,
+                    };
+                    // Only re-init travel state if there's something meaningful to restore
+                    const hasActiveTravel = travelInitData.travelMode !== 'inactive' || travelInitData.destination !== null;
+                    if (hasActiveTravel) {
+                        setTravelInit(travelInitData);
+                    }
+
                     if (isOldDefault) {
                         needsResetViewRef.current = true;
                     }
@@ -951,10 +983,11 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             marchingOrder,
             partyPosition,
             weather,
+            travelState: travelStateRef.current,
         };
         mapsService.saveMapData(campaignName, mapName, dataToSave)
             .catch(err => console.error('Failed to save hex map data:', err));
-    }, [campaignName, mapName, terrain, rivers, roads, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition, weather]);
+    }, [campaignName, mapName, terrain, rivers, roads, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition, weather, travelSaveVersion]);
 
     const viewPortBounds = useMemo(() => ({
         left: panX,
@@ -1237,6 +1270,9 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 onSetEventFrequency={travelMgmt.setEventFrequency}
                 horseback={travelMgmt.horseback}
                 onToggleHorseback={travelMgmt.toggleHorseback}
+                forcedMarchHours={travelMgmt.forcedMarchHours}
+                exhaustionMultiplier={travelMgmt.exhaustionMultiplier}
+                partyHasMaxExhaustion={travelMgmt.partyHasMaxExhaustion}
             />
 
             <EventDialog

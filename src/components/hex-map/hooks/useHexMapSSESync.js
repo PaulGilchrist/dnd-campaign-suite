@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-function useHexMapSSESync({ campaignName, mapName, setGridSize, setTerrain, setRivers, setRoads, setPois, setZoom, setPanX, setPanY, setMarchingOrder, setPartyPosition, setMapData, setWeather }) {
+function useHexMapSSESync({ campaignName, mapName, setGridSize, setTerrain, setRivers, setRoads, setPois, setZoom, setPanX, setPanY, setMarchingOrder, setPartyPosition, setMapData, setWeather, onTravelStateChange }) {
     const handleSSEEvent = useCallback((event) => {
         if (!event || !event.data) return;
         const expectedKey = `map-data-${campaignName}-${mapName}`;
@@ -40,10 +40,13 @@ function useHexMapSSESync({ campaignName, mapName, setGridSize, setTerrain, setR
         if (data.weather !== undefined) {
             setWeather(data.weather);
         }
+        if (data.travelState !== undefined && onTravelStateChange) {
+            onTravelStateChange(data.travelState);
+        }
         if (data.type) {
             setMapData(prev => ({ ...prev, ...data }));
         }
-    }, [campaignName, mapName, setGridSize, setTerrain, setRivers, setRoads, setPois, setZoom, setPanX, setPanY, setMarchingOrder, setPartyPosition, setMapData, setWeather]);
+    }, [campaignName, mapName, setGridSize, setTerrain, setRivers, setRoads, setPois, setZoom, setPanX, setPanY, setMarchingOrder, setPartyPosition, setMapData, setWeather, onTravelStateChange]);
 
     return { handleSSEEvent };
 }

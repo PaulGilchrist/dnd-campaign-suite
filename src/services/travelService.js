@@ -49,6 +49,22 @@ export const TRAVEL_PACES = [
 export const MAX_TRAVEL_HOURS_PER_DAY = 8;
 export const MAX_FORCED_MARCH_HOURS = 6;
 export const HORSEBACK_SPEED_MULTIPLIER = 2;
+export const EXHAUSTION_SPEED_MULTIPLIER = 5 / 6;
+export const EXHAUSTION_LEVELS = 6;
+
+export function applyExhaustionSpeedPenalty(baseCost, exhaustionStacks) {
+  if (exhaustionStacks <= 0) return baseCost;
+  return baseCost / Math.pow(EXHAUSTION_SPEED_MULTIPLIER, exhaustionStacks);
+}
+
+export function applyExhaustionSpeedPenaltyToBudget(baseBudget, exhaustionStacks) {
+  if (exhaustionStacks <= 0) return baseBudget;
+  return Math.floor(Math.pow(EXHAUSTION_SPEED_MULTIPLIER, exhaustionStacks) * baseBudget);
+}
+
+export function getExhaustionMultiplierPercent(exhaustionStacks) {
+  return Math.round(Math.pow(EXHAUSTION_SPEED_MULTIPLIER, exhaustionStacks) * 100);
+}
 
 export function isTerrainPassable(terrainType) {
   return TERRAIN_MOVE_COST[terrainType] !== null;
