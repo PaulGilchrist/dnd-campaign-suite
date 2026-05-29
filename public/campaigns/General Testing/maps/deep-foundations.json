@@ -1669,32 +1669,7 @@
       "visible": true
     }
   ],
-  "players": [
-    {
-      "id": "monk",
-      "name": "Monk",
-      "gridX": 32,
-      "gridY": 35
-    },
-    {
-      "id": "paladin",
-      "name": "Paladin",
-      "gridX": 32,
-      "gridY": 36
-    },
-    {
-      "id": "sorcerer",
-      "name": "Sorcerer",
-      "gridX": 31,
-      "gridY": 35
-    },
-    {
-      "id": "warlock",
-      "name": "Warlock",
-      "gridX": 31,
-      "gridY": 36
-    }
-  ],
+  "players": [],
   "zoom": 1,
   "panX": 0,
   "panY": 0,

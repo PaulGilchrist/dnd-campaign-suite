@@ -29,7 +29,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
     React.useEffect(() => {
         setExhaustionLevel(readExhaustionLevel());
-    }, [forceRefresh]);
+    }, [forceRefresh, playerSummary]);
     React.useEffect(() => {
         const fetchData = async () => {
             // Use rules factory to get appropriate rules based on character's rules setting
