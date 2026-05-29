@@ -170,6 +170,72 @@
     color: orange;
     font-weight: bold;
 }
+.death-saves-roll {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0;
+    padding: 4px 12px;
+    background-color: orange;
+    color: #1a1a2e;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.9em;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s;
+}
+.death-saves-roll:hover {
+    background-color: #ffb733;
+}
+.death-saves-roll:active {
+    background-color: #e69500;
+}
+.death-saves-result {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0 6px;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+.death-saves-result--success {
+    color: #4CAF50;
+}
+.death-saves-result--failure {
+    color: #e74c3c;
+}
+.death-saves-roll-value {
+    font-size: 1.1em;
+}
+.death-saves-nat {
+    font-size: 0.7em;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: bold;
+}
+.death-saves-nat--1 {
+    background-color: #e74c3c;
+    color: white;
+}
+.death-saves-nat--20 {
+    background-color: #4CAF50;
+    color: white;
+}
+.death-saves-result-label {
+    margin-left: 2px;
+}
+.death-saves-stable {
+    color: #4CAF50;
+    font-weight: bold;
+}
+.death-saves-dead {
+    color: #e74c3c;
+    font-weight: bold;
+}
+.death-saves-track {
+    margin-top: 2px;
+}
 
 @media print {
     .char-header .avatar-wrapper {

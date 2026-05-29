@@ -447,17 +447,59 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
         return () => window.removeEventListener('initiative-rolled', handler);
     }, []);
 
-    const handleCreatureHpChange = React.useCallback((creatureId, newValue) => {
-        if (!combatSummary) return;
-        const creature = combatSummary.creatures.find(c => c.id === creatureId);
-        if (!creature) return;
-        creature.currentHp = newValue;
-        if (creature.type === 'player') {
-            storage.setProperty(creature.name, 'currentHitPoints', newValue, campaignName);
-        }
-        storage.set('combatSummary', combatSummary, campaignName);
-        setCombatSummary(cloneDeep(combatSummary));
-    }, [combatSummary, campaignName]);
+     const handleCreatureHpChange = React.useCallback((creatureId, newValue) => {
+         if (!combatSummary) return;
+         const creature = combatSummary.creatures.find(c => c.id === creatureId);
+         if (!creature) return;
+         const oldHp = creature.currentHp;
+         const delta = newValue - oldHp;
+         if (delta === 0) return;
+
+         creature.currentHp = newValue;
+         if (creature.type === 'player') {
+             storage.setProperty(creature.name, 'currentHitPoints', newValue, campaignName);
+
+             fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+                 method: 'POST',
+                 headers: { 'Content-Type': 'application/json' },
+                 body: JSON.stringify({
+                     type: 'hp_change',
+                     targetName: creature.name,
+                     delta,
+                     currentHp: newValue,
+                     maxHp: creature.maxHp,
+                     isHealing: delta > 0,
+                     isUnconscious: newValue <= 0,
+                 })
+             }).catch(() => {});
+         } else {
+             const wasBloodied = oldHp > 0 && oldHp <= Math.floor(creature.maxHp / 2);
+             const isBloodied = newValue > 0 && newValue <= Math.floor(creature.maxHp / 2);
+             const wasDead = oldHp <= 0;
+             const isDead = newValue <= 0;
+
+             let threshold;
+             if (!wasDead && isDead) threshold = 'dead';
+             else if (!wasBloodied && isBloodied) threshold = 'bloodied';
+             else if (wasBloodied && !isBloodied && newValue > 0) threshold = 'recovering';
+
+             if (threshold) {
+                 fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: JSON.stringify({
+                         type: 'hp_change',
+                         targetName: creature.name,
+                         delta,
+                         threshold,
+                         maxHp: creature.maxHp,
+                     })
+                 }).catch(() => {});
+             }
+         }
+         storage.set('combatSummary', combatSummary, campaignName);
+         setCombatSummary(cloneDeep(combatSummary));
+     }, [combatSummary, campaignName]);
 
     const handleClear = () => {
         if (window.confirm('Are you sure you want to clear all combat status?')) {

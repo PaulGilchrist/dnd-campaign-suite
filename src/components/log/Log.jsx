@@ -191,6 +191,111 @@ function ConditionEntry({ entry }) {
   );
 }
 
+function EncounterEntry({ entry }) {
+  const isStart = entry.action === 'started';
+  return (
+    <div className={`log-entry log-encounter ${isStart ? 'log-encounter-start' : 'log-encounter-end'}`}>
+      <div className="log-entry-header">
+        <span className="log-icon">
+          <i className={`fas ${isStart ? 'fa-skull' : 'fa-trophy'}`}></i>
+        </span>
+        <span className="log-name">{isStart ? 'Encounter Started' : 'Encounter Completed'}</span>
+        <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
+      </div>
+      <div className="log-encounter-details">
+        <span className="log-encounter-name">{entry.encounterName}</span>
+        {isStart && entry.monsters && entry.monsters.length > 0 && (
+          <div className="log-encounter-monsters">
+            {entry.monsters.map((m, i) => (
+              <span key={i} className="log-encounter-monster">{m}</span>
+            ))}
+          </div>
+        )}
+        {!isStart && entry.xpPerChar > 0 && (
+          <span className="log-encounter-xp">
+            <i className="fas fa-star"></i>&nbsp;{entry.xpPerChar.toLocaleString()} XP per character
+          </span>
+        )}
+        {!isStart && entry.lootItems && entry.lootItems.length > 0 && (
+          <ul className="log-encounter-loot">
+            {entry.lootItems.map((item, i) => (
+              <li key={i} className="log-encounter-loot-item">{item}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HpChangeEntry({ entry }) {
+  const isDamage = entry.delta < 0;
+  const isNpc = !!entry.threshold;
+  return (
+    <div className={`log-entry log-hp-change ${isDamage ? 'log-hp-damage' : 'log-healing'}`}>
+      <div className="log-entry-header">
+        <span className="log-icon">
+          <i className={`fas ${isDamage ? 'fa-heart-crack' : 'fa-heart'}`}></i>
+        </span>
+        <span className="log-character">{entry.targetName}</span>
+        <span className="log-name">
+          {isNpc ? (
+            <>
+              {entry.threshold === 'dead' && 'Defeated'}
+              {entry.threshold === 'bloodied' && 'Bloodied'}
+              {entry.threshold === 'recovering' && 'Recovering'}
+              {entry.delta !== 0 && ` (${entry.delta > 0 ? '+' : ''}${entry.delta})`}
+            </>
+          ) : (
+            <>
+              {entry.isUnconscious && 'Knocked Unconscious — '}
+              {isDamage ? 'Takes Damage' : 'Healed'}
+            </>
+          )}
+        </span>
+        <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
+      </div>
+      <div className="log-hp-details">
+        {isNpc ? (
+          <span className="log-hp-delta">{entry.delta > 0 ? '+' : ''}{entry.delta} HP</span>
+        ) : (
+          <>
+            <span className="log-hp-delta">{entry.delta > 0 ? '+' : ''}{entry.delta} HP</span>
+            <span className="log-hp-current">{entry.currentHp}/{entry.maxHp}</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DeathSaveEntry({ entry }) {
+  const isSuccess = entry.success;
+  const isNat20 = entry.isNatural20;
+  const isNat1 = entry.isNatural1;
+  return (
+    <div className={`log-entry log-death-save ${isSuccess ? 'log-death-save-success' : 'log-death-save-failure'}`}>
+      <div className="log-entry-header">
+        <span className="log-icon">
+          <i className="fas fa-skull-crossbones"></i>
+        </span>
+        <span className="log-character">{entry.characterName}</span>
+        <span className="log-name">
+          {isNat20 && 'Natural 20 — Stabilized!'}
+          {isNat1 && 'Natural 1 — Double Failure'}
+          {!isNat20 && !isNat1 && (isSuccess ? 'Death Save Success' : 'Death Save Failure')}
+        </span>
+        <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
+      </div>
+      <div className="log-death-save-details">
+        <span className={`log-die ${isSuccess ? 'log-die-selected' : ''}`}>({entry.roll})</span>
+        {isNat1 && <span className="log-nat-badge log-nat1">NAT 1</span>}
+        {isNat20 && <span className="log-nat-badge log-nat20">NAT 20</span>}
+      </div>
+    </div>
+  );
+}
+
 export default function Log({ campaignName, characters }) {
   const { logEntries, initialized, addEntry } = useLog(campaignName);
   const [noteText, setNoteText] = useState('');
@@ -252,10 +357,13 @@ export default function Log({ campaignName, characters }) {
           <div key={entry.id}>
             {entry.type === 'roll' && <RollEntry entry={entry}/>}
             {entry.type === 'note' && <NoteEntry entry={entry}/>}
-              {entry.type === 'travel' && <TravelEntry entry={entry}/>}
-              {entry.type === 'loot' && <LootEntry entry={entry}/>}
-              {entry.type === 'condition' && <ConditionEntry entry={entry}/>}
-              </div>
+            {entry.type === 'travel' && <TravelEntry entry={entry}/>}
+            {entry.type === 'loot' && <LootEntry entry={entry}/>}
+            {entry.type === 'condition' && <ConditionEntry entry={entry}/>}
+            {entry.type === 'encounter' && <EncounterEntry entry={entry}/>}
+            {entry.type === 'hp_change' && <HpChangeEntry entry={entry}/>}
+            {entry.type === 'death_save' && <DeathSaveEntry entry={entry}/>}
+          </div>
         ))}
       </div>
     </div>

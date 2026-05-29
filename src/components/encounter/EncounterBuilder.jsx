@@ -430,45 +430,66 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
       }
     };
 
-   const handleStartEncounter = () => {
-    if (!selectedMonsters.length) return;
-
-    // Write combatStarted=true directly to localStorage before navigation unmounts the component
-    try {
-      localStorage.setItem(`encounterSession-${campaignName}`, JSON.stringify({
-        currentEncounterName, description, lootData, encounterCompleted,
-        combatStarted: true,
-        selectedMonsters: stripMonsters(selectedMonsters),
-        filter: { difficulty: filter.difficulty, playerLevels: filter.playerLevels },
-        encounterTitle,
-      }));
-    } catch { /* ignore */ }
-
-    setCombatStarted(true);
-    loadEncounterToInitiative(selectedMonsters, characters, campaignName);
-    onStartCombat();
+   const logEntry = async (entry) => {
+     try { await logService.addEntry(campaignName, entry); } catch { /* ignore */ }
    };
 
-  const handleCompleteEncounter = async () => {
-    const numChars = characters && characters.length > 0 ? characters.length : filter.playerLevels.length;
-    const xpPerChar = Math.floor(lootData.totalEncounterXp / numChars);
+   const handleStartEncounter = () => {
+     if (!selectedMonsters.length) return;
 
-    if (!window.confirm(`Award ${xpPerChar} XP to each of ${numChars} party members and log the loot?`)) return;
+     // Write combatStarted=true directly to localStorage before navigation unmounts the component
+     try {
+       localStorage.setItem(`encounterSession-${campaignName}`, JSON.stringify({
+         currentEncounterName, description, lootData, encounterCompleted,
+         combatStarted: true,
+         selectedMonsters: stripMonsters(selectedMonsters),
+         filter: { difficulty: filter.difficulty, playerLevels: filter.playerLevels },
+         encounterTitle,
+       }));
+     } catch { /* ignore */ }
 
-    for (const charData of (characters || [])) {
-      const currentXp = storage.getProperty(charData.name, 'xp', campaignName) || 0;
-      storage.setProperty(charData.name, 'xp', currentXp + xpPerChar, campaignName);
-      }
+     logEntry({
+       type: 'encounter',
+       action: 'started',
+       encounterName: encounterTitle || currentEncounterName || 'Unnamed Encounter',
+       monsters: selectedMonsters.map(m => `${m.qty || 1}x ${m.name}`),
+     });
 
-    await logService.addEntry(campaignName, {
-        type: 'loot',
-        lootItems: lootData.lootEntries.filter(item => item !== 'No loot for these monsters'),
-        xpPerChar,
-        totalEncounterXp: lootData.totalEncounterXp,
-        });
+     setCombatStarted(true);
+     loadEncounterToInitiative(selectedMonsters, characters, campaignName);
+     onStartCombat();
+   };
 
-    setEncounterCompleted(true);
-    };
+   const handleCompleteEncounter = async () => {
+     const numChars = characters && characters.length > 0 ? characters.length : filter.playerLevels.length;
+     const xpPerChar = Math.floor(lootData.totalEncounterXp / numChars);
+
+     if (!window.confirm(`Award ${xpPerChar} XP to each of ${numChars} party members and log the loot?`)) return;
+
+     for (const charData of (characters || [])) {
+       const currentXp = storage.getProperty(charData.name, 'xp', campaignName) || 0;
+       storage.setProperty(charData.name, 'xp', currentXp + xpPerChar, campaignName);
+     }
+
+     await logService.addEntry(campaignName, {
+         type: 'loot',
+         encounterName: encounterTitle || currentEncounterName || 'Unnamed Encounter',
+         lootItems: lootData.lootEntries.filter(item => item !== 'No loot for these monsters'),
+         xpPerChar,
+         totalEncounterXp: lootData.totalEncounterXp,
+     });
+
+     await logEntry({
+       type: 'encounter',
+       action: 'completed',
+       encounterName: encounterTitle || currentEncounterName || 'Unnamed Encounter',
+       xpPerChar,
+       totalEncounterXp: lootData.totalEncounterXp,
+       lootItems: lootData.lootEntries.filter(item => item !== 'No loot for these monsters'),
+     });
+
+     setEncounterCompleted(true);
+   };
 
   const handleApplySuggestion = (monsters) => {
     setSelectedMonsters(monsters);
