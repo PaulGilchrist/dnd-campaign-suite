@@ -1,5 +1,5 @@
 {
-  "name": "Temp 1",
+  "name": "Temp 2",
   "level": 1,
   "alignment": "True Neutral",
   "abilities": [
@@ -71,5 +71,6 @@
   "spells": [],
   "rules": "2024",
   "xp": 0,
-  "xpMode": "milestone"
+  "xpMode": "milestone",
+  "originalFileName": "Temp_1.json"
 }

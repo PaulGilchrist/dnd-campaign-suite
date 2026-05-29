@@ -183,10 +183,11 @@ router.post('/api/campaigns/:campaign', (req, res) => {
         }
         
         // Write the character file
-        fs.writeFileSync(filePath, JSON.stringify(character, null, 2));
-        
-        // Broadcast character creation
-        publish(`character-create-${campaign}-${fileName}`, character);
+         character._fileName = fileName;
+         fs.writeFileSync(filePath, JSON.stringify(character, null, 2));
+
+         // Broadcast character creation
+         publish(`character-create-${campaign}-${fileName}`, character);
         
         res.status(201).json({ message: 'Character created successfully', character, fileName });
     } catch (error) {

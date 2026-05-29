@@ -51,8 +51,8 @@ export function useCharacterWizard(campaignName) {
     try {
       if (!campaignName) throw new Error('No campaign selected');
       const originalCharacter = originalCharacterRef.current;
-      const originalFileName = `${originalCharacter.name.toLowerCase().replace(/\s+/g, '-')}.json`;
-      const fileName = `${characterData.name.toLowerCase().replace(/\s+/g, '-')}.json`;
+      const originalFileName = originalCharacter._fileName || `${originalCharacter.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
+      const fileName = `${characterData.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
       await campaignService.updateCharacter(campaignName, fileName, characterData, originalFileName);
       callbacksRef.current.setActiveCharacter(cloneDeep(characterData));
       setShowEditCharacterWizard(false);
