@@ -5,10 +5,13 @@
 <p>
   <strong>✨ Real-time party sharing</strong> &nbsp;·&nbsp;
   <strong>📖 Dual ruleset support (5e &amp; 2024)</strong> &nbsp;·&nbsp;
-  <strong>🗺️ Indoor &amp; outdoor maps</strong> &nbsp;·&nbsp;
-  <strong>🎲 Encounter &amp; dungeon generators</strong> &nbsp;·&nbsp;
-  <strong>📜 Quest, faction &amp; NPC tracking</strong> &nbsp;·&nbsp;
-  <strong>🖨️ Print-ready character sheets</strong>
+  <strong>🗺️ Indoor &amp; outdoor maps with fog of war</strong> &nbsp;·&nbsp;
+  <strong>🎲 Encounter, dungeon &amp; loot generators</strong> &nbsp;·&nbsp;
+  <strong>📜 Quest, faction &amp; NPC management</strong> &nbsp;·&nbsp;
+  <strong>🖨️ Print-ready character sheets</strong> &nbsp;·&nbsp;
+  <strong>📋 Full campaign activity log</strong> &nbsp;·&nbsp;
+  <strong>⚔️ Condition &amp; exhaustion tracking</strong> &nbsp;·&nbsp;
+  <strong>🌦️ Overland travel with weather</strong>
 </p>
 
 ---
@@ -21,7 +24,7 @@ A **complete D&D character sheet and campaign management suite** that runs on yo
 
 **As a printable sheet:** The app creates **beautiful, well-organized character sheets that fit on a single page**. All the critical stats you need during combat are front and center. Print it out, keep it at the table, and have everything you need at a glance — no flipping through rulebooks.
 
-**As a GM toolkit:** Indoor maps with fog of war, outdoor hex maps with procedural terrain, encounter builders, a procedural dungeon generator, quest tracking, faction management, NPC management, campaign notes, and a full activity log — everything you need to run a campaign from one app.
+**As a GM toolkit:** Indoor maps with fog of war and spell overlays, outdoor hex maps with procedural terrain and overland travel, encounter and loot builders, a procedural dungeon generator, quest tracking, faction management, NPC management with full stat blocks, campaign notes, and a full activity log — everything you need to run a campaign from one app.
 
 > **No computer expertise required.** If you can open a web browser, you can use this app. The setup instructions at the bottom are written for complete beginners.
 
@@ -48,24 +51,28 @@ No more "Wait, how many hit points do you have?" mid-combat! No more passing aro
 
 | Feature | Description |
 |---------|-------------|
-| 📜 **Campaign Management** | Multiple campaigns, switch/rename/delete, auto-saved |
-| 👤 **12-Step Character Wizard** | Ruleset, race, class, abilities, skills, spells, feats, inventory, and more |
-| 📊 **Digital Character Sheet** | Live-updating, click-to-roll, resource tracking, rest mechanics |
+| 📜 **Campaign Management** | Multiple campaigns, switch/rename/delete, auto-saved to JSON |
+| 👤 **12-Step Character Wizard** | Ruleset, race, class, abilities, skills, spells, feats, inventory, magic items, backgrounds, and more |
+| 📊 **Digital Character Sheet** | Live-updating, click-to-roll, condition & exhaustion tracking, resource management |
 | 🖨️ **Print-Ready Sheets** | Single-page, clean layout, critical stats front and center |
-| ⚔️ **Initiative Tracker** | Turn order, round counter, NPC management, keyboard shortcuts |
-| 👾 **Encounter Builder** | Monster selection, XP budgets, difficulty ratings, save/load |
-| 🗺️ **Indoor Maps** | Grid-based, fog of war, drag-and-drop tokens, 23+ furniture types |
-| 🏔️ **Outdoor Hex Maps** | Procedural terrain, POIs, rivers, roads, weather, random encounters |
-| 🏚️ **Dungeon Generator** | BSP algorithm, configurable rooms, corridors, doors |
-| 📝 **Campaign Notes** | Markdown-supported story notes and clues |
-| 🧙 **NPC Management** | Create, edit, and place NPCs on maps |
-| 📜 **Quest Tracking** | Status tracking, color-coded badges, markdown descriptions |
-| 🤝 **Faction Management** | Influence levels, goals, markdown notes |
-| 📋 **Campaign Activity Log** | Dice roll history, event tracking, audit trail |
-| 🎲 **Built-In Dice Roller** | Advantage, disadvantage, custom expressions, animated rolls |
+| ⚔️ **Initiative Tracker** | Turn order, round counter, NPC management, keyboard shortcuts, battle notes |
+| 👾 **Encounter Builder** | Monster selection, XP budgets, difficulty ratings, save/load, auto-generation by environment, loot tables |
+| 🗺️ **Indoor Maps** | Grid-based, fog of war, 25+ furniture types, spell overlays, ruler tool, door toggling, bulk selection |
+| 🏔️ **Outdoor Hex Maps** | Procedural terrain, rivers, roads, POIs, weather, overland travel with paces, indoor map linking |
+| 🏚️ **Dungeon Generator** | BSP algorithm, configurable rooms, corridors, doors, triggered from outdoor encounters |
+| 🗺️ **Terrain Generator** | Procedural hex terrain using fractal noise with configurable seed, grid size, and biome weights |
+| 📝 **Campaign Notes** | Markdown-supported story notes with location tracking, private notes, timestamps, party level |
+| 🧙 **NPC Management** | Full stat blocks (abilities, saves, skills, AC, HP, actions, traits, reactions), attitudes, tags, avatars, one-click to initiative |
+| 📜 **Quest Tracking** | Active/completed/failed statuses, color-coded badges, markdown descriptions, rewards, notes, search |
+| 🤝 **Faction Management** | Influence scale (1-10) with 4 color-coded tiers, goals, markdown notes, search |
+| 📋 **Campaign Activity Log** | Dice rolls with full details, manual notes, travel events, loot awards, condition tracking — all with timestamps |
+| 🎲 **Built-In Dice Roller** | Advantage, disadvantage, custom expressions, animated rolls, auto-crit/fumble detection, resistance notices |
 | 📥 **Character Import/Export** | Download/upload JSON files for between-session work |
 | 🎨 **Dark/Light Theme** | Toggle for late-night sessions |
 | 📖 **Dual Ruleset Support** | 5e and 2024 Essentials, even mixed within one campaign |
+| 🌦️ **Weather System** | Biome-based weather with animated overlays (rain, snow, fog, wind, lightning), travel modifiers |
+| 🗡️ **Loot Generator** | CR-tiered treasure tables — currency, gems, jewelry, equipment, and magic items by rarity |
+| 🗺️ **Map Manager** | Create, rename, activate, delete maps, indoor/outdoor type selection, markdown descriptions, dungeon/terrain generation |
 
 ---
 
@@ -109,7 +116,7 @@ Creating a character doesn't have to be overwhelming. The app guides you step by
 Your character sheet works two ways:
 
 **On Screen (Digital Mode):**
-Your sheet becomes a **living document** that updates as you play. Click any stat to roll dice, see detailed breakdowns, track resources, and share everything in real time with your party.
+Your sheet becomes a **living document** that updates as you play. Click any stat to roll dice, see detailed breakdowns, track resources, manage conditions, and share everything in real time with your party.
 
 **On Paper (Printed Mode):**
 The app creates **beautiful, well-organized character sheets that fit on a single page**. When you print:
@@ -118,58 +125,99 @@ The app creates **beautiful, well-organized character sheets that fit on a singl
 - **Management sections hide automatically** — Campaign buttons, audit warnings, and other digital-only features disappear when printing
 - **Fits on one page** — The layout is optimized so most characters fit on a single sheet of paper
 
+### Identity & Summary
+
+- **Avatar image** with click-to-expand modal
+- **Race/subrace** with creature type annotation
+- **Class/subclass** with domain/type annotation
+- **Alignment**, **proficiencies**, and **languages**
+- **Senses** — Darkvision, blindsight, tremorsense, etc.
+- **Resistances, vulnerabilities, and immunities** — At a glance
+
 ### Core Stats (All Calculated Automatically)
 
-- Ability scores and modifiers
-- Armor Class (click to see the formula!)
+- Ability scores and modifiers (click to see full description, click bonus to roll ability check)
+- Armor Class (click to see the formula breakdown!)
 - Hit Points and Hit Dice
 - Speed (including race and class bonuses)
-- Saving throws and skill proficiencies
+- Saving throws and skill proficiencies (click to roll)
 - Initiative bonus
 - Proficiency bonus
 - Inspiration tracker (toggle on/off)
 
+### XP & Leveling
+
+- **XP modal** — Click the level/XP display to add or subtract XP
+- **Milestone leveling mode** — Toggle between XP tracking and milestone leveling
+- **Live preview** of projected XP changes
+- Persisted per character/campaign
+
+### Condition Tracking
+
+- **15 tracked conditions** — Blinded, Charmed, Cursed, Deafened, Frightened, Grappled, Incapacitated, Paralyzed, Petrified, Poisoned, Prone, Restrained, Stunned, Unconscious
+- **Automatic stat penalties** — Conditions automatically propagate into attack advantage/disadvantage, auto-fail saving throws, speed zero, "cannot act" state (disabling all actions), auto-crit flags (paralyzed/unconscious), concentration broken, and more
+- **Condition removal saves** — Many conditions require a d20 roll vs DC 10 on the mapped ability (e.g., Charmed=WIS, Frightened=WIS, Grappled=STR) to shake off — with automatic rolling and logging
+- **Target-aware effects** — Conditions also affect how attackers interact with the character (advantage/disadvantage vs prone, auto-crit within 5 ft for unconscious, etc.)
+
+### Exhaustion System
+
+- **6 exhaustion levels** (level 6 = DEAD)
+- **Constitution save to reduce** — d20 vs DC (10 + current level), with roll logging
+- **Global penalty propagation** — -2 per level applied to ability checks, saves, attacks, spell attacks, initiative, speed (-5 ft/level), and modifier values
+- **Visual penalty indicators** on all affected stats
+
+### Death Saving Throws
+
+- **3 success + 3 failure toggles** — Automatically appear when current HP reaches 0 or below
+- **Persistent storage** — Saves and failures stored per character/campaign
+- **Auto-clear on healing** — Death saves reset when HP is restored above 0
+
 ### Class-Specific Resources (Tracked During Play)
 
 - **Barbarian**: Rage points (max/current), extra attacks, rage damage bonus, weapon mastery
-- **Bard**: Bardic Inspiration uses, bardic performance
-- **Cleric**: Channel Divinity charges
-- **Druid**: Wild Shape uses
-- **Fighter**: Action Surge, Indomitable, second wind
-- **Monk**: Ki points, unarmored movement
-- **Paladin**: Divine Smite resources, lay on hands
-- **Ranger**: Favored enemies, terrain expertise
-- **Rogue**: Sneak attack, expertise
-- **Sorcerer**: Sorcery points for metamagic
-- **Warlock**: Mystic Arcanum, eldritch blast, pact magic
-- **Wizard**: Arcane Recovery uses, spell preparation
+- **Bard**: Bardic Inspiration die size and uses, Song of Rest die, Magical Secrets count, expertise skills
+- **Cleric**: Channel Divinity charges, Destroy Undead CR
+- **Druid**: Wild Shape uses, Wild Shape Max CR, Beast Forms Known, Wild Shape Limitations
+- **Fighter**: Fighting styles, extra attacks, weapon mastery, Second Wind, Psi Warrior energy pool
+- **Monk**: Martial Arts die, Focus Points, Focus Save DC, Unarmored Movement increase
+- **Paladin**: Fighting styles, extra attacks, Channel Divinity, Aura Range
+- **Ranger**: Fighting styles, extra attacks, Favored Enemies
+- **Rogue**: Sneak Attack damage, expertise skills
+- **Sorcerer**: Sorcery Points, Metamagic Known, spell slot creation costs
+- **Warlock**: Arcanums Known (per level 6/7/8/9), Eldritch Invocations Known, Pact Boon
+- **Wizard**: Arcane Recovery Levels, spell preparation
 
 ### Spell Management
 
 - **Visual spell slot tracking** — Click a spell slot to use it, click again to reset after a long rest
-- **Prepare spells** — Toggle which spells are prepared for the day
-- **Filter spells** — Show only prepared spells, or sort by level or name
+- **Prepare spells** — Toggle which spells are prepared for the day (5e rules; 2024 spells are always known)
+- **Filter and sort** — Show only prepared spells, sort by level or name
 - **Spell details** — Click any spell to see its full description, higher-level effects, casting time, range, and duration
 - **Spell attack bonus and save DC** — Automatically calculated and displayed
+- **Spell damage rolls** — Clickable damage effects with dice parsing (e.g., "1d8+3 fire")
+- **Spell attack rolls** — Clickable to-hit with d20 and spell attack bonus
 
 ### Combat Readiness
 
-- **Actions** — See your attacks, hit bonuses, damage, and damage types (click to see the formula!)
+- **Actions** — Attacks with hit bonuses, damage, and damage types (click to roll vs target's AC with HIT/MISS determination)
 - **Bonus actions** — Clearly separated from regular actions
-- **Reactions** — See your available reactions, including opportunity attacks and reaction spells
-- **Special actions** — Class features, fighting styles, and custom abilities
-- **Short and Long Rests** — One-click rest mechanics. Short rest with interactive hit die rolling (Con bonus applied, min 1 HP per die, full roll log). Long rest restores all HP, spell slots, hit dice, and class resources
-- **Death Saving Throws** — Track successes and failures with clear visual indicators
-- **Built-in dice roller** — Click any stat to roll ability checks, saving throws, skill checks, attack rolls, or damage. Supports advantage, disadvantage, and dice expressions like "2d6+3"
+- **Reactions** — Opportunity attacks and reaction spells, all clickable to roll
+- **Special actions** — Class features, fighting styles, auto-integrated from rules data (Great Weapon Fighting, Protection), and custom abilities with markdown descriptions
+
+### Short Rest & Long Rest
+
+- **Short Rest modal** — Interactive hit die rolling (d{hitDie} + CON bonus, minimum 1 HP per die)
+  - "Roll One" and "Roll All" buttons with full roll log table showing each individual result
+  - Auto-recovers short-rest class resources (Channel Divinity, Wild Shape, Second Wind, Focus Points)
+- **Long Rest** — One-click full restoration of HP, spell slots (levels 1-9), hit dice, all class resources
+- **Exhaustion reduction** — Long rest decreases exhaustion by 1 level
 
 ### Inventory & Wealth
 
-- **Gold pieces** — Track your wealth
-- **Equipped items** — See what your character is wearing and wielding
-- **Backpack items** — Track everything in your pack
-- **Equipment details** — Click any item to see its full description, cost, weight, and category
-- **Magic items** — See your magic items with type, rarity, attunement status, and full descriptions
-- **Search equipment** — Browse the full equipment list by category during character creation
+- **Gold pieces** — Editable and persisted
+- **Equipped items** and **Backpack items** sections
+- **Equipment lookups** — Click any item to search the full database and see description, cost, weight, category
+- **Magic items** — Type, rarity, attunement status, full HTML descriptions
 
 ### Character Portability
 
@@ -187,7 +235,7 @@ When battle erupts, the app becomes your **tactical command center**:
 ### Initiative & Turn Order
 
 - All party members and enemies listed in initiative order
-- Add or remove NPCs as needed
+- Add or remove NPCs as needed (including one-click from the NPC editor)
 - Edit creature names and add battle notes
 - Clear visual indicator of whose turn it is
 
@@ -210,6 +258,21 @@ When battle erupts, the app becomes your **tactical command center**:
 
 ---
 
+## 🎲 Dice Roller
+
+The built-in dice roller is deeply integrated throughout the app:
+
+- **Click-to-roll everywhere** — Any stat on the character sheet, any attack, any save, any skill
+- **Advantage/Disadvantage toggles** — Two dice pre-rolled; toggle after the fact or forced by conditions
+- **Auto-critical/fumble detection** — Natural 20 triggers "Critical Hit!", natural 1 triggers "Fumble"
+- **Hit/Miss determination** — Attack rolls auto-compare against target's AC
+- **Save success/failure** — Saving throws auto-compare against DC
+- **Damage resistance notices** — Cross-references target resistances with damage type
+- **Campaign log integration** — Every roll is logged with timestamp, character name, full breakdown
+- **Custom expressions** — Supports dice notation like "2d6+3"
+
+---
+
 ## 🏰 Campaign Tools (GM Features)
 
 The app includes a comprehensive suite of tools for Dungeon Masters. GM features (encounter builder, map editing, quest/faction/NPC management) are automatically enabled when the app runs on localhost — players connecting over the network get a read-only view.
@@ -220,70 +283,263 @@ Turn order, round counter, NPC management, battle notes, and keyboard shortcuts 
 
 ### 👾 Encounter Builder
 
-- Select monsters from the full compendium
-- Adjust quantities and see XP totals in real time
-- Automatic difficulty rating based on party size and level
-- Save and load encounters for quick battle setup
-- Auto-generate balanced encounters by XP budget
+- **Monster selection** from the full compendium with search by name, type, or subtype
+- **Sortable columns** — Name, CR, XP; selected monsters pinned to top
+- **Quantity controls** — Add/remove monsters with +/- buttons, auto-remove at zero
+- **XP budget tracking** — Real-time total XP, monster count, multiplier, and effective XP
+- **Difficulty rating** — Automatic Easy/Medium/Hard/Deadly based on party size, level, and D&D 5e multipliers
+- **Difficulty filter** — Filter monsters by max CR appropriate for party level and selected difficulty
+- **Party setup** — Auto-populated from campaign characters or manual player/level inputs
+- **Save/Load encounters** — Full CRUD with rename and delete; working session auto-persisted to localStorage
+- **Encounter descriptions** — Markdown-supported text with preview toggle
+- **Start Combat** — Expands selected monsters into individual initiative-ready creatures, rolls initiative for each, loads HP, computes AC, sorts by initiative, and dispatches to the tracker
+- **XP Awarding** — Post-encounter XP summary with per-character split, auto-awards XP to all characters and logs details
+
+#### ✨ Auto-Generate Balanced Encounters
+
+- **Environment filtering** — 11 environments: Arctic, Forest, Grassland, Hill, Mountain, Swamp, Coastal, Desert, Underdark, Underwater, Urban
+- **Quick presets** — "All", "Dungeon" (underdark, urban), "Wilderness" (forest, grassland, hill, mountain)
+- **Smart generation** — Randomly builds encounters from environment-appropriate monsters, scaling CR to party level, respecting XP budgets, and prioritizing variety (multiple monster types over hordes)
+- **Up to 3 suggestions** per generation, ranked by closeness to target difficulty
+
+#### ✨ Loot Generation
+
+CR-tiered treasure tables that generate:
+- **Currency** — Copper through platinum, weighted by CR tier (Poor → Treasure Hoard)
+- **Gems & Jewelry** — Random gem types with 35% chance of jewelry (ring, necklace, earring) with modifiers
+- **Equipment** — Non-property items within tier value ranges
+- **Magic items** — Selected by rarity (common 40%, uncommon 35%, rare 17%, very rare 6%, legendary 2%) with type, attunement info, and rarity display
+
+#### ✨ Monster Card Modal
+
+Click the info icon on any monster to see its **full stat block**:
+- Armor Class, HP, hit dice, speed (all forms), initiative bonus with clickable roll
+- All ability scores with clickable ability checks
+- Saving throws and skills (clickable to roll)
+- Senses (blindsight, darkvision, truesight, tremorsense, passive perception)
+- Damage vulnerabilities, resistances, and immunities
+- Legendary Resistance (if applicable)
+- Actions, Reactions, Legendary Actions, Lair Actions, Regional Effects — with clickable attack rolls and damage dice
+- Full dice roll integration with damage type resolution and resistance notices
 
 ### 🗺️ Indoor Maps
 
-- Grid-based dungeon maps with zoom and pan
-- Paint and erase walls
-- Fog of war with drag-to-select rectangular area fogging
-- Drag-and-drop creature tokens and character tokens onto the grid
-- **23+ SVG furniture and prop types** — barrels, beds, bookshelves, chairs, chests, crates, doors, fire pits, tables, torches, traps, altars, and more
-- Rotate furniture items in 90° increments
-- Smart collision detection — dragging a character auto-finds the nearest empty cell
-- Real-time position sync across all connected devices via SSE
+Tactical grid-based dungeon maps with a full suite of editing tools:
+
+**Grid & Navigation:**
+- Configurable grid size (5–100, default 30×30)
+- Zoom (0.25x–4x) with mouse wheel support, zoom buttons, and reset
+- Pan by dragging when no tool is active
+- Dark/light theme support
+
+**Wall & Terrain Tools:**
+- **Paint** walls by clicking or dragging
+- **Erase** walls
+- **Select** walls and items with rectangle selection, then **bulk-move** them with live preview
+
+**Tokens & Characters:**
+- Drag-and-drop character tokens from the items panel onto the grid
+- Token images clipped to circles with fallback to initial letters
+- **Smart collision detection** — BFS algorithm finds nearest empty cell when dropping on occupied space
+- Real-time position sync across all connected devices
+
+**Furniture & Props (25+ SVG types):**
+- **Indoor**: Altar, Arrow Slit Wall, Barrel, Bed, Bookshelf, Chair, Chest, Crate, Door, Fire Pit, Fountain, Pillar, Secret Door, Skeleton, Stairs, Statue, Table, Torch, Trap, Spider Web
+- **Outdoor** (on outdoor maps): Barrel, Boulder, Bush, Crate, Fire Pit, Torch, Tree
+- **90° rotation** in context menu for: table, bed, stairs, altar, bookshelf, torch, chair, arrow slit wall
+- **Door open/close toggle** in context menu (closed doors block line-of-sight)
+- **Item visibility toggle** — Hidden items invisible to non-host players
+- **Rename** NPCs placed from the items panel; **View Stats** if name matches a monster in the database
+
+**Fog of War:**
+- **Line-of-sight system** using Bresenham's ray-casting algorithm
+- Walls and **closed doors** block vision
+- Per-cell visibility applied to all entities (players, items, NPCs, walls)
+- Non-host players see only what their tokens can see
+
+**Spell Combat Overlays:**
+- **Three shapes**: Radius (circle), Cone (angle-based), Line (rectangular beam)
+- Configurable parameters: radius in feet, cone distance/angle, line distance/width
+- **Drag to place**, drag overlays to reposition
+- **Rotate** cone and line overlays by dragging endpoints
+- Controls panel with shape selector, parameters, active overlay list, and clear all
+- **Real-time sync** across all connected clients via SSE with debounced updates during drag
+
+**Ruler / Distance Measurement:**
+- Click two points to measure distance
+- Shows feet (×5 per cell) and cell count with yellow dashed line and endpoint markers
+
+**Outdoor Map Integration:**
+- Maps with `parentHex` metadata are rendered as hex maps instead of square grids
+- Seamless handoff between indoor tactical maps and outdoor overland maps
 
 <img src="public/map-indoor-example.png" alt="Indoor Map Example" width="800" />
 
 ### 🏔️ Outdoor Hex Maps
 
-- Hex-grid overland maps with zoom (1x–8x) and pan, compass rose overlay
+Full overland exploration system with hex-grid mapping, terrain painting, and overland travel:
+
+**Hex Grid:**
+- Pointy-top hex grid using axial coordinates
+- Configurable grid size (30–100, default 30×60)
+- Zoom (2x–8x) with scroll wheel and pan with bounds clamping
+- Compass rose and scale legend ("1 hex = 6 miles")
+- SSE real-time sync of all map state across clients
+
+**Terrain System:**
 - **9 terrain types** — Plains, Hills, Forest, Mountains, Desert, Swamp, Tundra, Water, Beach
-- Paint and erase terrain on individual hexes; paint rivers manually or auto-generate from elevation data
+- **Paint and erase** terrain on individual hexes
 - **Procedural terrain generation** using fractal noise — configurable seed, grid size, and biome weights
-- **8 Point of Interest types** — Settlement, Dungeon, Camp, Tower, Lore Site, Hazard, Natural Wonder, Landmark — with custom SVG icons
-- Drag POIs from a panel onto the map; right-click to rename, hide, or delete
-- **Party marker** with drag-to-move — right-click to start an encounter at the party's hex, auto-generating a linked indoor encounter map with biome-appropriate features
-- **Marching order panel** with reorderable character list, persisted across sessions
-- **Weather system** — biome-based weather generation that changes as the party travels
-- **Random encounter generation** — terrain-appropriate encounters triggered by travel
+- Procedural color variation per hex for visual texture (deterministic hash-based)
+
+**Rivers & Roads:**
+- **River tool** — Click/drag to paint river segments; connected segments auto-grouped and rendered as smooth winding bezier curves with natural meanders
+- **Road tool** — Click two settlement/city-type POIs to auto-generate a road; uses **A\*** pathfinding weighted by terrain cost (plains=1, water=10); roads reduce travel cost by 50%
+- Roads auto-recalculate when connected POIs are moved
+
+**Points of Interest (POI)s:**
+- **9 POI types** with hand-crafted SVG icons: Camp, City, Dungeon, Hazard, Landmark, Lore Site, Natural Wonder, Settlement, Tower
+- Drag-and-drop from panel to map; drag to reposition on map
+- **Rename** with inline text input, **hide/show** (DM-only), **remove roads**, **delete**
+- **Indoor map linking** — Link any POI to an existing indoor map; when the party is adjacent, a golden "Enter" badge appears; click to seamlessly transition from overland to dungeon view
+
+**Party & Travel:**
+- **Party marker** (gold "P" with dashed outline) showing current position, draggable to any hex
+- **Three travel paces** (D&D standard):
+  - **Slow**: 1 hex per 3 hours, +5 perception, stealth advantage, -2 encounter modifier
+  - **Normal**: 1 hex per 2 hours, no modifiers
+  - **Fast**: 1 hex per 1.5 hours, -5 perception, +2 encounter modifier
+- **Horseback toggle** — Doubles travel speed
+- **Terrain move costs**: Plains (0.75), Hills/Forest/Desert/Beach (1), Swamp/Tundra (1.5), Mountains (2), Water (4) — further modified by pace, weather, roads, and exhaustion
+- **Daily travel budget** (8 hours/day) with progress bar
+- **Hex-by-hex advancement** with one-click "Advance One Hex"
+- **Travel path visualization** — Golden dashed polyline showing ahead (bright gold with destination "D" marker) and behind (faded)
+- **Forced March** — When budget exhausted, choose to Camp or Forced March (adds 1 exhaustion level per 6 hours to ALL party members, reduces speed and budget, max level 6 = death)
+- **A\* pathfinding** for automatic route planning considering terrain costs and roads
+
+**Weather System:**
+- **Biome-based weather tables** — 5 biomes (Temperate, Arid, Cold, Wet, Coastal) with weighted rolls
+- **9 weather conditions** — Clear, Cloudy, Rain, Storm, Fog, Mist, Snow, Wind, Extreme
+- **Animated overlays** — Rain (300 drops), Snow (150 flakes with drift), Wind (60 lines), Fog/Mist (12 drifting patches), Cloudy (5 cloud shadows), Storm (rain + lightning flashes)
+- **Travel modifiers** per condition: movement cost multiplier, budget modifier, encounter chance adjustment, visibility hex limits (Storm=3, Fog=1, Mist=2, Extreme=0 = blocked)
+- Re-runnable weather rolls via dice button
+
+**Random Encounters:**
+- Triggered after each hex advancement with configurable frequency (None 0%, Sparse 5%, Normal 12%, Frequent 25%) + terrain and weather modifiers
+- **6 event types**: Combat, Discovery, Hazard, NPC, Weather Change, Navigation
+- **Terrain-specific tables** — Each of 8 terrain types has ~8 themed events with unique titles and descriptions
+- Combat events include real monster suggestions filtered by terrain-appropriate environments and player levels
+- **Event dialog** with Accept, Skip, and **Re-roll** buttons (3 re-rolls per day, reset on camp)
+- Right-click party marker → "Start Encounter" to generate an indoor combat map at the party's hex with **biome-appropriate procedural obstacles** (trees, boulders, bushes placed via seeded random, keeping center clear)
+- Encounter maps created as child indoor maps with `parentTerrain` and `parentHex` metadata
+
+**Marching Order:**
+- Panel to manage character order with up/down/remove controls
+- Add characters via "+" buttons or by dropping them onto the map
+- Ordinal rank display (1st position highlighted as "leader")
+- Persisted across sessions
+- Used for encounter player placement
 
 <img src="public/map-outdoor-example.png" alt="Outdoor Map Example" width="800" />
 
 ### 🏚️ Procedural Dungeon Generator
 
-Generate random dungeon maps using a **BSP (Binary Space Partitioning) algorithm** — configurable grid size, room count, corridor width, and door placement. Perfect for inspiration or when you need a map in minutes.
+Generate random dungeon maps using a **BSP (Binary Space Partitioning) algorithm**:
+- Configurable grid size, room count, corridor width, and door placement
+- Accessible from the Maps Manager via "Generate Dungeon" button
+- Perfect for inspiration or when you need a map in minutes
 
-### 📝 Campaign Notes
+### 🗺️ Procedural Terrain Generator
 
-Record story details, clues, and important information with full **markdown support**.
-
-### 🧙 NPC Management
-
-Create and manage NPCs with images, descriptions, and map placement.
-
-### 📜 Quest Tracking
-
-Create and manage quests with status tracking (active, completed, failed), color-coded badges, search, and rich markdown descriptions and rewards.
-
-### 🤝 Faction Management
-
-Track campaign factions with influence levels (1–4), goals, markdown notes, and search.
-
-### 📋 Campaign Activity Log
-
-A running audit trail of dice rolls, events, and actions during play. Every roll made from the character sheet is logged with timestamp, character name, and result — perfect for settling disputes or remembering what happened three sessions ago.
-
-<img src="public/logging.png" alt="Party Log Example" width="800" />
-
+Generate random hex terrain maps:
+- Configurable seed (for reproducible results), grid size, and biome weights
+- Uses fractal noise for natural-looking terrain distribution
+- Accessible from the Maps Manager via "Generate Terrain" button
 
 ### 🗂️ Map Management
 
-Create, rename, activate, and delete maps — multiple maps per campaign, switch between them on the fly.
+- **Create** maps with custom names; choose indoor or outdoor type
+- **Activate** a map (players see the active map when clicking Maps in the sidebar)
+- **Rename** and **delete** maps (with confirmation and permanent delete warning)
+- **Edit descriptions** with full markdown support and preview
+- **Type badges** display whether a map is Indoor or Outdoor
+- SSE sync — map list and active map update across all clients
+- "Generate Dungeon" for indoor maps, "Generate Terrain" for outdoor maps
+
+### 📝 Campaign Notes
+
+Record story details, clues, and important information:
+
+- **Full markdown support** with preview toggle
+- **Party Location** field (e.g., "Skull Creek Cave")
+- **Party Level** auto-calculated from campaign characters
+- **Timestamps** — Date Created and Date Modified (auto-set, read-only)
+- **Private Notes** — DM-only visibility toggle (localhost only)
+- **Search** by text content
+- Rich list view with location, timestamp, private badge, and description preview
+
+### 🧙 NPC Management
+
+A full-featured NPC creator with both **roleplay** and **combat** data:
+
+**Roleplay Tab:**
+- Name, Race, Class/Role
+- **Attitude system** — Deep Bonds, Positive, Neutral, Negative, Extreme Opposition (color-coded badges)
+- **Appearance** — Physical description with markdown preview
+- **Personality** — Traits, ideals, bonds, flaws with markdown preview
+- **Goals** — What the NPC wants; **Secrets** — Hidden truths
+- **Notes** and **Tags** (comma-separated for organization, searchable)
+- **Avatar image** upload with click-to-expand modal
+
+**Stats Tab (Full Stat Block):**
+- **Combat Stats**: AC, HP, Hit Dice, Speed, Initiative Bonus
+- **Ability Scores**: All 6 abilities with auto-calculated modifiers
+- **Saving Throw Bonuses**: Per-ability custom bonuses
+- **Skill Bonuses**: Add/remove skills with custom bonus values
+- **Defenses**: Damage Resistances, Damage Immunities, Condition Immunities (comma-separated)
+- **Actions**: Add multiple with name, attack bonus, damage dice, and description
+- **Traits** and **Reactions** — Free-text/markdown areas
+
+**Combat Integration:**
+- **"Save & Add to Initiative"** — One-click from the NPC editor to save and immediately roll initiative into the active combat tracker
+- **"Add to Initiative"** button on NPC list items (if stat block exists)
+- Initiative rolls logged to campaign log
+- NPCs with stat blocks show a shield badge in the list
+
+**Search** by name, race, class/role, or tags.
+
+### 📜 Quest Tracking
+
+- **Status tracking** — Active (green), Completed (blue), Failed (red) with color-coded badges
+- **Rich descriptions** with markdown preview
+- **Rewards** field with markdown preview for describing quest rewards
+- **Notes** field for additional GM-only details
+- **Search** by quest name
+- List view shows name, status badge, and description preview
+
+### 🤝 Faction Management
+
+- **Influence scale (1–10)** with slider control and 4 color-coded tiers:
+  - **Low** (1–3, green), **Medium** (4–6, yellow), **High** (7–8, orange), **Extreme** (9–10, red)
+- **Description** with markdown preview
+- **Goals** — What the faction wants to achieve
+- **Notes** with markdown preview
+- **Search** by faction name
+
+### 📋 Campaign Activity Log
+
+A comprehensive running record of everything that happens during play — synced in real-time across all clients:
+
+**Entry Types:**
+- **Dice Rolls** — Character name, roll type (attack, save, damage, spell attack, initiative, condition save), rolls with advantage/disadvantage mode displayed, total with bonus, target with HIT/MISS result, save success/failure vs DC, NAT 20/FUMBLE badges, damage type, resistance notices, timestamp
+- **Manual Notes** — Add text notes to the log with character attribution (or Anonymous); send with Ctrl/Cmd+Enter
+- **Travel Events** — Advance, arrive, camp, forced march, event triggered, event accepted/skipped/re-rolled, extreme weather halt, budget exhausted, travel cancelled — each with terrain, weather, hex coordinates, and event details
+- **Loot Awards** — XP per character and itemized loot list
+- **Condition Changes** — "Condition Applied" / "Condition Broken" with character name, condition name, DC, and ability
+
+All entries are timestamped and displayed in reverse chronological order with color-coded left borders by type.
+
+<img src="public/logging.png" alt="Party Log Example" width="800" />
 
 ---
 
@@ -324,6 +580,7 @@ This app supports **both** the classic 5th Edition rules and the new 2024 Essent
 | Magic Items | Standard items | Updated items |
 | Backgrounds | Basic support | Full background system |
 | Weapon Mastery | Not included | Included |
+| Spell Preparation | Required | Not required (always known) |
 
 **Which should you choose?**
 - Use **5e** if you play with the original 5th Edition rulebooks
@@ -345,7 +602,7 @@ You can even **mix and match** — different characters in the same campaign can
 
 - **Everyone** views character sheets and campaign tools from their own device
 - The **DM** manages combat, builds encounters, runs maps, and tracks rounds
-- **Players** can see their character's stats, spells, inventory, and abilities
+- **Players** can see their character's stats, spells, inventory, abilities, and conditions
 - When anyone makes a change, **everyone sees it instantly**
 
 ### Between Games
@@ -372,9 +629,9 @@ Want to level up, buy gear, or prepare spells between sessions?
 
 **No More Rules Confusion** — The app validates your character against the rules and shows warnings if something doesn't match.
 
-**No More Boring Maps** — Interactive indoor maps with fog of war, outdoor hex maps with procedural terrain, and a BSP dungeon generator make your table feel alive.
+**No More Boring Maps** — Interactive indoor maps with fog of war and spell overlays, outdoor hex maps with overland travel, a BSP dungeon generator, and encounter-map transitions make your table feel alive.
 
-**No More Dice Hunt** — Roll ability checks, saving throws, attacks, damage, and resting hit dice right from your character sheet. Built-in dice roller supports advantage, disadvantage, and custom expressions.
+**No More Dice Hunt** — Roll ability checks, saving throws, attacks, damage, and resting hit dice right from your character sheet. Built-in dice roller supports advantage, disadvantage, and custom expressions with auto-crit/fumble detection.
 
 **No More Late-Night Eye Strain** — Toggle between dark and light themes to match your gaming environment.
 
@@ -433,10 +690,10 @@ The app validates your character against the rules and shows warnings if somethi
 Yes! Download your character as a JSON file, work on it at home, then upload it before the next session.
 
 **What campaign tools are available?**
-The app includes an initiative tracker, encounter builder, interactive indoor and outdoor maps with fog of war and terrain painting, a procedural dungeon generator, quest tracking, faction management, NPC management, campaign notes, and a campaign activity log — everything a DM needs to run a great session.
+The app includes an initiative tracker, encounter builder with auto-generation and loot tables, interactive indoor maps with fog of war and spell overlays, outdoor hex maps with overland travel and weather, a BSP dungeon generator and fractal terrain generator, quest tracking, faction management, NPC management with full stat blocks, campaign notes with private notes and location tracking, and a comprehensive campaign activity log — everything a DM needs to run a great session.
 
 **How does real-time sync work?**
-The app uses Server-Sent Events (SSE) — a lightweight, one-way push protocol. When the DM or a player changes something (HP, spell slots, position on a map), the server broadcasts the update to every connected browser instantly. No polling, no refresh lag.
+The app uses Server-Sent Events (SSE) — a lightweight, one-way push protocol. When the DM or a player changes something (HP, spell slots, position on a map, fog of war updates), the server broadcasts the update to every connected browser instantly. No polling, no refresh lag.
 
 **Is this open source?**
 Yes! The project is MIT licensed. Feel free to fork it, customize it, or contribute.

@@ -1,501 +1,280 @@
-# Architecture — dnd-char-sheet
+# D&D Character Sheet — Architecture Document
 
-> **Generated:** 2026-05-25T00:00:00Z
-> **Repository:** https://github.com/PaulGilchrist/dnd-char-sheet.git
-> **Stack:** React 19.2 · Vite 8 · Express 5 · Vitest 4 · FontAwesome 7
+> Generated: 2026-05-29
 
----
+## High-Level Overview
 
-## 1. High-Level Overview
+D&D Character Sheet is a single-page React application for managing Dungeons & Dragons campaigns, character sheets, tactical maps, combat encounters, and more. It supports both the **2014 (5e)** and **2024** editions of D&D 5th Edition through a dual-ruleset architecture.
 
-`dnd-char-sheet` is a single-page web application for creating, managing, and playing Dungeons & Dragons character sheets. It supports both the classic 5th Edition (5e) and the 2024 Essentials rulesets, with full dual-ruleset logic throughout the codebase.
+The app consists of:
+- A **React SPA** (client) built with Vite
+- An **Express.js server** providing RESTful APIs, file-based persistence, and Server-Sent Events (SSE) for real-time sync
+- A **static JSON data layer** for D&D rules reference data
 
-The application consists of three major subsystems:
-
-1. **Character Sheet System** — A React SPA (Vite 8) providing character creation via a 12-step wizard, full character sheet display, initiative tracking, encounter building, hex map rendering, campaign notes, quest tracking, NPC management, faction management, and sidebar-based navigation.
-2. **Express 5 Server** — Provides REST API endpoints for character/campaign CRUD, static file serving, and real-time multi-user sync via Server-Sent Events (SSE).
-3. **Campaign Tools** — GM-focused subsystems for map management (indoor grid maps and outdoor hex maps), encounter generation, NPC management, faction tracking, quest logging, notes, and a campaign activity log.
-
-The app is private (not published to npm), licensed under MIT, and authored by Paul Gilchrist. It runs on port 80 by default and is designed for local network multiplayer use.
+There is no database. All persistent data is stored as JSON files on disk under `public/campaigns/<name>/`.
 
 ---
 
-## 2. Module-by-Module Breakdown
+## Architectural Pattern
 
-### 2.1 Entry Points
+The project follows a **layered, feature-based architecture**:
 
-| File | Role |
-|------|------|
-| `index.html` | Vite HTML entry point; mounts React into `#root` |
-| `src/main.jsx` | React root mount with `StrictMode`; renders `<App />`, imports FontAwesome CSS |
-| `src/App.jsx` | Top-level state-based router: renders views based on `activeView`, `mapsView`, theme state, and wizard toggles |
-| `server.js` | Express server: serves `dist/` (production SPA), `public/` (static data), REST API (`/api/*`), SSE (`/subscribe`), and health check (`/health`) |
+```
+┌─────────────────────────────────────────────┐
+│              React SPA (Client)             │
+├──────────┬──────────┬───────────┬───────────┤
+│ App.jsx  │ Routes   │ Hooks     │ Components│
+├──────────┼──────────┼───────────┼───────────┤
+│ Services │ Models   │ Config    │ (CSS)     │
+└────┬─────┴────┬─────┴─────┬─────┴─────┬─────┘
+     │          │           │           │
+     └──────────┴───────────┴───────────┘
+                 HTTP / SSE
+     ┌──────────────────────────────────┐
+     │      Express Server (Node.js)    │
+     ├──────────┬──────────┬───────────┤
+     │ Routes   │ Utils    │ File I/O  │
+     └──────────┴──────────┴───────────┘
+                 JSON Files on Disk
+```
 
-### 2.2 Frontend Layers
+---
 
-#### Hooks (`src/hooks/`) — 46 files
+## Module-by-Module Breakdown
 
-Centralized state management via custom hooks — no class components exist. Each hook has a paired `.test.js`.
+### `src/main.jsx` — Entry Point
+
+Bootstraps React 19 with `ReactDOM.createRoot`. Loads global CSS (`index.css`) and Font Awesome, then renders `<App />` inside `<React.StrictMode>`.
+
+### `src/App.jsx` — Root Orchestrator (~300 lines)
+
+The top-level component. Manages all global state: active view, characters, active character, maps navigation/history, theme (persisted to localStorage), and character wizard modals. Delegates domain concerns to custom hooks and renders either the campaign selection screen or the main sidebar + content layout.
+
+### `src/routes/config.js` — View Router Configuration
+
+Single source of truth for all view definitions, sidebar buttons, and active-view state keys. No routing library is used — navigation is entirely string-based React state (`activeView`).
+
+### `src/components/` — Feature-Based UI Components
+
+| Directory | Responsibility | Files (non-test) |
+|---|---|---|
+| `common/` | Shared reusable primitives: Subscriber (SSE), Popup, AvatarImage, MarkdownPreview, PreviewToggle, MonsterNameAutocomplete, WarningList, HiddenInput | 8 |
+| `char-sheet/` | Character sheet view with sub-components for stats, abilities, actions, inventory, spells, class features, rest buttons | ~20 |
+| `character-creation/` | Wizard-style character creation/editing. Config-driven step rendering via `steps-config.js`. Steps: Rules, Basic, RaceClass, Abilities, Skills, Feats, Spells, Inventory, MagicItems, Languages, Special | ~15 |
+| `encounter/` | Encounter builder with monster filtering, XP calculation, difficulty ratings, and random encounter generation | 7 |
+| `hex-map/` | Outdoor hex-grid SVG map. Terrain, rivers, roads, POIs, party markers, travel paths, weather. Procedural terrain generation | ~23 |
+| `initiative/` | Combat tracker / initiative order manager | 1 |
+| `map/` | Indoor tactical SVG grid map with fog-of-war, spell overlays, item placement, NPC placement, ruler tool | ~35 |
+| `maps-manager/` | Maps CRUD list with create/rename/delete and procedural generation modals | 2 |
+| `sidebar/` | Navigation sidebar with expandable character list and GM-gated view links | 1 |
+| `campaign-selection/` | Campaign browser with create/delete functionality | 1 |
+| `factions/`, `npcs/`, `quests/`, `notes/`, `log/` | Simple CRUD views, each single-file with modal-based forms | 5 |
+
+**Patterns:** Compound components (root orchestrator + presentational children), default exports, PascalCase naming, domain-prefixed names (`Char*`, `Wizard*`, `Encounter*`, `HexMap*`), colocated CSS per component.
+
+### `src/hooks/` — Custom Hooks Layer (22 non-test files)
+
+Hooks bridge UI components with services and manage domain state:
 
 | Hook | Responsibility |
-|------|----------------|
-| `useAppData.js` | Loads all static game data (classes, races, spells, equipment) via `dataLoader` with caching |
-| `useCampaignManagement.js` | Campaign selection, rename, delete, session storage |
-| `useCharacterManagement.js` | Character list, active character, save/delete via API |
-| `useCharacterWizard.js` | Wizard show/hide, complete/cancel handlers |
-| `useTrackedResource.js` | Generic tracked resource (HP, spell slots, rage) with localStorage + server sync |
-| `useWizardArrayToggle.js` | Generic array toggle for wizard form fields |
-| `useEquipmentSearch.js` | Equipment search with filtering and custom item addition |
-| `useWizardConfig.js` | Central wizard config: validation, slot fetching, pre-selection, warnings |
-| `useWizardAbilities.js` | Wizard ability score management |
-| `useWizardData.js` | Wizard form data management |
-| `useWizardFeats.js` | Wizard feat selection |
-| `useWizardForm.js` | Wizard form state management |
-| `useWizardLanguages.js` | Wizard language selection |
-| `useWizardNavigation.js` | Wizard step navigation |
-| `useWizardResistances.js` | Wizard resistance/immunity selection |
-| `useWizardSkills.js` | Wizard skill proficiency selection |
-| `useWizardSpells.js` | Wizard spell selection |
-| `useDiceRoll.js` | Integration of dice roller service with UI actions |
-| `useLoggedDiceRoll.js` | Dice rolls that also write to the campaign log |
-| `useActionPopup.js` | Action popup display for character sheet interactions |
-| `usePopup.js` | Generic popup state management |
-| `useEncounterManagement.js` | Encounter builder state management |
-| `useFactionsManagement.js` | Faction management state |
-| `useMonstersData.js` | Monster data loading for encounters |
-| `useNotesManagement.js` | Campaign notes management |
-| `useNPCsManagement.js` | NPC management state |
-| `useQuestsManagement.js` | Quest tracking and management state |
-| `useTravelManagement.js` | Hex map travel management |
-| `useLog.js` | Campaign log reading |
+|---|---|
+| `useAppData` | Loads 5e + 2024 reference data via `dataLoader.js` |
+| `useCampaignManagement` | Campaign CRUD (create/rename/delete/select) |
+| `useCharacterManagement` | Character save/upload/delete/active selection |
+| `useCharacterWizard` | Bridges wizard UI to `campaignService` for create/edit |
+| `useLog` | Dual-path log: initial load + live SSE subscription, capped at 200 entries |
+| `useTravelManagement` | Hex-map party movement: pathfinding, budget/exhaustion, random events, combat encounters |
+| `useEncounterManagement`, `useFactionsManagement`, `useNPCsManagement`, `useNotesManagement`, `useQuestsManagement` | Domain-specific CRUD management |
+| `useWizard*` (10 hooks) | Wizard step state: Form, Data, Navigation, Skills, Languages, Resistances, Feats, Abilities, ArrayToggle, Config |
+| `useActionPopup`, `useDiceRoll`, `useLoggedDiceRoll` | Interaction utilities |
+| `useEquipmentSearch`, `useMonstersData` | Search and data helpers |
+| `usePopup`, `useTrackedResource` | UI state management |
 
-#### Components (`src/components/`) — ~100 files across 16 directories
+### `src/services/` — Business Logic & Calculations (48 non-test files, 96 total)
 
-| Module | Key Components | Purpose |
-|--------|---------------|---------|
-| `campaign-selection/` | `CampaignSelection` | Full-screen campaign gate; list/create/rename/delete campaigns |
-| `character-creation/` | `CharacterCreationWizard` + 12 step components | Step-by-step character creation/editing wizard with progress bar, sidebar, and footer |
-| `char-sheet/` | `CharSheet` + 13 sub-components (incl. `char-feats/`, `char-spells/`, `char-summary/`) | Full character sheet display (abilities, actions, inventory, spells, feats, summary, combat, short/long rest) |
-| `initiative/` | `Initiative` | Initiative tracker, round counter, NPC management |
-| `encounter/` | `EncounterBuilder` + 5 sub-components | Encounter builder for balancing encounters against party levels |
-| `factions/` | `Factions` | Faction management for campaigns |
-| `hex-map/` | `HexMap`, `HexGridLayer`, `TerrainLayer`, `POILayer`, `RiverLayer`, `RoadLayer`, `PartyMarkerLayer`, `TravelPathLayer`, `MarchingOrderPanel`, `TravelPanel`, `WeatherOverlay`, `EventDialog`, 9 SVG icons | Hex-based outdoor map with layered SVG components, POI markers, terrain, rivers, roads, party positioning, travel, and weather |
-| `map/` | `Map` + 20+ SVG components + `ItemsPanel`, `GridAndWalls`, `PlacedItems`, `Players`, `FogOverlay`, `MapToolbar`, 5 hooks | Indoor map viewer with grid/wall rendering, placed items, players, furniture/monster SVGs, toolbar, fog overlay, and context menus |
-| `maps-manager/` | `MapsManager`, `GenerateDungeonModal`, `GenerateTerrainModal` | GM map management with procedural dungeon and terrain generation |
-| `notes/` | `Notes` | Campaign notes viewer/editor with privacy support |
-| `npcs/` | `NPCs` | NPC management for campaigns |
-| `quests/` | `Quests` | Quest tracking and management for campaigns |
-| `log/` | `Log` | Campaign dice roll and activity log viewer |
-| `sidebar/` | `Sidebar` | Sidebar navigation with view switching, theme toggle, character list, campaign management |
-| `common/` | `Popup`, `Subscriber`, `HiddenInput`, `WarningList`, `AvatarImage`, `MarkdownPreview`, `PreviewToggle` | Shared UI primitives including rich text preview, SSE subscription, and image avatars |
+Organized by feature domain with two subdirectories for ruleset-specific logic:
 
-#### Character Creation Wizard (12 steps)
+**Data Loading & Persistence:**
+- `dataLoader.js` — Centralized JSON fetch/cache for reference data. Maintains separate caches for ruleset-specific (`5e`, `2024`) and version-agnostic data types. Loads from `/data/` or `/data/2024/`.
+- `storage.js` — Thin localStorage abstraction with fire-and-forget sync to `/api/campaigns/{campaign}/{key}`. Used for character sheets.
 
-Steps are defined declaratively in `src/config/steps-config.js`. Steps 1–3 are required; the rest produce warnings (non-blocking).
+**CRUD Services (RPC-style, no inter-dependencies):**
+`campaignService`, `encountersService`, `factionsService`, `mapsService`, `notesService`, `npcsService`, `questsService`, `logService` — Each follows: `load*`, `save*`/`create*`, `update*`, `delete*`.
 
-| Step | Title | Component |
-|------|-------|-----------|
-| 1 | Ruleset | `WizardStepRules` |
-| 2 | Basic Information | `WizardStepBasic` |
-| 3 | Race & Class | `WizardStepRaceClass` |
-| 4 | Feats | `WizardStepFeats` |
-| 5 | Ability Scores | `WizardStepAbilities` |
-| 6 | Skill Proficiencies | `WizardStepSkills` |
-| 7 | Languages & Fighting Styles | `WizardStepLanguages` |
-| 8 | Resistances & Immunities | `WizardStepResistances` |
-| 9 | Spells | `WizardStepSpells` |
-| 10 | Magic Items | `WizardStepMagicItems` |
-| 11 | Inventory | `WizardStepInventory` |
-| 12 | Special | `WizardStepSpecial` |
+**Calculation Services:**
+- `abilityCalc.js` / `abilityCalc2024.js` — Ability modifier and derived stat computation per ruleset
+- `attackCalc.js` / `attackCalc2024.js` — Attack bonus and damage calculations
+- `spellCalc.js` / `spellCalc2024.js` — Spell slot tables and spellcasting mechanics
+- `classRules.js` / `classRules2024.js` — Class feature computation, Hit Dice, HP progression
+- `proficiencyUtils.js` / `proficiencyUtils2024.js` — Proficiency bonus tracks
+- `rule s.js` (20 KB) — Master rules module composing all sub-calculators
 
-Per-step hooks (`useWizardSkills`, `useWizardAbilities`, etc.) compose `useWizardConfig` with step-specific validation. Wizard UI shell: `CharacterCreationWizard.jsx` with `WizardHeader`, `WizardSidebar`, `WizardFooter`, `WizardProgressBar`. Shared UI: `CascadingSelect`, `EquipmentSearchModal`, `SelectableList`.
+**Validation Services:** `featValidation`, `skillValidation`, `spellValidation`, `resistancesValidation`, `languagesFightingstylesValidation` — Pre-requisite and ruleset validation for character creation.
 
-### 2.3 Config (`src/config/`)
+**Categorization:** `featureCategories5e.js`, `featureCategories2024.js`, `featureCategorizationUtils.js` — Maps class features to UI categories (traits, spell slots, actions, etc.).
+
+**Generation Services:** `dungeonGenerator.js`, `hexTerrainGenerator.js`, `encounterGenerator.js`, `lootGenerator.js`, `randomEventService.js`, `weatherService.js` — Procedural content generation. Dungeon and terrain generators support seeded runs.
+
+**Map Tools:** `hexMapUtils.js`, `lineOfSight.js` (Bresenham grid visibility), `damageUtils.js`, `conditionEffects.js`, `conditionUtils.js`, `monsterUtils.js`, `npcStatBlockUtils.js`, `travelService.js`, `encounterToInitiative.js`
+
+**Dual-Ruleset Subdirectories:**
+- `race-rules/` — `index.js` (entry), `5e.js`, `2024.js` — Race trait computation per edition
+- `shared/` — `spell-utils.js` — Cross-ruleset spell utilities (level calculation)
+
+**Factory Pattern — `rulesFactory.js`:**
+Central strategy/factory that selects 5e or 2024 ruleset based on `playerSummary.rules`. Composes `rules`, `raceRules`, `classRules` sub-modules and delegates all player-state computation. Chain: `rulesFactory` → `rules` → per-ruleset calculators → `dataLoader`.
+
+### `src/config/` — Configuration Constants (3 files)
+
+- `constants.js` — Default character form shape, required fields
+- `outdoorConfig.js` — Hex map rendering constants, terrain types/colors, POI types, tool modes, zoom limits
+- `utils.js` — Async validation utilities (point-buy costs, ability score validation, step validation) using JSON rules files
+
+### `src/models/` — Data Models (2 files non-test)
+
+Minimal model layer. `SpellOverlay.js` defines geometry primitives for combat map targeting overlays (RADIUS / CONE / LINE), default dimensions, grid-to-screen conversion, and hit-testing logic. `config.js` contains build-time configuration.
+
+### `public/data/` — Static Reference Data (15 JSON files)
+
+Version-agnostic D&D data: ability-scores, actions, alignments, equipment, feats (5e), fighting-styles, languages, magic-items, monsters, passive-skills, resistances-immunities, rules-validation, spells (5e), classes (5e), races (5e). Mirrored under `public/data/2024/` for the 2024 edition (backgrounds, classes, feats, races, rules-validation, spells).
+
+### Express Server (`server.js` + `server/routes/` + `server/utils/`)
+
+**Server:** Port 80. Serves React SPA from `/dist` with catch-all fallback for client-side routing. Serves `public/campaigns/` with `no-store` headers to prevent caching of campaign data.
+
+**Routes (13 modules):**
+| Route Module | Responsibility |
+|---|---|
+| `campaigns-basic.js` | List campaigns and characters |
+| `campaigns-character.js` | Read/write/delete character JSON |
+| `campaigns-changedata.js` | Runtime change tracking (in-memory Map, 1-min debounced write-back) |
+| `campaigns-admin.js` | Create/rename/delete campaigns |
+| `campaigns-positioning.js` | Character ordering in campaigns |
+| `maps.js` | MAP CRUD and wall placement |
+| `encounters.js`, `factions.js`, `notes.js`, `npcs.js`, `quests.js` | Domain entity APIs |
+| `log.js` | Campaign log entries |
+| `sse.js` | Server-Sent Events: `/subscribe?campaign=<name>` pushes full snapshot then incremental updates via `changeData.publish()` |
+| `spell-overlay.js` | Real-time spell overlay geometry for multi-client maps |
+
+**Utils:** `changeData.js` (in-memory change-data Map with SSE publish), `encounterUtils.js`, `imageUtils.js`.
+
+**Health:** `/health` endpoint with 60s keep-alive interval to prevent proxy timeouts.
+
+### Build and Test Infrastructure
+
+| Tool | Purpose | Key Config |
+|---|---|---|
+| **Vite 8** + `@vitejs/plugin-react` | Bundler, dev server, HMR | Output → `dist/`, assets with original filenames (no hash), `copyPublicDir: true` |
+| **Vitest 4** | Test runner | jsdom env, globals, v8 coverage, setup via `src/test/setup.js`, matches `src/**/*.{test,spec}.{js,jsx}` |
+| **ESLint 8** | Linting | React + React Hooks + React Refresh plugins |
+
+Test coverage excluded for assets (images, fonts, audio/video). Output in text, json, html, lcov formats to `./coverage/`.
+
+### Migration and CLI Tools
 
 | File | Purpose |
-|------|---------|
-| `constants.js` | Required fields, default form data for character creation |
-| `steps-config.js` | Declarative wizard step definitions (step number, title, component, props function) |
-| `utils.js` | Wizard utility functions (point buy costs, ability validation, step validation) |
-| `outdoorConfig.js` | Hex map rendering constants (hex size, grid size, terrain types with colors/border styles, POI types, tool modes, zoom limits) |
-
-### 2.4 Routing (`src/routes/`)
-
-| File | Purpose |
-|------|---------|
-| `config.js` | **Single source of truth** for all views — defines `VIEWS`, `SIDEBAR_BUTTONS`, and `SIDEBAR_VIEWS` with full metadata (state variable type, component name, overlay flag) |
-
-Views defined in `config.js`:
-- **Sidebar views** (mutually exclusive via `activeView`): `charSheet`, `encounter`, `factions`, `initiative`, `mapsManager`, `map`, `notes`, `npcs`, `quests`, `campaignLog` (10 total)
-- **Overlay views** (independent boolean toggles): `campaignSelection`, `characterWizard`, `editCharacterWizard`
-- The `mapsView` state is an object `{ type: 'none' | 'manager' | 'map', mapName?: string }` controlling the maps sub-view
-
-### 2.5 Services (`src/services/`) — ~82 files
-
-Pure logic services with no UI dependencies. Every 5e file has a `*2024.js` pair where rules differ. Each service has a paired `.test.js`.
-
-| Category | Files | Purpose |
-|----------|-------|---------|
-| **Core** | `dataLoader.js`, `storage.js`, `utils.js`, `rules.js`, `rulesFactory.js`, `campaignService.js`, `sanitize.js` | Data loading with per-ruleset caching, localStorage wrapper with server sync, unified rules dispatch, campaign API client, DOMPurify wrapper |
-| **Calculations (5e ↔ 2024 pairs)** | `abilityCalc.js` / `abilityCalc2024.js`, `attackCalc.js` / `attackCalc2024.js`, `spellCalc.js` / `spellCalc2024.js`, `proficiencyUtils.js` / `proficiencyUtils2024.js` | Ability modifiers, weapon/spell attacks, spell lists and slots, proficiency calculation |
-| **Spell Management** | `spellLimits.js`, `spellValidation.js`, `shared/spell-utils.js` | Spell slot limits per class/level, spell selection validation, shared spell utilities |
-| **Class & Race Rules** | `classFeatures.js`, `classRules.js`, `classRules2024.js`, `race-rules/5e.js`, `race-rules/2024.js`, `race-rules/index.js` | Class-specific features, race traits (immunities, senses, bonuses) |
-| **Feature Categorization** | `featureCategories5e.js`, `featureCategories2024.js`, `featureCategorizationUtils.js` | Categorizes class/race features into actions, bonusActions, reactions, characterAdvancement |
-| **Validation** | `featValidation.js`, `skillValidation.js`, `resistancesValidation.js`, `languagesFightingstylesValidation.js` | Validates selections against ruleset constraints (prerequisites, level requirements, limits) |
-| **Encounter & Dungeon** | `encountersService.js`, `dungeonGenerator.js`, `monsterUtils.js`, `encounterGenerator.js`, `outdoorEncounterGenerator.js`, `randomEventService.js` | Encounter building, dungeon generation, monster utilities, random encounter suggestions, outdoor encounter seeding |
-| **Hex Map** | `hexMapUtils.js`, `hexTerrainGenerator.js` | Hex grid math (coord systems, adjacency), terrain rasterization via marching squares algorithm |
-| **Dice Roller** | `diceRoller.js` | D20, single/multi-die rolls, advantage/disadvantage, formula parsing (e.g. "2d6+3") |
-| **Campaign Tools** | `factionsService.js`, `mapsService.js`, `notesService.js`, `npcsService.js`, `questsService.js`, `logService.js`, `travelService.js`, `weatherService.js` | Faction management, map management, campaign notes, NPC management, quest tracking, campaign log, travel, weather |
-
-### 2.6 Static Data (`public/data/`)
-
-JSON catalogs loaded at runtime by `dataLoader.js` with per-ruleset caching:
-
-| Data | 5e Path | 2024 Path | Size (5e / 2024) |
-|------|---------|-----------|-------------------|
-| Classes | `data/classes.json` | `data/2024/classes.json` | 701KB / 432KB |
-| Races | `data/races.json` | `data/2024/races.json` | 52KB / 36KB |
-| Spells | `data/spells.json` | `data/2024/spells.json` | 507KB / 523KB |
-| Feats | `data/feats.json` | `data/2024/feats.json` | 26KB / 162KB |
-| Magic Items | `data/magic-items.json` | `data/2024/magic-items.json` | 250KB / 515KB |
-| Monsters | `data/monsters.json` | (shared) | 1.8MB / 1.5MB |
-| Backgrounds | — | `data/2024/backgrounds.json` | — / 13KB |
-| Ability Scores | `data/ability-scores.json` | (shared) | 18KB |
-| Equipment | `data/equipment.json` | (shared) | 125KB |
-| Skills | `data/passive-skills.json` | (shared) | 56B |
-| Actions | `data/actions.json` | (shared) | 195B |
-| Alignments | `data/alignments.json` | (shared) | 185B |
-| Languages | `data/languages.json` | (shared) | 249B |
-| Fighting Styles | `data/fighting-styles.json` | (shared) | 289B |
-| Rules Validation | `data/rules-validation.json` | `data/2024/rules-validation.json` | 2KB / 1KB |
-| Resistances | `data/resistances-immunities.json` | (shared) | 194B |
-
-### 2.7 Campaign Data (`public/campaigns/`)
-
-**Directory structure per campaign:**
-```
-public/campaigns/<campaign>/
-├── <CharacterName>.json          # Character files (validated against schema)
-├── data/
-│   ├── character-change-data.json # Runtime state (HP, slots, etc.)
-│   ├── encounters.json
-│   ├── factions.json
-│   ├── notes.json
-│   ├── npcs.json
-│   ├── quests.json
-│   └── campaign-log.json          # (optional)
-├── extras/                        # Additional character files
-├── images/                        # Character portrait images
-└── maps/                          # Map JSON files (indoor + outdoor)
-```
-
-**Schemas** (all JSON Schema draft-07, located in `public/campaigns/`):
-- `character.schema.json` — Character data (required: name, level, alignment, race, class, abilities, inventory, skillProficiencies, rules)
-- `encounters.schema.json` — Encounter data with difficulty, player levels, monsters
-- `factions.schema.json` — Faction data with influence scores
-- `maps-indoor.schema.json` — Indoor grid map with walls, placed items, fog-of-war
-- `maps-outdoor.schema.json` — Outdoor hex map with terrain, POIs, weather, party position
-- `notes.schema.json` — Campaign notes with privacy and timestamps
-- `npcs.schema.json` — NPC data with race, class, attitude
-- `quests.schema.json` — Quest data with status tracking
-
-**Existing campaigns:** `2024 Testing`, `5e Testing`, `General Testing`
-
-### 2.8 Runtime State
-
-- **In-memory (`characterChangeData` Map):** Server holds per-campaign transient state (HP, spell slots, positioning, etc.) in memory. Persisted to `character-change-data.json` on a 60-second debounce.
-- **In-memory (`activeMaps` Map):** Tracks which map is active per campaign.
-- **In-memory (`subscribers` Array):** Active SSE client connections for real-time broadcast.
-- **In-memory (`logCache` Map):** Campaign log entries cached server-side, debounced write to `campaign-log.json`.
-- **localStorage:** Client-side persistence for tracked resources and theme preference.
+|---|---|
+| `migrate5eTo2024.mjs` | Converts 5e monsters to 2024 schema; parses attack descriptions, dice expressions, save DCs/types, reach/range; merges overlapping monsters |
+| `dungeon-generator.mjs` | CLI wrapper for procedural dungeon generation with seed support |
+| `hex-terrain-generator.mjs` | CLI wrapper for procedural hex terrain generation with seed support |
 
 ---
 
-## 3. Data Flow Summary
+## Data Flow Summary
 
 ```
-┌──────────────┐      ┌──────────────┐      ┌──────────────┐
-│  Static JSON  │      │  Character   │      │  Runtime     │
-│  (data/*.json)│      │  Files       │      │  State       │
-└──────┬───────┘      └──────┬───────┘      └──────┬───────┘
-       │                      │                      │
-       ▼                      ▼                      ▼
-   ┌──────────┐        ┌──────────┐          ┌──────────┐
-   │dataLoader│        │ Express  │          │ localStorage│
-   │(cached)  │        │ REST API │          │ (client)   │
-   └────┬─────┘        └────┬─────┘          └──────────┘
-       │                      │
-       ▼                      ▼
-    ┌──────────┐        ┌──────────┐         ┌──────────────┐
-    │ rules.js │        │ SSE      │         │ Hex Map      │
-    │ + *-calc │        │/subscribe│         │ Services     │
-    └────┬─────┘        └────┬─────┘         │(hexMapUtils, │
-       │                      │              │ hexTerrain)  │
-       ▼                      ▼              └──────┬───────┘
-┌──────────────────────────────────────┐            │
-│ React Components (UI)               │            ▼
-│                                    │   ┌──────────────────┐
-│ CharSheet · Initiative · Encounter │   │ HexMap Layered   │
-│ Maps (indoor + outdoor hex)       │   │ SVG Rendering    │
-│ Quests · Notes · Factions · NPCs  │   └──────────────────┘
-│ CharacterCreationWizard           │
-└──────────────────────────────────────┘
+[User Action] → [Component] → [Custom Hook] → [Service / dataLoader]
+                                                    ↓
+                                           [/api/*  or /data/*.json]
+                                                    ↓
+                                         [Express Server ↔ File System]
+                                                    ↑
+                                    [SSE推送 update via changeData.publish()]
+                                    [←───────────────────────────────┘]
 ```
 
-1. **Initialization:** `dataLoader.js` loads all static JSON catalogs (cached per ruleset). `useAppData.js` exposes this to components.
-2. **Character CRUD:** `useCharacterManagement.js` calls Express REST API (`/api/campaigns/*`) for list/create/update/delete. Characters are persisted as JSON files on disk.
-3. **Real-time sync:** `Subscriber` component connects to SSE (`/subscribe?campaign=<name>`). On connect, the server replays the full change-data snapshot for the campaign. Subsequent changes are broadcast via `publish()`.
-4. **Ephemeral state:** HP, spell slots, and tracked resources are stored in per-campaign `character-change-data.json` (in-memory, debounced 60s save). Client also writes to localStorage and fire-and-forgets to the server API.
-5. **Rules evaluation:** `rules.js` dispatches to 5e or 2024 logic based on `playerStats.rules`. Calculation services compute modifiers, attacks, spells, and class features from the character data.
-6. **Campaign tools:** Encounter, quest, faction, notes, NPC, and map data are stored as JSON files under campaign directories. Each has CRUD endpoints.
-7. **Hex maps:** Outdoor hex maps use seeded procedural terrain generation (`hexTerrainGenerator.js`) with biome-specific feature placement (`outdoorEncounterGenerator.js`). Indoor maps support grid/wall/item/player placement with fog-of-war.
+1. **Static data** flows: Component → Hook → `dataLoader.js` → HTTP fetch from `/data/<type>.json` → Express serves file from `public/data/` or `public/data/2024/`.
+2. **Campaign/persistent data** flows two ways depending on entity type:
+   - **Characters**: Hook → `campaignService` / `storage.js` → localStorage (immediate) + fire-and-forget HTTP to `/api/campaigns/{campaign}/{key}`.
+   - **All other entities** (NPCs, quests, maps, etc.): Hook → domain service → HTTP POST/PUT/DELETE to `/api/*/`. Data stored in `public/campaigns/<name>/` as JSON on disk.
+3. **Real-time sync**: Client subscribes via SSE at `/subscribe?campaign=<name>`. Server pushes full snapshot on connect, then incremental updates via `changeData.publish()` with campaign-scoped filtering. Components render `<Subscriber>` to receive events.
+4. **Player stats computation** (client-side only): Component → `rulesFactory.js` → selects 5e or 2024 ruleset → delegates to sub-calculators → pure functions compute derived state from `playerSummary`.
 
 ---
 
-## 4. Dependency Graph (Textual)
+## Dependency Graph (Textual)
 
 ```
-main.jsx
-   └── App.jsx
-        ├── CampaignSelection
-        ├── CharSheet
-        │     ├── CharSummary → CharHitPoints, CharGold, CharClassFeatures, CharConditions, DeathSavingThrows
-        │     ├── CharAbilities
-        │     ├── CharActions
-        │     ├── CharInventory
-        │     ├── CharReactions
-        │     ├── CharSpecialActions
-        │     ├── CharCharacterAdvancement
-        │     ├── CharFeats (char-feats/)
-        │     └── CharSpells → CharSpellSlots, CharSpellSlotLevel (char-spells/)
-        │           → LongRestButton, ShortRestButton, ShortRestModal
-        ├── Initiative
-        ├── EncounterBuilder → EncounterFilterPanel, EncounterGeneratorModal, EncounterModal, EncounterMonsterTable, EncounterSelectedMonsters, EncounterSummaryPanel
-        ├── HexMap → HexGridLayer, TerrainLayer, POILayer, RiverLayer, RoadLayer, PartyMarkerLayer, TravelPathLayer, WeatherOverlay, MarchingOrderPanel, TravelPanel, EventDialog, POIContextMenu, POIPanel, 9 SVG icons
-        │     └── useHexMapSSESync
-        ├── Map → GridAndWalls, PlacedItems, Players, ItemsPanel, FogOverlay, MapToolbar, 20+ SVG components, ItemContextMenu
-        │     ├── useItemDragging, useNpcImageCache, usePlacedItems, usePlayerDragging, useSSESync
-        ├── MapsManager → GenerateDungeonModal, GenerateTerrainModal
-        ├── Factions
-        ├── Notes
-        ├── Quests
-        ├── NPCs
-        ├── Log
-        ├── CharacterCreationWizard → 12 step components + WizardHeader, WizardSidebar, WizardFooter, WizardProgressBar
-        └── Sidebar (theme toggle, character list, view nav, campaign management)
-
-Hooks → Services:
-   useAppData → dataLoader.js → public/data/*.json
-   useCampaignManagement → campaignService.js → Express API
-   useCharacterManagement → Express API
-   useCharacterWizard → Express API
-   useTrackedResource → localStorage + storage.js → Express API
-   useWizardConfig → rules.js + validation services
-   useEncounterManagement → encountersService.js → Express API
-   useFactionsManagement → factionsService.js → Express API
-   useMonstersData → public/data/monsters.json
-   useNotesManagement → notesService.js → Express API
-   useNPCsManagement → npcsService.js → Express API
-   useQuestsManagement → questsService.js → Express API
-   useDiceRoll → diceRoller.js (pure functions)
-   useLoggedDiceRoll → diceRoller.js + logService.js
-   useTravelManagement → travelService.js → Express API
-
-Services (pure logic, no UI):
-   rules.js → abilityCalc.js/abilityCalc2024.js
-              attackCalc.js/attackCalc2024.js
-              spellCalc.js/spellCalc2024.js
-              proficiencyUtils.js/proficiencyUtils2024.js
-              classRules.js/classRules2024.js
-              race-rules/5e.js, race-rules/2024.js
-   rulesFactory.js → rules.js (delegation wrappers)
-   classFeatures.js → classRules.js/classRules2024.js
-   featureCategorizationUtils.js → featureCategories5e.js/featureCategories2024.js
-   spellLimits.js, spellValidation.js, shared/spell-utils.js
-   featValidation.js, skillValidation.js
-   resistancesValidation.js, languagesFightingstylesValidation.js
-   sanitize.js (DOMPurify wrapper)
-   encountersService.js, dungeonGenerator.js, monsterUtils.js
-   encounterGenerator.js, outdoorEncounterGenerator.js, randomEventService.js
-   hexMapUtils.js, hexTerrainGenerator.js
-   diceRoller.js
-   factionsService.js, mapsService.js, notesService.js, npcsService.js, questsService.js, logService.js, travelService.js, weatherService.js
-
-Server:
-   server.js
-    ├── server/utils/changeData.js (in-memory state, SSE pub/sub, debounced persistence)
-    ├── server/utils/encounterUtils.js (encounter file I/O)
-    ├── server/utils/imageUtils.js (base64 image processing)
-    └── server/routes/
-        ├── sse.js (SSE /subscribe, /health, SPA fallback)
-        ├── campaigns-basic.js (list campaigns, list character files)
-        ├── campaigns-character.js (character CRUD + image handling)
-        ├── campaigns-changedata.js (generic key/value change data)
-        ├── campaigns-positioning.js (character positioning on maps)
-        ├── campaigns-admin.js (create/rename/delete campaigns)
-        ├── maps.js (map CRUD, rename, activate)
-        ├── encounters.js (encounter CRUD + rename)
-        ├── notes.js (notes CRUD with privacy filtering)
-        ├── npcs.js (NPC CRUD)
-        ├── quests.js (quest CRUD, GM-only)
-        ├── factions.js (faction CRUD)
-        └── log.js (campaign log with in-memory cache)
+App.jsx
+├── Sidebar.jsx, CampaignSelection.jsx
+├── hooks: useAppData, useCampaignManagement, useCharacterManagement, useCharacterWizard
+│   ├── services/campaignService.js → Express /api/
+│   ├── services/storage.js → localStorage + Express /api/
+│   └── services/dataLoader.js → /data/*.json (Express serves from disk)
+├── Views (activeView state-driven):
+│   ├── CharSheet.jsx → rulesFactory.js → {rules, raceRules, classRules} → dataLoader
+│   │   └── char-sheet/* components
+│   ├── CharacterCreationWizard.jsx → hooks/useWizard* → steps-config.js, services/* validation
+│   │   └── character-creation/* components
+│   ├── Map.jsx (grid) / HexMap.jsx (outdoor) → services/hexMapUtils, lineOfSight, travelService
+│   ├── Initiative.jsx → services/encounterToInitiative
+│   ├── Encounter Builder → services/encounterGenerator, lootGenerator
+│   ├── NPCs, Factions, Quests, Notes → respective services + use*Management hooks
+│   ├── MapsManager, CampaignLog
+│   └── components/common/* (shared primitives for all views)
+│
+Express Server
+├── routes/: 13 modules → utils/changeData.js (SSE), utils/imageUtils.js, utils/encounterUtils.js
+└── File I/O: public/campaigns/<name>/ and public/data/*.json
 ```
 
-**Key dependency rules:**
-- Components → Hooks → Services → Static JSON (one-way data flow)
-- Services have no UI dependencies
-- Services are version-paired (`*-2024.js`) where rules differ
-- `rules.js` is the central dispatch point for all ruleset logic
-- The hex map subsystem uses layered SVG rendering (each layer is a separate component)
-- Campaign tool services follow the same pattern but operate on campaign-scoped JSON files
+---
+
+## Key Architectural Decisions (ADR Summary)
+
+| ADR | Decision | Rationale |
+|---|---|---|
+| **No routing library** | String-based `activeView` state drives navigation | Simpler; no URL-based routing needed for a single-campaign tool |
+| **File-based persistence** | JSON files on disk, no database | Simple deployment, human-editable data, no DB infrastructure |
+| **Dual-ruleset support** | Parallel modules (`*5e.js` / `*2024.js`) + factory selector | Full backward compatibility with 5e (2014); supports new 2024 edition |
+| **SSE for real-time sync** | Server-Sent Events (one-way server→client), not WebSockets | Simpler protocol sufficient for append-only and polling-based updates; no bidirectional requirement |
+| **Client-side stat computation** | `rulesFactory.js` computes derived player state in the browser | No server-round-trip needed; rules data already loaded client-side as JSON |
+| **Colocated CSS** | Each component has its own CSS file, global `index.css` for variables and themes | Per-component ownership without CSS-in-JS overhead |
+| **localStorage + server sync for characters** | Character sheets cached in localStorage with fire-and-forget HTTP sync | Immediate responsiveness; survives server restarts; eventual consistency is acceptable |
+| **Default exports only** | All components use `export default` | Consistent convention across the codebase |
 
 ---
 
-## 5. Key Architectural Decisions
+## Known Constraints and Assumptions
 
-### ADR-1: Dual Ruleset Architecture (5e ↔ 2024)
-**Decision:** Every calculation service has paired 5e and 2024 versions. A factory (`rulesFactory.js` / `rules.js`) dispatches to the correct implementation based on the character's `rules` field.
-
-**Rationale:** 5e and 2024 Essentials have significant mechanical differences (feats at level 1 vs 4, class majors vs subclasses, lineage races, energy systems, weapon mastery). Parallel files avoid conditional branching throughout the codebase.
-
-**Trade-off:** ~2× the service files, but cleaner separation and easier maintenance.
-
-### ADR-2: Server-Sent Events for Real-Time Sync
-**Decision:** Use SSE (`/subscribe`) rather than WebSockets for multi-user sync.
-
-**Rationale:** SSE is simpler (HTTP-based, auto-reconnect), sufficient for the push-only broadcast pattern needed. The server maintains an in-memory subscribers array and broadcasts character updates to all connected clients filtered by campaign.
-
-**Trade-off:** No client-to-client messaging; server is the sole broadcaster. In-memory subscriber list means no horizontal scaling without sticky sessions.
-
-### ADR-3: Declarative Wizard Configuration
-**Decision:** Character creation wizard steps are defined declaratively in `steps-config.js` (step number, title, component, props function).
-
-**Rationale:** Adding or reordering steps requires only editing the config, not the wizard orchestrator. Per-step hooks compose `useWizardConfig` with step-specific validation.
-
-**Trade-off:** Slight indirection; understanding a step requires reading both the config and its component.
-
-### ADR-4: Non-Blocking Validation with Warnings
-**Decision:** Validation services produce warnings, not errors. Required fields are the only hard constraints (steps 1–3: ruleset, basic info, race & class).
-
-**Rationale:** D&D character creation is creative; the app guides without blocking. Players can create "sub-optimal" characters and fix warnings later.
-
-**Trade-off:** Risk of invalid characters being saved; mitigated by server-side schema validation.
-
-### ADR-5: File-Based Character Storage
-**Decision:** Characters are stored as JSON files on disk, served via Express, not a database.
-
-**Rationale:** Simple, version-controllable, human-readable. JSON Schema (`character.schema.json`) provides structural validation.
-
-**Trade-off:** No concurrent write protection; race conditions possible if two users edit the same character simultaneously (mitigated by SSE broadcast).
-
-### ADR-6: Centralized View Configuration
-**Decision:** All views (sidebar and overlay) are defined declaratively in `src/routes/config.js` with metadata about state variables, component names, and overlay status.
-
-**Rationale:** Single source of truth for view behavior. Adding a new sidebar view requires only adding entries to `VIEWS`, `SIDEBAR_BUTTONS`, and `SIDEBAR_VIEWS`.
-
-**Trade-off:** Tight coupling between sidebar and view config; changes to one require awareness of the other.
-
-### ADR-7: Per-Campaign Character Change Data Files
-**Decision:** Tracked resource state (HP, spell slots, rage, etc.) is persisted to per-campaign files at `public/campaigns/<campaign>/data/character-change-data.json` with a 60-second debounce.
-
-**Rationale:** Campaigns are independent contexts; keeping change data scoped prevents cross-campaign state leakage and aligns with the existing per-campaign directory structure.
-
-**Trade-off:** Slightly more complex file path resolution, but cleaner campaign isolation.
-
-### ADR-8: Layered Hex Map Rendering
-**Decision:** The outdoor hex map (`hex-map/`) uses a layered SVG architecture where each visual element type (grid, terrain, POIs, rivers, roads, party markers, travel paths, weather) is rendered by an independent React component.
-
-**Rationale:** Each map layer can be independently toggled or styled without affecting other layers. The hex grid math (`hexMapUtils.js`) and terrain generation (`hexTerrainGenerator.js`) are decoupled utilities.
-
-**Trade-off:** Multiple SVG layers add rendering overhead; pan/zoom affects all layers.
-
-### ADR-9: Deterministic Outdoor Encounter Seeding
-**Decision:** Random outdoor encounters on hex maps use a deterministic hash-based seed combined with the Mulberry32 PRNG. Every hex at given coordinates produces the same encounter features every time.
-
-**Rationale:** Players can return to a hex and find the same terrain features. Biome-type feature pools are selected based on the hex's terrain type with min-distance constraints to prevent overlap.
-
-**Trade-off:** Fixed seed pool is limited; the BIOME_FEATURES map must be extended for new terrain types.
-
-### ADR-10: Pure Dice Roller Service
-**Decision:** All dice rolling logic lives in a single service (`diceRoller.js`) with no dependencies.
-
-**Rationale:** Pure utility functions are trivially testable. The UI layer accesses them through `useDiceRoll.js` and `useLoggedDiceRoll.js`, which manage roll history and integrate with character sheet actions.
-
-**Trade-off:** No server-side authority for dice rolls; clients trust their own RNG (`Math.random()`).
-
-### ADR-11: Theme Selection via localStorage
-**Decision:** Dark/light theme is stored in `localStorage` as a simple preference string applied to `document.body` via `data-theme` attribute. The default is `'dark'`.
-
-**Rationale:** Simple persistence without needing an API call or server configuration.
-
-**Trade-off:** Theme is client-local only; no cross-device sync or per-user profile.
-
-### ADR-12: State-Based Navigation (No Router)
-**Decision:** All navigation uses a single `activeView` string state variable. No react-router or any routing library is used.
-
-**Rationale:** Simplicity — the app has a flat view structure with one active sidebar view at a time. URL-based routing is unnecessary for this use case.
-
-**Trade-off:** No deep linking, no browser history integration, no URL-driven navigation.
-
-### ADR-13: GM/Player Role Differentiation via `isLocalhost`
-**Decision:** Certain features (map management, quest editing, private notes) are only available when the client is running on localhost.
-
-**Rationale:** Simple role-based access control without authentication. The GM runs the server locally; players connect over the network.
-
-**Trade-off:** No granular permissions; anyone with localhost access has full GM privileges.
+1. **No database** — Data files are on disk accessible to the Node.js process. Multi-instance deployment requires shared storage (NAS, network mount).
+2. **Single-user primary** — SSE enables multi-client sync within a single server instance, but there is no distributed locking or conflict resolution beyond last-write-wins on file I/O.
+3. **No URL routing** — Bookmarking or deep-linking into specific views is not possible; browser back/forward does not navigate between views.
+4. **Rules computation is client-side only** — Server has no knowledge of D&D rules. All stat calculations happen in the browser via `rulesFactory.js`.
+5. **No SSR** — Pure SPA; initial page load requires JavaScript execution.
+6. **SSE keep-alive** required by reverse proxies (60s interval on `/health`) to prevent connection drops.
 
 ---
 
-## 6. Known Constraints & Assumptions
+## Recommended Future Improvements
 
-- **Single server instance:** SSE subscribers are in-memory; horizontal scaling requires sticky sessions or a message broker.
-- **No TypeScript:** The project uses vanilla JS/JSX. Type safety is not enforced at compile time.
-- **No coverage thresholds:** Vitest coverage thresholds are all set to 0 — tests exist but coverage is not enforced.
-- **Port 80 default:** The server defaults to port 80 (requires root privileges on Unix).
-- **Static data is bundled:** All D&D rule data is shipped as JSON files — no external API calls for game data.
-- **Browser support:** Assumes modern browsers with ES module support (Vite 8 target).
-- **Character schema:** All character JSON files must conform to `character.schema.json` (draft-07).
-- **No concurrent edit protection:** Multiple users editing the same character simultaneously may cause race conditions. Only SSE broadcast provides awareness of changes.
-- **Campaign tool schemas exist but are not validated at runtime:** JSON Schema files exist for encounters, NPCs, notes, quests, factions, and maps, but the server does not enforce them during writes.
-- **Hex rendering performance:** Layered SVG on large hex grids (30×30 = 900+ hexes) may impact frame rate; zoom/pan operations trigger full layer re-renders.
-- **Dice RNG:** Client-side only using `Math.random()`; not suitable for high-stakes or audit scenarios.
-- **Campaign selection as gate:** The application always starts at the campaign selection overlay.
-- **No CI/CD pipeline:** No GitHub Actions, GitLab CI, or other automation configured.
-- **No containerization:** No Dockerfile or docker-compose configuration.
-- **No environment configuration:** No `.env` files; only `PORT` environment variable is supported.
+1. **URL-based routing** — Adopt React Router or similar for bookmarkable views, back/forward navigation, and shareable links.
+2. **Database migration** — Replace file-based storage with SQLite or similar embedded database for concurrent access safety and query performance.
+3. **Conflict resolution** — Add timestamp/version-based optimistic concurrency for server-side writes to prevent data loss in multi-client scenarios.
+4. **Code splitting** — Vite config does not configure explicit lazy loading; route-level code splitting would reduce initial bundle size.
+5. **TypeScript migration** — Current codebase is all JavaScript/JSX (per coding standards); adding TS would improve maintainability as the codebase grows (267 source files, 139 tests).
+6. **i18n support** — Currently hardcoded English strings; could be extracted for multi-language support.
 
 ---
 
-## 7. Recommended Future Improvements
-
-1. **Coverage thresholds:** Set non-zero coverage thresholds in `vitest.config.js` to prevent test regressions.
-2. **Runtime schema validation:** Enforce JSON Schema validation on the server for all campaign tool data writes (encounters, NPCs, quests, etc.).
-3. **PWA support:** Add service worker for offline character sheet access and cached static data.
-4. **Server-side dice verification:** Implement optional server-side RNG signing for auditability in multiplayer sessions.
-5. **Hex map virtualization:** For grids larger than 30×30, implement viewport-aware hex rendering to avoid drawing off-screen hexes.
-6. **Concurrent write protection:** Add optimistic locking or last-write-wins with conflict detection for character file edits.
-7. **Authentication:** Replace the `isLocalhost` GM check with proper user authentication for multi-user deployments.
-8. **CI/CD pipeline:** Add automated testing and deployment via GitHub Actions or similar.
-9. **Containerization:** Add Dockerfile for consistent deployment across environments.
-10. **TypeScript migration:** Consider migrating to TypeScript for compile-time type safety, especially for the large service layer.
-
----
-
-## 8. File Inventory Summary
+## File Statistics
 
 | Category | Count |
-|----------|-------|
-| Source files (.js) | ~82 services + ~46 hooks + ~13 server routes + ~4 server utils + ~4 config + 3 core = ~152 |
-| React component files (.jsx) | ~100 (character-creation ~22, char-sheet ~20, hex-map ~18, map ~25+, others ~15) |
-| Test files (.test.js / .test.jsx) | ~62 (paired with nearly all source files) |
-| CSS files (.css) | ~25 (spread across component directories) |
-| Static data JSON | 18 (public/data/ + public/data/2024/) |
-| JSON Schema files | 8 (in public/campaigns/) |
-| Campaign data files | ~30+ (across 3 test campaigns) |
-| Image assets | ~20+ (character portraits, static examples, icons) |
-| **Total (excl. node_modules)** | **~360+** |
-
----
-
-*Document generated automatically. Last updated: 2026-05-25T00:00:00Z*
+|---|---|
+| Source files (JS/JSX/CSS) | 267 |
+| Test files | 139 |
+| Hooks (non-test) | 22 |
+| Service modules (non-test) | 48 |
+| Server route modules | 13 |
+| Server utility modules | 3 |
+| Component directories | 12 |
