@@ -19,7 +19,7 @@ function HexMapToolbar({
     marchingOrder,
 }) {
     return (
-        <div className="hex-map-toolbar">
+        <div className="hex-map-toolbar no-print">
             <button onClick={onBack} title="Back to maps">
                 <i className="fa-solid fa-arrow-left"></i>
             </button>
@@ -101,6 +101,11 @@ function HexMapToolbar({
                 {marchingOrder.length > 0 && (
                     <span className="hex-map-poi-indicator">{marchingOrder.length}</span>
                 )}
+            </button>
+
+            {/* Print */}
+            <button onClick={() => window.print()} title="Print map">
+                <i className="fa-solid fa-print"></i>
             </button>
 
             {/* Zoom controls */}

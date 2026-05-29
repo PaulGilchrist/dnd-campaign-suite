@@ -1204,7 +1204,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                         />
                     </svg>
 
-                    <div className="hex-map-compass">
+                    <div className="hex-map-compass no-print">
                         <svg viewBox="0 0 48 48" width="44" height="44">
                             <polygon points="24,2 28,20 46,24 28,28 24,46 20,28 2,24 20,20" fill="#666" stroke="#999" strokeWidth="0.5" />
                             <polygon points="24,2 28,20 24,24 20,20" fill="#c44" />
@@ -1223,67 +1223,73 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                         </div>
                     </div>
 
-                    <WeatherOverlay weather={weather} />
+                    <div className="no-print"><WeatherOverlay weather={weather} /></div>
                 </div>
             )}
 
             {/* Marching Order Panel overlay */}
             {marchingOpen && (
-                <MarchingOrderPanel
-                    marchingOrder={marchingOrder}
-                    setMarchingOrder={setMarchingOrder}
-                    characters={characters}
-                    onClose={() => setMarchingOpen(false)}
-                />
+                <div className="no-print">
+                    <MarchingOrderPanel
+                        marchingOrder={marchingOrder}
+                        setMarchingOrder={setMarchingOrder}
+                        characters={characters}
+                        onClose={() => setMarchingOpen(false)}
+                    />
+                </div>
             )}
 
             {/* POI Panel overlay */}
             {poiPanelOpen && (
-                <POIPanel
-                    poiPanelOpen={poiPanelOpen}
-                    onClose={() => setPoiPanelOpen(false)}
-                />
+                <div className="no-print">
+                    <POIPanel
+                        poiPanelOpen={poiPanelOpen}
+                        onClose={() => setPoiPanelOpen(false)}
+                    />
+                </div>
             )}
 
             {/* Travel Panel overlay */}
-            <TravelPanel
-                travelMode={travelMgmt.travelMode}
-                travelPace={travelMgmt.travelPace}
-                destination={travelMgmt.destination}
-                path={travelMgmt.path}
-                pathIndex={travelMgmt.pathIndex}
-                accruedCost={travelMgmt.accruedCost}
-                dailyBudget={travelMgmt.dailyBudget}
-                dayExhausted={travelMgmt.dayExhausted}
-                lastMessage={travelMgmt.lastMessage}
-                paceInfo={travelMgmt.paceInfo}
-                hexesRemaining={travelMgmt.hexesRemaining}
-                isTravelActive={travelMgmt.isTravelActive}
-                pendingEvent={travelMgmt.pendingEvent}
-                terrain={terrain}
-                eventFrequency={travelMgmt.eventFrequency}
-                onChangePace={travelMgmt.changePace}
-                onAdvance={handleAdvance}
-                onCancel={travelMgmt.cancelTravel}
-                onForceCamp={handleForceCamp}
-                onForcedMarch={handleForcedMarch}
-                weather={weather}
-                onReRollWeather={handleReRollWeather}
-                onSetEventFrequency={travelMgmt.setEventFrequency}
-                horseback={travelMgmt.horseback}
-                onToggleHorseback={travelMgmt.toggleHorseback}
-                forcedMarchHours={travelMgmt.forcedMarchHours}
-                exhaustionMultiplier={travelMgmt.exhaustionMultiplier}
-                partyHasMaxExhaustion={travelMgmt.partyHasMaxExhaustion}
-            />
+            <div className="no-print">
+                <TravelPanel
+                    travelMode={travelMgmt.travelMode}
+                    travelPace={travelMgmt.travelPace}
+                    destination={travelMgmt.destination}
+                    path={travelMgmt.path}
+                    pathIndex={travelMgmt.pathIndex}
+                    accruedCost={travelMgmt.accruedCost}
+                    dailyBudget={travelMgmt.dailyBudget}
+                    dayExhausted={travelMgmt.dayExhausted}
+                    lastMessage={travelMgmt.lastMessage}
+                    paceInfo={travelMgmt.paceInfo}
+                    hexesRemaining={travelMgmt.hexesRemaining}
+                    isTravelActive={travelMgmt.isTravelActive}
+                    pendingEvent={travelMgmt.pendingEvent}
+                    terrain={terrain}
+                    eventFrequency={travelMgmt.eventFrequency}
+                    onChangePace={travelMgmt.changePace}
+                    onAdvance={handleAdvance}
+                    onCancel={travelMgmt.cancelTravel}
+                    onForceCamp={handleForceCamp}
+                    onForcedMarch={handleForcedMarch}
+                    weather={weather}
+                    onReRollWeather={handleReRollWeather}
+                    onSetEventFrequency={travelMgmt.setEventFrequency}
+                    horseback={travelMgmt.horseback}
+                    onToggleHorseback={travelMgmt.toggleHorseback}
+                    forcedMarchHours={travelMgmt.forcedMarchHours}
+                    exhaustionMultiplier={travelMgmt.exhaustionMultiplier}
+                    partyHasMaxExhaustion={travelMgmt.partyHasMaxExhaustion}
+                />
 
-            <EventDialog
-                event={travelMgmt.pendingEvent}
-                rerollsRemaining={travelMgmt.rerollsRemaining}
-                onAccept={handleEventAccept}
-                onSkip={handleEventSkip}
-                onReroll={handleEventReroll}
-            />
+                <EventDialog
+                    event={travelMgmt.pendingEvent}
+                    rerollsRemaining={travelMgmt.rerollsRemaining}
+                    onAccept={handleEventAccept}
+                    onSkip={handleEventSkip}
+                    onReroll={handleEventReroll}
+                />
+            </div>
         </div>
     );
 }
