@@ -151,12 +151,12 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 <div>
                     <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{playerStats.armorClass}</div>
                     <CharHitPoints playerStats={playerStats} campaignName={campaignName}></CharHitPoints>
-                    <b>Speed: </b>{speed} ft.<br />
+                    <b>Speed: </b><span className={exhaustionLevel > 0 ? 'stat--penalized' : ''}>{speed}</span> ft.<br />
                     <CharGold playerStats={playerStats} campaignName={campaignName}></CharGold>
                 </div>
                 <div>
                     <b>Proficiency: </b>+{playerStats.proficiency}<br />
-                    <span className='clickable' onClick={() => rollInitiative(effectiveInitiative)}><b>Initiative: </b>{signFormatter.format(effectiveInitiative)}</span><br />
+                    <span className={'clickable' + (exhaustionLevel > 0 ? ' stat--penalized' : '')} onClick={() => rollInitiative(effectiveInitiative)}><b>Initiative: </b>{signFormatter.format(effectiveInitiative)}</span><br />
                     <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiration} /><br />
                 </div>
                 <div>

@@ -79,8 +79,8 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
             <div className='spell-abilities'>
                 <div className="sectionHeader"><h4>&nbsp;Spells</h4></div>
                 <div>
-                    <b className="clickable" onClick={() => rollAttack('Spell Attack', playerStats.spellAbilities.toHit - exhaustionPenalty)}>Attack (to hit):</b> +{playerStats.spellAbilities.toHit - exhaustionPenalty}<br/>
-                    <b>Modifier:</b> +{playerStats.spellAbilities.modifier - exhaustionPenalty}<br/>
+                    <b className="clickable" onClick={() => rollAttack('Spell Attack', playerStats.spellAbilities.toHit - exhaustionPenalty)}>Attack (to hit):</b> <span className={exhaustionPenalty > 0 ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.toHit - exhaustionPenalty}</span><br/>
+                    <b>Modifier:</b> <span className={exhaustionPenalty > 0 ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.modifier - exhaustionPenalty}</span><br/>
                     <b>Save DC:</b> {playerStats.spellAbilities.saveDc}
                 </div>
                 <div>

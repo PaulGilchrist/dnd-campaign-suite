@@ -30,11 +30,11 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                 return <div key={ability.name} className='abilities'>
                     <div className='clickable left' onClick={() => setPopupHtml(abilityDesc(ability.name))}>{ability.name}</div>
                     <div>{ability.totalScore}</div>
-                    <div className='clickable' onClick={() => rollAbilityCheck(ability.name, ability.bonus - exhaustionPenalty)}>{signFormatter.format(ability.bonus - exhaustionPenalty)}</div>
-                    <div className='clickable' onClick={() => rollSavingThrow(ability.name, ability.save - exhaustionPenalty)}>{signFormatter.format(ability.save - exhaustionPenalty)}</div>
+                    <div className={'clickable' + (exhaustionPenalty > 0 ? ' stat--penalized' : '')} onClick={() => rollAbilityCheck(ability.name, ability.bonus - exhaustionPenalty)}>{signFormatter.format(ability.bonus - exhaustionPenalty)}</div>
+                    <div className={'clickable' + (exhaustionPenalty > 0 ? ' stat--penalized' : '')} onClick={() => rollSavingThrow(ability.name, ability.save - exhaustionPenalty)}>{signFormatter.format(ability.save - exhaustionPenalty)}</div>
                     <div className='left'>{ability.skills.map((skill) => {
                         return <span key={skill.name}>
-                            <span className='clickable' onClick={() => rollSkillCheck(skill.name, skill.bonus - exhaustionPenalty)}>{skill.name} ({signFormatter.format(skill.bonus - exhaustionPenalty)})</span>
+                            <span className={'clickable' + (exhaustionPenalty > 0 ? ' stat--penalized' : '')} onClick={() => rollSkillCheck(skill.name, skill.bonus - exhaustionPenalty)}>{skill.name} ({signFormatter.format(skill.bonus - exhaustionPenalty)})</span>
                             {ability.skills.indexOf(skill) < ability.skills.length - 1 ? ', ' : ''}
                         </span>;
                     })}</div>

@@ -76,6 +76,10 @@
     margin-bottom: 2px;
 }
 
+.stat--penalized {
+    color: var(--color-error-light);
+}
+
 @media print {
     .char-sheet {
         padding: 0;

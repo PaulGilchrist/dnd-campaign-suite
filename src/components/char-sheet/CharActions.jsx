@@ -83,7 +83,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         return <React.Fragment key={attack.name}>
                             <div className='left'>{attack.name}</div>
                             <div>{attack.range} ft.</div>
-                            <div className={attack.hitBonusFormula ? "clickable" : ""} onClick={() => rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, buildAttackContext(attack))}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>
+                            <div className={(attack.hitBonusFormula ? "clickable" : "") + (exhaustionPenalty > 0 ? " stat--penalized" : "")} onClick={() => rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, buildAttackContext(attack))}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>
                             <div className={attack.damage ? "clickable" : ""} onClick={() => handleDamageClick(attack)}>{attack.damage}</div>
                             <div className='left'>{attack.damageType}</div>
                             {is2024Rules && <div>{getWeaponMastery(attack.name) || ''}</div>}
@@ -120,7 +120,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             return <React.Fragment key={attack.name}>
                                 <div className='left'>{attack.name}</div>
                                 <div>{attack.range} ft.</div>
-                            <div className={attack.hitBonusFormula ? "clickable" : ""} onClick={() => rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, buildAttackContext(attack))}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>
+                            <div className={(attack.hitBonusFormula ? "clickable" : "") + (exhaustionPenalty > 0 ? " stat--penalized" : "")} onClick={() => rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, buildAttackContext(attack))}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>
                                 <div className={attack.damage ? "clickable" : ""} onClick={() => handleDamageClick(attack)}>{attack.damage}</div>
                                 <div className='left'>{attack.damageType}</div>
                                 {is2024Rules && <div>{getWeaponMastery(attack.name) || ''}</div>}
