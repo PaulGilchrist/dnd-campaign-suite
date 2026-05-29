@@ -35,6 +35,10 @@ export default defineConfig({
                 timeout: 0,
                 proxyTimeout: 0,
             },
+            '/spell-overlay': {
+                target: 'http://localhost:80',
+                changeOrigin: true,
+            },
         },
     }
 })

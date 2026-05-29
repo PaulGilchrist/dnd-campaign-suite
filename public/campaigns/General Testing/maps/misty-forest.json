@@ -1899,8 +1899,8 @@
     }
   ],
   "zoom": 3.125,
-  "panX": 1299.2647460583476,
-  "panY": 529.0554076812682,
+  "panX": 1272.9281056113086,
+  "panY": 437.440139968688,
   "marchingOrder": [
     "Monk",
     "Paladin",
@@ -1909,7 +1909,7 @@
   ],
   "partyPosition": {
     "q": 28,
-    "r": 12
+    "r": 11
   },
   "weather": {
     "condition": "fog",

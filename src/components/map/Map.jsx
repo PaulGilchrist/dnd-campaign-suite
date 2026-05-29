@@ -42,6 +42,9 @@ import useItemDragging from './hooks/useItemDragging';
 import useNpcImageCache from './hooks/useNpcImageCache';
 import useSSESync from './hooks/useSSESync';
 import useFogOfWar from './hooks/useFogOfWar';
+import useSpellOverlay from './hooks/useSpellOverlay';
+import SpellOverlayRenderer from './SpellOverlayRenderer.jsx';
+import { OverlayShape, DEFAULTS, createOverlay } from '../../models/SpellOverlay.js';
 import HexMap from '../hex-map/HexMap';
 import '../hex-map/HexMap.css';
 
@@ -82,6 +85,19 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     // Paint state: tracks grid coords during active paint/erase
     const [painting, setPainting] = useState(null);
     const [panning, setPanning] = useState(null); // { startX, startY, startPanX, startPanY }
+
+    // Spell overlay state
+    const [spellMode, setSpellMode] = useState(null); // null | 'radius' | 'cone' | 'line'
+    const [selectedShape, setSelectedShape] = useState(OverlayShape.RADIUS);
+    const [shapeParams, setShapeParams] = useState(DEFAULTS.radius);
+    const [spellDraft, setSpellDraft] = useState(null); // { startGridX, startGridY, startScreenX, startScreenY, angle? }
+    const {
+        overlays,
+        addOverlay,
+        removeOverlay,
+        clearOverlays,
+        handleSSEEvent: handleSpellOverlayEvent,
+    } = useSpellOverlay(campaignName);
 
     // Selection state
     const [selectionRect, setSelectionRect] = useState(null);
@@ -232,6 +248,59 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         const svg = svgRef.current;
         if (svg) svg.releasePointerCapture(e.pointerId);
         setPainting(null);
+    }, []);
+
+    // Spell overlay handlers
+    const computeAngle = useCallback((originX, originY, cursorX, cursorY) => {
+        const dx = cursorX - originX;
+        const dy = cursorY - originY;
+        const radians = Math.atan2(dy, dx);
+        let degrees = radians * (180 / Math.PI);
+        if (degrees < 0) degrees += 360;
+        return degrees;
+    }, []);
+
+    const handleSpellPointerDown = useCallback((e) => {
+        if (!spellMode) return;
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+        e.preventDefault();
+
+        if (spellMode === 'radius') {
+            const overlay = createOverlay(OverlayShape.RADIUS, grid.gridX, grid.gridY);
+            addOverlay(overlay);
+            setSpellMode(null);
+        } else {
+            setSpellDraft({
+                startGridX: grid.gridX,
+                startGridY: grid.gridY,
+                startScreenX: e.clientX,
+                startScreenY: e.clientY,
+                angle: 0,
+            });
+        }
+    }, [spellMode, getGridFromEvent, addOverlay]);
+
+    const handleSpellPointerMove = useCallback((e) => {
+        if (!spellDraft) return;
+        e.preventDefault();
+        const angle = computeAngle(spellDraft.startScreenX, spellDraft.startScreenY, e.clientX, e.clientY);
+        setSpellDraft(prev => prev ? { ...prev, angle } : null);
+    }, [spellDraft, computeAngle]);
+
+    const handleSpellPointerUp = useCallback((e) => {
+        if (!spellDraft) return;
+        const angle = computeAngle(spellDraft.startScreenX, spellDraft.startScreenY, e.clientX, e.clientY);
+        const shape = spellMode;
+        const overlay = createOverlay(shape, spellDraft.startGridX, spellDraft.startGridY, angle);
+        addOverlay(overlay);
+        setSpellDraft(null);
+        setSpellMode(null);
+    }, [spellDraft, spellMode, computeAngle, addOverlay]);
+
+    const cancelSpellMode = useCallback(() => {
+        setSpellMode(null);
+        setSpellDraft(null);
     }, []);
 
     // Select/move handlers
@@ -535,7 +604,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     }, [mapData, campaignName, gridSize, placedItems, mapName]);
 
     // SSE handler for real-time updates from other clients
-    const { handleSSEEvent } = useSSESync({
+    const { handleSSEEvent: handleMapSSEEvent } = useSSESync({
         campaignName,
         mapName,
         setGridSize,
@@ -543,6 +612,12 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         setPlacedItems,
         lastSavedWallsRef,
     });
+
+    // Combined SSE handler for both map data and spell overlays
+    const handleSSEEvent = useCallback((event) => {
+        handleMapSSEEvent(event);
+        handleSpellOverlayEvent(event);
+    }, [handleMapSSEEvent, handleSpellOverlayEvent]);
 
     const { dragging, handlePointerDown, handlePointerMove, handlePointerUp } = usePlayerDragging({
         svgRef,
@@ -714,15 +789,26 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 zoomOut={zoomOut}
                 resetView={resetView}
                 onBack={onBack}
+                spellOverlayState={{
+                    spellMode,
+                    setSpellMode,
+                    selectedShape,
+                    setSelectedShape,
+                    shapeParams,
+                    setShapeParams,
+                    overlays,
+                    removeOverlay,
+                    clearOverlays,
+                }}
             />
             <Subscriber campaignName={campaignName} handleEvent={handleSSEEvent} />
             <svg
                 ref={svgRef}
                 viewBox={`${panX} ${panY} ${SVG_SIZE / zoom} ${SVG_SIZE / zoom}`}
                 className="grid-svg"
-                onPointerDown={handlePanStart}
-                onPointerMove={(e) => { handlePointerMove(e); handleItemPointerMove(e); handleGridPointerMove(e); handleSelectPointerMove(e); handlePanMove(e); }}
-                onPointerUp={(e) => { handlePointerUp(e); handleItemPointerUpHook(e); handleGridPointerUp(e); handleSelectPointerUp(e); handlePanEnd(e); }}
+                onPointerDown={(e) => { handlePanStart(e); handleSpellPointerDown(e); }}
+                onPointerMove={(e) => { handlePointerMove(e); handleItemPointerMove(e); handleGridPointerMove(e); handleSelectPointerMove(e); handlePanMove(e); handleSpellPointerMove(e); }}
+                onPointerUp={(e) => { handlePointerUp(e); handleItemPointerUpHook(e); handleGridPointerUp(e); handleSelectPointerUp(e); handlePanEnd(e); handleSpellPointerUp(e); }}
                 onPointerLeave={(e) => { handleItemPointerLeave(); handleGridPointerLeave(e); handleSelectPointerUp(e); }}
                 onWheel={handleWheel}
                 onContextMenu={(e) => e.preventDefault()}
@@ -947,6 +1033,12 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                         </g>
                     );
                 })()}
+
+                {/* Spell overlays */}
+                <SpellOverlayRenderer
+                    overlays={overlays}
+                    pendingOverlay={spellDraft ? { ...spellDraft, shape: spellMode, ...shapeParams, id: 'pending' } : null}
+                />
             </svg>
 
               {/* NPC Rename Autocomplete Overlay */}

@@ -707,6 +707,177 @@
     pointer-events: none;
 }
 
+/* Spell overlay controls */
+.spell-overlay-controls {
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.spell-overlay-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e0e0e0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.spell-overlay-header i {
+    color: #e74c3c;
+}
+
+.spell-overlay-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.spell-overlay-row label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #ccc;
+}
+
+.spell-overlay-row input[type="number"] {
+    width: 60px;
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #e0e0e0;
+    padding: 3px 6px;
+    font-size: 12px;
+}
+
+.spell-overlay-row select {
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #e0e0e0;
+    padding: 3px 6px;
+    font-size: 12px;
+}
+
+.spell-overlay-cancel-btn {
+    background: #5a2a2a;
+    border: 1px solid #8a3a3a;
+    border-radius: 4px;
+    color: #e74c3c;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.spell-overlay-cancel-btn:hover {
+    background: #6a3030;
+}
+
+.spell-overlay-hint {
+    font-size: 11px;
+    color: #888;
+    font-style: italic;
+}
+
+.spell-overlay-active {
+    border-top: 1px solid #444;
+    padding-top: 8px;
+}
+
+.spell-overlay-active-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #ccc;
+    margin-bottom: 4px;
+}
+
+.spell-overlay-clear-btn {
+    background: transparent;
+    border: 1px solid #555;
+    border-radius: 3px;
+    color: #999;
+    padding: 2px 8px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.spell-overlay-clear-btn:hover {
+    border-color: #888;
+    color: #ccc;
+}
+
+.spell-overlay-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #aaa;
+    padding: 2px 0;
+}
+
+.spell-overlay-item button {
+    background: transparent;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 2px 4px;
+}
+
+.spell-overlay-item button:hover {
+    color: #e74c3c;
+}
+
+/* Light theme spell overlay controls */
+[data-theme="light"] .spell-overlay-controls {
+    background: #e8e8e8;
+    border-color: #ccc;
+}
+
+[data-theme="light"] .spell-overlay-header {
+    color: #333;
+}
+
+[data-theme="light"] .spell-overlay-row label {
+    color: #444;
+}
+
+[data-theme="light"] .spell-overlay-row input[type="number"],
+[data-theme="light"] .spell-overlay-row select {
+    background: #fff;
+    border-color: #bbb;
+    color: #333;
+}
+
+[data-theme="light"] .spell-overlay-active {
+    border-top-color: #ccc;
+}
+
+[data-theme="light"] .spell-overlay-active-header {
+    color: #555;
+}
+
+[data-theme="light"] .spell-overlay-item {
+    color: #666;
+}
+
+.spell-overlay-group {
+    pointer-events: none;
+}
+
+
+
 
 
 

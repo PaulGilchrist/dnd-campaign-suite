@@ -16,6 +16,7 @@ import campaignsCharacter from './server/routes/campaigns-character.js';
 import campaignsChangedata from './server/routes/campaigns-changedata.js';
 import campaignsAdmin from './server/routes/campaigns-admin.js';
 import logRoutes from './server/routes/log.js';
+import spellOverlayRoutes from './server/routes/spell-overlay.js';
 
 const PORT = process.env.PORT || 80;
 
@@ -106,3 +107,6 @@ app.use(campaignsAdmin);
 
 // Campaign log routes (must be before wildcard catch-all in sseRoutes)
 app.use(logRoutes);
+
+// Spell overlay routes (transient, broadcast only)
+app.use(spellOverlayRoutes);

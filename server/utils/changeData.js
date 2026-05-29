@@ -84,7 +84,7 @@ export const debouncedSave = () => {
 export const publish = (key, data) => {
     const unwrapped = data && typeof data === 'object' && 'value' in data && Object.keys(data).length === 1 ? data.value : data;
     const eventData = `data: ${JSON.stringify({ key, data: unwrapped })}\n\n`;
-    const campaignPrefix = key.match(/^change-(.+?)-/);
+    const campaignPrefix = key.match(/^(?:change|spell-overlay|map-data|maps-list|map-activate|positioning|log)-(.+?)(?:-|$)/);
     const targetCampaign = campaignPrefix ? campaignPrefix[1] : null;
     subscribers.forEach(client => {
         if (targetCampaign && client.campaignName && client.campaignName !== targetCampaign) return;
@@ -93,8 +93,8 @@ export const publish = (key, data) => {
         } catch (e) {
             // client disconnected
         }
-     });
- }
+    });
+}
 
 /**
  * Self health-check via HTTP GET to /health, runs every 60s
