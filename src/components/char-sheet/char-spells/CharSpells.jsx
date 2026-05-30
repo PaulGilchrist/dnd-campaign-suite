@@ -8,24 +8,38 @@ import DiceRollResult from '../DiceRollResult.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
 import { rollExpression } from '../../../services/diceRoller.js';
 import { sanitizeHtml } from '../../../services/sanitize.js';
+import { getCombatContext, getTargetFromAttacker } from '../../../services/damageUtils.js';
 import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct }) {
     const { showPopup, popupHtml, setPopupHtml } = useActionPopup('spell');
-    const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName);
+    const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName);
 
     const getDamageFormula = (effect) => {
         const match = effect.match(/^(\d+d\d+(?:[+-]\d+)?)/);
         return match ? match[1] : null;
     };
 
+    const getCombatTargetInfo = React.useCallback(() => {
+        const cs = getCombatContext();
+        if (!cs) return null;
+        return getTargetFromAttacker(cs, playerStats.name);
+    }, [playerStats.name]);
+
     const handleDamageRoll = (formula, spellName, spell) => {
         const result = rollExpression(formula);
         if (result) {
-            const context = {};
+            const target = getCombatTargetInfo();
+            const context = {
+                targetId: target?.id,
+                attackerName: playerStats.name,
+            };
             if (spell.dc) {
                 context.dc = playerStats.spellAbilities.saveDc;
                 context.dcType = spell.dc.dc_type;
+                context.dcSuccess = spell.dc.dc_success;
+                context.saveDc = playerStats.spellAbilities.saveDc;
+                context.saveType = spell.dc.dc_type;
                 context.dcSuccess = spell.dc.dc_success;
             }
             rollDamage(spellName, formula, result.total, result.rolls, result.modifier, context);
@@ -78,7 +92,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                     {dicePopupHtml && (
                         <Popup onClickOrKeyDown={() => setDicePopupHtml && setDicePopupHtml(null)}>
                             {typeof dicePopupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(dicePopupHtml) }}></div> : 
-                             <DiceRollResult {...dicePopupHtml} />}
+                             <DiceRollResult {...dicePopupHtml} onQuickRoll={dicePopupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(dicePopupHtml.promptId, dicePopupHtml.targetName, dicePopupHtml.saveType, dicePopupHtml.saveDc) : undefined} />}
                         </Popup>
                     )}
             <hr />

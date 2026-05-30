@@ -10,9 +10,15 @@ import { findCreatureByName } from '../../services/damageUtils.js';
 import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT } from '../../services/conditionEffects.js';
 import './MonsterCardModal.css';
 
+const ABBR_MAP = { Strength: 'str', Dexterity: 'dex', Constitution: 'con', Intelligence: 'int', Wisdom: 'wis', Charisma: 'cha', str: 'str', dex: 'dex', con: 'con', int: 'int', wis: 'wis', cha: 'cha' };
+
+function toAbbr(name) {
+  return ABBR_MAP[name] || name?.substring(0, 3).toLowerCase();
+}
+
 function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
   const monsterName = monster?.name || 'Monster';
-  const { popupHtml, setPopupHtml, rollAttack, rollDamage, rollAbilityCheck, rollSavingThrow, rollSkillCheck, rollInitiative } = useLoggedDiceRoll(
+  const { popupHtml, setPopupHtml, rollAttack, rollDamage, rollAbilityCheck, rollSavingThrow, rollSkillCheck, rollInitiative, quickRollPlayerSave } = useLoggedDiceRoll(
     monsterName,
     campaignName
   );
@@ -72,10 +78,22 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
     });
   };
 
-  const handleDamage = (name, formula, damageType, targetName) => {
+  const handleDamage = (name, formula, damageType, action) => {
+    const target = getCombatTarget();
     const result = rollExpression(formula);
     if (result) {
-      rollDamage(name, formula, result.total, result.rolls, result.modifier, { damageType, targetName });
+      const context = {
+        damageType,
+        targetName: target?.name,
+        targetId: target?.id,
+        attackerName: monsterName,
+      };
+      if (action?.save_dc != null) {
+        context.saveDc = action.save_dc;
+        context.saveType = toAbbr(action.save_type);
+        context.dcSuccess = 'half';
+      }
+      rollDamage(name, formula, result.total, result.rolls, result.modifier, context);
     }
   };
 
@@ -104,12 +122,12 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
         </span>
       )}
       {action.damage_dice && (
-        <span className="mc-dice-link" onClick={() => handleDamage(action.name, action.damage_dice, formatDamageTypes(damageTypes), target?.name)} role="button" tabIndex={0}>
+        <span className="mc-dice-link" onClick={() => handleDamage(action.name, action.damage_dice, formatDamageTypes(damageTypes), action)} role="button" tabIndex={0}>
           <i className="fa-solid fa-dice" /> {action.damage_dice}
         </span>
       )}
       {parseExtraDamageDice(action.damage, action.damage_dice).map((formula, idx) => (
-        <span key={idx} className="mc-dice-link" onClick={() => handleDamage(action.name, formula, formatDamageTypes(damageTypes), target?.name)} role="button" tabIndex={0}>
+        <span key={idx} className="mc-dice-link" onClick={() => handleDamage(action.name, formula, formatDamageTypes(damageTypes), action)} role="button" tabIndex={0}>
           <i className="fa-solid fa-dice" /> {formula}
         </span>
       ))}
@@ -432,7 +450,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
           <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
             {typeof popupHtml === 'string'
               ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }} />
-              : <DiceRollResult {...popupHtml} />}
+              : <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
           </Popup>
         </div>
       )}

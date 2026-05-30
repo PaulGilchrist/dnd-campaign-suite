@@ -3,9 +3,69 @@ import { rollD20 } from '../services/diceRoller.js';
 import utils from '../services/utils.js';
 import storage from '../services/storage.js';
 import { getTargetFromAttacker } from '../services/damageUtils.js';
+import {
+  computeDamageAfterSave,
+  rollSaveForCreature,
+  applyDamageToTarget,
+} from '../services/applyDamage.js';
+import { sendSavePrompt, sendSaveResult } from '../services/savePromptService.js';
+
+function getCombatSummary() {
+  const stored = localStorage.getItem('combatSummary');
+  if (!stored) return null;
+  try { return JSON.parse(stored); } catch { return null; }
+}
 
 export default function useLoggedDiceRoll(characterName, campaignName) {
   const { popupHtml, setPopupHtml } = useDiceRoll();
+  const pendingSavesRef = {};
+
+  if (!window.__pendingSaves) window.__pendingSaves = {};
+  const pendingSaves = window.__pendingSaves;
+
+  if (campaignName && !window.__saveResultHandlerInstalled) {
+    window.__saveResultHandlerInstalled = true;
+    window.addEventListener('save-result', (e) => {
+      const pending = window.__pendingSaves[e.detail.promptId];
+      if (!pending) return;
+
+      const combatSummary = getCombatSummary();
+      const finalDamage = computeDamageAfterSave(
+        e.detail.rawDamage, e.detail.success, e.detail.dcSuccess
+      );
+      const targetId = pending.targetId;
+      let targetMaxHp = 0;
+      if (combatSummary) {
+        const t = combatSummary.creatures.find(c => c.id === targetId);
+        if (t) targetMaxHp = t.maxHp;
+      }
+      const applyResult = applyDamageToTarget(
+        combatSummary, targetId, finalDamage, [pending.damageType], pending.campaignName
+      );
+
+      delete window.__pendingSaves[e.detail.promptId];
+
+      pending.setPopupHtml({
+        type: 'save-damage',
+        name: pending.name,
+        formula: pending.formula,
+        rolls: pending.rolls,
+        bonus: 0,
+        modifier: pending.modifier,
+        damageType: pending.damageType,
+        targetName: e.detail.targetName,
+        targetCurrentHp: applyResult?.newHp,
+        targetMaxHp,
+        saveDc: e.detail.saveDc,
+        saveType: e.detail.saveType,
+        dcSuccess: e.detail.dcSuccess,
+        saveResult: { roll: e.detail.roll, total: e.detail.total, bonus: e.detail.saveBonus, success: e.detail.success },
+        finalDamage: applyResult?.finalDamage,
+        damageApplied: true,
+        damageReduced: applyResult?.damageReduced,
+      });
+    });
+  }
 
   function logEntry(entry) {
     fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
@@ -19,11 +79,7 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
     const r1 = rollD20();
     const r2 = rollD20();
 
-    const combatSummary = (() => {
-      const stored = localStorage.getItem('combatSummary');
-      if (!stored) return null;
-      try { return JSON.parse(stored); } catch { return null; }
-    })();
+    const combatSummary = getCombatSummary();
 
     const target = combatSummary ? getTargetFromAttacker(combatSummary, utils.getFirstName(characterName)) : null;
 
@@ -83,20 +139,203 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
      }
 
    function logDamageAndShow(name, formula, total, rolls, modifier, context) {
-       logEntry({
-          type: 'roll',
-            characterName,
-             rollType: 'damage',
-               name,
-                formula,
-                 rolls,
-                  total,
-                   modifier,
-                   damageType: context?.damageType,
-                   targetName: context?.targetName
-                 });
-          setPopupHtml({ type: 'damage', name, formula, rolls, bonus: 0, modifier, dc: context?.dc, dcType: context?.dcType, dcSuccess: context?.dcSuccess });
-           }
+     const { saveDc, saveType, dcSuccess, targetId, damageType, attackerName } = context || {};
+     const combatSummary = getCombatSummary();
+     const target = targetId ? combatSummary?.creatures?.find(c => c.id === targetId) : null;
+
+     if (saveDc && saveType && target) {
+       if (target.type === 'npc') {
+         const saveResult = rollSaveForCreature(target, saveType, saveDc);
+         const finalDamage = computeDamageAfterSave(total, saveResult.success, dcSuccess);
+         const applyResult = applyDamageToTarget(combatSummary, targetId, finalDamage, damageType ? [damageType] : [], campaignName);
+
+         logEntry({
+           type: 'roll',
+           characterName,
+           rollType: 'save-damage',
+           name,
+           formula,
+           rolls,
+           total,
+           modifier,
+           damageType,
+           targetName: target.name,
+           saveType,
+           saveDc,
+           saveResult: saveResult.success ? 'success' : 'failure',
+           saveRoll: saveResult.roll,
+           saveBonus: saveResult.bonus,
+           finalDamage: applyResult?.finalDamage ?? total,
+         });
+
+         setPopupHtml({
+           type: 'save-damage',
+           name,
+           formula,
+           rolls,
+           bonus: 0,
+           modifier,
+           damageType,
+           targetName: target.name,
+           targetCurrentHp: applyResult?.newHp,
+           targetMaxHp: target.maxHp,
+           saveDc,
+           saveType,
+           dcSuccess,
+           saveResult,
+           finalDamage: applyResult?.finalDamage,
+           damageApplied: true,
+           damageReduced: applyResult?.damageReduced,
+         });
+         return;
+       }
+
+       if (target.type === 'player') {
+         const promptId = utils.guid();
+         pendingSaves[promptId] = {
+           targetId, rawDamage: total, saveDc, saveType, dcSuccess,
+           damageType, attackerName: attackerName || characterName,
+           targetName: target.name, name, formula, modifier, rolls,
+           campaignName, setPopupHtml,
+         };
+
+         sendSavePrompt(campaignName, {
+           promptId,
+           targetName: target.name,
+           saveType,
+           saveDc,
+           dcSuccess,
+           damageFormula: formula,
+           damageType,
+           sourceName: name,
+           sourceAttackerName: attackerName || characterName,
+           rawDamage: total,
+         });
+
+         logEntry({
+           type: 'roll',
+           characterName,
+           rollType: 'save-prompt',
+           name,
+           formula,
+           rolls,
+           total,
+           modifier,
+           damageType,
+           targetName: target.name,
+           saveType,
+           saveDc,
+           dcSuccess,
+         });
+
+         setPopupHtml({
+           type: 'save-damage',
+           name,
+           formula,
+           rolls,
+           bonus: 0,
+           modifier,
+           damageType,
+           targetName: target.name,
+           saveDc,
+           saveType,
+           dcSuccess,
+           waitingForPlayerSave: true,
+           promptId,
+           rawDamage: total,
+           targetId,
+           attackerName: attackerName || characterName,
+         });
+         return;
+       }
+     }
+
+     let applyResult = null;
+     if (target) {
+       applyResult = applyDamageToTarget(combatSummary, targetId, total, damageType ? [damageType] : [], campaignName);
+     }
+
+     logEntry({
+        type: 'roll',
+          characterName,
+           rollType: 'damage',
+             name,
+              formula,
+               rolls,
+                total,
+                 modifier,
+                 damageType,
+                 targetName: target?.name,
+                 finalDamage: applyResult?.finalDamage,
+               });
+
+       const popupData = {
+         type: 'damage',
+         name,
+         formula,
+         rolls,
+         bonus: 0,
+         modifier,
+         dc: context?.dc,
+         dcType: context?.dcType,
+         dcSuccess: context?.dcSuccess,
+         damageType,
+         targetName: target?.name,
+       };
+
+       if (applyResult) {
+         popupData.targetCurrentHp = applyResult.newHp;
+         popupData.targetMaxHp = target.maxHp;
+         popupData.damageApplied = true;
+         popupData.finalDamage = applyResult.finalDamage;
+         popupData.damageReduced = applyResult.damageReduced;
+       }
+
+       setPopupHtml(popupData);
+        }
+
+  function quickRollPlayerSave(promptId, targetName, saveType, saveDc) {
+    const pending = pendingSaves[promptId];
+    if (!pending) return;
+
+    const combatSummary = getCombatSummary();
+    const target = combatSummary?.creatures?.find(c => c.id === pending.targetId);
+    if (!target) return;
+
+    const saveResult = rollSaveForCreature(target, saveType, saveDc);
+    const finalDamage = computeDamageAfterSave(pending.rawDamage, saveResult.success, pending.dcSuccess);
+    const applyResult = applyDamageToTarget(combatSummary, pending.targetId, finalDamage, [pending.damageType], campaignName);
+
+    delete pendingSaves[promptId];
+
+    sendSaveResult(campaignName, targetName, {
+      promptId,
+      success: saveResult.success,
+      roll: saveResult.roll,
+      total: saveResult.total,
+      saveBonus: saveResult.bonus,
+    });
+
+    setPopupHtml({
+      type: 'save-damage',
+      name: pending.name,
+      formula: pending.formula,
+      rolls: pending.rolls,
+      bonus: 0,
+      modifier: pending.modifier,
+      damageType: pending.damageType,
+      targetName: target.name,
+      targetCurrentHp: applyResult?.newHp,
+      targetMaxHp: target.maxHp,
+      saveDc,
+      saveType,
+      dcSuccess: pending.dcSuccess,
+      saveResult,
+      finalDamage: applyResult?.finalDamage,
+      damageApplied: true,
+      damageReduced: applyResult?.damageReduced,
+    });
+  }
 
      return {
            popupHtml,
@@ -106,6 +345,7 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
    rollSkillCheck: (name, bonus) => logAndShow(name, bonus, 'skill'),
     rollInitiative: (initBonus) => logAndShow('Initiative', initBonus, 'initiative'),
        rollAttack: (name, hitBonus, context) => logAndShow(name, hitBonus, 'attack', context),
-   rollDamage: (name, formula, total, rolls, modifier, context) => logDamageAndShow(name, formula, total, rolls, modifier, context)
+   rollDamage: (name, formula, total, rolls, modifier, context) => logDamageAndShow(name, formula, total, rolls, modifier, context),
+   quickRollPlayerSave,
         };
        }

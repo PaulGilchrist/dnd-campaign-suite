@@ -4,6 +4,37 @@ import { cloneDeep } from 'lodash';
 import { rollD20 } from './diceRoller.js';
 import { computePlayerAc } from './damageUtils.js';
 
+function getCharacterSaveBonuses(character) {
+  const abilities = character.abilities || [];
+  const getBonus = (name) => {
+    const ab = abilities.find(a => a.name === name);
+    return ab?.save ?? ab?.bonus ?? 0;
+  };
+  return {
+    str: getBonus('Strength'),
+    dex: getBonus('Dexterity'),
+    con: getBonus('Constitution'),
+    int: getBonus('Intelligence'),
+    wis: getBonus('Wisdom'),
+    cha: getBonus('Charisma'),
+  };
+}
+
+function getMonsterSaveBonuses(monster) {
+  const map = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
+  const bonuses = {};
+  for (const [abbr] of Object.entries(map)) {
+    if (monster.saving_throws?.[abbr]?.modifier != null) {
+      bonuses[abbr] = monster.saving_throws[abbr].modifier;
+    } else if (monster.ability_score_modifiers?.[abbr] != null) {
+      bonuses[abbr] = monster.ability_score_modifiers[abbr];
+    } else {
+      bonuses[abbr] = 0;
+    }
+  }
+  return bonuses;
+}
+
 function parseInitBonus(monster) {
     const initStr = monster.initiative_details;
     if (!initStr) return 0;
@@ -60,6 +91,7 @@ export async function expandMonstersToCreatures(selectedMonsters, characters, ca
         concentration: null,
         maxHp: storedMaxHp ?? maxHp,
         currentHp: currentHp,
+        saveBonuses: getCharacterSaveBonuses(character),
       };
       }));
     playerChars.sort((a, b) => a.name.localeCompare(b.name));
@@ -85,6 +117,7 @@ export async function expandMonstersToCreatures(selectedMonsters, characters, ca
             concentration: null,
             maxHp: npcHp,
             currentHp: npcHp,
+            saveBonuses: getMonsterSaveBonuses(monster),
           });
           npcRollResults.push({ name, rollResult });
           }

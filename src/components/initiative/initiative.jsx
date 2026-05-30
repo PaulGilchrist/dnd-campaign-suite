@@ -226,6 +226,22 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
         });
     }, [combatSummary, campaignNpcs]);
 
+    const getSaveBonuses = React.useCallback((character) => {
+        const abilities = character.abilities || [];
+        const getBonus = (name) => {
+            const ab = abilities.find(a => a.name === name);
+            return ab?.save ?? ab?.bonus ?? 0;
+        };
+        return {
+            str: getBonus('Strength'),
+            dex: getBonus('Dexterity'),
+            con: getBonus('Constitution'),
+            int: getBonus('Intelligence'),
+            wis: getBonus('Wisdom'),
+            cha: getBonus('Charisma'),
+        };
+    }, []);
+
     const setupCreatures = React.useCallback(() => {
         const creatureList = characters.map((character) => {
             const maxHp = character.hitPoints || 0;
@@ -244,11 +260,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                 concentration: null,
                 maxHp: loadCreatureMaxHp(utils.getFirstName(character.name), maxHp),
                 currentHp: loadCreatureHp(utils.getFirstName(character.name), maxHp),
+                saveBonuses: getSaveBonuses(character),
             };
         });
         creatureList.sort((a, b) => a.name.localeCompare(b.name));
         for (let i = 0; i < numOfNpc; i++) {
-            creatureList.push({ id: utils.guid(), name: `NPC ${i + 1}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null, maxHp: 10, currentHp: 10 });
+            creatureList.push({ id: utils.guid(), name: `NPC ${i + 1}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null, maxHp: 10, currentHp: 10, saveBonuses: {} });
         }
         return creatureList;
     }, [characters, numOfNpc, loadCreatureHp, loadCreatureMaxHp]);
@@ -262,7 +279,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                 return match ? Math.max(max, parseInt(match[1])) : max;
             }, 0);
         const nextNum = maxNpcNum + 1;
-        combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${nextNum}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null, maxHp: 10, currentHp: 10 });
+        combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${nextNum}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null, maxHp: 10, currentHp: 10, saveBonuses: {} });
         setNumOfNpc(nextNum);
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
@@ -343,9 +360,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                 if (c.type === 'player' && characterNameSet.has(c.name)) {
                     const character = characters.find(ch => utils.getFirstName(ch.name) === c.name);
                     const maxHp = loadCreatureMaxHp(c.name, character?.hitPoints || c.maxHp || 0);
-                    return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(character), currentHp: loadCreatureHp(c.name, maxHp), maxHp };
+                    return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(character), currentHp: loadCreatureHp(c.name, maxHp), maxHp, saveBonuses: c.saveBonuses || getSaveBonuses(character) };
                 }
-                return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, currentHp: c.currentHp ?? c.maxHp ?? 10, maxHp: c.maxHp ?? 10 };
+                return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, currentHp: c.currentHp ?? c.maxHp ?? 10, maxHp: c.maxHp ?? 10, saveBonuses: c.saveBonuses || {} };
             });
 
             const npcCount = mergedCreatures.filter(c => c.type === 'npc').length;
@@ -533,6 +550,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                 combatSummary.creatures[idx].initiativeBonus = monster.initiative_details ? parseInt(monster.initiative_details) || 0 : 0;
                 combatSummary.creatures[idx].maxHp = monster.hit_points || 10;
                 combatSummary.creatures[idx].currentHp = monster.hit_points || 10;
+                combatSummary.creatures[idx].saveBonuses = buildMonsterSaveBonuses(monster);
                 const matchedNpc = campaignNpcs.find(n => n.name?.toLowerCase() === value.toLowerCase());
                 if (matchedNpc?.imagePath) {
                     combatSummary.creatures[idx].imagePath = matchedNpc.imagePath;
@@ -1148,6 +1166,22 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
             )}
         </div>
     )
+}
+
+function buildMonsterSaveBonuses(monster) {
+  const map = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
+  const bonuses = {};
+  for (const [abbr, fullName] of Object.entries(map)) {
+    const monAbbr = abbr === 'cha' ? 'cha' : abbr;
+    if (monster.saving_throws?.[monAbbr]?.modifier != null) {
+      bonuses[abbr] = monster.saving_throws[monAbbr].modifier;
+    } else if (monster.ability_score_modifiers?.[abbr] != null) {
+      bonuses[abbr] = monster.ability_score_modifiers[abbr];
+    } else {
+      bonuses[abbr] = 0;
+    }
+  }
+  return bonuses;
 }
 
 export default Initiative

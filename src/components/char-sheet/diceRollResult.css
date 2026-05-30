@@ -100,3 +100,51 @@
     border-radius: 4px;
     margin: 4px 0;
 }
+
+.dice-roll-save-waiting {
+    text-align: center;
+    font-size: 0.95em;
+    margin: 10px 0;
+    padding: 8px;
+    border-radius: 4px;
+    color: #a855f7;
+    background: rgba(168, 85, 247, 0.12);
+}
+
+.dice-roll-save-waiting i {
+    margin-right: 6px;
+}
+
+.dice-roll-quick-roll {
+    display: block;
+    margin: 8px auto 0;
+    background-color: var(--color-link, #3b7dd8);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 0.9em;
+    cursor: pointer;
+}
+
+.dice-roll-quick-roll:hover {
+    opacity: 0.9;
+}
+
+.dice-roll-save-detail {
+    font-weight: normal;
+    font-size: 0.8em;
+    opacity: 0.7;
+    margin-left: 4px;
+}
+
+.dice-roll-damage-applied {
+    text-align: center;
+    font-size: 0.95em;
+    font-weight: bold;
+    color: #4CAF50;
+    background: rgba(76, 175, 80, 0.12);
+    padding: 6px 10px;
+    border-radius: 4px;
+    margin: 8px 0;
+}

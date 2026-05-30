@@ -1,0 +1,97 @@
+.sp-overlay {
+  position: fixed;
+  top: 0;
+  left: 180px;
+  width: calc(100vw - 180px);
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.85);
+  z-index: 2000;
+}
+
+.sp-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--background-color-header-inner);
+  border: 2px solid var(--color-header);
+  border-radius: 10px;
+  color: var(--color-header-inner);
+  padding: 24px;
+  min-width: 320px;
+  max-width: 480px;
+  text-align: center;
+}
+
+.sp-header {
+  font-size: 1.15em;
+  font-weight: bold;
+  margin-bottom: 16px;
+  color: var(--color-link);
+}
+
+.sp-header i {
+  margin-right: 8px;
+}
+
+.sp-body {
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.sp-body p {
+  margin: 8px 0;
+}
+
+.sp-dc {
+  font-size: 1.4em;
+  font-weight: bold;
+  color: var(--color-link);
+}
+
+.sp-note {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.sp-source {
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+
+.sp-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.sp-roll-btn {
+  background-color: var(--color-link);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 1em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sp-roll-btn:hover {
+  opacity: 0.9;
+}
+
+.sp-dismiss-btn {
+  background-color: transparent;
+  color: var(--color-header);
+  border: 1px solid var(--color-header);
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 1em;
+  cursor: pointer;
+}
+
+.sp-dismiss-btn:hover {
+  opacity: 0.8;
+}

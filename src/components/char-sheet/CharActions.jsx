@@ -24,7 +24,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
              .then(data => setActions(data))
           .catch(error => console.error('Error loading actions:', error));
        }, []);
-    const { popupHtml, setPopupHtml, rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName);
+    const { popupHtml, setPopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName);
 
     const getCombatTargetInfo = React.useCallback(() => {
         const cs = getCombatContext();
@@ -37,8 +37,18 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const buildAttackContext = React.useCallback((attack) => {
         const target = getCombatTargetInfo();
         const resistanceNotice = target ? getResistanceNotice([attack.damageType], target.resistances, target.immunities, target.name) : null;
-        return { damageType: attack.damageType, resistanceNotice, targetName: target?.name, forcedMode: conditionAttackMode !== 'normal' ? conditionAttackMode : undefined };
-    }, [getCombatTargetInfo, conditionAttackMode]);
+        return {
+            damageType: attack.damageType,
+            resistanceNotice,
+            targetName: target?.name,
+            targetId: target?.id,
+            saveDc: attack.saveDc,
+            saveType: attack.saveType,
+            dcSuccess: attack.saveSuccess,
+            attackerName: playerStats.name,
+            forcedMode: conditionAttackMode !== 'normal' ? conditionAttackMode : undefined,
+        };
+    }, [getCombatTargetInfo, conditionAttackMode, playerStats.name]);
 
     const handleDamageClick = (attack) => {
         const result = rollExpression(attack.damage);
@@ -94,12 +104,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     })}
                 </div>
                 <br />
-                                   {popupHtml && (
-                                       <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
-                                           {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
-                                            <DiceRollResult {...popupHtml} />}
-                                       </Popup>
-                                   )}
+                                    {popupHtml && (
+                                        <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
+                                            {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
+                                             <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
+                                        </Popup>
+                                    )}
                 {playerStats.actions.map((action) => {
                                         return <div key={action.name}>
                           <b className={action.details ? "clickable" : ""} onClick={() => setPopupHtml(buildFeatureDetailHtml(action))}>{action.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }}></span>
@@ -146,7 +156,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 {popupHtml && (
                     <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
                         {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
-                         <DiceRollResult {...popupHtml} />}
+                         <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
                     </Popup>
                 )}
                                   <b className={bonusAction.details ? "clickable" : ""} onClick={() => setPopupHtml(buildFeatureDetailHtml(bonusAction))}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(bonusAction.description) }}></span>
