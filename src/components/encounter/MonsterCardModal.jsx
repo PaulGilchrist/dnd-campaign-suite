@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { sanitizeHtml } from '../../services/sanitize.js';
-import { rollExpression } from '../../services/diceRoller.js';
+import { rollExpression, rollExpressionDoubled } from '../../services/diceRoller.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
 import Popup from '../common/Popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
@@ -80,7 +80,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
 
   const handleDamage = (name, formula, damageType, action) => {
     const target = getCombatTarget();
-    const result = rollExpression(formula);
+    const wasCrit = popupHtml?.isCrit;
+    if (wasCrit && setPopupHtml) setPopupHtml(null);
+    const result = wasCrit ? rollExpressionDoubled(formula) : rollExpression(formula);
     if (result) {
       const context = {
         damageType,

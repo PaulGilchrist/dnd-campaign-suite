@@ -6,7 +6,7 @@ import useLoggedDiceRoll from '../../../hooks/useLoggedDiceRoll.js'
 import Popup from '../../common/Popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
-import { rollExpression } from '../../../services/diceRoller.js';
+import { rollExpression, rollExpressionDoubled } from '../../../services/diceRoller.js';
 import { sanitizeHtml } from '../../../services/sanitize.js';
 import { getCombatContext, getTargetFromAttacker, getAttackerTargetId } from '../../../services/damageUtils.js';
 import './CharSpells.css'
@@ -27,7 +27,9 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     }, [playerStats.name]);
 
     const handleDamageRoll = (formula, spellName, spell) => {
-        const result = rollExpression(formula);
+        const wasCrit = dicePopupHtml?.isCrit;
+        if (wasCrit && setDicePopupHtml) setDicePopupHtml(null);
+        const result = wasCrit ? rollExpressionDoubled(formula) : rollExpression(formula);
         if (result) {
             const target = getCombatTargetInfo();
             const cs = getCombatContext();

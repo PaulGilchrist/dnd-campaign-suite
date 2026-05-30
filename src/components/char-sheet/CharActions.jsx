@@ -6,7 +6,7 @@ import { sanitizeHtml } from '../../services/sanitize.js';
 import { parseMagicItemName } from '../../services/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
-import { rollExpression } from '../../services/diceRoller.js'
+import { rollExpression, rollExpressionDoubled } from '../../services/diceRoller.js'
 import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetId } from '../../services/damageUtils.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';
@@ -53,7 +53,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     }, [getCombatTargetInfo, conditionAttackMode, playerStats.name]);
 
     const handleDamageClick = (attack) => {
-        const result = rollExpression(attack.damage);
+        const wasCrit = popupHtml?.isCrit;
+        if (wasCrit && setPopupHtml) setPopupHtml(null);
+        const result = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
         if (result) {
             const ctx = buildAttackContext(attack);
             rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier, ctx);

@@ -118,6 +118,8 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
     const targetName = target?.name || context?.targetName;
     const targetAc = target?.ac || context?.targetAc;
 
+    const isCrit = (r1 === 20 || context?.isAutoCrit) && hit;
+
     logEntry({
        type: 'roll',
        characterName,
@@ -133,21 +135,22 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
         targetAc,
         damageType: context?.damageType,
         hit,
-        resistanceNotice: context?.resistanceNotice
-         });
-    setPopupHtml({
-      type: 'd20',
-      rollType,
-      name,
-      rolls: [r1, r2],
-      bonus,
-      targetName,
-      targetAc,
-      hit,
-      resistanceNotice: context?.resistanceNotice,
-      forcedMode: context?.forcedMode,
-      isAutoCrit: context?.isAutoCrit
-    });
+         resistanceNotice: context?.resistanceNotice
+          });
+     setPopupHtml({
+       type: 'd20',
+       rollType,
+       name,
+       rolls: [r1, r2],
+       bonus,
+       targetName,
+       targetAc,
+       hit,
+       resistanceNotice: context?.resistanceNotice,
+       forcedMode: context?.forcedMode,
+       isAutoCrit: context?.isAutoCrit,
+       isCrit
+     });
 
     if (rollType === 'initiative') {
         const firstName = utils.getName(characterName);

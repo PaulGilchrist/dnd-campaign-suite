@@ -46,4 +46,12 @@ function rollExpression(formula) {
   return { total: total + modifier, rolls, modifier, formula };
 }
 
-export { rollD20, rollDie, rollDice, rollAdvantage, rollDisadvantage, parseExpression, rollExpression };
+function rollExpressionDoubled(formula) {
+  const parsed = parseExpression(formula);
+  if (!parsed) return null;
+  const { sides, modifier } = parsed;
+  const { total, rolls } = rollDice(parsed.count * 2, sides);
+  return { total: total + modifier, rolls, modifier, formula };
+}
+
+export { rollD20, rollDie, rollDice, rollAdvantage, rollDisadvantage, parseExpression, rollExpression, rollExpressionDoubled };

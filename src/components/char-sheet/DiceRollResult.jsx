@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, targetMaxHp, damageReduced, onQuickRoll }) {
+function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, targetMaxHp, damageReduced, onQuickRoll }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
 
     const isD20 = type === 'd20';
@@ -24,7 +24,7 @@ function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier =
     }
 
     const total = finalRoll + bonus + modifier;
-    const isCrit = isAutoCrit || (isD20 && finalRoll === 20);
+    const showCrit = isCrit || isAutoCrit || (isD20 && finalRoll === 20);
 
     const saveAbilityLabel = saveType ? saveType.toUpperCase() : '';
 
@@ -82,7 +82,7 @@ function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier =
                   </div>
               )}
 
-            {isCrit && <div className="dice-roll-crit">{isAutoCrit ? 'AUTO-CRIT (target condition)' : 'Critical Hit!'}</div>}
+            {showCrit && <div className="dice-roll-crit">{isAutoCrit ? 'AUTO-CRIT (target condition)' : 'Critical Hit!'} — damage dice doubled</div>}
             {targetName && hit !== undefined && !isSaveDamageType && (
               <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
                 {hit ? '✓ HIT' : '✗ MISS'} ({total} vs AC {targetAc})
