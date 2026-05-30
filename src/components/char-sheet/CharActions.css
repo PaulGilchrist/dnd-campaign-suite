@@ -1,6 +1,6 @@
 .char-actions .attacks {
     display: grid;
-    grid-template-columns: 120px 80px 40px 80px 70px;
+    grid-template-columns: 120px 80px 80px 80px 70px;
     text-align: center;
 }
 .char-actions .attacks > div {
@@ -11,12 +11,6 @@
     opacity: 0.35;
     cursor: not-allowed;
     pointer-events: none;
-}
-
-.char-actions .save-dc-display {
-    font-size: 0.75rem;
-    color: #a855f7;
-    font-weight: 700;
 }
 
 .char-actions .disabled-attack-label {
@@ -30,15 +24,15 @@
 
 /* Add extra column for Mastery when using 2024 rules */
 .char-actions .attacks.mastery-enabled {
-    grid-template-columns: 120px 80px 40px 80px 70px 80px;
+    grid-template-columns: 120px 80px 80px 80px 70px 80px;
 }
 
 @media print {
     .char-actions .attacks {
-        grid-template-columns: 160px 120px 60px 120px 1fr;
+        grid-template-columns: 160px 120px 90px 120px 1fr;
     }
     .char-actions .attacks.mastery-enabled {
-        grid-template-columns: 140px 100px 50px 110px 80px 1fr;
+        grid-template-columns: 140px 100px 80px 110px 80px 1fr;
     }
     .char-actions .attacks > div {
         padding-right: 4px;

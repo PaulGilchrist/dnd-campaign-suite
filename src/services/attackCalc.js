@@ -162,15 +162,22 @@ export function buildSpellAttacks(playerSpells, allSpells, spellAbilities) {
             damage,
             damageType: spell.damage.damage_type,
             range: spell.range,
-            type: spell.casting_time === '1 action' ? 'Action' : 'Bonus Action',
-        };
+            type: spell.casting_time,
+         };
+
+        // Only include spells cast as an Action or Bonus Action in the attacks list
+        const isCombatCastingTime = ['1 action', 'Action', '1 bonus action', 'Bonus Action'].includes(attackEntry.type);
+        if (!isCombatCastingTime) return;
+
+        attackEntry.type = (attackEntry.type === '1 action' || attackEntry.type === 'Action') ? 'Action' : 'Bonus Action';
+
         if (spell.dc) {
             attackEntry.saveDc = spellAbilities.saveDc;
             attackEntry.saveType = spell.dc.dc_type;
             attackEntry.saveSuccess = spell.dc.dc_success;
-        } else {
+         } else {
             attackEntry.hitBonus = spellAbilities.modifier;
-        }
+         }
         attacks.push(attackEntry);
     });
 
