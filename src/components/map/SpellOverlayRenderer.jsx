@@ -17,7 +17,7 @@ const DragHandle = ({ cx, cy, cursor = 'grab' }) => (
     />
 );
 
-const renderRadius = (overlay) => {
+const renderSphere = (overlay) => {
     const r = toGrid(overlay.radiusFt) * CELL_SIZE;
     const { x: cx, y: cy } = svgOrigin(overlay);
     return (
@@ -31,6 +31,28 @@ const renderRadius = (overlay) => {
                 strokeWidth={2}
                 className="spell-overlay"
             />
+            <DragHandle cx={cx} cy={cy} cursor="move" />
+        </g>
+    );
+};
+
+const renderCube = (overlay) => {
+    const { x: cx, y: cy } = svgOrigin(overlay);
+    const size = toGrid(overlay.sizeFt) * CELL_SIZE;
+    return (
+        <g key={overlay.id} className="spell-overlay-group">
+            <g transform={`rotate(${overlay.angle}, ${cx}, ${cy})`}>
+                <rect
+                    x={cx - size / 2}
+                    y={cy - size / 2}
+                    width={size}
+                    height={size}
+                    fill={overlay.color}
+                    stroke={overlay.color.replace('0.35', '0.8')}
+                    strokeWidth={2}
+                    className="spell-overlay"
+                />
+            </g>
             <DragHandle cx={cx} cy={cy} cursor="move" />
         </g>
     );
@@ -95,8 +117,12 @@ const renderLine = (overlay) => {
 const SpellOverlayRenderer = ({ overlays = [], pendingOverlay = null }) => {
     const renderOverlay = (overlay) => {
         switch (overlay.shape) {
-            case OverlayShape.RADIUS:
-                return renderRadius(overlay);
+            case OverlayShape.SPHERE:
+                return renderSphere(overlay);
+            case OverlayShape.CYLINDER:
+                return renderSphere(overlay);
+            case OverlayShape.CUBE:
+                return renderCube(overlay);
             case OverlayShape.CONE:
                 return renderCone(overlay);
             case OverlayShape.LINE:

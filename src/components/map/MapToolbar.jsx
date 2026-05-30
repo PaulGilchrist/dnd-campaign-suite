@@ -1,5 +1,6 @@
 import * as mapsService from '../../services/mapsService.js';
 import SpellOverlayControls from './SpellOverlayControls.jsx';
+import { OverlayShape } from '../../models/SpellOverlay.js';
 
 const MapToolbar = ({
     mapName,
@@ -81,7 +82,7 @@ const MapToolbar = ({
                                 setSpellMode(null);
                             } else {
                                 setTool('none');
-                                setSpellMode(selectedShape || 'radius');
+                                setSpellMode(selectedShape || OverlayShape.SPHERE);
                             }
                         }}
                     >

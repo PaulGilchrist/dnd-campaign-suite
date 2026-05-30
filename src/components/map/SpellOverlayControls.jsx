@@ -1,7 +1,9 @@
 import { OverlayShape, DEFAULTS } from '../../models/SpellOverlay.js';
 
 const SHAPE_LABELS = {
-    [OverlayShape.RADIUS]: 'Radius',
+    [OverlayShape.SPHERE]: 'Sphere',
+    [OverlayShape.CYLINDER]: 'Cylinder',
+    [OverlayShape.CUBE]: 'Cube',
     [OverlayShape.CONE]: 'Cone',
     [OverlayShape.LINE]: 'Line',
 };
@@ -50,7 +52,7 @@ const SpellOverlayControls = ({
                 )}
             </div>
 
-            {selectedShape === OverlayShape.RADIUS && (
+            {(selectedShape === OverlayShape.SPHERE || selectedShape === OverlayShape.CYLINDER) && (
                 <div className="spell-overlay-row">
                     <label>
                         Radius (ft)&nbsp;
@@ -60,6 +62,21 @@ const SpellOverlayControls = ({
                             step="5"
                             value={shapeParams.radiusFt || 20}
                             onChange={(e) => handleParamChange('radiusFt', e.target.value)}
+                        />
+                    </label>
+                </div>
+            )}
+
+            {selectedShape === OverlayShape.CUBE && (
+                <div className="spell-overlay-row">
+                    <label>
+                        Size (ft)&nbsp;
+                        <input
+                            type="number"
+                            min="5"
+                            step="5"
+                            value={shapeParams.sizeFt || 15}
+                            onChange={(e) => handleParamChange('sizeFt', e.target.value)}
                         />
                     </label>
                 </div>
@@ -117,7 +134,7 @@ const SpellOverlayControls = ({
 
             {isActive && (
                 <div className="spell-overlay-hint">
-                    Click map to place{selectedShape !== OverlayShape.RADIUS && ', drag for angle'}
+                    Click map to place{selectedShape === OverlayShape.CONE || selectedShape === OverlayShape.LINE || selectedShape === OverlayShape.CUBE ? ', drag for angle' : ''}
                 </div>
             )}
 

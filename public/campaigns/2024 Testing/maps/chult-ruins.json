@@ -867,32 +867,7 @@
       "rotation": 180
     }
   ],
-  "players": [
-    {
-      "id": "player-2-1779209589404",
-      "name": "Cleric",
-      "gridX": 5,
-      "gridY": 2
-    },
-    {
-      "id": "player-4-1779209589404",
-      "name": "Fighter",
-      "gridX": 9,
-      "gridY": 2
-    },
-    {
-      "id": "player-8-1779209589404",
-      "name": "Rogue",
-      "gridX": 4,
-      "gridY": 4
-    },
-    {
-      "id": "wizard",
-      "name": "Wizard",
-      "gridX": 8,
-      "gridY": 4
-    }
-  ],
+  "players": [],
   "zoom": 1,
   "panX": 0,
   "panY": 0,

@@ -94,9 +94,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const [rulerPreview, setRulerPreview] = useState(null); // { gridX, gridY } | null (live preview)
 
     // Spell overlay state
-    const [spellMode, setSpellMode] = useState(null); // null | 'radius' | 'cone' | 'line'
-    const [selectedShape, setSelectedShape] = useState(OverlayShape.RADIUS);
-    const [shapeParams, setShapeParams] = useState(DEFAULTS.radius);
+    const [spellMode, setSpellMode] = useState(null); // null | 'sphere' | 'cylinder' | 'cube' | 'cone' | 'line'
+    const [selectedShape, setSelectedShape] = useState(OverlayShape.SPHERE);
+    const [shapeParams, setShapeParams] = useState(DEFAULTS.sphere);
     const [spellDraft, setSpellDraft] = useState(null); // { startGridX, startGridY, startScreenX, startScreenY, angle? }
     // Overlay drag/rotate state
     const [dragOverlay, setDragOverlay] = useState(null); // { overlayId, startGridX, startGridY, offsetGridX, offsetGridY } | null
@@ -329,8 +329,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
         if (spellMode) {
             e.preventDefault();
-            if (spellMode === 'radius') {
-                const overlay = createOverlay(OverlayShape.RADIUS, grid.gridX, grid.gridY);
+            if (spellMode === OverlayShape.SPHERE || spellMode === OverlayShape.CYLINDER) {
+                const overlay = createOverlay(spellMode, grid.gridX, grid.gridY, 0, shapeParams);
                 addOverlay(overlay);
                 setSpellMode(null);
             } else {
@@ -359,9 +359,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 const distFromOrigin = Math.sqrt(dx * dx + dy * dy);
                 const isAtOrigin = grid.gridX === overlay.startGridX && grid.gridY === overlay.startGridY;
                 const EDGE_FRACTION = 0.25;
-                const overlayDist = (overlay.distanceFt / 5) * 40;
-                const isNearEdge = !isAtOrigin && overlay.shape !== OverlayShape.RADIUS && distFromOrigin > overlayDist * EDGE_FRACTION;
-                if (isNearEdge && (overlay.shape === OverlayShape.CONE || overlay.shape === OverlayShape.LINE)) {
+                const overlayDist = ((overlay.distanceFt || overlay.sizeFt || 0) / 5) * 40;
+                const isNearEdge = !isAtOrigin && overlay.shape !== OverlayShape.SPHERE && overlay.shape !== OverlayShape.CYLINDER && distFromOrigin > overlayDist * EDGE_FRACTION;
+                if (isNearEdge && (overlay.shape === OverlayShape.CONE || overlay.shape === OverlayShape.LINE || overlay.shape === OverlayShape.CUBE)) {
                     const initialAngle = computeAngle(origin.x, origin.y, screenPt.x, screenPt.y);
                     spellDragActiveRef.current = true;
                     const svg = svgRef.current;
@@ -386,7 +386,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 return;
             }
         }
-    }, [rulerMode, spellMode, overlays, getGridFromEvent, clientToSVG, computeAngle, addOverlay]);
+    }, [rulerMode, spellMode, overlays, getGridFromEvent, clientToSVG, computeAngle, addOverlay, shapeParams]);
 
     const handleSpellPointerMove = useCallback((e) => {
         if (!spellDraft) return;
@@ -399,11 +399,11 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         if (!spellDraft) return;
         const angle = computeAngle(spellDraft.startScreenX, spellDraft.startScreenY, e.clientX, e.clientY);
         const shape = spellMode;
-        const overlay = createOverlay(shape, spellDraft.startGridX, spellDraft.startGridY, angle);
+        const overlay = createOverlay(shape, spellDraft.startGridX, spellDraft.startGridY, angle, shapeParams);
         addOverlay(overlay);
         setSpellDraft(null);
         setSpellMode(null);
-    }, [spellDraft, spellMode, computeAngle, addOverlay]);
+    }, [spellDraft, spellMode, computeAngle, addOverlay, shapeParams]);
 
     const handleSpellDragMove = useCallback((e) => {
         if (dragOverlay) {

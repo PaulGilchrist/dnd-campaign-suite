@@ -1,15 +1,34 @@
 export const OverlayShape = {
-  RADIUS: 'radius',
+  SPHERE: 'sphere',
+  CYLINDER: 'cylinder',
+  CUBE: 'cube',
   CONE: 'cone',
   LINE: 'line',
 };
 
 export const DEFAULTS = {
-  radius: {
+  sphere: {
     radiusFt: 20,
     coneAngle: 0,
     widthFt: 0,
     distanceFt: 0,
+    sizeFt: 0,
+    color: 'rgba(255,80,60,0.35)',
+  },
+  cylinder: {
+    radiusFt: 20,
+    coneAngle: 0,
+    widthFt: 0,
+    distanceFt: 0,
+    sizeFt: 0,
+    color: 'rgba(255,80,60,0.35)',
+  },
+  cube: {
+    radiusFt: 0,
+    coneAngle: 0,
+    widthFt: 0,
+    distanceFt: 0,
+    sizeFt: 15,
     color: 'rgba(255,80,60,0.35)',
   },
   cone: {
@@ -17,6 +36,7 @@ export const DEFAULTS = {
     coneAngle: 53,
     widthFt: 0,
     distanceFt: 60,
+    sizeFt: 0,
     color: 'rgba(255,80,60,0.35)',
   },
   line: {
@@ -24,19 +44,21 @@ export const DEFAULTS = {
     coneAngle: 0,
     widthFt: 5,
     distanceFt: 60,
+    sizeFt: 0,
     color: 'rgba(255,80,60,0.35)',
   },
 };
 
 export const toGrid = (ft) => ft / 5;
 
-export const createOverlay = (shape, gridX, gridY, angle = 0) => ({
+export const createOverlay = (shape, gridX, gridY, angle = 0, params = {}) => ({
   id: crypto.randomUUID(),
   shape,
   startGridX: gridX,
   startGridY: gridY,
   angle,
   ...DEFAULTS[shape],
+  ...params,
 });
 
 const CELL = 40;
@@ -54,9 +76,19 @@ export const hitTestOverlay = (overlay, gridX, gridY) => {
   const dy = sy - oy;
 
   switch (overlay.shape) {
-    case OverlayShape.RADIUS: {
+    case OverlayShape.SPHERE:
+    case OverlayShape.CYLINDER: {
       const r = (overlay.radiusFt / 5) * CELL;
       return dx * dx + dy * dy <= r * r;
+    }
+    case OverlayShape.CUBE: {
+      const half = (overlay.sizeFt / 5) * CELL / 2;
+      const angleRad = overlay.angle * (Math.PI / 180);
+      const cos = Math.cos(-angleRad);
+      const sin = Math.sin(-angleRad);
+      const rx = dx * cos - dy * sin;
+      const ry = dx * sin + dy * cos;
+      return rx >= -half && rx <= half && ry >= -half && ry <= half;
     }
     case OverlayShape.CONE: {
       const dist = (overlay.distanceFt / 5) * CELL;
