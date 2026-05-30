@@ -289,4 +289,17 @@ describe('Sidebar', () => {
     const questsBtn = screen.getByText(/Quests/).closest('button');
     expect(questsBtn.classList.contains('active')).toBe(true);
   });
+
+  it('should render Rules button', () => {
+    render(<Sidebar {...defaultProps} />);
+    expect(screen.getByText(/Rules/)).toBeInTheDocument();
+  });
+
+  it('should open rules URL in new tab when Rules clicked', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    render(<Sidebar {...defaultProps} />);
+    fireEvent.click(screen.getByText(/Rules/));
+    expect(openSpy).toHaveBeenCalledWith('https://paulgilchrist.github.io/dnd-tools/rules/general', '_blank');
+    openSpy.mockRestore();
+  });
 });

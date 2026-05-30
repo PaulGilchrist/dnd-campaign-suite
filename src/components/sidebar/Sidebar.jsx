@@ -90,10 +90,6 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                 <i className="fa-solid fa-map"></i> {isLocalhost ? 'Maps' : 'Map'}
             </button>
 
-            <button className="sidebar-section-header" onClick={onNotesClick}>
-                <i className="fa-solid fa-book"></i> Notes
-            </button>
-
             {isLocalhost && (
                 <button
                     className={`sidebar-section-header${activeView?.type === 'npcs' ? ' active' : ''}`}
@@ -103,6 +99,10 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                 </button>
             )}
 
+            <button className="sidebar-section-header" onClick={onNotesClick}>
+                <i className="fa-solid fa-book"></i> Notes
+            </button>
+
             {isLocalhost && (
                 <button
                     className={`sidebar-section-header${activeView === 'quests' ? ' active' : ''}`}
@@ -111,6 +111,13 @@ function Sidebar({ campaignName, characters, activeCharacter, onBackToCampaigns,
                     <i className="fa-solid fa-scroll"></i> Quests
                 </button>
             )}
+
+            <button
+                className="sidebar-section-header"
+                onClick={() => window.open('https://paulgilchrist.github.io/dnd-tools/rules/general', '_blank')}
+            >
+                <i className="fa-solid fa-book"></i> Rules <i className="fa-solid fa-external-link-alt fa-xs"></i>
+            </button>
 
         </nav>
     );
