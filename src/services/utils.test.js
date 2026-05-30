@@ -40,9 +40,41 @@ describe('utils', () => {
         });
     });
 
+    describe('getName', () => {
+        it('should return the full name', () => {
+            expect(utils.getName('John Doe')).toBe('John Doe');
+        });
+
+        it('should return the name when only one name is provided', () => {
+            expect(utils.getName('John')).toBe('John');
+        });
+
+        it('should return Unknown for null', () => {
+            expect(utils.getName(null)).toBe('Unknown');
+        });
+
+        it('should return Unknown for undefined', () => {
+            expect(utils.getName(undefined)).toBe('Unknown');
+        });
+
+        it('should return Unknown for empty string', () => {
+            expect(utils.getName('')).toBe('Unknown');
+        });
+
+        it('should return Unknown for non-string types', () => {
+            expect(utils.getName(123)).toBe('Unknown');
+            expect(utils.getName({})).toBe('Unknown');
+            expect(utils.getName([])).toBe('Unknown');
+        });
+
+        it('should handle names with multiple spaces', () => {
+            expect(utils.getName('John Michael Doe')).toBe('John Michael Doe');
+        });
+    });
+
     describe('getFirstName', () => {
-        it('should return the first name from a full name', () => {
-            expect(utils.getFirstName('John Doe')).toBe('John');
+        it('should return the full name', () => {
+            expect(utils.getFirstName('John Doe')).toBe('John Doe');
         });
 
         it('should return the name when only one name is provided', () => {
@@ -68,7 +100,7 @@ describe('utils', () => {
         });
 
         it('should handle names with multiple spaces', () => {
-            expect(utils.getFirstName('John Michael Doe')).toBe('John');
+            expect(utils.getFirstName('John Michael Doe')).toBe('John Michael Doe');
         });
     });
 

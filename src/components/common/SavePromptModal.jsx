@@ -10,7 +10,7 @@ function SavePromptModal({ campaignName, characters }) {
 
   const characterNames = new Set((characters || []).map(c => {
     const name = typeof c === 'string' ? c : c.name;
-    return name ? utils.getFirstName(name).toLowerCase() : '';
+    return name ? utils.getName(name).toLowerCase() : '';
   }));
 
   const handleEvent = useCallback((event) => {

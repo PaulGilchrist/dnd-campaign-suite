@@ -4,7 +4,7 @@ import useCharacterManagement from './useCharacterManagement.js';
 
 vi.mock('lodash/cloneDeep', () => ({ default: vi.fn(val => val) }));
 vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
-vi.mock('../services/utils.js', () => ({ default: { getFirstName: vi.fn(n => n) } }));
+vi.mock('../services/utils.js', () => ({ default: { getName: vi.fn(n => n) } }));
 vi.mock('../services/campaignService.js', () => ({
   deleteCharacter: vi.fn().mockResolvedValue(undefined),
 }));
@@ -65,7 +65,7 @@ describe('useCharacterManagement', () => {
         result.current.handleSaveClick();
       });
 
-      expect(Utils.getFirstName).toHaveBeenCalledWith(char.name);
+      expect(Utils.getName).toHaveBeenCalledWith(char.name);
       expect(saveAs).toHaveBeenCalledWith(
         expect.any(Blob),
         'dark lord.json'

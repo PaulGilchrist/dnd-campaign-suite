@@ -89,6 +89,7 @@ vi.mock('../../services/storage.js', () => ({
 // Mock utils
 vi.mock('../../services/utils.js', () => ({
   default: {
+    getName: vi.fn((name) => name),
     getFirstName: vi.fn((name) => name),
     guid: vi.fn(() => 'unique-id'),
   },
@@ -151,9 +152,8 @@ describe('CharSheet', () => {
 
     // Mock localStorage.getItem to return null (no prepared spells)
     mockLocalStorage.getItem.mockReturnValue(null);
-
-    // Mock utils.getFirstName
-    utils.getFirstName.mockReturnValue('Test Character');
+    // Mock utils.getName
+    utils.getName.mockReturnValue('Test Character');
   });
 
   it('should render all child components after loading', async () => {

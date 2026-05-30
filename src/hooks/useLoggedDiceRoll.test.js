@@ -9,7 +9,7 @@ vi.mock('../services/diceRoller.js', () => ({
   rollD20: vi.fn(() => 15)
 }));
 vi.mock('../services/utils.js', () => ({
-  default: { getFirstName: vi.fn((name) => name.split(' ')[0]) }
+  default: { getName: vi.fn((name) => name) }
 }));
 vi.mock('../services/storage.js', () => ({
   default: {
@@ -122,7 +122,7 @@ describe('useLoggedDiceRoll', () => {
   it('rollInitiative should update combatSummary in localStorage when it exists', () => {
     const combatSummary = {
       creatures: [
-        { type: 'player', name: 'Gandalf', initiative: '0' },
+        { type: 'player', name: 'Gandalf the Grey', initiative: '0' },
         { type: 'monster', name: 'Goblin', initiative: '10' },
       ],
     };
@@ -132,7 +132,6 @@ describe('useLoggedDiceRoll', () => {
     act(() => {
       result.current.rollInitiative(2);
     });
-    // combatSummary creatures should be sorted by initiative desc and Gandalf updated
     expect(window.dispatchEvent).toHaveBeenCalledWith(expect.any(CustomEvent));
   });
 

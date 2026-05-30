@@ -7,7 +7,7 @@ import { parseMagicItemName } from '../../services/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import { rollExpression } from '../../services/diceRoller.js'
-import { getTargetFromAttacker, getCombatContext, getResistanceNotice } from '../../services/damageUtils.js';
+import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetId } from '../../services/damageUtils.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';
 
@@ -36,12 +36,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const buildAttackContext = React.useCallback((attack) => {
         const target = getCombatTargetInfo();
+        const cs = getCombatContext();
+        const rawTargetId = getAttackerTargetId(cs, playerStats.name);
         const resistanceNotice = target ? getResistanceNotice([attack.damageType], target.resistances, target.immunities, target.name) : null;
         return {
             damageType: attack.damageType,
             resistanceNotice,
             targetName: target?.name,
-            targetId: target?.id,
+            targetId: rawTargetId || target?.id,
             saveDc: attack.saveDc,
             saveType: attack.saveType,
             dcSuccess: attack.saveSuccess,

@@ -4,7 +4,7 @@ import utils from './utils.js';
 
 vi.mock('./utils.js', () => ({
   default: {
-    getFirstName: vi.fn((name) => name?.split(' ')[0] || name)
+    getName: vi.fn((name) => name)
   }
 }));
 
@@ -92,13 +92,13 @@ describe('storage', () => {
       expect(result).toBe(5);
     });
 
-    it('should use utils.getFirstName to get first name', () => {
+    it('should use utils.getName to get the full name', () => {
       const testData = { level: 10 };
-      localStorage.setItem('John', JSON.stringify(testData));
+      localStorage.setItem('John Doe', JSON.stringify(testData));
 
       storage.getProperty('John Doe', 'level', 'TestCampaign');
 
-      expect(utils.getFirstName).toHaveBeenCalledWith('John Doe');
+      expect(utils.getName).toHaveBeenCalledWith('John Doe');
     });
   });
 
@@ -130,10 +130,10 @@ describe('storage', () => {
       expect(stored.level).toBe(10);
     });
 
-    it('should use utils.getFirstName to get first name', () => {
+    it('should use utils.getName to get the full name', () => {
       storage.setProperty('John Doe', 'level', 5, 'TestCampaign');
 
-      expect(utils.getFirstName).toHaveBeenCalledWith('John Doe');
+      expect(utils.getName).toHaveBeenCalledWith('John Doe');
     });
   });
 });

@@ -16,6 +16,7 @@ vi.mock('../../services/utils.js', () => {
     default: {
       guid: vi.fn(() => `test-guid-${Date.now()}-${Math.random()}`),
       getFirstName: vi.fn((name) => name?.split(' ')[0] || name),
+      getName: vi.fn((name) => name),
     },
   };
 });

@@ -24,7 +24,7 @@ const storage = {
     },
     getProperty: (name, propertyName, campaignName) => {
         void campaignName;
-        const firstName = utils.getFirstName(name);
+        const firstName = utils.getName(name);
         const obj = storage.get(firstName);
         if(obj && obj[propertyName] != null) {
             return obj[propertyName];
@@ -32,7 +32,7 @@ const storage = {
         return null;
     },
     setProperty: (name, propertyName, value, campaignName) => {
-        const firstName = utils.getFirstName(name);
+        const firstName = utils.getName(name);
         let obj = storage.get(firstName);
         if(!obj) {
             obj = {};

@@ -91,7 +91,7 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
 
     const combatSummary = getCombatSummary();
 
-    const target = combatSummary ? getTargetFromAttacker(combatSummary, utils.getFirstName(characterName)) : null;
+    const target = combatSummary ? getTargetFromAttacker(combatSummary, utils.getName(characterName)) : null;
 
     const hit = target ? (r1 + bonus >= target.ac) : undefined;
     const targetName = target?.name || context?.targetName;
@@ -129,7 +129,7 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
     });
 
     if (rollType === 'initiative') {
-        const firstName = utils.getFirstName(characterName);
+        const firstName = utils.getName(characterName);
         const stored = localStorage.getItem('combatSummary');
         if (stored) {
             try {

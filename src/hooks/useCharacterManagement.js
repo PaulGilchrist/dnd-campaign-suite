@@ -61,7 +61,7 @@ function useCharacterManagement(campaignName) {
    };
 
   const handleSaveClick = async () => {
-    let fileName = `${utils.getFirstName(activeCharacter.name)}.json`;
+    let fileName = `${utils.getName(activeCharacter.name)}.json`;
     fileName = fileName.toLowerCase();
     const json = JSON.stringify(activeCharacter, null, 4);
     const blob = new Blob([json], { type: 'application/json' });

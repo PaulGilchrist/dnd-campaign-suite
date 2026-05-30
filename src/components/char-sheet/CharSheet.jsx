@@ -89,7 +89,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
             localStorage.setItem(characterKey, JSON.stringify(event.data));
 
-            if (playerStats && utils.getFirstName(playerStats.name) === characterKey) {
+            if (playerStats && utils.getName(playerStats.name) === characterKey) {
                 setForceRefresh(utils.guid());
               }
             }

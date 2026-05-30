@@ -54,6 +54,11 @@ export function getTargetFromAttacker(combatSummary, attackerName) {
   return target || null;
 }
 
+export function getAttackerTargetId(combatSummary, attackerName) {
+  const attacker = findCreatureByName(combatSummary, attackerName);
+  return attacker?.targetId || null;
+}
+
 function computeAbilityBonus(character, abilityName) {
   const ab = character.abilities?.find(a => a.name === abilityName);
   if (!ab) return 0;

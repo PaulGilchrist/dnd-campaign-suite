@@ -8,7 +8,7 @@ import DiceRollResult from '../DiceRollResult.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
 import { rollExpression } from '../../../services/diceRoller.js';
 import { sanitizeHtml } from '../../../services/sanitize.js';
-import { getCombatContext, getTargetFromAttacker } from '../../../services/damageUtils.js';
+import { getCombatContext, getTargetFromAttacker, getAttackerTargetId } from '../../../services/damageUtils.js';
 import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct }) {
@@ -30,8 +30,10 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         const result = rollExpression(formula);
         if (result) {
             const target = getCombatTargetInfo();
+            const cs = getCombatContext();
+            const rawTargetId = getAttackerTargetId(cs, playerStats.name);
             const context = {
-                targetId: target?.id,
+                targetId: rawTargetId || target?.id,
                 targetName: target?.name,
                 attackerName: playerStats.name,
             };

@@ -329,7 +329,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             const maxHp = character.hitPoints || 0;
             return {
                 id: utils.guid(),
-                name: utils.getFirstName(character.name),
+                name: utils.getName(character.name),
                 type: 'player',
                 imagePath: character.imagePath || '',
                 initiative: '',
@@ -340,8 +340,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 immunities: character.immunities || [],
                 conditions: [],
                 concentration: null,
-                maxHp: loadCreatureMaxHp(utils.getFirstName(character.name), maxHp),
-                currentHp: loadCreatureHp(utils.getFirstName(character.name), maxHp),
+                maxHp: loadCreatureMaxHp(utils.getName(character.name), maxHp),
+                currentHp: loadCreatureHp(utils.getName(character.name), maxHp),
                 saveBonuses: getSaveBonuses(character),
             };
         });
@@ -437,10 +437,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         }
 
         if (initialSummary) {
-            const characterNameSet = new Set(characters.map(c => utils.getFirstName(c.name)));
+            const characterNameSet = new Set(characters.map(c => utils.getName(c.name)));
             const mergedCreatures = initialSummary.creatures.map(c => {
                 if (c.type === 'player' && characterNameSet.has(c.name)) {
-                    const character = characters.find(ch => utils.getFirstName(ch.name) === c.name);
+                    const character = characters.find(ch => utils.getName(ch.name) === c.name);
                     const maxHp = loadCreatureMaxHp(c.name, character?.hitPoints || c.maxHp || 0);
                     return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(character), currentHp: loadCreatureHp(c.name, maxHp), maxHp, saveBonuses: c.saveBonuses || getSaveBonuses(character) };
                 }
@@ -519,7 +519,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         (async () => {
             for (const creature of combatSummary.creatures) {
                 if (creature.type !== 'player') continue;
-                const character = characters.find(c => utils.getFirstName(c.name) === creature.name);
+                const character = characters.find(c => utils.getName(c.name) === creature.name);
                 if (character) {
                     const ac = await computePlayerAc(character);
                     if (cancelled) return;
@@ -770,7 +770,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
         let saveBonus = 0;
         if (creature.type === 'player') {
-            const character = characters.find(c => utils.getFirstName(c.name) === creature.name);
+            const character = characters.find(c => utils.getName(c.name) === creature.name);
             saveBonus = getAbilitySaveBonus(character, condition.ability);
         } else {
             try {
@@ -876,7 +876,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
         let saveBonus = 0;
         if (creature.type === 'player') {
-            const character = characters.find(c => utils.getFirstName(c.name) === creature.name);
+            const character = characters.find(c => utils.getName(c.name) === creature.name);
             saveBonus = getAbilitySaveBonus(character, 'con');
         } else {
             try {

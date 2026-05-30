@@ -79,7 +79,7 @@ export async function expandMonstersToCreatures(selectedMonsters, characters, ca
       const storedMaxHp = storage.getProperty(character.name, 'hitPoints', campaignName);
       return {
         id: utils.guid(),
-        name: utils.getFirstName(character.name),
+        name: utils.getName(character.name),
         type: 'player',
         imagePath: character.imagePath || '',
         initiative: '',

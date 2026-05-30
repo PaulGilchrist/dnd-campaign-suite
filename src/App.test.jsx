@@ -209,7 +209,7 @@ const { MockFactions } = vi.hoisted(() => ({
 vi.mock('./services/dataLoader.js', () => dataLoaderMocks);
 
 vi.mock('./services/utils.js', () => ({
-  default: { getFirstName: vi.fn((name) => (name ? name.split(' ')[0] : '')) },
+  default: { getName: vi.fn((name) => name || '') },
 }));
 
 vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
