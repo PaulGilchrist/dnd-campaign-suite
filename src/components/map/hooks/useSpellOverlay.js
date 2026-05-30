@@ -1,13 +1,39 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 const SSE_EVENT_KEY_PREFIX = 'spell-overlay-';
 const UPDATE_DEBOUNCE_MS = 150;
 
-function useSpellOverlay(campaignName) {
-    const [overlays, setOverlays] = useState([]);
+function getStorageKey(campaignName, mapName) {
+  return `spellOverlays-${campaignName}-${mapName}`;
+}
+
+function loadOverlays(campaignName, mapName) {
+  try {
+    const stored = localStorage.getItem(getStorageKey(campaignName, mapName));
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveOverlays(campaignName, mapName, overlays) {
+  try {
+    localStorage.setItem(getStorageKey(campaignName, mapName), JSON.stringify(overlays));
+  } catch { /* ignore quota errors */ }
+}
+
+function useSpellOverlay(campaignName, mapName) {
+    const [overlays, setOverlays] = useState(() => loadOverlays(campaignName, mapName));
     const [pendingOverlay, setPendingOverlay] = useState(null);
     const debounceTimerRef = useRef(null);
     const pendingRef = useRef(null);
+    const campaignRef = useRef(campaignName);
+    campaignRef.current = campaignName;
+
+    // Persist overlays to localStorage whenever they change
+    useEffect(() => {
+      if (mapName) saveOverlays(campaignName, mapName, overlays);
+    }, [campaignName, mapName, overlays]);
 
     const sendAction = useCallback(async (action, data = {}) => {
         try {

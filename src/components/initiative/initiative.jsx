@@ -17,7 +17,30 @@ import { loadNPCs } from '../../services/npcsService.js';
 import { npcToMonsterFormat, npcHasStatBlock } from '../../services/npcStatBlockUtils.js';
 import Popup from '../common/Popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
+import * as mapsService from '../../services/mapsService.js';
+import { OverlayShape } from '../../models/SpellOverlay.js';
 import './initiative.css'
+
+const SHAPE_LABELS = {
+    [OverlayShape.SPHERE]: 'Sphere',
+    [OverlayShape.CYLINDER]: 'Cylinder',
+    [OverlayShape.CUBE]: 'Cube',
+    [OverlayShape.CONE]: 'Cone',
+    [OverlayShape.LINE]: 'Line',
+};
+
+function getOverlayStorageKey(campaignName, mapName) {
+    return `spellOverlays-${campaignName}-${mapName}`;
+}
+
+function loadOverlays(campaignName, mapName) {
+    try {
+        const stored = localStorage.getItem(getOverlayStorageKey(campaignName, mapName));
+        return stored ? JSON.parse(stored) : [];
+    } catch {
+        return [];
+    }
+}
 
 function NpcAvatar({ name, imageUrl, imagePath, onClick }) {
     const src = imagePath || imageUrl;
@@ -127,7 +150,7 @@ function CreatureHp({ creature, isLocalhost, onChange }) {
     );
 }
 
-function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
+function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
     const [numOfNpc, setNumOfNpc] = React.useState(4);
     const [activeCreatureId, setActiveCreatureId] = React.useState(null);
@@ -148,6 +171,23 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
     const [concentrationDc, setConcentrationDc] = React.useState(10);
 
     const [campaignNpcs, setCampaignNpcs] = React.useState([]);
+
+    const [mapData, setMapData] = React.useState(null);
+    const [overlays, setOverlays] = React.useState([]);
+
+    React.useEffect(() => {
+        if (!campaignName || !mapName) {
+            setMapData(null);
+            setOverlays([]);
+            return;
+        }
+        setOverlays(loadOverlays(campaignName, mapName));
+        mapsService.loadMapData(campaignName, mapName).then(data => {
+            setMapData(data);
+        }).catch(() => {
+            setMapData(null);
+        });
+    }, [campaignName, mapName]);
 
     const loadCreatureHp = React.useCallback((characterName, fallbackMaxHp) => {
         const stored = storage.getProperty(characterName, 'currentHitPoints', campaignName);
@@ -566,9 +606,27 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
     const handleTargetChange = (id, targetId) => {
         if (!combatSummary) return;
         const idx = combatSummary.creatures.findIndex((creature) => creature.id === id);
-        combatSummary.creatures[idx].targetId = targetId || null;
-        const target = targetId ? combatSummary.creatures.find(c => c.id === targetId) : null;
-        combatSummary.creatures[idx].targetName = target ? target.name : null;
+        if (targetId && targetId.startsWith('overlay-')) {
+            const overlayId = targetId.slice('overlay-'.length);
+            const overlay = overlays.find(o => o.id === overlayId);
+            if (overlay) {
+                combatSummary.creatures[idx].targetId = targetId;
+                combatSummary.creatures[idx].targetName = overlay.label || `${SHAPE_LABELS[overlay.shape] || overlay.shape} (${overlay.radiusFt || overlay.distanceFt || overlay.sizeFt || 0}ft)`;
+                const players = mapData?.players || [];
+                const npcs = (mapData?.placedItems || []).filter(i => i.type === 'npc');
+                try {
+                    localStorage.setItem(`aoeContext-${campaignName}`, JSON.stringify({
+                        overlay,
+                        players,
+                        npcs,
+                    }));
+                } catch { /* ignore */ }
+            }
+        } else {
+            combatSummary.creatures[idx].targetId = targetId || null;
+            const target = targetId ? combatSummary.creatures.find(c => c.id === targetId) : null;
+            combatSummary.creatures[idx].targetName = target ? target.name : null;
+        }
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
     };
@@ -957,6 +1015,18 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost }) {
                                             <option key={c.id} value={c.id}>{c.name}</option>
                                         ))
                                     }
+                                    {overlays.length > 0 && (
+                                        <optgroup label="─── Overlays ───">
+                                            {overlays.map(o => {
+                                                const label = o.label || `${SHAPE_LABELS[o.shape] || o.shape} (${o.radiusFt || o.distanceFt || o.sizeFt || 0}ft)`;
+                                                return (
+                                                    <option key={`overlay-${o.id}`} value={`overlay-${o.id}`}>
+                                                        {label}
+                                                    </option>
+                                                );
+                                            })}
+                                        </optgroup>
+                                    )}
                                 </select>
                             </div>
                             <div className='creature-conditions'>

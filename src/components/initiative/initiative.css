@@ -722,3 +722,26 @@
     filter: grayscale(0.8);
 }
 
+.initiative .creature-target select optgroup {
+    font-style: italic;
+    color: #888;
+}
+
+.initiative .aoe-target-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 80, 60, 0.15);
+    border: 1px solid rgba(255, 80, 60, 0.4);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.75em;
+    color: #ff5040;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+.initiative .aoe-target-badge i {
+    font-size: 0.85em;
+}
+

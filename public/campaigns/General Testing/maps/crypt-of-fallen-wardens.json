@@ -444,8 +444,8 @@
       "gridY": 9,
       "type": "npc",
       "visible": false,
-      "name": "Skeleton",
-      "rotation": 90
+      "name": "Skeleton 1",
+      "rotation": 0
     },
     {
       "id": "npc-2",

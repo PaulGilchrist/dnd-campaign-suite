@@ -110,7 +110,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         removeOverlay,
         clearOverlays,
         handleSSEEvent: handleSpellOverlayEvent,
-    } = useSpellOverlay(campaignName);
+    } = useSpellOverlay(campaignName, mapName);
 
     // Selection state
     const [selectionRect, setSelectionRect] = useState(null);

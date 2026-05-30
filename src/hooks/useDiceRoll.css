@@ -52,3 +52,70 @@
     margin-top: 16px;
     opacity: 0.5;
 }
+
+.aoe-summary {
+    text-align: left;
+    min-width: 280px;
+    padding: 4px 8px;
+}
+
+.aoe-summary h3 {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin: 0 0 10px;
+    color: var(--color-header);
+    text-align: center;
+}
+
+.aoe-summary h3 i {
+    margin-right: 8px;
+    color: var(--color-hover);
+}
+
+.aoe-damage-info {
+    text-align: center;
+    font-size: 1.05em;
+    font-weight: 600;
+    color: var(--color-header-inner);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-border, #444);
+}
+
+.aoe-results {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.aoe-result-row {
+    font-size: 0.9em;
+    color: var(--color-text);
+    padding: 4px 8px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 4px;
+}
+
+.aoe-result-row strong {
+    color: var(--color-header);
+}
+
+.aoe-save-success {
+    color: #2ecc71;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.aoe-save-fail {
+    color: #e74c3c;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.aoe-pending {
+    margin-top: 10px;
+    font-size: 0.85em;
+    color: var(--color-text-muted);
+    text-align: center;
+    padding: 6px;
+}

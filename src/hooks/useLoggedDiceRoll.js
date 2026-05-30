@@ -9,6 +9,16 @@ import {
   applyDamageToTarget,
 } from '../services/applyDamage.js';
 import { sendSavePrompt, sendSaveResult } from '../services/savePromptService.js';
+import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../services/aoeService.js';
+
+function readAoeContext(campaignName) {
+  try {
+    const stored = localStorage.getItem(`aoeContext-${campaignName}`);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
 
 function getCombatSummary() {
   const stored = localStorage.getItem('combatSummary');
@@ -139,9 +149,72 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
      }
 
    function logDamageAndShow(name, formula, total, rolls, modifier, context) {
-     const { saveDc, saveType, dcSuccess, targetId, damageType, attackerName } = context || {};
-     const combatSummary = getCombatSummary();
-     const target = targetId ? combatSummary?.creatures?.find(c => c.id === targetId) : null;
+      const { saveDc, saveType, dcSuccess, targetId, damageType, attackerName } = context || {};
+      const combatSummary = getCombatSummary();
+
+      if (targetId && targetId.startsWith('overlay-')) {
+        const aoeCtx = readAoeContext(campaignName);
+        if (aoeCtx && combatSummary) {
+          const { overlay, players, npcs } = aoeCtx;
+          const affected = getAffectedCreatures(overlay, players, npcs, combatSummary);
+          const npcResults = saveDc && saveType
+            ? processAoeNpcs(combatSummary, affected, total, damageType, saveDc, saveType, dcSuccess, campaignName)
+            : affected.map(({ creature }) => {
+                const applyResult = applyDamageToTarget(combatSummary, creature.id, total, damageType ? [damageType] : [], campaignName);
+                return { creatureName: creature.name, finalDamage: applyResult?.finalDamage, newHp: applyResult?.newHp, damageReduced: applyResult?.damageReduced, saveSuccess: null };
+              });
+          const playerAffected = affected.filter(a => a.creature.type === 'player');
+          if (playerAffected.length && saveDc && saveType) {
+            const playerPrompts = sendAoePlayerSaves(playerAffected, total, damageType, saveDc, saveType, dcSuccess, campaignName, name, attackerName || characterName, rolls, formula);
+            for (const pp of playerPrompts) {
+              pendingSaves[pp.promptId] = {
+                targetId: pp.targetId,
+                rawDamage: total,
+                saveDc,
+                saveType,
+                dcSuccess,
+                damageType,
+                attackerName: attackerName || characterName,
+                targetName: pp.targetName,
+                name,
+                formula,
+                modifier,
+                rolls,
+                campaignName,
+                setPopupHtml,
+                isAoe: true,
+              };
+            }
+          }
+          const overlayLabel = overlay.label || overlay.shape || 'AoE';
+          const npcResultRows = npcResults.map(r => {
+            const saveInfo = r.saveSuccess === null ? '' : (r.saveSuccess
+              ? `<span class="aoe-save-success">SAVE ${r.saveRoll}+${r.saveBonus} PASS</span>`
+              : `<span class="aoe-save-fail">SAVE ${r.saveRoll}+${r.saveBonus} FAIL</span>`);
+            const reduced = r.damageReduced ? ' <em>(reduced)</em>' : '';
+            return `<div class="aoe-result-row"><strong>${r.creatureName}</strong>: ${r.finalDamage} dmg${reduced} → ${r.newHp !== undefined ? `HP ${r.newHp}` : ''} ${saveInfo}</div>`;
+          }).join('');
+          const pendingList = playerAffected.length
+            ? `<div class="aoe-pending"><i class="fa-solid fa-spinner fa-spin"></i> Waiting for saves: ${playerAffected.map(a => a.creature.name).join(', ')}</div>`
+            : '';
+          const html = `<div class="aoe-summary"><h3><i class="fa-solid fa-wand-magic-sparkles"></i> ${overlayLabel} — ${name}</h3><div class="aoe-damage-info">${formula}: <strong>${total}</strong> ${damageType || 'untyped'}${saveDc ? ` — ${saveType ? saveType.toUpperCase() : ''} save DC ${saveDc}` : ''}</div><div class="aoe-results">${npcResultRows || '<em>No creatures affected</em>'}</div>${pendingList}</div>`;
+          logEntry({
+            type: 'aoe-damage',
+            characterName,
+            rollType: 'aoe-damage',
+            name,
+            formula, rolls, total, modifier, damageType,
+            targetName: overlayLabel,
+            affectedCount: affected.length,
+            npcResults: npcResults.map(r => r.creatureName),
+            saveType, saveDc, dcSuccess,
+          });
+          setPopupHtml(html);
+        }
+        return;
+      }
+
+      const target = targetId ? combatSummary?.creatures?.find(c => c.id === targetId) : null;
 
      if (saveDc && saveType && target) {
        if (target.type === 'npc') {
