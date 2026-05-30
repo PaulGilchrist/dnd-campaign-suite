@@ -96,19 +96,19 @@
   ],
   "specialActions": [],
   "spells": [
-    "Disguise Self",
     "Find Familiar",
     "Fire Bolt",
     "Mage Hand",
     "Magic Missile",
-    "Minor Illusion",
     "Shield",
-    "Shocking Grasp",
     "Enlarge/Reduce",
     "Invisibility",
     "Misty Step",
     "Counterspell",
-    "Fireball"
+    "Fireball",
+    "Poison Spray",
+    "Chill Touch",
+    "Feather Fall"
   ],
   "rules": "2024",
   "xp": 0,

@@ -99,8 +99,8 @@ function SelectableList({
     const isPreSelected = preSelectedItems.includes(itemName);
     const isCurrentlySelected = currentItems.includes(itemName);
 
-    // Don't allow unselection of pre-selected items
-    if (isCurrentlySelected && isPreSelected) {
+    // Don't allow toggling of pre-selected items
+    if (isPreSelected) {
       return;
     }
 

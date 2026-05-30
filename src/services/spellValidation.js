@@ -104,7 +104,7 @@ function extractSpellsFromDescription(description, result) {
     
     const knownSpells = [
       'Speak with Animals', 'Detect Magic', 'Faerie Fire', 'Longstrider',
-      'Darkness', 'Misty Step', 'Pass without Trace', 'Invisibility',
+      'Darkness', 'Misty Step', 'Pass Without Trace', 'Invisibility',
       'Silent Image', 'Cursed Hunt', 'Ensnaring Strike'
     ];
     
@@ -314,7 +314,7 @@ export async function getSpellSources(formData, version = '5e') {
  * @param {string} version - '5e' or '2024'
  * @returns {Promise<object>} - { warnings: array, valid: boolean }
  */
-export async function validateSpells(formData, selectedSpells, allSpells, version = '5e') {
+export async function validateSpells(formData, selectedSpells, allSpells, version = '5e', grantedSpells = []) {
   const warnings = [];
   const selectedSpellNames = selectedSpells || [];
   
@@ -345,6 +345,9 @@ export async function validateSpells(formData, selectedSpells, allSpells, versio
   // Add feat-granted spells
   sources.feats.grantedSpells.forEach(spell => allowedSpells.add(spell));
   sources.feats.grantedCantrips.forEach(spell => allowedSpells.add(spell));
+  
+  // Add any explicitly granted spells (auto-assigned from subclass/race/subrace/feats)
+  grantedSpells.forEach(spell => allowedSpells.add(spell));
   
   // Check each selected spell
   const spellsOutsideClassList = [];
@@ -399,8 +402,8 @@ export async function validateSpells(formData, selectedSpells, allSpells, versio
  * @param {string} version - '5e' or '2024'
  * @returns {Promise<object>} - Object with validation info for UI display
  */
-export async function getSpellValidationInfo(formData, selectedSpells, allSpells, version = '5e') {
-  const validation = await validateSpells(formData, selectedSpells, allSpells, version);
+export async function getSpellValidationInfo(formData, selectedSpells, allSpells, version = '5e', grantedSpells = []) {
+  const validation = await validateSpells(formData, selectedSpells, allSpells, version, grantedSpells);
   const sources = await getSpellSources(formData, version);
   
   return {

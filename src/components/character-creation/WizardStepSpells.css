@@ -11,6 +11,23 @@
     color: var(--color-text);
 }
 
+.wizard-step-spells .spell-item.pre-selected {
+    opacity: 0.7;
+    cursor: default;
+    pointer-events: none;
+}
+
+.wizard-step-spells .spell-item.pre-selected .list-item-checkbox {
+    opacity: 0.5;
+}
+
+.wizard-step-spells .pre-selected-label {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary, #888);
+    font-style: italic;
+    margin-left: 0.25rem;
+}
+
 .wizard-step-spells .spell-levels-summary {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

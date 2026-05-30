@@ -13,6 +13,7 @@ import useWizardSkills from '../../hooks/useWizardSkills.js';
 import useWizardLanguages from '../../hooks/useWizardLanguages.js';
 import useWizardResistances from '../../hooks/useWizardResistances.js';
 import useWizardFeats from '../../hooks/useWizardFeats.js';
+import useWizardSpells from '../../hooks/useWizardSpells.js';
 
 import useWizardAbilities from '../../hooks/useWizardAbilities.js';
 import useWizardArrayToggle from '../../hooks/useWizardArrayToggle.js';
@@ -29,6 +30,7 @@ const WizardStepRenderer = React.memo(({
   magicItems,
   allSpells,
   preSelectedFeats,
+  preSelectedSpells,
   preSelectedSkills,
   preSelectedLanguages,
   preSelectedFightingStyles,
@@ -178,6 +180,11 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, characterDat
     preSelectedFeats,
    } = useWizardFeats(formData, setFormData);
 
+  // Spells
+  const {
+    preSelectedSpells,
+   } = useWizardSpells(formData, setFormData);
+
 	// Inventory
 	const [tempInventory, setTempInventory] = useState({ backpack: [], equipped: [] });
 
@@ -293,6 +300,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, characterDat
         magicItems={magicItems}
         allSpells={allSpells}
         preSelectedFeats={preSelectedFeats}
+        preSelectedSpells={preSelectedSpells}
         preSelectedSkills={preSelectedSkills}
         preSelectedLanguages={preSelectedLanguages}
         preSelectedFightingStyles={preSelectedFightingStyles}
@@ -341,6 +349,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, characterDat
     preSelectedLanguages,
     preSelectedFightingStyles,
     preSelectedResistancesList,
+    preSelectedSpells,
     skillLimits,
     expertiseLimits,
     skillWarnings,

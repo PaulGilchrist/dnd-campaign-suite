@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import SelectableList from './SelectableList.jsx';
 import WarningList from '../common/WarningList.jsx';
 import { getSpellLimits, validateSpellSelection } from '../../services/spellLimits.js';
 import { getSpellValidationInfo } from '../../services/spellValidation.js';
 import './WizardStepSpells.css';
-function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
+function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelectedSpells }) {
+  const preSelected = useMemo(() => preSelectedSpells || [], [preSelectedSpells]);
   const [spellCounts, setSpellCounts] = useState({ cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 });
   const [spellLimits, setSpellLimits] = useState({ cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 });
   const [spellWarnings, setSpellWarnings] = useState([]);
@@ -37,12 +38,13 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
     fetchSpellLimits();
   }, [formData, formData.class, formData.level, formData.rules]);
 
-  // Calculate spell counts by level
+  // Calculate spell counts by level (excluding pre-selected spells)
   useEffect(() => {   
     const counts = { cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 };
     
     if (formData.spells && formData.spells.length > 0) {
       formData.spells.forEach(spellName => {
+        if (preSelected.includes(spellName)) return;
         const spell = allSpells.find(s => s.name === spellName || s.index === spellName);
         if (spell) {
           const level = spell.level !== undefined ? spell.level : 0;
@@ -53,7 +55,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
     }
     
     setSpellCounts(counts);
-  }, [formData.spells, allSpells]);
+  }, [formData.spells, allSpells, preSelected]);
 
   // Check if spell selection exceeds limits
   const getValidationMessage = useCallback(async () => {
@@ -66,8 +68,9 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
     const version = formData.rules || '5e';
     const majorName = formData.class.major?.name || formData.class.subclass?.name || null;
 
-    // Validate spell selection
-    const validation = await validateSpellSelection(formData.spells || [], allSpells || [], className, charLevel, version, majorName);
+    // Validate spell selection (excluding pre-selected spells)
+    const userSpells = (formData.spells || []).filter(s => !preSelected.includes(s));
+    const validation = await validateSpellSelection(userSpells, allSpells || [], className, charLevel, version, majorName);
 
     if (className === 'Barbarian' || className === 'Monk' || className === 'Rogue' || className === 'Fighter') {
       if (validation.valid) {
@@ -80,7 +83,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
     }
 
     return '';
-  }, [formData, allSpells]);
+  }, [formData, allSpells, preSelected]);
 
   useEffect(() => {
     const validate = async () => {
@@ -104,7 +107,8 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
           formData,
           formData.spells,
           allSpells || [],
-          version
+          version,
+          preSelected
           );
         
         setSpellWarnings(validationInfo.warnings || []);
@@ -115,7 +119,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
       };
     
     validateSpells();
-   }, [formData, formData.class, formData.race, formData.background, formData.feats, formData.spells, formData.level, formData.rules, allSpells]);
+   }, [formData, formData.class, formData.race, formData.background, formData.feats, formData.spells, formData.level, formData.rules, allSpells, preSelected]);
 
    // Get level class for styling
   const getLevelClass = (spell) => {
@@ -127,20 +131,23 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
   };
 
    // Render item function
-  const renderItem = (spell, index, { isSelected, isExpanded, onToggle, onToggleExpand }) => {
+  const renderItem = (spell, index, { isSelected, isPreSelected, isExpanded, onToggle, onToggleExpand }) => {
     return (
       <div
         key={spell.index || index}
-        className={`list-item spell-item ${isSelected ? 'selected' : ''}`}
-        onClick={onToggle}
+        className={`list-item spell-item ${isSelected ? 'selected' : ''} ${isPreSelected ? 'pre-selected' : ''}`}
+        onClick={isPreSelected ? undefined : onToggle}
       >
         <div className="list-item-header">
-          <div className="list-item-name">{spell.name}</div>
+          <div className="list-item-name">
+            {spell.name}
+            {isPreSelected && <span className="pre-selected-label"> (Auto-assigned)</span>}
+          </div>
           <span className={`spell-level ${getLevelClass(spell)}`}>
             {spell.level !== undefined ? spell.level : '0'}
           </span>
-          <div className={`list-item-checkbox ${isSelected ? 'checked' : ''}`}>
-            {isSelected ? '✓' : ''}
+          <div className={`list-item-checkbox ${(isSelected || isPreSelected) ? 'checked' : ''}`}>
+            {(isSelected || isPreSelected) ? '✓' : ''}
           </div>
         </div>
         
@@ -256,6 +263,7 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
       renderItem={renderItem}
       renderSummary={renderSummary}
       loadingMessage="Spell data not yet loaded. Please try again."
+      preSelectedItems={preSelected}
       className="wizard-step-spells"
       resultLabel="spell"
      />

@@ -126,10 +126,11 @@ export const WIZARD_STEPS = [
     step: 9,
     title: 'Spells',
     component: WizardStepSpells,
-    getProps: ({ formData, allSpells, onArrayFieldChange }) => ({
+    getProps: ({ formData, allSpells, onArrayFieldChange, preSelectedSpells }) => ({
       formData,
       allSpells,
       onArrayFieldChange,
+      preSelectedSpells,
     }),
   },
   {
