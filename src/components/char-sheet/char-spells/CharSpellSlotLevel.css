@@ -1,41 +1,41 @@
-.char-spell-slot-level .level > .header {
+.char-spell-slot-level.level > .header {
     text-align: center;
 }
-.char-spell-slot-level .level {
+.char-spell-slot-level.level {
     margin-right: 5px;
     width: 28px;
 }
-.char-spell-slot-level .level > .slots {
+.char-spell-slot-level.level > .slots {
     border-radius: 2px;
     border: 1px solid var(--border-color-light);
     width: 100%;
 }
-.char-spell-slot-level .level > .slots > .row {
+.char-spell-slot-level.level > .slots > .row {
     display: grid;
     grid-template-columns: auto auto;
     margin: 0;
 }
-.char-spell-slot-level .level > .slots > .row > .slot {
+.char-spell-slot-level.level > .slots > .row > .slot {
     height: 10px;
     margin: 2px;
     width: 10px;
 }
-.char-spell-slot-level .level > .slots > .row > .slot.active {
+.char-spell-slot-level.level > .slots > .row > .slot.active {
     background-color: var(--color-header);
 }
-.char-spell-slot-level .level > .slots > .row > .slot.inactive {
+.char-spell-slot-level.level > .slots > .row > .slot.inactive {
     border: 1px solid var(--color-header);
     height: 8px;
     width: 8px;
 }
 @media print {
-    .char-spell-slot-level .level > .slots > .row > .slot.active {
+     .char-spell-slot-level.level > .slots > .row > .slot.active {
         print-color-adjust: exact;
-        -webkit-print-color-adjust: exact;
+         -webkit-print-color-adjust: exact;
         background-color: black;
-    }
-    .char-spell-slot-level .level > .slots > .row > .slot.inactive {
+     }
+     .char-spell-slot-level.level > .slots > .row > .slot.inactive {
         background-color: transparent;
         border: 1px solid black;
-    }
+     }
 }
