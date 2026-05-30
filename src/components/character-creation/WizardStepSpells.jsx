@@ -57,8 +57,28 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
      setSpellCounts(counts);
     }, [formData.spells, allSpells, preSelected]);
 
-   // Calculate total prepared spells (non-cantrip), for classes with spellType === 'prepared'
-   const totalPrepared = useMemo(() => {
+    // Filter spells to only those of levels for which the character has at least one spell slot.
+   // Cantrips are always available since they don't require spell slots.
+   const availableSpells = useMemo(() => {
+      if (!spellLimits.spellType) return allSpells || [];
+
+      let maxSlotLevel = 0;
+      for (let i = 9; i >= 1; i--) {
+        if ((spellLimits[`level${i}`] || 0) > 0) {
+          maxSlotLevel = i;
+          break;
+        }
+      }
+
+      return (allSpells || []).filter(spell => {
+        const level = spell.level !== undefined ? spell.level : 0;
+        if (level === 0) return true;
+        return level <= maxSlotLevel;
+      });
+    }, [allSpells, spellLimits]);
+
+     // Calculate total prepared spells (non-cantrip), for classes with spellType === 'prepared'
+    const totalPrepared = useMemo(() => {
      if (spellLimits.spellType !== 'prepared') return 0;
      return (
       spellCounts.level1 +
@@ -293,9 +313,9 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
        },
    ];
 
-  return (
-     <SelectableList
-      items={allSpells}
+   return (
+       <SelectableList
+      items={availableSpells}
       fieldName="spells"
       formData={formData}
       onArrayFieldChange={onArrayFieldChange}
