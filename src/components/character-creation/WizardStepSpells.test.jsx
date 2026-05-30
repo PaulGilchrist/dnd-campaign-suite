@@ -320,7 +320,7 @@ describe('WizardStepSpells', () => {
       damage: { damage_type: 'Radiant' },
       casting_time: '1 action',
       duration: 'Concentration, up to 1 minute',
-      higher_level: ['When cast at higher levels...'],
+
     };
 
     it('should show ritual and concentration tags in spell meta', async () => {
@@ -417,7 +417,7 @@ describe('WizardStepSpells', () => {
       });
     });
 
-    it('should show higher level description when present', async () => {
+    it('should show damage type when spell has damage', async () => {
       const { container } = render(
         <WizardStepSpells
           {...mockProps}
@@ -427,9 +427,9 @@ describe('WizardStepSpells', () => {
       );
 
       await waitFor(() => {
-        const higherLevelDiv = container.querySelector('.spell-higher-level');
-        expect(higherLevelDiv).toBeInTheDocument();
-        expect(higherLevelDiv).toHaveTextContent(/higher levels/i);
+        const dmgDiv = container.querySelector('.spell-damage');
+        expect(dmgDiv).toBeInTheDocument();
+        expect(dmgDiv).toHaveTextContent(/Radiant/i);
       });
     });
   });

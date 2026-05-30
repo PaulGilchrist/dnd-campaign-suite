@@ -96,8 +96,6 @@
   ],
   "specialActions": [],
   "spells": [
-    "Burning Hands",
-    "Detect Magic",
     "Disguise Self",
     "Find Familiar",
     "Fire Bolt",
@@ -105,11 +103,16 @@
     "Magic Missile",
     "Minor Illusion",
     "Shield",
-    "Shocking Grasp"
+    "Shocking Grasp",
+    "Enlarge/Reduce",
+    "Invisibility",
+    "Misty Step",
+    "Counterspell",
+    "Fireball"
   ],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "originalFileName": "wizard.json",
+  "originalFileName": "Elarielle.json",
   "imagePath": "campaigns/2024 Testing/images/Elarielle.png"
 }

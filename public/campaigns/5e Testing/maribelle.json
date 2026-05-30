@@ -97,11 +97,26 @@
     "Guidance",
     "Mending",
     "Produce Flame",
-    "Shocking Grasp"
+    "Shocking Grasp",
+    "Entangle",
+    "Ice Knife",
+    "Speak with Animals",
+    "Thunderwave",
+    "Hold Person",
+    "Moonbeam",
+    "Pass Without Trace",
+    "Call Lightning",
+    "Conjure Animals",
+    "Speak with Plants",
+    "Ice Storm",
+    "Polymorph",
+    "Giant Insect",
+    "Scrying",
+    "Insect Plague"
   ],
   "rules": "5e",
   "xp": 0,
   "xpMode": "milestone",
-  "originalFileName": "druid.json",
+  "originalFileName": "Maribelle.json",
   "imagePath": "campaigns/5e Testing/images/Maribelle.png"
 }

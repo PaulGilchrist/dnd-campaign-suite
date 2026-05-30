@@ -96,17 +96,15 @@
   ],
   "specialActions": [],
   "spells": [
-    "Detect Magic",
-    "Guidance",
     "Guiding Bolt",
     "Healing Word",
-    "Inflict Wounds",
     "Sacred Flame",
-    "Spare the Dying"
+    "Spare the Dying",
+    "Command"
   ],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
   "imagePath": "campaigns/2024 Testing/images/Grommok.png",
-  "originalFileName": "fighter.json"
+  "originalFileName": "Grommok.json"
 }

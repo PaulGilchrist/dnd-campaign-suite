@@ -101,11 +101,17 @@
     "Healing Word",
     "Inflict Wounds",
     "Sacred Flame",
-    "Spare the Dying"
+    "Spare the Dying",
+    "Mending",
+    "Prayer of Healing",
+    "Spiritual Weapon",
+    "Aid",
+    "Spirit Guardians",
+    "Revivify"
   ],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
   "imagePath": "campaigns/2024 Testing/images/Liora.png",
-  "originalFileName": "cleric.json"
+  "originalFileName": "Liora.json"
 }

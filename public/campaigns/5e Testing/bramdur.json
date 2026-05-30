@@ -94,10 +94,20 @@
     "Survival"
   ],
   "specialActions": [],
-  "spells": [],
+  "spells": [
+    "Animal Friendship",
+    "Ensnaring Strike",
+    "Hail of Thorns",
+    "Jump",
+    "Silence",
+    "Spike Growth",
+    "Pass Without Trace",
+    "Water Walk",
+    "Wind Wall"
+  ],
   "rules": "5e",
   "xp": 0,
   "xpMode": "milestone",
-  "originalFileName": "ranger.json",
+  "originalFileName": "Bramdur.json",
   "imagePath": "campaigns/5e Testing/images/Bramdur.png"
 }

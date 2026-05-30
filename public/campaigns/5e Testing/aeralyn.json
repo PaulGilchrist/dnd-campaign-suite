@@ -99,11 +99,24 @@
     "Hideous Laughter",
     "Mage Hand",
     "Minor Illusion",
-    "Sleep"
+    "Sleep",
+    "Vicious Mockery",
+    "Message",
+    "Invisibility",
+    "Knock",
+    "See Invisibility",
+    "Speak with Dead",
+    "Tiny Hut",
+    "Fear",
+    "Greater Invisibility",
+    "Freedom of Movement",
+    "Polymorph",
+    "Greater Restoration",
+    "Hold Monster"
   ],
   "rules": "5e",
   "xp": 0,
   "xpMode": "milestone",
-  "originalFileName": "bard.json",
+  "originalFileName": "Aeralyn.json",
   "imagePath": "campaigns/5e Testing/images/Aeralyn.png"
 }

@@ -104,10 +104,13 @@
     "Charm Person",
     "Eldritch Blast",
     "Hellish Rebuke",
-    "Mage Hand"
+    "Mage Hand",
+    "Misty Step",
+    "Invisibility"
   ],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "campaigns/General Testing/images/Zivri.png"
+  "imagePath": "campaigns/General Testing/images/Zivri.png",
+  "originalFileName": "Zivri.json"
 }

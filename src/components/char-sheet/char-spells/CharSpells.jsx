@@ -113,10 +113,11 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                         if(spell.components) notes.push(spell.components.join('/'));
                         let effect = 'Utility';
                         if(spell.damage) {
-                            if(spell.damage.damage_at_slot_level) {
-                                effect = `${spell.damage.damage_at_slot_level[Object.keys(spell.damage.damage_at_slot_level)[0]]} ${spell.damage.damage_type}`
-                            } else if (spell.damage.damage_at_character_level) {
-                                effect = `${spell.damage.damage_at_character_level[Object.keys(spell.damage.damage_at_character_level)[0]]} ${spell.damage.damage_type}`
+                            const slotDmg = spell.damage.damage_at_slot_level;
+                            const charDmg = spell.damage.damage_at_character_level;
+                            const dmgObj = slotDmg && Object.keys(slotDmg).length ? slotDmg : charDmg;
+                            if (dmgObj) {
+                                effect = `${dmgObj[Object.keys(dmgObj)[0]]} ${spell.damage.damage_type}`;
                             }
                         }
                         return <tr key={spell.name}>

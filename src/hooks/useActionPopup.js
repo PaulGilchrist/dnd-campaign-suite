@@ -9,11 +9,7 @@ export function buildFeatureDetailHtml(entity) {
 
 function buildSpellDetailHtml(entity) {
     if (entity.desc) {
-        let html = `<b>${entity.name}</b><br/><br/>${entity.desc}<br/>`;
-        if (typeof entity.higher_level === 'string' && entity.higher_level.trim()) {
-            html += `<br/><b>At higher levels.</b>&nbsp;${entity.higher_level}`;
-        }
-        return html;
+        return `<b>${entity.name}</b><br/><br/>${entity.desc}<br/>`;
     }
     return null;
 }

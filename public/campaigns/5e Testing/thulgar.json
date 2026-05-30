@@ -84,10 +84,13 @@
     "Survival"
   ],
   "specialActions": [],
-  "spells": [],
+  "spells": [
+    "Mending",
+    "Spare the Dying"
+  ],
   "rules": "5e",
   "xp": 0,
   "xpMode": "milestone",
-  "originalFileName": "barbarian.json",
+  "originalFileName": "Thulgar.json",
   "imagePath": "campaigns/5e Testing/images/Thulgar.png"
 }

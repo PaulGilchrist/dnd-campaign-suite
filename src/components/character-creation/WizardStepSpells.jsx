@@ -159,11 +159,6 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange }) {
                 {spell.desc && spell.desc[0] && spell.desc[0]}
               </div>
               
-              {spell.higher_level && spell.higher_level[0] && (
-                <div className="spell-higher-level">
-                  <strong>Higher Levels:</strong> {spell.higher_level[0]}
-                </div>
-              )}
               
               {spell.components && spell.components.length > 0 && (
                 <div className="spell-components">

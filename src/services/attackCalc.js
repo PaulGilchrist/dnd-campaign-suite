@@ -150,10 +150,11 @@ export function buildSpellAttacks(playerSpells, allSpells, spellAbilities) {
         if (attacks.find(a => a.name === spell.name)) return;
 
         let damage = '';
-        if (spell.damage.damage_at_slot_level) {
-            damage = spell.damage.damage_at_slot_level[Object.keys(spell.damage.damage_at_slot_level)[0]];
-        } else if (spell.damage.damage_at_character_level) {
-            damage = spell.damage.damage_at_character_level[Object.keys(spell.damage.damage_at_character_level)[0]];
+        const slotDmg = spell.damage.damage_at_slot_level;
+        const charDmg = spell.damage.damage_at_character_level;
+        const dmgObj = slotDmg && Object.keys(slotDmg).length ? slotDmg : charDmg;
+        if (dmgObj) {
+            damage = dmgObj[Object.keys(dmgObj)[0]];
         }
 
         attacks.push({

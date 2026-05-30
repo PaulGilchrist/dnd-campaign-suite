@@ -94,9 +94,14 @@
     "Persuasion"
   ],
   "specialActions": [],
-  "spells": [],
+  "spells": [
+    "Bless",
+    "Command",
+    "Searing Smite"
+  ],
   "rules": "2024",
   "xp": 0,
   "xpMode": "milestone",
-  "imagePath": "campaigns/General Testing/images/Arjhan.png"
+  "imagePath": "campaigns/General Testing/images/Arjhan.png",
+  "originalFileName": "Arjhan.json"
 }
