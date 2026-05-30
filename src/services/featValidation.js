@@ -55,6 +55,9 @@ export async function validateFeats(formData, allFeats) {
     const warnings = [];
     const selectedFeats = formData.feats || [];
     const ruleset = formData.rules || '5e';
+    const preSelected = await getPreSelectedFeats(formData);
+    const userSelectedCount = selectedFeats.filter(f => !preSelected.includes(f)).length;
+    const preSelectedCount = selectedFeats.filter(f => preSelected.includes(f)).length;
 
     if (selectedFeats.length === 0) {
         return warnings; // No warnings if no feats selected
@@ -63,10 +66,10 @@ export async function validateFeats(formData, allFeats) {
        // Get feat limits from JSON
     const limits = await getFeatLimits(formData);
 
-      // Check if too many feats selected
-    if (selectedFeats.length > limits.allowed) {
+      // Check if too many feats selected (excluding pre-selected background feats)
+    if (userSelectedCount > limits.allowed) {
         warnings.push({
-            message: `Rules allow ${limits.allowed} feat(s) at level ${formData.level}. You have selected ${selectedFeats.length}. (${limits.details})`,
+            message: `Rules allow ${limits.allowed} feat(s) at level ${formData.level}. You have selected ${userSelectedCount} (plus ${preSelectedCount} background feat). (${limits.details})`,
             type: 'warning'
              });
          }
@@ -169,6 +172,17 @@ export function getFeatTypeInfo(featName, allFeats) {
      }
 
 /**
+ * Normalizes a feat name from background data by stripping parenthetical qualifiers.
+ * e.g. "Magic Initiate (Druid)" → "Magic Initiate"
+ * @param {string} rawName - The raw feat name from background data
+ * @returns {string} - The normalized feat name
+ */
+export function normalizeBackgroundFeatName(rawName) {
+    if (!rawName) return rawName;
+    return rawName.replace(/\s*\([^)]*\)\s*$/, '').trim();
+}
+
+/**
  * Determines which feats are pre-selected (automatically granted) from background
  * @param {object} formData - The character form data
  * @returns {Promise<string[]>} - Array of feat names that are automatically granted
@@ -181,8 +195,9 @@ export async function getPreSelectedFeats(formData) {
     if (formData.background && ruleset === '2024') {
         const backgroundData = await fetchBackgroundData(formData.background);
         if (backgroundData && backgroundData.feat) {
-             // The feat field contains the feat name as a string
-            preSelected.add(backgroundData.feat);
+             // Strip parenthetical qualifiers (e.g. "Magic Initiate (Druid)" → "Magic Initiate")
+            const normalized = normalizeBackgroundFeatName(backgroundData.feat);
+            preSelected.add(normalized);
      }
           }
 

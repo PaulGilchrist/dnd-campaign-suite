@@ -2,9 +2,10 @@ import React from 'react';
 import SelectableList from './SelectableList.jsx';
 import WarningList from '../common/WarningList.jsx';
 import { validateFeats, getFeatLimits, normalizeFeatDescription } from '../../services/featValidation.js';
+import { computeFeatBuffs } from '../../services/featBuffService.js';
 import { sanitizeHtml } from '../../services/sanitize.js';
 
-function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFeats }) {
+function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFeats, computedBuffs }) {
   const [warnings, setWarnings] = React.useState([]);
     // Validate feats when selection changes
       React.useEffect(() => {
@@ -40,6 +41,13 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
     // Render item function
   const renderItem = (feat, index, { isSelected, isPreSelected, isExpanded, onToggle, onToggleExpand }) => {
     const descData = normalizeFeatDescription(feat);
+    const ruleset = formData.rules || '5e';
+    const featBuffs = isSelected ? computeFeatBuffs(feat, ruleset) : null;
+
+    const hasAbilityIncrease = featBuffs && featBuffs.abilityScoreIncreases.length > 0;
+    const hasProficiencies = featBuffs && featBuffs.proficiencies.length > 0;
+    const hasResistances = featBuffs && featBuffs.resistances.length > 0;
+    const hasFeatures = featBuffs && featBuffs.features.length > 0;
 
         return (
             <div
@@ -63,7 +71,7 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
                         <div className="list-item-full-details">
                             {feat.prerequisites && (
                                 <div className="feat-prerequisites">
-                     <strong>Prerequisites:</strong> {renderPrerequisites(feat)}
+                      <strong>Prerequisites:</strong> {renderPrerequisites(feat)}
                                 </div>
                             )}
                             {descData.text && (
@@ -74,6 +82,32 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
                                         descData.text
                                     )}
                                 </div>
+                            )}
+                            {isSelected && hasAbilityIncrease && (
+                              <div className="feat-buffs">
+                                <strong>Ability Score Increase:</strong>
+                                {featBuffs.abilityScoreIncreases.map((inc, i) => (
+                                  <span key={i} className="feat-buff-tag">
+                                    {inc.isChoice ? `${inc.name} +${inc.amount} (choice)` : `${inc.name} +${inc.amount}`}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {isSelected && hasProficiencies && (
+                              <div className="feat-buffs">
+                                <strong>Proficiencies:</strong>
+                                {featBuffs.proficiencies.map((p, i) => (
+                                  <span key={i} className="feat-buff-tag">{p.name}</span>
+                                ))}
+                              </div>
+                            )}
+                            {isSelected && hasResistances && (
+                              <div className="feat-buffs">
+                                <strong>Resistances:</strong>
+                                {featBuffs.resistances.map((r, i) => (
+                                  <span key={i} className="feat-buff-tag">{r}</span>
+                                ))}
+                              </div>
                             )}
                         </div>
                     )}
@@ -94,12 +128,36 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
     };
 
     // Render summary
-  const renderSummary = () => (
-                <div className="rule-info">
-                    <p><strong>Rules:</strong> {featLimits.details}</p>
-                    <p>You have selected {formData.feats?.length || 0} of {featLimits.allowed} allowed feat(s).</p>
-                </div>
-        );
+  const renderSummary = () => {
+    const preSelected = preSelectedFeats || [];
+    const allSelected = formData.feats || [];
+    const userSelectedCount = allSelected.filter(f => !preSelected.includes(f)).length;
+    const preSelectedCount = allSelected.filter(f => preSelected.includes(f)).length;
+    const totalASI = computedBuffs?.abilityScoreIncreases?.filter(inc => inc.name && inc.name !== 'any').length || 0;
+    const totalProfs = computedBuffs?.proficiencies?.length || 0;
+    const totalResists = computedBuffs?.resistances?.length || 0;
+    const totalFeatures = computedBuffs?.features?.length || 0;
+    const hasBuffs = totalASI > 0 || totalProfs > 0 || totalResists > 0 || totalFeatures > 0;
+
+    return (
+      <div className="rule-info">
+        <p><strong>Rules:</strong> {featLimits.details}</p>
+        <p>
+          You have selected {userSelectedCount} of {featLimits.allowed} allowed feat(s)
+          {preSelectedCount > 0 ? ` (plus ${preSelectedCount} background feat)` : ''}.
+        </p>
+        {hasBuffs && (
+          <div className="feat-buffs-summary">
+            <p><strong>Applied Buffs:</strong></p>
+            {totalASI > 0 && <p className="feat-buff-line">• {totalASI} ability score increase(s)</p>}
+            {totalProfs > 0 && <p className="feat-buff-line">• {totalProfs} proficiency/proficiencie(s)</p>}
+            {totalResists > 0 && <p className="feat-buff-line">• {totalResists} resistance(s)</p>}
+            {totalFeatures > 0 && <p className="feat-buff-line">• {totalFeatures} passive/feature buff(s)</p>}
+          </div>
+        )}
+      </div>
+    );
+  };
 
      // Filter configuration
    const filters = [

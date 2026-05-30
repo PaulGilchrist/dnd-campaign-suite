@@ -14,6 +14,8 @@ import { getSpellAbilities as getSpellAbilities2024 } from './spellCalc2024.js';
 import { getAttacks as getAttacks5e } from './attackCalc.js';
 import { getAttacks as getAttacks2024 } from './attackCalc2024.js';
 import { getSpellMaxLevel } from './shared/spell-utils.js';
+import { loadFeatData } from './dataLoader.js';
+import { computeAllFeatBuffs } from './featBuffService.js';
 
 /**
  * Determine which ruleset to use. Checks playerStats.rules first,
@@ -402,10 +404,24 @@ const rules = {
             playerStats.equipment = allEquipment;
          }
 
-         [playerStats.actions, playerStats.bonusActions, playerStats.reactions, playerStats.specialActions, playerStats.characterAdvancement] = rules.getActions(playerStats, playerSummary);
-         [playerStats.languagesAllowed, playerStats.languages] = rules.getLanguages(playerStats, playerSummary);
-         [playerStats.proficienciesAllowed, playerStats.proficiencies] = rules.getProficiencies(playerStats, false, playerSummary);
-         [playerStats.skillProficienciesAllowed, playerStats.skillProficiencies] = rules.getProficiencies(playerStats, true, playerSummary);
+          [playerStats.actions, playerStats.bonusActions, playerStats.reactions, playerStats.specialActions, playerStats.characterAdvancement] = rules.getActions(playerStats, playerSummary);
+          [playerStats.languagesAllowed, playerStats.languages] = rules.getLanguages(playerStats, playerSummary);
+          [playerStats.proficienciesAllowed, playerStats.proficiencies] = rules.getProficiencies(playerStats, false, playerSummary);
+          [playerStats.skillProficienciesAllowed, playerStats.skillProficiencies] = rules.getProficiencies(playerStats, true, playerSummary);
+
+        // Apply feat buffs to ability miscBonus before computing abilities
+        const featData = await loadFeatData(is2024(playerStats, playerSummary) ? '2024' : '5e');
+        const featBuffs = computeAllFeatBuffs(playerStats, featData);
+        featBuffs.abilityScoreIncreases.forEach(inc => {
+            if (inc.name && inc.name !== 'any') {
+                const ability = playerStats.abilities.find(
+                    a => a.name.toLowerCase() === inc.name.toLowerCase()
+                );
+                if (ability) {
+                    ability.miscBonus = (ability.miscBonus || 0) + inc.amount;
+                }
+            }
+        });
 
         playerStats.abilities = await rules.getAbilities(playerStats, playerSummary);
         playerStats.hitPoints = rules.getHitPoints(playerStats, playerSummary);
@@ -413,6 +429,23 @@ const rules = {
          [playerStats.armorClass, playerStats.armorClassFormula] = rules.getArmorClass(allEquipment, playerStats, playerSummary);
         playerStats.spellAbilities = rules.getSpellAbilities(allSpells, playerStats, playerSummary);
         playerStats.attacks = rules.getAttacks(allEquipment, allSpells, playerStats, playerSummary);
+
+         // Apply feat features to special actions
+        const existingActionNames = new Set(
+            (playerStats.specialActions || []).map(a => a.name)
+        );
+        featBuffs.features.forEach(f => {
+            if (!existingActionNames.has(f.name)) {
+                playerStats.specialActions = playerStats.specialActions || [];
+                playerStats.specialActions.push({
+                    name: f.name,
+                    description: f.description,
+                    type: f.type || 'passive',
+                    source: 'feat',
+                });
+                existingActionNames.add(f.name);
+            }
+        });
 
          // 2024-specific: senses set later (override), 5e-specific: immunities/resistances
         if (is2024(playerStats, playerSummary)) {

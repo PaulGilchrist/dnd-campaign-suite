@@ -736,6 +736,36 @@
     margin-top: 0.5rem;
 }
 
+.character-creation-wizard .feat-buffs {
+    margin-top: 0.5rem;
+    padding: 0.4rem;
+    background: var(--background-color-card);
+    border-radius: 4px;
+}
+
+.character-creation-wizard .feat-buff-tag {
+    display: inline-block;
+    background: var(--color-primary);
+    color: var(--color-text-inverse);
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    margin: 0.15rem;
+}
+
+.character-creation-wizard .feat-buffs-summary {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: var(--background-color-card);
+    border: 1px solid var(--color-primary);
+    border-radius: 4px;
+}
+
+.character-creation-wizard .feat-buff-line {
+    margin: 0.15rem 0;
+    font-size: 0.85rem;
+}
+
 .character-creation-wizard .feat-description {
     font-size: 0.9rem;
     color: var(--color-text);

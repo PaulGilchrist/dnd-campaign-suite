@@ -3,7 +3,8 @@ import { describe, it, expect, vi } from 'vitest';
 // Mock dataLoader before importing rules
 vi.mock('./dataLoader.js', () => ({
   loadSkills: vi.fn(),
-  loadPassiveSkills: vi.fn()
+  loadPassiveSkills: vi.fn(),
+  loadFeatData: vi.fn().mockResolvedValue([])
 }));
 
 import rules from './rules.js';

@@ -59,11 +59,12 @@ export const WIZARD_STEPS = [
     step: 4,
     title: 'Feats',
     component: WizardStepFeats,
-    getProps: ({ formData, allFeats, onArrayFieldChange, preSelectedFeats }) => ({
+    getProps: ({ formData, allFeats, onArrayFieldChange, preSelectedFeats, computedBuffs }) => ({
       formData,
       allFeats,
       onArrayFieldChange,
       preSelectedFeats,
+      computedBuffs,
     }),
   },
   {

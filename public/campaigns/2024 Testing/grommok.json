@@ -96,11 +96,12 @@
   ],
   "specialActions": [],
   "spells": [
-    "Guiding Bolt",
-    "Healing Word",
-    "Sacred Flame",
-    "Spare the Dying",
-    "Command"
+    "Fire Bolt",
+    "Mage Hand",
+    "Feather Fall",
+    "Jump",
+    "Magic Missile",
+    "Shield"
   ],
   "rules": "2024",
   "xp": 0,
