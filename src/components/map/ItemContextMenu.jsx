@@ -23,12 +23,12 @@ function ItemContextMenu({
     const showRenameOption = isNpc;
     const showViewStats = isNpc && monsterFound;
     const hasExtra = showRenameOption || showViewStats || isDoor;
-    const menuHeight = hasExtra ? (showViewStats ? 116 : 98) : 76;
+    const menuHeight = hasExtra ? (showViewStats ? 138 : 120) : 76;
     const doorMenuHeight = isDoor ? 116 : 0;
 
     const effectiveHeight = isDoor ? doorMenuHeight : menuHeight;
 
-    const yRotate = isDoor ? 86 : 64;
+    const yRotate = showViewStats ? 108 : showRenameOption ? 86 : isDoor ? 86 : 64;
     const yClose = menuY + 12;
 
     return (

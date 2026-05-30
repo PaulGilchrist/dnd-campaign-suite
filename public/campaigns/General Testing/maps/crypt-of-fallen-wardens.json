@@ -453,8 +453,8 @@
       "gridY": 9,
       "type": "npc",
       "visible": false,
-      "name": "Skeleton",
-      "rotation": 90
+      "name": "Skeleton 2",
+      "rotation": 180
     },
     {
       "id": "npc-3",
@@ -471,8 +471,8 @@
       "gridY": 9,
       "type": "npc",
       "visible": false,
-      "name": "Zombie",
-      "rotation": 0
+      "name": "Zombie 1",
+      "rotation": 90
     }
   ],
   "players": [],
