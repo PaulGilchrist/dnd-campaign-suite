@@ -214,6 +214,31 @@ describe('CharActions', () => {
     expect(screen.getByText('Actions')).toBeInTheDocument();
   });
 
+  it('should show save DC instead of hit bonus for save-based spells', async () => {
+    const statsWithSaveSpell = {
+      ...mockPlayerStats,
+      attacks: [
+        {
+          name: 'Sacred Flame',
+          range: 60,
+          saveDc: 14,
+          saveType: 'DEX',
+          saveSuccess: 'none',
+          damage: '1d8',
+          damageType: 'Radiant',
+          type: 'Action',
+        },
+      ],
+      actions: [],
+      bonusActions: [],
+    };
+
+    render(<CharActions playerStats={statsWithSaveSpell} />);
+
+    expect(screen.getByText('DC 14 DEX')).toBeInTheDocument();
+    expect(screen.getByText('1d8')).toBeInTheDocument();
+  });
+
   it('should handle bonus action attacks', async () => {
     const statsWithBonusAttack = {
       ...mockPlayerStats,

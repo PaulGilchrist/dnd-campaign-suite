@@ -19,10 +19,16 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         return match ? match[1] : null;
     };
 
-    const handleDamageRoll = (formula, spellName) => {
+    const handleDamageRoll = (formula, spellName, spell) => {
         const result = rollExpression(formula);
         if (result) {
-            rollDamage(spellName, formula, result.total, result.rolls, result.modifier);
+            const context = {};
+            if (spell.dc) {
+                context.dc = playerStats.spellAbilities.saveDc;
+                context.dcType = spell.dc.dc_type;
+                context.dcSuccess = spell.dc.dc_success;
+            }
+            rollDamage(spellName, formula, result.total, result.rolls, result.modifier, context);
         }
     };
     const [filterPrepared, setFilterPrepared] = React.useState(false);
@@ -118,6 +124,10 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                             const dmgObj = slotDmg && Object.keys(slotDmg).length ? slotDmg : charDmg;
                             if (dmgObj) {
                                 effect = `${dmgObj[Object.keys(dmgObj)[0]]} ${spell.damage.damage_type}`;
+                                if (spell.dc) {
+                                    const saveLabel = spell.dc.dc_success === 'half' ? 'half' : 'negates';
+                                    effect += ` (${spell.dc.dc_type} ${saveLabel})`;
+                                }
                             }
                         }
                         return <tr key={spell.name}>
@@ -127,7 +137,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                             {!is2024 && (spell.prepared === 'Prepared' || spell.prepared === '') && <td><input tabIndex={0} type="checkbox" checked={spell.prepared === 'Prepared'} onChange={() => handleTogglePreparedSpells(spell.name)}/></td>}
                             <td>{spell.casting_time ? spell.casting_time.replace('reaction','R').replace('bonus action','BA').replace('action',' A').replace('minute','min').replace('minutes','min') : ''}</td>
                             <td>{spell.range}</td>
-                            <td className={getDamageFormula(effect) ? 'clickable' : ''} onClick={getDamageFormula(effect) ? () => handleDamageRoll(getDamageFormula(effect), spell.name) : undefined}>{effect}</td>
+                            <td className={getDamageFormula(effect) ? 'clickable' : ''} onClick={getDamageFormula(effect) ? () => handleDamageRoll(getDamageFormula(effect), spell.name, spell) : undefined}>{effect}</td>
                             <td>{spell.duration ? spell.duration.replace('Instantaneous','Instant').replace('minute','min').replace('minutes','min') : ''}</td>
                             <td className='left'>{notes.join(', ').replace('Concentration','Con')}</td>
                         </tr>

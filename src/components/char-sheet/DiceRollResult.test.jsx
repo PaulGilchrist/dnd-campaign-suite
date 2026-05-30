@@ -193,4 +193,63 @@ describe('DiceRollResult', () => {
             expect(screen.getByText('click to dismiss')).toBeInTheDocument();
         });
     });
+
+    describe('save info display', () => {
+        it('shows save info when dc and dcType are provided without success', () => {
+            render(
+                <DiceRollResult
+                    name="Fireball"
+                    type="damage"
+                    rolls={[6, 5, 4]}
+                    bonus={0}
+                    dc={16}
+                    dcType="DEX"
+                    dcSuccess="half"
+                />
+            );
+            expect(screen.getByText(/Save DC 16 DEX/)).toBeInTheDocument();
+            expect(screen.getByText(/half damage on save/)).toBeInTheDocument();
+        });
+
+        it('shows no damage on save for dc_success "none"', () => {
+            render(
+                <DiceRollResult
+                    name="Sacred Flame"
+                    type="damage"
+                    rolls={[4]}
+                    bonus={0}
+                    dc={14}
+                    dcType="DEX"
+                    dcSuccess="none"
+                />
+            );
+            expect(screen.getByText(/no damage on save/)).toBeInTheDocument();
+        });
+
+        it('does not show save info when dc is undefined', () => {
+            render(
+                <DiceRollResult
+                    name="Fire Bolt"
+                    type="damage"
+                    rolls={[6]}
+                    bonus={0}
+                />
+            );
+            expect(screen.queryByText(/Save DC/)).not.toBeInTheDocument();
+        });
+
+        it('does not show save info when success is also provided (resolved save)', () => {
+            render(
+                <DiceRollResult
+                    name="Fireball"
+                    type="damage"
+                    rolls={[6]}
+                    bonus={0}
+                    dc={16}
+                    success={true}
+                />
+            );
+            expect(screen.queryByText(/Save DC/)).not.toBeInTheDocument();
+        });
+    });
 });

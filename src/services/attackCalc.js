@@ -157,14 +157,21 @@ export function buildSpellAttacks(playerSpells, allSpells, spellAbilities) {
             damage = dmgObj[Object.keys(dmgObj)[0]];
         }
 
-        attacks.push({
+        const attackEntry = {
             name: spell.name,
             damage,
             damageType: spell.damage.damage_type,
-            hitBonus: spellAbilities.modifier,
             range: spell.range,
             type: spell.casting_time === '1 action' ? 'Action' : 'Bonus Action',
-        });
+        };
+        if (spell.dc) {
+            attackEntry.saveDc = spellAbilities.saveDc;
+            attackEntry.saveType = spell.dc.dc_type;
+            attackEntry.saveSuccess = spell.dc.dc_success;
+        } else {
+            attackEntry.hitBonus = spellAbilities.modifier;
+        }
+        attacks.push(attackEntry);
     });
 
     return attacks;

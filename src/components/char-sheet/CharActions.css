@@ -13,6 +13,12 @@
     pointer-events: none;
 }
 
+.char-actions .save-dc-display {
+    font-size: 0.75rem;
+    color: #a855f7;
+    font-weight: 700;
+}
+
 .char-actions .disabled-attack-label {
     display: inline;
     font-size: 0.75rem;

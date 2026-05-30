@@ -85,18 +85,18 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
    function logDamageAndShow(name, formula, total, rolls, modifier, context) {
        logEntry({
           type: 'roll',
-           characterName,
-            rollType: 'damage',
-              name,
-               formula,
-                rolls,
-                 total,
-                  modifier,
-                  damageType: context?.damageType,
-                  targetName: context?.targetName
-                });
-         setPopupHtml({ type: 'damage', name, formula, rolls, bonus: 0, modifier });
-          }
+            characterName,
+             rollType: 'damage',
+               name,
+                formula,
+                 rolls,
+                  total,
+                   modifier,
+                   damageType: context?.damageType,
+                   targetName: context?.targetName
+                 });
+          setPopupHtml({ type: 'damage', name, formula, rolls, bonus: 0, modifier, dc: context?.dc, dcType: context?.dcType, dcSuccess: context?.dcSuccess });
+           }
 
      return {
            popupHtml,

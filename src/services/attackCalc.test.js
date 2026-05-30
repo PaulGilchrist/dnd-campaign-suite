@@ -206,6 +206,7 @@ describe('attackCalc', () => {
     const allSpells = [
       { name: 'Fire Bolt', damage: { damage_at_slot_level: { '1': '1d10' }, damage_type: 'Fire' }, range: '120 feet', casting_time: '1 action', level: 0, classes: ['Wizard'] },
       { name: 'Magic Missile', damage: { damage_at_slot_level: { '1': '1d4+1' }, damage_type: 'Force' }, range: '120 feet', casting_time: '1 action', level: 1, classes: ['Wizard'] },
+      { name: 'Sacred Flame', damage: { damage_at_slot_level: { '1': '1d8' }, damage_type: 'Radiant' }, range: '60 feet', casting_time: '1 action', level: 0, classes: ['Cleric'], dc: { dc_type: 'DEX', dc_success: 'none' } },
     ];
 
     it('should build spell attacks from prepared spells', () => {
@@ -213,12 +214,27 @@ describe('attackCalc', () => {
         { name: 'Fire Bolt', prepared: 'Always' },
         { name: 'Magic Missile', prepared: 'Prepared' },
       ];
-      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4 });
+      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4, saveDc: 13 });
 
       expect(result).toHaveLength(2);
       expect(result[0].name).toBe('Fire Bolt');
       expect(result[0].damage).toBe('1d10');
       expect(result[0].hitBonus).toBe(4);
+    });
+
+    it('should build save-based spell attacks with save info', () => {
+      const playerSpells = [
+        { name: 'Sacred Flame', prepared: 'Always' },
+      ];
+      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4, saveDc: 13 });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Sacred Flame');
+      expect(result[0].damage).toBe('1d8');
+      expect(result[0].saveDc).toBe(13);
+      expect(result[0].saveType).toBe('DEX');
+      expect(result[0].saveSuccess).toBe('none');
+      expect(result[0].hitBonus).toBeUndefined();
     });
 
     it('should skip spells without damage', () => {

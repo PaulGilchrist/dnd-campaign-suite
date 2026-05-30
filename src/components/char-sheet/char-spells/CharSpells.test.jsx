@@ -35,6 +35,7 @@ vi.mock('lodash', () => ({
 }));
 
 import useActionPopup from '../../../hooks/useActionPopup.js';
+import useLoggedDiceRoll from '../../../hooks/useLoggedDiceRoll.js';
 
 const mockPlayerStats = {
   name: 'Test Character',
@@ -630,6 +631,144 @@ describe('CharSpells', () => {
 
     // Spell with damage_at_character_level should show that damage
     expect(screen.getByText('1d10 Fire')).toBeInTheDocument();
+  });
+
+  it('should show save info in effect text for save-based spells', () => {
+    const statsWithSaveSpell = {
+      ...mockPlayerStats,
+      spellAbilities: {
+        ...mockPlayerStats.spellAbilities,
+        spells: [
+          ...mockPlayerStats.spellAbilities.spells,
+          {
+            name: 'Sacred Flame',
+            level: 0,
+            casting_time: '1 action',
+            range: '60 feet',
+            duration: 'Instantaneous',
+            components: ['V', 'S'],
+            damage: {
+              damage_at_slot_level: {
+                '1': '1d8',
+              },
+              damage_type: 'Radiant',
+            },
+            dc: {
+              dc_type: 'DEX',
+              dc_success: 'none',
+            },
+            prepared: 'Always',
+          },
+        ],
+      },
+    };
+
+    render(
+      <CharSpells
+        playerStats={statsWithSaveSpell}
+        handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
+      />
+    );
+
+    expect(screen.getByText('1d8 Radiant (DEX negates)')).toBeInTheDocument();
+  });
+
+  it('should show half for save-based spells with dc_success half', () => {
+    const statsWithSaveSpell = {
+      ...mockPlayerStats,
+      spellAbilities: {
+        ...mockPlayerStats.spellAbilities,
+        spells: [
+          ...mockPlayerStats.spellAbilities.spells,
+          {
+            name: 'Fireball',
+            level: 3,
+            casting_time: '1 action',
+            range: '150 feet',
+            duration: 'Instantaneous',
+            components: ['V', 'S', 'M'],
+            damage: {
+              damage_at_slot_level: {
+                '3': '8d6',
+              },
+              damage_type: 'Fire',
+            },
+            dc: {
+              dc_type: 'DEX',
+              dc_success: 'half',
+            },
+            prepared: 'Prepared',
+          },
+        ],
+      },
+    };
+
+    render(
+      <CharSpells
+        playerStats={statsWithSaveSpell}
+        handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
+      />
+    );
+
+    expect(screen.getByText('8d6 Fire (DEX half)')).toBeInTheDocument();
+  });
+
+  it('should call rollDamage with save context for save-based spells', () => {
+    const mockRollDamage = vi.fn();
+    useLoggedDiceRoll.mockImplementation(() => ({
+      popupHtml: null,
+      setPopupHtml: vi.fn(),
+      rollAttack: vi.fn(),
+      rollDamage: mockRollDamage,
+    }));
+
+    const statsWithSaveSpell = {
+      ...mockPlayerStats,
+      spellAbilities: {
+        ...mockPlayerStats.spellAbilities,
+        saveDc: 14,
+        spells: [
+          {
+            name: 'Sacred Flame',
+            level: 0,
+            casting_time: '1 action',
+            range: '60 feet',
+            duration: 'Instantaneous',
+            components: ['V', 'S'],
+            damage: {
+              damage_at_slot_level: {
+                '1': '1d8',
+              },
+              damage_type: 'Radiant',
+            },
+            dc: {
+              dc_type: 'DEX',
+              dc_success: 'none',
+            },
+            prepared: 'Always',
+          },
+        ],
+      },
+    };
+
+    render(
+      <CharSpells
+        playerStats={statsWithSaveSpell}
+        handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
+      />
+    );
+
+    const effectCell = screen.getByText('1d8 Radiant (DEX negates)');
+    fireEvent.click(effectCell);
+
+    expect(mockRollDamage).toHaveBeenCalled();
+    const args = mockRollDamage.mock.calls[0];
+    expect(args[0]).toBe('Sacred Flame');
+    expect(args[5]).toEqual({
+      dc: 14,
+      dcType: 'DEX',
+      dcSuccess: 'none',
+    });
   });
 
   it('should exclude non-prepared spells when filter is active', () => {
