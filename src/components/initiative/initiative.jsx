@@ -547,6 +547,39 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         return () => window.removeEventListener('initiative-rolled', handler);
     }, []);
 
+    React.useEffect(() => {
+        const handler = (e) => {
+            if (!combatSummary) return;
+            const creature = combatSummary.creatures.find(c =>
+                c.name === e.detail.targetName || c.name.startsWith(e.detail.targetName + ' ')
+            );
+            if (creature && !e.detail.success) {
+                creature.concentration = null;
+                storage.set('combatSummary', combatSummary, campaignName);
+                setCombatSummary(cloneDeep(combatSummary));
+            }
+        };
+        window.addEventListener('concentration-result', handler);
+        return () => window.removeEventListener('concentration-result', handler);
+    }, [combatSummary, campaignName]);
+
+    React.useEffect(() => {
+        const handler = (e) => {
+            if (!combatSummary || !e.detail.restoredToHp) return;
+            const creature = combatSummary.creatures.find(c =>
+                c.name === e.detail.targetName || c.name.startsWith(e.detail.targetName + ' ')
+            );
+            if (creature) {
+                creature.currentHp = e.detail.restoredToHp;
+                storage.setProperty(creature.name, 'currentHitPoints', e.detail.restoredToHp, campaignName);
+                storage.set('combatSummary', combatSummary, campaignName);
+                setCombatSummary(cloneDeep(combatSummary));
+            }
+        };
+        window.addEventListener('death-save-result', handler);
+        return () => window.removeEventListener('death-save-result', handler);
+    }, [combatSummary, campaignName]);
+
      const handleCreatureHpChange = React.useCallback((creatureId, newValue) => {
          if (!combatSummary) return;
          const creature = combatSummary.creatures.find(c => c.id === creatureId);

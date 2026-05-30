@@ -1,5 +1,8 @@
 import storage from './storage.js';
 import { rollD20 } from './diceRoller.js';
+import utils from './utils.js';
+import { sendDeathSavePrompt, sendConcentrationPrompt } from './savePromptService.js';
+import { rollConcentrationSave } from './concentrationRules.js';
 
 export function computeDamageAfterResistances(rawDamage, damageTypes, resistances, immunities) {
   if (!damageTypes || damageTypes.length === 0) return rawDamage;
@@ -35,6 +38,9 @@ export function applyDamageToTarget(combatSummary, targetId, rawDamage, damageTy
   const newHp = Math.max(0, oldHp - finalDamage);
   creature.currentHp = newHp;
 
+  const wasAlive = oldHp > 0;
+  const isNowUnconscious = newHp <= 0;
+
   if (creature.concentration && finalDamage > 0) {
     creature.concentration.dc = Math.max(10, Math.floor(finalDamage / 2));
   }
@@ -42,6 +48,68 @@ export function applyDamageToTarget(combatSummary, targetId, rawDamage, damageTy
   storage.set('combatSummary', combatSummary, campaignName);
 
   logDamageApplication(creature, finalDamage, oldHp, newHp, campaignName);
+
+  let npcConcentrationBroken = false;
+  if (creature.type === 'player') {
+    if (wasAlive && isNowUnconscious) {
+      const promptId = utils.guid();
+      sendDeathSavePrompt(campaignName, {
+        promptId,
+        targetName: creature.name,
+      });
+    }
+
+    if (creature.concentration && finalDamage > 0) {
+      const promptId = utils.guid();
+      sendConcentrationPrompt(campaignName, {
+        promptId,
+        targetName: creature.name,
+        spellName: creature.concentration.spell,
+        dc: creature.concentration.dc,
+      });
+    }
+  } else {
+    if (creature.concentration && finalDamage > 0) {
+      const saveBonus = creature?.saveBonuses?.['con'] ?? 0;
+      const { success, roll, total } = rollConcentrationSave(saveBonus, creature.concentration.dc);
+      if (!success) {
+        const spellName = creature.concentration.spell;
+        const dc = creature.concentration.dc;
+        creature.concentration = null;
+        npcConcentrationBroken = true;
+        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'concentration-broken',
+            characterName: creature.name,
+            spellName,
+            roll,
+            total,
+            dc,
+          }),
+        }).catch(() => {});
+      } else {
+        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'concentration-save',
+            characterName: creature.name,
+            spellName: creature.concentration.spell,
+            roll,
+            total,
+            dc: creature.concentration.dc,
+            success: true,
+          }),
+        }).catch(() => {});
+      }
+    }
+  }
+
+  if (npcConcentrationBroken) {
+    storage.set('combatSummary', combatSummary, campaignName);
+  }
 
   window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
@@ -73,6 +141,10 @@ function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
 
   if (creature.type === 'player') {
     storage.setProperty(creature.name, 'currentHitPoints', newHp, campaignName);
+    if (oldHp > 0 && isDead) {
+      storage.setProperty(creature.name, 'deathSaves', [false, false, false], campaignName);
+      storage.setProperty(creature.name, 'deathFailures', [false, false, false], campaignName);
+    }
   }
 
   fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {

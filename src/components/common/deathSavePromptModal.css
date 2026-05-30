@@ -1,0 +1,128 @@
+.dsp-overlay {
+  position: fixed;
+  top: 0;
+  left: 180px;
+  width: calc(100vw - 180px);
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.85);
+  z-index: 2000;
+}
+
+.dsp-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--background-color-header-inner);
+  border: 2px solid #e69500;
+  border-radius: 10px;
+  color: var(--color-header-inner);
+  padding: 24px;
+  min-width: 320px;
+  max-width: 480px;
+  text-align: center;
+}
+
+.dsp-header {
+  font-size: 1.15em;
+  font-weight: bold;
+  margin-bottom: 16px;
+  color: #e69500;
+}
+
+.dsp-queue-info {
+  font-size: 0.75em;
+  font-weight: normal;
+  opacity: 0.7;
+  margin-left: 8px;
+}
+
+.dsp-header i {
+  margin-right: 8px;
+}
+
+.dsp-body {
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.dsp-body p {
+  margin: 8px 0;
+}
+
+.dsp-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.dsp-roll-btn {
+  background-color: #e69500;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 1em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dsp-roll-btn:hover {
+  opacity: 0.9;
+}
+
+.dsp-result {
+  margin: 16px 0;
+  padding: 14px;
+  border-radius: 8px;
+}
+
+.dsp-result-success {
+  background-color: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.dsp-result-fail {
+  background-color: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.dsp-result-nat20 {
+  background-color: rgba(34, 197, 94, 0.25);
+  border: 2px solid rgba(34, 197, 94, 0.6);
+}
+
+.dsp-result-nat1 {
+  background-color: rgba(239, 68, 68, 0.25);
+  border: 2px solid rgba(239, 68, 68, 0.6);
+}
+
+.dsp-result-label {
+  font-size: 1.15em;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.dsp-result-success .dsp-result-label,
+.dsp-result-nat20 .dsp-result-label {
+  color: #22c55e;
+}
+
+.dsp-result-fail .dsp-result-label,
+.dsp-result-nat1 .dsp-result-label {
+  color: #ef4444;
+}
+
+.dsp-result-total {
+  font-size: 1.05em;
+  margin: 4px 0;
+}
+
+.dsp-result-hp {
+  font-size: 1.05em;
+  font-weight: bold;
+  color: #22c55e;
+  margin: 4px 0;
+}

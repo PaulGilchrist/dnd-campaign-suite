@@ -15,6 +15,23 @@ function DeathSavingThrows({ playerStats, campaignName }) {
         if (savedFailures) setFailures(savedFailures)
     }, [playerStats, campaignName])
 
+    React.useEffect(() => {
+        const handler = (e) => {
+            if (!e.detail || e.detail.targetName !== playerStats.name) return;
+            setSaves(e.detail.newSaves);
+            setFailures(e.detail.newFailures);
+            setLastRoll({
+                roll: e.detail.roll,
+                success: e.detail.success,
+                isNat20: e.detail.isNat20,
+                isNat1: e.detail.isNat1,
+            });
+            setTimeout(() => setLastRoll(null), 2000);
+        };
+        window.addEventListener('death-save-result', handler);
+        return () => window.removeEventListener('death-save-result', handler);
+    }, [playerStats.name])
+
     const isStable = deathSaveRules.isStable(saves)
     const isDead = deathSaveRules.isDead(failures)
 

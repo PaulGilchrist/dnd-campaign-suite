@@ -1,0 +1,135 @@
+.cnp-overlay {
+  position: fixed;
+  top: 0;
+  left: 180px;
+  width: calc(100vw - 180px);
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.85);
+  z-index: 2000;
+}
+
+.cnp-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--background-color-header-inner);
+  border: 2px solid #9333ea;
+  border-radius: 10px;
+  color: var(--color-header-inner);
+  padding: 24px;
+  min-width: 320px;
+  max-width: 480px;
+  text-align: center;
+}
+
+.cnp-header {
+  font-size: 1.15em;
+  font-weight: bold;
+  margin-bottom: 16px;
+  color: #9333ea;
+}
+
+.cnp-queue-info {
+  font-size: 0.75em;
+  font-weight: normal;
+  opacity: 0.7;
+  margin-left: 8px;
+}
+
+.cnp-header i {
+  margin-right: 8px;
+}
+
+.cnp-body {
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.cnp-body p {
+  margin: 8px 0;
+}
+
+.cnp-dc {
+  font-size: 1.4em;
+  font-weight: bold;
+  color: #9333ea;
+}
+
+.cnp-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.cnp-roll-btn {
+  background-color: #9333ea;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 1em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cnp-roll-btn:hover {
+  opacity: 0.9;
+}
+
+.cnp-dismiss-btn {
+  background-color: transparent;
+  color: var(--color-header);
+  border: 1px solid var(--color-header);
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 1em;
+  cursor: pointer;
+}
+
+.cnp-dismiss-btn:hover {
+  opacity: 0.8;
+}
+
+.cnp-result {
+  margin: 16px 0;
+  padding: 14px;
+  border-radius: 8px;
+}
+
+.cnp-result-success {
+  background-color: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.cnp-result-fail {
+  background-color: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.cnp-result-label {
+  font-size: 1.15em;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.cnp-result-success .cnp-result-label {
+  color: #22c55e;
+}
+
+.cnp-result-fail .cnp-result-label {
+  color: #ef4444;
+}
+
+.cnp-result-total {
+  font-size: 1.05em;
+  margin: 4px 0;
+}
+
+.cnp-result-breakdown {
+  font-size: 0.85em;
+  opacity: 0.7;
+  margin: 4px 0;
+}

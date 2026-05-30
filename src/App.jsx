@@ -21,6 +21,8 @@ import NPCs from './components/npcs/NPCs.jsx';
 import Factions from './components/factions/Factions.jsx';
 import Log from './components/log/Log.jsx';
 import SavePromptModal from './components/common/SavePromptModal.jsx';
+import DeathSavePromptModal from './components/common/DeathSavePromptModal.jsx';
+import ConcentrationPromptModal from './components/common/ConcentrationPromptModal.jsx';
 
 function App() {
   const appData = useAppData();
@@ -372,6 +374,8 @@ function App() {
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allRaces={races} allRaces2024={races2024} allClasses={classes} allSpells={spells} allSpells2024={spells2024} />}
         {showEditCharacterWizard && <CharacterCreationWizard onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allRaces={races} allClasses={classes} allSpells={spells} allSpells2024={spells2024} characterData={activeCharacter} isEditing={true} />}
         <SavePromptModal campaignName={campaignName} characters={charactersWithHp} />
+        <DeathSavePromptModal campaignName={campaignName} characters={charactersWithHp} />
+        <ConcentrationPromptModal campaignName={campaignName} characters={charactersWithHp} />
       </div>
     </div>
   );

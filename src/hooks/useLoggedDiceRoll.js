@@ -32,8 +32,9 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
   if (!window.__pendingSaves) window.__pendingSaves = {};
   const pendingSaves = window.__pendingSaves;
 
-  if (campaignName && !window.__saveResultHandlerInstalled) {
-    window.__saveResultHandlerInstalled = true;
+  if (campaignName && !window.__pendingResultHandlersInstalled) {
+    window.__pendingResultHandlersInstalled = true;
+
     window.addEventListener('save-result', (e) => {
       const pending = window.__pendingSaves[e.detail.promptId];
       if (!pending) return;
@@ -95,6 +96,47 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
         damageApplied: true,
         damageReduced: applyResult?.damageReduced,
       });
+    });
+
+    window.addEventListener('death-save-result', (e) => {
+      logEntry({
+        type: 'death_save',
+        characterName: e.detail.targetName,
+        roll: e.detail.roll,
+        isNatural20: e.detail.isNat20,
+        isNatural1: e.detail.isNat1,
+        success: e.detail.success,
+      });
+    });
+
+    window.addEventListener('concentration-result', (e) => {
+      logEntry({
+        type: 'concentration-save',
+        characterName: e.detail.targetName,
+        rollType: 'concentration-save',
+        name: 'Constitution',
+        rolls: [e.detail.roll],
+        mode: 'normal',
+        total: e.detail.total,
+        bonus: e.detail.saveBonus,
+        condition: `Concentration: ${e.detail.spellName}`,
+        dc: e.detail.dc,
+        success: e.detail.success,
+        timestamp: Date.now(),
+        id: utils.guid(),
+      });
+
+      const combatSummary = getCombatSummary();
+      if (combatSummary) {
+        const creature = combatSummary.creatures.find(c =>
+          c.name === e.detail.targetName || c.name.startsWith(e.detail.targetName + ' ')
+        );
+        if (creature && !e.detail.success) {
+          creature.concentration = null;
+          storage.set('combatSummary', combatSummary, campaignName);
+          window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+        }
+      }
     });
   }
 
