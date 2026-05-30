@@ -139,12 +139,6 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
     const userSpells = (formData.spells || []).filter(s => !preSelected.includes(s));
     const validation = await validateSpellSelection(userSpells, allSpells || [], className, charLevel, version, majorName);
 
-    if (className === 'Barbarian' || className === 'Monk' || className === 'Rogue' || className === 'Fighter') {
-      if (validation.valid) {
-        return 'This class does not have spellcasting abilities. Consider choosing a spellcasting class.';
-      }
-    }
-
     if (!validation.valid) {
       return `Spell limit exceeded: ${validation.violations.join(', ')}`;
     }

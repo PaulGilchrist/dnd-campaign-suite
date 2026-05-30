@@ -159,8 +159,11 @@ function convertSpellcastingToLimits(spellcasting, className = null) {
  * Returns default spell limits for classes without spellcasting
  */
 function getDefaultSpellLimits(className) {
-  const defaultLimits = {
+  return {
+    spellType: 'prepared',
+    isNonSpellcaster: true,
     cantrip: 0,
+    preparedSpells: 0,
     level1: 0,
     level2: 0,
     level3: 0,
@@ -170,27 +173,7 @@ function getDefaultSpellLimits(className) {
     level7: 0,
     level8: 0,
     level9: 0
-   };
-
-   // Classes that have cantrips but no spell slots at level 1
-  const cantripOnlyClasses = ['Barbarian', 'Monk', 'Rogue', 'Fighter', 'Paladin'];
-  
-  if (cantripOnlyClasses.includes(className)) {
-    return {
-      cantrip: 2, // Most non-spellcasting classes get 2 cantrips
-      level1: 0,
-      level2: 0,
-      level3: 0,
-      level4: 0,
-      level5: 0,
-      level6: 0,
-      level7: 0,
-      level8: 0,
-      level9: 0
-    };
-  }
-
-  return defaultLimits;
+     };
 }
 
 /**
@@ -199,6 +182,11 @@ function getDefaultSpellLimits(className) {
 export async function validateSpellSelection(selectedSpells, allSpells, className, level, version = '5e', majorName = null) {
   const limits = await getSpellLimits(className, level, version, majorName);
   const counts = countSpellsByLevel(selectedSpells, allSpells);
+
+    // Non-spellcasting classes have no inherent restrictions — allow any selection for homebrew/feat/race feats
+  if (limits.isNonSpellcaster) {
+      return { valid: true, violations: [], limits, counts };
+      }
   
    const violations = [];
 

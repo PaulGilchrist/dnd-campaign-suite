@@ -30,7 +30,9 @@ describe('spellLimits', () => {
 
       const limits = await getSpellLimits('Barbarian', 1, '5e');
       
-      expect(limits.cantrip).toBe(2); // Barbarians get 2 cantrips
+       expect(limits.cantrip).toBe(0); // Non-spellcasters default to no spell limits
+       expect(limits.spellType).toBe('prepared'); // Uses prepared model for flexibility
+       expect(limits.preparedSpells).toBe(0); // No inherent prepared limit
       expect(limits.level1).toBe(0);
       expect(limits.level9).toBe(0);
      });
@@ -117,7 +119,9 @@ describe('spellLimits', () => {
 
       const limits = await getSpellLimits('Rogue', 3, '5e');
       
-      expect(limits.cantrip).toBe(2); // Rogues get 2 cantrips
+       expect(limits.cantrip).toBe(0); // Non-spellcasters default to no spell limits
+       expect(limits.spellType).toBe('prepared'); // Uses prepared model for flexibility
+       expect(limits.preparedSpells).toBe(0); // No inherent prepared limit
       expect(limits.level1).toBe(0);
      });
 
