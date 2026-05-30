@@ -367,7 +367,10 @@ export async function validateSpells(formData, selectedSpells, allSpells, versio
     void _spellLevel;
     
     // Check if spell is allowed by class
-    const isClassSpell = spellClasses.includes(sources.class.name);
+    const className = sources.class.name;
+       const isClassSpell = spellClasses.includes(className) ||
+       (className === 'Fighter' && spellClasses.includes('Wizard')) ||
+       (className === 'Rogue' && spellClasses.includes('Wizard'));
     const isGrantedSpell = allowedSpells.has(spellName);
     
       // If not a class spell and not granted by another source, collect it

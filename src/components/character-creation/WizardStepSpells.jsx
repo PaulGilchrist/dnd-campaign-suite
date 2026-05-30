@@ -243,12 +243,19 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
         return parseInt(a) - parseInt(b);
 }
      },
-    {
-      label: 'Class',
-      field: 'class',
-      className: 'class-filter',
-      getValue: (spell) => spell.classes
-     }
+      {
+       label: 'Class',
+       field: 'class',
+       className: 'class-filter',
+       getValue: (spell) => {
+          const classes = spell.classes || [];
+         if (classes.includes('Wizard')) {
+           return [...classes, 'Fighter', 'Rogue'];
+          }
+         return classes;
+        },
+        renderOption: (cls) => cls
+       },
    ];
 
   return (
