@@ -579,7 +579,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 6,
@@ -618,7 +619,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 6,
@@ -682,7 +684,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 6,
@@ -714,7 +717,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 6,
@@ -753,7 +757,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 8,
@@ -786,7 +791,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 8,
@@ -812,7 +818,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 8,
@@ -838,7 +845,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 8,
@@ -871,7 +879,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 8,
@@ -940,7 +949,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 10,
@@ -972,7 +982,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 10,
@@ -998,7 +1009,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 10,
@@ -1031,7 +1043,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 10,
@@ -1064,7 +1077,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 10,
@@ -1097,7 +1111,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 12,
@@ -1123,7 +1138,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 12,
@@ -1156,7 +1172,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 12,
@@ -1189,7 +1206,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 12,
@@ -1215,7 +1233,8 @@
                     "spell_slots_level_6": 2,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 12,
@@ -1248,7 +1267,8 @@
                     "spell_slots_level_6": 2,
                     "spell_slots_level_7": 2,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "bardic_inspiration_die": 12,
@@ -1430,7 +1450,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 0,
@@ -1466,7 +1487,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 1,
@@ -1496,7 +1518,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 1,
@@ -1519,7 +1542,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 1,
@@ -1555,7 +1579,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 1,
@@ -1585,7 +1610,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 2,
@@ -1615,7 +1641,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 2,
@@ -1645,7 +1672,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 2,
@@ -1675,7 +1703,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 2,
@@ -1705,7 +1734,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 2,
@@ -1735,7 +1765,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 2,
@@ -1758,7 +1789,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 2,
@@ -1781,7 +1813,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 2,
@@ -1811,7 +1844,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 2,
@@ -1834,7 +1868,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 2,
@@ -1857,7 +1892,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 2,
@@ -1887,7 +1923,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 2,
@@ -1917,7 +1954,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 3,
@@ -1940,7 +1978,8 @@
                     "spell_slots_level_6": 2,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 3,
@@ -1970,7 +2009,8 @@
                     "spell_slots_level_6": 2,
                     "spell_slots_level_7": 2,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "channel_divinity_charges": 3,
@@ -3366,7 +3406,7 @@
                     "Heavy Armor",
                     "Martial Weapons"
                 ],
-                "description": "War has many manifestations. It can make heroes of ordinary people. It can be desperate and horrific, with acts of cruelty and cowardice eclipsing instances of excellence and courage. In either case, the gods of war watch over warriors and reward them for their great deeds. The clerics of such gods excel in battle, inspiring others to fight the good fight or offering acts of violence asprayers.Godsofwarincludechampionsofhonor and chivalry (such as Torm, Heironeous, and Kiri­ Jolith) as well as gods of destruction and pillage (such as Erythnul, the Fury, Gruumsh, and Ares) and gods of conquest and domination (such as Bane, Hextor, and Maglubiyet). Other war gods (such as Tempus, Nike, and Nuada) take a more neutral stance, promoting war in all its manifestations and supporting warriors in any circumstance."
+                "description": "War has many manifestations. It can make heroes of ordinary people. It can be desperate and horrific, with acts of cruelty and cowardice eclipsing instances of excellence and courage. In either case, the gods of war watch over warriors and reward them for their great deeds. The clerics of such gods excel in battle, inspiring others to fight the good fight or offering acts of violence asprayers.Godsofwarincludechampionsofhonor and chivalry (such as Torm, Heironeous, and Kiri\u00ad Jolith) as well as gods of destruction and pillage (such as Erythnul, the Fury, Gruumsh, and Ares) and gods of conquest and domination (such as Bane, Hextor, and Maglubiyet). Other war gods (such as Tempus, Nike, and Nuada) take a more neutral stance, promoting war in all its manifestations and supporting warriors in any circumstance."
             }
         ],
         "book": "Player's Handbook",
@@ -3444,7 +3484,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 0,
@@ -3481,7 +3522,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 0.25,
@@ -3504,7 +3546,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 0.25,
@@ -3535,7 +3578,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 0.5,
@@ -3558,7 +3602,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 0.5,
@@ -3581,7 +3626,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 0.5,
@@ -3604,7 +3650,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 1,
@@ -3635,7 +3682,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 1,
@@ -3658,7 +3706,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 1,
@@ -3681,7 +3730,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 1,
@@ -3704,7 +3754,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 1,
@@ -3727,7 +3778,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 1,
@@ -3750,7 +3802,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 1,
@@ -3773,7 +3826,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 1,
@@ -3796,7 +3850,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 1,
@@ -3819,7 +3874,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 1,
@@ -3842,7 +3898,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 1,
@@ -3878,7 +3935,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 1,
@@ -3901,7 +3959,8 @@
                     "spell_slots_level_6": 2,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 1,
@@ -3931,7 +3990,8 @@
                     "spell_slots_level_6": 2,
                     "spell_slots_level_7": 2,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "wild_shape_max_cr": 1,
@@ -6460,7 +6520,7 @@
                                 "name": "Disciple of the Elements",
                                 "level": 3,
                                 "prerequisites": [],
-                                "description": "You learn magical disciplines that harness the power of the four elements. A discipline requires you to spend ki points each time you use it.<br/><br/> You know the Elemental Attunement discipline and one other elemental discipline of your choice, which are detailed in the &quot;Elemental Disciplines&quot; section below. You learn one additional elemental discipline of your choice at 6th, 11th, and 17th level.<br/><br/> Whenever you learn a new elemental discipline, you can also replace one elemental discipline that you already know with a different discipline.<br/><br/> Casting Elemental Spells. Some elemental disciplines allow you to cast spells. See chapter 10 for the general rules of spellcasting. To cast one of these spells, you use its casting time and other rules, but you don't need to provide material components for it.<br/><br/> Once you reach 5th level in this class, you can spend additional ki points to increase the level of an elemental discipline spell that you cast, provided that the spell has an enhanced effect at a higher level, as burning hands does. The spell's level increases by 1 for each additional ki point you spend. For example, if you are a 5th-level monk and use Sweeping Cinder Strike to cast burning hands, you can spend 3 ki points to cast it as a 2nd-level spell (the discipline's base cost of 2 ki points plus 1).<br/><br/> The maximum number of ki points you can spend to cast a spell in this way (including its base ki point cost and any additional ki points you spend to increase its level) is determined by your monk level, as shown in the Spells and Ki Points table.<br/><br/> <b>Spells and KI Points</b><br/> <table class='table table-condensed table-striped table-hover'><thead><tr><th>Monk Levels</th><th>Maximum Ki Points for a Spell</th></tr></thead><tbody> <tr><td>5th-8th</td><td>3</td></tr> <tr><td>9th-12th</td><td>4</td></tr> <tr><td>13th-16th</td><td>5</td></tr> <tr><td>17th-20th</td><td>6</td></tr> </tbody></table> <br/> <b>Elemental Disciplines</b><br/> <ul> <li><b>Breath of Winter (17th Level Required)</b>: You can spend 6 ki points to cast cone of cold.</li> <li><b>Clench of the North Wind (6th Level Required)</b>: You can spend 3 ki points to cast hold person.</li> <li> <b>Elemental Attunement</b>: You can use your action to briefly control elemental forces within 30 feet of you, causing one of the following effects of your choice: <ul> <li>Create a harmless, instantaneous sensory effect related to air, earth, fire, or water, such as a shower of sparks, a puff of wind, a spray of light mist, or a gentle rumbling of stone.</li> <li>Instantaneously light or snuff out a candle, a torch, or a small campfire.</li> <li>Chill or warm up to 1 pound of nonliving material for up to 1 hour.</li> <li>Cause earth, fire, water, or mist that can fit within a I-foot cube to shape itself into a crude form you desig­ nate for 1 minute.</li> </ul> </li> <li><b>Eternal Mountain Defense (17th Level Required)</b>: You can spend 5 ki points to cast stoneskin, target­ ing yourself.</li> <li><b>Fangs of the Fire Snake</b>: When you use the Attack action on your turn, you can spend 1 ki point to cause tendrils of flame to stretch out from your fists and feet. Your reach with your unarmed strikes increases by 10 feet for that action, as well as the rest of the turn. A hit with such an attack deals fire damage instead of bludgeoning damage, and if you spend 1 ki point when the attack hits, it also deals an extra ldlO fire damage.</li> <li><b>Fist ofFour Thunders</b>: You can spend 2 ki points to cast thunderwave.</li> <li><b>Fist of Unbroken Air</b>: You can create a blast of compressed air that strikes like a mighty fist. As an action, you can spend 2 ki points and choose a creature within 30 feet of you. That creature must make a Strength saving throw. On a failed save, the creature takes 3d10 bludgeoning damage, plus an extra ldlO bludgeoning damage for each additional ki point you spend, and you can push the creature up to 20 feet away from you and knock it prone. On a successful save, the creature takes half as much damage, and you don't push it or knock it prone.</li> <li><b>Flames ofthe Phoenix (11th Level Required)</b>: You can spend 4 ki points to cast fireball.</li> <li><b>Gong ofthe Summit (6th Level Required)</b>: You can spend 3 ki points to cast shatter.</li> <li><b>Mist Stance (11th Level Required)</b>: You can spend 4 ki points to cast gaseous form, targeting yourself.</li> <li><b>Ride the Wind (11th Level Required)</b>: You can spend 4 ki points to cast fly, targeting yourself.</li> <li><b>River of Hungry Flame (17th Level Required)</b>: You can spend 5 ki points to cast wall of fire.</li> <li><b>Rush of the Gale Spirits</b>: You can spend 2 ki points to cast gust of wind.</li> <li><b>Shape the Flowing River</b>: As an action, you can spend 1 ki point to choose an area of ice or water no larger than 30 feet on a side within 120 feet of you. You can change water to ice within the area and vice versa, and you can reshape ice in the area in any manner you choose. You can raise or lower the ice's elevation, create or fill in a trench, erect or flatten a wall, or form a pillar. The extent of any such changes can't exceed half the area's largest dimension. For example, ifyou affect a 30-foot square, you can create a pillar up to 15 feet high, raise or lower the square's elevation by up to 1 5 feet, dig a trench up to 15 feet deep, and so on. You can't shape the ice to trap or damage a creature in the area.</li> <li><b>Sweeping Cinder Strike</b>: You can spend 2 ki points to cast burning hands.</li> <li><b>Water Whip</b>: You can spend 2 ki points as an action to create a whip of water that shoves and pulls a creature to unbalance it. A creature that you can see that is within 30 feet of you must make a Dexterity saving throw. On a failed save, the creature takes 3d10 bludgeoning damage, plus an extra ldlO bludgeoning damage for each additional ki point you spend, and you can either knock it prone or pull it up to 25 feet closer to you. On a successful save, the creature takes half as much damage, and you don't pull it or knock it prone.</li> <li><b>Wave of Rolling Earth (17th Level Required)</b>: You can spend 6 ki points to cast wall ofstone.</li> </ul>"
+                                "description": "You learn magical disciplines that harness the power of the four elements. A discipline requires you to spend ki points each time you use it.<br/><br/> You know the Elemental Attunement discipline and one other elemental discipline of your choice, which are detailed in the &quot;Elemental Disciplines&quot; section below. You learn one additional elemental discipline of your choice at 6th, 11th, and 17th level.<br/><br/> Whenever you learn a new elemental discipline, you can also replace one elemental discipline that you already know with a different discipline.<br/><br/> Casting Elemental Spells. Some elemental disciplines allow you to cast spells. See chapter 10 for the general rules of spellcasting. To cast one of these spells, you use its casting time and other rules, but you don't need to provide material components for it.<br/><br/> Once you reach 5th level in this class, you can spend additional ki points to increase the level of an elemental discipline spell that you cast, provided that the spell has an enhanced effect at a higher level, as burning hands does. The spell's level increases by 1 for each additional ki point you spend. For example, if you are a 5th-level monk and use Sweeping Cinder Strike to cast burning hands, you can spend 3 ki points to cast it as a 2nd-level spell (the discipline's base cost of 2 ki points plus 1).<br/><br/> The maximum number of ki points you can spend to cast a spell in this way (including its base ki point cost and any additional ki points you spend to increase its level) is determined by your monk level, as shown in the Spells and Ki Points table.<br/><br/> <b>Spells and KI Points</b><br/> <table class='table table-condensed table-striped table-hover'><thead><tr><th>Monk Levels</th><th>Maximum Ki Points for a Spell</th></tr></thead><tbody> <tr><td>5th-8th</td><td>3</td></tr> <tr><td>9th-12th</td><td>4</td></tr> <tr><td>13th-16th</td><td>5</td></tr> <tr><td>17th-20th</td><td>6</td></tr> </tbody></table> <br/> <b>Elemental Disciplines</b><br/> <ul> <li><b>Breath of Winter (17th Level Required)</b>: You can spend 6 ki points to cast cone of cold.</li> <li><b>Clench of the North Wind (6th Level Required)</b>: You can spend 3 ki points to cast hold person.</li> <li> <b>Elemental Attunement</b>: You can use your action to briefly control elemental forces within 30 feet of you, causing one of the following effects of your choice: <ul> <li>Create a harmless, instantaneous sensory effect related to air, earth, fire, or water, such as a shower of sparks, a puff of wind, a spray of light mist, or a gentle rumbling of stone.</li> <li>Instantaneously light or snuff out a candle, a torch, or a small campfire.</li> <li>Chill or warm up to 1 pound of nonliving material for up to 1 hour.</li> <li>Cause earth, fire, water, or mist that can fit within a I-foot cube to shape itself into a crude form you desig\u00ad nate for 1 minute.</li> </ul> </li> <li><b>Eternal Mountain Defense (17th Level Required)</b>: You can spend 5 ki points to cast stoneskin, target\u00ad ing yourself.</li> <li><b>Fangs of the Fire Snake</b>: When you use the Attack action on your turn, you can spend 1 ki point to cause tendrils of flame to stretch out from your fists and feet. Your reach with your unarmed strikes increases by 10 feet for that action, as well as the rest of the turn. A hit with such an attack deals fire damage instead of bludgeoning damage, and if you spend 1 ki point when the attack hits, it also deals an extra ldlO fire damage.</li> <li><b>Fist ofFour Thunders</b>: You can spend 2 ki points to cast thunderwave.</li> <li><b>Fist of Unbroken Air</b>: You can create a blast of compressed air that strikes like a mighty fist. As an action, you can spend 2 ki points and choose a creature within 30 feet of you. That creature must make a Strength saving throw. On a failed save, the creature takes 3d10 bludgeoning damage, plus an extra ldlO bludgeoning damage for each additional ki point you spend, and you can push the creature up to 20 feet away from you and knock it prone. On a successful save, the creature takes half as much damage, and you don't push it or knock it prone.</li> <li><b>Flames ofthe Phoenix (11th Level Required)</b>: You can spend 4 ki points to cast fireball.</li> <li><b>Gong ofthe Summit (6th Level Required)</b>: You can spend 3 ki points to cast shatter.</li> <li><b>Mist Stance (11th Level Required)</b>: You can spend 4 ki points to cast gaseous form, targeting yourself.</li> <li><b>Ride the Wind (11th Level Required)</b>: You can spend 4 ki points to cast fly, targeting yourself.</li> <li><b>River of Hungry Flame (17th Level Required)</b>: You can spend 5 ki points to cast wall of fire.</li> <li><b>Rush of the Gale Spirits</b>: You can spend 2 ki points to cast gust of wind.</li> <li><b>Shape the Flowing River</b>: As an action, you can spend 1 ki point to choose an area of ice or water no larger than 30 feet on a side within 120 feet of you. You can change water to ice within the area and vice versa, and you can reshape ice in the area in any manner you choose. You can raise or lower the ice's elevation, create or fill in a trench, erect or flatten a wall, or form a pillar. The extent of any such changes can't exceed half the area's largest dimension. For example, ifyou affect a 30-foot square, you can create a pillar up to 15 feet high, raise or lower the square's elevation by up to 1 5 feet, dig a trench up to 15 feet deep, and so on. You can't shape the ice to trap or damage a creature in the area.</li> <li><b>Sweeping Cinder Strike</b>: You can spend 2 ki points to cast burning hands.</li> <li><b>Water Whip</b>: You can spend 2 ki points as an action to create a whip of water that shoves and pulls a creature to unbalance it. A creature that you can see that is within 30 feet of you must make a Dexterity saving throw. On a failed save, the creature takes 3d10 bludgeoning damage, plus an extra ldlO bludgeoning damage for each additional ki point you spend, and you can either knock it prone or pull it up to 25 feet closer to you. On a successful save, the creature takes half as much damage, and you don't pull it or knock it prone.</li> <li><b>Wave of Rolling Earth (17th Level Required)</b>: You can spend 6 ki points to cast wall ofstone.</li> </ul>"
                             }
                         ]
                     }
@@ -6525,7 +6585,8 @@
                     "spell_slots_level_2": 0,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 0
@@ -6572,7 +6633,8 @@
                     "spell_slots_level_2": 0,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 0
@@ -6618,7 +6680,8 @@
                     "spell_slots_level_2": 0,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 0
@@ -6634,7 +6697,8 @@
                     "spell_slots_level_2": 0,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 0
@@ -6657,7 +6721,8 @@
                     "spell_slots_level_2": 2,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 0
@@ -6680,7 +6745,8 @@
                     "spell_slots_level_2": 2,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 10
@@ -6696,7 +6762,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 10
@@ -6712,7 +6779,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 10
@@ -6728,7 +6796,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 2,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 10
@@ -6751,7 +6820,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 2,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 10
@@ -6774,7 +6844,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 10
@@ -6790,7 +6861,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 10
@@ -6806,7 +6878,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 1,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 10
@@ -6829,7 +6902,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 1,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 10
@@ -6845,7 +6919,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 2,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 10
@@ -6861,7 +6936,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 2,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 10
@@ -6877,7 +6953,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 3,
-                    "spell_slots_level_5": 1
+                    "spell_slots_level_5": 1,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 10
@@ -6906,7 +6983,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 3,
-                    "spell_slots_level_5": 1
+                    "spell_slots_level_5": 1,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 30
@@ -6922,7 +7000,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 3,
-                    "spell_slots_level_5": 2
+                    "spell_slots_level_5": 2,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 30
@@ -6938,7 +7017,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 3,
-                    "spell_slots_level_5": 2
+                    "spell_slots_level_5": 2,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "aura_range": 30
@@ -7569,7 +7649,8 @@
                     "spell_slots_level_2": 0,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 1,
@@ -7612,7 +7693,8 @@
                     "spell_slots_level_2": 0,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 1,
@@ -7648,7 +7730,8 @@
                     "spell_slots_level_2": 0,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 1,
@@ -7666,7 +7749,8 @@
                     "spell_slots_level_2": 0,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 1,
@@ -7691,7 +7775,8 @@
                     "spell_slots_level_2": 2,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 1,
@@ -7722,7 +7807,8 @@
                     "spell_slots_level_2": 2,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 2,
@@ -7740,7 +7826,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 2,
@@ -7765,7 +7852,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 0,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 2,
@@ -7783,7 +7871,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 2,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 2,
@@ -7814,7 +7903,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 2,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 2,
@@ -7832,7 +7922,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 2,
@@ -7850,7 +7941,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 0,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 2,
@@ -7868,7 +7960,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 1,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 2,
@@ -7899,7 +7992,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 1,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 3,
@@ -7917,7 +8011,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 2,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 3,
@@ -7935,7 +8030,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 2,
-                    "spell_slots_level_5": 0
+                    "spell_slots_level_5": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 3,
@@ -7953,7 +8049,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 3,
-                    "spell_slots_level_5": 1
+                    "spell_slots_level_5": 1,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 3,
@@ -7978,7 +8075,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 3,
-                    "spell_slots_level_5": 1
+                    "spell_slots_level_5": 1,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 3,
@@ -7996,7 +8094,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 3,
-                    "spell_slots_level_5": 2
+                    "spell_slots_level_5": 2,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 3,
@@ -8021,7 +8120,8 @@
                     "spell_slots_level_2": 3,
                     "spell_slots_level_3": 3,
                     "spell_slots_level_4": 3,
-                    "spell_slots_level_5": 2
+                    "spell_slots_level_5": 2,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "favored_enemies": 3,
@@ -8135,7 +8235,7 @@
                                 "name": "Ranger's Companion",
                                 "level": 3,
                                 "prerequisites": [],
-                                "description": "You gain a beast companion that accompanies you on your adventures and is trained to fight alongside you. Choose a beast that is no larger than Medium and that has a challenge rating of 1/4 or lower (appendix D presents statistics for the hawk, mastiff, and panther as examples). Add your proficiency bonus to the beast's AC, attack rolls, and damage rolls, as well as to any saving throws and skills it is proficient in. Its hit point maximum equals the hit point number in its stat block or four times your ranger level, whichever is higher. Like any creature, it can spend Hit Dice during a short rest to regain hit points. The beast obeys your commands as best as it can. It takes its turn on your initiative. On your turn, you can verbally command the beast where to move (no action required by you). You can use your action to verbally command it to take the Attack, Dash, Disengage, or Help action. Once you have the Extra Attack feature, you can make one weapon attack yourself when you com­ mand the beast to take the Attack action. If you don't issue a command, the beast takes the Dodge action. If you are incapacitated or absent, the beast acts on its own, focusing on protecting you and itself. The beast never requires your command to use its reaction, such as when making an opportunity attack. While traveling through your favored terrain with only the beast, you can move stealthily at a normal pace. If the beast dies, you can obtain a new companion by spending 8 hours magically bonding with a beast that isn't hostile to you and that meets the requirements."
+                                "description": "You gain a beast companion that accompanies you on your adventures and is trained to fight alongside you. Choose a beast that is no larger than Medium and that has a challenge rating of 1/4 or lower (appendix D presents statistics for the hawk, mastiff, and panther as examples). Add your proficiency bonus to the beast's AC, attack rolls, and damage rolls, as well as to any saving throws and skills it is proficient in. Its hit point maximum equals the hit point number in its stat block or four times your ranger level, whichever is higher. Like any creature, it can spend Hit Dice during a short rest to regain hit points. The beast obeys your commands as best as it can. It takes its turn on your initiative. On your turn, you can verbally command the beast where to move (no action required by you). You can use your action to verbally command it to take the Attack, Dash, Disengage, or Help action. Once you have the Extra Attack feature, you can make one weapon attack yourself when you com\u00ad mand the beast to take the Attack action. If you don't issue a command, the beast takes the Dodge action. If you are incapacitated or absent, the beast acts on its own, focusing on protecting you and itself. The beast never requires your command to use its reaction, such as when making an opportunity attack. While traveling through your favored terrain with only the beast, you can move stealthily at a normal pace. If the beast dies, you can obtain a new companion by spending 8 hours magically bonding with a beast that isn't hostile to you and that meets the requirements."
                             }
                         ]
                     },
@@ -8709,7 +8809,7 @@
                                 "name": "Infiltration Expertise",
                                 "level": 9,
                                 "prerequisites": [],
-                                "description": "You can unfailingly create false identities for yourself. You must spend seven days and 25 gp to establish the history, profession, and affiliations for an identity. You can't establish an identity that belongs to someone else. For example, you might acquire appropriate clothing, letters of introduction, and official­ looking certification to establish yourself as a member of a trading house from a remote city so you can insinuate yourself into the company of other wealthy merchants. Thereafter, ifyou adopt the new identity as a disguise, other creatures believe you to be that person until given an obvious reason not to."
+                                "description": "You can unfailingly create false identities for yourself. You must spend seven days and 25 gp to establish the history, profession, and affiliations for an identity. You can't establish an identity that belongs to someone else. For example, you might acquire appropriate clothing, letters of introduction, and official\u00ad looking certification to establish yourself as a member of a trading house from a remote city so you can insinuate yourself into the company of other wealthy merchants. Thereafter, ifyou adopt the new identity as a disguise, other creatures believe you to be that person until given an obvious reason not to."
                             }
                         ]
                     },
@@ -9029,7 +9129,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 0,
@@ -9072,7 +9173,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 2,
@@ -9140,7 +9242,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 3,
@@ -9185,7 +9288,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 4,
@@ -9230,7 +9334,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 5,
@@ -9275,7 +9380,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 6,
@@ -9320,7 +9426,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 7,
@@ -9365,7 +9472,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 8,
@@ -9410,7 +9518,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 9,
@@ -9477,7 +9586,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 10,
@@ -9522,7 +9632,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 11,
@@ -9567,7 +9678,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 12,
@@ -9612,7 +9724,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 13,
@@ -9657,7 +9770,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 14,
@@ -9702,7 +9816,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 15,
@@ -9747,7 +9862,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 16,
@@ -9814,7 +9930,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 17,
@@ -9859,7 +9976,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 18,
@@ -9904,7 +10022,8 @@
                     "spell_slots_level_6": 2,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 19,
@@ -9956,7 +10075,8 @@
                     "spell_slots_level_6": 2,
                     "spell_slots_level_7": 2,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "sorcery_points": 20,
@@ -10187,7 +10307,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 0,
@@ -10244,7 +10365,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 2,
@@ -10288,7 +10410,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 2,
@@ -10314,7 +10437,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 3,
@@ -10371,7 +10495,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 3,
@@ -10397,7 +10522,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 4,
@@ -10454,7 +10580,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 4,
@@ -10480,7 +10607,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 4,
@@ -10537,7 +10665,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 5,
@@ -10563,7 +10692,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 5,
@@ -10596,7 +10726,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 5,
@@ -10653,7 +10784,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 6,
@@ -10686,7 +10818,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 6,
@@ -10712,7 +10845,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 6,
@@ -10775,7 +10909,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 7,
@@ -10801,7 +10936,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 7,
@@ -10834,7 +10970,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 7,
@@ -10891,7 +11028,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 8,
@@ -10917,7 +11055,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 8,
@@ -10950,7 +11089,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
                 },
                 "class_specific": {
                     "invocations_known": 8,
@@ -11537,7 +11677,7 @@
                         "name": "Spellcasting",
                         "level": 1,
                         "prerequisites": [],
-                        "description": "As a student of arcane magic, you have a spellbook containing spells that show the first glimmerings of your true power.<br/><br/><h6>Cantrips</h6>At 1st level, you know three cantrips of your choice from the wizard spell list. You learn additional wizard cantrips of your choice at higher levels, as shown in the Cantrips Known column of the Wizard table.<br/><br/><h6>Spellbook</h6> At 1st level, you have a spellbook containing six 1st-level wizard spells of your choice. Your spellbook is the repository of the wizard spells you know, except your cantrips, which are fixed in your mind.<br/> <br/> <h6>Preparing and Casting Spells</h6> The Wizard table shows how many spell slots you have to cast your wizard spells of 1st level and higher. To cast one of these spells, you must expend a slot of the spell's level or higher. You regain all expended spell slots when you finish a long rest.<br/><br/> You prepare the list of wizard spells that are available for you to cast. To do so, choose a number of wizard spells from your spellbook equal to your Intelligence modifier + your wizard level (minimum of one spell). The spells must be of a level for which you have spell slots.<br/><br/> For example, if you're a 3rd-level wizard, you have four 1st-level and two 2nd-level spell slots. With an Intelli­gence of 16, your list of prepared spells can include six spells of 1st or 2nd level, in any combination, chosen from your spellbook. If you prepare the 1st-level spell magic missile, you can cast it using a 1st-level or a 2nd-level slot. Casting the spell doesn't remove it from your list of prepared spells.<br/><br/> You can change your list of prepared spells when you finish a long rest. Preparing a new list of wizard spells requires time spent studying your spellbook and memorizing the incantations and gestures you must make to cast the spell: at least 1 minute per spell level for each spell on your list.<br/> <br/> <h6>Spellcasting Ability</h6> Intelligence is your spellcasting ability for your wizard spells, since you learn your spells through dedicated study and memorization. You use your Intelligence whenever a spell refers to your spellcasting ability. In addition, you use your Intelligence modifier when set­ting the saving throw DC for a wizard spell you cast and when making an attack roll with one.<br/><br/> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Spell save DC</b> = 8 + your proficiency bonus + your Intelligence modifier<br/> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Spell attack modifier</b> = your proficiency bonus + your Intelligence modifier<br/> <br/> <h6>Ritual Casting</h6> You can cast a wizard spell as a ritual if that spell has the ritual tag and you have the spell in your spellbook. You don't need to have the spell prepared.<br/> <br/> <h6>Spellcasting Focus</h6> You can use an arcane focus as a spellcasting focus for your wizard spells.<br/> <br/> <h6>Learning Spells of 1st Level and Higher</h6> Each time you gain a wizard level, you can add two wizard spells of your choice to your spellbook for free. Each of these spells must be of a level for which you have spell slots, as shown on the Wizard table. On your adventures, you might find other spells that you can add to your spellbook."
+                        "description": "As a student of arcane magic, you have a spellbook containing spells that show the first glimmerings of your true power.<br/><br/><h6>Cantrips</h6>At 1st level, you know three cantrips of your choice from the wizard spell list. You learn additional wizard cantrips of your choice at higher levels, as shown in the Cantrips Known column of the Wizard table.<br/><br/><h6>Spellbook</h6> At 1st level, you have a spellbook containing six 1st-level wizard spells of your choice. Your spellbook is the repository of the wizard spells you know, except your cantrips, which are fixed in your mind.<br/> <br/> <h6>Preparing and Casting Spells</h6> The Wizard table shows how many spell slots you have to cast your wizard spells of 1st level and higher. To cast one of these spells, you must expend a slot of the spell's level or higher. You regain all expended spell slots when you finish a long rest.<br/><br/> You prepare the list of wizard spells that are available for you to cast. To do so, choose a number of wizard spells from your spellbook equal to your Intelligence modifier + your wizard level (minimum of one spell). The spells must be of a level for which you have spell slots.<br/><br/> For example, if you're a 3rd-level wizard, you have four 1st-level and two 2nd-level spell slots. With an Intelli\u00adgence of 16, your list of prepared spells can include six spells of 1st or 2nd level, in any combination, chosen from your spellbook. If you prepare the 1st-level spell magic missile, you can cast it using a 1st-level or a 2nd-level slot. Casting the spell doesn't remove it from your list of prepared spells.<br/><br/> You can change your list of prepared spells when you finish a long rest. Preparing a new list of wizard spells requires time spent studying your spellbook and memorizing the incantations and gestures you must make to cast the spell: at least 1 minute per spell level for each spell on your list.<br/> <br/> <h6>Spellcasting Ability</h6> Intelligence is your spellcasting ability for your wizard spells, since you learn your spells through dedicated study and memorization. You use your Intelligence whenever a spell refers to your spellcasting ability. In addition, you use your Intelligence modifier when set\u00adting the saving throw DC for a wizard spell you cast and when making an attack roll with one.<br/><br/> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Spell save DC</b> = 8 + your proficiency bonus + your Intelligence modifier<br/> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Spell attack modifier</b> = your proficiency bonus + your Intelligence modifier<br/> <br/> <h6>Ritual Casting</h6> You can cast a wizard spell as a ritual if that spell has the ritual tag and you have the spell in your spellbook. You don't need to have the spell prepared.<br/> <br/> <h6>Spellcasting Focus</h6> You can use an arcane focus as a spellcasting focus for your wizard spells.<br/> <br/> <h6>Learning Spells of 1st Level and Higher</h6> Each time you gain a wizard level, you can add two wizard spells of your choice to your spellbook for free. Each of these spells must be of a level for which you have spell slots, as shown on the Wizard table. On your adventures, you might find other spells that you can add to your spellbook."
                     }
                 ],
                 "spellcasting": {
@@ -11550,7 +11690,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 1
@@ -11578,7 +11719,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 1
@@ -11599,7 +11741,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 2
@@ -11620,7 +11763,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 2
@@ -11641,7 +11785,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 3
@@ -11662,7 +11807,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 3
@@ -11683,7 +11829,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 4
@@ -11704,7 +11851,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 4
@@ -11725,7 +11873,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 5
@@ -11746,7 +11895,8 @@
                     "spell_slots_level_6": 0,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 5
@@ -11767,7 +11917,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 6
@@ -11788,7 +11939,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 0,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 6
@@ -11809,7 +11961,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 7
@@ -11830,7 +11983,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 0,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 7
@@ -11851,7 +12005,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 8
@@ -11872,7 +12027,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 0
+                    "spell_slots_level_9": 0,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 8
@@ -11893,7 +12049,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 9
@@ -11921,7 +12078,8 @@
                     "spell_slots_level_6": 1,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 9
@@ -11942,7 +12100,8 @@
                     "spell_slots_level_6": 2,
                     "spell_slots_level_7": 1,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 10
@@ -11970,7 +12129,8 @@
                     "spell_slots_level_6": 2,
                     "spell_slots_level_7": 2,
                     "spell_slots_level_8": 1,
-                    "spell_slots_level_9": 1
+                    "spell_slots_level_9": 1,
+                    "spell_type": "prepared"
                 },
                 "class_specific": {
                     "arcane_recovery_levels": 10
@@ -12325,7 +12485,7 @@
                                 "name": "Illusory Reality",
                                 "level": 14,
                                 "prerequisites": [],
-                                "description": "You have learned the secret of weaving shadow magic into your illusions to give them a semi­ reality. When you cast an illusion spell of 1st level or higher, you can choose one inanimate, nonmagical object that is part of the illusion and make that object real. You can do this on your turn as a bonus action while the spell is ongoing. The object remains real for 1 minute. For example, you can create an illusion of a bridge over a chasm and then make it real long enough for your allies to cross. The object can't deal damage or otherwise directly harm anyone."
+                                "description": "You have learned the secret of weaving shadow magic into your illusions to give them a semi\u00ad reality. When you cast an illusion spell of 1st level or higher, you can choose one inanimate, nonmagical object that is part of the illusion and make that object real. You can do this on your turn as a bonus action while the spell is ongoing. The object remains real for 1 minute. For example, you can create an illusion of a bridge over a chasm and then make it real long enough for your allies to cross. The object can't deal damage or otherwise directly harm anyone."
                             }
                         ]
                     }

@@ -25,7 +25,7 @@ vi.mock('./SelectableList.jsx', () => ({
 }));
 
 vi.mock('../../services/spellLimits.js', () => ({
-  getSpellLimits: vi.fn(() => Promise.resolve({ cantrip: 3, level1: 2, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 })),
+  getSpellLimits: vi.fn(() => Promise.resolve({ cantrip: 3, level1: 2, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0, spellType: 'known', preparedSpells: null })),
   validateSpellSelection: vi.fn(() => Promise.resolve({ valid: true, violations: [] })),
 }));
 
@@ -84,13 +84,98 @@ describe('WizardStepSpells', () => {
      });
    });
 
-  it('should display level counts', async () => {
-    render(<WizardStepSpells {...mockProps} />);
-    
-    await waitFor(() => {
-      expect(screen.getByText('1th level:')).toBeInTheDocument();
+   it('should display level counts for known-spell mode', async () => {
+     render(<WizardStepSpells {...mockProps} />);
+     
+     await waitFor(() => {
+       expect(screen.getByText('1th level:')).toBeInTheDocument();
+      });
     });
-  });
+
+    describe('Prepared spell mode summary', () => {
+      it('should display prepared spells count instead of per-level breakdown', async () => {
+        spellLimits.getSpellLimits.mockResolvedValueOnce({
+          cantrip: 3,
+          preparedSpells: 4,
+          spellType: 'prepared',
+          level1: 2, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0
+         });
+
+        render(<WizardStepSpells {...mockProps} />);
+        
+        await waitFor(() => {
+          expect(screen.getByText('Spell Selection Summary')).toBeInTheDocument();
+          expect(screen.getByText('Prepared Spells:')).toBeInTheDocument();
+          expect(screen.queryByText('1th level:')).not.toBeInTheDocument();
+         });
+       });
+
+      it('should display cantrip count in prepared mode', async () => {
+        spellLimits.getSpellLimits.mockResolvedValueOnce({
+          cantrip: 3,
+          preparedSpells: 4,
+          spellType: 'prepared',
+          level1: 2, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0
+         });
+
+        render(<WizardStepSpells {...mockProps} />);
+        
+        await waitFor(() => {
+          expect(screen.getByText('Cantrips:')).toBeInTheDocument();
+          });
+         });
+
+      it('should show exceeded when total prepared spells exceeds limit', async () => {
+        spellLimits.getSpellLimits.mockResolvedValueOnce({
+           cantrip: 3,
+           preparedSpells: 2,
+           spellType: 'prepared',
+           level1: 2, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0
+           });
+
+        const manySpells = [
+           { name: 'Spell1', level: 1, school: 'Abjuration', classes: ['Wizard'], desc: [] },
+           { name: 'Spell2', level: 1, school: 'Abjuration', classes: ['Wizard'], desc: [] },
+           { name: 'Spell3', level: 2, school: 'Evocation', classes: ['Wizard'], desc: [] },
+          ];
+
+        render(
+            <WizardStepSpells
+             {...mockProps}
+            allSpells={manySpells}
+            formData={{ ...mockProps.formData, spells: ['Spell1', 'Spell2', 'Spell3'] }}
+            />
+          );
+
+        await waitFor(() => {
+          const countEl = screen.getByText('3/2');
+          expect(countEl).toHaveClass('exceeded');
+          });
+         });
+
+      it('should not show exceeded when total prepared spells is within limit', async () => {
+        spellLimits.getSpellLimits.mockResolvedValueOnce({
+           cantrip: 3,
+           preparedSpells: 4,
+           spellType: 'prepared',
+           level1: 2, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0
+           });
+
+        render(
+            <WizardStepSpells
+             {...mockProps}
+            formData={{ ...mockProps.formData, spells: [] }}
+            />
+          );
+
+        await waitFor(() => {
+          const countEl = screen.getByText('0/4');
+          expect(countEl).not.toHaveClass('exceeded');
+          });
+         });
+       });
+
+   describe('Known spell mode summary', () => {
 
   it('should pass correct resultLabel', async () => {
     render(<WizardStepSpells {...mockProps} />);
@@ -178,10 +263,11 @@ describe('WizardStepSpells', () => {
     
     await waitFor(() => {
       expect(screen.getByTestId('selectable-list')).toBeInTheDocument();
+       });
      });
-   });
+    });
 
-  describe('Spell limit error handling', () => {
+   describe('Spell limit error handling', () => {
     it('should catch error when getSpellLimits rejects and use default limits', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       spellLimits.getSpellLimits.mockRejectedValueOnce(new Error('Network error'));

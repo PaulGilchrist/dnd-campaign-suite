@@ -139,6 +139,8 @@ function convertSpellcastingToLimits(spellcasting, className = null) {
 
   const limits = {
     cantrip: spellcasting.cantrips_known || 0,
+    spellType: spellcasting.spell_type || 'known',
+    preparedSpells: spellcasting.prepared_spells || null,
     level1: spellcasting.spell_slots_level_1 || 0,
     level2: spellcasting.spell_slots_level_2 || 0,
     level3: spellcasting.spell_slots_level_3 || 0,
@@ -198,38 +200,46 @@ export async function validateSpellSelection(selectedSpells, allSpells, classNam
   const limits = await getSpellLimits(className, level, version, majorName);
   const counts = countSpellsByLevel(selectedSpells, allSpells);
   
-  const violations = [];
-  
-  if (counts.cantrip > limits.cantrip) {
-    violations.push(`Cantrips: ${counts.cantrip}/${limits.cantrip}`);
-  }
-  if (counts.level1 > limits.level1) {
-    violations.push(`1st level: ${counts.level1}/${limits.level1}`);
-  }
-  if (counts.level2 > limits.level2) {
-    violations.push(`2nd level: ${counts.level2}/${limits.level2}`);
-  }
-  if (counts.level3 > limits.level3) {
-    violations.push(`3rd level: ${counts.level3}/${limits.level3}`);
-  }
-  if (counts.level4 > limits.level4) {
-    violations.push(`4th level: ${counts.level4}/${limits.level4}`);
-  }
-  if (counts.level5 > limits.level5) {
-    violations.push(`5th level: ${counts.level5}/${limits.level5}`);
-  }
-  if (counts.level6 > limits.level6) {
-    violations.push(`6th level: ${counts.level6}/${limits.level6}`);
-  }
-  if (counts.level7 > limits.level7) {
-    violations.push(`7th level: ${counts.level7}/${limits.level7}`);
-  }
-  if (counts.level8 > limits.level8) {
-    violations.push(`8th level: ${counts.level8}/${limits.level8}`);
-  }
-  if (counts.level9 > limits.level9) {
-    violations.push(`9th level: ${counts.level9}/${limits.level9}`);
+   const violations = [];
+
+   if (counts.cantrip > limits.cantrip) {
+     violations.push(`Cantrips: ${counts.cantrip}/${limits.cantrip}`);
    }
+
+   if (limits.spellType === 'prepared') {
+     const totalPrepared = countAllNonCantripSpells(counts);
+     if (totalPrepared > limits.preparedSpells) {
+       violations.push(`Prepared spells: ${totalPrepared}/${limits.preparedSpells}`);
+      }
+   } else {
+     if (counts.level1 > limits.level1) {
+       violations.push(`1st level: ${counts.level1}/${limits.level1}`);
+      }
+     if (counts.level2 > limits.level2) {
+       violations.push(`2nd level: ${counts.level2}/${limits.level2}`);
+      }
+     if (counts.level3 > limits.level3) {
+       violations.push(`3rd level: ${counts.level3}/${limits.level3}`);
+      }
+     if (counts.level4 > limits.level4) {
+       violations.push(`4th level: ${counts.level4}/${limits.level4}`);
+      }
+     if (counts.level5 > limits.level5) {
+       violations.push(`5th level: ${counts.level5}/${limits.level5}`);
+      }
+     if (counts.level6 > limits.level6) {
+       violations.push(`6th level: ${counts.level6}/${limits.level6}`);
+      }
+     if (counts.level7 > limits.level7) {
+       violations.push(`7th level: ${counts.level7}/${limits.level7}`);
+      }
+     if (counts.level8 > limits.level8) {
+       violations.push(`8th level: ${counts.level8}/${limits.level8}`);
+      }
+     if (counts.level9 > limits.level9) {
+       violations.push(`9th level: ${counts.level9}/${limits.level9}`);
+      }
+    }
 
   return {
     valid: violations.length === 0,
@@ -275,8 +285,15 @@ function countSpellsByLevel(selectedSpells, allSpells) {
 }
 
 /**
- * Gets spell limits for all levels (1-20) for a class
- */
+  * Counts total non-cantrip spells from counts object (for prepared spell classes)
+  */
+function countAllNonCantripSpells(counts) {
+   return counts.level1 + counts.level2 + counts.level3 + counts.level4 + counts.level5 + counts.level6 + counts.level7 + counts.level8 + counts.level9;
+}
+
+/**
+  * Gets spell limits for all levels (1-20) for a class
+  */
 export async function getAllSpellLimits(className, version = '5e', majorName = null) {
   const limits = {};
   

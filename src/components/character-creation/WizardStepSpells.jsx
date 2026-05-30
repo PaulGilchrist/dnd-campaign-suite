@@ -38,26 +38,93 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
     fetchSpellLimits();
   }, [formData, formData.class, formData.level, formData.rules]);
 
-  // Calculate spell counts by level (excluding pre-selected spells)
-  useEffect(() => {   
-    const counts = { cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 };
-    
-    if (formData.spells && formData.spells.length > 0) {
-      formData.spells.forEach(spellName => {
-        if (preSelected.includes(spellName)) return;
-        const spell = allSpells.find(s => s.name === spellName || s.index === spellName);
-        if (spell) {
-          const level = spell.level !== undefined ? spell.level : 0;
-          const levelKey = level === 0 ? 'cantrip' : `level${level}`;
-          counts[levelKey] = (counts[levelKey] || 0) + 1;
-        }
-      });
-    }
-    
-    setSpellCounts(counts);
-  }, [formData.spells, allSpells, preSelected]);
+   // Calculate spell counts by level (excluding pre-selected spells)
+   useEffect(() => {   
+     const counts = { cantrip: 0, level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0 };
+     
+     if (formData.spells && formData.spells.length > 0) {
+       formData.spells.forEach(spellName => {
+         if (preSelected.includes(spellName)) return;
+         const spell = allSpells.find(s => s.name === spellName || s.index === spellName);
+         if (spell) {
+           const level = spell.level !== undefined ? spell.level : 0;
+           const levelKey = level === 0 ? 'cantrip' : `level${level}`;
+           counts[levelKey] = (counts[levelKey] || 0) + 1;
+          }
+        });
+      }
+     
+     setSpellCounts(counts);
+    }, [formData.spells, allSpells, preSelected]);
 
-  // Check if spell selection exceeds limits
+   // Calculate total prepared spells (non-cantrip), for classes with spellType === 'prepared'
+   const totalPrepared = useMemo(() => {
+     if (spellLimits.spellType !== 'prepared') return 0;
+     return (
+      spellCounts.level1 +
+      spellCounts.level2 +
+      spellCounts.level3 +
+      spellCounts.level4 +
+      spellCounts.level5 +
+      spellCounts.level6 +
+      spellCounts.level7 +
+      spellCounts.level8 +
+      spellCounts.level9
+    );
+   }, [spellLimits.spellType, spellCounts]);
+
+   // Render summary
+   const renderSummary = () => {
+     const isPrepared = spellLimits.spellType === 'prepared';
+     
+     if (isPrepared) {
+       return (
+         <div className="spells-summary">
+           <h4>Spell Selection Summary</h4>
+           <div className="spell-levels-summary">
+              <div className="level-summary-item">
+                <span className="level-label">Cantrips:</span>
+                <span className={`level-count ${spellCounts.cantrip > (spellLimits.cantrip || 0) ? 'exceeded' : ''}`}>
+                   {spellCounts.cantrip}/{spellLimits.cantrip || 0}
+                  </span>
+               </div>
+              <div className="level-summary-item">
+                 <span className="level-label">Prepared Spells:</span>
+                  <span className={`level-count ${totalPrepared > (spellLimits.preparedSpells || 0) ? 'exceeded' : ''}`}>
+                     {totalPrepared}/{spellLimits.preparedSpells || 0}
+                    </span>
+                 </div>
+             </div>
+           
+             {spellWarnings.length > 0 && <WarningList warnings={spellWarnings} showIcons />}
+          </div>
+        );
+      }
+
+     return (
+       <div className="spells-summary">
+         <h4>Spell Selection Summary</h4>
+         <div className="spell-levels-summary">
+           <div className="level-summary-item">
+             <span className="level-label">Cantrips:</span>
+             <span className={`level-count ${spellCounts.cantrip > (spellLimits.cantrip || 0) ? 'exceeded' : ''}`}>
+               {spellCounts.cantrip}/{spellLimits.cantrip || 0}
+              </span>
+           </div>
+          {['level1', 'level2', 'level3', 'level4', 'level5', 'level6', 'level7', 'level8', 'level9'].map(levelKey => (
+            <div key={levelKey} className="level-summary-item">
+              <span className="level-label">{levelKey.replace('level', '')}th level:</span>
+               <span className={`level-count ${spellCounts[levelKey] > (spellLimits[levelKey] || 0) ? 'exceeded' : ''}`}>
+                 {spellCounts[levelKey] || 0}/{spellLimits[levelKey] || 0}
+                </span>
+            </div>
+          ))}
+         </div>
+         
+         {spellWarnings.length > 0 && <WarningList warnings={spellWarnings} showIcons />}
+        </div>
+       );
+      };
   const getValidationMessage = useCallback(async () => {
     if (!formData || !formData.class) {
       return '';
@@ -201,35 +268,9 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
         </div>
       </div>
     );
-  };
+    };
 
-   // Render summary
-  const renderSummary = () => (
-        <div className="spells-summary">
-          <h4>Spell Selection Summary</h4>
-          
-          <div className="spell-levels-summary">
-            <div className="level-summary-item">
-              <span className="level-label">Cantrips:</span>
-              <span className={`level-count ${spellCounts.cantrip > (spellLimits.cantrip || 0) ? 'exceeded' : ''}`}>
-                {spellCounts.cantrip}/{spellLimits.cantrip || 0}
-              </span>
-            </div>
-            {['level1', 'level2', 'level3', 'level4', 'level5', 'level6', 'level7', 'level8', 'level9'].map(levelKey => (
-              <div key={levelKey} className="level-summary-item">
-                <span className="level-label">{levelKey.replace('level', '')}th level:</span>
-                <span className={`level-count ${spellCounts[levelKey] > (spellLimits[levelKey] || 0) ? 'exceeded' : ''}`}>
-                  {spellCounts[levelKey] || 0}/{spellLimits[levelKey] || 0}
-                </span>
-              </div>
-            ))}
-          </div>
-            
-            {spellWarnings.length > 0 && <WarningList warnings={spellWarnings} showIcons />}
-        </div>
-    );
-
-   // Filter configuration
+    // Filter configuration
   const filters = [
     {
       label: 'Spell Level',
