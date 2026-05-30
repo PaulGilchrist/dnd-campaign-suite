@@ -475,7 +475,32 @@
       "rotation": 90
     }
   ],
-  "players": [],
+  "players": [
+    {
+      "id": "arjhan",
+      "name": "Arjhan",
+      "gridX": 11,
+      "gridY": 17
+    },
+    {
+      "id": "selthara",
+      "name": "Selthara",
+      "gridX": 10,
+      "gridY": 17
+    },
+    {
+      "id": "seris",
+      "name": "Seris",
+      "gridX": 11,
+      "gridY": 18
+    },
+    {
+      "id": "zivri",
+      "name": "Zivri",
+      "gridX": 10,
+      "gridY": 18
+    }
+  ],
   "zoom": 1,
   "panX": 0,
   "panY": 0,

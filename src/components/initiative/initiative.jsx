@@ -210,8 +210,50 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         }).catch(() => {});
     }, [campaignName]);
 
+    const handleOverlayEvent = React.useCallback((event) => {
+        if (!event || !event.key || !event.key.startsWith('spell-overlay-')) return;
+        if (event.key !== `spell-overlay-${campaignName}`) return;
+        const { action, overlays: newOverlays, overlayId } = event.data || {};
+        switch (action) {
+            case 'add':
+                if (newOverlays?.length) {
+                    setOverlays(prev => {
+                        const existingIds = new Set(prev.map(o => o.id));
+                        const unique = newOverlays.filter(n => !existingIds.has(n.id));
+                        return unique.length ? [...prev, ...unique] : prev;
+                    });
+                }
+                break;
+            case 'update':
+                if (newOverlays?.length) {
+                    setOverlays(prev => prev.map(o => {
+                        const replacement = newOverlays.find(n => n.id === o.id);
+                        return replacement || o;
+                    }));
+                }
+                break;
+            case 'remove':
+                if (overlayId) {
+                    setOverlays(prev => prev.filter(o => o.id !== overlayId));
+                }
+                break;
+            case 'clear':
+                setOverlays([]);
+                break;
+            default:
+                break;
+        }
+    }, [campaignName]);
+
     const handleEvent = React.useCallback((event) => {
         if (event.key == null || event.data == null) return;
+
+        // Handle spell overlay events
+        if (event.key.startsWith('spell-overlay-')) {
+            handleOverlayEvent(event);
+            return;
+        }
+
         if (!event.key.startsWith(`change-${campaignName}-`)) return;
 
         const dataKey = event.key.slice(`change-${campaignName}-`.length);

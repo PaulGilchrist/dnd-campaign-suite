@@ -867,7 +867,32 @@
       "rotation": 180
     }
   ],
-  "players": [],
+  "players": [
+    {
+      "id": "elarielle",
+      "name": "Elarielle",
+      "gridX": 15,
+      "gridY": 1
+    },
+    {
+      "id": "grommok",
+      "name": "Grommok",
+      "gridX": 13,
+      "gridY": 3
+    },
+    {
+      "id": "liora",
+      "name": "Liora",
+      "gridX": 15,
+      "gridY": 3
+    },
+    {
+      "id": "vexiron",
+      "name": "Vexiron",
+      "gridX": 13,
+      "gridY": 1
+    }
+  ],
   "zoom": 1,
   "panX": 0,
   "panY": 0,

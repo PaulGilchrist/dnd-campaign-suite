@@ -1,5 +1,6 @@
 {
   "type": "outdoor",
+  "displayName": "Chult Jungle",
   "gridSize": 30,
   "terrain": {
     "0,0": "water",
@@ -1910,6 +1911,5 @@
     "encounterMod": 20,
     "description": "Thunderstorm — terrain costs +50%, visibility limited, daily budget -25%"
   },
-  "displayName": "Chult Jungle",
-  "name": "chult-jungle"
+  "travelState": null
 }
