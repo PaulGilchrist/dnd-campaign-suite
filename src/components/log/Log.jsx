@@ -13,6 +13,8 @@ function getRollIconType(rollType) {
     case 'spell_attack': return 'fa-wand-magic-sparkles';
     case 'save': return 'fa-shield-halved';
     case 'condition-save': return 'fa-shield-halved';
+    case 'save-damage': return 'fa-shield-halved';
+    case 'aoe-damage': return 'fa-wand-magic-sparkles';
     case 'initiative': return 'fa-bolt';
     case 'damage': return 'fa-skull';
     default: return 'fa-dice-d20';
@@ -21,7 +23,9 @@ function getRollIconType(rollType) {
 
 function RollEntry({ entry }) {
   const isDamage = entry.rollType === 'damage';
-  const showBothDice = !isDamage && entry.rolls?.length === 2;
+  const isSaveDamage = entry.rollType === 'save-damage';
+  const isAoeDamage = entry.rollType === 'aoe-damage';
+  const showBothDice = !isDamage && !isSaveDamage && !isAoeDamage && entry.rolls?.length === 2;
 
   return (
     <div className={`log-entry log-roll${entry.isNatural20 ? ' log-nat20' : ''}${entry.isNatural1 ? ' log-nat1' : ''}`}>
@@ -32,8 +36,11 @@ function RollEntry({ entry }) {
         <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
       </div>
       <div className="log-roll-details">
-        {entry.targetName && (
+        {entry.targetName && !isSaveDamage && !isAoeDamage && (
           <span className="log-target">→ {entry.targetName}</span>
+        )}
+        {entry.targetName && isSaveDamage && (
+          <span className="log-target">{entry.targetName}</span>
         )}
         {entry.hit !== undefined && (
           <span className={`log-hit-miss ${entry.hit ? 'log-hit' : 'log-miss'}`}>
@@ -47,21 +54,41 @@ function RollEntry({ entry }) {
         )}
         {entry.isNatural20 && <span className="log-nat-badge log-nat20">NAT 20</span>}
         {entry.isNatural1 && <span className="log-nat-badge log-nat1">FUMBLE</span>}
-        {entry.damageType && (
+        {entry.damageType && (isDamage || isSaveDamage || isAoeDamage) && (
           <span className="log-damage-type">{entry.damageType}</span>
         )}
+        {(isSaveDamage || isAoeDamage) && entry.saveType && entry.saveDc && (
+          <span className="log-save-info">
+            {entry.saveType.toUpperCase()} save DC {entry.saveDc}
+          </span>
+        )}
+        {isSaveDamage && entry.saveResult && (
+          <span className={`log-save-result ${entry.saveResult === 'success' ? 'log-condition-success' : 'log-condition-failure'}`}>
+            {entry.saveResult === 'success' ? 'SAVE SUCCESS' : 'SAVE FAILURE'}
+            {entry.saveRoll != null && ` (d20 ${entry.saveRoll}${entry.saveBonus != null ? `+${entry.saveBonus}` : ''})`}
+          </span>
+        )}
+        {isSaveDamage && entry.targetName && (
+          <span className="log-target">vs {entry.targetName}</span>
+        )}
         <div className="log-dice-values">
-          {!isDamage && (
+          {!isDamage && !isSaveDamage && !isAoeDamage && (
             <>
               <span className={`log-die${entry.rolls[0] === entry.total ? ' log-die-selected' : ''}`}>({entry.rolls[0]})</span>
               <span className={`log-die${entry.rolls[1] === entry.total ? ' log-die-selected' : ''}`}>({entry.rolls[1]})</span>
             </>
           )}
-          {isDamage && (
+          {(isDamage || isSaveDamage || isAoeDamage) && entry.formula && (
             <span className="log-dice-formula">{entry.formula}</span>
           )}
-          <span className="log-total"><b>{entry.total}{isDamage ? '' : (entry.bonus >= 0 ? `+${entry.bonus}` : `${entry.bonus}`)}</b></span>
+          <span className="log-total"><b>{entry.total}{isDamage ? '' : (isSaveDamage || isAoeDamage) ? '' : (entry.bonus >= 0 ? `+${entry.bonus}` : `${entry.bonus}`)}</b></span>
         </div>
+        {isSaveDamage && entry.finalDamage != null && entry.damageType && (
+          <span className="log-final-damage">→ {entry.finalDamage} {entry.damageType} damage</span>
+        )}
+        {isAoeDamage && entry.affectedCount != null && entry.affectedCount > 0 && (
+          <span className="log-aoe-affect">{entry.affectedCount} creature{entry.affectedCount !== 1 ? 's' : ''} affected</span>
+        )}
         {entry.condition && entry.dc !== undefined && (
           <span className={`log-condition-save ${entry.success ? 'log-condition-success' : 'log-condition-failure'}`}>
             vs {entry.condition} (DC {entry.dc}): {entry.success ? 'SUCCESS' : 'FAILURE'}

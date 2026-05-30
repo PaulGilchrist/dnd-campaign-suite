@@ -30,6 +30,13 @@
   color: var(--color-link);
 }
 
+.sp-queue-info {
+  font-size: 0.75em;
+  font-weight: normal;
+  opacity: 0.7;
+  margin-left: 8px;
+}
+
 .sp-header i {
   margin-right: 8px;
 }
@@ -94,4 +101,45 @@
 
 .sp-dismiss-btn:hover {
   opacity: 0.8;
+}
+
+.sp-result {
+  margin: 16px 0;
+  padding: 14px;
+  border-radius: 8px;
+}
+
+.sp-result-success {
+  background-color: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.sp-result-fail {
+  background-color: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.sp-result-label {
+  font-size: 1.15em;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.sp-result-success .sp-result-label {
+  color: #22c55e;
+}
+
+.sp-result-fail .sp-result-label {
+  color: #ef4444;
+}
+
+.sp-result-total {
+  font-size: 1.05em;
+  margin: 4px 0;
+}
+
+.sp-result-breakdown {
+  font-size: 0.85em;
+  opacity: 0.7;
+  margin: 4px 0;
 }

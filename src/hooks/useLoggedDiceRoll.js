@@ -28,7 +28,6 @@ function getCombatSummary() {
 
 export default function useLoggedDiceRoll(characterName, campaignName) {
   const { popupHtml, setPopupHtml } = useDiceRoll();
-  const pendingSavesRef = {};
 
   if (!window.__pendingSaves) window.__pendingSaves = {};
   const pendingSaves = window.__pendingSaves;
@@ -52,6 +51,28 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
       const applyResult = applyDamageToTarget(
         combatSummary, targetId, finalDamage, [pending.damageType], pending.campaignName
       );
+
+      logEntry({
+        type: 'roll',
+        characterName: pending.attackerName || characterName,
+        rollType: 'save-damage',
+        name: pending.name,
+        formula: pending.formula,
+        rolls: pending.rolls,
+        total: pending.rawDamage,
+        modifier: pending.modifier,
+        damageType: pending.damageType,
+        targetName: e.detail.targetName,
+        saveType: e.detail.saveType,
+        saveDc: e.detail.saveDc,
+        dcSuccess: e.detail.dcSuccess,
+        saveResult: e.detail.success ? 'success' : 'failure',
+        saveRoll: e.detail.roll,
+        saveBonus: e.detail.saveBonus,
+        finalDamage: applyResult?.finalDamage ?? finalDamage,
+        isAoe: pending.isAoe || false,
+        aoeAffectedCount: pending.isAoe ? (e.detail.aoeAffectedCount || null) : null,
+      });
 
       delete window.__pendingSaves[e.detail.promptId];
 
