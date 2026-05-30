@@ -101,7 +101,8 @@ function SavePromptModal({ campaignName, characters }) {
           }}
         />
       )}
-      <div className="sp-overlay" onClick={handleDismiss}>
+      {prompt && (
+        <div className="sp-overlay" onClick={handleDismiss}>
           <div className="sp-modal" onClick={e => e.stopPropagation()}>
             <div className="sp-header">
               <i className="fa-solid fa-shield-halved"></i> Saving Throw Required

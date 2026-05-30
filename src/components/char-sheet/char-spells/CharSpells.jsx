@@ -32,6 +32,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
             const target = getCombatTargetInfo();
             const context = {
                 targetId: target?.id,
+                targetName: target?.name,
                 attackerName: playerStats.name,
             };
             if (spell.dc) {

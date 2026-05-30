@@ -764,10 +764,13 @@ describe('CharSpells', () => {
     expect(mockRollDamage).toHaveBeenCalled();
     const args = mockRollDamage.mock.calls[0];
     expect(args[0]).toBe('Sacred Flame');
-    expect(args[5]).toEqual({
+    expect(args[5]).toMatchObject({
       dc: 14,
       dcType: 'DEX',
       dcSuccess: 'none',
+      saveDc: 14,
+      saveType: 'DEX',
+      attackerName: 'Test Character',
     });
   });
 
