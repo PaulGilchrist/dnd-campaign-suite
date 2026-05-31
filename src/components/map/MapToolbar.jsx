@@ -73,6 +73,12 @@ const MapToolbar = ({
                             >
                                 <i className="fa-solid fa-arrow-pointer"></i> Select
                             </button>
+                            <button
+                                className={tool === 'room' ? 'active' : ''}
+                                onClick={() => setTool(tool === 'room' ? 'none' : 'room')}
+                            >
+                                <i className="fa-solid fa-vector-square"></i> Room
+                            </button>
                         </>
                     )}
                     <button

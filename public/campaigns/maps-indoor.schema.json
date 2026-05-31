@@ -165,6 +165,60 @@
                 "pattern": "^\\d+,\\d+$"
             },
             "description": "Array of 'x,y' strings for fog-of-war cells"
+        },
+        "rooms": {
+            "type": "array",
+            "description": "Persistent room metadata for room-aware operations",
+            "items": {
+                "type": "object",
+                "required": ["id", "rect"],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "description": "Unique room identifier"
+                    },
+                    "rect": {
+                        "type": "object",
+                        "required": ["x", "y", "w", "h"],
+                        "properties": {
+                            "x": { "type": "integer" },
+                            "y": { "type": "integer" },
+                            "w": { "type": "integer", "minimum": 1 },
+                            "h": { "type": "integer", "minimum": 1 }
+                        },
+                        "description": "Bounding rectangle of the room"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": ["entrance", "common", "utility", "private", "grand", "hall", "passage"],
+                        "description": "Room type for furnishing and labeling"
+                    },
+                    "label": {
+                        "type": "string",
+                        "description": "Human-readable room label (e.g. 'Throne Room')"
+                    },
+                    "connectedTo": {
+                        "type": "array",
+                        "items": { "type": "integer" },
+                        "description": "IDs of rooms directly connected to this room"
+                    },
+                    "vertices": {
+                        "type": "array",
+                        "description": "Future: polygon vertices for irregular room shapes (replaces rect when set)",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "x": { "type": "number" },
+                                "y": { "type": "number" }
+                            }
+                        }
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "DM notes attached to this room"
+                    }
+                }
+            }
         }
     }
 }

@@ -678,6 +678,75 @@
     user-select: none;
 }
 
+/* Room draw preview */
+.map .room-draw-preview {
+    fill: rgba(74, 144, 217, 0.12);
+    stroke: #4a90d9;
+    stroke-width: 2;
+    stroke-dasharray: 8 4;
+    pointer-events: none;
+}
+
+/* Room highlights */
+.map .room-highlight {
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+    pointer-events: none;
+}
+
+.map .room-selected {
+    stroke-width: 2;
+    stroke-dasharray: none;
+}
+
+/* Per-type room colors */
+.map .room-type-entrance { stroke: #4caf50; fill: rgba(76, 175, 80, 0.08); }
+.map .room-type-common { stroke: #4a90d9; fill: rgba(74, 144, 217, 0.08); }
+.map .room-type-utility { stroke: #ff9800; fill: rgba(255, 152, 0, 0.08); }
+.map .room-type-private { stroke: #ce93d8; fill: rgba(206, 147, 216, 0.08); }
+.map .room-type-grand { stroke: #ffd700; fill: rgba(255, 215, 0, 0.08); }
+.map .room-type-hall { stroke: #4dd0e1; fill: rgba(77, 208, 225, 0.08); }
+
+.map .room-highlight.room-selected.room-type-entrance { stroke: #4caf50; fill: rgba(76, 175, 80, 0.15); }
+.map .room-highlight.room-selected.room-type-common { stroke: #4a90d9; fill: rgba(74, 144, 217, 0.15); }
+.map .room-highlight.room-selected.room-type-utility { stroke: #ff9800; fill: rgba(255, 152, 0, 0.15); }
+.map .room-highlight.room-selected.room-type-private { stroke: #ce93d8; fill: rgba(206, 147, 216, 0.15); }
+.map .room-highlight.room-selected.room-type-grand { stroke: #ffd700; fill: rgba(255, 215, 0, 0.15); }
+.map .room-highlight.room-selected.room-type-hall { stroke: #4dd0e1; fill: rgba(77, 208, 225, 0.15); }
+
+/* Room label */
+.map .room-label {
+    fill: rgba(255, 255, 255, 0.45);
+    font-size: 10px;
+    font-family: Arial, sans-serif;
+    font-weight: bold;
+    pointer-events: none;
+    user-select: none;
+    text-anchor: middle;
+    dominant-baseline: central;
+}
+
+/* Room hit area (clickable overlay) */
+.map .room-hit-area {
+    cursor: pointer;
+}
+
+[data-theme="light"] .map .room-highlight {
+}
+
+[data-theme="light"] .map .room-label {
+    fill: rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-color-scheme: light) {
+    .map .room-highlight {
+    }
+
+    .map .room-label {
+        fill: rgba(0, 0, 0, 0.35);
+    }
+}
+
 /* Selection group overlay styles */
 .map .selection-preview {
     fill: rgba(74, 144, 217, 0.15);

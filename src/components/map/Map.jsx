@@ -81,10 +81,14 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const mapDataRef = useRef(null);
     const selectionBoundsRef = useRef(null);
     const lastSavedWallsRef = useRef(null);
-    // Tool state: 'none' | 'paint' | 'erase' | 'select'
+    // Tool state: 'none' | 'paint' | 'erase' | 'select' | 'room'
     const [tool, setTool] = useState('none');
     // Paint state: tracks grid coords during active paint/erase
     const [painting, setPainting] = useState(null);
+    // Room draw state
+    const [roomDrawStart, setRoomDrawStart] = useState(null);
+    const [roomDrawRect, setRoomDrawRect] = useState(null);
+    const [selectedRoom, setSelectedRoom] = useState(null);
     const [panning, setPanning] = useState(null); // { startX, startY, startPanX, startPanY }
 
     // Ruler state
@@ -263,6 +267,174 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         if (svg) svg.releasePointerCapture(e.pointerId);
         setPainting(null);
     }, []);
+
+    // ---- Room drawing tool ----
+    const handleRoomPointerDown = useCallback((e) => {
+        if (!isLocalhost || tool !== 'room') return;
+        e.preventDefault();
+        const svg = svgRef.current;
+        if (svg) svg.setPointerCapture(e.pointerId);
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+        setRoomDrawStart(grid);
+        setRoomDrawRect({ minX: grid.gridX, maxX: grid.gridX, minY: grid.gridY, maxY: grid.gridY });
+        setSelectedRoom(null);
+    }, [isLocalhost, tool, getGridFromEvent]);
+
+    const handleRoomPointerMove = useCallback((e) => {
+        if (!isLocalhost || tool !== 'room' || !roomDrawStart) return;
+        e.preventDefault();
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+        const minX = Math.min(roomDrawStart.gridX, grid.gridX);
+        const maxX = Math.max(roomDrawStart.gridX, grid.gridX);
+        const minY = Math.min(roomDrawStart.gridY, grid.gridY);
+        const maxY = Math.max(roomDrawStart.gridY, grid.gridY);
+        setRoomDrawRect({ minX, maxX, minY, maxY });
+    }, [isLocalhost, tool, roomDrawStart, getGridFromEvent]);
+
+    const handleRoomPointerUp = useCallback((e) => {
+        if (!isLocalhost || tool !== 'room' || !roomDrawStart || !roomDrawRect) {
+            setRoomDrawStart(null);
+            setRoomDrawRect(null);
+            return;
+        }
+        const svg = svgRef.current;
+        if (svg) svg.releasePointerCapture(e.pointerId);
+
+        const { minX, maxX, minY, maxY } = roomDrawRect;
+        const w = maxX - minX + 1;
+        const h = maxY - minY + 1;
+        if (w < 3 || h < 3) {
+            // Too small — ignore
+            setRoomDrawStart(null);
+            setRoomDrawRect(null);
+            return;
+        }
+
+        setMapData((prev) => {
+            const newWalls = new Set(prev.walls);
+            const gridSize = prev.gridSize || 30;
+
+            // Step 1: Carve floor cells inside the rect
+            for (let y = minY; y <= maxY; y++) {
+                for (let x = minX; x <= maxX; x++) {
+                    const key = x + ',' + y;
+                    newWalls.delete(key);
+                }
+            }
+
+            // Step 2: Add wall cells around the perimeter
+            // But skip cells that border existing open space (creates door openings)
+            function hasOpenNeighbor(gx, gy) {
+                const neighbors = [
+                    [gx - 1, gy], [gx + 1, gy],
+                    [gx, gy - 1], [gx, gy + 1],
+                ];
+                for (const [nx, ny] of neighbors) {
+                    if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize) {
+                        if (!newWalls.has(nx + ',' + ny)) return true;
+                    }
+                }
+                return false;
+            }
+
+            // Check if a cell is adjacent to open space OUTSIDE the room rect
+            function hasOutsideOpenNeighbor(gx, gy) {
+                const neighbors = [
+                    [gx - 1, gy], [gx + 1, gy],
+                    [gx, gy - 1], [gx, gy + 1],
+                ];
+                for (const [nx, ny] of neighbors) {
+                    // Only check neighbors outside the room rect
+                    if (nx < minX || nx > maxX || ny < minY || ny > maxY) {
+                        if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize) {
+                            if (!newWalls.has(nx + ',' + ny)) return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            // Top wall
+            for (let x = minX; x <= maxX; x++) {
+                const key = x + ',' + minY;
+                if (!newWalls.has(key) && !hasOpenNeighbor(x, minY)) {
+                    // This is an interior edge — only add wall if no outside open neighbor
+                }
+                if (!hasOutsideOpenNeighbor(x, minY)) {
+                    newWalls.add(key);
+                }
+                // If hasOutsideOpenNeighbor, leave it open (doorway)
+            }
+            // Bottom wall
+            for (let x = minX; x <= maxX; x++) {
+                const key = x + ',' + maxY;
+                if (!hasOutsideOpenNeighbor(x, maxY)) {
+                    newWalls.add(key);
+                }
+            }
+            // Left wall
+            for (let y = minY + 1; y < maxY; y++) {
+                const key = minX + ',' + y;
+                if (!hasOutsideOpenNeighbor(minX, y)) {
+                    newWalls.add(key);
+                }
+            }
+            // Right wall
+            for (let y = minY + 1; y < maxY; y++) {
+                const key = maxX + ',' + y;
+                if (!hasOutsideOpenNeighbor(maxX, y)) {
+                    newWalls.add(key);
+                }
+            }
+
+            // Step 3: Add room to rooms array
+            const newRoom = {
+                id: Date.now(),
+                rect: { x: minX, y: minY, w, h },
+                type: 'common',
+                label: '',
+                connectedTo: [],
+            };
+            const existingRooms = prev.rooms || [];
+
+            return {
+                ...prev,
+                walls: newWalls,
+                rooms: [...existingRooms, newRoom],
+            };
+        });
+
+        setRoomDrawStart(null);
+        setRoomDrawRect(null);
+    }, [isLocalhost, tool, roomDrawStart, roomDrawRect]);
+
+    // Room click detection (select a room by clicking inside its rect)
+    const handleRoomClick = useCallback((e) => {
+        if (!isLocalhost) return;
+        if (tool !== 'none' && tool !== 'select') return;
+        const grid = getGridFromEvent(e);
+        if (!grid) return;
+        const rooms = mapDataRef.current?.rooms || [];
+        if (rooms.length === 0) return;
+
+        // Find the smallest room containing the click point
+        let bestRoom = null;
+        let bestArea = Infinity;
+        for (const room of rooms) {
+            const r = room.rect;
+            if (grid.gridX >= r.x && grid.gridX < r.x + r.w &&
+                grid.gridY >= r.y && grid.gridY < r.y + r.h) {
+                const area = r.w * r.h;
+                if (area < bestArea) {
+                    bestArea = area;
+                    bestRoom = room;
+                }
+            }
+        }
+        setSelectedRoom(bestRoom);
+    }, [isLocalhost, tool, getGridFromEvent]);
 
     // Spell overlay handlers
     const computeAngle = useCallback((originX, originY, cursorX, cursorY) => {
@@ -638,6 +810,10 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             handleSelectPointerDown(e);
             return;
         }
+        if (tool === 'room') {
+            handleRoomPointerDown(e);
+            return;
+        }
         if (e.button !== 0) return;
         e.preventDefault();
         const svg = svgRef.current;
@@ -650,7 +826,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             startPanX: panX,
             startPanY: panY
         });
-    }, [tool, panX, panY, handleGridPointerDown, handleSelectPointerDown, clientToSVG]);
+    }, [tool, panX, panY, handleGridPointerDown, handleSelectPointerDown, handleRoomPointerDown, clientToSVG]);
 
     const handlePanMove = useCallback((e) => {
         if (!panning) return;
@@ -728,7 +904,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 console.log('Map data not found, initializing empty map');
             }
 
-            const newData = { players: [], walls: new Set() };
+            const newData = { players: [], walls: new Set(), rooms: [] };
 
             setMapData(newData);
             // Save initial data
@@ -755,6 +931,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             gridSize,
             walls: Array.from(mapData.walls || []),
             placedItems: placedItems,
+            rooms: mapData.rooms || [],
         };
         lastSavedWallsRef.current = dataToSave.walls;
         mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save map data:', err));
@@ -889,6 +1066,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const handleCloseMenu = useCallback(() => {
         setSelectedItem(null);
         setSelectedPlayer(null);
+        setSelectedRoom(null);
         setRenamePopover(null);
        }, []);
 
@@ -978,15 +1156,15 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 viewBox={`${panX} ${panY} ${SVG_SIZE / zoom} ${SVG_SIZE / zoom}`}
                 className="grid-svg"
                 onPointerDown={(e) => { handleSpellPointerDown(e); handleRulerPointerDown(e); handlePanStart(e); }}
-                onPointerMove={(e) => { handlePointerMove(e); handleItemPointerMove(e); handleGridPointerMove(e); handleSelectPointerMove(e); handlePanMove(e); handleSpellPointerMove(e); handleSpellDragMove(e); handleRulerPointerMove(e); }}
-                onPointerUp={(e) => { handlePointerUp(e); handleItemPointerUpHook(e); handleGridPointerUp(e); handleSelectPointerUp(e); handlePanEnd(e); handleSpellPointerUp(e); handleSpellDragEnd(e); handleRulerPointerUp(e); }}
+                onPointerMove={(e) => { handlePointerMove(e); handleItemPointerMove(e); handleGridPointerMove(e); handleSelectPointerMove(e); handleRoomPointerMove(e); handlePanMove(e); handleSpellPointerMove(e); handleSpellDragMove(e); handleRulerPointerMove(e); }}
+                onPointerUp={(e) => { handlePointerUp(e); handleItemPointerUpHook(e); handleGridPointerUp(e); handleSelectPointerUp(e); handleRoomPointerUp(e); handlePanEnd(e); handleSpellPointerUp(e); handleSpellDragEnd(e); handleRulerPointerUp(e); }}
                 onPointerLeave={(e) => { handleItemPointerLeave(); handleGridPointerLeave(e); handleSelectPointerUp(e); }}
                 onWheel={handleWheel}
                 onContextMenu={(e) => e.preventDefault()}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
-                onClick={(e) => { if (e.button === 0) handleCloseMenu(); }}
-                style={{ cursor: panning ? 'grabbing' : rulerMode ? 'crosshair' : (tool === 'none' ? 'grab' : tool === 'select' ? (moveOffset ? 'grabbing' : 'crosshair') : 'default') }}
+                onClick={(e) => { if (e.button === 0) handleCloseMenu(); handleRoomClick(e); }}
+                style={{ cursor: panning ? 'grabbing' : rulerMode ? 'crosshair' : (tool === 'none' ? 'grab' : tool === 'select' ? (moveOffset ? 'grabbing' : 'crosshair') : tool === 'room' ? 'crosshair' : 'default') }}
             >
                 <defs>
                     <BarrelSVG id="barrel" />
@@ -1068,6 +1246,58 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                         />
                     );
                 })()}
+
+                {/* Room draw preview */}
+                {roomDrawRect && (() => {
+                    const { minX, maxX, minY, maxY } = roomDrawRect;
+                    return (
+                        <rect
+                            x={minX * CELL_SIZE}
+                            y={minY * CELL_SIZE}
+                            width={(maxX - minX + 1) * CELL_SIZE}
+                            height={(maxY - minY + 1) * CELL_SIZE}
+                            className="room-draw-preview"
+                        />
+                    );
+                })()}
+
+                {/* Room highlights and labels */}
+                {(mapData?.rooms || []).map(room => {
+                    const r = room.rect;
+                    const isSelected = selectedRoom && selectedRoom.id === room.id;
+                    const typeClass = 'room-type-' + (room.type || 'common');
+                    return (
+                        <g key={'room-' + room.id}>
+                            <rect
+                                x={r.x * CELL_SIZE}
+                                y={r.y * CELL_SIZE}
+                                width={r.w * CELL_SIZE}
+                                height={r.h * CELL_SIZE}
+                                className={`room-highlight ${typeClass} ${isSelected ? 'room-selected' : ''}`}
+                            />
+                            {/* Invisible hit area for click/hover */}
+                            {(tool === 'none' || tool === 'select') && (
+                                <rect
+                                    x={r.x * CELL_SIZE}
+                                    y={r.y * CELL_SIZE}
+                                    width={r.w * CELL_SIZE}
+                                    height={r.h * CELL_SIZE}
+                                    fill="transparent"
+                                    className="room-hit-area"
+                                />
+                            )}
+                            <text
+                                x={(r.x + r.w / 2) * CELL_SIZE}
+                                y={(r.y + r.h / 2) * CELL_SIZE}
+                                className="room-label"
+                                textAnchor="middle"
+                                dominantBaseline="central"
+                            >
+                                {room.label || room.type || 'common'}
+                            </text>
+                        </g>
+                    );
+                })}
 
                 {/* Committed selection outline (solid rect) */}
                 {!selectStart.current && !moveStartGrid.current && (selectedWalls.size > 0 || selectedItems.size > 0) && (() => {
@@ -1171,6 +1401,86 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                       onRenameClicked={handleRenameClicked}
                      onClose={handleCloseMenu}
                     />
+
+                {/* Room context menu */}
+                {selectedRoom && isLocalhost && (() => {
+                    const r = selectedRoom.rect;
+                    const menuX = Math.min((r.x + r.w) * CELL_SIZE + 10, gridSize * CELL_SIZE - 140);
+                    const menuY = r.y * CELL_SIZE;
+                    const roomTypes = ['entrance', 'common', 'utility', 'private', 'grand', 'hall'];
+                    return (
+                        <g className="item-context-menu" onClick={(e) => e.stopPropagation()}>
+                            <g>
+                                <rect x={menuX} y={menuY} width="130" height={72 + roomTypes.length * 20} rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
+                                <text x={menuX + 8} y={menuY + 16} fill="#e0e0e0" fontSize="11" fontWeight="bold">Room</text>
+                                <text
+                                    x={menuX + 8}
+                                    y={menuY + 34}
+                                    fill="#ccc"
+                                    fontSize="11"
+                                    className="menu-option"
+                                    onClick={() => {
+                                        const label = prompt('Room label:', selectedRoom.label || '');
+                                        if (label !== null) {
+                                            setMapData(prev => ({
+                                                ...prev,
+                                                rooms: (prev.rooms || []).map(rr =>
+                                                    rr.id === selectedRoom.id ? { ...rr, label } : rr
+                                                ),
+                                            }));
+                                        }
+                                        setSelectedRoom(null);
+                                    }}
+                                >
+                                    Set Label...
+                                </text>
+                                {roomTypes.map((type, i) => {
+                                    const colorMap = { entrance: '#4caf50', common: '#4a90d9', utility: '#ff9800', private: '#ce93d8', grand: '#ffd700', hall: '#4dd0e1' };
+                                    return (
+                                        <g key={type} style={{ cursor: 'pointer' }} onClick={() => {
+                                            setMapData(prev => ({
+                                                ...prev,
+                                                rooms: (prev.rooms || []).map(rr =>
+                                                    rr.id === selectedRoom.id ? { ...rr, type } : rr
+                                                ),
+                                            }));
+                                            setSelectedRoom(null);
+                                        }}>
+                                            <rect x={menuX + 8} y={menuY + 52 + i * 20 - 6} width={8} height={8} rx={2} fill={colorMap[type] || '#888'} />
+                                            <text
+                                                x={menuX + 20}
+                                                y={menuY + 52 + i * 20}
+                                                fill={selectedRoom.type === type ? '#fff' : '#ccc'}
+                                                fontSize="11"
+                                                fontWeight={selectedRoom.type === type ? 'bold' : 'normal'}
+                                                className="menu-option"
+                                            >
+                                                {type.charAt(0).toUpperCase() + type.slice(1)}
+                                            </text>
+                                        </g>
+                                    );
+                                })}
+                                <text
+                                    x={menuX + 8}
+                                    y={menuY + 52 + roomTypes.length * 20}
+                                    fill="#e74c3c"
+                                    fontSize="11"
+                                    className="menu-option"
+                                    onClick={() => {
+                                        setMapData(prev => ({
+                                            ...prev,
+                                            rooms: (prev.rooms || []).filter(rr => rr.id !== selectedRoom.id),
+                                        }));
+                                        setSelectedRoom(null);
+                                    }}
+                                >
+                                    Delete Room
+                                </text>
+                                <text x={menuX + 118} y={menuY + 14} fill="#999" fontSize="10" className="menu-close" onClick={() => setSelectedRoom(null)}>✕</text>
+                            </g>
+                        </g>
+                    );
+                })()}
 
                 {/* Player context menu */}
                 {selectedPlayer && (() => {

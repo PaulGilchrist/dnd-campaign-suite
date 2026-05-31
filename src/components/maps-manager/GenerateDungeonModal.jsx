@@ -1,7 +1,25 @@
 import { useState } from 'react';
-import { generateDungeon } from '../../services/dungeonGenerator.js';
+import { generateDungeon, generateAdjacentDungeon } from '../../services/dungeonGenerator.js';
 import * as mapsService from '../../services/mapsService.js';
 import './GenerateDungeonModal.css';
+
+const MODE_OPTIONS = [
+    { value: 'bsp', label: 'BSP Dungeon', icon: 'fa-solid fa-grid-2' },
+    { value: 'adjacent', label: 'Room Adjacent', icon: 'fa-solid fa-layer-group' },
+];
+
+const LAYOUT_OPTIONS = [
+    { value: 'balanced', label: 'Balanced' },
+    { value: 'linear', label: 'Linear' },
+    { value: 'forking', label: 'Forking' },
+    { value: 'winding', label: 'Winding' },
+];
+
+const CORRIDOR_OPTIONS = [
+    { value: 'compact', label: 'Compact (rooms adjacent)' },
+    { value: 'moderate', label: 'Moderate' },
+    { value: 'sprawling', label: 'Sprawling (long halls)' },
+];
 
 function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCreated }) {
     const [mapName, setMapName] = useState(initialMapName || '');
@@ -10,6 +28,14 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
     const [seed, setSeed] = useState('');
     const [generating, setGenerating] = useState(false);
     const [error, setError] = useState(null);
+
+    // Mode
+    const [mode, setMode] = useState('bsp');
+    // Adjacent-mode controls
+    const [roomCount, setRoomCount] = useState(8);
+    const [roomSize, setRoomSize] = useState('standard'); // 'cramped' | 'standard' | 'spacious'
+    const [corridorLength, setCorridorLength] = useState('compact');
+    const [layoutStyle, setLayoutStyle] = useState('balanced');
 
     const handleGenerate = async () => {
         const name = mapName.trim();
@@ -27,11 +53,29 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
 
         try {
             const seedValue = seed ? parseInt(seed, 10) : Math.floor(Math.random() * 2147483647);
-            const result = generateDungeon({
-                gridSize: safeGridSize,
-                density: density / 100,
-                seed: seedValue,
-            });
+
+            let result;
+            if (mode === 'adjacent') {
+                const sizeMultiplier = roomSize === 'cramped' ? 0.7 : roomSize === 'spacious' ? 1.3 : 1;
+                const baseMinRoom = Math.max(4, Math.floor(safeGridSize / 8));
+                const baseMaxRoom = Math.max(8, Math.min(18, Math.floor(safeGridSize / 2.5)));
+                result = generateAdjacentDungeon({
+                    gridSize: safeGridSize,
+                    density: density / 100,
+                    seed: seedValue,
+                    roomCount: roomCount,
+                    corridorLength: corridorLength,
+                    layoutStyle: layoutStyle,
+                    minRoom: Math.max(3, Math.floor(baseMinRoom * sizeMultiplier)),
+                    maxRoom: Math.max(6, Math.floor(baseMaxRoom * sizeMultiplier)),
+                });
+            } else {
+                result = generateDungeon({
+                    gridSize: safeGridSize,
+                    density: density / 100,
+                    seed: seedValue,
+                });
+            }
 
             const { name: generatedName, ...mapData } = result;
             void generatedName;
@@ -65,36 +109,129 @@ function GenerateDungeonModal({ campaignName, initialMapName, onClose, onMapCrea
                         />
                     </label>
 
-                    <label className="dungeon-gen-field">
-                        <span>Grid Size</span>
-                        <input
-                            type="number"
-                            min={7}
-                            max={100}
-                            value={gridSize}
-                            onChange={e => setGridSize(Number(e.target.value))}
-                        />
-                        <span className="dungeon-gen-hint">
-                            {gridSize} ft &times; {gridSize} ft ({gridSize} squares)
-                        </span>
-                    </label>
+                    {/* Mode selector */}
+                    <div className="dungeon-gen-mode-selector">
+                        <span className="dungeon-gen-field-label">Generation Mode</span>
+                        <div className="dungeon-gen-mode-options">
+                            {MODE_OPTIONS.map(opt => (
+                                <button
+                                    key={opt.value}
+                                    className={`dungeon-gen-mode-btn ${mode === opt.value ? 'active' : ''}`}
+                                    onClick={() => setMode(opt.value)}
+                                >
+                                    <i className={opt.icon}></i> {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
 
-                    <label className="dungeon-gen-field">
-                        <span>Density: {density}%</span>
-                        <input
-                            type="range"
-                            min={10}
-                            max={100}
-                            step={10}
-                            value={density}
-                            onChange={e => setDensity(Number(e.target.value))}
-                        />
-                        <span className="dungeon-gen-hint">
-                            {density <= 30 ? 'Sparse — wide halls, fewer rooms' :
-                             density <= 60 ? 'Moderate — balanced layout' :
-                             'Dense — many rooms, tight corridors'}
-                        </span>
-                    </label>
+                    {mode === 'bsp' ? (
+                        <>
+                            <label className="dungeon-gen-field">
+                                <span>Grid Size</span>
+                                <input
+                                    type="number"
+                                    min={7}
+                                    max={100}
+                                    value={gridSize}
+                                    onChange={e => setGridSize(Number(e.target.value))}
+                                />
+                                <span className="dungeon-gen-hint">
+                                    {gridSize} ft &times; {gridSize} ft ({gridSize} squares)
+                                </span>
+                            </label>
+
+                            <label className="dungeon-gen-field">
+                                <span>Density: {density}%</span>
+                                <input
+                                    type="range"
+                                    min={10}
+                                    max={100}
+                                    step={10}
+                                    value={density}
+                                    onChange={e => setDensity(Number(e.target.value))}
+                                />
+                                <span className="dungeon-gen-hint">
+                                    {density <= 30 ? 'Sparse — wide halls, fewer rooms' :
+                                     density <= 60 ? 'Moderate — balanced layout' :
+                                     'Dense — many rooms, tight corridors'}
+                                </span>
+                            </label>
+                        </>
+                    ) : (
+                        <>
+                            <label className="dungeon-gen-field">
+                                <span>Grid Size</span>
+                                <input
+                                    type="number"
+                                    min={7}
+                                    max={100}
+                                    value={gridSize}
+                                    onChange={e => setGridSize(Number(e.target.value))}
+                                />
+                                <span className="dungeon-gen-hint">
+                                    {gridSize} ft &times; {gridSize} ft ({gridSize} squares)
+                                </span>
+                            </label>
+
+                            <label className="dungeon-gen-field">
+                                <span>Room Count: {roomCount}</span>
+                                <input
+                                    type="range"
+                                    min={3}
+                                    max={20}
+                                    step={1}
+                                    value={roomCount}
+                                    onChange={e => setRoomCount(Number(e.target.value))}
+                                />
+                            </label>
+
+                            <label className="dungeon-gen-field">
+                                <span>Room Size</span>
+                                <div className="dungeon-gen-option-group">
+                                    {['cramped', 'standard', 'spacious'].map(size => (
+                                        <button
+                                            key={size}
+                                            className={`dungeon-gen-option-btn ${roomSize === size ? 'active' : ''}`}
+                                            onClick={() => setRoomSize(size)}
+                                        >
+                                            {size.charAt(0).toUpperCase() + size.slice(1)}
+                                        </button>
+                                    ))}
+                                </div>
+                            </label>
+
+                            <label className="dungeon-gen-field">
+                                <span>Corridor Length</span>
+                                <div className="dungeon-gen-option-group">
+                                    {CORRIDOR_OPTIONS.map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            className={`dungeon-gen-option-btn ${corridorLength === opt.value ? 'active' : ''}`}
+                                            onClick={() => setCorridorLength(opt.value)}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </label>
+
+                            <label className="dungeon-gen-field">
+                                <span>Layout Style</span>
+                                <div className="dungeon-gen-option-group">
+                                    {LAYOUT_OPTIONS.map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            className={`dungeon-gen-option-btn ${layoutStyle === opt.value ? 'active' : ''}`}
+                                            onClick={() => setLayoutStyle(opt.value)}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </label>
+                        </>
+                    )}
 
                     <label className="dungeon-gen-field">
                         <span>Seed (optional)</span>
