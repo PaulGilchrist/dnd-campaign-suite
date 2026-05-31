@@ -6,6 +6,7 @@ import AvatarModal from '../common/AvatarModal.jsx';
 import { npcHasStatBlock, calculateAbilityModifier } from '../../services/npcStatBlockUtils.js';
 import { rollD20 } from '../../services/diceRoller.js';
 import utils from '../../services/utils.js';
+import { generateNPC } from '../../services/npcGenerator.js';
 import './NPCs.css';
 
 const ABILITY_ABBR = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
@@ -91,6 +92,14 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
 
   const handleNewNPC = () => {
     setFormData(getDefaultFormData());
+    setEditingNPC(null);
+    setActiveTab('roleplay');
+    setModalOpen(true);
+  };
+
+  const handleGenerateNPC = async () => {
+    const generated = await generateNPC(npcs);
+    setFormData(getDefaultFormData(generated));
     setEditingNPC(null);
     setActiveTab('roleplay');
     setModalOpen(true);
@@ -297,6 +306,9 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
         </h2>
         <button className="ct-new-btn" onClick={handleNewNPC}>
           <i className="fa-solid fa-plus" /> New NPC
+        </button>
+        <button className="ct-generate-btn" onClick={handleGenerateNPC}>
+          <i className="fa-solid fa-wand-magic-sparkles" /> Generate NPC
         </button>
       </div>
 

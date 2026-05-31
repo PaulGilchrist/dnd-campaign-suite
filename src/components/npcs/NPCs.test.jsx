@@ -960,7 +960,7 @@ describe('NPCs', () => {
     fireEvent.click(deleteButton);
 
     expect(window.confirm).toHaveBeenCalledWith('Delete this NPC?');
-    expect(mockDelete).toHaveBeenCalledWith('npc-1');
+    expect(mockDelete).toHaveBeenCalledWith('Gandalf');
   });
 
   it('should not call deleteNPCAction when confirm is cancelled', async () => {
