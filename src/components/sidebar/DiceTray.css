@@ -1,0 +1,114 @@
+.dice-tray {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 10px 6px;
+  margin-top: auto;
+  border-top: 1px solid var(--border-color);
+}
+
+.dice-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0px;
+  padding: 4px 6px;
+  min-width: 28px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.dice-btn:hover {
+  background-color: var(--background-color-card-hover);
+  color: var(--color-hover);
+  transform: scale(1.15);
+}
+
+.dice-btn:active {
+  transform: scale(0.95);
+}
+
+.dice-btn:focus-visible {
+  outline: 2px solid var(--border-color-focus);
+  outline-offset: 1px;
+}
+
+.dice-label {
+  font-size: 9px;
+  line-height: 1;
+}
+
+.dice-svg {
+  color: currentColor;
+  width: 26px;
+  height: 26px;
+}
+
+.dice-result-svg {
+  width: 40px;
+  height: 40px;
+}
+
+.dice-btn .fa-solid {
+  font-size: 22px;
+}
+
+.dice-tray-result-icon .fa-solid {
+  font-size: 32px;
+}
+
+.dice-tray-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 180px;
+  width: calc(100vw - 180px);
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.85);
+  z-index: 200;
+}
+
+.dice-tray-popup-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.dice-tray-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 32px;
+  text-align: center;
+  background-color: var(--background-color-card);
+  border-radius: 10px;
+}
+
+.dice-tray-result-icon {
+  color: var(--color-primary);
+}
+
+.dice-tray-result-value {
+  font-size: 2.5em;
+  font-weight: bold;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.dice-tray-result-label {
+  font-size: 0.9em;
+  color: var(--color-text-secondary);
+}
+
+.dice-tray-result-dismiss {
+  font-size: 0.75em;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
