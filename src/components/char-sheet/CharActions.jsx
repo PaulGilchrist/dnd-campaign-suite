@@ -1,4 +1,4 @@
-  
+
 import React, { useState, useEffect } from 'react'
 import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
@@ -8,6 +8,10 @@ import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import { rollExpression, rollExpressionDoubled } from '../../services/diceRoller.js'
 import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetId } from '../../services/damageUtils.js';
+import * as mapsService from '../../services/mapsService.js';
+import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC } from '../../services/rangeValidation.js';
+import { computeFeatRangeEffects } from '../../services/featRangeService.js';
+import { loadNPCs } from '../../services/npcsService.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';
 
@@ -15,8 +19,13 @@ const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats);
 
-const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct }) {
-   const [actions, setActions] = useState([]);
+const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName }) {
+    const [actions, setActions] = useState([]);
+    const [featRangeEffects, setFeatRangeEffects] = useState(null);
+
+    useEffect(() => {
+      computeFeatRangeEffects(playerStats.feats, playerStats.rules).then(setFeatRangeEffects).catch(() => {});
+    }, [playerStats.feats, playerStats.rules]);
 
     useEffect(() => {
       fetch('/data/actions.json')
@@ -49,7 +58,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         return target;
     }, [playerStats.name]);
 
-    const buildAttackContext = React.useCallback((attack) => {
+    const buildAttackContextSync = React.useCallback((attack) => {
         const target = getCombatTargetInfo();
         const cs = getCombatContext();
         const rawTargetId = getAttackerTargetId(cs, playerStats.name);
@@ -69,15 +78,117 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         };
     }, [getCombatTargetInfo, conditionAttackMode, playerStats.name]);
 
+    const buildAttackContext = React.useCallback(async (attack) => {
+        if (!mapName) {
+            return buildAttackContextSync(attack);
+        }
+
+        const base = buildAttackContextSync(attack);
+
+        try {
+            const [mapData, npcs] = await Promise.all([
+              mapsService.loadMapData(campaignName, mapName),
+              loadNPCs(campaignName),
+            ]);
+
+            console.log('[RangeDebug] mapData loaded', { players: mapData?.players?.map(p => p.name), placedNames: mapData?.placedItems?.map(i => i.name).filter(Boolean) });
+
+            const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
+            console.log('[RangeDebug] attackerPlayer', attackerPlayer?.name, attackerPlayer ? `at (${attackerPlayer.gridX},${attackerPlayer.gridY})` : 'NOT FOUND');
+            if (attackerPlayer) {
+              let targetPos = null;
+              const cs = getCombatContext();
+              console.log('[RangeDebug] combatContext', cs ? 'exists' : 'null');
+              if (cs) {
+                const target = getTargetFromAttacker(cs, playerStats.name);
+                console.log('[RangeDebug] target from combat', target?.name, target ? `id=${target.id}` : 'null');
+                if (target) {
+                  const targetPlayer = mapData?.players?.find(p => p.name === target.name);
+                  const targetNpc = mapData?.placedItems?.find(i => i.name === target.name);
+                  console.log('[RangeDebug] targetPlayer match', targetPlayer?.name, 'targetNpc match', targetNpc?.name);
+                  if (targetPlayer) {
+                    targetPos = { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
+                  } else if (targetNpc) {
+                    targetPos = { gridX: targetNpc.gridX, gridY: targetNpc.gridY };
+                  }
+                }
+              }
+              console.log('[RangeDebug] targetPos', targetPos ? `(${targetPos.gridX},${targetPos.gridY})` : 'null');
+
+              const isRanged = attack.range > 5;
+              console.log('[RangeDebug] attack', attack.name, 'range', attack.range, 'isRanged', isRanged);
+              const feats = featRangeEffects || { ignoresMeleeDisadvantage: false, ignoresLongRangeDisadvantage: false, rangeMultiplier: 1, spellRangeBonus: 0 };
+
+              if (targetPos) {
+                const effectiveRange = isRanged ? attack.range + (feats.spellRangeBonus || 0) : attack.range;
+                const distanceFt = getDistanceFeet(
+                  { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
+                  targetPos
+                );
+                console.log('[RangeDebug] distanceFt', distanceFt, 'effectiveRange', effectiveRange);
+                const rangeResult = computeRangeEffect(effectiveRange, distanceFt, feats);
+                console.log('[RangeDebug] rangeResult', rangeResult);
+                if (rangeResult.mode === 'disadvantage') {
+                  base.forcedMode = 'disadvantage';
+                  base.rangeReason = rangeResult.reason;
+                  console.log('[RangeDebug] set forcedMode=disadvantage', rangeResult.reason);
+                } else if (rangeResult.mode === 'miss') {
+                  base.isAutoMiss = true;
+                  base.rangeReason = rangeResult.reason;
+                  base.forcedMode = undefined;
+                  console.log('[RangeDebug] set isAutoMiss=true', rangeResult.reason);
+                }
+              }
+
+              if (isRanged && !base.isAutoMiss) {
+                const nearbyThreats = (mapData?.placedItems || [])
+                  .filter(i => i.type === 'npc')
+                  .map(i => {
+                    const npcData = npcs?.find(n => n.name === i.name || n.name === i.name?.replace(/\s+\d+$/, ''));
+                    return { ...i, attitude: npcData?.attitude };
+                  })
+                  .filter(i => isHostileNPC(i))
+                  .map(i => ({ gridX: i.gridX, gridY: i.gridY, name: i.name }));
+
+                const meleeResult = computeMeleeProximityEffect(true, attackerPlayer, nearbyThreats, feats);
+                if (meleeResult.mode === 'disadvantage' && base.forcedMode !== 'disadvantage') {
+                  base.forcedMode = 'disadvantage';
+                  base.rangeReason = meleeResult.reason;
+                }
+              }
+            }
+          } catch (e) { console.log('[RangeDebug] CATCH - fallback, no range validation', e?.message); }
+
+        console.log('[RangeDebug] returning base', { isAutoMiss: base.isAutoMiss, rangeReason: base.rangeReason, forcedMode: base.forcedMode });
+        return base;
+    }, [buildAttackContextSync, campaignName, mapName, playerStats.name, getCombatContext, getTargetFromAttacker, playerStats.feats, playerStats.rules, featRangeEffects]);
+
     const handleDamageClick = (attack) => {
         const wasCrit = popupHtml?.isCrit;
         if (wasCrit && setPopupHtml) setPopupHtml(null);
         const result = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
         if (result) {
-            const ctx = buildAttackContext(attack);
-            rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier, ctx);
+            if (!mapName) {
+              rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier, buildAttackContextSync(attack));
+            } else {
+              buildAttackContext(attack).then(ctx => {
+                rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier, ctx);
+              }).catch(() => {});
+            }
         }
     };
+
+    const handleAttackClick = React.useCallback((attack) => {
+      if (cannotAct) return;
+      if (!mapName) {
+        const ctx = buildAttackContextSync(attack);
+        rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, ctx);
+      } else {
+        buildAttackContext(attack).then(ctx => {
+          rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, ctx);
+        }).catch(() => {});
+      }
+    }, [cannotAct, mapName, buildAttackContextSync, buildAttackContext, rollAttack, exhaustionPenalty]);
 
     // Helper function to get mastery for a weapon name
     const getWeaponMastery = (weaponName) => {
@@ -117,7 +228,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             <div>{attack.range} ft.</div>
                             {attack.saveDc
                                 ? <div className="save-dc-display">DC {attack.saveDc} {attack.saveType}</div>
-                                : <div className={(attack.hitBonusFormula ? "clickable" : "") + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => !cannotAct && rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, buildAttackContext(attack))}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
+                                : <div className={(attack.hitBonusFormula ? "clickable" : "") + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
                             <div className={attack.damage ? "clickable" : ""} onClick={() => !cannotAct && handleDamageClick(attack)}>{attack.damage}</div>
                             <div className='left'>{attack.damageType}</div>
                             {is2024Rules && <div>{getWeaponMastery(attack.name) || ''}</div>}
@@ -156,7 +267,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                 <div>{attack.range} ft.</div>
                             {attack.saveDc
                                 ? <div className="save-dc-display">DC {attack.saveDc} {attack.saveType}</div>
-                                : <div className={(attack.hitBonusFormula ? "clickable" : "") + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => !cannotAct && rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, buildAttackContext(attack))}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
+                                : <div className={(attack.hitBonusFormula ? "clickable" : "") + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
                                 <div className={attack.damage ? "clickable" : ""} onClick={() => !cannotAct && handleDamageClick(attack)}>{attack.damage}</div>
                                 <div className='left'>{attack.damageType}</div>
                                 {is2024Rules && <div>{getWeaponMastery(attack.name) || ''}</div>}

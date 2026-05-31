@@ -17,7 +17,7 @@ import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT }
 import Subscriber from '../common/Subscriber.jsx';
 import './CharSheet.css'
 
-function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName }) {
+function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName }) {
     const [playerStats, setPlayerStats] = React.useState(null);
     const [forceRefresh, setForceRefresh] = React.useState(0);
     const readExhaustionLevel = () => {
@@ -148,13 +148,14 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 conditionEffects={conditionEffects}
               ></CharAbilities><hr />
 
-              <CharActions
-                playerStats={playerStats}
-                campaignName={campaignName}
-                exhaustionPenalty={exhaustionPenalty}
-                conditionAttackMode={conditionAttackMode}
-                cannotAct={cannotAct}
-              ></CharActions><hr />
+               <CharActions
+                 playerStats={playerStats}
+                 campaignName={campaignName}
+                 exhaustionPenalty={exhaustionPenalty}
+                 conditionAttackMode={conditionAttackMode}
+                 cannotAct={cannotAct}
+                 mapName={activeMapName}
+               ></CharActions><hr />
               <CharReactions
                 playerStats={playerStats}
                 campaignName={campaignName}

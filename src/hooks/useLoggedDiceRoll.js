@@ -162,19 +162,21 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       }).catch(() => {});
    }
 
-  function logAndShow(name, bonus, rollType, context) {
-    const r1 = rollD20();
-    const r2 = rollD20();
+    function logAndShow(name, bonus, rollType, context) {
+     const r1 = rollD20();
+     const r2 = rollD20();
 
-    const combatSummary = getCombatSummary();
+     const combatSummary = getCombatSummary();
 
-    const target = combatSummary ? getTargetFromAttacker(combatSummary, utils.getName(characterName)) : null;
+     const target = combatSummary ? getTargetFromAttacker(combatSummary, utils.getName(characterName)) : null;
 
-    const hit = target ? (r1 + bonus >= target.ac) : undefined;
-    const targetName = target?.name || context?.targetName;
-    const targetAc = target?.ac || context?.targetAc;
+     const isAutoMiss = context?.isAutoMiss === true;
 
-     const isCrit = (r1 === 20 || context?.isAutoCrit) && hit;
+     const hit = isAutoMiss ? false : (target ? (r1 + bonus >= target.ac) : undefined);
+     const targetName = target?.name || context?.targetName;
+     const targetAc = target?.ac || context?.targetAc;
+
+      const isCrit = !isAutoMiss && (r1 === 20 || context?.isAutoCrit) && hit;
 
      const autoDamage = hit && context?.autoDamageFormula ? {
        name: context.autoDamageName || name,
@@ -201,20 +203,24 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
          isNatural1: r1 === 1,
          targetName,
          targetAc,
-         damageType: context?.damageType,
+          damageType: context?.damageType,
+          hit,
+          isAutoMiss,
+          rangeReason: context?.rangeReason,
+           resistanceNotice: context?.resistanceNotice
+            });
+      setPopupHtml({
+         type: 'd20',
+         rollType,
+         name,
+         rolls: [r1, r2],
+         bonus,
+         targetName,
+         targetAc,
          hit,
-          resistanceNotice: context?.resistanceNotice
-           });
-     setPopupHtml({
-        type: 'd20',
-        rollType,
-        name,
-        rolls: [r1, r2],
-        bonus,
-        targetName,
-        targetAc,
-        hit,
-        resistanceNotice: context?.resistanceNotice,
+         isAutoMiss,
+         rangeReason: context?.rangeReason,
+         resistanceNotice: context?.resistanceNotice,
         forcedMode: context?.forcedMode,
         isAutoCrit: context?.isAutoCrit,
         isCrit,
@@ -242,8 +248,36 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
      }
 
    function logDamageAndShow(name, formula, total, rolls, modifier, context) {
-      const { saveDc, saveType, dcSuccess, targetId, damageType, attackerName } = context || {};
+      const { saveDc, saveType, dcSuccess, targetId, damageType, attackerName, isAutoMiss, rangeReason } = context || {};
       const combatSummary = getCombatSummary();
+
+      if (isAutoMiss) {
+        logEntry({
+          type: 'roll',
+          characterName,
+          rollType: 'auto-miss-damage',
+          name,
+          formula,
+          rolls,
+          total,
+          modifier,
+          damageType,
+          targetName: context?.targetName,
+          rangeReason,
+        });
+        setPopupHtml({
+          type: 'auto-miss',
+          name,
+          formula,
+          rolls,
+          bonus: 0,
+          modifier,
+          damageType,
+          targetName: context?.targetName,
+          rangeReason,
+        });
+        return;
+      }
 
       if (targetId && targetId.startsWith('overlay-')) {
         const aoeCtx = readAoeContext(campaignName);

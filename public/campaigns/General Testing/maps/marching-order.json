@@ -1,26 +1,26 @@
 {
   "players": [
     {
-      "id": "monk",
-      "name": "Monk",
-      "gridX": 3,
-      "gridY": 6
-    },
-    {
-      "id": "paladin",
-      "name": "Paladin",
+      "id": "arjhan",
+      "name": "Arjhan",
       "gridX": 3,
       "gridY": 0
     },
     {
-      "id": "sorcerer",
-      "name": "Sorcerer",
+      "id": "seris",
+      "name": "Seris",
+      "gridX": 3,
+      "gridY": 6
+    },
+    {
+      "id": "selthara",
+      "name": "Selthara",
       "gridX": 3,
       "gridY": 4
     },
     {
-      "id": "warlock",
-      "name": "Warlock",
+      "id": "zivri",
+      "name": "Zivri",
       "gridX": 3,
       "gridY": 2
     }

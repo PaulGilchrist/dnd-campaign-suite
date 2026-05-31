@@ -2267,7 +2267,11 @@
             "<b>Bypass Cover.</b> Your ranged attacks with weapons ignore Half Cover and Three-Quarters Cover.",
             "<b>Firing in Melee.</b> Being within 5 feet of an enemy doesn't impose Disadvantage on your attack rolls with Ranged weapons.",
             "<b>Long Shots.</b> Attacking at long range doesn't impose Disadvantage on your attack rolls with Ranged weapons."
-        ]
+        ],
+        "rangeEffects": {
+            "ignoresMeleeDisadvantage": true,
+            "ignoresLongRangeDisadvantage": true
+        }
     },
     {
         "name": "Shield Master",
@@ -2606,7 +2610,11 @@
             "<b>Bypass Cover.</b> Your attack rolls for spells ignore Half Cover and Three-Quarters Cover.",
             "<b>Casting in Melee.</b> Being within 5 feet of an enemy doesn't impose Disadvantage on your attack rolls with spells.",
             "<b>Increased Range.</b> When you cast a spell that has a range of at least 10 feet and requires you to make an attack roll, you can increase the spell's range by 60 feet."
-        ]
+        ],
+        "rangeEffects": {
+            "ignoresMeleeDisadvantage": true,
+            "appliesToAttackType": "spell"
+        }
     },
     {
         "name": "Tavern Brawler",
@@ -2979,7 +2987,11 @@
             "<b>Ignore Loading.</b> You ignore the Loading property of the Hand Crossbow, Heavy Crossbow, and Light Crossbow (all called crossbows elsewhere in this feat). If you're holding one of them, you can load a piece of ammunition into it even if you lack a free hand.",
             "<b>Firing in Melee.</b> Being within 5 feet of an enemy doesn't impose Disadvantage on your attack rolls with crossbows.",
             "<b>Dual Wielding.</b> When you make the extra attack of the Light property, you can add your ability modifier to the damage of the extra attack if that attack is with a crossbow that has the Light property and you aren't already adding that modifier to the damage."
-        ]
+        ],
+        "rangeEffects": {
+            "ignoresMeleeDisadvantage": true,
+            "appliesToWeaponType": "crossbow"
+        }
     },
     {
         "name": "Thrown Weapon Fighting",

@@ -291,7 +291,7 @@
     {
       "id": "torch-0-2-9",
       "gridX": 2,
-      "gridY": 9,
+      "gridY": 8,
       "type": "torch",
       "visible": true,
       "rotation": 0
@@ -342,7 +342,7 @@
       "gridY": 8,
       "type": "torch",
       "visible": true,
-      "rotation": 180
+      "rotation": 0
     },
     {
       "id": "crate-3",
@@ -360,11 +360,11 @@
     },
     {
       "id": "torch-5-7-8",
-      "gridX": 7,
-      "gridY": 8,
+      "gridX": 5,
+      "gridY": 10,
       "type": "torch",
       "visible": true,
-      "rotation": 0
+      "rotation": 180
     },
     {
       "id": "chest-5",
@@ -435,13 +435,13 @@
       "gridY": 4,
       "type": "npc",
       "visible": false,
-      "name": "Zombie",
+      "name": "Zombie 2",
       "rotation": 180
     },
     {
       "id": "npc-1",
-      "gridX": 11,
-      "gridY": 9,
+      "gridX": 9,
+      "gridY": 8,
       "type": "npc",
       "visible": false,
       "name": "Skeleton 1",
@@ -450,7 +450,7 @@
     {
       "id": "npc-2",
       "gridX": 16,
-      "gridY": 9,
+      "gridY": 7,
       "type": "npc",
       "visible": false,
       "name": "Skeleton 2",
@@ -462,12 +462,12 @@
       "gridY": 11,
       "type": "npc",
       "visible": false,
-      "name": "Zombie",
+      "name": "Zombie 3",
       "rotation": 0
     },
     {
       "id": "npc-4",
-      "gridX": 14,
+      "gridX": 13,
       "gridY": 9,
       "type": "npc",
       "visible": false,
@@ -479,8 +479,8 @@
     {
       "id": "arjhan",
       "name": "Arjhan",
-      "gridX": 11,
-      "gridY": 17
+      "gridX": 12,
+      "gridY": 11
     },
     {
       "id": "selthara",

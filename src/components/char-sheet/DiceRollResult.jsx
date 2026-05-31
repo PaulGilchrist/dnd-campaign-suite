@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, targetMaxHp, damageReduced, onQuickRoll, autoDamage }) {
+function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, targetMaxHp, damageReduced, onQuickRoll, autoDamage }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
 
     const isD20 = type === 'd20';
@@ -75,19 +75,19 @@ function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier =
                           Disadvantage
                       </label>
                       {forcedMode && (
-                        <span className="badge-toggle forced-mode-badge" title="Automatically set by active conditions">
-                          <i className="fa-solid fa-asterisk"></i> {forcedMode === 'advantage' ? 'Adv' : 'Disadv'} (conditions)
-                        </span>
-                      )}
+                         <span className="badge-toggle forced-mode-badge" title={rangeReason || "Automatically set by active conditions"}>
+                           <i className="fa-solid fa-asterisk"></i> {forcedMode === 'advantage' ? 'Adv' : 'Disadv'} ({rangeReason || 'conditions'})
+                         </span>
+                       )}
                   </div>
               )}
 
             {showCrit && <div className="dice-roll-crit">{isAutoCrit ? 'AUTO-CRIT (target condition)' : 'Critical Hit!'} — damage dice doubled</div>}
-            {targetName && hit !== undefined && !isSaveDamageType && (
-              <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
-                {hit ? '✓ HIT' : '✗ MISS'} ({total} vs AC {targetAc})
-              </div>
-            )}
+             {targetName && hit !== undefined && !isSaveDamageType && (
+               <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
+                 {isAutoMiss ? '✗ AUTO-MISS' : (hit ? '✓ HIT' : '✗ MISS')} {isAutoMiss ? `(${rangeReason || 'out of range'})` : `(${total} vs AC ${targetAc})`}
+               </div>
+             )}
 
             {autoDamage && hit && (
               <div className="dice-roll-auto-damage">

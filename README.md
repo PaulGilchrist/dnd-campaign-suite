@@ -100,11 +100,14 @@ Creating a character doesn't have to be overwhelming. The app guides you step by
 - **Fighting styles** — Choose your fighting style (Fighters, Paladins, Rangers, or as a feat)
 - **Feats** — Select feats with prerequisite validation
 - **Resistances and immunities** — Track damage resistances and immunities
-- **Spell selection** — Choose spells with limits validation
+- **Spell selection** — Choose spells with limits validation; spells granted by subclasses, races, subraces, and feats are auto-assigned
+- **Prepared vs. known spells** — The wizard correctly distinguishes between prepared and known spellcasting, surfacing the right preparation workflow per class and ruleset
 - **Magic items** — Browse, search, and add items with attunement tracking
 - **Inventory** — Gold, backpack, and equipped items
 - **Custom special actions** — Add homebrew features or abilities not in the standard rules
-- **Backgrounds** — Choose your character's background
+- **Backgrounds** — Choose your character's background; granted buffs are auto-integrated into your sheet
+- **Auto-assigned spells** — Spells granted by subclasses, races, subraces, and feats are automatically added to your character
+- **Auto-integrated buffs** — Passive bonuses from races, backgrounds, and feats are automatically applied to your stats
 - **Rules validation** — The app checks your character against the rules and warns you if something doesn't match
 
 <img src="public/character-creation.png" alt="Character Creation" width="800" />
@@ -133,6 +136,7 @@ The app creates **beautiful, well-organized character sheets that fit on a singl
 - **Alignment**, **proficiencies**, and **languages**
 - **Senses** — Darkvision, blindsight, tremorsense, etc.
 - **Resistances, vulnerabilities, and immunities** — At a glance
+- **Auto-integrated buffs** — Passive bonuses from races, backgrounds, and feats are automatically applied to stats (ability scores, saves, AC, HP, skills, etc.)
 
 ### Core Stats (All Calculated Automatically)
 
@@ -169,6 +173,7 @@ The app creates **beautiful, well-organized character sheets that fit on a singl
 ### Death Saving Throws
 
 - **3 success + 3 failure toggles** — Automatically appear when current HP reaches 0 or below
+- **Automatic notification** — Dropping to 0 HP automatically triggers a death saving throw notification with die roller popup
 - **Persistent storage** — Saves and failures stored per character/campaign
 - **Auto-clear on healing** — Death saves reset when HP is restored above 0
 
@@ -196,13 +201,17 @@ The app creates **beautiful, well-organized character sheets that fit on a singl
 - **Spell attack bonus and save DC** — Automatically calculated and displayed
 - **Spell damage rolls** — Clickable damage effects with dice parsing (e.g., "1d8+3 fire")
 - **Spell attack rolls** — Clickable to-hit with d20 and spell attack bonus
+- **Saving throw resolution** — The UI understands saving throw-based spells, showing success/failure results and whether the target takes full damage, half damage, or no damage on a save
+- **Auto-transition to damage** — After a successful hit roll, the damage roll automatically begins — no extra clicks
+- **Concentration saves** — Taking damage while concentrating automatically triggers a Constitution saving throw notification with die roller popup; failed saves break concentration
 
 ### Combat Readiness
 
-- **Actions** — Attacks with hit bonuses, damage, and damage types (click to roll vs target's AC with HIT/MISS determination)
+- **Actions** — Attacks with hit bonuses, damage, and damage types (click to roll vs target's AC with HIT/MISS determination; successful hits auto-advance to damage roll)
 - **Bonus actions** — Clearly separated from regular actions
 - **Reactions** — Opportunity attacks and reaction spells, all clickable to roll
 - **Special actions** — Class features, fighting styles, auto-integrated from rules data (Great Weapon Fighting, Protection), and custom abilities with markdown descriptions
+- **Auto-damage with saving throws** — Dealing damage to a target automatically prompts a saving throw when applicable, with a die roller popup showing full results
 
 ### Short Rest & Long Rest
 
@@ -264,10 +273,11 @@ The built-in dice roller is deeply integrated throughout the app:
 
 - **Click-to-roll everywhere** — Any stat on the character sheet, any attack, any save, any skill
 - **Advantage/Disadvantage toggles** — Two dice pre-rolled; toggle after the fact or forced by conditions
-- **Auto-critical/fumble detection** — Natural 20 triggers "Critical Hit!", natural 1 triggers "Fumble"
-- **Hit/Miss determination** — Attack rolls auto-compare against target's AC
+- **Auto-critical/fumble detection** — Natural 20 triggers "Critical Hit!" with automatic double damage dice, natural 1 triggers "Fumble"
+- **Hit/Miss determination** — Attack rolls auto-compare against target's AC, then auto-transition to damage roll on a hit
 - **Save success/failure** — Saving throws auto-compare against DC
 - **Damage resistance notices** — Cross-references target resistances with damage type
+- **Auto-damage application** — Damage rolls automatically apply with saving throw prompts and die roller popups
 - **Campaign log integration** — Every roll is logged with timestamp, character name, full breakdown
 - **Custom expressions** — Supports dice notation like "2d6+3"
 
@@ -364,6 +374,7 @@ Tactical grid-based dungeon maps with a full suite of editing tools:
 - **Rotate** cone and line overlays by dragging endpoints
 - Controls panel with shape selector, parameters, active overlay list, and clear all
 - **Real-time sync** across all connected clients via SSE with debounced updates during drag
+- **AoE damage detection** — Tokens within a spell overlay area are automatically detected so damage can be applied to all affected targets
 
 **Ruler / Distance Measurement:**
 - Click two points to measure distance

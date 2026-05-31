@@ -290,23 +290,24 @@ function App() {
           />
         {activeView === 'charSheet' && activeCharacter && (
           <CharSheet
-            allAbilityScores={abilityScores}
-            allClasses={classes}
-            allClasses2024={classes2024}
-            allEquipment={equipment}
-            allMagicItems={magicItems}
-            allRaces={races}
-            allSpells={spells}
-            allSpells2024={spells2024}
-            playerSummary={activeCharacter}
-            allRaces2024={races2024}
-            allMagicItems2024={magicItems2024}
-            campaignName={campaignName}
-            onDeleteCharacter={handleDeleteCharacter}
-            onEditCharacter={() => handleEditCharacter(activeCharacter)}
-            onUploadClick={handleUploadClick}
-            onSaveClick={handleSaveClick}
-          />
+             allAbilityScores={abilityScores}
+             allClasses={classes}
+             allClasses2024={classes2024}
+             allEquipment={equipment}
+             allMagicItems={magicItems}
+             allRaces={races}
+             allSpells={spells}
+             allSpells2024={spells2024}
+             playerSummary={activeCharacter}
+             allRaces2024={races2024}
+             allMagicItems2024={magicItems2024}
+             campaignName={campaignName}
+             activeMapName={mapsView.type === 'map' ? mapsView.mapName : null}
+             onDeleteCharacter={handleDeleteCharacter}
+             onEditCharacter={() => handleEditCharacter(activeCharacter)}
+             onUploadClick={handleUploadClick}
+             onSaveClick={handleSaveClick}
+           />
         )}
         {activeView === 'initiative' && <Initiative characters={charactersWithHp} campaignName={campaignName} onNpcsChange={setNpcs} isLocalhost={isLocalhost} mapName={mapsView.type === 'map' ? mapsView.mapName : null} />}
         {activeView === 'mapsManager' && mapsView.type === 'manager' && (
