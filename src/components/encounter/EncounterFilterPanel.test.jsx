@@ -11,15 +11,17 @@ describe('EncounterFilterPanel', () => {
         difficulty: 2,
         playerLevels: [5, 5],
         totalThreshold: 600,
+        environment: 'forest',
         difficultyIndex: 2,
         difficultyLabels: ['Easy', 'Medium', 'Hard', 'Deadly'],
         difficultyColors: ['var(--color-success)', 'var(--color-warning)', '#fd7e14', 'var(--color-error)'],
-      },
+        },
       onDifficultyChange: vi.fn(),
+      onEnvironmentChange: vi.fn(),
       onAddPlayer: vi.fn(),
       onRemovePlayer: vi.fn(),
       onPlayerLevelChange: vi.fn(),
-    };
+       };
   });
 
   it('should render difficulty dropdown', () => {
@@ -42,7 +44,27 @@ describe('EncounterFilterPanel', () => {
     const select = document.querySelector('#difficulty-select');
     fireEvent.change(select, { target: { value: '3' } });
     expect(props.onDifficultyChange).toHaveBeenCalled();
-  });
+   });
+
+  it('should render environment dropdown', () => {
+    render(<EncounterFilterPanel {...props} />);
+    const select = document.querySelector('#environment-select');
+    expect(select).toBeInTheDocument();
+    expect(select.value).toBe('forest');
+   });
+
+  it('should call onEnvironmentChange when environment selection changes', () => {
+    render(<EncounterFilterPanel {...props} />);
+    const select = document.querySelector('#environment-select');
+    fireEvent.change(select, { target: { value: 'desert' } });
+    expect(props.onEnvironmentChange).toHaveBeenCalled();
+   });
+
+  it('should default to All Environments when environment is empty', () => {
+    render(<EncounterFilterPanel {...props} filter={{ ...props.filter, environment: '' }} />);
+    const select = document.querySelector('#environment-select');
+    expect(select.value).toBe('');
+   });
 
   it('should render player level rows', () => {
     render(<EncounterFilterPanel {...props} />);

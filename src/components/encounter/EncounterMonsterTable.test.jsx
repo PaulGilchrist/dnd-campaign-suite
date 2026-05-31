@@ -3,9 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EncounterMonsterTable from './EncounterMonsterTable.jsx';
 
 const sampleMonsters = [
-  { index: 'goblin', name: 'Goblin', challenge_rating: 0.25, xp: 50, type: 'humanoid' },
-  { index: 'orc', name: 'Orc', challenge_rating: 0.5, xp: 100, type: 'humanoid' },
-  { index: 'dragon', name: 'Young Dragon', challenge_rating: 10, xp: 5900, type: 'dragon' },
+   { index: 'goblin', name: 'Goblin', challenge_rating: 0.25, xp: 50, type: 'humanoid', environments: ['forest', 'underdark'] },
+   { index: 'orc', name: 'Orc', challenge_rating: 0.5, xp: 100, type: 'humanoid', environments: ['hill', 'mountain'] },
+   { index: 'dragon', name: 'Young Dragon', challenge_rating: 10, xp: 5900, type: 'dragon', environments: ['underground'] },
 ];
 
 describe('EncounterMonsterTable', () => {
@@ -24,7 +24,8 @@ describe('EncounterMonsterTable', () => {
       onSort: vi.fn(),
       sortField: 'name',
       sortDirection: 'asc',
-    };
+      showEnvironment: true,
+        };
   });
 
   it('should render search input with placeholder', () => {
@@ -38,15 +39,42 @@ describe('EncounterMonsterTable', () => {
     expect(screen.getByText('Monster')).toBeInTheDocument();
     expect(screen.getByText('CR')).toBeInTheDocument();
     expect(screen.getByText('XP')).toBeInTheDocument();
+    expect(screen.getByText('Env')).toBeInTheDocument();
     expect(screen.getByText('Qty')).toBeInTheDocument();
-  });
+   });
 
   it('should render correct number of monster rows', () => {
     render(<EncounterMonsterTable {...props} />);
     expect(screen.getByText('Goblin')).toBeInTheDocument();
     expect(screen.getByText('Orc')).toBeInTheDocument();
     expect(screen.getByText('Young Dragon')).toBeInTheDocument();
-  });
+   });
+
+  it('should show environment column with capitalized values', () => {
+    render(<EncounterMonsterTable {...props} />);
+    const cells = document.querySelectorAll('.monster-row .col-env');
+    expect(cells.length).toBe(3);
+    expect(cells[0].textContent).toContain('Forest');
+    expect(cells[1].textContent).toContain('Hill');
+     });
+
+  it('should not show environment column when showEnvironment is false', () => {
+    render(<EncounterMonsterTable {...props} showEnvironment={false} />);
+    const cells = document.querySelectorAll('.monster-row .col-env');
+    expect(cells.length).toBe(0);
+     });
+
+  it('should not show environment column when showEnvironment is false', () => {
+    render(<EncounterMonsterTable {...props} showEnvironment={false} />);
+    const rows = document.querySelectorAll('.monster-row .col-env');
+    expect(rows.length).toBe(0);
+     });
+
+  it('should not show environment column when showEnvironment is false', () => {
+    render(<EncounterMonsterTable {...props} showEnvironment={false} />);
+    const cells = document.querySelectorAll('.monster-row .col-env');
+    expect(cells.length).toBe(0);
+    });
 
   it('should show monster CR values', () => {
     render(<EncounterMonsterTable {...props} />);
@@ -131,7 +159,12 @@ describe('EncounterMonsterTable', () => {
     expect(props.onSort).toHaveBeenCalledWith('xp');
     fireEvent.click(screen.getByText('Sel').closest('th'));
     expect(props.onSort).toHaveBeenCalledWith('sel');
-  });
+    const envHeader = document.querySelector('th.col-env');
+    if (envHeader) {
+      fireEvent.click(envHeader);
+      expect(props.onSort).toHaveBeenCalledWith('env');
+    }
+    });
 
   it('should show sort indicator for active sort field', () => {
     render(<EncounterMonsterTable {...props} />);

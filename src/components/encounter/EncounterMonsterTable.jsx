@@ -13,6 +13,7 @@ function EncounterMonsterTable({
   sortField,
   sortDirection,
   onViewDetails,
+  showEnvironment,
 }) {
   const isSelected = (monsterIndex) => {
     return selectedMonsters.some((m) => m.index === monsterIndex);
@@ -80,19 +81,33 @@ function EncounterMonsterTable({
                     {sortField === 'cr' ? (sortDirection === 'asc' ? ' \u25B2' : ' \u25BC') : ''}
                   </span>
                 </th>
-                <th
-                  className="col-xp sortable"
-                  onClick={() => onSort('xp')}
-                  aria-label="Sort by XP"
-                  role="button"
-                  tabIndex={0}
-                >
-                  XP
-                  <span className="sort-indicator">
-                    {sortField === 'xp' ? (sortDirection === 'asc' ? ' \u25B2' : ' \u25BC') : ''}
-                  </span>
-                </th>
-                 <th className="col-qty">Qty</th>
+                    <th
+                   className="col-xp sortable"
+                   onClick={() => onSort('xp')}
+                   aria-label="Sort by XP"
+                   role="button"
+                   tabIndex={0}
+                  >
+                   XP
+                    <span className="sort-indicator">
+                      {sortField === 'xp' ? (sortDirection === 'asc' ? ' \u25B2' : ' \u25BC') : ''}
+                    </span>
+                  </th>
+    {showEnvironment && (
+                      <th
+                       className="col-env sortable"
+                       onClick={() => onSort('env')}
+                       aria-label="Sort by environment"
+                       role="button"
+                       tabIndex={0}
+                      >
+                       Env
+                        <span className="sort-indicator">
+                          {sortField === 'env' ? (sortDirection === 'asc' ? ' \u25B2' : ' \u25BC') : ''}
+                        </span>
+                      </th>
+                     )}
+                   <th className="col-qty">Qty</th>
                  <th className="col-details">Details</th>
                  <th className="col-remove">Remove</th>
                </tr>
@@ -120,8 +135,11 @@ function EncounterMonsterTable({
                     </td>
                     <td className="col-name">{monster.name}</td>
                     <td className="col-cr">{monster.challenge_rating}</td>
-                    <td className="col-xp">{monster.xp.toLocaleString()}</td>
-                     <td className="col-qty">
+                      <td className="col-xp">{monster.xp.toLocaleString()}</td>
+                       {showEnvironment && (
+                         <td className="col-env">{(monster.environments || []).map(e => e.charAt(0).toUpperCase() + e.slice(1)).join(', ')}</td>
+                        )}
+                        <td className="col-qty">
                        {qty > 0 ? (
                          <span className="qty-controls">
                            <button

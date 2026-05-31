@@ -327,6 +327,7 @@
 .encounter-builder .col-name { font-weight: 500; }
 .encounter-builder .col-cr { width: 50px; text-align: center; }
 .encounter-builder .col-xp { width: 70px; text-align: right; font-family: monospace; }
+.encounter-builder .col-env { max-width: 150px; font-size: 0.82rem; color: var(--color-text-secondary); }
 .encounter-builder .col-qty { width: 90px; text-align: center; }
 .encounter-builder .col-details { width: 36px; text-align: center; }
 .encounter-builder .col-remove { width: 30px; text-align: center; }

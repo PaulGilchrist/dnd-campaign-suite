@@ -42,7 +42,7 @@ function calculateMonsterCount(selectedMonsters) {
   return selectedMonsters.reduce((sum, m) => sum + (m.qty || 1), 0);
 }
 
-function filterMonsters(monsters, searchQuery, playerLevels, difficultyIndex, totalThreshold) {
+function filterMonsters(monsters, searchQuery, playerLevels, difficultyIndex, totalThreshold, environmentFilter) {
   if (!monsters) return [];
   const maxXP = calculateMaxXP(playerLevels, difficultyIndex);
   const avgLevel = playerLevels.reduce((sum, l) => sum + l, 0) / playerLevels.length;
@@ -50,11 +50,12 @@ function filterMonsters(monsters, searchQuery, playerLevels, difficultyIndex, to
   return monsters.filter(m => {
     if (m.xp > maxXP) return false;
     if (m.xp < minXP) return false;
+    if (environmentFilter && m.environments && !m.environments.includes(environmentFilter)) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return m.name.toLowerCase().includes(q)
-      || (m.type && m.type.toLowerCase().includes(q))
-      || (m.subtype && m.subtype.toLowerCase().includes(q));
+       || (m.type && m.type.toLowerCase().includes(q))
+       || (m.subtype && m.subtype.toLowerCase().includes(q));
   });
 }
 
@@ -94,8 +95,8 @@ function loadSavedFilter() {
 function saveFilter(filter) {
   try {
     const key = 'encounterFilter-2024';
-    localStorage.setItem(key, JSON.stringify({ difficulty: filter.difficulty }));
-  } catch { /* storage full, ignore */ }
+    localStorage.setItem(key, JSON.stringify({ difficulty: filter.difficulty, environment: filter.environment }));
+   } catch { /* storage full, ignore */ }
 }
 
 function stripMonsters(monsters) {
@@ -109,16 +110,17 @@ function stripMonsters(monsters) {
 function EncounterBuilder({ characters, campaignName, onStartCombat }) {
   const { monsters, loading } = useMonstersData();
 
-    const [filter, setFilter] = useState(() => {
+  const [filter, setFilter] = useState(() => {
       const saved = loadSavedFilter();
       const playerLevels = (characters && characters.length > 0)
-       ? characters.map(c => c.level || 1)
-       : (saved ? saved.playerLevels : [1]);
+        ? characters.map(c => c.level || 1)
+        : (saved ? saved.playerLevels : [1]);
      return {
        difficulty: saved ? saved.difficulty : ENCOUNTER_CONFIG.defaultDifficulty,
        playerLevels,
-      };
-    });
+       environment: saved ? saved.environment : '',
+       };
+     });
 
     // When characters change (e.g., campaign switch), show in party summary for display purposes only
    // Player levels filter is not auto-overwritten so loaded encounters preserve their settings
@@ -197,9 +199,9 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
        setLootData(session.lootData || { lootEntries: [], totalEncounterXp: 0 });
      setCombatStarted(!!session.combatStarted);
          setEncounterCompleted(!!session.encounterCompleted);
-        if (session.filter) {
-           setFilter({ difficulty: session.filter.difficulty, playerLevels: session.filter.playerLevels || [1] });
-                 }
+         if (session.filter) {
+            setFilter({ difficulty: session.filter.difficulty, playerLevels: session.filter.playerLevels || [1], environment: session.filter.environment || '' });
+                   }
        if (session.encounterTitle) setEncounterTitle(session.encounterTitle);
           setSelectedMonsters(session.selectedMonsters);
            }, [campaignName, monsters]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -266,20 +268,20 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
       return calculateDifficultyIndex(effectiveXP, mediumThreshold);
     }, [effectiveXP, filter.playerLevels]);
 
-   const filteredMonsters = useMemo(
-      () => {
-       // Ensure selected monsters always appear in the table, even if they don't match current filters
-       const result = filterMonsters(monsters, searchQuery, filter.playerLevels, filter.difficulty, totalThreshold);
-       for (const sm of selectedMonsters) {
-         if (!result.some(m => m.index === sm.index)) {
-           const full = (monsters || []).find(m => m.index === sm.index);
-           if (full) result.unshift(full);
-          }
-         }
+    const filteredMonsters = useMemo(
+        () => {
+         // Ensure selected monsters always appear in the table, even if they don't match current filters
+        const result = filterMonsters(monsters, searchQuery, filter.playerLevels, filter.difficulty, totalThreshold, filter.environment);
+        for (const sm of selectedMonsters) {
+          if (!result.some(m => m.index === sm.index)) {
+            const full = (monsters || []).find(m => m.index === sm.index);
+            if (full) result.unshift(full);
+            }
+           }
 
-       result.sort((a, b) => {
-        let valA, valB;
-        switch (sortField) {
+        result.sort((a, b) => {
+         let valA, valB;
+         switch (sortField) {
           case 'name':
             valA = a.name.toLowerCase();
             valB = b.name.toLowerCase();
@@ -292,22 +294,26 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
             valA = a.xp || 0;
             valB = b.xp || 0;
             break;
+          case 'env':
+            valA = (a.environments || []).join(', ').toLowerCase();
+            valB = (b.environments || []).join(', ').toLowerCase();
+            break;
           case 'sel':
             valA = selectedMonsters.some((m) => m.index === a.index) ? 0 : 1;
             valB = selectedMonsters.some((m) => m.index === b.index) ? 0 : 1;
             break;
-          default:
+           default:
             valA = a.name.toLowerCase();
             valB = b.name.toLowerCase();
-        }
-         if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-        if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-        return 0;
-         });
-       return result;
-      },
-      [monsters, searchQuery, filter.playerLevels, filter.difficulty, totalThreshold, selectedMonsters, sortField, sortDirection]
-  );
+           }
+          if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+         if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+         return 0;
+           });
+        return result;
+        },
+        [monsters, searchQuery, filter.playerLevels, filter.difficulty, totalThreshold, filter.environment, selectedMonsters, sortField, sortDirection]
+    );
 
   // --- Handlers ---
   const handleToggleMonster = (monster) => {
@@ -411,7 +417,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
          currentEncounterName, description, lootData, encounterCompleted,
          combatStarted: true,
          selectedMonsters: stripMonsters(selectedMonsters),
-         filter: { difficulty: filter.difficulty, playerLevels: filter.playerLevels },
+         filter: { difficulty: filter.difficulty, playerLevels: filter.playerLevels, environment: filter.environment },
          encounterTitle,
        }));
      } catch { /* ignore */ }
@@ -471,11 +477,12 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
      setEncounterCompleted(false);
      setCombatStarted(false);
       setFilter({
-        difficulty: ENCOUNTER_CONFIG.defaultDifficulty,
-       playerLevels: (characters && characters.length > 0)
-             ? characters.map(c => c.level || 1)
-             : [1],
-         });
+         difficulty: ENCOUNTER_CONFIG.defaultDifficulty,
+        playerLevels: (characters && characters.length > 0)
+               ? characters.map(c => c.level || 1)
+               : [1],
+        environment: '',
+           });
     setSelectedMonsters([]);
     setSearchQuery('');
     setDescription('');
@@ -493,7 +500,11 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
 
   const handleDifficultyChange = (e) => {
     setFilter(prev => ({ ...prev, difficulty: parseInt(e.target.value, 10) }));
-  };
+   };
+
+  const handleEnvironmentChange = (e) => {
+    setFilter(prev => ({ ...prev, environment: e.target.value }));
+   };
 
   const handleAddPlayer = () => {
     setFilter(prev => ({ ...prev, playerLevels: [...prev.playerLevels, 1] }));
@@ -671,19 +682,20 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
 
       {/* Top Row: Filters + Summary */}
       <div className="encounter-top-row">
-        <EncounterFilterPanel
-          filter={{
-            ...filter,
-            totalThreshold,
-             difficultyIndex: filterDifficultyIndex,
-            difficultyLabels,
-            difficultyColors: ['var(--color-success)', 'var(--color-warning)', '#fd7e14', 'var(--color-error)'],
-          }}
-          onDifficultyChange={handleDifficultyChange}
-          onAddPlayer={handleAddPlayer}
-          onRemovePlayer={handleRemovePlayer}
-          onPlayerLevelChange={handlePlayerLevelChange}
-        />
+          <EncounterFilterPanel
+           filter={{
+              ...filter,
+             totalThreshold,
+              difficultyIndex: filterDifficultyIndex,
+             difficultyLabels,
+             difficultyColors: ['var(--color-success)', 'var(--color-warning)', '#fd7e14', 'var(--color-error)'],
+            }}
+           onDifficultyChange={handleDifficultyChange}
+           onEnvironmentChange={handleEnvironmentChange}
+           onAddPlayer={handleAddPlayer}
+           onRemovePlayer={handleRemovePlayer}
+           onPlayerLevelChange={handlePlayerLevelChange}
+          />
           <EncounterSummaryPanel
            totalMonsterXP={totalMonsterXP}
            monsterCount={monsterCount}
@@ -705,20 +717,21 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
          />
 
         {/* Monster Selection Table */}
-        <EncounterMonsterTable
-         filteredMonsters={filteredMonsters}
-         selectedMonsters={selectedMonsters}
-         onToggleMonster={handleToggleMonster}
-         onIncreaseQty={handleIncreaseQty}
-         onDecreaseQty={handleDecreaseQty}
-         onRemoveMonster={handleRemoveMonster}
-         searchQuery={searchQuery}
-         onSearchQueryChange={setSearchQuery}
-         onSort={handleSort}
-         sortField={sortField}
-         sortDirection={sortDirection}
-         onViewDetails={setViewingMonster}
-        />
+          <EncounterMonsterTable
+          filteredMonsters={filteredMonsters}
+          selectedMonsters={selectedMonsters}
+          onToggleMonster={handleToggleMonster}
+          onIncreaseQty={handleIncreaseQty}
+          onDecreaseQty={handleDecreaseQty}
+          onRemoveMonster={handleRemoveMonster}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          onSort={handleSort}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onViewDetails={setViewingMonster}
+          showEnvironment={true}
+          />
 
       {/* Encounter Save/Load Modal */}
       <EncounterModal
