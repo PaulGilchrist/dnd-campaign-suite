@@ -53,7 +53,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
             const cs = getCombatContext();
             const rawTargetId = getAttackerTargetId(cs, playerStats.name);
             const context = {
-                targetId: rawTargetId || target?.id,
+                targetId: rawTargetId || target?.name,
                 targetName: target?.name,
                 attackerName: playerStats.name,
             };

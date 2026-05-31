@@ -59,7 +59,6 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   }, [npcs, searchQuery]);
 
   const getDefaultFormData = (overrides = {}) => ({
-    id: crypto.randomUUID(),
     name: '',
     race: '',
     classRole: '',
@@ -199,7 +198,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       if (cleaned.armorClass === undefined) {
         cleaned.armorClass = null;
       }
-      await saveNPCAction(cleaned);
+      await saveNPCAction(cleaned, editingNPC?.name);
       handleCloseModal();
     } catch (error) {
       console.error('Failed to save NPC:', error);
@@ -213,7 +212,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     if (!window.confirm('Delete this NPC?')) return;
     setDeleting(true);
     try {
-      await deleteNPCAction(editingNPC.id);
+      await deleteNPCAction(editingNPC.name);
       handleCloseModal();
     } catch (error) {
       console.error('Failed to delete NPC:', error);
@@ -238,7 +237,6 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       const roll = rollD20();
       const total = roll + initBonus;
       combatSummary.creatures.push({
-        id: crypto.randomUUID(),
         name: npc.name,
         type: 'npc',
         initiative: String(total),
@@ -350,7 +348,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
         <ul className="ct-list">
           {filteredNPCs.map((npc) => (
             <li
-              key={npc.id}
+              key={npc.name}
               className="ct-list-item"
               onClick={() => handleEditNPC(npc)}
               role="button"
@@ -830,7 +828,6 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
                           const roll = rollD20();
                           const total = roll + initBonus;
                           combatSummary.creatures.push({
-                            id: crypto.randomUUID(),
                             name: snapshot.name,
                             type: 'npc',
                             initiative: String(total),

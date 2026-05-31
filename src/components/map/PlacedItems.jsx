@@ -502,9 +502,9 @@ function PlacedItems({
                     </clipPath>
                 </defs>
                 <circle cx={cx} cy={cy} r={20} className="npc-circle" style={{ opacity: npcOpacity }} />
-                {(npcImages[item.id] || item.imageUrl) ? (
+                {(npcImages[item.name] || item.imageUrl) ? (
                     <image
-                        xlinkHref={npcImages[item.id] || item.imageUrl}
+                        xlinkHref={npcImages[item.name] || item.imageUrl}
                         x={cx - 18}
                         y={cy - 18}
                         width={36}

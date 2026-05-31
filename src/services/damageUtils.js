@@ -49,14 +49,14 @@ export function findCreatureByName(combatSummary, name) {
 
 export function getTargetFromAttacker(combatSummary, attackerName) {
   const attacker = findCreatureByName(combatSummary, attackerName);
-  if (!attacker || !attacker.targetId) return null;
-  const target = combatSummary.creatures.find(c => c.id === attacker.targetId);
+  if (!attacker || !attacker.targetName) return null;
+  const target = combatSummary.creatures.find(c => c.name === attacker.targetName);
   return target || null;
 }
 
 export function getAttackerTargetId(combatSummary, attackerName) {
   const attacker = findCreatureByName(combatSummary, attackerName);
-  return attacker?.targetId || null;
+  return attacker?.targetName || null;
 }
 
 function computeAbilityBonus(character, abilityName) {

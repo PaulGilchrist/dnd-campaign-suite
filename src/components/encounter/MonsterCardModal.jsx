@@ -56,8 +56,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
       return cs ? getTargetFromAttacker(cs, monsterName) : null;
     }
     const attacker = findCreatureByName({ creatures }, monsterName);
-    if (!attacker || !attacker.targetId) return null;
-    return creatures.find(c => c.id === attacker.targetId) || null;
+    if (!attacker || !attacker.targetName) return null;
+    return creatures.find(c => c.name === attacker.targetName) || null;
   }, [creatures, monsterName]);
 
   const getDamageTypesForAction = useCallback((action) => {
@@ -96,7 +96,6 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
       isAutoCrit,
       autoDamageFormula: action?.damage_dice || null,
       autoDamageName: name,
-      targetId: target?.id,
       targetName: target?.name,
       attackerName: monsterName,
       saveDc: action?.save_dc || null,
@@ -114,7 +113,6 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
       const context = {
         damageType,
         targetName: target?.name,
-        targetId: target?.id,
         attackerName: monsterName,
       };
       if (action?.save_dc != null) {

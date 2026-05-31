@@ -28,9 +28,9 @@ export function rollSaveForCreature(creature, saveType, saveDc) {
   return { roll, total, bonus, success };
 }
 
-export function applyDamageToTarget(combatSummary, targetId, rawDamage, damageTypes, campaignName) {
+export function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName) {
   if (!combatSummary) return null;
-  const creature = combatSummary.creatures.find(c => c.id === targetId);
+  const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
 
   const finalDamage = computeDamageAfterResistances(rawDamage, damageTypes || [], creature.resistances, creature.immunities);

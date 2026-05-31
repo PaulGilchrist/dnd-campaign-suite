@@ -20,7 +20,7 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
         if (npcs?.length) {
             const npcNames = npcs
                 .filter(n => n.name)
-                .map(n => ({ name: n.name, index: n.id, source: 'npc' }));
+                .map(n => ({ name: n.name, index: n.name, source: 'npc' }));
             return [...npcNames, ...monsterNames];
         }
         return monsterNames;

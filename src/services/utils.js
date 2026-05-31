@@ -28,6 +28,9 @@ const utils = {
 			return v.toString(16);
 		});
 	},
+    // WARNING: Do NOT use guid() or crypto.randomUUID() to identify NPCs or characters.
+    // Use their name as the unique identifier everywhere. GUIDs are only for internal
+    // sub-objects (conditions, concentration, log entries, non-NPC map items).
 }
 
 export default utils

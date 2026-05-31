@@ -78,12 +78,10 @@ export async function expandMonstersToCreatures(selectedMonsters, characters, ca
       const currentHp = storage.getProperty(character.name, 'currentHitPoints', campaignName) ?? maxHp;
       const storedMaxHp = storage.getProperty(character.name, 'hitPoints', campaignName);
       return {
-        id: utils.guid(),
         name: utils.getName(character.name),
         type: 'player',
         imagePath: character.imagePath || '',
         initiative: '',
-        targetId: null,
         targetName: null,
         ac: await computePlayerAc(character),
         resistances: character.resistances || [],
@@ -105,11 +103,9 @@ export async function expandMonstersToCreatures(selectedMonsters, characters, ca
           const name = qty === 1 ? baseName : `${baseName} ${i + 1}`;
           const rollResult = rollNpcInitiative(monster);
           creatureList.push({
-            id: utils.guid(),
             name,
             type: 'npc',
             initiative: String(rollResult.total),
-            targetId: null,
             targetName: null,
             ac: monster.armor_class || 10,
             resistances: monster.damage_resistances || [],
@@ -138,10 +134,10 @@ export async function loadEncounterToInitiative(selectedMonsters, characters, ca
 
     storage.set('combatSummary', cloneDeep(combatSummary), campaignName);
 
-    const firstId = creatures[0]?.id;
-    storage.set('activeCreatureId', firstId, campaignName);
+    const firstName = creatures[0]?.name;
+    storage.set('activeCreatureName', firstName, campaignName);
 
     window.dispatchEvent(new CustomEvent('initiative-rolled'));
 
-    return { combatSummary, firstId };
+    return { combatSummary, firstName };
 }

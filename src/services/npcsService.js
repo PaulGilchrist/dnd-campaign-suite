@@ -1,6 +1,7 @@
-export const saveNPC = async (campaignName, npc) => {
+export const saveNPC = async (campaignName, npc, oldName) => {
   try {
-    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/npcs/${encodeURIComponent(npc.id)}`, {
+    const name = oldName || npc.name;
+    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/npcs/${encodeURIComponent(name)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(npc),
@@ -51,11 +52,11 @@ export const saveNPCs = async (campaignName, npcs) => {
   }
 };
 
-export const loadNPC = async (campaignName, npcId) => {
+export const loadNPC = async (campaignName, npcName) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
-    const encodedNpcId = encodeURIComponent(npcId);
-    const response = await fetch(`/api/campaigns/${encodedCampaign}/npcs/${encodedNpcId}`, {
+    const encodedNpcName = encodeURIComponent(npcName);
+    const response = await fetch(`/api/campaigns/${encodedCampaign}/npcs/${encodedNpcName}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -70,11 +71,11 @@ export const loadNPC = async (campaignName, npcId) => {
   }
 };
 
-export const deleteNPC = async (campaignName, npcId) => {
+export const deleteNPC = async (campaignName, npcName) => {
   try {
     const encodedCampaign = encodeURIComponent(campaignName);
-    const encodedNpcId = encodeURIComponent(npcId);
-    const response = await fetch(`/api/campaigns/${encodedCampaign}/npcs/${encodedNpcId}`, {
+    const encodedNpcName = encodeURIComponent(npcName);
+    const response = await fetch(`/api/campaigns/${encodedCampaign}/npcs/${encodedNpcName}`, {
       method: 'DELETE',
     });
     if (!response.ok) {

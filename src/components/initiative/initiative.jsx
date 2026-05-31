@@ -104,7 +104,7 @@ function CreatureHp({ creature, isLocalhost, onChange }) {
                         type="number"
                         min="0"
                         value={currentHp}
-                        onChange={(e) => onChange(creature.id, parseInt(e.target.value) || 0)}
+                        onChange={(e) => onChange(creature.name, parseInt(e.target.value) || 0)}
                         aria-label={`${creature.name} current HP`}
                     />
                     <span className="hp-sep">/</span>
@@ -119,7 +119,7 @@ function CreatureHp({ creature, isLocalhost, onChange }) {
                             if (creature.currentHp > newMax) {
                                 creature.currentHp = newMax;
                             }
-                            onChange(creature.id, creature.currentHp);
+                            onChange(creature.name, creature.currentHp);
                         }}
                         aria-label={`${creature.name} max HP`}
                     />
@@ -140,7 +140,7 @@ function CreatureHp({ creature, isLocalhost, onChange }) {
                     type="number"
                     min={0}
                     value={currentHp}
-                    onChange={(e) => onChange(creature.id, parseInt(e.target.value) || 0)}
+                    onChange={(e) => onChange(creature.name, parseInt(e.target.value) || 0)}
                     aria-label={`${creature.name} current HP`}
                 />
                 <span className="hp-sep">/</span>
@@ -153,7 +153,7 @@ function CreatureHp({ creature, isLocalhost, onChange }) {
 function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
     const [numOfNpc, setNumOfNpc] = React.useState(4);
-    const [activeCreatureId, setActiveCreatureId] = React.useState(null);
+    const [activeCreatureName, setActiveCreatureName] = React.useState(null);
     const [npcImages, setNpcImages] = React.useState({});
     const [viewingMonster, setViewingMonster] = React.useState(null);
     const carouselRef = React.useRef(null);
@@ -262,9 +262,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             localStorage.setItem('combatSummary', JSON.stringify(event.data));
             combatSummaryRef.current = event.data;
             setCombatSummary(event.data);
-        } else if (dataKey === 'activeCreatureId') {
-            localStorage.setItem('activeCreatureId', JSON.stringify(event.data));
-            setActiveCreatureId(event.data);
+        } else if (dataKey === 'activeCreatureName') {
+            localStorage.setItem('activeCreatureName', JSON.stringify(event.data));
+            setActiveCreatureName(event.data);
         } else {
             const cs = combatSummaryRef.current;
             if (!cs) return;
@@ -291,19 +291,15 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     React.useEffect(() => {
         if (!combatSummary) return;
-        const npcIds = combatSummary.creatures.filter(c => c.type === 'npc').map(c => c.id);
-        const promises = npcIds.map(async (id) => {
-            const creature = combatSummary.creatures.find(c => c.id === id);
-            if (creature) {
-                if (creature.imagePath) return { id, url: null };
-                const url = await getMonsterImageUrl(creature.name, campaignNpcs);
-                return { id, url };
-            }
-            return { id, url: null };
+        const npcs = combatSummary.creatures.filter(c => c.type === 'npc');
+        const promises = npcs.map(async (creature) => {
+            if (creature.imagePath) return { name: creature.name, url: null };
+            const url = await getMonsterImageUrl(creature.name, campaignNpcs);
+            return { name: creature.name, url };
         });
         Promise.all(promises).then(results => {
             const newImages = {};
-            results.forEach(({ id, url }) => { newImages[id] = url; });
+            results.forEach(({ name, url }) => { newImages[name] = url; });
             setNpcImages(newImages);
         });
     }, [combatSummary, campaignNpcs]);
@@ -328,12 +324,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         const creatureList = characters.map((character) => {
             const maxHp = character.hitPoints || 0;
             return {
-                id: utils.guid(),
                 name: utils.getName(character.name),
                 type: 'player',
                 imagePath: character.imagePath || '',
                 initiative: '',
-                targetId: null,
                 targetName: null,
                 ac: computeAcEstimate(character),
                 resistances: character.resistances || [],
@@ -347,7 +341,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         });
         creatureList.sort((a, b) => a.name.localeCompare(b.name));
         for (let i = 0; i < numOfNpc; i++) {
-            creatureList.push({ id: utils.guid(), name: `NPC ${i + 1}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null, maxHp: 10, currentHp: 10, saveBonuses: {} });
+            creatureList.push({ name: `NPC ${i + 1}`, type: 'npc', initiative: '', targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null, maxHp: 10, currentHp: 10, saveBonuses: {} });
         }
         return creatureList;
     }, [characters, numOfNpc, loadCreatureHp, loadCreatureMaxHp]);
@@ -361,15 +355,15 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 return match ? Math.max(max, parseInt(match[1])) : max;
             }, 0);
         const nextNum = maxNpcNum + 1;
-        combatSummary.creatures.push({ id: utils.guid(), name: `NPC ${nextNum}`, type: 'npc', initiative: '', targetId: null, targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null, maxHp: 10, currentHp: 10, saveBonuses: {} });
+        combatSummary.creatures.push({ name: `NPC ${nextNum}`, type: 'npc', initiative: '', targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null, maxHp: 10, currentHp: 10, saveBonuses: {} });
         setNumOfNpc(nextNum);
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
     }, [combatSummary, campaignName]);
 
-    const handleRemoveNpc = React.useCallback((creatureId) => {
+    const handleRemoveNpc = React.useCallback((creatureName) => {
         if (!combatSummary) return;
-        const creature = combatSummary.creatures.find(c => c.id === creatureId);
+        const creature = combatSummary.creatures.find(c => c.name === creatureName);
         if (!creature || creature.type !== 'npc') return;
 
         const needsConfirmation = creature.currentHp > 0 || creature.initiative !== '';
@@ -380,7 +374,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             if (!window.confirm(msg)) return;
         }
 
-        combatSummary.creatures = combatSummary.creatures.filter(c => c.id !== creatureId);
+        combatSummary.creatures = combatSummary.creatures.filter(c => c.name !== creatureName);
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
     }, [combatSummary, campaignName]);
@@ -402,32 +396,32 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const handleNextCreature = React.useCallback(() => {
         const cs = combatSummaryRef.current;
         if (!cs) return;
-        const currentIndex = cs.creatures.findIndex((creature) => creature.id === activeCreatureId);
+        const currentIndex = cs.creatures.findIndex((creature) => creature.name === activeCreatureName);
         if (currentIndex < cs.creatures.length - 1) {
-            const nextId = cs.creatures[currentIndex + 1].id;
-            storage.set('activeCreatureId', nextId, campaignName);
-            setActiveCreatureId(nextId);
+            const nextName = cs.creatures[currentIndex + 1].name;
+            storage.set('activeCreatureName', nextName, campaignName);
+            setActiveCreatureName(nextName);
         } else {
-            const firstId = cs.creatures[0].id;
-            storage.set('activeCreatureId', firstId, campaignName);
-            setActiveCreatureId(firstId);
+            const firstName = cs.creatures[0].name;
+            storage.set('activeCreatureName', firstName, campaignName);
+            setActiveCreatureName(firstName);
         }
-    }, [activeCreatureId, campaignName]);
+    }, [activeCreatureName, campaignName]);
 
     const handlePreviousCreature = React.useCallback(() => {
         const cs = combatSummaryRef.current;
         if (!cs) return;
-        const currentIndex = cs.creatures.findIndex((creature) => creature.id === activeCreatureId);
+        const currentIndex = cs.creatures.findIndex((creature) => creature.name === activeCreatureName);
         if (currentIndex > 0) {
-            const prevId = cs.creatures[currentIndex - 1].id;
-            storage.set('activeCreatureId', prevId, campaignName);
-            setActiveCreatureId(prevId);
+            const prevName = cs.creatures[currentIndex - 1].name;
+            storage.set('activeCreatureName', prevName, campaignName);
+            setActiveCreatureName(prevName);
         } else {
-            const lastId = cs.creatures[cs.creatures.length - 1].id;
-            storage.set('activeCreatureId', lastId, campaignName);
-            setActiveCreatureId(lastId);
+            const lastName = cs.creatures[cs.creatures.length - 1].name;
+            storage.set('activeCreatureName', lastName, campaignName);
+            setActiveCreatureName(lastName);
         }
-    }, [activeCreatureId, campaignName]);
+    }, [activeCreatureName, campaignName]);
 
     React.useEffect(() => {
         const stored = localStorage.getItem('combatSummary');
@@ -454,11 +448,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             setCombatSummary(summary);
             combatSummaryRef.current = summary;
 
-            const storedActive = localStorage.getItem('activeCreatureId');
+            const storedActive = localStorage.getItem('activeCreatureName');
             if (storedActive) {
-                setActiveCreatureId(JSON.parse(storedActive));
+                setActiveCreatureName(JSON.parse(storedActive));
             } else {
-                setActiveCreatureId(mergedCreatures[0]?.id || null);
+                setActiveCreatureName(mergedCreatures[0]?.name || null);
             }
         } else {
             const creatures = setupCreatures();
@@ -466,9 +460,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             storage.set('combatSummary', newSummary, campaignName);
             setCombatSummary(newSummary);
             combatSummaryRef.current = newSummary;
-            const firstId = creatures[0]?.id;
-            storage.set('activeCreatureId', firstId, campaignName);
-            setActiveCreatureId(firstId);
+            const firstName = creatures[0]?.name;
+            storage.set('activeCreatureName', firstName, campaignName);
+            setActiveCreatureName(firstName);
         }
     }, [characters, campaignName, setupCreatures, loadCreatureHp, loadCreatureMaxHp]);
 
@@ -476,7 +470,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         if (!combatSummary || !onNpcsChange) return;
         const npcList = combatSummary.creatures
             .filter(c => c.type === 'npc')
-            .map(c => ({ id: c.id, name: c.name, type: 'npc', imageUrl: npcImages[c.id] || null }));
+            .map(c => ({ name: c.name, type: 'npc', imageUrl: npcImages[c.name] || null }));
         onNpcsChange(npcList);
     }, [combatSummary, onNpcsChange, npcImages]);
 
@@ -580,9 +574,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         return () => window.removeEventListener('death-save-result', handler);
     }, [combatSummary, campaignName]);
 
-     const handleCreatureHpChange = React.useCallback((creatureId, newValue) => {
+     const handleCreatureHpChange = React.useCallback((creatureName, newValue) => {
          if (!combatSummary) return;
-         const creature = combatSummary.creatures.find(c => c.id === creatureId);
+         const creature = combatSummary.creatures.find(c => c.name === creatureName);
          if (!creature) return;
          const oldHp = creature.currentHp;
          const delta = newValue - oldHp;
@@ -640,23 +634,23 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             const combatSummary = { round: 1, creatures };
             storage.set('combatSummary', combatSummary, campaignName);
             setCombatSummary(combatSummary);
-            const firstCreatureId = creatures[0].id;
-            storage.set('activeCreatureId', firstCreatureId, campaignName);
-            setActiveCreatureId(firstCreatureId);
+            const firstCreatureName = creatures[0].name;
+            storage.set('activeCreatureName', firstCreatureName, campaignName);
+            setActiveCreatureName(firstCreatureName);
         }
     };
-    const handleInitiativeChange = (id, value) => {
+    const handleInitiativeChange = (creatureName, value) => {
         if (!combatSummary) return;
-        const index = combatSummary.creatures.findIndex((creature) => creature.id === id);
+        const index = combatSummary.creatures.findIndex((creature) => creature.name === creatureName);
         combatSummary.creatures[index].initiative = value;
         combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
     };
-    const handleNameChange = (id, value) => {
+    const handleNameChange = (oldName, newName) => {
         if (!combatSummary) return;
-        const idx = combatSummary.creatures.findIndex((creature) => creature.id === id);
-        combatSummary.creatures[idx].name = value;
+        const idx = combatSummary.creatures.findIndex((creature) => creature.name === oldName);
+        combatSummary.creatures[idx].name = newName;
         getMonsterData(value, campaignNpcs).then(monster => {
             if (monster) {
                 combatSummary.creatures[idx].ac = monster.armor_class || 10;
@@ -676,16 +670,15 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         });
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
-        setNpcImages(prev => ({ ...prev, [id]: null }));
+        setNpcImages(prev => ({ ...prev, [newName]: null }));
     };
-    const handleTargetChange = (id, targetId) => {
+    const handleTargetChange = (creatureName, targetName) => {
         if (!combatSummary) return;
-        const idx = combatSummary.creatures.findIndex((creature) => creature.id === id);
-        if (targetId && targetId.startsWith('overlay-')) {
-            const overlayId = targetId.slice('overlay-'.length);
+        const idx = combatSummary.creatures.findIndex((creature) => creature.name === creatureName);
+        if (targetName && targetName.startsWith('overlay-')) {
+            const overlayId = targetName.slice('overlay-'.length);
             const overlay = overlays.find(o => o.id === overlayId);
             if (overlay) {
-                combatSummary.creatures[idx].targetId = targetId;
                 combatSummary.creatures[idx].targetName = overlay.label || `${SHAPE_LABELS[overlay.shape] || overlay.shape} (${overlay.radiusFt || overlay.distanceFt || overlay.sizeFt || 0}ft)`;
                 const players = mapData?.players || [];
                 const npcs = (mapData?.placedItems || []).filter(i => i.type === 'npc');
@@ -698,16 +691,14 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 } catch { /* ignore */ }
             }
         } else {
-            combatSummary.creatures[idx].targetId = targetId || null;
-            const target = targetId ? combatSummary.creatures.find(c => c.id === targetId) : null;
-            combatSummary.creatures[idx].targetName = target ? target.name : null;
+            combatSummary.creatures[idx].targetName = targetName || null;
         }
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
     };
-    const handleRollNpcInitiative = (creatureId) => {
+    const handleRollNpcInitiative = (creatureName) => {
         if (!combatSummary) return;
-        const creature = combatSummary.creatures.find(c => c.id === creatureId);
+        const creature = combatSummary.creatures.find(c => c.name === creatureName);
         if (!creature || creature.type !== 'npc') return;
         const bonus = creature.initiativeBonus || 0;
         const roll = rollD20();
@@ -765,7 +756,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         if (!conditionPickerTarget || !conditionPickerSelected || !combatSummary) return;
         const conditionDef = CONDITIONS.find(c => c.key === conditionPickerSelected);
         if (!conditionDef) return;
-        const creature = combatSummary.creatures.find(c => c.id === conditionPickerTarget.id);
+        const creature = combatSummary.creatures.find(c => c.name === conditionPickerTarget.name);
         if (!creature) return;
         creature.conditions = creature.conditions.filter(c => c.key !== conditionDef.key);
         creature.conditions.push({
@@ -796,9 +787,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         }).catch(() => {});
     };
 
-    const handleRollConditionSave = async (creatureId, condition) => {
+    const handleRollConditionSave = async (creatureName, condition) => {
         if (!combatSummary) return;
-        const creature = combatSummary.creatures.find(c => c.id === creatureId);
+        const creature = combatSummary.creatures.find(c => c.name === creatureName);
         if (!creature) return;
 
         let saveBonus = 0;
@@ -871,7 +862,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     const handleApplyConcentration = () => {
         if (!concentrationPickerTarget || !concentrationSpellName.trim() || !combatSummary) return;
-        const creature = combatSummary.creatures.find(c => c.id === concentrationPickerTarget.id);
+        const creature = combatSummary.creatures.find(c => c.name === concentrationPickerTarget.name);
         if (!creature) return;
         creature.concentration = {
             id: utils.guid(),
@@ -900,9 +891,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         }).catch(() => {});
     };
 
-    const handleRollConcentrationSave = async (creatureId) => {
+    const handleRollConcentrationSave = async (creatureName) => {
         if (!combatSummary) return;
-        const creature = combatSummary.creatures.find(c => c.id === creatureId);
+        const creature = combatSummary.creatures.find(c => c.name === creatureName);
         if (!creature || !creature.concentration) return;
 
         const concentration = creature.concentration;
@@ -966,9 +957,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         }).catch(() => {});
     };
 
-    const handleBreakConcentration = (creatureId) => {
+    const handleBreakConcentration = (creatureName) => {
         if (!combatSummary) return;
-        const creature = combatSummary.creatures.find(c => c.id === creatureId);
+        const creature = combatSummary.creatures.find(c => c.name === creatureName);
         if (!creature || !creature.concentration) return;
         const spell = creature.concentration.spell;
         creature.concentration = concentrationRules.breakConcentration(creature.concentration);
@@ -989,9 +980,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         }).catch(() => {});
     };
 
-    const handleAutoBreakCondition = (creatureId, condition) => {
+    const handleAutoBreakCondition = (creatureName, condition) => {
         if (!isLocalhost || !combatSummary) return;
-        const creature = combatSummary.creatures.find(c => c.id === creatureId);
+        const creature = combatSummary.creatures.find(c => c.name === creatureName);
         if (!creature) return;
         creature.conditions = creature.conditions.filter(c => c.id !== condition.id);
         storage.set('combatSummary', combatSummary, campaignName);
@@ -1018,14 +1009,14 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             <h4>Initiative (round {combatSummary.round})</h4>
             <div className='carousel-container' ref={carouselRef}>
                 {combatSummary?.creatures?.map((creature) => {
-                    const isActive = creature.id === activeCreatureId;
+                    const isActive = creature.name === activeCreatureName;
                     const isUnconscious = creature.currentHp <= 0;
                     return (
-                        <div key={creature.id} className={`creature-card ${creature.type} ${isActive ? 'active' : ''} ${isUnconscious ? 'creature-unconscious' : ''}`}>
+                        <div key={creature.name} className={`creature-card ${creature.type} ${isActive ? 'active' : ''} ${isUnconscious ? 'creature-unconscious' : ''}`}>
                             {creature.type === 'npc' && isLocalhost && (
                                 <button
                                     className="npc-remove-btn"
-                                    onClick={() => handleRemoveNpc(creature.id)}
+                                    onClick={() => handleRemoveNpc(creature.name)}
                                     type="button"
                                     title="Remove NPC"
                                 >
@@ -1036,14 +1027,14 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                                 {creature.type === 'player' ? (
                                     <AvatarImage name={creature.name} imagePath={creature.imagePath} size={150} />
                                 ) : (
-                                    <NpcAvatar name={creature.name} imageUrl={npcImages[creature.id]} imagePath={creature.imagePath} onClick={() => handleNpcClick(creature)} />
+                                    <NpcAvatar name={creature.name} imageUrl={npcImages[creature.name]} imagePath={creature.imagePath} onClick={() => handleNpcClick(creature)} />
                                 )}
                             </div>
                             <div className='creature-name'>
                               {creature.type === 'npc' ? (
                                       <MonsterNameAutocomplete
                                         value={creature.name}
-                                        onChange={(newVal) => handleNameChange(creature.id, newVal)}
+                                        onChange={(newVal) => handleNameChange(creature.name, newVal)}
                                         npcs={campaignNpcs}
                                         showBadge={campaignNpcs.some(n => n.name?.toLowerCase() === creature.name?.toLowerCase())}
                                        />
@@ -1060,7 +1051,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                                 {creature.type === 'npc' && creature.initiativeBonus != null && creature.initiativeBonus !== '' && creature.initiativeBonus !== 0 ? (
                                     <span
                                         className="initiative-roll-link"
-                                        onClick={() => handleRollNpcInitiative(creature.id)}
+                                        onClick={() => handleRollNpcInitiative(creature.name)}
                                         role="button"
                                         tabIndex={0}
                                         title={`Roll initiative (d20 + ${creature.initiativeBonus})`}
@@ -1070,7 +1061,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                                 ) : (
                                     <input
                                         min="0"
-                                        onChange={(event) => handleInitiativeChange(creature.id, event.target.value)}
+                                        onChange={(event) => handleInitiativeChange(creature.name, event.target.value)}
                                         type="number"
                                         value={creature.initiative}
                                         placeholder="Init"
@@ -1079,15 +1070,15 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                             </div>
                             <div className='creature-target'>Target&nbsp;
                                 <select
-                                    value={creature.targetId || ''}
-                                    onChange={(e) => handleTargetChange(creature.id, e.target.value)}
+                                    value={creature.targetName || ''}
+                                    onChange={(e) => handleTargetChange(creature.name, e.target.value)}
                                     disabled={creature.type === 'npc' && !isLocalhost}
                                 >
                                     <option value="">— No Target —</option>
                                     {combatSummary.creatures
-                                        .filter(c => c.id !== creature.id)
+                                        .filter(c => c.name !== creature.name)
                                         .map(c => (
-                                            <option key={c.id} value={c.id}>{c.name}</option>
+                                            <option key={c.name} value={c.name}>{c.name}</option>
                                         ))
                                     }
                                     {overlays.length > 0 && (
@@ -1111,7 +1102,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                                         <div key={cond.id} className='condition-badge-wrapper'>
                                             <button
                                                 className='condition-badge initiative-condition-badge'
-                                                onClick={() => canRoll && handleRollConditionSave(creature.id, cond)}
+                                                onClick={() => canRoll && handleRollConditionSave(creature.name, cond)}
                                                 disabled={!canRoll}
                                                 type='button'
                                                 title={`${cond.label} (DC ${cond.dc} ${getAbilityLabel(cond.ability)})`}
@@ -1121,7 +1112,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                                             {isLocalhost && (
                                                 <button
                                                     className='condition-break-btn'
-                                                    onClick={() => handleAutoBreakCondition(creature.id, cond)}
+                                                    onClick={() => handleAutoBreakCondition(creature.name, cond)}
                                                     type='button'
                                                     title='Automatically break condition'
                                                 >
@@ -1163,7 +1154,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                                     <div className='concentration-badge-wrapper'>
                                         <button
                                             className='initiative-concentration-badge'
-                                            onClick={() => handleRollConcentrationSave(creature.id)}
+                                            onClick={() => handleRollConcentrationSave(creature.name)}
                                             type='button'
                                             title={`Concentration: ${creature.concentration.spell} (DC ${creature.concentration.dc} Constitution)`}
                                         >
@@ -1171,7 +1162,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                                         </button>
                                         <button
                                             className='concentration-break-btn'
-                                            onClick={() => handleBreakConcentration(creature.id)}
+                                            onClick={() => handleBreakConcentration(creature.name)}
                                             type='button'
                                             title='Break concentration'
                                         >

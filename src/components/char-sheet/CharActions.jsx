@@ -67,7 +67,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             damageType: attack.damageType,
             resistanceNotice,
             targetName: target?.name,
-            targetId: rawTargetId || target?.id,
+            targetId: rawTargetId || target?.name,
             saveDc: attack.saveDc,
             saveType: attack.saveType,
             dcSuccess: attack.saveSuccess,
@@ -101,7 +101,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
               console.log('[RangeDebug] combatContext', cs ? 'exists' : 'null');
               if (cs) {
                 const target = getTargetFromAttacker(cs, playerStats.name);
-                console.log('[RangeDebug] target from combat', target?.name, target ? `id=${target.id}` : 'null');
+                console.log('[RangeDebug] target from combat', target?.name, target ? `name=${target.name}` : 'null');
                 if (target) {
                   const targetPlayer = mapData?.players?.find(p => p.name === target.name);
                   const targetNpc = mapData?.placedItems?.find(i => i.name === target.name);

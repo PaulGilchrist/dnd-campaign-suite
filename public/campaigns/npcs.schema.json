@@ -6,15 +6,9 @@
     "items": {
         "type": "object",
         "required": [
-            "id",
             "name"
         ],
         "properties": {
-            "id": {
-                "type": "string",
-                "format": "uuid",
-                "description": "Unique identifier for the NPC"
-            },
             "name": {
                 "type": "string",
                 "description": "The NPC's name"

@@ -125,7 +125,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
     // Item context menu state
     const [selectedItem, setSelectedItem] = useState(null); // { id, gridX, gridY }
-    const [renamePopover, setRenamePopover] = useState(null); // { itemId, name } | null
+    const [renamePopover, setRenamePopover] = useState(null); // { itemName, name } | null
 
     // Monster card modal state
     const [viewingMonster, setViewingMonster] = useState(null);
@@ -833,7 +833,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         // Generic NPC drop
         if (dragData === 'npc') {
             const newItem = {
-                id: utils.guid(),
                 type: 'npc',
                 gridX: grid.gridX,
                 gridY: grid.gridY,
@@ -857,17 +856,17 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
     const { npcImages, setNpcImages } = useNpcImageCache(placedItems);
 
-    const handleRenameItem = useCallback((itemId, newName) => {
+    const handleRenameItem = useCallback((oldName, newName) => {
         if (!newName || !newName.trim()) return;
         setPlacedItems(prev =>
             prev.map(item =>
-                item.id === itemId ? { ...item, name: newName.trim() } : item
+                item.name === oldName ? { ...item, name: newName.trim() } : item
             )
         );
         setRenamePopover(null);
         setSelectedItem(null);
         // Clear the cached image so it gets recomputed
-        setNpcImages(prev => ({ ...prev, [itemId]: null }));
+        setNpcImages(prev => ({ ...prev, [newName.trim()]: null }));
     }, [setNpcImages]);
 
     const {
@@ -910,7 +909,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             const domY = svgRect.top + (menuSvgY - vbY) * scaleY + 80;
 
             setSelectedItem(null);
-            setRenamePopover({ itemId: item.id, name: defaultName || 'NPC', position: { left: `${domX}px`, top: `${domY}px` } });
+            setRenamePopover({ itemName: item.name, name: defaultName || 'NPC', position: { left: `${domX}px`, top: `${domY}px` } });
              };
 
     // Sync state to refs so handleWheel always reads latest values
@@ -1220,10 +1219,10 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
               {/* NPC Rename Autocomplete Overlay */}
                   {renamePopover && (
                       <MonsterNameAutocomplete
-                        key={renamePopover.itemId}
+                        key={renamePopover.name}
                         value={renamePopover.name}
                         position={renamePopover.position}
-                        onCommit={(newName) => handleRenameItem(renamePopover.itemId, newName)}
+                        onCommit={(newName) => handleRenameItem(renamePopover.itemName, newName)}
                     />
                  )}
 

@@ -47,9 +47,10 @@ router.post('/api/campaigns/:campaign/npcs', (req, res) => {
   }
 });
 
-// PUT /api/campaigns/:campaign/npcs/:npcId - Update a specific NPC (with optional image upload)
-router.put('/api/campaigns/:campaign/npcs/:npcId', (req, res) => {
-  const { campaign, npcId } = req.params;
+// PUT /api/campaigns/:campaign/npcs/:npcName - Update a specific NPC (with optional image upload)
+router.put('/api/campaigns/:campaign/npcs/:npcName', (req, res) => {
+  const { campaign, npcName } = req.params;
+  const decodedNpcName = decodeURIComponent(npcName);
   const updatedNpc = req.body;
   const npcPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'npcs.json');
 
@@ -63,7 +64,7 @@ router.put('/api/campaigns/:campaign/npcs/:npcId', (req, res) => {
     }
     if (!Array.isArray(npcs)) npcs = [];
 
-    const existingIndex = npcs.findIndex(n => n.id === npcId);
+    const existingIndex = npcs.findIndex(n => n.name === decodedNpcName);
     const existingNpc = existingIndex !== -1 ? npcs[existingIndex] : null;
     const originalImagePath = existingNpc?.imagePath;
 
@@ -101,9 +102,10 @@ router.put('/api/campaigns/:campaign/npcs/:npcId', (req, res) => {
   }
 });
 
-// GET /api/campaigns/:campaign/npcs/:npcId - Get a specific NPC
-router.get('/api/campaigns/:campaign/npcs/:npcId', (req, res) => {
-  const { campaign, npcId } = req.params;
+// GET /api/campaigns/:campaign/npcs/:npcName - Get a specific NPC
+router.get('/api/campaigns/:campaign/npcs/:npcName', (req, res) => {
+  const { campaign, npcName } = req.params;
+  const decodedNpcName = decodeURIComponent(npcName);
   const npcPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'npcs.json');
 
   try {
@@ -113,7 +115,7 @@ router.get('/api/campaigns/:campaign/npcs/:npcId', (req, res) => {
 
     const npcData = JSON.parse(fs.readFileSync(npcPath, 'utf-8'));
     const npcs = Array.isArray(npcData) ? npcData : [];
-    const npc = npcs.find(n => n.id === npcId);
+    const npc = npcs.find(n => n.name === decodedNpcName);
 
     if (!npc) {
       return res.status(404).json({ error: 'NPC not found' });
@@ -126,9 +128,10 @@ router.get('/api/campaigns/:campaign/npcs/:npcId', (req, res) => {
   }
 });
 
-// DELETE /api/campaigns/:campaign/npcs/:npcId - Delete a specific NPC (with image cleanup)
-router.delete('/api/campaigns/:campaign/npcs/:npcId', (req, res) => {
-  const { campaign, npcId } = req.params;
+// DELETE /api/campaigns/:campaign/npcs/:npcName - Delete a specific NPC (with image cleanup)
+router.delete('/api/campaigns/:campaign/npcs/:npcName', (req, res) => {
+  const { campaign, npcName } = req.params;
+  const decodedNpcName = decodeURIComponent(npcName);
   const npcPath = path.join(process.cwd(), 'public', 'campaigns', campaign, 'data', 'npcs.json');
 
   try {
@@ -138,13 +141,13 @@ router.delete('/api/campaigns/:campaign/npcs/:npcId', (req, res) => {
 
     const npcData = JSON.parse(fs.readFileSync(npcPath, 'utf-8'));
     const npcs = Array.isArray(npcData) ? npcData : [];
-    const deletedNpc = npcs.find(n => n.id === npcId);
+    const deletedNpc = npcs.find(n => n.name === decodedNpcName);
 
     if (deletedNpc?.imagePath) {
       deleteCharacterImage(deletedNpc.imagePath);
     }
 
-    const updatedNpcs = npcs.filter(n => n.id !== npcId);
+    const updatedNpcs = npcs.filter(n => n.name !== decodedNpcName);
 
     fs.writeFileSync(npcPath, JSON.stringify(updatedNpcs, null, 2));
 

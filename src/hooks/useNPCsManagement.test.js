@@ -28,8 +28,8 @@ describe('useNPCsManagement', () => {
   describe('loadNPCsList', () => {
     it('loads and sets npcs from service', async () => {
       const npcsData = [
-        { id: 'npc-1', name: 'Elminster', role: 'Wizard' },
-        { id: 'npc-2', name: 'Drizzt', role: 'Ranger' },
+        { name: 'Elminster', role: 'Wizard' },
+        { name: 'Drizzt', role: 'Ranger' },
       ];
       mockLoadNPCs.mockResolvedValue({ npcs: npcsData });
 
@@ -87,7 +87,7 @@ describe('useNPCsManagement', () => {
 
   describe('saveNPCsList', () => {
     it('saves npcs and reloads the list', async () => {
-      const npcsToSave = [{ id: 'npc-1', name: 'Elminster', role: 'Wizard' }];
+      const npcsToSave = [{ name: 'Elminster', role: 'Wizard' }];
       mockSaveNPCs.mockResolvedValue({ success: true });
       mockLoadNPCs.mockResolvedValue({ npcs: npcsToSave });
 
@@ -109,7 +109,7 @@ describe('useNPCsManagement', () => {
 
       await expect(
         act(async () => {
-          await result.current.saveNPCsList([{ id: 'npc-1' }]);
+          await result.current.saveNPCsList([{ name: 'Elminster' }]);
         })
       ).rejects.toThrow('Save failed');
     });
@@ -123,10 +123,10 @@ describe('useNPCsManagement', () => {
       const { result } = renderHook(() => useNPCsManagement('test-campaign'));
 
       await act(async () => {
-        await result.current.deleteNPCAction('npc-1');
+        await result.current.deleteNPCAction('Elminster');
       });
 
-      expect(mockDeleteNPC).toHaveBeenCalledWith('test-campaign', 'npc-1');
+      expect(mockDeleteNPC).toHaveBeenCalledWith('test-campaign', 'Elminster');
       expect(mockLoadNPCs).toHaveBeenCalled();
       expect(result.current.npcs).toEqual([]);
     });
@@ -138,7 +138,7 @@ describe('useNPCsManagement', () => {
 
       await expect(
         act(async () => {
-          await result.current.deleteNPCAction('npc-1');
+          await result.current.deleteNPCAction('Elminster');
         })
       ).rejects.toThrow('Delete failed');
     });

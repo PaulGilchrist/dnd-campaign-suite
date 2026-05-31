@@ -30,9 +30,9 @@ function useNPCsManagement(campaignName) {
     }
   }, [campaignName, loadNPCsList]);
 
-  const saveNPCAction = useCallback(async (npc) => {
+  const saveNPCAction = useCallback(async (npc, oldName) => {
     try {
-      const result = await saveNPC(campaignName, npc);
+      const result = await saveNPC(campaignName, npc, oldName);
       if (result?.npc?.imagePath) {
         const img = new Image();
         await new Promise((resolve) => {
@@ -43,7 +43,8 @@ function useNPCsManagement(campaignName) {
       }
       if (result?.npc) {
         setNpcs((prev) => {
-          const index = prev.findIndex((n) => n.id === result.npc.id);
+          const name = oldName || result.npc.name;
+          const index = prev.findIndex((n) => n.name === name);
           if (index !== -1) {
             const updated = [...prev];
             updated[index] = result.npc;
@@ -59,9 +60,9 @@ function useNPCsManagement(campaignName) {
     }
   }, [campaignName]);
 
-  const deleteNPCAction = useCallback(async (npcId) => {
+  const deleteNPCAction = useCallback(async (npcName) => {
     try {
-      await deleteNPC(campaignName, npcId);
+      await deleteNPC(campaignName, npcName);
       await loadNPCsList();
     } catch (error) {
       console.error('Failed to delete NPC:', error);

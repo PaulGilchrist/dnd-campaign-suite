@@ -50,7 +50,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       const targetId = pending.targetId;
       let targetMaxHp = 0;
       if (combatSummary) {
-        const t = combatSummary.creatures.find(c => c.id === targetId);
+        const t = combatSummary.creatures.find(c => c.name === targetId);
         if (t) targetMaxHp = t.maxHp;
       }
       const applyResult = applyDamageToTarget(
@@ -287,7 +287,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           const npcResults = saveDc && saveType
             ? processAoeNpcs(combatSummary, affected, total, damageType, saveDc, saveType, dcSuccess, campaignName)
             : affected.map(({ creature }) => {
-                const applyResult = applyDamageToTarget(combatSummary, creature.id, total, damageType ? [damageType] : [], campaignName);
+                const applyResult = applyDamageToTarget(combatSummary, creature.name, total, damageType ? [damageType] : [], campaignName);
                 return { creatureName: creature.name, finalDamage: applyResult?.finalDamage, newHp: applyResult?.newHp, damageReduced: applyResult?.damageReduced, saveSuccess: null };
               });
           const playerAffected = affected.filter(a => a.creature.type === 'player');
@@ -341,7 +341,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         return;
       }
 
-      const target = targetId ? combatSummary?.creatures?.find(c => c.id === targetId) : null;
+      const target = targetId ? combatSummary?.creatures?.find(c => c.name === targetId) : null;
 
      if (saveDc && saveType && target) {
        if (target.type === 'npc') {
@@ -499,7 +499,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
     if (!pending) return;
 
     const combatSummary = getCombatSummary();
-    const target = combatSummary?.creatures?.find(c => c.id === pending.targetId);
+    const target = combatSummary?.creatures?.find(c => c.name === pending.targetId);
     if (!target) return;
 
     const saveResult = rollSaveForCreature(target, saveType, saveDc);

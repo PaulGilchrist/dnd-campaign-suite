@@ -11,7 +11,7 @@ describe('npcsService', () => {
 
   describe('loadNPCs', () => {
     it('should return NPCs from API response', async () => {
-      const mockNPCs = [{ id: '1', name: 'NPC 1' }, { id: '2', name: 'NPC 2' }];
+      const mockNPCs = [{ name: 'NPC 1' }, { name: 'NPC 2' }];
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(mockNPCs),
@@ -67,7 +67,7 @@ describe('npcsService', () => {
 
   describe('saveNPCs', () => {
     it('should save NPCs and return response', async () => {
-      const npcs = [{ id: '1', name: 'NPC 1' }];
+      const npcs = [{ name: 'NPC 1' }];
       const responseData = { success: true, savedCount: 1 };
 
       mockFetch.mockResolvedValue({
@@ -129,31 +129,31 @@ describe('npcsService', () => {
 
   describe('loadNPC', () => {
     it('should return a single NPC from API response', async () => {
-      const mockNPC = { id: 'npc-1', name: 'Town Guard' };
+      const mockNPC = { name: 'Town Guard' };
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(mockNPC),
       });
 
-      const result = await loadNPC('campaign1', 'npc-1');
+      const result = await loadNPC('campaign1', 'Town Guard');
 
       expect(result).toEqual(mockNPC);
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign1/npcs/npc-1',
+        '/api/campaigns/campaign1/npcs/Town%20Guard',
         { method: 'GET', headers: { 'Content-Type': 'application/json' } }
       );
     });
 
-    it('should encode campaign and NPC IDs in URL', async () => {
+    it('should encode campaign and NPC names in URL', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({}),
       });
 
-      await loadNPC('campaign with spaces', 'npc with spaces');
+      await loadNPC('campaign with spaces', 'NPC with spaces');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/npcs/npc%20with%20spaces',
+        '/api/campaigns/campaign%20with%20spaces/npcs/NPC%20with%20spaces',
         { method: 'GET', headers: { 'Content-Type': 'application/json' } }
       );
     });
@@ -164,7 +164,7 @@ describe('npcsService', () => {
         json: () => Promise.resolve({ error: 'NPC not found' }),
       });
 
-      await expect(loadNPC('campaign1', 'npc-1')).rejects.toThrow('NPC not found');
+      await expect(loadNPC('campaign1', 'Town Guard')).rejects.toThrow('NPC not found');
     });
 
     it('should throw generic message when error is missing', async () => {
@@ -173,43 +173,43 @@ describe('npcsService', () => {
         json: () => Promise.resolve({}),
       });
 
-      await expect(loadNPC('campaign1', 'npc-1')).rejects.toThrow('Failed to load NPC');
+      await expect(loadNPC('campaign1', 'Town Guard')).rejects.toThrow('Failed to load NPC');
     });
 
     it('should throw on network error', async () => {
       mockFetch.mockRejectedValue(new Error('Network error'));
 
-      await expect(loadNPC('campaign1', 'npc-1')).rejects.toThrow('Network error');
+      await expect(loadNPC('campaign1', 'Town Guard')).rejects.toThrow('Network error');
     });
   });
 
   describe('deleteNPC', () => {
     it('should delete an NPC and return response', async () => {
-      const responseData = { success: true, deleted: 'npc-1' };
+      const responseData = { success: true };
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(responseData),
       });
 
-      const result = await deleteNPC('campaign1', 'npc-1');
+      const result = await deleteNPC('campaign1', 'Town Guard');
 
       expect(result).toEqual(responseData);
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign1/npcs/npc-1',
+        '/api/campaigns/campaign1/npcs/Town%20Guard',
         { method: 'DELETE' }
       );
     });
 
-    it('should encode campaign and NPC IDs in URL', async () => {
+    it('should encode campaign and NPC names in URL', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ success: true }),
       });
 
-      await deleteNPC('campaign with spaces', 'npc with spaces');
+      await deleteNPC('campaign with spaces', 'NPC with spaces');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign%20with%20spaces/npcs/npc%20with%20spaces',
+        '/api/campaigns/campaign%20with%20spaces/npcs/NPC%20with%20spaces',
         { method: 'DELETE' }
       );
     });
@@ -220,7 +220,7 @@ describe('npcsService', () => {
         json: () => Promise.resolve({ error: 'NPC not found' }),
       });
 
-      await expect(deleteNPC('campaign1', 'npc-1')).rejects.toThrow('NPC not found');
+      await expect(deleteNPC('campaign1', 'Town Guard')).rejects.toThrow('NPC not found');
     });
 
     it('should throw generic message when error is missing', async () => {
@@ -229,13 +229,13 @@ describe('npcsService', () => {
         json: () => Promise.resolve({}),
       });
 
-      await expect(deleteNPC('campaign1', 'npc-1')).rejects.toThrow('Failed to delete NPC');
+      await expect(deleteNPC('campaign1', 'Town Guard')).rejects.toThrow('Failed to delete NPC');
     });
 
     it('should throw on network error', async () => {
       mockFetch.mockRejectedValue(new Error('Network error'));
 
-      await expect(deleteNPC('campaign1', 'npc-1')).rejects.toThrow('Network error');
+      await expect(deleteNPC('campaign1', 'Town Guard')).rejects.toThrow('Network error');
     });
   });
 });

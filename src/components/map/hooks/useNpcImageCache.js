@@ -8,11 +8,11 @@ function useNpcImageCache(placedItems) {
         const npcItems = placedItems.filter(item => item.type === 'npc');
         const promises = npcItems.map(async (item) => {
             const url = await getMonsterImageUrl(item.name);
-            return { id: item.id, url };
+            return { name: item.name, url };
         });
         Promise.all(promises).then(results => {
             const newImages = {};
-            results.forEach(({ id, url }) => { newImages[id] = url; });
+            results.forEach(({ name, url }) => { newImages[name] = url; });
             setNpcImages(newImages);
         });
     }, [placedItems]);
