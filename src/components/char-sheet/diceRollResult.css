@@ -138,6 +138,20 @@
     margin-left: 4px;
 }
 
+.dice-roll-auto-damage {
+    text-align: center;
+    font-size: 0.95em;
+    margin: 10px 0;
+    padding: 8px;
+    border-radius: 4px;
+    color: #4CAF50;
+    background: rgba(76, 175, 80, 0.12);
+}
+
+.dice-roll-auto-damage i {
+    margin-right: 6px;
+}
+
 .dice-roll-damage-applied {
     text-align: center;
     font-size: 0.95em;

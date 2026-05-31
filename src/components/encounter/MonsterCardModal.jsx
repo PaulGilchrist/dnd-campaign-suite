@@ -20,7 +20,26 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
   const monsterName = monster?.name || 'Monster';
   const { popupHtml, setPopupHtml, rollAttack, rollDamage, rollAbilityCheck, rollSavingThrow, rollSkillCheck, rollInitiative, quickRollPlayerSave } = useLoggedDiceRoll(
     monsterName,
-    campaignName
+    campaignName,
+    {
+      autoDamageRoll: (autoDamage, isCrit) => {
+        const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
+        if (result) {
+          const context = {
+            damageType: autoDamage.damageType,
+            targetId: autoDamage.targetId,
+            targetName: autoDamage.targetName,
+            attackerName: autoDamage.attackerName,
+          };
+          if (autoDamage.saveDc) {
+            context.saveDc = autoDamage.saveDc;
+            context.saveType = autoDamage.saveType;
+            context.dcSuccess = autoDamage.dcSuccess;
+          }
+          rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
+        }
+      },
+    }
   );
 
   const getAttackerCreature = useCallback(() => {
@@ -75,6 +94,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
       resistanceNotice,
       forcedMode: forcedMode !== 'normal' ? forcedMode : undefined,
       isAutoCrit,
+      autoDamageFormula: action?.damage_dice || null,
+      autoDamageName: name,
+      targetId: target?.id,
+      targetName: target?.name,
+      attackerName: monsterName,
+      saveDc: action?.save_dc || null,
+      saveType: action?.save_type ? toAbbr(action.save_type) : null,
+      dcSuccess: action?.save_dc != null ? 'half' : null,
     });
   };
 

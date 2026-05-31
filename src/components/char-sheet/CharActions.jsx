@@ -16,15 +16,30 @@ const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats);
 
 const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct }) {
-  const [actions, setActions] = useState([]);
+   const [actions, setActions] = useState([]);
 
-   useEffect(() => {
-     fetch('/data/actions.json')
-            .then(response => response.json())
-             .then(data => setActions(data))
-          .catch(error => console.error('Error loading actions:', error));
-       }, []);
-    const { popupHtml, setPopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName);
+    useEffect(() => {
+      fetch('/data/actions.json')
+             .then(response => response.json())
+              .then(data => setActions(data))
+           .catch(error => console.error('Error loading actions:', error));
+        }, []);
+     const { popupHtml, setPopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
+       autoDamageRoll: (autoDamage, isCrit) => {
+         const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
+         if (result) {
+           rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, {
+             damageType: autoDamage.damageType,
+             targetId: autoDamage.targetId,
+             targetName: autoDamage.targetName,
+             attackerName: autoDamage.attackerName,
+             saveDc: autoDamage.saveDc,
+             saveType: autoDamage.saveType,
+             dcSuccess: autoDamage.dcSuccess,
+           });
+         }
+       },
+     });
 
     const getCombatTargetInfo = React.useCallback(() => {
         const cs = getCombatContext();
@@ -49,6 +64,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             dcSuccess: attack.saveSuccess,
             attackerName: playerStats.name,
             forcedMode: conditionAttackMode !== 'normal' ? conditionAttackMode : undefined,
+            autoDamageFormula: attack.damage,
+            autoDamageName: attack.name,
         };
     }, [getCombatTargetInfo, conditionAttackMode, playerStats.name]);
 

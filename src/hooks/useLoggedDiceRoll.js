@@ -1,3 +1,4 @@
+import { useRef, useEffect } from 'react';
 import useDiceRoll from './useDiceRoll.js';
 import { rollD20 } from '../services/diceRoller.js';
 import utils from '../services/utils.js';
@@ -26,8 +27,11 @@ function getCombatSummary() {
   try { return JSON.parse(stored); } catch { return null; }
 }
 
-export default function useLoggedDiceRoll(characterName, campaignName) {
+export default function useLoggedDiceRoll(characterName, campaignName, options = {}) {
   const { popupHtml, setPopupHtml } = useDiceRoll();
+  const { autoDamageRoll } = options;
+  const autoDamageRollRef = useRef(null);
+  autoDamageRollRef.current = autoDamageRoll || null;
 
   if (!window.__pendingSaves) window.__pendingSaves = {};
   const pendingSaves = window.__pendingSaves;
@@ -140,6 +144,16 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
     });
   }
 
+  useEffect(() => {
+    if (popupHtml?.hit === true && popupHtml?.autoDamage && autoDamageRollRef.current) {
+      const timer = setTimeout(() => {
+        const { autoDamage } = popupHtml;
+        autoDamageRollRef.current(autoDamage, popupHtml.isCrit);
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [popupHtml]);
+
   function logEntry(entry) {
     fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
         method: 'POST',
@@ -160,39 +174,52 @@ export default function useLoggedDiceRoll(characterName, campaignName) {
     const targetName = target?.name || context?.targetName;
     const targetAc = target?.ac || context?.targetAc;
 
-    const isCrit = (r1 === 20 || context?.isAutoCrit) && hit;
+     const isCrit = (r1 === 20 || context?.isAutoCrit) && hit;
 
-    logEntry({
-       type: 'roll',
-       characterName,
-       rollType,
-       name,
-       rolls: [r1, r2],
-      mode: 'normal',
-     total: r1,
-       bonus,
-       isNatural20: r1 === 20,
-        isNatural1: r1 === 1,
+     const autoDamage = hit && context?.autoDamageFormula ? {
+       name: context.autoDamageName || name,
+       formula: context.autoDamageFormula,
+       damageType: context.damageType,
+       targetId: context.targetId,
+       targetName: targetName,
+       attackerName: context.attackerName || characterName,
+       saveDc: context.saveDc,
+       saveType: context.saveType,
+       dcSuccess: context.dcSuccess,
+     } : undefined;
+
+     logEntry({
+        type: 'roll',
+        characterName,
+        rollType,
+        name,
+        rolls: [r1, r2],
+       mode: 'normal',
+      total: r1,
+        bonus,
+        isNatural20: r1 === 20,
+         isNatural1: r1 === 1,
+         targetName,
+         targetAc,
+         damageType: context?.damageType,
+         hit,
+          resistanceNotice: context?.resistanceNotice
+           });
+     setPopupHtml({
+        type: 'd20',
+        rollType,
+        name,
+        rolls: [r1, r2],
+        bonus,
         targetName,
         targetAc,
-        damageType: context?.damageType,
         hit,
-         resistanceNotice: context?.resistanceNotice
-          });
-     setPopupHtml({
-       type: 'd20',
-       rollType,
-       name,
-       rolls: [r1, r2],
-       bonus,
-       targetName,
-       targetAc,
-       hit,
-       resistanceNotice: context?.resistanceNotice,
-       forcedMode: context?.forcedMode,
-       isAutoCrit: context?.isAutoCrit,
-       isCrit
-     });
+        resistanceNotice: context?.resistanceNotice,
+        forcedMode: context?.forcedMode,
+        isAutoCrit: context?.isAutoCrit,
+        isCrit,
+        autoDamage,
+      });
 
     if (rollType === 'initiative') {
         const firstName = utils.getName(characterName);

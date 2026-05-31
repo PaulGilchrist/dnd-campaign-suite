@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, targetMaxHp, damageReduced, onQuickRoll }) {
+function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, targetMaxHp, damageReduced, onQuickRoll, autoDamage }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
 
     const isD20 = type === 'd20';
@@ -86,6 +86,12 @@ function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier =
             {targetName && hit !== undefined && !isSaveDamageType && (
               <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
                 {hit ? '✓ HIT' : '✗ MISS'} ({total} vs AC {targetAc})
+              </div>
+            )}
+
+            {autoDamage && hit && (
+              <div className="dice-roll-auto-damage">
+                <i className="fa-solid fa-spinner fa-spin"></i> Rolling damage...
               </div>
             )}
 

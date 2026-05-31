@@ -13,7 +13,25 @@ import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct }) {
     const { showPopup, popupHtml, setPopupHtml } = useActionPopup('spell');
-    const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName);
+    const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
+       autoDamageRoll: (autoDamage, isCrit) => {
+         const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
+         if (result) {
+           const context = {
+             damageType: autoDamage.damageType,
+             targetId: autoDamage.targetId,
+             targetName: autoDamage.targetName,
+             attackerName: autoDamage.attackerName,
+           };
+           if (autoDamage.saveDc) {
+             context.saveDc = autoDamage.saveDc;
+             context.saveType = autoDamage.saveType;
+             context.dcSuccess = autoDamage.dcSuccess;
+           }
+           rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
+         }
+       },
+     });
 
     const getDamageFormula = (effect) => {
         const match = effect.match(/^(\d+d\d+(?:[+-]\d+)?)/);
