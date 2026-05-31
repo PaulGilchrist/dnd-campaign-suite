@@ -47,15 +47,15 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       const finalDamage = computeDamageAfterSave(
         e.detail.rawDamage, e.detail.success, e.detail.dcSuccess
       );
-      const targetId = pending.targetId;
+      const pendingTargetName = pending.targetName;
       let targetMaxHp = 0;
       if (combatSummary) {
-        const t = combatSummary.creatures.find(c => c.name === targetId);
+        const t = combatSummary.creatures.find(c => c.name === pendingTargetName);
         if (t) targetMaxHp = t.maxHp;
-      }
+       }
       const applyResult = applyDamageToTarget(
-        combatSummary, targetId, finalDamage, [pending.damageType], pending.campaignName
-      );
+        combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName
+       );
 
       logEntry({
         type: 'roll',
@@ -180,17 +180,16 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
 
       const isCrit = !isAutoMiss && (r1 === 20 || context?.isAutoCrit) && hit;
 
-     const autoDamage = hit && context?.autoDamageFormula ? {
-       name: context.autoDamageName || name,
-       formula: context.autoDamageFormula,
-       damageType: context.damageType,
-       targetId: context.targetId,
-       targetName: targetName,
-       attackerName: context.attackerName || characterName,
-       saveDc: context.saveDc,
-       saveType: context.saveType,
-       dcSuccess: context.dcSuccess,
-     } : undefined;
+      const autoDamage = hit && context?.autoDamageFormula ? {
+        name: context.autoDamageName || name,
+        formula: context.autoDamageFormula,
+        damageType: context.damageType,
+        targetName: targetName,
+        attackerName: context.attackerName || characterName,
+        saveDc: context.saveDc,
+        saveType: context.saveType,
+        dcSuccess: context.dcSuccess,
+       } : undefined;
 
      logEntry({
         type: 'roll',
@@ -254,7 +253,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
      }
 
    function logDamageAndShow(name, formula, total, rolls, modifier, context) {
-      const { saveDc, saveType, dcSuccess, targetId, damageType, attackerName, isAutoMiss, rangeReason } = context || {};
+      const { saveDc, saveType, dcSuccess, damageType, attackerName, isAutoMiss, rangeReason } = context || {};
       const combatSummary = getCombatSummary();
 
       if (isAutoMiss) {
@@ -270,7 +269,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           damageType,
           targetName: context?.targetName,
           rangeReason,
-        });
+         });
         setPopupHtml({
           type: 'auto-miss',
           name,
@@ -281,55 +280,44 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           damageType,
           targetName: context?.targetName,
           rangeReason,
-        });
+         });
         return;
-      }
+       }
 
-      if (targetId && targetId.startsWith('overlay-')) {
+       const targetTargetName = context?.targetName;
+       if (targetTargetName && targetTargetName.startsWith('overlay-')) {
         const aoeCtx = readAoeContext(campaignName);
         if (aoeCtx && combatSummary) {
           const { overlay, players, npcs } = aoeCtx;
           const affected = getAffectedCreatures(overlay, players, npcs, combatSummary);
           const npcResults = saveDc && saveType
-            ? processAoeNpcs(combatSummary, affected, total, damageType, saveDc, saveType, dcSuccess, campaignName)
-            : affected.map(({ creature }) => {
+             ? processAoeNpcs(combatSummary, affected, total, damageType, saveDc, saveType, dcSuccess, campaignName)
+             : affected.map(({ creature }) => {
                 const applyResult = applyDamageToTarget(combatSummary, creature.name, total, damageType ? [damageType] : [], campaignName);
                 return { creatureName: creature.name, finalDamage: applyResult?.finalDamage, newHp: applyResult?.newHp, damageReduced: applyResult?.damageReduced, saveSuccess: null };
-              });
+               });
           const playerAffected = affected.filter(a => a.creature.type === 'player');
           if (playerAffected.length && saveDc && saveType) {
             const playerPrompts = sendAoePlayerSaves(playerAffected, total, damageType, saveDc, saveType, dcSuccess, campaignName, name, attackerName || characterName, rolls, formula);
             for (const pp of playerPrompts) {
               pendingSaves[pp.promptId] = {
-                targetId: pp.targetId,
-                rawDamage: total,
-                saveDc,
-                saveType,
-                dcSuccess,
-                damageType,
-                attackerName: attackerName || characterName,
-                targetName: pp.targetName,
-                name,
-                formula,
-                modifier,
-                rolls,
-                campaignName,
-                setPopupHtml,
-                isAoe: true,
-              };
+                targetName: pp.targetName, rawDamage: total, saveDc, saveType, dcSuccess,
+                damageType, attackerName: attackerName || characterName,
+                name, formula, modifier, rolls, campaignName, setPopupHtml, isAoe: true,
+               };
+              }
             }
-          }
           const overlayLabel = overlay.label || overlay.shape || 'AoE';
           const npcResultRows = npcResults.map(r => {
             const saveInfo = r.saveSuccess === null ? '' : (r.saveSuccess
-              ? `<span class="aoe-save-success">SAVE ${r.saveRoll}+${r.saveBonus} PASS</span>`
-              : `<span class="aoe-save-fail">SAVE ${r.saveRoll}+${r.saveBonus} FAIL</span>`);
+               ? `<span class="aoe-save-success">SAVE ${r.saveRoll}+${r.saveBonus} PASS</span>`
+               : `<span class="aoe-save-fail">SAVE ${r.saveRoll}+${r.saveBonus} FAIL</span>`);
             const reduced = r.damageReduced ? ' <em>(reduced)</em>' : '';
             return `<div class="aoe-result-row"><strong>${r.creatureName}</strong>: ${r.finalDamage} dmg${reduced} → ${r.newHp !== undefined ? `HP ${r.newHp}` : ''} ${saveInfo}</div>`;
-          }).join('');
+           }).join('');
           const pendingList = playerAffected.length
-            ? `<div class="aoe-pending"><i class="fa-solid fa-spinner fa-spin"></i> Waiting for saves: ${playerAffected.map(a => a.creature.name).join(', ')}</div>`
-            : '';
+             ? `<div class="aoe-pending"><i class="fa-solid fa-spinner fa-spin"></i> Waiting for saves: ${playerAffected.map(a => a.creature.name).join(', ')}</div>`
+             : '';
           const html = `<div class="aoe-summary"><h3><i class="fa-solid fa-wand-magic-sparkles"></i> ${overlayLabel} — ${name}</h3><div class="aoe-damage-info">${formula}: <strong>${total}</strong> ${damageType || 'untyped'}${saveDc ? ` — ${saveType ? saveType.toUpperCase() : ''} save DC ${saveDc}` : ''}</div><div class="aoe-results">${npcResultRows || '<em>No creatures affected</em>'}</div>${pendingList}</div>`;
           logEntry({
             type: 'aoe-damage',
@@ -341,125 +329,122 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             affectedCount: affected.length,
             npcResults: npcResults.map(r => r.creatureName),
             saveType, saveDc, dcSuccess,
-          });
+           });
           setPopupHtml(html);
-        }
+         }
         return;
-      }
-
-      const target = targetId ? combatSummary?.creatures?.find(c => c.name === targetId) : null;
-
-     if (saveDc && saveType && target) {
-       if (target.type === 'npc') {
-         const saveResult = rollSaveForCreature(target, saveType, saveDc);
-         const finalDamage = computeDamageAfterSave(total, saveResult.success, dcSuccess);
-         const applyResult = applyDamageToTarget(combatSummary, targetId, finalDamage, damageType ? [damageType] : [], campaignName);
-
-         logEntry({
-           type: 'roll',
-           characterName,
-           rollType: 'save-damage',
-           name,
-           formula,
-           rolls,
-           total,
-           modifier,
-           damageType,
-           targetName: target.name,
-           saveType,
-           saveDc,
-           saveResult: saveResult.success ? 'success' : 'failure',
-           saveRoll: saveResult.roll,
-           saveBonus: saveResult.bonus,
-           finalDamage: applyResult?.finalDamage ?? total,
-         });
-
-         setPopupHtml({
-           type: 'save-damage',
-           name,
-           formula,
-           rolls,
-           bonus: 0,
-           modifier,
-           damageType,
-           targetName: target.name,
-           targetCurrentHp: applyResult?.newHp,
-           targetMaxHp: target.maxHp,
-           saveDc,
-           saveType,
-           dcSuccess,
-           saveResult,
-           finalDamage: applyResult?.finalDamage,
-           damageApplied: true,
-           damageReduced: applyResult?.damageReduced,
-         });
-         return;
        }
 
-       if (target.type === 'player') {
-         const promptId = utils.guid();
-         pendingSaves[promptId] = {
-           targetId, rawDamage: total, saveDc, saveType, dcSuccess,
-           damageType, attackerName: attackerName || characterName,
-           targetName: target.name, name, formula, modifier, rolls,
-           campaignName, setPopupHtml,
-         };
+      const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
 
-         sendSavePrompt(campaignName, {
-           promptId,
-           targetName: target.name,
-           saveType,
-           saveDc,
-           dcSuccess,
-           damageFormula: formula,
-           damageType,
-           sourceName: name,
-           sourceAttackerName: attackerName || characterName,
-           rawDamage: total,
-         });
+      if (saveDc && saveType && target) {
+        if (target.type === 'npc') {
+          const saveResult = rollSaveForCreature(target, saveType, saveDc);
+          const finalDamage = computeDamageAfterSave(total, saveResult.success, dcSuccess);
+          const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, damageType ? [damageType] : [], campaignName);
 
-         logEntry({
-           type: 'roll',
-           characterName,
-           rollType: 'save-prompt',
-           name,
-           formula,
-           rolls,
-           total,
-           modifier,
-           damageType,
-           targetName: target.name,
-           saveType,
-           saveDc,
-           dcSuccess,
-         });
+          logEntry({
+            type: 'roll',
+            characterName,
+            rollType: 'save-damage',
+            name,
+            formula,
+            rolls,
+            total,
+            modifier,
+            damageType,
+            targetName: target.name,
+            saveType,
+            saveDc,
+            saveResult: saveResult.success ? 'success' : 'failure',
+            saveRoll: saveResult.roll,
+            saveBonus: saveResult.bonus,
+            finalDamage: applyResult?.finalDamage ?? total,
+           });
 
-         setPopupHtml({
-           type: 'save-damage',
-           name,
-           formula,
-           rolls,
-           bonus: 0,
-           modifier,
-           damageType,
-           targetName: target.name,
-           saveDc,
-           saveType,
-           dcSuccess,
-           waitingForPlayerSave: true,
-           promptId,
-           rawDamage: total,
-           targetId,
-           attackerName: attackerName || characterName,
-         });
-         return;
+          setPopupHtml({
+            type: 'save-damage',
+            name,
+            formula,
+            rolls,
+            bonus: 0,
+            modifier,
+            damageType,
+            targetName: target.name,
+            targetCurrentHp: applyResult?.newHp,
+            targetMaxHp: target.maxHp,
+            saveDc,
+            saveType,
+            dcSuccess,
+            saveResult,
+            finalDamage: applyResult?.finalDamage,
+            damageApplied: true,
+            damageReduced: applyResult?.damageReduced,
+           });
+          return;
+          }
+
+        if (target.type === 'player') {
+          const promptId = utils.guid();
+          pendingSaves[promptId] = {
+            targetName: target.name, rawDamage: total, saveDc, saveType, dcSuccess,
+            damageType, attackerName: attackerName || characterName, name, formula, modifier, rolls, campaignName, setPopupHtml,
+           };
+
+          sendSavePrompt(campaignName, {
+            promptId,
+            targetName: target.name,
+            saveType,
+            saveDc,
+            dcSuccess,
+            damageFormula: formula,
+            damageType,
+            sourceName: name,
+            sourceAttackerName: attackerName || characterName,
+            rawDamage: total,
+           });
+
+          logEntry({
+            type: 'roll',
+            characterName,
+            rollType: 'save-prompt',
+            name,
+            formula,
+            rolls,
+            total,
+            modifier,
+            damageType,
+            targetName: target.name,
+            saveType,
+            saveDc,
+            dcSuccess,
+           });
+
+          setPopupHtml({
+            type: 'save-damage',
+            name,
+            formula,
+            rolls,
+            bonus: 0,
+            modifier,
+            damageType,
+            targetName: target.name,
+            saveDc,
+            saveType,
+            dcSuccess,
+            waitingForPlayerSave: true,
+            promptId,
+            rawDamage: total,
+            attackerName: attackerName || characterName,
+           });
+          return;
+          }
+        }
+
+      let applyResult = null;
+      if (target) {
+        applyResult = applyDamageToTarget(combatSummary, target.name, total, damageType ? [damageType] : [], campaignName);
        }
-     }
-
-     let applyResult = null;
-     if (target) {
-       applyResult = applyDamageToTarget(combatSummary, targetId, total, damageType ? [damageType] : [], campaignName);
-     }
 
      logEntry({
         type: 'roll',
@@ -505,12 +490,12 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
     if (!pending) return;
 
     const combatSummary = getCombatSummary();
-    const target = combatSummary?.creatures?.find(c => c.name === pending.targetId);
+    const target = combatSummary?.creatures?.find(c => c.name === pending.targetName);
     if (!target) return;
 
     const saveResult = rollSaveForCreature(target, saveType, saveDc);
     const finalDamage = computeDamageAfterSave(pending.rawDamage, saveResult.success, pending.dcSuccess);
-    const applyResult = applyDamageToTarget(combatSummary, pending.targetId, finalDamage, [pending.damageType], campaignName);
+    const applyResult = applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName);
 
     delete pendingSaves[promptId];
 

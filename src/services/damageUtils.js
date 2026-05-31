@@ -54,7 +54,7 @@ export function getTargetFromAttacker(combatSummary, attackerName) {
   return target || null;
 }
 
-export function getAttackerTargetId(combatSummary, attackerName) {
+export function getAttackerTargetName(combatSummary, attackerName) {
   const attacker = findCreatureByName(combatSummary, attackerName);
   return attacker?.targetName || null;
 }

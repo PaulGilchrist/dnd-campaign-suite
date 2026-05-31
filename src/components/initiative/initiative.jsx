@@ -534,12 +534,16 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     const summary = JSON.parse(stored);
                     combatSummaryRef.current = summary;
                     setCombatSummary(summary);
-                } catch (e) { /* ignore parse errors */ }
-            }
-        };
+                  } catch (e) { /* ignore parse errors */ }
+              }
+          };
         window.addEventListener('initiative-rolled', handler);
-        return () => window.removeEventListener('initiative-rolled', handler);
-    }, []);
+        window.addEventListener('combat-summary-updated', handler);
+        return () => {
+            window.removeEventListener('initiative-rolled', handler);
+            window.removeEventListener('combat-summary-updated', handler);
+          };
+      }, []);
 
     React.useEffect(() => {
         const handler = (e) => {

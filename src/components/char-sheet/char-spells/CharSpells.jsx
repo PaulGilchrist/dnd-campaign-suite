@@ -8,30 +8,29 @@ import DiceRollResult from '../DiceRollResult.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
 import { rollExpression, rollExpressionDoubled } from '../../../services/diceRoller.js';
 import { sanitizeHtml } from '../../../services/sanitize.js';
-import { getCombatContext, getTargetFromAttacker, getAttackerTargetId } from '../../../services/damageUtils.js';
+import { getCombatContext, getTargetFromAttacker } from '../../../services/damageUtils.js';
 import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct }) {
     const { showPopup, popupHtml, setPopupHtml } = useActionPopup('spell');
-    const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
-       autoDamageRoll: (autoDamage, isCrit) => {
-         const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
-         if (result) {
-           const context = {
-             damageType: autoDamage.damageType,
-             targetId: autoDamage.targetId,
-             targetName: autoDamage.targetName,
-             attackerName: autoDamage.attackerName,
-           };
+     const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
+        autoDamageRoll: (autoDamage, isCrit) => {
+          const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
+          if (result) {
+            const context = {
+              damageType: autoDamage.damageType,
+              targetName: autoDamage.targetName,
+              attackerName: autoDamage.attackerName,
+             };
            if (autoDamage.saveDc) {
-             context.saveDc = autoDamage.saveDc;
-             context.saveType = autoDamage.saveType;
-             context.dcSuccess = autoDamage.dcSuccess;
-           }
-           rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
-         }
-       },
-     });
+              context.saveDc = autoDamage.saveDc;
+              context.saveType = autoDamage.saveType;
+              context.dcSuccess = autoDamage.dcSuccess;
+             }
+            rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
+            }
+           },
+         });
 
     const getDamageFormula = (effect) => {
         const match = effect.match(/^(\d+d\d+(?:[+-]\d+)?)/);
@@ -50,13 +49,10 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         const result = wasCrit ? rollExpressionDoubled(formula) : rollExpression(formula);
         if (result) {
             const target = getCombatTargetInfo();
-            const cs = getCombatContext();
-            const rawTargetId = getAttackerTargetId(cs, playerStats.name);
             const context = {
-                targetId: rawTargetId || target?.name,
                 targetName: target?.name,
                 attackerName: playerStats.name,
-            };
+             };
             if (spell.dc) {
                 context.dc = playerStats.spellAbilities.saveDc;
                 context.dcType = spell.dc.dc_type;

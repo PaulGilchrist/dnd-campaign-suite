@@ -54,10 +54,9 @@ export function sendAoePlayerSaves(affected, rawDamage, damageType, saveDc, save
     const promptId = utils.guid();
     pendingList.push({
       promptId,
-      targetId: creature.name,
       targetName: creature.name,
       creature,
-    });
+     });
 
     sendSavePrompt(campaignName, {
       promptId,

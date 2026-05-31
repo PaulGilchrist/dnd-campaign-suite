@@ -236,12 +236,11 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       if (alreadyAdded) return;
       const roll = rollD20();
       const total = roll + initBonus;
-      combatSummary.creatures.push({
-        name: npc.name,
-        type: 'npc',
-        initiative: String(total),
-        targetId: null,
-        targetName: null,
+       combatSummary.creatures.push({
+         name: npc.name,
+         type: 'npc',
+         initiative: String(total),
+         targetName: null,
         ac: npc.armorClass || 10,
         resistances: npc.damageResistances || [],
         immunities: npc.damageImmunities || [],
@@ -827,12 +826,11 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
                           }
                           const roll = rollD20();
                           const total = roll + initBonus;
-                          combatSummary.creatures.push({
-                            name: snapshot.name,
-                            type: 'npc',
-                            initiative: String(total),
-                            targetId: null,
-                            targetName: null,
+                           combatSummary.creatures.push({
+                             name: snapshot.name,
+                             type: 'npc',
+                             initiative: String(total),
+                             targetName: null,
                             ac: snapshot.armorClass || 10,
                             resistances: snapshot.damageResistances || [],
                             immunities: snapshot.damageImmunities || [],

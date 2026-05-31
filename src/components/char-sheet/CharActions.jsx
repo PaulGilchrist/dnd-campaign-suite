@@ -7,7 +7,7 @@ import { parseMagicItemName } from '../../services/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import { rollExpression, rollExpressionDoubled } from '../../services/diceRoller.js'
-import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetId } from '../../services/damageUtils.js';
+import { getTargetFromAttacker, getCombatContext, getResistanceNotice } from '../../services/damageUtils.js';
 import * as mapsService from '../../services/mapsService.js';
 import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem } from '../../services/rangeValidation.js';
 import { computeCover } from '../../services/coverService.js';
@@ -34,22 +34,21 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
               .then(data => setActions(data))
            .catch(error => console.error('Error loading actions:', error));
         }, []);
-     const { popupHtml, setPopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
-       autoDamageRoll: (autoDamage, isCrit) => {
-         const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
-         if (result) {
-           rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, {
-             damageType: autoDamage.damageType,
-             targetId: autoDamage.targetId,
-             targetName: autoDamage.targetName,
-             attackerName: autoDamage.attackerName,
-             saveDc: autoDamage.saveDc,
-             saveType: autoDamage.saveType,
-             dcSuccess: autoDamage.dcSuccess,
-           });
-         }
-       },
-     });
+      const { popupHtml, setPopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
+        autoDamageRoll: (autoDamage, isCrit) => {
+          const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
+          if (result) {
+            rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, {
+              damageType: autoDamage.damageType,
+              targetName: autoDamage.targetName,
+              attackerName: autoDamage.attackerName,
+              saveDc: autoDamage.saveDc,
+              saveType: autoDamage.saveType,
+              dcSuccess: autoDamage.dcSuccess,
+              });
+            }
+          },
+        });
 
     const getCombatTargetInfo = React.useCallback(() => {
         const cs = getCombatContext();
@@ -61,15 +60,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const buildAttackContextSync = React.useCallback((attack) => {
         const target = getCombatTargetInfo();
-        const cs = getCombatContext();
-        const rawTargetId = getAttackerTargetId(cs, playerStats.name);
-        const resistanceNotice = target ? getResistanceNotice([attack.damageType], target.resistances, target.immunities, target.name) : null;
-        return {
-            damageType: attack.damageType,
-            resistanceNotice,
-            targetName: target?.name,
-            targetId: rawTargetId || target?.name,
-            saveDc: attack.saveDc,
+         const cs = getCombatContext();
+         const resistanceNotice = target ? getResistanceNotice([attack.damageType], target.resistances, target.immunities, target.name) : null;
+         return {
+             damageType: attack.damageType,
+             resistanceNotice,
+             targetName: target?.name,
+             saveDc: attack.saveDc,
             saveType: attack.saveType,
             dcSuccess: attack.saveSuccess,
             attackerName: playerStats.name,

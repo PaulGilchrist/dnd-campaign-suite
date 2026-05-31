@@ -25,12 +25,11 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
       autoDamageRoll: (autoDamage, isCrit) => {
         const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
         if (result) {
-          const context = {
-            damageType: autoDamage.damageType,
-            targetId: autoDamage.targetId,
-            targetName: autoDamage.targetName,
-            attackerName: autoDamage.attackerName,
-          };
+         const context = {
+             damageType: autoDamage.damageType,
+             targetName: autoDamage.targetName,
+             attackerName: autoDamage.attackerName,
+            };
           if (autoDamage.saveDc) {
             context.saveDc = autoDamage.saveDc;
             context.saveType = autoDamage.saveType;
