@@ -12,6 +12,14 @@
       "gridY": 0,
       "visible": true,
       "name": "Zombie 1"
+    },
+    {
+      "id": "395a1b7a-23b1-462f-b9bf-cadf348fc244",
+      "type": "npc",
+      "gridX": 38,
+      "gridY": 39,
+      "visible": true,
+      "name": "Zombie 1"
     }
   ],
   "paintCells": [],

@@ -92,6 +92,7 @@ function App() {
 
 
   const [mapsView, setMapsView] = useState({ type: 'none' });
+  const [activeMapName, setActiveMapName] = useState(null);
   const [npcs, setNpcs] = useState([]);
   const [activeView, setActiveView] = useState(null);
   // activeView: null | 'charSheet' | 'mapsManager' | 'encounter' | 'notes' | 'npcs' | 'initiative'
@@ -105,6 +106,7 @@ function App() {
       mapHistoryRef.current.push(mapsView.mapName);
     }
     setMapsView({ type: 'map', mapName });
+    setActiveMapName(mapName);
   }, [mapsView]);
 
   const handleBackFromMap = useCallback(() => {
@@ -145,6 +147,21 @@ function App() {
     setMapsView({ type: 'none' });
   }, [campaignName]);
 
+  useEffect(() => {
+    setActiveMapName(null);
+    if (!campaignName) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await mapsService.loadMaps(campaignName);
+        if (cancelled) return;
+        const active = result.maps.find(m => m.isActive);
+        if (active) setActiveMapName(active.fileName.replace(/\.json$/, ''));
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [campaignName]);
+
   const handleCharacterClick = (character) => {
     setActiveCharacter(cloneDeep(character));
     setActiveView('charSheet');
@@ -179,6 +196,7 @@ function App() {
       if (activeMap) {
         const mapName = activeMap.fileName.replace(/\.json$/, '');
         setMapsView({ type: 'map', mapName });
+        setActiveMapName(mapName);
       } else {
         alert('No map is currently active. Ask your Game Master to activate one.');
       }
@@ -301,19 +319,19 @@ function App() {
              playerSummary={activeCharacter}
              allRaces2024={races2024}
              allMagicItems2024={magicItems2024}
-             campaignName={campaignName}
-             activeMapName={mapsView.type === 'map' ? mapsView.mapName : null}
+              campaignName={campaignName}
+              activeMapName={activeMapName}
              onDeleteCharacter={handleDeleteCharacter}
              onEditCharacter={() => handleEditCharacter(activeCharacter)}
              onUploadClick={handleUploadClick}
              onSaveClick={handleSaveClick}
            />
         )}
-        {activeView === 'initiative' && <Initiative characters={charactersWithHp} campaignName={campaignName} onNpcsChange={setNpcs} isLocalhost={isLocalhost} mapName={mapsView.type === 'map' ? mapsView.mapName : null} />}
+        {activeView === 'initiative' && <Initiative characters={charactersWithHp} campaignName={campaignName} onNpcsChange={setNpcs} isLocalhost={isLocalhost} mapName={activeMapName} />}
         {activeView === 'mapsManager' && mapsView.type === 'manager' && (
           <MapsManager
             campaignName={campaignName}
-            onOpenMap={(mapName) => setMapsView({ type: 'map', mapName })}
+            onOpenMap={(mapName) => { setMapsView({ type: 'map', mapName }); setActiveMapName(mapName); }}
             onBack={() => setMapsView({ type: 'none' })}
           />
         )}

@@ -650,8 +650,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const handleNameChange = (oldName, newName) => {
         if (!combatSummary) return;
         const idx = combatSummary.creatures.findIndex((creature) => creature.name === oldName);
+        if (idx === -1) return;
         combatSummary.creatures[idx].name = newName;
-        getMonsterData(value, campaignNpcs).then(monster => {
+        getMonsterData(newName, campaignNpcs).then(monster => {
             if (monster) {
                 combatSummary.creatures[idx].ac = monster.armor_class || 10;
                 combatSummary.creatures[idx].resistances = monster.damage_resistances || [];
@@ -660,14 +661,14 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 combatSummary.creatures[idx].maxHp = monster.hit_points || 10;
                 combatSummary.creatures[idx].currentHp = monster.hit_points || 10;
                 combatSummary.creatures[idx].saveBonuses = buildMonsterSaveBonuses(monster);
-                const matchedNpc = campaignNpcs.find(n => n.name?.toLowerCase() === value.toLowerCase());
+                const matchedNpc = campaignNpcs.find(n => n.name?.toLowerCase() === newName.toLowerCase());
                 if (matchedNpc?.imagePath) {
                     combatSummary.creatures[idx].imagePath = matchedNpc.imagePath;
                 }
                 storage.set('combatSummary', combatSummary, campaignName);
                 setCombatSummary(cloneDeep(combatSummary));
             }
-        });
+        }).catch(() => {});
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
         setNpcImages(prev => ({ ...prev, [newName]: null }));
