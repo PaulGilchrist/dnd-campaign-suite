@@ -26,7 +26,7 @@ describe('routes config', () => {
       const sidebarViewKeys = [
         'CHAR_SHEET', 'INITIATIVE', 'MAPS_MANAGER', 'MAP',
         'ENCOUNTER', 'FACTIONS', 'NOTES', 'QUESTS', 'NPCS',
-        'CAMPAIGN_LOG',
+        'SETTLEMENTS', 'CAMPAIGN_LOG',
       ];
 
       sidebarViewKeys.forEach(key => {
@@ -59,6 +59,7 @@ describe('routes config', () => {
       expect(VIEWS.NOTES.component).toBe('Notes');
       expect(VIEWS.QUESTS.component).toBe('Quests');
       expect(VIEWS.NPCS.component).toBe('NPCs');
+      expect(VIEWS.SETTLEMENTS.component).toBe('Settlements');
       expect(VIEWS.CAMPAIGN_LOG.component).toBe('Log');
     });
 
@@ -81,8 +82,8 @@ describe('routes config', () => {
       expect(VIEWS.EDIT_CHARACTER_WIZARD.needsActiveCharacter).toBe(true);
     });
 
-    it('should have exactly 13 views defined', () => {
-      expect(Object.keys(VIEWS).length).toBe(13);
+    it('should have exactly 14 views defined', () => {
+      expect(Object.keys(VIEWS).length).toBe(14);
     });
   });
 
@@ -93,8 +94,8 @@ describe('routes config', () => {
       expect(SIDEBAR_BUTTONS.length).toBeGreaterThan(0);
     });
 
-    it('should have 9 sidebar buttons', () => {
-      expect(SIDEBAR_BUTTONS.length).toBe(9);
+    it('should have 10 sidebar buttons', () => {
+      expect(SIDEBAR_BUTTONS.length).toBe(10);
     });
 
     it('should have required fields on each button', () => {
@@ -122,7 +123,8 @@ describe('routes config', () => {
       expect(SIDEBAR_BUTTONS[5]).toEqual({ label: 'Notes', icon: 'fa-sticky-note', view: 'notes' });
       expect(SIDEBAR_BUTTONS[6]).toEqual({ label: 'Quests', icon: 'fa-scroll', view: 'quests' });
       expect(SIDEBAR_BUTTONS[7]).toEqual({ label: 'NPCs', icon: 'fa-users', view: 'npcs' });
-      expect(SIDEBAR_BUTTONS[8]).toEqual({ label: 'Log', icon: 'fa-book-journal-whills', view: 'campaignLog' });
+      expect(SIDEBAR_BUTTONS[8]).toEqual({ label: 'Settlements', icon: 'fa-city', view: 'settlements' });
+      expect(SIDEBAR_BUTTONS[9]).toEqual({ label: 'Log', icon: 'fa-book-journal-whills', view: 'campaignLog' });
     });
 
     it('should have all view values reference valid VIEWS entries', () => {
@@ -140,8 +142,8 @@ describe('routes config', () => {
       expect(SIDEBAR_VIEWS.length).toBeGreaterThan(0);
     });
 
-    it('should have 9 sidebar views', () => {
-      expect(SIDEBAR_VIEWS.length).toBe(9);
+    it('should have 10 sidebar views', () => {
+      expect(SIDEBAR_VIEWS.length).toBe(10);
     });
 
     it('should contain all sidebar view names', () => {
@@ -153,6 +155,7 @@ describe('routes config', () => {
       expect(SIDEBAR_VIEWS).toContain('notes');
       expect(SIDEBAR_VIEWS).toContain('quests');
       expect(SIDEBAR_VIEWS).toContain('npcs');
+      expect(SIDEBAR_VIEWS).toContain('settlements');
       expect(SIDEBAR_VIEWS).toContain('campaignLog');
     });
 

@@ -1,0 +1,209 @@
+.settlements-size-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.settlements-list-subtitle {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.settlements-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settlements-list-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settlements-list-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.settlements-list-tags {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.settlements-list-services {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.settlements-list-preview {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin: 4px 0 0;
+  line-height: 1.3;
+}
+
+.settlements-size-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  margin: 0 4px 8px 0;
+  font-size: 0.78rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--background-color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.settlements-size-btn:hover {
+  background: var(--color-link);
+  color: var(--color-background);
+  border-color: var(--color-link);
+}
+
+.settlements-size-btn-active {
+  font-weight: 600;
+}
+
+.settlements-modal {
+  max-width: 720px;
+}
+
+.settlements-form-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.settlements-form-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settlements-section-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-header);
+  margin: 16px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.settlements-section-title:first-of-type {
+  margin-top: 8px;
+}
+
+.settlements-services-section,
+.settlements-npcs-section,
+.settlements-rumors-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settlements-service-row,
+.settlements-npc-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background: var(--background-color-surface);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.settlements-service-fields-row,
+.settlements-npc-fields-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.settlements-service-fields-row .settlements-svc-type {
+  width: 130px;
+  flex-shrink: 0;
+}
+
+.settlements-service-fields-row .settlements-svc-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.settlements-svc-desc,
+.settlements-npc-desc {
+  width: 100%;
+  min-height: 36px;
+}
+
+.settlements-npc-fields-row .settlements-npc-name {
+  flex: 2;
+  min-width: 0;
+}
+
+.settlements-npc-fields-row .settlements-npc-role {
+  flex: 1;
+  min-width: 0;
+}
+
+.settlements-rumor-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.settlements-rumor-row .settlements-rumor-text {
+  flex: 1;
+}
+
+@media print {
+  .ct-container:has(.settlements-modal) > :not(.ct-modal-overlay) {
+    display: none !important;
+  }
+
+  .ct-container .ct-modal-overlay:has(.settlements-modal) {
+    position: static;
+    background: none;
+    display: block;
+    z-index: auto;
+  }
+
+  .ct-container .ct-modal.settlements-modal {
+    max-height: none;
+    height: auto;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    width: 100%;
+    max-width: 100%;
+    display: block;
+    background: none;
+  }
+
+  .ct-container .ct-modal.settlements-modal .ct-modal-body {
+    overflow: visible;
+    padding: 20px;
+    page-break-inside: auto;
+  }
+}

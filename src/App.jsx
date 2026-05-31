@@ -18,6 +18,7 @@ import rulesFactory from './services/rulesFactory.js';
 import Notes from './components/notes/Notes.jsx';
 import Quests from './components/quests/Quests.jsx';
 import NPCs from './components/npcs/NPCs.jsx';
+import Settlements from './components/settlements/Settlements.jsx';
 import Factions from './components/factions/Factions.jsx';
 import Log from './components/log/Log.jsx';
 import SavePromptModal from './components/common/SavePromptModal.jsx';
@@ -95,7 +96,7 @@ function App() {
   const [activeMapName, setActiveMapName] = useState(null);
   const [npcs, setNpcs] = useState([]);
   const [activeView, setActiveView] = useState(null);
-  // activeView: null | 'charSheet' | 'mapsManager' | 'encounter' | 'notes' | 'npcs' | 'initiative'
+   // activeView: null | 'charSheet' | 'mapsManager' | 'encounter' | 'notes' | 'npcs' | 'settlements' | 'initiative'
   // type: 'none' | 'manager' | 'map'
   // When type is 'map', mapName holds the sanitized map filename (e.g. 'dungeon-level-1')
   // Navigation stack for indoor map entry (POI, encounter) — push on enter, pop on back
@@ -236,6 +237,16 @@ function App() {
     }
   };
 
+  const handleSettlementsClick = () => {
+    if (activeView !== 'settlements') {
+      setActiveView('settlements');
+    }
+  };
+
+  const handleBackFromSettlements = () => {
+    setActiveView(null);
+  };
+
   const handleBackFromNPCs = () => {
     setActiveView(null);
   };
@@ -303,7 +314,8 @@ function App() {
           toggleTheme={toggleTheme}
           isLocalhost={isLocalhost}
            onNPCsClick={handleNPCsClick}
-         onFactionsClick={handleFactionsClick}
+           onSettlementsClick={handleSettlementsClick}
+           onFactionsClick={handleFactionsClick}
          onLogClick={handleLogClick}
           />
         {activeView === 'charSheet' && activeCharacter && (
@@ -371,6 +383,12 @@ function App() {
             characters={characters}
             onBack={handleBackFromNPCs}
             onViewInitiative={() => setActiveView('initiative')}
+          />
+        )}
+        {activeView === 'settlements' && (
+          <Settlements
+            campaignName={campaignName}
+            onBack={handleBackFromSettlements}
           />
         )}
           {activeView === 'factions' && (

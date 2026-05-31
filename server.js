@@ -11,6 +11,7 @@ import notesRoutes from './server/routes/notes.js';
 import npcsRoutes from './server/routes/npcs.js';
 import questsRoutes from './server/routes/quests.js';
 import factionsRoutes from './server/routes/factions.js';
+import settlementsRoutes from './server/routes/settlements.js';
 import campaignsBasic from './server/routes/campaigns-basic.js';
 import campaignsCharacter from './server/routes/campaigns-character.js';
 import campaignsChangedata from './server/routes/campaigns-changedata.js';
@@ -92,6 +93,9 @@ app.use(questsRoutes);
 
 // Faction routes
 app.use(factionsRoutes);
+
+// Settlement routes
+app.use(settlementsRoutes);
 
 // Campaign basic routes (list campaigns, list character files)
 app.use(campaignsBasic);

@@ -68,13 +68,20 @@ export const VIEWS = {
     component: 'Quests',
     description: 'Quest tracking'
   },
-  NPCS: {
-    name: 'npcs',
-    stateVar: 'activeView',
-    type: 'string',
-    component: 'NPCs',
-    description: 'NPC management'
-   },
+    NPCS: {
+      name: 'npcs',
+      stateVar: 'activeView',
+      type: 'string',
+      component: 'NPCs',
+      description: 'NPC management'
+    },
+    SETTLEMENTS: {
+      name: 'settlements',
+      stateVar: 'activeView',
+      type: 'string',
+      component: 'Settlements',
+      description: 'Settlement management'
+    },
   CAMPAIGN_LOG: {
     name: 'campaignLog',
     stateVar: 'activeView',
@@ -121,11 +128,12 @@ export const SIDEBAR_BUTTONS = [
   { label: 'Maps', icon: 'fa-map', view: 'mapsManager' },
   { label: 'Notes', icon: 'fa-sticky-note', view: 'notes' },
 { label: 'Quests', icon: 'fa-scroll', view: 'quests' },
-    { label: 'NPCs', icon: 'fa-users', view: 'npcs' },
-    { label: 'Log', icon: 'fa-book-journal-whills', view: 'campaignLog' }
+  { label: 'NPCs', icon: 'fa-users', view: 'npcs' },
+  { label: 'Settlements', icon: 'fa-city', view: 'settlements' },
+  { label: 'Log', icon: 'fa-book-journal-whills', view: 'campaignLog' }
 ];
 
 /**
  * All sidebar views — mutually exclusive via single activeView variable.
  */
-export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'npcs', 'campaignLog'];
+export const SIDEBAR_VIEWS = ['charSheet', 'initiative', 'mapsManager', 'encounter', 'factions', 'notes', 'quests', 'npcs', 'settlements', 'campaignLog'];
