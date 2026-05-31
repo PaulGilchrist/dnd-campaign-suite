@@ -497,15 +497,15 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [combatSummary, activeCreatureId, handleAddCombatRound, handleAddNpc, handleNextCreature, handlePreviousCreature, handleRemoveCombatRound]);
+    }, [combatSummary, activeCreatureName, handleAddCombatRound, handleAddNpc, handleNextCreature, handlePreviousCreature, handleRemoveCombatRound]);
 
     React.useEffect(() => {
-        if (!carouselRef.current || !activeCreatureId) return;
+        if (!carouselRef.current || !activeCreatureName) return;
         const activeCard = carouselRef.current.querySelector('.creature-card.active');
         if (activeCard) {
             activeCard.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
         }
-    }, [activeCreatureId]);
+    }, [activeCreatureName]);
 
     React.useEffect(() => {
         if (!combatSummary || characters.length === 0) return;
