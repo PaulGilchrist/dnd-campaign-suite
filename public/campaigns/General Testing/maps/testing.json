@@ -9,14 +9,39 @@
       "id": "eae69f21-560a-4cde-9b47-98807f883b7a",
       "type": "npc",
       "gridX": 0,
-      "gridY": 25,
+      "gridY": 0,
       "visible": true,
-      "name": "NPC"
+      "name": "Zombie 1"
     }
   ],
   "paintCells": [],
   "items": [],
-  "players": [],
+  "players": [
+    {
+      "id": "arjhan",
+      "name": "Arjhan",
+      "gridX": 47,
+      "gridY": 47
+    },
+    {
+      "id": "selthara",
+      "name": "Selthara",
+      "gridX": 49,
+      "gridY": 49
+    },
+    {
+      "id": "seris",
+      "name": "Seris",
+      "gridX": 47,
+      "gridY": 49
+    },
+    {
+      "id": "zivri",
+      "name": "Zivri",
+      "gridX": 49,
+      "gridY": 47
+    }
+  ],
   "fog": [],
   "terrain": {},
   "pois": [],

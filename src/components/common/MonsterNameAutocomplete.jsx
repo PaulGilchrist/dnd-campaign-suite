@@ -106,13 +106,17 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
              } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             setHighlightedIndex(prev => (prev > 0 ? prev - 1 : list.length - 1));
-             } else if (e.key === 'Enter') {
+    } else if (e.key === 'Enter') {
             e.preventDefault();
             if (highlightedIndex >= 0 && list[highlightedIndex]) {
                 selectSuggestion(list[highlightedIndex].name);
-                 }
-             }
+            } else if (onCommit) {
+                onCommit(query);
+            }
+        }
          };
+
+    const list = suggestions();
 
     return (
             <div className={`monster-autocomplete${position ? ' monster-autocomplete-fixed' : ''}`} style={position}>
@@ -126,7 +130,21 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
                  className="monster-autocomplete-input"
                  autoFocus={initialFocus}
                  />
-             </div>
+                {showSuggestions && list.length > 0 && (
+                    <ul ref={listRef} className="monster-autocomplete-list">
+                        {list.map((entry, i) => (
+                            <li
+                             key={`${entry.source}-${entry.index}`}
+                             className={`monster-autocomplete-item${i === highlightedIndex ? ' highlighted' : ''}`}
+                             onMouseDown={() => selectSuggestion(entry.name)}
+                            >
+                                {entry.name}
+                                {entry.source === 'npc' && <span className="monster-autocomplete-badge">NPC</span>}
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
          );
 }
 

@@ -897,6 +897,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             if (!svgRef.current) return;
             const svgRect = svgRef.current.getBoundingClientRect();
 
+            const placedItem = placedItems.find(i => i.id === item.id);
+
              // Convert SVG coords to DOM position
             const vbX = panX;
             const vbY = panY;
@@ -910,7 +912,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
             const domY = svgRect.top + (menuSvgY - vbY) * scaleY + 80;
 
             setSelectedItem(null);
-            setRenamePopover({ itemName: item.name, name: defaultName || 'NPC', position: { left: `${domX}px`, top: `${domY}px` } });
+            setRenamePopover({ itemName: placedItem?.name || defaultName || 'NPC', name: defaultName || placedItem?.name || 'NPC', position: { left: `${domX}px`, top: `${domY}px` } });
              };
 
     // Sync state to refs so handleWheel always reads latest values
