@@ -56,7 +56,7 @@ There is no freeform dice input field. All dice formulas come from your characte
 
 ---
 
-##Fog of War — Indoor Maps Only
+## Fog of War — Indoor Maps Only
 
 Fog of war is a DM-only feature that hides map areas until player characters move into line of sight. It works by drawing imaginary rays from each player token to every cell on the grid using a Bresenham line-of-sight algorithm. Walls and closed doors block visibility.
 
