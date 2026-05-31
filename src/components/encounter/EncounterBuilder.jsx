@@ -13,6 +13,7 @@ import { formatEncounterName } from '../../services/encountersService.js';
 import { loadEncounterToInitiative } from '../../services/encounterToInitiative.js';
 import { generateLootSuggestions } from '../../services/lootGenerator.js';
 import { calculateXPThreshold, calculateDifficultyMultiplier } from '../../services/encounterGenerator.js';
+import { ENCOUNTER_CONFIG } from '../../config/encounterConfig.js';
 import storage from '../../services/storage.js';
 import * as logService from '../../services/logService.js';
 import './EncounterBuilder.css';
@@ -21,7 +22,7 @@ const difficultyLabels = ['Easy', 'Medium', 'Hard', 'Deadly'];
 
 // Local helpers not available in the service
 function calculateMaxXP(playerLevels, difficultyIndex) {
-  return calculateXPThreshold(playerLevels, difficultyIndex) * 2;
+  return calculateXPThreshold(playerLevels, difficultyIndex) * 1.5;
 }
 
 function calculateDifficultyIndex(effectiveXP, totalThreshold) {
@@ -45,13 +46,10 @@ function filterMonsters(monsters, searchQuery, playerLevels, difficultyIndex, to
   if (!monsters) return [];
   const maxXP = calculateMaxXP(playerLevels, difficultyIndex);
   const avgLevel = playerLevels.reduce((sum, l) => sum + l, 0) / playerLevels.length;
-  const minCRMultipliers = [0.25, 0.35, 0.45, 0.55];
-  const minCR = avgLevel * (minCRMultipliers[difficultyIndex] ?? 0.25);
-  const minXP = totalThreshold * 0.2;
+  const minXP = totalThreshold * 0.15;
   return monsters.filter(m => {
     if (m.xp > maxXP) return false;
     if (m.xp < minXP) return false;
-    if ((m.challenge_rating ?? 0) < minCR) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return m.name.toLowerCase().includes(q)
@@ -111,16 +109,16 @@ function stripMonsters(monsters) {
 function EncounterBuilder({ characters, campaignName, onStartCombat }) {
   const { monsters, loading } = useMonstersData();
 
-  const [filter, setFilter] = useState(() => {
-    const saved = loadSavedFilter();
-    const playerLevels = (characters && characters.length > 0)
-      ? characters.map(c => c.level || 1)
-      : (saved ? saved.playerLevels : [1]);
-    return {
-      difficulty: saved ? saved.difficulty : 2,
-      playerLevels,
-    };
-  });
+    const [filter, setFilter] = useState(() => {
+      const saved = loadSavedFilter();
+      const playerLevels = (characters && characters.length > 0)
+       ? characters.map(c => c.level || 1)
+       : (saved ? saved.playerLevels : [1]);
+     return {
+       difficulty: saved ? saved.difficulty : ENCOUNTER_CONFIG.defaultDifficulty,
+       playerLevels,
+      };
+    });
 
     // When characters change (e.g., campaign switch), show in party summary for display purposes only
    // Player levels filter is not auto-overwritten so loaded encounters preserve their settings
@@ -253,7 +251,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
   );
 
   const difficultyMultiplier = useMemo(
-    () => calculateDifficultyMultiplier(monsterCount),
+      () => calculateDifficultyMultiplier(monsterCount, filter.playerLevels.length),
     [monsterCount]
   );
 
@@ -472,12 +470,12 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
      setLootData({ lootEntries: [], totalEncounterXp: 0 });
      setEncounterCompleted(false);
      setCombatStarted(false);
-     setFilter({
-       difficulty: 2,
-      playerLevels: (characters && characters.length > 0)
-           ? characters.map(c => c.level || 1)
-           : [1],
-       });
+      setFilter({
+        difficulty: ENCOUNTER_CONFIG.defaultDifficulty,
+       playerLevels: (characters && characters.length > 0)
+             ? characters.map(c => c.level || 1)
+             : [1],
+         });
     setSelectedMonsters([]);
     setSearchQuery('');
     setDescription('');

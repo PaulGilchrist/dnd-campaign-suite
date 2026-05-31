@@ -6,10 +6,23 @@
       "savedAt": "2026-05-23T00:00:00Z",
       "rulesVersion": "2024",
       "difficulty": 1,
-      "playerLevels": [3, 3, 3, 3],
+      "playerLevels": [
+        3,
+        3,
+        3,
+        3
+      ],
       "selectedMonsters": [
-        { "index": "zombie", "name": "Zombie", "qty": 3 },
-        { "index": "skeleton", "name": "Skeleton", "qty": 2 }
+        {
+          "index": "zombie",
+          "name": "Zombie",
+          "qty": 3
+        },
+        {
+          "index": "skeleton",
+          "name": "Skeleton",
+          "qty": 2
+        }
       ]
     },
     {
@@ -18,10 +31,23 @@
       "savedAt": "2026-05-23T00:00:00Z",
       "rulesVersion": "2024",
       "difficulty": 1,
-      "playerLevels": [3, 3, 3, 3],
+      "playerLevels": [
+        3,
+        3,
+        3,
+        3
+      ],
       "selectedMonsters": [
-        { "index": "vine-blight", "name": "Vine Blight", "qty": 2 },
-        { "index": "twig-blight", "name": "Twig Blight", "qty": 4 }
+        {
+          "index": "vine-blight",
+          "name": "Vine Blight",
+          "qty": 2
+        },
+        {
+          "index": "twig-blight",
+          "name": "Twig Blight",
+          "qty": 4
+        }
       ]
     },
     {
@@ -30,11 +56,28 @@
       "savedAt": "2026-05-23T00:00:00Z",
       "rulesVersion": "2024",
       "difficulty": 2,
-      "playerLevels": [3, 3, 3, 3],
+      "playerLevels": [
+        3,
+        3,
+        3,
+        3
+      ],
       "selectedMonsters": [
-        { "index": "animated-armor", "name": "Animated Armor", "qty": 1 },
-        { "index": "specter", "name": "Specter", "qty": 1 },
-        { "index": "cultist", "name": "Cultist", "qty": 2 }
+        {
+          "index": "animated-armor",
+          "name": "Animated Armor",
+          "qty": 1
+        },
+        {
+          "index": "specter",
+          "name": "Specter",
+          "qty": 1
+        },
+        {
+          "index": "cultist",
+          "name": "Cultist",
+          "qty": 2
+        }
       ]
     },
     {
@@ -43,10 +86,23 @@
       "savedAt": "2026-05-23T00:00:00Z",
       "rulesVersion": "2024",
       "difficulty": 2,
-      "playerLevels": [3, 3, 3, 3],
+      "playerLevels": [
+        3,
+        3,
+        3,
+        3
+      ],
       "selectedMonsters": [
-        { "index": "ettercap", "name": "Ettercap", "qty": 1 },
-        { "index": "giant-spider", "name": "Giant Spider", "qty": 2 }
+        {
+          "index": "ettercap",
+          "name": "Ettercap",
+          "qty": 1
+        },
+        {
+          "index": "giant-spider",
+          "name": "Giant Spider",
+          "qty": 2
+        }
       ]
     },
     {
@@ -55,11 +111,46 @@
       "savedAt": "2026-05-23T00:00:00Z",
       "rulesVersion": "2024",
       "difficulty": 3,
-      "playerLevels": [3, 3, 3, 3],
+      "playerLevels": [
+        3,
+        3,
+        3,
+        3
+      ],
       "selectedMonsters": [
-        { "index": "green-hag", "name": "Green Hag", "qty": 1 },
-        { "index": "will-o-wisp", "name": "Will-o'-Wisp", "qty": 1 }
+        {
+          "index": "green-hag",
+          "name": "Green Hag",
+          "qty": 1
+        },
+        {
+          "index": "will-o-wisp",
+          "name": "Will-o'-Wisp",
+          "qty": 1
+        }
       ]
+    },
+    {
+      "name": "Difficulty Testing",
+      "savedAt": "2026-05-31T15:34:26.631Z",
+      "selectedMonsters": [
+        {
+          "index": "gnoll-warrior",
+          "name": "Gnoll Warrior",
+          "qty": 3
+        },
+        {
+          "index": "bugbear",
+          "name": "Bugbear",
+          "qty": 1
+        }
+      ],
+      "description": "Test encounter was originally set as Deadly with effective 1000XP where target was for a 600XP encounter.",
+      "lootData": {
+        "lootEntries": [],
+        "totalEncounterXp": 0
+      },
+      "encounterCompleted": false
     }
   ]
 }
