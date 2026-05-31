@@ -72,8 +72,15 @@ function DeathSavePromptModal({ campaignName, characters }) {
         newSaves: result.newSaves,
         newFailures: result.newFailures,
         restoredToHp: result.restoredToHp,
-      },
-    }));
+       },
+     }));
+
+    storage.setProperty(current.targetName, 'deathSaves', result.newSaves, campaignName);
+    storage.setProperty(current.targetName, 'deathFailures', result.newFailures, campaignName);
+
+    if (result.restoredToHp !== null) {
+      storage.setProperty(current.targetName, 'currentHitPoints', result.restoredToHp, campaignName);
+    }
 
     setPrompts(prev => prev.map((p, i) =>
       i === 0
