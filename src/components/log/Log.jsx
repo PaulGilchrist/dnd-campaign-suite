@@ -47,6 +47,14 @@ function RollEntry({ entry }) {
             {entry.hit ? 'HIT' : 'MISS'} (AC {entry.targetAc})
           </span>
         )}
+        {entry.coverAcBonus > 0 && (
+          <span className="log-cover">
+            {entry.coverLevel === 'threeQuarter' ? '3/4' : '1/2'} Cover (+{entry.coverAcBonus} AC)
+          </span>
+        )}
+        {entry.rangeReason && (
+          <span className="log-range-reason">{entry.rangeReason}</span>
+        )}
         {showBothDice && (
           <span className={`log-mode-badge ${entry.mode || 'normal'}`}>
             {(entry.mode || 'normal').toUpperCase()}

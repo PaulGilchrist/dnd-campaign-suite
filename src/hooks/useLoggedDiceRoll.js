@@ -149,7 +149,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       const timer = setTimeout(() => {
         const { autoDamage } = popupHtml;
         autoDamageRollRef.current(autoDamage, popupHtml.isCrit);
-      }, 600);
+      }, 1000);
       return () => clearTimeout(timer);
     }
   }, [popupHtml]);

@@ -507,27 +507,27 @@
   "items": [],
   "players": [
     {
-      "id": "barbarian",
-      "name": "Barbarian",
+      "id": "aeralyn",
+      "name": "Aeralyn",
       "gridX": 17,
       "gridY": 19
     },
     {
-      "id": "bard",
-      "name": "Bard",
+      "id": "bramdur",
+      "name": "Bramdur",
+      "gridX": 17,
+      "gridY": 18
+    },
+    {
+      "id": "maribelle",
+      "name": "Maribelle",
       "gridX": 16,
-      "gridY": 19
+      "gridY": 18
     },
     {
-      "id": "druid",
-      "name": "Druid",
-      "gridX": 15,
-      "gridY": 19
-    },
-    {
-      "id": "ranger",
-      "name": "Ranger",
-      "gridX": 14,
+      "id": "thulgar",
+      "name": "Thulgar",
+      "gridX": 16,
       "gridY": 19
     }
   ],

@@ -92,23 +92,17 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
               loadNPCs(campaignName),
             ]);
 
-            console.log('[RangeDebug] mapData loaded', { players: mapData?.players?.map(p => p.name), placedNames: mapData?.placedItems?.map(i => i.name).filter(Boolean) });
-
             const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
-            console.log('[RangeDebug] attackerPlayer', attackerPlayer?.name, attackerPlayer ? `at (${attackerPlayer.gridX},${attackerPlayer.gridY})` : 'NOT FOUND');
             if (attackerPlayer) {
               let targetPos = null;
               const cs = getCombatContext();
-              console.log('[RangeDebug] combatContext', cs ? 'exists' : 'null');
               if (cs) {
                 const target = getTargetFromAttacker(cs, playerStats.name);
-                console.log('[RangeDebug] target from combat', target?.name, target ? `name=${target.name}` : 'null');
                 if (target) {
                   const targetPlayer = mapData?.players?.find(p => p.name === target.name);
                   const targetNpc = mapData?.placedItems?.length
                     ? getNearestPlacedItem(mapData.placedItems, target.name, { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY })
                     : null;
-                  console.log('[RangeDebug] targetPlayer match', targetPlayer?.name, 'targetNpc match', targetNpc?.name);
                   if (targetPlayer) {
                     targetPos = { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
                   } else if (targetNpc) {
@@ -116,10 +110,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                   }
                 }
               }
-              console.log('[RangeDebug] targetPos', targetPos ? `(${targetPos.gridX},${targetPos.gridY})` : 'null');
 
               const isRanged = attack.range > 5;
-              console.log('[RangeDebug] attack', attack.name, 'range', attack.range, 'isRanged', isRanged);
               const feats = featRangeEffects || { ignoresMeleeDisadvantage: false, ignoresLongRangeDisadvantage: false, rangeMultiplier: 1, spellRangeBonus: 0 };
 
               if (targetPos) {
@@ -128,18 +120,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                   { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
                   targetPos
                 );
-                console.log('[RangeDebug] distanceFt', distanceFt, 'effectiveRange', effectiveRange);
                 const rangeResult = computeRangeEffect(effectiveRange, distanceFt, feats);
-                console.log('[RangeDebug] rangeResult', rangeResult);
                 if (rangeResult.mode === 'disadvantage') {
                   base.forcedMode = 'disadvantage';
                   base.rangeReason = rangeResult.reason;
-                  console.log('[RangeDebug] set forcedMode=disadvantage', rangeResult.reason);
                 } else if (rangeResult.mode === 'miss') {
                   base.isAutoMiss = true;
                   base.rangeReason = rangeResult.reason;
                   base.forcedMode = undefined;
-                  console.log('[RangeDebug] set isAutoMiss=true', rangeResult.reason);
                 }
               }
 
@@ -180,9 +168,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 }
               }
             }
-          } catch (e) { console.log('[RangeDebug] CATCH - fallback, no range validation', e?.message); }
+          } catch (e) { /* fallback, no range validation */ }
 
-        console.log('[RangeDebug] returning base', { isAutoMiss: base.isAutoMiss, rangeReason: base.rangeReason, forcedMode: base.forcedMode });
         return base;
     }, [buildAttackContextSync, campaignName, mapName, playerStats.name, getCombatContext, getTargetFromAttacker, playerStats.feats, playerStats.rules, featRangeEffects]);
 

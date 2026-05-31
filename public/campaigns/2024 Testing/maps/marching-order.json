@@ -1,28 +1,28 @@
 {
   "players": [
     {
-      "id": "dcfacfda-d85c-4127-b80c-201284a6317f",
-      "name": "Cleric",
+      "id": "elarielle",
+      "name": "Elarielle",
       "gridX": 3,
-      "gridY": 6
+      "gridY": 4
     },
     {
-      "id": "85060eef-04b3-4d51-8fb1-a7677f9c5e75",
-      "name": "Fighter",
-      "gridX": 3,
-      "gridY": 2
-    },
-    {
-      "id": "89784ed0-ca5a-4d5f-9dc4-56beebc95e5e",
-      "name": "Rogue",
+      "id": "grommok",
+      "name": "Grommok",
       "gridX": 3,
       "gridY": 0
     },
     {
-      "id": "18aca0b7-6040-41d3-917f-925428374d96",
-      "name": "Wizard",
+      "id": "liora",
+      "name": "Liora",
       "gridX": 3,
-      "gridY": 4
+      "gridY": 2
+    },
+    {
+      "id": "vexiron",
+      "name": "Vexiron",
+      "gridX": 3,
+      "gridY": 6
     }
   ],
   "walls": [],

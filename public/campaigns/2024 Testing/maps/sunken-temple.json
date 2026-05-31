@@ -127,7 +127,6 @@
     "6,7",
     "7,7",
     "9,7",
-    "10,7",
     "20,7",
     "21,7",
     "23,7",
@@ -143,7 +142,6 @@
     "6,8",
     "7,8",
     "9,8",
-    "10,8",
     "20,8",
     "21,8",
     "23,8",
@@ -610,7 +608,14 @@
     "22,28",
     "22,29",
     "23,27",
-    "27,29"
+    "27,29",
+    "8,9",
+    "8,10",
+    "9,10",
+    "10,10",
+    "11,10",
+    "12,10",
+    "8,7"
   ],
   "placedItems": [
     {
@@ -1041,14 +1046,6 @@
       "rotation": 0
     },
     {
-      "id": "door-13",
-      "gridX": 8,
-      "gridY": 7,
-      "type": "door",
-      "visible": true,
-      "rotation": 90
-    },
-    {
       "id": "door-15",
       "gridX": 23,
       "gridY": 25,
@@ -1175,36 +1172,25 @@
       "gridY": 10,
       "visible": true,
       "name": "NPC"
+    },
+    {
+      "id": "57835b2c-0d87-4a3f-8b13-69e0d9846b5d",
+      "type": "chest",
+      "gridX": 8,
+      "gridY": 8,
+      "visible": true
+    },
+    {
+      "id": "84e44d54-9b35-471c-8e30-8e16c50e5f21",
+      "type": "secretDoor",
+      "gridX": 8,
+      "gridY": 7,
+      "visible": true
     }
   ],
   "paintCells": [],
   "items": [],
-  "players": [
-    {
-      "id": "cleric",
-      "name": "Cleric",
-      "gridX": 25,
-      "gridY": 28
-    },
-    {
-      "id": "fighter",
-      "name": "Fighter",
-      "gridX": 26,
-      "gridY": 28
-    },
-    {
-      "id": "rogue",
-      "name": "Rogue",
-      "gridX": 26,
-      "gridY": 29
-    },
-    {
-      "id": "wizard",
-      "name": "Wizard",
-      "gridX": 25,
-      "gridY": 29
-    }
-  ],
+  "players": [],
   "terrain": {},
   "pois": [],
   "zoom": 1,

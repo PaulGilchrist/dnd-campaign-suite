@@ -20,6 +20,13 @@
       "gridY": 39,
       "visible": true,
       "name": "Zombie 1"
+    },
+    {
+      "id": "e3d51734-4883-4d99-951a-95bffaf5938c",
+      "type": "crate",
+      "gridX": 39,
+      "gridY": 40,
+      "visible": true
     }
   ],
   "paintCells": [],
@@ -28,8 +35,8 @@
     {
       "id": "arjhan",
       "name": "Arjhan",
-      "gridX": 47,
-      "gridY": 47
+      "gridX": 40,
+      "gridY": 41
     },
     {
       "id": "selthara",

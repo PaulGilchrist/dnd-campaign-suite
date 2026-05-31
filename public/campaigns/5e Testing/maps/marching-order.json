@@ -6,26 +6,26 @@
   "placedItems": [],
   "players": [
     {
-      "id": "player-0-1779389602005",
-      "name": "Barbarian",
+      "id": "aeralyn",
+      "name": "Aeralyn",
       "gridX": 3,
       "gridY": 2
     },
     {
-      "id": "player-1-1779389602005",
-      "name": "Bard",
+      "id": "bramdur",
+      "name": "Bramdur",
       "gridX": 3,
       "gridY": 6
     },
     {
-      "id": "player-2-1779389602005",
-      "name": "Druid",
+      "id": "maribelle",
+      "name": "Maribelle",
       "gridX": 3,
       "gridY": 4
     },
     {
-      "id": "player-3-1779389602005",
-      "name": "Ranger",
+      "id": "thulgar",
+      "name": "Thulgar",
       "gridX": 3,
       "gridY": 0
     }

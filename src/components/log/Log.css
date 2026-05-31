@@ -386,6 +386,26 @@
   text-transform: capitalize;
 }
 
+/* Cover indicator */
+.log-cover {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: #9C27B0;
+  background: rgba(156, 39, 176, 0.2);
+}
+
+/* Range reason (out of range, long range, etc.) */
+.log-range-reason {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: #FF9800;
+  background: rgba(255, 152, 0, 0.2);
+}
+
 /* Resistance/Immunity notice */
 .log-resistance-notice {
   width: 100%;
