@@ -233,10 +233,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         return <React.Fragment key={attack.name}>
                             <div className='left'>{attack.name}</div>
                             <div>{attack.range} ft.</div>
-                            {attack.saveDc
-                                ? <div className="save-dc-display">DC {attack.saveDc} {attack.saveType}</div>
-                                : <div className={(attack.hitBonusFormula ? "clickable" : "") + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
-                            <div className={attack.damage ? "clickable" : ""} onClick={() => !cannotAct && handleDamageClick(attack)}>{attack.damage}</div>
+                              {attack.saveDc
+                                  ? <div className="save-dc-display">DC {attack.saveDc} {attack.saveType}</div>
+                                  : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
+                              <div className={attack.damage ? "clickable" : ""} onClick={() => !cannotAct && handleDamageClick(attack)}>{attack.damage}</div>
+
                             <div className='left'>{attack.damageType}</div>
                             {is2024Rules && <div>{getWeaponMastery(attack.name) || ''}</div>}
                         </React.Fragment>;
@@ -272,9 +273,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             return <React.Fragment key={attack.name}>
                                 <div className='left'>{attack.name}</div>
                                 <div>{attack.range} ft.</div>
-                            {attack.saveDc
-                                ? <div className="save-dc-display">DC {attack.saveDc} {attack.saveType}</div>
-                                : <div className={(attack.hitBonusFormula ? "clickable" : "") + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
+                              {attack.saveDc
+                                  ? <div className="save-dc-display">DC {attack.saveDc} {attack.saveType}</div>
+                                  : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
                                 <div className={attack.damage ? "clickable" : ""} onClick={() => !cannotAct && handleDamageClick(attack)}>{attack.damage}</div>
                                 <div className='left'>{attack.damageType}</div>
                                 {is2024Rules && <div>{getWeaponMastery(attack.name) || ''}</div>}
