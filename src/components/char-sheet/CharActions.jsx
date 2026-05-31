@@ -5,7 +5,7 @@ import DiceRollResult from './DiceRollResult.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { parseMagicItemName } from '../../services/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
-import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
+import { buildFeatureDetailHtml, showWeaponMasteryPopup } from '../../hooks/useActionPopup.js'
 import { rollExpression, rollExpressionDoubled } from '../../services/diceRoller.js'
 import { getTargetFromAttacker, getCombatContext, getResistanceNotice } from '../../services/damageUtils.js';
 import * as mapsService from '../../services/mapsService.js';
@@ -238,12 +238,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                   : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
                               <div className={attack.damage ? "clickable" : ""} onClick={() => !cannotAct && handleDamageClick(attack)}>{attack.damage}</div>
 
-                            <div className='left'>{attack.damageType}</div>
-                            {is2024Rules && <div>{getWeaponMastery(attack.name) || ''}</div>}
-                        </React.Fragment>;
-                    })}
-                </div>
-                <br />
+                              <div className='left'>{attack.damageType}</div>
+                              {is2024Rules && <div className={getWeaponMastery(attack.name) ? "clickable" : ""} onClick={() => { const mastery = getWeaponMastery(attack.name); if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{getWeaponMastery(attack.name) || ''}</div>}
+                          </React.Fragment>;
+                      })}
+                  </div>
+                  <br />
                                     {popupHtml && (
                                         <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
                                             {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
@@ -277,12 +277,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                   ? <div className="save-dc-display">DC {attack.saveDc} {attack.saveType}</div>
                                   : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
                                 <div className={attack.damage ? "clickable" : ""} onClick={() => !cannotAct && handleDamageClick(attack)}>{attack.damage}</div>
-                                <div className='left'>{attack.damageType}</div>
-                                {is2024Rules && <div>{getWeaponMastery(attack.name) || ''}</div>}
-                            </React.Fragment>;
-                        })}
-                    </div>
-                </div>}
+                                   <div className='left'>{attack.damageType}</div>
+                                   {is2024Rules && <div className={getWeaponMastery(attack.name) ? "clickable" : ""} onClick={() => { const mastery = getWeaponMastery(attack.name); if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{getWeaponMastery(attack.name) || ''}</div>}
+                               </React.Fragment>;
+                           })}
+                       </div>
+                   </div>}
                 {/* No Bonus Action Attacks and only Bonus Actions so the Bonus Actions are the section's header */}
                 {!playerStats.attacks.find((attack) => attack.type === 'Bonus Action') && playerStats.bonusActions.length > 0 && <div>
                     <div className='sectionHeader'>Bonus Actions</div>

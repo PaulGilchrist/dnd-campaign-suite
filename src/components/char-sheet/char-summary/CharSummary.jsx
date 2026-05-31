@@ -12,6 +12,7 @@ import Popup from '../../common/Popup.jsx'
 import AvatarImage from '../../common/AvatarImage.jsx'
 import AvatarModal from '../../common/AvatarModal.jsx';
 import useTrackedResource from '../../../hooks/useTrackedResource.js'
+import { showBackgroundPopup } from '../../../hooks/useActionPopup.js';
 import useLoggedDiceRoll from '../../../hooks/useLoggedDiceRoll.js';
 import { sanitizeHtml } from '../../../services/sanitize.js';
 import LongRestButton from '../LongRestButton.jsx'
@@ -195,7 +196,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                             setPopupHtml(html);
                         }
                     }} />
-                    {playerStats.background && <div><b>Background: </b>{playerStats.background}</div>}
+                      {playerStats.background && <div><b>Background: </b><span className="clickable" onClick={() => showBackgroundPopup(playerStats.background, setPopupHtml)}>{playerStats.background}</span></div>}
                       <CharClassFeatures playerStats={playerStats} />
                 </div>
       </div>

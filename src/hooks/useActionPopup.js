@@ -19,9 +19,60 @@ export function buildAbilityDetailHtml(allAbilityScores) {
         const abilityScore = allAbilityScores.find((a) => a.full_name === name);
         if (abilityScore) {
             return `<h3>${name}</h3>${abilityScore.desc}<br/>`;
-        }
+         }
         return null;
-    };
+     };
+}
+
+let weaponMasteryCache = null;
+export async function loadWeaponMasteries() {
+    if (weaponMasteryCache === null) {
+        weaponMasteryCache = await (await fetch('/data/2024/weapon-mastery.json')).json();
+      }
+    return weaponMasteryCache;
+}
+
+export async function showWeaponMasteryPopup(masteryName, setPopupHtml) {
+    const masteries = await loadWeaponMasteries().catch(() => []);
+    const entity = masteries.find((m) => m.name === masteryName);
+    if (entity && entity.description) {
+        setPopupHtml(`<b>${entity.name}</b><br/><br/>${entity.description}<br/>`);
+      }
+}
+
+let backgroundsCache = null;
+export async function loadBackgrounds() {
+    if (backgroundsCache === null) {
+        backgroundsCache = await (await fetch('/data/2024/backgrounds.json')).json();
+      }
+    return backgroundsCache;
+}
+
+export async function showBackgroundPopup(backgroundName, setPopupHtml) {
+    const backgrounds = await loadBackgrounds().catch(() => []);
+    const entity = backgrounds.find((b) => b.name === backgroundName);
+    if (entity && entity.description) {
+        let html = `<b>${entity.name}</b><br/><br/>${entity.description}`;
+        if (entity.ability_scores) {
+            html += `<br/><br/><b>Ability Scores:</b> ${entity.ability_scores}`;
+          }
+        if (entity.feat) {
+            html += `<br/><br/><b>Feat:</b> ${entity.feat}`;
+          }
+        if (entity.skill_proficiencies) {
+            html += `<br/><br/><b>Skill Proficiencies:</b> ${entity.skill_proficiencies}`;
+          }
+        if (entity.tool_proficiencies) {
+            html += `<br/><br/><b>Tool Proficiencies:</b> ${entity.tool_proficiencies}`;
+          }
+        if (entity.equipment) {
+            html += `<br/><br/><b>Equipment:</b> ${entity.equipment}`;
+          }
+        if (entity.book || entity.page) {
+            html += `<br/><br/><b>Source:</b> ${entity.book || ''} ${entity.page || ''}`.trim();
+          }
+        setPopupHtml(html);
+       }
 }
 
 export default function useActionPopup(preset, context = {}) {
