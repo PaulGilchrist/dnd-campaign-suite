@@ -28,7 +28,8 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
 
     useEffect(() => {
         setQuery(value || '');
-         }, [value]);
+        setShowSuggestions(false);
+          }, [value]);
 
     useEffect(() => {
         if (initialFocus && inputRef.current) inputRef.current.focus();
