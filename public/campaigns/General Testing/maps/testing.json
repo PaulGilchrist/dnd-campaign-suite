@@ -1,0 +1,26 @@
+{
+  "displayName": "Testing",
+  "name": "testing",
+  "type": "indoor",
+  "gridSize": 50,
+  "walls": [],
+  "placedItems": [
+    {
+      "id": "eae69f21-560a-4cde-9b47-98807f883b7a",
+      "type": "npc",
+      "gridX": 0,
+      "gridY": 25,
+      "visible": true,
+      "name": "NPC"
+    }
+  ],
+  "paintCells": [],
+  "items": [],
+  "players": [],
+  "fog": [],
+  "terrain": {},
+  "pois": [],
+  "zoom": 1,
+  "panX": 0,
+  "panY": 0
+}

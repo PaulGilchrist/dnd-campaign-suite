@@ -9,7 +9,8 @@ import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import { rollExpression, rollExpressionDoubled } from '../../services/diceRoller.js'
 import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetId } from '../../services/damageUtils.js';
 import * as mapsService from '../../services/mapsService.js';
-import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC } from '../../services/rangeValidation.js';
+import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem } from '../../services/rangeValidation.js';
+import { computeCover } from '../../services/coverService.js';
 import { computeFeatRangeEffects } from '../../services/featRangeService.js';
 import { loadNPCs } from '../../services/npcsService.js';
 import './CharActions.css'
@@ -104,7 +105,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 console.log('[RangeDebug] target from combat', target?.name, target ? `name=${target.name}` : 'null');
                 if (target) {
                   const targetPlayer = mapData?.players?.find(p => p.name === target.name);
-                  const targetNpc = mapData?.placedItems?.find(i => i.name === target.name);
+                  const targetNpc = mapData?.placedItems?.length
+                    ? getNearestPlacedItem(mapData.placedItems, target.name, { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY })
+                    : null;
                   console.log('[RangeDebug] targetPlayer match', targetPlayer?.name, 'targetNpc match', targetNpc?.name);
                   if (targetPlayer) {
                     targetPos = { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
@@ -137,6 +140,26 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                   base.rangeReason = rangeResult.reason;
                   base.forcedMode = undefined;
                   console.log('[RangeDebug] set isAutoMiss=true', rangeResult.reason);
+                }
+              }
+
+              // Cover determination (ranged only - melee always has no cover)
+              if (isRanged && !base.isAutoMiss && targetPos) {
+                const walls = mapData?.walls || new Set()
+                const gridSize = mapData?.gridSize || 20
+                const coverResult = computeCover(
+                  { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
+                  { gridX: targetPos.gridX, gridY: targetPos.gridY },
+                  walls,
+                  mapData?.placedItems || [],
+                  gridSize,
+                )
+                if (coverResult.level === 'full') {
+                  base.isAutoMiss = true
+                  base.rangeReason = 'Target has full cover'
+                } else if (coverResult.acBonus > 0) {
+                  base.coverAcBonus = coverResult.acBonus
+                  base.coverLevel = coverResult.level
                 }
               }
 

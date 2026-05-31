@@ -172,9 +172,11 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
 
      const isAutoMiss = context?.isAutoMiss === true;
 
-     const hit = isAutoMiss ? false : (target ? (r1 + bonus >= target.ac) : undefined);
-     const targetName = target?.name || context?.targetName;
-     const targetAc = target?.ac || context?.targetAc;
+      const coverAcBonus = context?.coverAcBonus || 0;
+      const effectiveAc = target ? target.ac + coverAcBonus : undefined;
+      const hit = isAutoMiss ? false : (target ? (r1 + bonus >= effectiveAc) : undefined);
+      const targetName = target?.name || context?.targetName;
+      const targetAc = effectiveAc || context?.targetAc;
 
       const isCrit = !isAutoMiss && (r1 === 20 || context?.isAutoCrit) && hit;
 
@@ -206,9 +208,11 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           damageType: context?.damageType,
           hit,
           isAutoMiss,
-          rangeReason: context?.rangeReason,
-           resistanceNotice: context?.resistanceNotice
-            });
+           rangeReason: context?.rangeReason,
+           resistanceNotice: context?.resistanceNotice,
+           coverLevel: context?.coverLevel,
+           coverAcBonus: context?.coverAcBonus,
+             });
       setPopupHtml({
          type: 'd20',
          rollType,
@@ -221,6 +225,8 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
          isAutoMiss,
          rangeReason: context?.rangeReason,
          resistanceNotice: context?.resistanceNotice,
+         coverLevel: context?.coverLevel,
+         coverAcBonus: context?.coverAcBonus,
         forcedMode: context?.forcedMode,
         isAutoCrit: context?.isAutoCrit,
         isCrit,

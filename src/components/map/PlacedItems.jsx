@@ -655,32 +655,34 @@ function PlacedItems({
         );
     };
 
+    const renderItems = (type, renderFn) => placedItems.filter(i => i.type === type).map(renderFn).filter(Boolean)
+
     return (
         <>
-            {placedItems.filter(item => item.type === 'altar').map(renderAltar)}
-            {placedItems.filter(item => item.type === 'arrowSlitWall').map(renderArrowSlitWall)}
-            {placedItems.filter(item => item.type === 'barrel').map(renderBarrel)}
-            {placedItems.filter(item => item.type === 'bed').map(renderBed)}
-            {placedItems.filter(item => item.type === 'bookshelf').map(renderBookshelf)}
-            {placedItems.filter(item => item.type === 'boulder').map(renderBoulder)}
-            {placedItems.filter(item => item.type === 'bush').map(renderBush)}
-            {placedItems.filter(item => item.type === 'chair').map(renderChair)}
-            {placedItems.filter(item => item.type === 'chest').map(renderChest)}
-            {placedItems.filter(item => item.type === 'crate').map(renderCrate)}
-            {placedItems.filter(item => item.type === 'door').map(renderDoor)}
-            {placedItems.filter(item => item.type === 'firepit').map(renderFirepit)}
-            {placedItems.filter(item => item.type === 'fountain').map(renderFountain)}
-            {placedItems.filter(item => item.type === 'npc').map(renderNpc)}
-            {placedItems.filter(item => item.type === 'pillar').map(renderPillar)}
-            {placedItems.filter(item => item.type === 'secretDoor').map(renderSecretDoor)}
-            {placedItems.filter(item => item.type === 'skeleton').map(renderSkeleton)}
-            {placedItems.filter(item => item.type === 'stairs').map(renderStairs)}
-            {placedItems.filter(item => item.type === 'statue').map(renderStatue)}
-            {placedItems.filter(item => item.type === 'table').map(renderTable)}
-            {placedItems.filter(item => item.type === 'torch').map(renderTorch)}
-            {placedItems.filter(item => item.type === 'trap').map(renderTrap)}
-            {placedItems.filter(item => item.type === 'tree').map(renderTree)}
-            {placedItems.filter(item => item.type === 'web').map(renderWeb)}
+            {renderItems('altar', renderAltar)}
+            {renderItems('arrowSlitWall', renderArrowSlitWall)}
+            {renderItems('barrel', renderBarrel)}
+            {renderItems('bed', renderBed)}
+            {renderItems('bookshelf', renderBookshelf)}
+            {renderItems('boulder', renderBoulder)}
+            {renderItems('bush', renderBush)}
+            {renderItems('chair', renderChair)}
+            {renderItems('chest', renderChest)}
+            {renderItems('crate', renderCrate)}
+            {renderItems('door', renderDoor)}
+            {renderItems('firepit', renderFirepit)}
+            {renderItems('fountain', renderFountain)}
+            {renderItems('npc', renderNpc)}
+            {renderItems('pillar', renderPillar)}
+            {renderItems('secretDoor', renderSecretDoor)}
+            {renderItems('skeleton', renderSkeleton)}
+            {renderItems('stairs', renderStairs)}
+            {renderItems('statue', renderStatue)}
+            {renderItems('table', renderTable)}
+            {renderItems('torch', renderTorch)}
+            {renderItems('trap', renderTrap)}
+            {renderItems('tree', renderTree)}
+            {renderItems('web', renderWeb)}
         </>
     );
 }

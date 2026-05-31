@@ -4,6 +4,7 @@ import {
   computeRangeEffect,
   computeMeleeProximityEffect,
   isHostileNPC,
+  getNearestPlacedItem,
 } from './rangeValidation.js'
 
 describe('getDistanceFeet', () => {
@@ -139,6 +140,56 @@ describe('computeMeleeProximityEffect', () => {
     const threats = [{ gridX: 10, gridY: 10, name: 'Goblin' }]
     const result = computeMeleeProximityEffect(true, attacker, threats, {})
     expect(result.mode).toBe('disadvantage')
+  })
+})
+
+describe('getNearestPlacedItem', () => {
+  it('returns the item when there is a single match', () => {
+    const items = [
+      { name: 'Goblin', gridX: 5, gridY: 5 },
+    ]
+    const result = getNearestPlacedItem(items, 'Goblin', { gridX: 0, gridY: 0 })
+    expect(result).toEqual(items[0])
+  })
+
+  it('returns the nearest item when there are multiple matches', () => {
+    const items = [
+      { name: 'Goblin', gridX: 10, gridY: 10 },
+      { name: 'Goblin', gridX: 2, gridY: 2 },
+    ]
+    const result = getNearestPlacedItem(items, 'Goblin', { gridX: 0, gridY: 0 })
+    expect(result).toEqual(items[1])
+  })
+
+  it('returns the nearest item with name number suffix', () => {
+    const items = [
+      { name: 'Goblin 1', gridX: 10, gridY: 10 },
+      { name: 'Goblin 2', gridX: 2, gridY: 2 },
+    ]
+    const result = getNearestPlacedItem(items, 'Goblin', { gridX: 0, gridY: 0 })
+    expect(result).toEqual(items[1])
+  })
+
+  it('returns null when no items match', () => {
+    const items = [
+      { name: 'Orc', gridX: 5, gridY: 5 },
+    ]
+    const result = getNearestPlacedItem(items, 'Goblin', { gridX: 0, gridY: 0 })
+    expect(result).toBeNull()
+  })
+
+  it('returns null when placedItems is empty', () => {
+    const result = getNearestPlacedItem([], 'Goblin', { gridX: 0, gridY: 0 })
+    expect(result).toBeNull()
+  })
+
+  it('returns exact name match over prefix match', () => {
+    const items = [
+      { name: 'Goblin', gridX: 10, gridY: 10 },
+      { name: 'Goblin King', gridX: 2, gridY: 2 },
+    ]
+    const result = getNearestPlacedItem(items, 'Goblin', { gridX: 0, gridY: 0 })
+    expect(result).toEqual(items[0])
   })
 })
 

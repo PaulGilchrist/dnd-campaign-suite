@@ -88,6 +88,27 @@ export function computeMeleeProximityEffect(isRanged, attackerPos, nearbyThreats
   return { mode: 'normal' }
 }
 
+export function getNearestPlacedItem(placedItems, targetName, attackerPos) {
+  const matches = placedItems.filter(i => i.name === targetName || (
+    i.name?.startsWith(targetName + ' ') && /^\d+$/.test(i.name.slice(targetName.length + 1))
+  ))
+  if (matches.length === 0) return null
+  if (matches.length === 1) return matches[0]
+
+  let nearest = matches[0]
+  let nearestDist = Infinity
+  for (const item of matches) {
+    const dx = item.gridX - attackerPos.gridX
+    const dy = item.gridY - attackerPos.gridY
+    const dist = dx * dx + dy * dy
+    if (dist < nearestDist) {
+      nearestDist = dist
+      nearest = item
+    }
+  }
+  return nearest
+}
+
 export function isHostileNPC(npc, characterName) {
   if (!npc) return false
   if (npc.attitude == null) return true

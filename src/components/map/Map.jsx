@@ -833,6 +833,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         // Generic NPC drop
         if (dragData === 'npc') {
             const newItem = {
+                id: utils.guid(),
                 type: 'npc',
                 gridX: grid.gridX,
                 gridY: grid.gridY,

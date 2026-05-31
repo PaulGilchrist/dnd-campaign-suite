@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, targetMaxHp, damageReduced, onQuickRoll, autoDamage }) {
+function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, targetMaxHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
 
     const isD20 = type === 'd20';
@@ -87,7 +87,13 @@ function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier =
                <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
                  {isAutoMiss ? '✗ AUTO-MISS' : (hit ? '✓ HIT' : '✗ MISS')} {isAutoMiss ? `(${rangeReason || 'out of range'})` : `(${total} vs AC ${targetAc})`}
                </div>
-             )}
+              )}
+
+            {coverAcBonus > 0 && (
+              <div className="dice-roll-cover">
+                {coverLevel === 'threeQuarter' ? '3/4' : '1/2'} Cover (+{coverAcBonus} AC)
+              </div>
+            )}
 
             {autoDamage && hit && (
               <div className="dice-roll-auto-damage">
