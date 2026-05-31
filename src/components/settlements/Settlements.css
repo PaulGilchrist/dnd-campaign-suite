@@ -170,11 +170,12 @@
 .settlements-rumor-row {
   display: flex;
   gap: 6px;
-  align-items: center;
+  align-items: flex-start;
 }
 
-.settlements-rumor-row .settlements-rumor-text {
+.settlements-rumor-row > .preview-toggle-wrapper {
   flex: 1;
+  min-width: 0;
 }
 
 @media print {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import useSettlementsManagement from '../../hooks/useSettlementsManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import { generateSettlement } from '../../services/settlementGenerator.js';
@@ -69,12 +69,13 @@ function Settlements({ campaignName, onBack }) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const descDataRef = useRef(null);
 
   useEffect(() => {
-    if (campaignName) {
-      loadSettlementsList();
-    }
-  }, [campaignName, loadSettlementsList]);
+    fetch('/data/settlement-descriptions.json')
+      .then(r => r.json())
+      .then(d => { descDataRef.current = d; });
+  }, []);
 
   const filteredSettlements = useMemo(() => {
     let result = settlements;
@@ -141,8 +142,36 @@ function Settlements({ campaignName, onBack }) {
     setEditingSettlement(null);
   };
 
+  const POPULATION_RANGES = {
+    village: ['50-100 souls', '100-200 souls', '200-400 souls', '400-800 souls'],
+    town: ['800-1,500 souls', '1,500-3,000 souls', '3,000-5,000 souls'],
+    city: ['5,000-12,000 souls', '12,000-25,000 souls', '25,000-50,000 souls'],
+    metropolis: ['50,000-100,000 souls', '100,000-250,000 souls', '250,000+ souls'],
+  };
+
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
   const handleFormChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (field === 'size') {
+      const descs = descDataRef.current;
+      const sizeDescs = (descs && descs[value]) || {};
+      const newPopulation = pick(POPULATION_RANGES[value] || POPULATION_RANGES.village);
+      const newDescription = pick(sizeDescs.descriptions || []);
+      const newAtmosphere = pick(sizeDescs.atmospheres || []);
+      const newGovernment = pick(sizeDescs.governments || '');
+      const newThreat = pick(sizeDescs.threats || []);
+      setFormData((prev) => ({
+        ...prev,
+        size: value,
+        population: newPopulation,
+        description: newDescription,
+        atmosphere: newAtmosphere,
+        government: newGovernment,
+        threat: newThreat,
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+    }
   };
 
   const handleAddService = () => {
@@ -434,14 +463,12 @@ function Settlements({ campaignName, onBack }) {
                 </div>
               </div>
 
-              <label htmlFor="settlement-government" className="ct-label">Government</label>
-              <input
+              <PreviewToggle
                 id="settlement-government"
-                type="text"
-                className="ct-input"
                 value={formData.government}
-                onChange={(e) => handleFormChange('government', e.target.value)}
+                onChange={(value) => handleFormChange('government', value)}
                 placeholder="How is this settlement governed?"
+                label="Government"
               />
 
               <PreviewToggle
@@ -558,12 +585,12 @@ function Settlements({ campaignName, onBack }) {
               <div className="settlements-rumors-section">
                 {(formData.rumors || []).map((rumor, i) => (
                   <div key={i} className="settlements-rumor-row">
-                    <input
-                      type="text"
-                      className="ct-input settlements-rumor-text"
+                    <PreviewToggle
+                      id={`settlement-rumor-${i}`}
                       value={rumor}
-                      onChange={(e) => handleRumorChange(i, e.target.value)}
+                      onChange={(value) => handleRumorChange(i, value)}
                       placeholder="A rumor or piece of news…"
+                      rows={2}
                     />
                     <button
                       className="ct-btn ct-btn-sm ct-btn-danger"

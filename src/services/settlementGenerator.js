@@ -1,4 +1,5 @@
 let nameCache = null;
+let npcNameCache = null;
 let descCache = null;
 let shopNameCache = null;
 let guildNameCache = null;
@@ -9,6 +10,13 @@ async function loadNameData() {
   const response = await fetch('/data/settlement-names.json');
   nameCache = await response.json();
   return nameCache;
+}
+
+async function loadNpcNameData() {
+  if (npcNameCache) return npcNameCache;
+  const response = await fetch('/data/npc-names.json');
+  npcNameCache = await response.json();
+  return npcNameCache;
 }
 
 async function loadDescData() {
@@ -204,8 +212,8 @@ const SIZE_CULTURE_MAP = {
 };
 
 export async function generateSettlement(existingSettlements = [], options = {}) {
-  const [names, descs, shopNames, guildNames, rumors] = await Promise.all([
-    loadNameData(), loadDescData(), loadShopNameData(), loadGuildNameData(), loadRumorData(),
+  const [names, npcNames, descs, shopNames, guildNames, rumors] = await Promise.all([
+    loadNameData(), loadNpcNameData(), loadDescData(), loadShopNameData(), loadGuildNameData(), loadRumorData(),
   ]);
 
   const size = options.size || pick(SIZE_LABELS);
@@ -264,7 +272,7 @@ export async function generateSettlement(existingSettlements = [], options = {})
 
     const npcRace = pick(['Human', 'Elf', 'Dwarf', 'Halfling', 'Half-Elf', 'Half-Orc']);
     const npcGender = Math.random() > 0.5 ? 'male' : 'female';
-    const npcNamePool = names[npcRace] || names['Human'];
+    const npcNamePool = npcNames[npcRace] || npcNames['Human'];
     const npcFirstName = pick(npcNamePool[npcGender] || npcNamePool['male'] || []);
 
     const fullNpcName = `${npcFirstName}`;
