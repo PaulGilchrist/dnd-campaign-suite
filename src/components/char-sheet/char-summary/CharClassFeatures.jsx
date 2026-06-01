@@ -45,6 +45,23 @@ const ClericFeatures = function ClericFeatures({ playerStats }) {
          <div data-testid="char-class-cleric">
              <TrackedResourceInput label="Channel Divinity Charges" resourceKey="channelDivinityCharges" playerName={playerStats.name} getMax={() => clericFeatures?.maxChannelDivinity || 0} deps={[playerStats]} />
              {clericFeatures?.destroyUndeadCR !== null && <div><b>Destroy Undead Challenge Rating: </b>{clericFeatures.destroyUndeadCR}</div>}
+             <div className="automation-actions">
+                 {playerStats.level >= 2 && (
+                     <button className="automation-btn" title="Divine Spark: Heal or deal Necrotic/Radiant damage (1d8+WIS)">
+                         <i className="fas fa-hands"></i> Divine Spark (1 CD)
+                     </button>
+                 )}
+                 {playerStats.level >= 2 && (
+                     <button className="automation-btn" title="Turn Undead: Frighten and Incapacitate Undead within 30 ft (WIS DC)">
+                         <i className="fas fa-ghost"></i> Turn Undead (1 CD)
+                     </button>
+                 )}
+                 {playerStats.level >= 7 && (
+                     <button className="automation-btn" title="Blessed Strikes: Extra 1d8 Necrotic/Radiant on weapon hit (WIS)">
+                         <i className="fas fa-cross"></i> Blessed Strikes
+                     </button>
+                 )}
+             </div>
          </div>
     );
 };
@@ -59,6 +76,11 @@ const DruidFeatures = function DruidFeatures({ playerStats }) {
              <div><b>Wild Shape Max Challenge Rating: </b>{druidFeatures?.maxWildShapeChallengeRating}</div>
              {druidFeatures?.beastKnownForms > 0 && <div><b>Beast Forms Known: </b>{druidFeatures.beastKnownForms}</div>}
              <div><b>Wild Shape Limitations: </b>{druidFeatures.wildShapeLimitations}</div>
+             <div className="automation-actions">
+                 <button className="automation-btn" title="Wild Shape: Transform into a beast form">
+                     <i className="fas fa-paw"></i> Wild Shape
+                 </button>
+             </div>
          </div>
     );
 };
@@ -102,17 +124,32 @@ const MonkFeatures = function MonkFeatures({ playerStats }) {
              <div><b>Focus Save DC: </b>{focusSaveDc}</div>
              <div><b>Unarmored Movement:</b> +{monkFeatures?.unarmoredMovementIncrease || 0} ft.</div>
              <div className="automation-actions">
+                 {playerStats.level >= 1 && (
+                     <button className="automation-btn" title="Uncanny Metabolism: Regain all FP and heal on initiative">
+                         <i className="fas fa-heartbeat"></i> Uncanny Metabolism
+                     </button>
+                 )}
+                 {playerStats.level >= 2 && (
+                     <button className="automation-btn" title="Flurry of Blows: 2 Unarmed Strikes as Bonus Action (1 FP)">
+                         <i className="fas fa-fist-raised"></i> Flurry of Blows (1 FP)
+                     </button>
+                 )}
                  {playerStats.level >= 5 && (
                      <button className="automation-btn" title="Stunning Strike: Spend 1 FP, target CON save or stunned">
                          <i className="fas fa-hand-paper"></i> Stunning Strike (1 FP, DC {focusSaveDc})
                      </button>
                  )}
                  {playerStats.reactions?.find(r => r.name === 'Deflect Missiles' || r.name === 'Deflect Attacks') && (
-                     <button className="automation-btn" title="Deflect Missiles/Attacks: Reduce ranged B/P/S damage by 1d10+DEX+level">
+                     <button className="automation-btn" title="Deflect Attacks: Reduce incoming damage by 1d10+DEX+level">
                          <i className="fas fa-shield-alt"></i> {playerStats.reactions.find(r => r.name === 'Deflect Missiles' || r.name === 'Deflect Attacks').name}
                      </button>
                  )}
-            </div>
+                 {playerStats.level >= 10 && (
+                     <button className="automation-btn" title="Heightened Focus: Flurry gives 3 strikes, Patient Defense grants temp HP">
+                         <i className="fas fa-wind"></i> Heightened Focus
+                     </button>
+                 )}
+             </div>
          </div>
     );
 };
@@ -139,7 +176,7 @@ const PaladinFeatures = function PaladinFeatures({ playerStats }) {
                          <i className="fas fa-bolt"></i> Divine Smite (SPC)
                      </button>
                  )}
-            </div>
+             </div>
          </div>
     );
 };
@@ -152,6 +189,18 @@ const RangerFeatures = function RangerFeatures({ playerStats }) {
              {playerStats.class.fightingStyles && playerStats.level > 1 && <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles.join(', ')}</div>}
              <div><b>Extra Attacks: </b>{rangerFeatures?.extraAttacks || 0}</div>
              <div><b>Favored Enemies: </b>{rangerFeatures?.favoredEnemies}</div>
+             <div className="automation-actions">
+                 {playerStats.level >= 2 && (
+                     <button className="automation-btn" title="Favored Foe: Mark a foe for extra 1d4 damage">
+                         <i className="fas fa-crosshairs"></i> Favored Foe
+                     </button>
+                 )}
+                 {playerStats.level >= 2 && (
+                     <button className="automation-btn" title="Cunning Strike: Add poison/extra effects to weapon hits">
+                         <i className="fas fa-skull-crossbones"></i> Cunning Strike
+                     </button>
+                 )}
+             </div>
          </div>
     );
 };
@@ -163,6 +212,16 @@ const RogueFeatures = function RogueFeatures({ playerStats }) {
          <div data-testid="char-class-rogue">
              <div><b>Sneak Attack Damage: </b>+{rogueFeatures?.sneakAttack?.dice_count || 0}d{rogueFeatures?.sneakAttack?.dice_value || 0}</div>
              {rogueFeatures?.expertise && <div><b>Expertise: </b>{rogueFeatures.expertise.join(', ')}</div>}
+             <div className="automation-actions">
+                 <button className="automation-btn" title="Sneak Attack: Extra damage when you have advantage or ally adjacent">
+                     <i className="fas fa-user-ninja"></i> Sneak Attack ({rogueFeatures?.sneakAttack?.dice_count || 0}d{rogueFeatures?.sneakAttack?.dice_value || 0})
+                 </button>
+                 {playerStats.level >= 9 && (
+                     <button className="automation-btn" title="Supreme Sneak: Advantage on Stealth if you move no more than half speed">
+                         <i className="fas fa-eye-slash"></i> Supreme Sneak
+                     </button>
+                 )}
+             </div>
          </div>
     );
 };
@@ -175,6 +234,11 @@ const SorcererFeatures = function SorcererFeatures({ playerStats }) {
              <TrackedResourceInput label="Sorcery Points" resourceKey="sorceryPoints" playerName={playerStats.name} getMax={() => sorcererFeatures?.maxSorceryPoints || 0} deps={[playerStats]} />
              <div><b>Metamagic Known: </b>{sorcererFeatures?.metamagicKnown}</div>
              {sorcererFeatures?.creatingSpellSlotCosts?.length > 0 && <div><b>Spell Slot (level 1-5) Costs: </b>{sorcererFeatures.creatingSpellSlotCosts.join(', ')}</div>}
+             <div className="automation-actions">
+                 <button className="automation-btn" title="Metamagic: Apply metamagic options to spells">
+                     <i className="fas fa-magic"></i> Metamagic
+                 </button>
+             </div>
          </div>
     );
 };
@@ -200,6 +264,13 @@ const WarlockFeatures = function WarlockFeatures({ playerStats }) {
              {warlockFeatures?.arcanums && Array.isArray(warlockFeatures.arcanums) && warlockFeatures.arcanums.length > 0 && (
                  <div><b>Eldritch Invocations List: </b>{warlockFeatures.arcanums.join(', ')}</div>
              )}
+             <div className="automation-actions">
+                 {warlockFeatures?.pactBoon && (
+                     <button className="automation-btn" title={`Pact Boon: ${warlockFeatures.pactBoon}`}>
+                         <i className="fas fa-hand-sparkles"></i> {warlockFeatures.pactBoon}
+                     </button>
+                 )}
+             </div>
          </div>
     );
 };
@@ -211,6 +282,11 @@ const WizardFeatures = function WizardFeatures({ playerStats }) {
     return (
          <div data-testid="char-class-wizard">
              <TrackedResourceInput label="Arcane Recovery Levels" resourceKey="arcaneRecoveryLevels" playerName={playerStats.name} getMax={() => wizardFeatures?.arcaneRecoveryLevels || 0} deps={[playerStats]} />
+             <div className="automation-actions">
+                 <button className="automation-btn" title="Arcane Recovery: Regain spell slots on short rest">
+                     <i className="fas fa-book-open"></i> Arcane Recovery
+                 </button>
+             </div>
          </div>
     );
 };

@@ -56,7 +56,14 @@
             {
                 "name": "Impersonation",
                 "description": "While you're disguised as a real or fictional person, you have Advantage on Charisma (Deception or Performance) checks to convince others that you are that person.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "deception_performance_checks",
+                    "condition": "disguised",
+                    "effect": "advantage",
+                    "ability": "Charisma"
+                }
             },
             {
                 "name": "Mimicry",
@@ -110,17 +117,32 @@
             {
                 "name": "Climb Speed",
                 "description": "You gain a Climb Speed equal to your Speed.",
-                "type": "speed"
+                "type": "speed",
+                "automation": {
+                    "type": "passive_buff",
+                    "effect": "climb_speed",
+                    "bonusExpression": "speed"
+                }
             },
             {
                 "name": "Hop Up",
                 "description": "When you have the Prone condition, you can right yourself with only 5 feet of movement.",
-                "type": "utility"
+                "type": "utility",
+                "automation": {
+                    "type": "passive_buff",
+                    "effect": "stand_from_prone",
+                    "movementCost": "5 ft"
+                }
             },
             {
                 "name": "Jumping",
                 "description": "You can make a running Long or High Jump after moving only 5 feet.",
-                "type": "utility"
+                "type": "utility",
+                "automation": {
+                    "type": "passive_buff",
+                    "effect": "reduced_running_jump_requirement",
+                    "runningStartRequirement": "5 ft"
+                }
             }
         ],
         "ability_score_increase": {
@@ -162,7 +184,13 @@
             {
                 "name": "Fearless Aim",
                 "description": "When you miss with an attack roll, you can hit instead. Once you use this benefit, you can't use it again until the start of your next turn.",
-                "type": "utility"
+                "type": "utility",
+                "automation": {
+                    "type": "auto_reroll",
+                    "trigger": "attack_roll_miss",
+                    "effect": "convert_miss_to_hit",
+                    "oncePerTurn": true
+                }
             }
         ],
         "ability_score_increase": {
@@ -205,7 +233,14 @@
             {
                 "name": "Blink Steps",
                 "description": "Immediately after you take the Attack action or the Magic action, you can teleport up to 30 feet to an unoccupied space you can see.",
-                "type": "movement"
+                "type": "movement",
+                "automation": {
+                    "type": "temp_buff",
+                    "trigger": "after_attack_or_magic_action",
+                    "effect": "bonus_teleport",
+                    "distance": "30 ft",
+                    "requiresLineOfSight": true
+                }
             }
         ],
         "ability_score_increase": {
@@ -248,12 +283,35 @@
             {
                 "name": "Energy Resistances",
                 "description": "You gain Resistance to two of the following damage types of your choice: Acid, Cold, Fire, Lightning, Necrotic, Poison, Psychic, Radiant, or Thunder. Whenever you finish a Long Rest, you can change your choices.",
-                "type": "resistance"
+                "type": "resistance",
+                "automation": {
+                    "type": "passive_buff",
+                    "effect": "damage_resistance",
+                    "resistanceType": [
+                        "player_choice_2_from_list"
+                    ],
+                    "validTypes": [
+                        "Acid", "Cold", "Fire", "Lightning",
+                        "Necrotic", "Poison", "Psychic", "Radiant", "Thunder"
+                    ],
+                    "recharge": "long_rest"
+                }
             },
             {
                 "name": "Energy Redirection",
                 "description": "When you take damage of one of the types chosen for the Energy Resistances benefit, you can take a Reaction to direct damage of the same type toward another creature you can see within 60 feet of yourself that isn't behind Total Cover. If you do so, that creature must succeed on a Dexterity saving throw (DC 8 plus your Constitution modifier and Proficiency Bonus) or take damage equal to 2d12 plus your Constitution modifier.",
-                "type": "reaction"
+                "type": "reaction",
+                "automation": {
+                    "type": "reaction_damage",
+                    "trigger": "damage_taken_of_chosen_resistance_type",
+                    "effect": "redirect_damage",
+                    "damageExpression": "2d12 + CON modifier",
+                    "saveType": "DEX",
+                    "saveDcExpression": "8 + CON modifier + proficiency_bonus",
+                    "range": "60 ft",
+                    "requiresLineOfSight": true,
+                    "targets": 1
+                }
             }
         ],
         "ability_score_increase": {
@@ -297,7 +355,16 @@
             {
                 "name": "Improve Fate",
                 "description": "When you or another creature within 60 feet of you succeeds on or fails a d20 Test, you can roll 2d4 and apply the total rolled as a bonus or penalty to the d20 roll. Once you use this benefit, you can't use it again until you roll Initiative or finish a Short or Long Rest.",
-                "type": "utility"
+                "type": "utility",
+                "automation": {
+                    "type": "buff_ally",
+                    "trigger": "d20_test_by_self_or_ally_in_60ft",
+                    "effect": "modify_d20_roll",
+                    "modifier": "2d4",
+                    "canBeBonusOrPenalty": true,
+                    "range": "60 ft",
+                    "recharge": "initiative_or_short_or_long_rest"
+                }
             }
         ],
         "ability_score_increase": {
@@ -340,7 +407,16 @@
             {
                 "name": "Fortified Health",
                 "description": "Your Hit Point maximum increases by 40. In addition, whenever you regain Hit Points, you can regain additional Hit Points equal to your Constitution modifier. Once you've regained these additional Hit Points, you can't do so again until the start of your next turn.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_buff",
+                    "effect": "max_hp_increase",
+                    "amount": 40,
+                    "alsoSelfHealing": {
+                        "extraHealingExpression": "CON modifier",
+                        "oncePerTurn": true
+                    }
+                }
             }
         ],
         "ability_score_increase": {
@@ -383,12 +459,28 @@
             {
                 "name": "Overcome Defenses",
                 "description": "The Bludgeoning, Piercing, and Slashing damage you deal always ignores Resistance.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_rule",
+                    "effect": "ignore_resistance",
+                    "damageTypes": [
+                        "Bludgeoning",
+                        "Piercing",
+                        "Slashing"
+                    ]
+                }
             },
             {
                 "name": "Overwhelming Strike",
                 "description": "When you roll a 20 on the d20 for an attack roll, you can deal extra damage to the target equal to the ability score increased by this feat. The extra damage's type is the same as the attack's type.",
-                "type": "damage"
+                "type": "damage",
+                "automation": {
+                    "type": "damage_bonus",
+                    "trigger": "natural_20_attack_roll",
+                    "effect": "extra_damage",
+                    "extraDamageExpression": "increased_ability_score",
+                    "extraDamageType": "same_as_attack"
+                }
             }
         ],
         "ability_score_increase": {
@@ -428,12 +520,26 @@
             {
                 "name": "Last Stand",
                 "description": "When you would be reduced to 0 Hit Points, you can drop to 1 Hit Point instead and regain a number of Hit Points equal to half your Hit Point maximum. Once you use this benefit, you can't use it again until you finish a Long Rest.",
-                "type": "reaction"
+                "type": "reaction",
+                "automation": {
+                    "type": "auto_effect",
+                    "trigger": "reduced_to_0_hp",
+                    "effect": "survive_and_heal",
+                    "minHp": 1,
+                    "healExpression": "half_max_hp",
+                    "recharge": "long_rest"
+                }
             },
             {
                 "name": "Recover Vitality",
                 "description": "You have a pool of ten d10s. As a Bonus Action, you can expend dice from the pool, roll those dice, and regain a number of Hit Points equal to the roll's total. You regain all the expended dice when you finish a Long Rest.",
-                "type": "bonus_action"
+                "type": "bonus_action",
+                "automation": {
+                    "type": "healing_pool",
+                    "poolExpression": "10d10",
+                    "action": "bonus_action",
+                    "recharge": "long_rest"
+                }
             }
         ],
         "ability_score_increase": {
@@ -477,12 +583,22 @@
             {
                 "name": "All-Around Adept",
                 "description": "You gain proficiency in all skills.",
-                "type": "proficiency"
+                "type": "proficiency",
+                "automation": {
+                    "type": "passive_buff",
+                    "effect": "all_skill_proficiencies"
+                }
             },
             {
                 "name": "Expertise",
                 "description": "Choose one skill in which you lack Expertise. You gain Expertise in that skill.",
-                "type": "proficiency"
+                "type": "proficiency",
+                "automation": {
+                    "type": "passive_buff",
+                    "effect": "expertise",
+                    "count": 1,
+                    "requirement": "no_existing_expertise"
+                }
             }
         ],
         "ability_score_increase": {
@@ -526,12 +642,24 @@
             {
                 "name": "Escape Artist",
                 "description": "As a Bonus Action, you can take the Disengage action, which also ends the Grappled condition on you.",
-                "type": "bonus_action"
+                "type": "bonus_action",
+                "automation": {
+                    "type": "bonus_action_attack",
+                    "action": "bonus_action",
+                    "effect": "disengage_end_grappled",
+                    "additionalEffect": "end_grappled",
+                    "noOpportunityAttacks": true
+                }
             },
             {
                 "name": "Quickness",
                 "description": "Your Speed increases by 30 feet.",
-                "type": "speed"
+                "type": "speed",
+                "automation": {
+                    "type": "passive_buff",
+                    "effect": "speed_increase",
+                    "bonus": "30 ft"
+                }
             }
         ],
         "ability_score_increase": {
@@ -575,7 +703,12 @@
             {
                 "name": "Truesight",
                 "description": "You have Truesight with a range of 60 feet.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_buff",
+                    "effect": "truesight",
+                    "range": "60 ft"
+                }
             }
         ],
         "ability_score_increase": {
@@ -628,12 +761,36 @@
             {
                 "name": "Improved Dash",
                 "description": "When you take the Dash action, your Speed increases by 10 feet for that action.",
-                "type": "speed"
+                "type": "speed",
+                "automation": {
+                    "type": "temp_buff",
+                    "trigger": "dash_action",
+                    "effect": "speed_bonus",
+                    "bonus": "10 ft",
+                    "duration": "same_action"
+                }
             },
             {
                 "name": "Charge Attack",
                 "description": "If you move at least 10 feet in a straight line toward a target immediately before hitting it with a melee attack roll as part of the Attack action, choose one of the following effects: gain a d8 bonus to the attack's damage roll, or push the target up to 10 feet away if it is no more than one size larger than you. You can use this benefit only once on each of your turns.",
-                "type": "action"
+                "type": "action",
+                "automation": {
+                    "type": "attack_rider",
+                    "trigger": "melee_hit_after_10ft_charge",
+                    "effects": [
+                        {
+                            "option": "damage_bonus",
+                            "dice": "1d8"
+                        },
+                        {
+                            "option": "push",
+                            "distance": "10 ft",
+                            "sizeLimit": "one_size_larger"
+                        }
+                    ],
+                    "chooseOne": true,
+                    "oncePerTurn": true
+                }
             }
         ],
         "ability_score_increase": {
@@ -679,12 +836,27 @@
             {
                 "name": "Replenishing Meal",
                 "description": "As part of a Short Rest, you can cook special food if you have ingredients and Cook's Utensils on hand. You can prepare enough of this food for a number of creatures equal to 4 plus your Proficiency Bonus. At the end of the Short Rest, any creature who eats the food and spends one or more Hit Dice to regain Hit Points regains an extra 1d8 Hit Points.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "healing_bonus",
+                    "trigger": "short_rest_food_healing",
+                    "effect": "extra_healing_hit_dice",
+                    "extraHealing": "1d8",
+                    "targets": "4 + proficiency_bonus"
+                }
             },
             {
                 "name": "Bolstering Treats",
                 "description": "With 1 hour of work or when you finish a Long Rest, you can cook a number of treats equal to your Proficiency Bonus if you have ingredients and Cook's Utensils on hand. These special treats last 8 hours after being made. A creature can use a Bonus Action to eat one of those treats to gain a number of Temporary Hit Points equal to your Proficiency Bonus.",
-                "type": "bonus_action"
+                "type": "bonus_action",
+                "automation": {
+                    "type": "temp_hp_buff",
+                    "action": "bonus_action",
+                    "tempHpExpression": "proficiency_bonus",
+                    "craftCount": "proficiency_bonus",
+                    "craftTime": "1_hour_or_long_rest",
+                    "duration": "8_hours"
+                }
             }
         ],
         "ability_score_increase": {
@@ -761,12 +933,27 @@
             {
                 "name": "Push",
                 "description": "Once per turn, when you hit a creature with an attack that deals Bludgeoning damage, you can move it 5 feet to an unoccupied space if the target is no more than one size larger than you.",
-                "type": "utility"
+                "type": "utility",
+                "automation": {
+                    "type": "attack_rider",
+                    "trigger": "bludgeoning_damage_hit",
+                    "effect": "push",
+                    "distance": "5 ft",
+                    "oncePerTurn": true,
+                    "sizeLimit": "one_size_larger"
+                }
             },
             {
                 "name": "Enhanced Critical",
                 "description": "When you score a Critical Hit that deals Bludgeoning damage to a creature, attack rolls against that creature have Advantage until the start of your next turn.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "conditional_advantage",
+                    "trigger": "critical_hit_bludgeoning",
+                    "target": "all_attackers_vs_target",
+                    "effect": "advantage",
+                    "duration": "until_start_of_next_turn"
+                }
             }
         ],
         "ability_score_increase": {
@@ -839,7 +1026,14 @@
             {
                 "name": "Parry",
                 "description": "If you're holding a Finesse weapon and another creature hits you with a melee attack, you can take a Reaction to add your Proficiency Bonus to your Armor Class, potentially causing the attack to miss you. You gain this bonus to your AC against melee attacks until the start of your next turn.",
-                "type": "reaction"
+                "type": "reaction",
+                "automation": {
+                    "type": "reaction_bonus",
+                    "trigger": "melee_attack_hit_while_holding_finesse",
+                    "effect": "ac_bonus",
+                    "bonusExpression": "proficiency_bonus",
+                    "duration": "until_start_of_next_turn"
+                }
             }
         ],
         "ability_score_increase": {
@@ -887,7 +1081,17 @@
             {
                 "name": "Enhanced Dual Wielding",
                 "description": "When you take the Attack action on your turn and attack with a weapon that has the Light property, you can make one extra attack as a Bonus Action later on the same turn with a different weapon, which must be a Melee weapon that lacks the Two-Handed property. You don't add your ability modifier to the extra attack's damage unless that modifier is negative.",
-                "type": "bonus_action"
+                "type": "bonus_action",
+                "automation": {
+                    "type": "bonus_attacks",
+                    "trigger": "attack_action_with_light_weapon",
+                    "extraAttacks": 1,
+                    "weaponRequirements": {
+                        "mustHave": ["Light"],
+                        "twoHanded": false
+                    },
+                    "weaponRestriction": "must_differ_from_main_hand"
+                }
             },
             {
                 "name": "Quick Draw",
@@ -959,12 +1163,23 @@
             {
                 "name": "Defy Death",
                 "description": "You have Advantage on Death Saving Throws.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "death_saving_throws",
+                    "effect": "advantage"
+                }
             },
             {
                 "name": "Speedy Recovery",
                 "description": "As a Bonus Action, you can expend one of your Hit Point Dice, roll the die, and regain a number of Hit Points equal to the roll.",
-                "type": "bonus_action"
+                "type": "bonus_action",
+                "automation": {
+                    "type": "self_healing",
+                    "action": "bonus_action",
+                    "hitDiceCost": 1,
+                    "healExpression": "hit_die_roll"
+                }
             }
         ],
         "ability_score_increase": {
@@ -1887,12 +2102,27 @@
             {
                 "name": "Puncture",
                 "description": "Once per turn, when you hit a creature with an attack that deals Piercing damage, you can reroll one of the attack's damage dice, and you must use the new roll.",
-                "type": "damage"
+                "type": "damage",
+                "automation": {
+                    "type": "attack_rider",
+                    "trigger": "piercing_damage_hit",
+                    "effect": "reroll_damage_die",
+                    "rerollCount": 1,
+                    "oncePerTurn": true,
+                    "mustUseNew": true
+                }
             },
             {
                 "name": "Enhanced Critical",
                 "description": "When you score a Critical Hit that deals Piercing damage to a creature, you can roll one additional damage die when determining the extra Piercing damage the target takes.",
-                "type": "damage"
+                "type": "damage",
+                "automation": {
+                    "type": "damage_bonus",
+                    "trigger": "critical_hit_piercing",
+                    "effect": "extra_damage_die",
+                    "extraDice": 1,
+                    "diceType": "weapon_die"
+                }
             }
         ],
         "ability_score_increase": {
@@ -2466,12 +2696,27 @@
             {
                 "name": "Hamstring",
                 "description": "Once per turn when you hit a creature with an attack that deals Slashing damage, you can reduce the Speed of that creature by 10 feet until the start of your next turn.",
-                "type": "condition"
+                "type": "condition",
+                "automation": {
+                    "type": "attack_rider",
+                    "trigger": "slashing_damage_hit",
+                    "effect": "reduce_speed",
+                    "speedReduction": "10 ft",
+                    "duration": "until_start_of_next_turn",
+                    "oncePerTurn": true
+                }
             },
             {
                 "name": "Enhanced Critical",
                 "description": "When you score a Critical Hit that deals Slashing damage to a creature, it has Disadvantage on attack rolls until the start of your next turn.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "conditional_advantage",
+                    "trigger": "critical_hit_slashing",
+                    "target": "target_attack_rolls",
+                    "effect": "disadvantage",
+                    "duration": "until_start_of_next_turn"
+                }
             }
         ],
         "ability_score_increase": {

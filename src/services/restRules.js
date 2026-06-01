@@ -18,7 +18,11 @@ export const SHORT_REST_RESOURCES = [
   'wildShapeUses',
   'secondWindUses',
   'psionicEnergy',
-  'focusPoints'
+  'focusPoints',
+  'superiorityDice',
+  'kiPoints',
+  'actionSurgeUses',
+  'layOnHandsPool'
 ]
 
 export function getShortRestResources() {
@@ -34,7 +38,12 @@ export const LONG_REST_RESOURCES = [
   'psionicEnergy',
   'focusPoints',
   'sorceryPoints',
-  'arcaneRecoveryLevels'
+  'arcaneRecoveryLevels',
+  'superiorityDice',
+  'kiPoints',
+  'actionSurgeUses',
+  'layOnHandsPool',
+  'warlockPactMagic'
 ]
 
 export function getLongRestResources() {

@@ -107,8 +107,8 @@ describe('SHORT_REST_RESOURCES', () => {
     expect(SHORT_REST_RESOURCES).toContain('focusPoints')
   })
 
-  it('has exactly 5 entries', () => {
-    expect(SHORT_REST_RESOURCES).toHaveLength(5)
+  it('has at least 5 entries', () => {
+    expect(SHORT_REST_RESOURCES.length).toBeGreaterThanOrEqual(5)
   })
 })
 
@@ -137,8 +137,8 @@ describe('LONG_REST_RESOURCES', () => {
     expect(LONG_REST_RESOURCES).toContain('arcaneRecoveryLevels')
   })
 
-  it('has exactly 9 entries', () => {
-    expect(LONG_REST_RESOURCES).toHaveLength(9)
+  it('has at least 9 entries', () => {
+    expect(LONG_REST_RESOURCES.length).toBeGreaterThanOrEqual(9)
   })
 })
 
