@@ -989,7 +989,13 @@
             {
                 "name": "Armor Class Bonus",
                 "description": "While you're wearing Light, Medium, or Heavy armor, you gain a +1 bonus to Armor Class.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_buff",
+                    "effect": "ac_bonus",
+                    "bonus": 1,
+                    "condition": "wearing_light_medium_or_heavy_armor"
+                }
             }
         ],
         "ability_score_increase": null,
@@ -1132,7 +1138,13 @@
             {
                 "name": "Damage Bonus",
                 "description": "When you're holding a melee weapon in one hand and no other weapons, you gain a +2 bonus to damage rolls with that weapon.",
-                "type": "damage"
+                "type": "damage",
+                "automation": {
+                    "type": "passive_buff",
+                    "effect": "damage_bonus_dueling",
+                    "bonus": 2,
+                    "condition": "holding_melee_weapon_one_hand_no_other_weapons"
+                }
             }
         ],
         "ability_score_increase": null,
@@ -1316,7 +1328,13 @@
             {
                 "name": "Attack Advantage",
                 "description": "You have Advantage on attack rolls against a creature Grappled by you.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "attack_rolls",
+                    "condition": "creature_grappled_by_you",
+                    "effect": "advantage"
+                }
             },
             {
                 "name": "Fast Wrestler",
@@ -1396,12 +1414,24 @@
             {
                 "name": "Heavy Weapon Mastery",
                 "description": "When you hit a creature with a weapon that has the Heavy property as part of the Attack action on your turn, you can cause the weapon to deal extra damage to the target. The extra damage equals your Proficiency Bonus.",
-                "type": "damage"
+                "type": "damage",
+                "automation": {
+                    "type": "damage_bonus",
+                    "trigger": "heavy_weapon_hit_during_attack_action",
+                    "extraDamageExpression": "proficiency_bonus",
+                    "damageType": "same_as_weapon"
+                }
             },
             {
                 "name": "Hew",
                 "description": "Immediately after you score a Critical Hit with a Melee weapon or reduce a creature to 0 Hit Points with one, you can make one attack with the same weapon as a Bonus Action.",
-                "type": "bonus_action"
+                "type": "bonus_action",
+                "automation": {
+                    "type": "bonus_action_attack",
+                    "trigger": "critical_hit_or_kill_with_melee_weapon",
+                    "action": "bonus_action",
+                    "effect": "free_melee_attack_after_crit_or_kill"
+                }
             }
         ],
         "ability_score_increase": {
@@ -1433,7 +1463,14 @@
             {
                 "name": "Battle Medic",
                 "description": "If you have a Healer's Kit, you can expend one use of it and tend to a creature within 5 feet of yourself as a Utilize action. That creature can expend one of its Hit Point Dice, and you then roll that die. The creature regains a number of Hit Points equal to the roll plus your Proficiency Bonus.",
-                "type": "utility"
+                "type": "utility",
+                "automation": {
+                    "type": "healing",
+                    "action": "action",
+                    "healExpression": "ally_hit_die + proficiency_bonus",
+                    "range": "5 ft",
+                    "requiresHealersKit": true
+                }
             },
             {
                 "name": "Healing Rerolls",
@@ -1512,7 +1549,13 @@
             {
                 "name": "Damage Reduction",
                 "description": "When you're hit by an attack while you're wearing Heavy armor, any Bludgeoning, Piercing, and Slashing damage dealt to you by that attack is reduced by an amount equal to your Proficiency Bonus.",
-                "type": "resistance"
+                "type": "resistance",
+                "automation": {
+                    "type": "damage_reduction",
+                    "reductionExpression": "proficiency_bonus",
+                    "damageTypes": ["Bludgeoning", "Piercing", "Slashing"],
+                    "condition": "wearing_heavy_armor"
+                }
             }
         ],
         "ability_score_increase": {
@@ -1561,7 +1604,15 @@
             {
                 "name": "Bolstering Performance",
                 "description": "When you finish a Short or Long Rest, you can give an inspiring performance: a speech, song, or dance. When you do so, choose up to six allies (which can include yourself) within 30 feet of yourself who witness the performance. The chosen creatures each gain Temporary Hit Points equal to your character level plus the modifier of the ability you increased with this feat.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "temp_hp_buff",
+                    "trigger": "after_short_or_long_rest",
+                    "tempHpExpression": "character_level + ability_modifier",
+                    "range": "30 ft",
+                    "targets": 6,
+                    "includesSelf": true
+                }
             }
         ],
         "ability_score_increase": {
@@ -1596,7 +1647,15 @@
             {
                 "name": "Damage Reduction",
                 "description": "When a creature you can see hits another creature within 5 feet of you with an attack roll, you can take a Reaction to reduce the damage dealt to the target by 1d10 plus your Proficiency Bonus. You must be holding a Shield or a Simple or Martial weapon to use this Reaction.",
-                "type": "reaction"
+                "type": "reaction",
+                "automation": {
+                    "type": "damage_reduction",
+                    "trigger": "creature_hits_ally_within_5ft",
+                    "reductionExpression": "1d10 + proficiency_bonus",
+                    "reaction": true,
+                    "target": "ally",
+                    "requiresShieldOrWeapon": true
+                }
             }
         ],
         "ability_score_increase": null,
@@ -1755,12 +1814,23 @@
             {
                 "name": "Concentration Breaker",
                 "description": "When you damage a creature that is concentrating, it has Disadvantage on the saving throw it makes to maintain Concentration.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_rule",
+                    "effect": "concentration_disadvantage_on_damage_dealt",
+                    "target": "creature_you_damage"
+                }
             },
             {
                 "name": "Guarded Mind",
                 "description": "If you fail an Intelligence, a Wisdom, or a Charisma saving throw, you can cause yourself to succeed instead. Once you use this benefit, you can't use it again until you finish a Short or Long Rest.",
-                "type": "saving_throw"
+                "type": "saving_throw",
+                "automation": {
+                    "type": "auto_reroll",
+                    "trigger": "failed_int_wis_cha_save",
+                    "effect": "override_fail_to_success",
+                    "oncePer": "short_or_long_rest"
+                }
             }
         ],
         "ability_score_increase": {
@@ -1961,17 +2031,36 @@
             {
                 "name": "Mounted Strike",
                 "description": "While mounted, you have Advantage on attack rolls against any unmounted creature within 5 feet of your mount that is at least one size smaller than the mount.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "attack_rolls_vs_unmounted_near_mount",
+                    "condition": "mounted_and_target_one_size_smaller",
+                    "effect": "advantage"
+                }
             },
             {
                 "name": "Leap Aside",
                 "description": "If your mount is subjected to an effect that allows it to make a Dexterity saving throw to take only half damage, it instead takes no damage if it succeeds on the saving throw and only half damage if it fails. For your mount to gain this benefit, you must be riding it, and neither of you can have the Incapacitated condition.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "reaction_bonus",
+                    "trigger": "mount_makes_dex_save_for_half",
+                    "effect": "zero_on_success_half_on_fail_for_mount",
+                    "mount": true,
+                    "requiresRiding": true
+                }
             },
             {
                 "name": "Veer",
                 "description": "While mounted, you can force an attack that hits your mount to hit you instead if you don't have the Incapacitated condition.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "reaction_bonus",
+                    "trigger": "attack_hits_mount",
+                    "effect": "redirect_attack_to_self",
+                    "mount": true
+                }
             }
         ],
         "ability_score_increase": {
@@ -2219,12 +2308,26 @@
             {
                 "name": "Pole Strike",
                 "description": "Immediately after you take the Attack action and attack with a Quarterstaff, a Spear, or a weapon that has the Heavy and Reach properties, you can use a Bonus Action to make a melee attack with the opposite end of the weapon. The weapon deals Bludgeoning damage, and the weapon's damage die for this attack is a d4.",
-                "type": "bonus_action"
+                "type": "bonus_action",
+                "automation": {
+                    "type": "bonus_action_attack",
+                    "action": "bonus_action",
+                    "damage": "1d4",
+                    "damageType": "Bludgeoning",
+                    "weaponRequirement": "quarterstaff_spear_heavy_reach",
+                    "trigger": "after_attack_action_with_polearm"
+                }
             },
             {
                 "name": "Reactive Strike",
                 "description": "While you're holding a Quarterstaff, a Spear, or a weapon that has the Heavy and Reach properties, you can take a Reaction to make one melee attack against a creature that enters the 5-foot reach you have with that weapon.",
-                "type": "reaction"
+                "type": "reaction",
+                "automation": {
+                    "type": "reaction_damage",
+                    "trigger": "creature_enters_reach_while_holding_polearm",
+                    "range": "5_ft",
+                    "effect": "melee_attack"
+                }
             }
         ],
         "ability_score_increase": {
@@ -2261,7 +2364,14 @@
             {
                 "name": "Shield Interposition",
                 "description": "When a creature you can see attacks a target other than you that is within 5 feet of you, you can take a Reaction to interpose your Shield if you're holding one. You impose Disadvantage on the triggering attack roll and all other attack rolls against the target until the start of your next turn if you remain within 5 feet of the target.",
-                "type": "reaction"
+                "type": "reaction",
+                "automation": {
+                    "type": "reaction_debuff",
+                    "trigger": "creature_attacks_ally_within_5ft_while_holding_shield",
+                    "effect": "disadvantage_on_attacks_vs_ally",
+                    "duration": "until_start_of_next_turn",
+                    "requiresShield": true
+                }
             }
         ],
         "ability_score_increase": null,
@@ -2370,12 +2480,24 @@
             {
                 "name": "Guardian",
                 "description": "Immediately after a creature within 5 feet of you takes the Disengage action or hits a target other than you with an attack, you can make an Opportunity Attack against that creature.",
-                "type": "reaction"
+                "type": "reaction",
+                "automation": {
+                    "type": "reaction_damage",
+                    "trigger": "creature_disengages_or_hits_other_within_5ft",
+                    "effect": "opportunity_attack",
+                    "range": "5_ft",
+                    "oaType": "any_attack_miss_or_disengage"
+                }
             },
             {
                 "name": "Halt",
                 "description": "When you hit a creature with an Opportunity Attack, the creature's Speed becomes 0 for the rest of the current turn.",
-                "type": "condition"
+                "type": "condition",
+                "automation": {
+                    "type": "passive_rule",
+                    "effect": "speed_0_on_oa_hit",
+                    "duration": "end_of_turn"
+                }
             }
         ],
         "ability_score_increase": {
@@ -2464,17 +2586,30 @@
             {
                 "name": "Bypass Cover",
                 "description": "Your ranged attacks with weapons ignore Half Cover and Three-Quarters Cover.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_rule",
+                    "effect": "ignore_cover_ranged",
+                    "coverTypes": ["Half", "Three-Quarters"]
+                }
             },
             {
                 "name": "Firing in Melee",
                 "description": "Being within 5 feet of an enemy doesn't impose Disadvantage on your attack rolls with Ranged weapons.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_rule",
+                    "effect": "no_melee_disadvantage_ranged"
+                }
             },
             {
                 "name": "Long Shots",
                 "description": "Attacking at long range doesn't impose Disadvantage on your attack rolls with Ranged weapons.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_rule",
+                    "effect": "no_long_range_disadvantage_ranged"
+                }
             }
         ],
         "ability_score_increase": {
@@ -2520,12 +2655,30 @@
             {
                 "name": "Shield Bash",
                 "description": "If you attack a creature within 5 feet of you as part of the Attack action and hit with a Melee weapon, you can immediately bash the target with your Shield if it's equipped, forcing the target to make a Strength saving throw (DC 8 plus your Strength modifier and Proficiency Bonus). On a failed save, you either push the target 5 feet from you or cause it to have the Prone condition (your choice). You can use this benefit only once on each of your turns.",
-                "type": "action"
+                "type": "action",
+                "automation": {
+                    "type": "attack_rider",
+                    "trigger": "melee_hit_with_shield_equipped",
+                    "effect": "push_or_prone",
+                    "saveType": "STR",
+                    "saveDcExpression": "8 + STR modifier + proficiency_bonus",
+                    "distance": "5 ft",
+                    "oncePerTurn": true,
+                    "requiresShield": true
+                }
             },
             {
                 "name": "Intervene Shield",
                 "description": "If you're subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you can take a Reaction to take no damage if you succeed on the saving throw and are holding a Shield.",
-                "type": "reaction"
+                "type": "reaction",
+                "automation": {
+                    "type": "damage_reduction",
+                    "trigger": "dex_save_for_half_damage_with_shield",
+                    "effect": "zero_on_success_half_on_fail",
+                    "reaction": true,
+                    "saveType": "DEX",
+                    "requiresShield": true
+                }
             }
         ],
         "ability_score_increase": {
@@ -2645,17 +2798,32 @@
             {
                 "name": "Blindsight",
                 "description": "You have Blindsight with a range of 10 feet.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_buff",
+                    "effect": "blindsight",
+                    "range": "10 ft"
+                }
             },
             {
                 "name": "Fog of War",
                 "description": "You exploit the distractions of battle, gaining Advantage on any Dexterity (Stealth) check you make as part of the Hide action during combat.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "stealth_checks",
+                    "condition": "combat_hide_action",
+                    "effect": "advantage"
+                }
             },
             {
                 "name": "Sniper",
                 "description": "If you make an attack roll while hidden and the roll misses, making the attack roll doesn't reveal your location.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_rule",
+                    "effect": "hidden_miss_doesnt_reveal"
+                }
             }
         ],
         "ability_score_increase": {
@@ -2767,17 +2935,31 @@
             {
                 "name": "Speed Increase",
                 "description": "Your Speed increases by 10 feet.",
-                "type": "speed"
+                "type": "speed",
+                "automation": {
+                    "type": "passive_buff",
+                    "effect": "speed_increase",
+                    "bonus": "10 ft"
+                }
             },
             {
                 "name": "Dash over Difficult Terrain",
                 "description": "When you take the Dash action on your turn, Difficult Terrain doesn't cost you extra movement for the rest of that turn.",
-                "type": "utility"
+                "type": "utility",
+                "automation": {
+                    "type": "passive_rule",
+                    "effect": "ignore_difficult_terrain_on_dash",
+                    "duration": "rest_of_turn"
+                }
             },
             {
                 "name": "Agile Movement",
                 "description": "Opportunity Attacks have Disadvantage against you.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_rule",
+                    "effect": "opportunity_attacks_disadvantage"
+                }
             }
         ],
         "ability_score_increase": {
@@ -3100,12 +3282,24 @@
             {
                 "name": "Concentration",
                 "description": "You have Advantage on Constitution saving throws that you make to maintain Concentration.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "concentration_saving_throws",
+                    "effect": "advantage",
+                    "abilities": ["CON"]
+                }
             },
             {
                 "name": "Reactive Spell",
                 "description": "When a creature provokes an Opportunity Attack from you by leaving your reach, you can take a Reaction to cast a spell at the creature rather than making an Opportunity Attack. The spell must have a casting time of one action and must target only that creature.",
-                "type": "reaction"
+                "type": "reaction",
+                "automation": {
+                    "type": "reaction_damage",
+                    "trigger": "creature_leaves_reach",
+                    "effect": "cast_spell_as_reaction",
+                    "range": "melee_reach"
+                }
             },
             {
                 "name": "Somatic Components",
@@ -3200,12 +3394,21 @@
             {
                 "name": "Ignore Loading",
                 "description": "You ignore the Loading property of the Hand Crossbow, Heavy Crossbow, and Light Crossbow (all called crossbows elsewhere in this feat). If you're holding one of them, you can load a piece of ammunition into it even if you lack a free hand.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_rule",
+                    "effect": "ignore_loading_crossbows",
+                    "weapons": ["Hand Crossbow", "Heavy Crossbow", "Light Crossbow"]
+                }
             },
             {
                 "name": "Firing in Melee",
                 "description": "Being within 5 feet of an enemy doesn't impose Disadvantage on your attack rolls with crossbows.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_rule",
+                    "effect": "no_melee_disadvantage_crossbows"
+                }
             },
             {
                 "name": "Dual Wielding",

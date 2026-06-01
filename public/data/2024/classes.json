@@ -453,22 +453,52 @@
                     {
                         "name": "Frenzy",
                         "description": "If you use Reckless Attack while your Rage is active, you deal extra damage to the first target you hit on your turn with a Strength-based attack. To determine the extra damage, roll a number of d6s equal to your Rage Damage bonus, and add them together. The damage has the same type as the weapon or Unarmed Strike used for the attack.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "damage_bonus",
+                            "trigger": "reckless_attack_hit_while_raging",
+                            "damageExpression": "rage_damage_d6",
+                            "damageType": "same_as_weapon",
+                            "oncePerTurn": true
+                        }
                     },
                     {
                         "name": "Mindless Rage",
                         "description": "You have Immunity to the Charmed and Frightened conditions while your Rage is active. If you're Charmed or Frightened when you enter your Rage, the condition ends on you.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "passive_immunity",
+                            "target": "self",
+                            "conditionImmunity": "Charmed and Frightened while raging"
+                        }
                     },
                     {
                         "name": "Retaliation",
                         "description": "When you take damage from a creature that is within 5 feet of you, you can take a Reaction to make one melee attack against that creature, using a weapon or an Unarmed Strike.",
-                        "level": 10
+                        "level": 10,
+                        "automation": {
+                            "type": "reaction_damage",
+                            "trigger": "damage_from_adjacent_creature",
+                            "range": "5 ft",
+                            "effect": "melee_attack_reaction"
+                        }
                     },
                     {
                         "name": "Intimidating Presence",
                         "description": "As a Bonus Action, you can strike terror into others with your menacing presence and primal power. When you do so, each creature of your choice in a 30-foot Emanation originating from you must make a Wisdom saving throw (DC 8 plus your Strength modifier and Proficiency Bonus). On a failed save, a creature has the Frightened condition for 1 minute. At the end of each of the Frightened creature's turns, the creature repeats the save, ending the effect on itself on a success. Once you use this feature, you can't use it again until you finish a Long Rest unless you expend a use of your Rage (no action required) to restore your use of it.",
-                        "level": 14
+                        "level": 14,
+                        "automation": {
+                            "type": "save_attack",
+                            "damage": "",
+                            "damageType": "",
+                            "saveType": "WIS",
+                            "saveDc": "ability",
+                            "conditionInflicted": "Frightened",
+                            "shape": "emanation_30ft",
+                            "duration": "1_minute_or_success_save",
+                            "bonusAction": true,
+                            "recharge": "long_rest_or_expend_rage"
+                        }
                     }
                 ],
                 "spells": []
@@ -486,12 +516,27 @@
                     {
                         "name": "Rage of the Wilds",
                         "description": "Your Rage taps into the primal power of animals. Whenever you activate your Rage, you gain one of the following options of your choice. Bear. While your Rage is active, you have Resistance to every damage type except Force, Necrotic, Psychic, and Radiant. Eagle. When you activate your Rage, you can take the Disengage and Dash actions as part of that Bonus Action. While your Rage is active, you can take a Bonus Action to take both of those actions. Wolf. While your Rage is active, your allies have Advantage on attack rolls against any enemy of yours within 5 feet of you.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "combat_stance",
+                            "effect": "animal_rage_option",
+                            "options": [
+                                { "name": "Bear", "resistanceTypes": ["all_except_force_necrotic_psychic_radiant"] },
+                                { "name": "Eagle", "effect": "disengage_and_dash" },
+                                { "name": "Wolf", "effect": "ally_advantage_on_nearby_enemies", "range": "5 ft" }
+                            ],
+                            "duration": "while_raging"
+                        }
                     },
                     {
                         "name": "Aspect of the Wilds",
                         "description": "You gain one of the following options of your choice. Whenever you finish a Long Rest, you can change your choice. Owl. You have Darkvision with a range of 60 feet. If you already have Darkvision, its range increases by 60 feet. Panther. You have a Climb Speed equal to your Speed. Salmon. You have a Swim Speed equal to your Speed.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "passive_buff",
+                            "effect": "animal_aspect",
+                            "options": ["darkvision_60ft", "climb_speed", "swim_speed"]
+                        }
                     },
                     {
                         "name": "Nature Speaker",
@@ -501,7 +546,17 @@
                     {
                         "name": "Power of the Wilds",
                         "description": "Whenever you activate your Rage, you gain one of the following options of your choice. Falcon. While your Rage is active, you have a Fly Speed equal to your Speed if you aren't wearing any armor. Lion. While your Rage is active, any of your enemies within 5 feet of you have Disadvantage on attack rolls against targets other than you or another Barbarian who has this option active. Ram. While your Rage is active, you can cause a Large or smaller creature to have the Prone condition when you hit it with a melee attack.",
-                        "level": 14
+                        "level": 14,
+                        "automation": {
+                            "type": "combat_stance",
+                            "effect": "power_of_the_wilds_option",
+                            "options": [
+                                { "name": "Falcon", "flySpeed": "speed", "noArmor": true },
+                                { "name": "Lion", "effect": "enemies_disadvantage_attacks", "range": "5 ft" },
+                                { "name": "Ram", "effect": "prone_on_melee_hit" }
+                            ],
+                            "duration": "while_raging"
+                        }
                     }
                 ],
                 "spells": []
@@ -514,22 +569,56 @@
                     {
                         "name": "Vitality of the Tree",
                         "description": "Your Rage taps into the life force of the World Tree. You gain the following benefits. Vitality Surge. When you activate your Rage, you gain a number of Temporary Hit Points equal to your Barbarian level. Life-Giving Force. At the start of each of your turns while your Rage is active, you can choose another creature within 10 feet of yourself to gain Temporary Hit Points. To determine the number of Temporary Hit Points, roll a number of d6s equal to your Rage Damage bonus, and add them together. If any of these Temporary Hit Points remain when your Rage ends, they vanish.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "temp_hp_buff",
+                            "tempHpExpression": "barbarian_level",
+                            "trigger_on_rage": true,
+                            "ongoingHealingExpression": "rage_damage_d6",
+                            "healingRange": "10 ft",
+                            "healingStartOfTurn": true
+                        }
                     },
                     {
                         "name": "Branches of the Tree",
                         "description": "Whenever a creature you can see starts its turn within 30 feet of you while your Rage is active, you can take a Reaction to summon spectral branches of the World Tree around it. The target must succeed on a Strength saving throw (DC 8 plus your Strength modifier and Proficiency Bonus) or be teleported to an unoccupied space you can see within 5 feet of yourself or in the nearest unoccupied space you can see. After the target teleports, you can reduce its Speed to 0 until the end of the current turn.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "reaction_debuff",
+                            "trigger": "creature_starts_turn_within_30ft_while_raging",
+                            "effect": "teleport_and_slow",
+                            "saveType": "STR",
+                            "saveDcExpression": "8 + STR modifier + proficiency_bonus",
+                            "range": "30 ft",
+                            "teleportRange": "5 ft"
+                        }
                     },
                     {
                         "name": "Battering Roots",
                         "description": "During your turn, your reach is 10 feet greater with any Melee weapon that has the Heavy or Versatile property, as tendrils of the World Tree extend from you. When you hit with such a weapon on your turn, you can activate the Push or Topple mastery property in addition to a different mastery property you're using with that weapon.",
-                        "level": 10
+                        "level": 10,
+                        "automation": {
+                            "type": "passive_buff",
+                            "effect": "extra_reach",
+                            "bonus": "10 ft",
+                            "condition": "heavy_or_versatile_melee_weapon",
+                            "extraMastery": ["Push", "Topple"]
+                        }
                     },
                     {
                         "name": "Travel Along the Tree",
                         "description": "When you activate your Rage and as a Bonus Action while your Rage is active, you can teleport up to 60 feet to an unoccupied space you can see. In addition, once per Rage, you can increase the range of that teleport to 150 feet. When you do so, you can also bring up to six willing creatures who are within 10 feet of you. Each creature teleports to an unoccupied space of your choice within 10 feet of your destination space.",
-                        "level": 14
+                        "level": 14,
+                        "automation": {
+                            "type": "temp_buff",
+                            "effect": "teleport_on_rage",
+                            "distance": "60 ft",
+                            "extendedDistance": "150 ft",
+                            "oncePerRage": true,
+                            "bringAllies": true,
+                            "allyCount": 6,
+                            "teleportRange": "10 ft"
+                        }
                     }
                 ],
                 "spells": []
@@ -542,27 +631,65 @@
                     {
                         "name": "Divine Fury",
                         "description": "You can channel divine power into your strikes. On each of your turns while your Rage is active, the first creature you hit with a weapon or an Unarmed Strike takes extra damage equal to 1d6 plus half your Barbarian level (round down). The extra damage is Necrotic or Radiant; you choose the type each time you deal the damage.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "damage_bonus",
+                            "trigger": "first_hit_while_raging",
+                            "damageExpression": "1d6 + barbarian_level / 2",
+                            "damageType": "Necrotic or Radiant",
+                            "oncePerTurn": true
+                        }
                     },
                     {
                         "name": "Warrior of the Gods",
                         "description": "A divine entity helps ensure you can continue the fight. You have a pool of four d12s that you can spend to heal yourself. As a Bonus Action, you can expend dice from the pool, roll them, and regain a number of Hit Points equal to the roll's total. Your pool regains all expended dice when you finish a Long Rest. The pool's maximum number of dice increases by one when you reach Barbarian levels 6 (5 dice), 12 (6 dice), and 17 (7 dice).",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "healing_pool",
+                            "poolExpression": "4d12",
+                            "action": "bonus_action",
+                            "recharge": "long_rest",
+                            "scaling": { "6": "5d12", "12": "6d12", "17": "7d12" }
+                        }
                     },
                     {
                         "name": "Fanatical Focus",
                         "description": "Once per active Rage, if you fail a saving throw, you can reroll it with a bonus equal to your Rage Damage bonus, and you must use the new roll.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "auto_reroll",
+                            "trigger": "failed_save_while_raging",
+                            "bonusExpression": "rage_damage",
+                            "oncePerRage": true
+                        }
                     },
                     {
                         "name": "Zealous Presence",
                         "description": "As a Bonus Action, you unleash a battle cry infused with divine energy. Up to ten other creatures of your choice within 60 feet of you gain Advantage on attack rolls and saving throws until the start of your next turn. Once you use this feature, you can't use it again until you finish a Long Rest unless you expend a use of your Rage (no action required) to restore your use of it.",
-                        "level": 10
+                        "level": 10,
+                        "automation": {
+                            "type": "buff_ally",
+                            "buffExpression": "advantage_attacks_and_saves",
+                            "range": "60 ft",
+                            "targets": 10,
+                            "duration": "until_start_of_next_turn",
+                            "action": "bonus_action",
+                            "recharge": "long_rest_or_expend_rage"
+                        }
                     },
                     {
                         "name": "Rage of the Gods",
                         "description": "When you activate your Rage, you can assume the form of a divine warrior. This form lasts for 1 minute or until you drop to 0 Hit Points. Once you use this feature, you can't do so again until you finish a Long Rest. While in this form, you gain the benefits below. Flight. You have a Fly Speed equal to your Speed and can hover. Resistance. You have Resistance to Necrotic, Psychic, and Radiant damage. Revivification. When a creature within 30 feet of you would drop to 0 Hit Points, you can take a Reaction to expend a use of your Rage to instead change the target's Hit Points to a number equal to your Barbarian level.",
-                        "level": 14
+                        "level": 14,
+                        "automation": {
+                            "type": "combat_stance",
+                            "effect": "divine_warrior_form",
+                            "duration": "1_minute",
+                            "flySpeed": "speed",
+                            "resistanceTypes": ["Necrotic", "Psychic", "Radiant"],
+                            "reactionSave": { "range": "30 ft", "healTo": "barbarian_level" },
+                            "recharge": "long_rest"
+                        }
                     }
                 ],
                 "spells": []
@@ -1144,22 +1271,53 @@
                     {
                         "name": "Dazzling Footwork",
                         "description": "While you aren't wearing armor or wielding a shield, you gain the following benefits. Dance Virtuoso. You have Advantage on any Charisma (Performance) check you make that involves you dancing. Unarmored Defense. Your base Armor Class equals 10 plus your Dexterity and Charisma modifiers. Agile Strikes. When you expend a use of your Bardic Inspiration as part of an action, a Bonus Action, or a Reaction, you can make one Unarmed Strike as part of that action. Bardic Damage. You can use Dexterity instead of Strength for the attack rolls of your Unarmed Strikes. When you deal damage with an Unarmed Strike, you can deal Bludgeoning damage equal to a roll of your Bardic Inspiration die plus your Dexterity modifier, instead of the strike's normal damage.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "conditional_advantage",
+                            "target": "performance_checks",
+                            "condition": "dancing",
+                            "effect": "advantage"
+                        }
                     },
                     {
                         "name": "Inspiring Movement",
                         "description": "When an enemy you can see ends its turn within 5 feet of you, you can take a Reaction and expend one use of your Bardic Inspiration to move up to half your Speed. Then one ally of your choice within 30 feet of you can also move up to half their Speed using their Reaction. None of this feature's movement provokes Opportunity Attacks.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "reaction_bonus",
+                            "trigger": "enemy_turn_ends_within_5ft",
+                            "effect": "self_and_ally_reactive_movement",
+                            "selfMovement": "half_speed",
+                            "allyMovement": "half_speed",
+                            "allyRange": "30 ft",
+                            "noOAs": true,
+                            "resourceCost": "bardic_inspiration"
+                        }
                     },
                     {
                         "name": "Tandem Footwork",
                         "description": "When you roll Initiative, you can expend one use of your Bardic Inspiration if you don't have the Incapacitated condition. When you do so, roll your Bardic Inspiration die; you and each ally within 30 feet of you who can see or hear you gains a bonus to Initiative equal to the number rolled.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "initiative_action",
+                            "effect": "bonus_initiative_allies",
+                            "bonusExpression": "bardic_inspiration_die",
+                            "range": "30 ft",
+                            "resourceCost": "bardic_inspiration"
+                        }
                     },
                     {
                         "name": "Leading Evasion",
                         "description": "When you are subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw and only half damage if you fail. If any creatures within 5 feet of you are making the same Dexterity saving throw, you can share this benefit with them for that save.",
-                        "level": 14
+                        "level": 14,
+                        "automation": {
+                            "type": "conditional_advantage",
+                            "target": "dex_saves",
+                            "condition": "share_with_allies_5ft",
+                            "effect": "zero_on_success_half_on_fail",
+                            "shareable": true,
+                            "shareRange": "5 ft"
+                        }
                     }
                 ],
                 "spells": []
@@ -1172,22 +1330,53 @@
                     {
                         "name": "Beguiling Magic",
                         "description": "You always have the Charm Person and Mirror Image spells prepared. In addition, immediately after you cast an Enchantment or Illusion spell using a spell slot, you can cause a creature you can see within 60 feet of yourself to make a Wisdom saving throw against your spell save DC. On a failed save, the target has the Charmed or Frightened condition (your choice) for 1 minute. Once you use this benefit, you can't use it again until you finish a Long Rest.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "always_prepared_spells",
+                            "spells": ["Charm Person", "Mirror Image"],
+                            "riderSave": { "type": "WIS", "condition": "Charmed or Frightened", "duration": "1_minute", "after": "enchantment_or_illusion_spell", "range": "60 ft", "recharge": "long_rest" }
+                        }
                     },
                     {
                         "name": "Mantle of Inspiration",
                         "description": "As a Bonus Action, you can expend a use of Bardic Inspiration, rolling a Bardic Inspiration die. When you do so, choose a number of other creatures within 60 feet of yourself, up to a number equal to your Charisma modifier (minimum of one creature). Each of those creatures gains Temporary Hit Points equal to two times the number rolled on the Bardic Inspiration die, and then each can use its Reaction to move up to its Speed without provoking Opportunity Attacks.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "temp_hp_buff",
+                            "tempHpExpression": "2 * bardic_inspiration_die",
+                            "action": "bonus_action",
+                            "range": "60 ft",
+                            "targetsExpression": "CHA modifier",
+                            "bonusMovement": true
+                        }
                     },
                     {
                         "name": "Mantle of Majesty",
                         "description": "You always have the Command spell prepared. As a Bonus Action, you cast Command without expending a spell slot, and you take on an unearthly appearance for 1 minute or until your Concentration ends. During this time, you can cast Command as a Bonus Action without expending a spell slot.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "free_spell",
+                            "spell": "Command",
+                            "freeCasts": "at_will_while_active",
+                            "action": "bonus_action",
+                            "duration": "1_minute",
+                            "concentration": true
+                        }
                     },
                     {
                         "name": "Unbreakable Majesty",
                         "description": "As a Bonus Action, you can assume a magically majestic presence for 1 minute or until you have the Incapacitated condition. For the duration, whenever any creature hits you with an attack roll for the first time on a turn, the attacker must succeed on a Charisma saving throw against your spell save DC, or the attack misses instead.",
-                        "level": 14
+                        "level": 14,
+                        "automation": {
+                            "type": "reaction_bonus",
+                            "trigger": "first_attack_per_turn_against_self",
+                            "effect": "miss_on_failed_save",
+                            "saveType": "CHA",
+                            "saveDc": "spell_save_dc",
+                            "duration": "1_minute",
+                            "action": "bonus_action"
+                        }
                     }
                 ],
                 "spells": [
@@ -1221,14 +1410,27 @@
                         "level": 3
                     },
                     {
-                        "name": "Magical Discoveries",
-                        "description": "You learn two spells of your choice. These spells can come from the Cleric, Druid, or Wizard spell list or any combination thereof. You always have the chosen spells prepared.",
-                        "level": 6
+                        "name": "Cutting Words",
+                        "description": "You learn to use your wit to supernaturally distract, confuse, and otherwise sap the confidence and competence of others. When a creature that you can see within 60 feet of yourself makes a damage roll or succeeds on an ability check or attack roll, you can take a Reaction to expend one use of your Bardic Inspiration; roll your Bardic Inspiration die, and subtract the number rolled from the creature's roll.",
+                        "level": 3,
+                        "automation": {
+                            "type": "reaction_debuff",
+                            "trigger": "damage_ability_check_or_attack_roll_within_60ft",
+                            "debuffExpression": "bardic_inspiration_die",
+                            "subtractive": true,
+                            "range": "60 ft"
+                        }
                     },
                     {
                         "name": "Peerless Skill",
                         "description": "When you make an ability check or attack roll and fail, you can expend one use of Bardic Inspiration; roll the Bardic Inspiration die, and add the number rolled to the d20, potentially turning a failure into a success.",
-                        "level": 14
+                        "level": 14,
+                        "automation": {
+                            "type": "auto_reroll",
+                            "trigger": "failed_ability_check_or_attack_roll",
+                            "effect": "add_to_failed_roll",
+                            "bonusExpression": "bardic_inspiration_die"
+                        }
                     }
                 ],
                 "spells": [],
@@ -1242,22 +1444,24 @@
                     {
                         "name": "Combat Inspiration",
                         "description": "A creature that has a Bardic Inspiration die from you can use it for one of the following effects. Defense. When the creature is hit by an attack roll, that creature can use its Reaction to roll the Bardic Inspiration die and add the number rolled to its AC. Offense. Immediately after the creature hits a target with an attack roll, the creature can roll the Bardic Inspiration die and add the number rolled to the attack's damage.",
-                        "level": 3
-                    },
-                    {
-                        "name": "Martial Training",
-                        "description": "You gain proficiency with Martial weapons and training with Medium armor and Shields. In addition, you can use a Simple or Martial weapon as a Spellcasting Focus to cast spells from your Bard spell list.",
-                        "level": 3
-                    },
-                    {
-                        "name": "Extra Attack",
-                        "description": "You can attack twice instead of once whenever you take the Attack action on your turn. In addition, you can cast one of your cantrips that has a casting time of an action in place of one of those attacks.",
-                        "level": 6
+                        "level": 3,
+                        "automation": {
+                            "type": "buff_ally",
+                            "buffExpression": "bardic_inspiration_die",
+                            "options": ["defense_add_to_ac", "offense_add_to_damage"],
+                            "range": "60 ft"
+                        }
                     },
                     {
                         "name": "Battle Magic",
                         "description": "After you cast a spell that has a casting time of an action, you can make one attack with a weapon as a Bonus Action.",
-                        "level": 14
+                        "level": 14,
+                        "automation": {
+                            "type": "bonus_action_attack",
+                            "trigger": "after_casting_action_spell",
+                            "action": "bonus_action",
+                            "weaponAttack": true
+                        }
                     }
                 ],
                 "spells": [],
@@ -1332,7 +1536,15 @@
                         "name": "Channel Divinity",
                         "description": "You can channel divine energy directly from the Outer Planes to fuel magical effects. You start with two such effects: Divine Spark and Turn Undead. You can use this class's Channel Divinity twice. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Divine Spark. As a Magic action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and add your Wisdom modifier. You either restore Hit Points to the creature equal to that total or force the creature to make a Constitution saving throw. On a failed save, the creature takes Necrotic or Radiant damage (your choice) equal to that total. Turn Undead. As a Magic action, you present your Holy Symbol and censure Undead creatures. Each Undead of your choice within 30 feet of you must make a Wisdom saving throw. If the creature fails its save, it has the Frightened and Incapacitated conditions for 1 minute.",
                         "level": 2,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "resource_pool",
+                            "resource": "Channel Divinity",
+                            "uses_expression": "proficiency_bonus",
+                            "recharge_short_rest": "1",
+                            "recharge_long_rest": "all",
+                            "effects": ["Divine Spark", "Turn Undead"]
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -1410,10 +1622,17 @@
                 "channel_divinity": 2,
                 "features": [
                     {
-                        "name": "Seer Undead",
+                        "name": "Searing Undead",
                         "description": "Whenever you use Turn Undead, you can roll a number of d8s equal to your Wisdom modifier (minimum of 1d8) and add the rolls together. Each Undead that fails its saving throw against that use of Turn Undead takes Radiant damage equal to the roll's total.",
                         "level": 5,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "damage_bonus",
+                            "trigger": "turn_undead_fail",
+                            "damageExpression": "WIS modifier d8",
+                            "damageType": "Radiant",
+                            "extraVs": "undead"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -1467,7 +1686,15 @@
                         "name": "Blessed Strikes",
                         "description": "Divine power infuses you in battle. You gain one of the following options of your choice: Divine Strike. Once on each of your turns when you hit a creature with an attack roll using a weapon, you can cause the target to take an extra 1d8 Necrotic or Radiant damage (your choice). Potent Spellcasting. Add your Wisdom modifier to the damage you deal with any Cleric cantrip.",
                         "level": 7,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "damage_bonus",
+                            "trigger": "weapon_attack_hit",
+                            "damageExpression": "1d8",
+                            "damageType": "Necrotic or Radiant",
+                            "oncePerTurn": true,
+                            "options": ["Divine Strike", "Potent Spellcasting"]
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -1541,7 +1768,13 @@
                         "name": "Divine Intervention",
                         "description": "You can call on your deity or pantheon to intervene on your behalf. As a Magic action, choose any Cleric spell of level 5 or lower that doesn't require a Reaction to cast. As part of the same action, you cast that spell without expending a spell slot or needing Material components. You can't use this feature again until you finish a Long Rest.",
                         "level": 10,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "free_spell",
+                            "spell": "any_cleric_spell_level_5_or_lower",
+                            "action": "action",
+                            "recharge": "long_rest"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -1635,7 +1868,15 @@
                         "name": "Improved Blessed Strikes",
                         "description": "The option you chose for Blessed Strikes grows more powerful. Divine Strike. The extra damage of your Divine Strike increases to 2d8. Potent Spellcasting. When you cast a Cleric cantrip and deal damage to a creature with it, you can give vitality to yourself or another creature within 60 feet of yourself, granting a number of Temporary Hit Points equal to twice your Wisdom modifier.",
                         "level": 14,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "damage_bonus",
+                            "trigger": "weapon_attack_hit",
+                            "damageExpression": "2d8",
+                            "damageType": "Necrotic or Radiant",
+                            "oncePerTurn": true,
+                            "tempHpExpression": "2 * WIS modifier"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -1783,7 +2024,14 @@
                         "name": "Greater Divine Intervention",
                         "description": "You can call on even more powerful divine intervention. When you use your Divine Intervention feature, you can choose Wish when you select a spell. If you do so, you can't use Divine Intervention again until you finish 2d4 Long Rests.",
                         "level": 20,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "free_spell",
+                            "spell": "Wish",
+                            "action": "action",
+                            "recharge": "2d4_long_rests",
+                            "upgradeTo": "wish"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -1811,22 +2059,44 @@
                     {
                         "name": "Disciple of Life",
                         "description": "When a spell you cast with a spell slot restores Hit Points to a creature, that creature regains additional Hit Points on the turn you cast the spell. The additional Hit Points equal 2 plus the spell slot's level.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "bonus_healing",
+                            "bonusExpression": "2 + spell_slot_level"
+                        }
                     },
                     {
                         "name": "Preserve Life",
                         "description": "As a Magic action, you present your Holy Symbol and expend a use of your Channel Divinity to evoke healing energy that can restore a number of Hit Points equal to five times your Cleric level. Choose Bloodied creatures within 30 feet of yourself and divide those Hit Points among them.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "healing",
+                            "action": "action",
+                            "healExpression": "5 * cleric_level",
+                            "range": "30 ft",
+                            "resourceCost": "channel_divinity"
+                        }
                     },
                     {
                         "name": "Blessed Healer",
                         "description": "When you cast a healing spell on others that targets one or more creatures other than yourself, you regain Hit Points equal to 2 plus the spell slot's level.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "self_healing",
+                            "action": "passive",
+                            "healExpression": "2 + spell_slot_level",
+                            "condition": "after_casting_healing_spell_on_others"
+                        }
                     },
                     {
                         "name": "Supreme Healing",
                         "description": "When you would normally roll one or more dice to restore Hit Points to a creature with a spell or Channel Divinity, don't roll those dice; instead use the highest number possible for each die.",
-                        "level": 17
+                        "level": 17,
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "maximize_healing_dice"
+                        }
                     }
                 ],
                 "spells": [
@@ -1883,22 +2153,52 @@
                     {
                         "name": "Radiance of the Dawn",
                         "description": "As a Magic action, you present your Holy Symbol and expend a use of your Channel Divinity to emit a flash of light in a 30-foot Emanation originating from yourself. Any magical Darkness in that area is dispelled. Each creature of your choice in that area must make a Constitution saving throw or take Radiant damage equal to 2d10 plus your Cleric level.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "save_attack",
+                            "damage": "2d10 + cleric level",
+                            "damageType": "Radiant",
+                            "saveType": "CON",
+                            "saveDc": "ability",
+                            "shape": "emanation_30ft",
+                            "resourceCost": "channel_divinity"
+                        }
                     },
                     {
                         "name": "Warding Flare",
                         "description": "When a creature that you can see within 30 feet of yourself makes an attack roll, you can take a Reaction to impose Disadvantage on the attack roll, causing light to flare before it hits or misses. You can use this feature a number of times equal to your Wisdom modifier (minimum of once).",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "reaction_debuff",
+                            "trigger": "attack_roll_within_30ft",
+                            "effect": "disadvantage_on_attack_roll",
+                            "uses_expression": "WIS modifier_min_1",
+                            "recharge": "proficiency_bonus"
+                        }
                     },
                     {
                         "name": "Improved Warding Flare",
                         "description": "You gain all expended uses of your Warding Flare when you finish a Short or Long Rest. In addition, whenever you use Warding Flare, you can give the target of the triggering attack a number of Temporary Hit Points equal to 2d6 plus your Wisdom modifier.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "temp_hp_buff",
+                            "tempHpExpression": "2d6 + WIS modifier",
+                            "trigger": "after_warding_flare_use",
+                            "target": "attacker_target"
+                        }
                     },
                     {
                         "name": "Corona of Light",
                         "description": "As a Magic action, you cause yourself to emit an aura of sunlight that lasts for 1 minute. You emit Bright Light in a 60-foot radius and Dim Light for an additional 30 feet. Your enemies in the Bright Light have Disadvantage on saving throws against spells that deal Fire or Radiant damage.",
-                        "level": 17
+                        "level": 17,
+                        "automation": {
+                            "type": "temp_buff",
+                            "effect": "sunlight_aura",
+                            "duration": "1_minute",
+                            "action": "action",
+                            "range": "60_ft",
+                            "enemies_disadvantage_saves": ["Fire", "Radiant"]
+                        }
                     }
                 ],
                 "spells": [
@@ -1952,22 +2252,51 @@
                     {
                         "name": "Blessing of the Trickster",
                         "description": "As a Magic action, you can choose yourself or a willing creature within 30 feet of yourself to have Advantage on Dexterity (Stealth) checks. This blessing lasts until you finish a Long Rest or you use this feature again.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "temp_buff",
+                            "effect": "advantage_on_stealth",
+                            "action": "action",
+                            "range": "30 ft",
+                            "target": "willing_creature",
+                            "duration": "long_rest"
+                        }
                     },
                     {
                         "name": "Invoke Duplicity",
                         "description": "As a Bonus Action, you can expend one use of your Channel Divinity to create a perfect visual illusion of yourself in an unoccupied space you can see within 30 feet of yourself. The illusion lasts for 1 minute. While it persists: Cast Spells - you can cast spells as though you were in the illusion's space. Distract - when both you and your illusion are within 5 feet of a creature that can see the illusion, you have Advantage on attack rolls against that creature. Move - as a Bonus Action, you can move the illusion up to 30 feet.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "combat_stance",
+                            "action": "bonus_action",
+                            "effect": "create_illusion",
+                            "duration": "1_minute",
+                            "resourceCost": "channel_divinity",
+                            "range": "30 ft"
+                        }
                     },
                     {
                         "name": "Trickster's Transposition",
                         "description": "Whenever you take the Bonus Action to create or move the illusion of your Invoke Duplicity, you can teleport, swapping places with the illusion.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "temp_buff",
+                            "effect": "teleport_swap_with_illusion",
+                            "action": "bonus_action",
+                            "duration": "while_illusion_active"
+                        }
                     },
                     {
                         "name": "Improved Duplicity",
                         "description": "The illusion has grown more powerful: Enhanced Distraction - when you and your allies make attack rolls against a creature within 5 feet of the illusion, the attacks have Advantage. Healing Illusion - when the illusion ends, you or a creature of your choice within 5 feet of it regains a number of Hit Points equal to your Cleric level.",
-                        "level": 17
+                        "level": 17,
+                        "automation": {
+                            "type": "passive_buff",
+                            "effect": "enhanced_distraction_and_healing",
+                            "bonusExpression": "cleric_level",
+                            "healingRange": "5_ft",
+                            "attackAdvantageRange": "5_ft"
+                        }
                     }
                 ],
                 "spells": [
@@ -2021,22 +2350,47 @@
                     {
                         "name": "Guided Strike",
                         "description": "When you or a creature within 30 feet of you misses with an attack roll, you can expend one use of your Channel Divinity and give that roll a +10 bonus, potentially causing it to hit.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "auto_reroll",
+                            "trigger": "missed_attack_roll_within_30ft",
+                            "effect": "bonus_to_miss",
+                            "bonus": 10,
+                            "range": "30 ft",
+                            "resourceCost": "channel_divinity"
+                        }
                     },
                     {
                         "name": "War Priest",
                         "description": "As a Bonus Action, you can make one attack with a weapon or an Unarmed Strike. You can use this Bonus Action a number of times equal to your Wisdom modifier (minimum of once).",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "bonus_action_attack",
+                            "action": "bonus_action",
+                            "uses_expression": "WIS modifier_min_1",
+                            "recharge": "short_rest"
+                        }
                     },
                     {
                         "name": "War God's Blessing",
                         "description": "You can expend a use of your Channel Divinity to cast Shield of Faith or Spiritual Weapon rather than expending a spell slot. When you cast either spell in this way, the spell doesn't require Concentration. Instead the spell lasts for 1 minute.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "free_spell",
+                            "spell": "Shield of Faith or Spiritual Weapon",
+                            "resourceCost": "channel_divinity",
+                            "noConcentration": true,
+                            "duration": "1_minute"
+                        }
                     },
                     {
                         "name": "Avatar of Battle",
                         "description": "You gain Resistance to Bludgeoning, Piercing, and Slashing damage.",
-                        "level": 17
+                        "level": 17,
+                        "automation": {
+                            "type": "resistance",
+                            "damageTypes": ["Bludgeoning", "Piercing", "Slashing"]
+                        }
                     }
                 ],
                 "spells": [
@@ -2163,7 +2517,17 @@
                         "name": "Wild Shape",
                         "description": "The power of nature allows you to assume the form of an animal. As a Bonus Action, you shape-shift into a Beast form. You stay in that form for a number of hours equal to half your Druid level or until you use Wild Shape again, have the Incapacitated condition, or die. Number of Uses. You can use Wild Shape twice. You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Known Forms. You know four Beast forms for this feature, chosen from among Beast stat blocks that have a maximum Challenge Rating of 1/4 and that lack a Fly Speed. The Rat, Riding Horse, Spider, and Wolf are recommended. Whenever you finish a Long Rest, you can replace one of your known forms with another eligible form. When you reach certain Druid levels, your number of known forms and the maximum Challenge Rating for those forms increases: Level 2: 4 forms (Max CR 1/4, no fly). Level 4: 6 forms (Max CR 1/2, no fly). Level 8: 8 forms (Max CR 1, yes fly). Rules While Shape-Shifted: You retain personality, memories, and ability to speak. Temporary Hit Points equal to your Druid level. Your game statistics are replaced by the Beast's stat block, but you retain your creature type, Hit Points, Hit Point Dice, Intelligence/Wisdom/Charisma scores, class features, languages, and feats. No Spellcasting.",
                         "level": 2,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "temp_buff",
+                            "effect": "shape_shift",
+                            "action": "bonus_action",
+                            "duration": "half_druid_level_hours",
+                            "tempHpExpression": "druid_level",
+                            "uses": 2,
+                            "recharge_short_rest": 1,
+                            "recharge_long_rest": "all"
+                        }
                     },
                     {
                         "name": "Wild Companion",
@@ -2259,7 +2623,14 @@
                         "name": "Wild Resurgence",
                         "description": "Once on each of your turns, if you have no uses of Wild Shape left, you can give yourself one use by expending a spell slot (no action required). In addition, you can expend one use of Wild Shape (no action required) to give yourself a level 1 spell slot, but you can't do so again until you finish a Long Rest.",
                         "level": 5,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "resource_pool",
+                            "resource": "Wild Shape",
+                            "conversion": "spell_slot_to_wild_shape",
+                            "reverseConversion": "wild_shape_to_spell_slot",
+                            "reverseRecharge": "long_rest"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -2319,7 +2690,15 @@
                         "name": "Elemental Fury",
                         "description": "The might of the elements flows through you. You gain one of the following options of your choice. Potent Spellcasting. Add your Wisdom modifier to the damage you deal with any Druid cantrip. Primal Strike. Once on each of your turns when you hit a creature with an attack roll using a weapon or a Beast form's attack in Wild Shape, you can cause the target to take an extra 1d8 Cold, Fire, Lightning, or Thunder damage (choose when you hit).",
                         "level": 7,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "damage_bonus",
+                            "trigger": "weapon_or_beast_form_attack_hit",
+                            "damageExpression": "1d8",
+                            "damageType": "Cold Fire Lightning or Thunder",
+                            "oncePerTurn": true,
+                            "options": ["Potent Spellcasting", "Primal Strike"]
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -2538,7 +2917,15 @@
                         "name": "Improved Elemental Fury",
                         "description": "Potent Spellcasting. When you cast a Druid cantrip with a range of 10 feet or greater, the spell's range increases by 300 feet. Primal Strike. The extra damage of your Primal Strike increases to 2d8.",
                         "level": 15,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "damage_bonus",
+                            "trigger": "weapon_or_beast_form_attack_hit",
+                            "damageExpression": "2d8",
+                            "damageType": "Cold Fire Lightning or Thunder",
+                            "oncePerTurn": true,
+                            "rangeBonusCantrip": "300 ft"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -2681,7 +3068,13 @@
                         "name": "Archdruid",
                         "description": "The vitality of nature constantly blooms within you, granting you the following benefits. Evergreen Wild Shape. Whenever you roll Initiative and have no uses of Wild Shape left, you regain one expended use of it. Nature Magician. You can convert uses of Wild Shape into a spell slot (no action required). Choose a number of your unexpended uses of Wild Shape and convert them into a single spell slot, with each use contributing 2 spell levels. Longevity. The primal magic that you wield causes you to age more slowly. For every ten years that pass, your body ages only one year.",
                         "level": 20,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_buff",
+                            "effect": "wild_shape_regen_on_initiative",
+                            "conversion": "wild_shape_to_spell_slot",
+                            "conversionRate": "2_levels_per_use"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -3297,7 +3690,13 @@
                         "name": "Indomitable",
                         "description": "If you fail a saving throw, you can reroll it with a bonus equal to your Fighter level. You must use the new roll, and you can't use this feature again until you finish a Long Rest.",
                         "level": 9,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "auto_reroll",
+                            "trigger": "failed_saving_throw",
+                            "bonusExpression": "fighter_level",
+                            "recharge": "long_rest"
+                        }
                     },
                     {
                         "name": "Tactical Master",
@@ -4273,8 +4672,39 @@
                 "features": [
                     {
                         "name": "Hand of Harm",
-                        "description": "Once per turn when you hit with Unarmed Strike and deal damage, expend 1 Focus Point for extra Necrotic damage (Martial Arts die + Wisdom modifier).",
-                        "level": 3
+                        "description": "When a creature you can see within 5 feet of you hits on an attack roll, you can take a Reaction to channel supernatural poison through that creature. The creature must succeed on a Constitution saving throw against your spell save DC or take 1d6 Necrotic damage and have Disadvantage on the next attack roll it makes. This Necrotic damage increases to 2d6 at level 11 and 3d6 at level 17.",
+                        "level": 3,
+                        "automation": {
+                            "type": "reaction_damage",
+                            "trigger": "creature_within_5ft_hits_on_attack_roll",
+                            "damageExpression": "1d6",
+                            "damageType": "Necrotic",
+                            "saveType": "CON",
+                            "saveDc": "ability",
+                            "scaling": { "11": "2d6", "17": "3d6" },
+                            "alsoInflicts": "disadvantage_next_attack"
+                        }
+                    },
+                    {
+                        "name": "Hand of Healing",
+                        "description": "As a Bonus Action, or when you use Flurry of Healing and Harm, you can touch a creature and expend one use of your Focus Points. Roll a Martial Arts die, and the creature regains a number of Hit Points equal to 1d4 plus your Wisdom modifier.",
+                        "level": 3,
+                        "automation": {
+                            "type": "healing",
+                            "healExpression": "martial_arts_die + WIS modifier",
+                            "action": "bonus_action",
+                            "resourceCost": "focus_point"
+                        }
+                    },
+                    {
+                        "name": "Physician's Touch",
+                        "description": "When you use Hand of Healing on a creature, you can also end one of the following conditions on that creature: Blinded, Deafened, Paralyzed, Poisoned, or Stunned.",
+                        "level": 6,
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "cure_conditions_on_heal",
+                            "cureConditions": ["Blinded", "Deafened", "Paralyzed", "Poisoned", "Stunned"]
+                        }
                     },
                     {
                         "name": "Hand of Healing",
@@ -4311,8 +4741,36 @@
                 "features": [
                     {
                         "name": "Shadow Arts",
-                        "description": "Darkness - expend 1 Focus Point to cast Darkness spell (you can see within it, can move area 60 feet per turn). Darkvision 60 feet (or +60 feet if already have). Shadowy Figments - know Minor Illusion spell (Wisdom spellcasting ability).",
-                        "level": 3
+                        "description": "You can cast the Darkness, Darkvision, Pass Without Trace, and Silence spells without expending spell slots or preparing them, using Wisdom as your spellcasting ability. Each of these spells can be cast in this way once per Long Rest.",
+                        "level": 3,
+                        "automation": {
+                            "type": "free_spell",
+                            "spell": "Darkness, Darkvision, Pass Without Trace, Silence",
+                            "recharge": "long_rest"
+                        }
+                    },
+                    {
+                        "name": "Shadow Step",
+                        "description": "As a Bonus Action, you can teleport up to 60 feet to an unoccupied space you can see that is in Dim Light or Darkness. You then have Advantage on the first melee attack roll you make before the end of the turn.",
+                        "level": 6,
+                        "automation": {
+                            "type": "temp_buff",
+                            "effect": "shadow_step_teleport",
+                            "distance": "60 ft",
+                            "condition": "dim_light_or_darkness",
+                            "bonus": "advantage_on_next_melee_attack"
+                        }
+                    },
+                    {
+                        "name": "Improved Shadow Step",
+                        "description": "Your Shadow Step generates a burst of shadows. Teleporting with your Shadow Step leaves behind a cloud of shadows in the space you left. Creatures in that space have Disadvantage on Wisdom (Perception) checks and must make a Wisdom saving throw or have the Blinded condition until the start of your next turn.",
+                        "level": 10,
+                        "automation": {
+                            "type": "temp_buff",
+                            "effect": "shadow_step_area_debuff",
+                            "conditions_inflicted": ["Blinded", "disadvantage_perception"],
+                            "saveType": "WIS"
+                        }
                     },
                     {
                         "name": "Shadow Step",
@@ -4348,8 +4806,39 @@
                 "features": [
                     {
                         "name": "Elemental Attunement",
-                        "description": "Expend 1 Focus Point at start of turn to imbue yourself with elemental energy for 10 minutes. Reach +10 feet. Elemental Strikes - choose Acid, Cold, Fire, Lightning, or Thunder damage. Force Strength save or move target up to 10 feet.",
-                        "level": 3
+                        "description": "As a Bonus Action, you can create a elemental manifestation at a point you can see within 60 feet. Choose Cold, Fire, Lightning, or Thunder. The effects last for 1 minute. Cold: 5-ft radius area of extreme cold, Dexterity save or speed reduced 15 ft. Fire: 5-ft radius flames, Dexterity save or 1d10 Fire damage. Lightning: line of lightning, Dexterity save or 1d8 Lightning damage. Thunder: burst of sonic energy, Constitution save or 1d6 Thunder damage and pushed 10 ft.",
+                        "level": 3,
+                        "automation": {
+                            "type": "save_attack",
+                            "action": "bonus_action",
+                            "damageExpression": "varies_by_element",
+                            "saveType": "varies",
+                            "range": "60 ft",
+                            "duration": "1_minute",
+                            "options": ["Cold", "Fire", "Lightning", "Thunder"]
+                        }
+                    },
+                    {
+                        "name": "Stride of the Elements",
+                        "description": "When you use your Elemental Attunement, you can gain a special movement type: Cold = Ice Walk (walk on water/ice), Fire = +10ft Speed, Lightning = Fly Speed equal to your Speed for 1 round, Thunder = teleport 30 ft.",
+                        "level": 6,
+                        "automation": {
+                            "type": "temp_buff",
+                            "effect": "elemental_movement",
+                            "options": ["ice_walk", "speed_boost_10", "fly_speed", "teleport_30"]
+                        }
+                    },
+                    {
+                        "name": "Elemental Strike",
+                        "description": "When you hit a creature with an Unarmed Strike or Monk weapon, you can deal an extra 1d6 damage of a type you chose with Elemental Attunement. At level 11, this increases to 2d6. At level 17, this increases to 3d6.",
+                        "level": 10,
+                        "automation": {
+                            "type": "damage_bonus",
+                            "trigger": "unarmed_or_monk_weapon_hit",
+                            "damageExpression": "1d6",
+                            "damageType": "elemental_attunement_type",
+                            "scaling": { "11": "2d6", "17": "3d6" }
+                        }
                     },
                     {
                         "name": "Manipulate Elements",
@@ -4386,23 +4875,30 @@
                 "features": [
                     {
                         "name": "Open Hand Technique",
-                        "description": "When you hit with attack from Flurry of Blows, impose one effect: Addle (no Opportunity Attacks), Push (Strength save or pushed 15 feet), Topple (Dexterity save or Prone).",
-                        "level": 3
+                        "description": "Whenever you hit a creature with an Unarmed Strike as part of your Flurry of Blows, you can impose one of the following effects on the target. It must succeed on a Strength saving throw (DC 8 + your Wisdom modifier + Proficiency Bonus) or: Push it up to 15 feet away. It has Disadvantage on its next attack roll. It can't take Reactions until the start of your next turn.",
+                        "level": 3,
+                        "automation": {
+                            "type": "flurry_effect",
+                            "options": [
+                                { "name": "Push", "distance": "15 ft" },
+                                { "name": "Disadvantage Next Attack", "duration": "until_next_attack" },
+                                { "name": "No Reactions", "duration": "until_start_of_next_turn" }
+                            ],
+                            "saveType": "STR",
+                            "saveDcExpression": "8 + WIS modifier + proficiency_bonus",
+                            "trigger": "flurry_of_blows_unarmed_strike_hit"
+                        }
                     },
                     {
                         "name": "Wholeness of Body",
-                        "description": "Bonus Action to roll Martial Arts die, regain Hit Points equal to number rolled + Wisdom modifier (minimum 1). Uses equal to Wisdom modifier (minimum once).",
-                        "level": 6
-                    },
-                    {
-                        "name": "Fleet Step",
-                        "description": "When you take a Bonus Action other than Step of the Wind, you can also use Step of the Wind immediately after.",
-                        "level": 11
-                    },
-                    {
-                        "name": "Quivering Palm",
-                        "description": "When you hit with Unarmed Strike, expend 4 Focus Points to set up imperceptible vibrations lasting Monk level days. End them as Attack action or take Attack action and forgo one attack. Target makes Constitution save: 10d12 Force damage (half on success). Only one creature at a time.",
-                        "level": 17
+                        "description": "As a Bonus Action, you can regain Hit Points equal to three times your Monk level. You must finish a Long Rest before you can use this feature again.",
+                        "level": 6,
+                        "automation": {
+                            "type": "self_healing",
+                            "healExpression": "3 * monk_level",
+                            "action": "bonus_action",
+                            "recharge": "long_rest"
+                        }
                     }
                 ],
                 "spells": []

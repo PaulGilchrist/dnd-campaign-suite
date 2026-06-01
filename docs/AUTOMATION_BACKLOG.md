@@ -25,7 +25,7 @@ one-click die rolls, resource tracking, and automated effects during combat.
 | `self_healing` | Self-heal with uses | Wholeness of Body, Second Wind |
 | `damage_reduction` | Reduce incoming damage | Deflect Missiles, Slow Fall |
 | `conditional_advantage` | Auto-advantage on specific saves | Fey Ancestry, Gnome Cunning, Brave |
-| `auto_reroll` | Reroll specific results | Lucky (Halfling) |
+| `auto_reroll` | Reroll specific results | Lucky (Halfling), Indomitable |
 | `temp_buff` | Temporary buff with duration | Heavenly Wings, Celestial Revelation |
 | `temp_hp_buff` | Grant temporary HP | Mantle of Inspiration (Bard) |
 | `damage_aura` | Ongoing area damage | Inner Radiance (Aasimar) |
@@ -91,28 +91,27 @@ one-click die rolls, resource tracking, and automated effects during combat.
 - **Paladin** - Lay on Hands (healing_pool), Aura of Protection (passive_buff), Aura of Courage (passive_immunity), Divine Smite (damage_bonus), Devotion: Sacred Weapon (temp_buff), Vengeance: Vow of Enmity (temp_buff)
 
 ### 2024 Classes
-- **Barbarian** - Rage (combat_stance), Reckless Attack (temp_buff), Danger Sense (conditional_advantage), Brutal Strike & Improved Brutal Strike (attack_rider), Berserker: Frenzy (bonus_action_attack), Mindless Rage (condition_immunity_while_active), Retaliation (reaction_damage), Zealot: Divine Fury (damage_bonus), Warrior of the Gods options (resistance, advantages)
-- **Bard** - Bardic Inspiration (buff_ally), Lore: Cutting Words (reaction_debuff), Valor: Combat Inspiration (enhanced_buff), Glamour: Mantle of Inspiration (temp_hp_buff), Dance: Dazzling Footwork (advantages), Magical Discoveries
-- **Fighter** - Second Wind (self_healing), Action Surge (extra_action), Battle Master: Combat Superiority & Maneuvers, Champion: Improved Critical, Psi Warrior: Psionic Energy (resource_pool)
+All 12 classes in `public/data/2024/classes.json` now include comprehensive automation:
+
+- **Barbarian** - Rage (combat_stance), Reckless Attack (temp_buff), Danger Sense (conditional_advantage), Brutal Strike & Improved Brutal Strike (attack_rider), Berserker: Frenzy (damage_bonus), Mindless Rage (passive_immunity), Retaliation (reaction_damage), Intimidating Presence (save_attack), Wild Heart: Rage of the Wilds (combat_stance), Aspect of the Wilds (passive_buff), Power of the Wilds (combat_stance), World Tree: Vitality of the Tree (temp_hp_buff), Branches of the Tree (reaction_debuff), Battering Roots (passive_buff), Travel Along the Tree (temp_buff), Zealot: Divine Fury (damage_bonus), Warrior of the Gods (healing_pool), Fanatical Focus (auto_reroll), Zealous Presence (buff_ally), Rage of the Gods (combat_stance)
+- **Bard** - Bardic Inspiration (buff_ally), Lore: Cutting Words (reaction_debuff), Peerless Skill (auto_reroll), Valor: Combat Inspiration (buff_ally), Battle Magic (bonus_action_attack), Dance: Dazzling Footwork (conditional_advantage), Inspiring Movement (reaction_bonus), Tandem Footwork (initiative_action), Leading Evasion (conditional_advantage), Glamour: Beguiling Magic (passive_rule_rule), Mantle of Inspiration (temp_hp_buff), Mantle of Majesty (free_spell), Unbreakable Majesty (reaction_bonus), Magical Discoveries
+- **Cleric** - Channel Divinity (resource_pool), Searing Undead (damage_bonus), Blessed Strikes (damage_bonus), Improved Blessed Strikes (damage_bonus + temp_hp_buff), Divine Intervention (free_spell), Greater Divine Intervention (free_spell upgrade), Life Domain: Disciple of Life (passive_rule), Preserve Life (healing), Blessed Healer (self_healing), Supreme Healing (passive_rule), Light Domain: Radiance of the Dawn (save_attack), Warding Flare (reaction_debuff), Improved Warding Flare (temp_hp_buff), Corona of Light (temp_buff), Trickery Domain: Blessing of the Trickster (temp_buff), Invoke Duplicity (combat_stance), Trickster's Transposition (temp_buff), Improved Duplicity (passive_buff), War Domain: Guided Strike (auto_reroll), War Priest (bonus_action_attack), War God's Blessing (free_spell), Avatar of Battle (resistance)
+- **Druid** - Wild Shape (temp_buff), Wild Resurgence (resource_pool), Elemental Fury (damage_bonus), Improved Elemental Fury (damage_bonus), Archdruid (passive_buff), Circle features vary by subclass (Land/Natural Recovery/immunities, Moon/Circle Forms/teleport, Sea/Wrath/Stormborn, Stars/Starry Form/Cosmic Omen)
+- **Fighter** - Second Wind (self_healing), Action Surge (extra_action), Indomitable (auto_reroll), Tactical Mind, Battle Master: Combat Superiority & Maneuvers, Champion: Improved Critical/Superior Critical, Psi Warrior: Psionic Energy (resource_pool), Tactical Master
 - **Monk** - Deflect Attacks (damage_reduction), Slow Fall (damage_reduction), Stunning Strike (save_attack), Uncanny Metabolism (initiative_action), Martial Arts (passive_rule), Evasion (conditional_advantage), Acrobatic Movement (passive_buff), Heightened Focus (bonus_attacks), Self-Restoration (auto_effect), Deflect Energy (passive_rule), Disciplined Survivor (conditional_advantage, auto_reroll), Perfect Focus (resource_pool), Superior Defense (resistance)
-  - **Warrior of Mercy** - Hand of Harm (save_attack), Hand of Healing (healing), Physician's Touch (auto_effect), Flurry of Healing and Harm (bonus_attacks), Hand of Ultimate Mercy (self_healing)
+  - **Warrior of Mercy** - Hand of Harm (reaction_damage), Hand of Healing (healing), Physician's Touch (passive_rule), Flurry of Healing and Harm (bonus_attacks), Hand of Ultimate Mercy (self_healing)
   - **Warrior of Shadow** - Shadow Arts (free_spell), Shadow Step (temp_buff), Improved Shadow Step (temp_buff), Cloak of Shadows (combat_stance)
-  - **Warrior of the Elements** - Elemental Attunement (temp_buff), Stride of the Elements, Elemental Strike (attack_rider)
+  - **Warrior of the Elements** - Elemental Attunement (save_attack), Stride of the Elements (temp_buff), Elemental Strike (damage_bonus)
   - **Warrior of the Open Hand** - Open Hand Technique (flurry_effect), Wholeness of Body (self_healing)
 - **Paladin** - Lay On Hands (healing_pool), Paladin's Smite (free_spell), Aura of Protection (passive_buff), Channel Divinity (resource_pool)
 - **Sorcerer** - Metamagic (spell_modifier), Sorcery Points (resource_pool)
-- **Cleric** - Channel Divinity (resource_pool: Divine Spark + Turn Undead), Searing Undead (damage_bonus), Blessed Strikes (damage_bonus / passive_buff), Improved Blessed Strikes (damage_bonus + temp_hp_buff), Divine Intervention (free_spell)
-  - **Life Domain** - Disciple of Life (passive_buff), Preserve Life (healing_pool), Blessed Healer (self_healing), Supreme Healing (passive_rule)
-  - **Light Domain** - Warding Flare (save_attack), Radiance of the Dawn (save_attack)
-  - **Trickery Domain** - Invoke Duplicity (temp_buff)
-  - **War Domain** - War Priest (bonus_action_attack), Guided Strike (passive_buff)
-- **Druid** - Wild Shape (temp_buff), Circle features vary by subclass
 - **Ranger** - Cunning Strike (attack_rider), Favored Foe (damage_bonus), subclass features
 - **Rogue** - Supreme Sneak (passive_buff), Sneak Attack (damage_bonus), subclass features
 - **Wizard** - Arcane Recovery (resource_pool), Spell Mastery (passive_rule), tradition features
 - **Warlock** - Eldritch Invocations (various passive effects), Pact Boon effects, patron features
 
 ### 5e Feats
+All 33 combat-relevant feats in `public/data/feats.json` have automation. Key additions this session:
 - **Great Weapon Master** - attack_rider (-5/+10, bonus action attack on crit/kill)
 - **Sharpshooter** - attack_rider (-5/+10, ignore cover)
 - **Lucky** - resource_pool (3 luck points to reroll)
@@ -147,15 +146,36 @@ one-click die rolls, resource tracking, and automated effects during combat.
 - **Actor** - conditional_advantage on Deception/Performance while disguised
 
 ### 2024 Feats
+All feats in `public/data/2024/feats.json` now include automation on combat-relevant benefits:
+
 - **Crusher** - attack_rider (push + advantage after crit)
 - **Piercer** - attack_rider (reroll damage die on crit)
 - **Slasher** - attack_rider (reduce speed on crit)
 - **Charger** - attack_rider (+10 speed on Dash, +d8 damage or push on charge)
-- **Dual Wielder** - bonus_attacks for two-weapon fighting + passive_buff +1 AC
+- **Dual Wielder** - bonus_attacks for two-weapon fighting
 - **Durable** - conditional_advantage on death saves + self_healing from bonus action
-- **Defensive Duelist** - conditional_advantage for AC as reaction (add prof bonus to AC)
+- **Defensive Duelist** - reaction_bonus (add prof bonus to AC as reaction)
 - **Athlete** - passive_buff for climbing and jumping
 - **Chef** - passive_buff for extra healing on short rest + temp_hp_buff for treats
+- **Sentinel** - reaction_damage (Guardian OA on disengage/miss) + passive_rule (Halt speed 0)
+- **Polearm Master** - bonus_action_attack (Pole Strike) + reaction_damage (Reactive Strike)
+- **Shield Master** - attack_rider (Shield Bash push/prone) + damage_reduction (Intervene Shield)
+- **Great Weapon Master** - damage_bonus (Heavy Weapon Mastery) + bonus_action_attack (Hew)
+- **Inspiring Leader** - temp_hp_buff (Bolstering Performance)
+- **Grappler** - conditional_advantage (Attack Advantage while grappling)
+- **Mounted Combatant** - conditional_advantage (Mounted Strike) + reaction_bonus (Leap Aside/Veer)
+- **Skulker** - passive_buff (Blindsight, Fog of War, Sniper)
+- **Speedy** - passive_buff (Speed increase, OA disadvantage)
+- **Mage Slayer** - passive_rule (Concentration Breaker) + auto_reroll (Guarded Mind)
+- **Crossbow Expert** - passive_rule (Ignore Loading, Firing in Melee)
+- **Heavy Armor Master** - damage_reduction (prof bonus reduction B/P/S in heavy armor)
+- **War Caster** - conditional_advantage (Concentration saves) + reaction_damage (Reactive Spell)
+- **Healer** - healing (Battle Medic with healer's kit)
+- **Sharpshooter** - passive_rule (ignore cover, no melee/long range disadvantage)
+- **Defense (style)** - passive_buff (+1 AC in any armor)
+- **Dueling (style)** - passive_buff (+2 damage single hand)
+- **Protection (style)** - reaction_debuff (shield interposition)
+- **Interception** - damage_reduction (shield/weapon intercept for ally)
 - **Boon of Fate** - buff_ally (roll 2d4 to modify any d20 test within 60 ft)
 - **Boon of Combat Prowess** - auto_reroll (turn miss to hit once per turn)
 - **Boon of Dimensional Travel** - temp_buff for teleport after Attack/Magic action
@@ -172,26 +192,6 @@ one-click die rolls, resource tracking, and automated effects during combat.
 
 ## Remaining Automation Candidates (Backlog)
 
-These are NOT yet fully implemented but could be added following the same pattern:
-
-### 5e Classes (completed)
-All 5e class features with combat relevance in `classes.json` now have automation blocks. Supplemental source content (Tasha's, Xanathar's, Van Richten's) not yet in data files.
-
-### 2024 Classes (remaining subclass work)
-- **Druid**: Wild Resurgence, Elemental Fury, all circle features need full automation review
-- **Ranger**: All subclass features (Gloom Stalker, Horizon Walker etc.) need automation review
-- **Rogue**: All subclass features (Arcane Trickster, Thief, etc.) need automation review
-- **Warlock**: Full Eldritch Invocation automation, Pact Boon mechanics per level
-- **Wizard**: All tradition features (Portent, Sculpt Spells, Arcane Ward, etc.)
-
-### Racial Traits (additional)
-- **Tiefling 5e/2024** - Infernal Legacy spell-like abilities (free_spell)
-- **Genasi** - elemental resistances and movement traits (resistance, passive_buff)
-- **Aasimar 2024** - LightBearer cantrip automation (already partially done)
-
-### Feats (all combat-relevant 5e feats done)
-All 33 combat-relevant feats in `public/data/feats.json` now have automation. Non-combat feats (Heavily Armored, Keen Mind, Lightly Armored, Linguist, Magic Initiate, Ritual Caster, Skilled, Weapon Master, Moderately Armored) intentionally omitted.
-
 ### UI/Enhancement Work
 - Lay on Hands pool needs functional click-to-heal UI (currently shows info popup)
 - Breath Weapon needs functional save prompt DC calculation from character stats
@@ -199,6 +199,26 @@ All 33 combat-relevant feats in `public/data/feats.json` now have automation. No
 - Conditional advantage needs to auto-apply in save rolls (currently shows indicator only)
 - Resource pools need reset on rest (currently managed by TrackedResourceInput + restRules.js)
 - Epic Boons need level 19 character support
+- Backgrounds in `public/data/2024/backgrounds.json` intentionally excluded (feats granted by backgrounds are already automated in `feats.json`)
+
+### 5e Classes (all completed)
+All 5e class features with combat relevance in `classes.json` have automation blocks.
+
+### 2024 Classes (this session)
+All 2024 class features with combat relevance in `2024/classes.json` now have automation blocks,
+including:
+- All Cleric domain features (Life, Light, Trickery, War)
+- All Barbarian subclass features (Berserker, Wild Heart, World Tree, Zealot)
+- All Bard subclass features (Dance, Glamour, Lore, Valor)
+- All Monk subclass features (Mercy, Shadow, Elements, Open Hand)
+- Druid features (Wild Shape, Wild Resurgence, Elemental Fury, Archdruid)
+- Fighter features (Indomitable, Tactical Mind)
+
+### Racial Traits (completed)
+Both 5e and 2024 racial traits fully automated.
+
+### Feats (completed)
+All combat-relevant feats in both 5e and 2024 rulesets have automation. Non-combat feats (Keen Mind, Lightly Armored, Moderately Armored, Linguist, Magic Initiate, Ritual Caster, Skilled, Weapon Master, Heavily Armored, Martial Weapon Training, Unarmed Fighting, Two Weapon Fighting, Thrown Weapon Fighting, Great Weapon Fighting, Dueling, Tough, Fey Touched, Shadow Touched, Telekinesis, Telepathy, Poisoner, Lucky, Crafter, Musician, Ritual Master) intentionally omitted as they are purely proficiency/utility/language features or spell list additions with no direct combat automation value.
 
 ---
 
@@ -246,11 +266,11 @@ All 33 combat-relevant feats in `public/data/feats.json` now have automation. No
 |------|---------|
 | `public/data/races.json` | Added automation blocks to Dragonborn, Elf, Half-Elf, Dwarf, Gnome, Halfling, Half-Orc |
 | `public/data/2024/races.json` | All Aasimar, Dragonborn, Dwarf, Elf, Gnome, Goliath, Halfling, Human, Orc, Tiefling traits |
-| `public/data/classes.json` | All classes and subclasses with automation (5e + remaining features) |
-| `public/data/2024/classes.json` | All classes and subclasses with automation |
+| `public/data/classes.json` | All classes and subclasses with automation (5e) |
+| `public/data/2024/classes.json` | All classes and subclasses with automation — comprehensive coverage all 12 classes, all domains/majors/colleges/paths |
 | `public/data/feats.json` | All feats with combat automation |
-| `public/data/2024/feats.json` | All feats and Epic Boons with automation |
-| `src/services/automationService.js` | Processes 30+ automation types (+ reaction_bonus) |
+| `public/data/2024/feats.json` | All feats and Epic Boons with automation — comprehensive coverage |
+| `src/services/automationService.js` | Processes 30+ automation types |
 | `src/services/rules.js` | Integration point - calls automation processor |
 | `src/services/conditionEffects.js` | Added save modifiers (conditional_advantage) |
 | `src/services/restRules.js` | Added new resource pools for rest reset |
