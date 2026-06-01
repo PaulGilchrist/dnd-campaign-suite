@@ -457,6 +457,10 @@ function evaluateAutoExpression(expression, playerStats, prof, level) {
     .replace(/barbarian level/gi, level)
     .replace(/bard level/gi, level)
     .replace(/level/gi, level)
+  try {
+    const result = new Function(`"use strict"; return (${expr})`)()
+    if (typeof result === 'number' && !isNaN(result)) return result
+  } catch (e) { /* not a simple expression, return as string */ }
   return expr
 }
 

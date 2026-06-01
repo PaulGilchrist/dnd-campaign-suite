@@ -2,50 +2,76 @@
 import React from 'react'
 import storage from '../../services/storage.js'
 import useTrackedResource from '../../hooks/useTrackedResource.js'
+import { getTargetFromAttacker, getCombatContext } from '../../services/damageUtils.js'
+import { applyHealingToTarget } from '../../services/applyHealing.js'
 import './CharSheet.css'
 
-function HealingPoolModal({ playerStats, campaignName, poolMax, resourceKey, alsoCures, cureCost, onClose }) {
-    const { current: poolRemaining, update: setPoolRemaining } = useTrackedResource(
-        resourceKey,
+function HealingPoolModal({ playerStats, campaignName, poolMax, alsoCures, cureCost, onClose }) {
+    const layOnHandsPoolMax = 5 * (playerStats.level || 1);
+
+    const { current: poolRemaining, max: poolMaxFromHook, update: setPoolRemaining } = useTrackedResource(
+         'layOnHandsPool',
         playerStats.name,
-        () => poolMax,
-        [playerStats],
+          () => layOnHandsPoolMax,
+          [playerStats],
         campaignName
-    );
+       );
     const [healAmount, setHealAmount] = React.useState(1);
     const [log, setLog] = React.useState([]);
 
-    const currentHp = storage.getProperty(playerStats.name, 'currentHitPoints', campaignName);
-    const effectiveCurrentHp = currentHp != null && currentHp !== '' ? Number(currentHp) : playerStats.hitPoints;
+    const safePool = Number(poolRemaining) || 0;
+    const safeMax = Number(poolMaxFromHook) || 0;
+
+    const combatSummary = getCombatContext();
+    const combatTarget = combatSummary ? getTargetFromAttacker(combatSummary, playerStats.name) : null;
+    const targetName = combatTarget ? combatTarget.name : playerStats.name;
+    const targetMaxHp = combatTarget ? combatTarget.maxHp : playerStats.hitPoints;
+    const targetCurrentHp = combatTarget
+        ? combatTarget.currentHp
+        : (() => {
+            const stored = storage.getProperty(playerStats.name, 'currentHitPoints', campaignName);
+            return stored != null && stored !== '' ? Number(stored) : playerStats.hitPoints;
+        })();
 
     const applyHeal = () => {
-        const amount = Math.min(healAmount, poolRemaining);
+        const amount = Math.min(healAmount, safePool);
         if (amount <= 0) return;
-        const newPool = poolRemaining - amount;
+        const newPool = safePool - amount;
         setPoolRemaining(newPool);
-        const newHp = Math.min(playerStats.hitPoints, effectiveCurrentHp + amount);
-        storage.setProperty(playerStats.name, 'currentHitPoints', newHp, campaignName);
-        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: 'hp_change',
-                targetName: playerStats.name,
-                delta: amount,
-                currentHp: newHp,
-                maxHp: playerStats.hitPoints,
-                isHealing: true,
-                isUnconscious: newHp <= 0,
-            })
-        }).catch(() => {});
-        setLog(prev => [...prev, { action: 'Heal', amount, poolAfter: newPool }]);
+
+        if (combatTarget && combatSummary) {
+            const result = applyHealingToTarget(combatSummary, combatTarget.name, amount, campaignName);
+            if (result) {
+                setLog(prev => [...prev, { action: 'Heal', target: combatTarget.name, amount: result.actualHeal, poolAfter: newPool }]);
+                setHealAmount(Math.min(healAmount, newPool));
+            }
+        } else {
+            const newHp = Math.min(playerStats.hitPoints, targetCurrentHp + amount);
+            storage.setProperty(playerStats.name, 'currentHitPoints', newHp, campaignName);
+            fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'hp_change',
+                    targetName: playerStats.name,
+                    delta: amount,
+                    currentHp: newHp,
+                    maxHp: playerStats.hitPoints,
+                    isHealing: true,
+                    isUnconscious: false,
+                })
+            }).catch(() => {});
+            setLog(prev => [...prev, { action: 'Heal', target: playerStats.name, amount, poolAfter: newPool }]);
+            setHealAmount(Math.min(healAmount, newPool));
+        }
     };
 
     const applyCure = (condition) => {
-        if (poolRemaining < cureCost) return;
-        const newPool = poolRemaining - cureCost;
+        if (safePool < cureCost) return;
+        const newPool = safePool - cureCost;
         setPoolRemaining(newPool);
-        setLog(prev => [...prev, { action: `Cure ${condition}`, amount: cureCost, poolAfter: newPool }]);
+        setLog(prev => [...prev, { action: `Cure ${condition}`, target: targetName, amount: cureCost, poolAfter: newPool }]);
+        setHealAmount(Math.min(healAmount, newPool));
     };
 
     React.useEffect(() => {
@@ -62,25 +88,27 @@ function HealingPoolModal({ playerStats, campaignName, poolMax, resourceKey, als
                 <h3><i className="fas fa-hands-helping"></i> Lay On Hands</h3>
 
                 <div className="short-rest-section">
-                    <p>Pool: <b>{poolRemaining}</b> / {poolMax} HP</p>
-                    <p>Current HP: <b>{effectiveCurrentHp}</b> / {playerStats.hitPoints}</p>
+                    <p>Pool: <b>{safePool}</b> / {safeMax} HP</p>
                 </div>
 
                 <div className="short-rest-section">
-                    <h4>Heal</h4>
+                    <h4>Heal — {targetName} ({targetCurrentHp} / {targetMaxHp} HP)</h4>
                     <div className="short-rest-dice-row">
                         <label>
                             Amount:
                             <input
                                 type="number"
-                                min="1"
-                                max={poolRemaining}
-                                value={healAmount}
-                                onChange={(e) => setHealAmount(Math.max(1, Math.min(poolRemaining, Number(e.target.value) || 1)))}
+                                min="0"
+                                max={safePool}
+                                value={Math.min(healAmount, safePool)}
+                                onChange={(e) => {
+                                    const raw = Number(e.target.value);
+                                    setHealAmount(raw >= 0 ? raw : 0);
+                                }}
                                 style={{ width: '62px', marginLeft: '6px' }}
                             />
                         </label>
-                        <button className="char-btn" onClick={applyHeal} disabled={poolRemaining <= 0 || healAmount <= 0}>
+                        <button className="char-btn" onClick={applyHeal} disabled={safePool <= 0 || healAmount <= 0}>
                             <i className="fas fa-heart"></i> Apply Heal
                         </button>
                     </div>
@@ -91,7 +119,7 @@ function HealingPoolModal({ playerStats, campaignName, poolMax, resourceKey, als
                         <h4>Cure Conditions ({cureCost} HP each)</h4>
                         <div className="short-rest-dice-row">
                             {alsoCures.map((condition) => (
-                                <button key={condition} className="char-btn" onClick={() => applyCure(condition)} disabled={poolRemaining < cureCost}>
+                                <button key={condition} className="char-btn" onClick={() => applyCure(condition)} disabled={safePool < cureCost}>
                                     <i className="fas fa-shield-alt"></i> {condition}
                                 </button>
                             ))}
@@ -105,12 +133,13 @@ function HealingPoolModal({ playerStats, campaignName, poolMax, resourceKey, als
                         <div className="short-rest-roll-log">
                             <table>
                                 <thead>
-                                    <tr><th>Action</th><th>Cost</th><th>Pool After</th></tr>
+                                    <tr><th>Action</th><th>Target</th><th>Pool Used</th><th>Pool Left</th></tr>
                                 </thead>
                                 <tbody>
                                     {log.map((entry, i) => (
                                         <tr key={i}>
                                             <td>{entry.action}</td>
+                                            <td>{entry.target}</td>
                                             <td>{entry.amount}</td>
                                             <td>{entry.poolAfter}</td>
                                         </tr>

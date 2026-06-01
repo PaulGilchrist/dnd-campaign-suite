@@ -237,15 +237,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 }
                 break;
             }
-            case 'healing_pool': {
+             case 'healing_pool': {
                 setHealingPoolModal({
                     name: action.name,
                     pool: auto.pool,
-                    poolExpression: auto.poolExpression,
                     resourceKey: auto.resourceKey,
                     alsoCures: auto.alsoCures || [],
                     cureCost: auto.cureCost || 5,
-                });
+                  });
                 break;
             }
             case 'extra_action':
@@ -328,17 +327,17 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                              <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
                                         </Popup>
                                     )}
-                {healingPoolModal && (
-                    <HealingPoolModal
-                        playerStats={playerStats}
-                        campaignName={campaignName}
-                        poolMax={healingPoolModal.pool}
-                        resourceKey={healingPoolModal.resourceKey}
-                        alsoCures={healingPoolModal.alsoCures}
-                        cureCost={healingPoolModal.cureCost}
-                        onClose={() => setHealingPoolModal(null)}
-                    />
-                )}
+                  {healingPoolModal && (
+                      <HealingPoolModal
+                         playerStats={playerStats}
+                         campaignName={campaignName}
+                         poolMax={healingPoolModal.pool}
+                         poolExpression={healingPoolModal.poolExpression}
+                         alsoCures={healingPoolModal.alsoCures}
+                         cureCost={healingPoolModal.cureCost}
+                         onClose={() => setHealingPoolModal(null)}
+                      />
+                  )}
                 {playerStats.actions.map((action) => {
                     const isClickable = action.details || hasAutomation(action);
                     const handleClick = () => {
@@ -392,14 +391,24 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <br />
                     {(playerStats.bonusActions.length > 0) && <div>
                         {playerStats.bonusActions.map((bonusAction) => {
-                                                        return <div key={bonusAction.name}>
+                            const isBonusClickable = bonusAction.details || hasAutomation(bonusAction);
+                            const handleBonusClick = () => {
+                                if (hasAutomation(bonusAction)) {
+                                    handleAutomationAction(bonusAction);
+                                } else {
+                                    setPopupHtml(buildFeatureDetailHtml(bonusAction));
+                                }
+                            };
+                            return <div key={bonusAction.name}>
                 {popupHtml && (
                     <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
                         {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
                          <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
                     </Popup>
                 )}
-                                  <b className={bonusAction.details ? "clickable" : ""} onClick={() => setPopupHtml(buildFeatureDetailHtml(bonusAction))}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(bonusAction.description) }}></span>
+                                  <b className={isBonusClickable ? "clickable" : ""} onClick={handleBonusClick}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(bonusAction.description) }}></span>
+                                  {hasAutomation(bonusAction) && bonusAction.automation?.type === 'healing_pool' && <span className="automation-badge"> Pool: {bonusAction.automation.pool} HP</span>}
+                                  {hasAutomation(bonusAction) && bonusAction.automation?.damage && <span className="automation-badge"> {bonusAction.automation.damage} {bonusAction.automation.damageType}</span>}
                              </div>
                         })}
                     </div>}

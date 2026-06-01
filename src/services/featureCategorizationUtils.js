@@ -49,7 +49,8 @@ export const categorizeFeatures = (items, categories, options = {}) => {
     const itemSummary = {
       name: item.name,
       description: item[descriptionField],
-      details: item.details
+      details: item.details,
+      automation: item.automation
     };
 
     // Skip ignored features

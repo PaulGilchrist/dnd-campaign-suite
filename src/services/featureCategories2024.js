@@ -83,6 +83,7 @@ export const bonusActions = [
     "Innate Sorcery",
     "Instinctive Pounce",
     "Large Form",
+    "Lay On Hands",
     "Nature's Veil",
     "Patient Defense",
     "Second Wind",

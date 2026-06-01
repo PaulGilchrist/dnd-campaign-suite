@@ -4,6 +4,8 @@ import storage from '../../services/storage.js'
 import { rollDice } from '../../services/diceRoller.js'
 import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES } from '../../services/restRules.js'
 import { getClassFeatures } from '../../services/classFeatures.js'
+import { getCombatContext } from '../../services/damageUtils.js'
+import { applyHealingToTarget } from '../../services/applyHealing.js'
 
 function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [remainingHitDice, setRemainingHitDice] = React.useState(() => {
@@ -48,8 +50,17 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         if (!songOfRestDie || songOfRestApplied) return;
         const { total } = rollDice(1, songOfRestDie);
         const bonus = Math.max(1, total + conBonus);
-        setRecoveredHp(prev => prev + bonus);
-        setRollLog(prev => [...prev, { roll: total, hp: bonus, isSongOfRest: true }]);
+        const combatSummary = getCombatContext();
+        if (combatSummary) {
+            const result = applyHealingToTarget(combatSummary, playerStats.name, bonus, campaignName);
+            if (result) {
+                setRecoveredHp(prev => prev + result.actualHeal);
+                setRollLog(prev => [...prev, { roll: total, hp: result.actualHeal, isSongOfRest: true }]);
+            }
+        } else {
+            setRecoveredHp(prev => prev + bonus);
+            setRollLog(prev => [...prev, { roll: total, hp: bonus, isSongOfRest: true }]);
+        }
         setSongOfRestApplied(true);
      };
 
