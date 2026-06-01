@@ -34,6 +34,13 @@ export function sendDeathSavePrompt(campaignName, promptData) {
   }).catch(() => {});
 }
 
+export function clearDeathSavePrompt(campaignName, targetName) {
+  const key = `deathSavePrompt-${targetName}`;
+  fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
+    method: 'DELETE',
+  }).catch(() => {});
+}
+
 export function sendDeathSaveResult(campaignName, targetName, resultData) {
   const key = `deathSaveResult-${targetName}`;
   fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {

@@ -3,6 +3,7 @@ import React from 'react'
 import { cloneDeep } from 'lodash';
 import utils from '../../services/utils.js'
 import storage from '../../services/storage.js'
+import { clearDeathSavePrompt } from '../../services/savePromptService.js'
 import { getMonsterImageUrl, getMonsterData } from '../../services/monsterUtils.js';
 import { rollD20 } from '../../services/diceRoller.js';
 import * as concentrationRules from '../../services/concentrationRules.js';
@@ -587,8 +588,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
          if (delta === 0) return;
 
          creature.currentHp = newValue;
-         if (creature.type === 'player') {
-             storage.setProperty(creature.name, 'currentHitPoints', newValue, campaignName);
+        if (creature.type === 'player') {
+            storage.setProperty(creature.name, 'currentHitPoints', newValue, campaignName);
+            if (oldHp <= 0 && newValue > 0) {
+                storage.setProperty(creature.name, 'deathSaves', [false, false, false], campaignName);
+                storage.setProperty(creature.name, 'deathFailures', [false, false, false], campaignName);
+                clearDeathSavePrompt(campaignName, creature.name);
+            }
 
              fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
                  method: 'POST',

@@ -35,4 +35,17 @@ if (!characterChangeData.has(campaign)) {
     res.json({ message: 'Data saved successfully' });
 });
 
+// DELETE /api/campaigns/:campaign/:key - Remove a key from the change data store
+router.delete('/api/campaigns/:campaign/:key', (req, res, next) => {
+    const { campaign, key } = req.params;
+    if (key === 'log') return next();
+    if (characterChangeData.has(campaign)) {
+        delete characterChangeData.get(campaign)[key];
+        saveFile();
+    }
+    publish(`change-${campaign}-${key}`, null);
+
+    res.json({ message: 'Data deleted successfully' });
+});
+
 export default router;

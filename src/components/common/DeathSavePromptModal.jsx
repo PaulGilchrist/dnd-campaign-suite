@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import utils from '../../services/utils.js';
 import { rollD20 } from '../../services/diceRoller.js';
-import { sendDeathSaveResult } from '../../services/savePromptService.js';
+import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/savePromptService.js';
 import * as deathSaveRules from '../../services/deathSaveRules.js';
 import Subscriber from './Subscriber.jsx';
 import storage from '../../services/storage.js';
@@ -77,6 +77,7 @@ function DeathSavePromptModal({ campaignName, characters }) {
 
     storage.setProperty(current.targetName, 'deathSaves', result.newSaves, campaignName);
     storage.setProperty(current.targetName, 'deathFailures', result.newFailures, campaignName);
+    clearDeathSavePrompt(campaignName, current.targetName);
 
     if (result.restoredToHp !== null) {
       storage.setProperty(current.targetName, 'currentHitPoints', result.restoredToHp, campaignName);

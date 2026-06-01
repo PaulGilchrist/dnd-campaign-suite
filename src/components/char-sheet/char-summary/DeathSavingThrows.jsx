@@ -1,5 +1,6 @@
 import React from 'react'
 import storage from '../../../services/storage.js'
+import { clearDeathSavePrompt } from '../../../services/savePromptService.js'
 import * as deathSaveRules from '../../../services/deathSaveRules.js'
 import './CharSummary.css'
 
@@ -68,6 +69,7 @@ function DeathSavingThrows({ playerStats, campaignName }) {
         setFailures(result.newFailures);
         storage.setProperty(playerStats.name, 'deathSaves', result.newSaves, campaignName);
         storage.setProperty(playerStats.name, 'deathFailures', result.newFailures, campaignName);
+        clearDeathSavePrompt(campaignName, playerStats.name);
     }
 
     return (

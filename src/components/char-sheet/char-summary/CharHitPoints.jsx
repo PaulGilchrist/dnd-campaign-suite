@@ -1,6 +1,7 @@
  
 import React from 'react'
 import storage from '../../../services/storage.js'
+import { clearDeathSavePrompt } from '../../../services/savePromptService.js'
 import HiddenInput from '../../common/HiddenInput.jsx'
 import DeathSavingThrows from './DeathSavingThrows.jsx'
 
@@ -39,6 +40,7 @@ function CharHitPoints({ playerStats, campaignName }) {
           if (value > 0) {
               storage.setProperty(playerStats.name, 'deathSaves', [false, false, false], campaignName);
               storage.setProperty(playerStats.name, 'deathFailures', [false, false, false], campaignName);
+              clearDeathSavePrompt(campaignName, playerStats.name);
           }
       };
 
