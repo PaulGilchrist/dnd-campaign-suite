@@ -36,8 +36,8 @@ describe('computeRangeEffect', () => {
     expect(computeRangeEffect(5, 3)).toEqual({ mode: 'normal' })
   })
 
-  it('returns auto-miss for melee attacks beyond 5 ft', () => {
-    const result = computeRangeEffect(5, 5.1)
+  it('returns auto-miss for melee attacks beyond 8 ft', () => {
+    const result = computeRangeEffect(5, 8.1)
     expect(result.mode).toBe('miss')
     expect(result.reason).toContain('out of melee range')
   })

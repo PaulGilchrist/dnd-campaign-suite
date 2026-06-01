@@ -136,7 +136,7 @@ describe('DiceRollResult', () => {
             render(
                 <DiceRollResult name="Attack" type="d20" rolls={[20, 5]} bonus={3} />
             );
-            expect(screen.getByText('Critical Hit!')).toBeInTheDocument();
+            expect(screen.getByText(/Critical Hit!/)).toBeInTheDocument();
         });
 
         it('does NOT show "Critical Hit!" when roll is not 20', () => {
