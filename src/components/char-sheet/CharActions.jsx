@@ -13,7 +13,8 @@ import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHos
 import { computeCover } from '../../services/coverService.js';
 import { computeFeatRangeEffects } from '../../services/featRangeService.js';
 import { loadNPCs } from '../../services/npcsService.js';
-import { hasAutomation } from '../../services/automationService.js'
+import { hasAutomation, getAutomationInfo } from '../../services/automationService.js'
+import storage from '../../services/storage.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
 import './CharActions.css'
 import { isEqual } from 'lodash';
@@ -22,7 +23,7 @@ const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats);
 
-const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName }) {
+const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, onBuffsChange }) {
     const [actions, setActions] = useState([]);
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
     const [healingPoolModal, setHealingPoolModal] = useState(null);
@@ -290,11 +291,44 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 }
                 break;
             }
+            case 'temp_buff': {
+                const activeBuffsKey = 'activeBuffs';
+                const stored = storage.getProperty(playerStats.name, activeBuffsKey, campaignName);
+                const activeBuffs = Array.isArray(stored) ? stored : [];
+                const isActive = activeBuffs.some(b => b.name === action.name);
+                const newBuffs = isActive ? activeBuffs.filter(b => b.name !== action.name) : [...activeBuffs, { name: action.name, effect: auto.effect, duration: auto.duration }];
+                storage.setProperty(playerStats.name, activeBuffsKey, newBuffs, campaignName);
+                if (onBuffsChange) onBuffsChange();
+                if (setPopupHtml) {
+                    setPopupHtml({
+                        type: 'automation_info',
+                        name: action.name,
+                        automationType: auto.type,
+                        description: isActive ? `${action.name} toggled OFF` : `${action.name} activated (${auto.duration || '10 min'})`,
+                        automation: auto,
+                     });
+                }
+               break;
+            }
+            case 'temp_hp_buff': {
+                // Temp HP doesn't modify speed display, just show info popup
+                if (setPopupHtml) {
+                    const result = rollExpression(auto.buffExpression || '');
+                    let desc = `${action.name}: ${auto.buffExpression} temp HP`;
+                    if (result) desc += ` (${result.total})`;
+                    setPopupHtml({
+                        type: 'automation_info',
+                        name: action.name,
+                        automationType: auto.type,
+                        description: desc,
+                        automation: auto,
+                     });
+                }
+               break;
+            }
             case 'extra_action':
             case 'bonus_attacks':
             case 'bonus_action_attack':
-            case 'temp_buff':
-            case 'temp_hp_buff':
             case 'damage_aura':
             case 'combat_stance':
             case 'initiative_action':
@@ -309,9 +343,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         automationType: auto.type,
                         description: action.description || '',
                         automation: auto,
-                    });
+                     });
                 }
-                break;
+               break;
             }
             default:
                 break;
@@ -363,12 +397,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                       })}
                   </div>
                   <br />
-                                    {popupHtml && (
-                                        <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
-                                            {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
-                                             <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
-                                        </Popup>
-                                    )}
+                                      {popupHtml && (
+                                          <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
+                                              {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
+                                               popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
+                                               <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
+                                          </Popup>
+                                      )}
                   {healingPoolModal && (
                       <HealingPoolModal
                          playerStats={playerStats}
@@ -442,13 +477,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                 }
                             };
                             return <div key={bonusAction.name}>
-                {popupHtml && (
-                    <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
-                        {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
-                         <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
-                    </Popup>
-                )}
-                                  <b className={isBonusClickable ? "clickable" : ""} onClick={handleBonusClick}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(bonusAction.description) }}></span>
+                 {popupHtml && (
+                     <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
+                         {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
+                          popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
+                          <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
+                     </Popup>
+                 )}
+                                   <b className={isBonusClickable ? "clickable" : ""} onClick={handleBonusClick}>{bonusAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(bonusAction.description) }}></span>
                                   {hasAutomation(bonusAction) && bonusAction.automation?.type === 'healing_pool' && <span className="automation-badge"> Pool: {bonusAction.automation.pool} HP</span>}
                                   {hasAutomation(bonusAction) && bonusAction.automation?.damage && <span className="automation-badge"> {bonusAction.automation.damage} {bonusAction.automation.damageType}</span>}
                              </div>

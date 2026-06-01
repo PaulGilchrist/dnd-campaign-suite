@@ -6,11 +6,12 @@ function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier =
 
     const isD20 = type === 'd20';
 
-    let finalRoll = rolls[0] || 0;
+    let finalRoll = 0;
+    const safeRolls = Array.isArray(rolls) ? rolls : [];
 
     if (isD20) {
-        const r1 = rolls[0] || 0;
-        const r2 = rolls[1] || 0;
+        const r1 = safeRolls[0] || 0;
+        const r2 = safeRolls[1] || 0;
 
         if (mode === 'advantage') {
             finalRoll = Math.max(r1, r2);
@@ -20,8 +21,8 @@ function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier =
             finalRoll = r1;
         }
     } else {
-        finalRoll = rolls.reduce((sum, r) => sum + r, 0);
-    }
+         finalRoll = safeRolls.reduce((sum, r) => sum + r, 0);
+      }
 
     const total = finalRoll + bonus + modifier;
     const showCrit = isCrit || isAutoCrit || (isD20 && finalRoll === 20);
@@ -45,10 +46,10 @@ function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier =
             <div className="dice-roll-breakdown">
                 {formula ? `${formula}: ` : type === 'd20' ? 'd20 ' : ''}
                 <span className="dice-rolled">
-                    {isD20
-                        ? (mode === 'normal' ? rolls[0] : finalRoll)
-                        : rolls.join(', ')
-                    }
+                  {isD20
+                      ? (mode === 'normal' ? safeRolls[0] || 0 : finalRoll)
+                      : safeRolls.join(', ')
+                  }
                 </span>
                 {(bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${bonus + modifier}` :
                  (bonus + modifier) < 0 ? ` ${bonus + modifier}` : ''}

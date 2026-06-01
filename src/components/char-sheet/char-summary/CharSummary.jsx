@@ -18,7 +18,8 @@ import { sanitizeHtml } from '../../../services/sanitize.js';
 import LongRestButton from '../LongRestButton.jsx'
 import ShortRestButton from '../ShortRestButton.jsx'
 import ShortRestModal from '../ShortRestModal.jsx'
-import storage from '../../../services/storage.js'
+import storage from '../../../services/storage.js';
+import { getActiveBuffs } from './buffService.js';
 import CharConditions from './CharConditions.jsx'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
@@ -77,20 +78,26 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         setShowXpModal(false);
     };
 
+    const activeBuffs = getActiveBuffs(playerStats.name, campaignName);
     let speed = playerStats.race.subrace && playerStats.race.subrace.speed ? playerStats.race.subrace.speed : playerStats.race.speed;
     if (playerStats.class.name === 'Monk') {
         const { classRules: cr } = rulesFactory.getRules(playerStats);
         if (typeof cr.getUnarmoredMovementIncrease === 'function') {
             speed += cr.getUnarmoredMovementIncrease(playerStats);
-        }
-    }
+         }
+     }
         if (playerStats.class.name === 'Barbarian') {
         const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
         const unarmoredMovement = classLevel?.class_specific?.unarmored_movement || 0;
         speed += unarmoredMovement;
-    }
+     }
     speed = Math.max(0, speed - (5 * exhaustionLevel));
     if (conditionEffects?.speedZero) speed = 0;
+
+    let flySpeed = null;
+    activeBuffs.forEach(buff => {
+        if (buff.effect === 'fly_speed_equals_walk_speed') flySpeed = speed;
+    });
 
     const exhaustionPenalty = 2 * exhaustionLevel;
     const effectiveInitiative = playerStats.initiative - exhaustionPenalty;
@@ -151,7 +158,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 <div>
                     <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{playerStats.armorClass}</div>
                     <CharHitPoints playerStats={playerStats} campaignName={campaignName}></CharHitPoints>
-                    <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{speed}</span> ft.<br />
+                      <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{speed}{flySpeed !== null ? `, fly ${flySpeed}` : ''}</span> ft.<br />
                     <CharGold playerStats={playerStats} campaignName={campaignName}></CharGold>
                 </div>
                 <div>

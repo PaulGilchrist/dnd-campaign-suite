@@ -117,6 +117,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     }
 
     const handleConditionsChange = () => setForceRefresh(utils.guid())
+    const handleBuffsChange = () => setForceRefresh(utils.guid())
 
     const exhaustionPenalty = 2 * exhaustionLevel;
 
@@ -155,7 +156,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                  conditionAttackMode={conditionAttackMode}
                  cannotAct={cannotAct}
                  mapName={activeMapName}
-               ></CharActions><hr />
+                 onBuffsChange={handleBuffsChange}
+                ></CharActions><hr />
               <CharReactions
                 playerStats={playerStats}
                 campaignName={campaignName}
