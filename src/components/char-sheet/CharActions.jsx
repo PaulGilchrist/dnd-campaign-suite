@@ -6,13 +6,14 @@ import { sanitizeHtml } from '../../services/sanitize.js';
 import { parseMagicItemName } from '../../services/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { buildFeatureDetailHtml, showWeaponMasteryPopup } from '../../hooks/useActionPopup.js'
-import { rollExpression, rollExpressionDoubled } from '../../services/diceRoller.js'
+import { rollExpression, rollExpressionDoubled } from '../../services/diceRoller.js';
 import { getTargetFromAttacker, getCombatContext, getResistanceNotice } from '../../services/damageUtils.js';
 import * as mapsService from '../../services/mapsService.js';
 import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem } from '../../services/rangeValidation.js';
 import { computeCover } from '../../services/coverService.js';
 import { computeFeatRangeEffects } from '../../services/featRangeService.js';
 import { loadNPCs } from '../../services/npcsService.js';
+import { hasAutomation } from '../../services/automationService.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';
 
@@ -197,7 +198,87 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
       }
     }, [cannotAct, mapName, buildAttackContextSync, buildAttackContext, rollAttack, exhaustionPenalty]);
 
-    // Helper function to get mastery for a weapon name
+    const handleAutomationAction = React.useCallback((action) => {
+        if (cannotAct) return;
+        const auto = action.automation;
+        if (!auto) return;
+
+        switch (auto.type) {
+            case 'save_attack': {
+                const damageResult = rollExpression(auto.damage);
+                if (damageResult && setPopupHtml) {
+                    const dcSuccess = auto.shape === 'cone' ? 0.5 : 0;
+                    setPopupHtml({
+                        type: 'save-prompt',
+                        name: action.name,
+                        formula: auto.damage,
+                        rolls: damageResult.rolls,
+                        modifier: damageResult.modifier,
+                        damageType: auto.damageType,
+                        saveDc: auto.saveDc,
+                        saveType: auto.saveType,
+                        dcSuccess,
+                        targetName: '',
+                        attackerName: playerStats.name,
+                        campaignName,
+                    });
+                }
+                break;
+            }
+            case 'healing':
+            case 'self_healing': {
+                const healAmount = auto.healAmount || auto.healExpression;
+                if (setPopupHtml) {
+                    setPopupHtml({
+                        type: 'healing',
+                        name: action.name,
+                        healAmount: typeof healAmount === 'number' ? healAmount : auto.healExpression,
+                        description: `${action.name}: Restores ${auto.healExpression} HP`,
+                    });
+                }
+                break;
+            }
+            case 'healing_pool': {
+                if (setPopupHtml) {
+                    setPopupHtml({
+                        type: 'healing_pool',
+                        name: action.name,
+                        pool: auto.pool,
+                        poolExpression: auto.poolExpression,
+                        description: `${action.name}: Pool of ${auto.pool} HP. Click to heal or cure.`,
+                        resourceKey: auto.resourceKey,
+                    });
+                }
+                break;
+            }
+            case 'extra_action':
+            case 'free_spell':
+            case 'bonus_attacks':
+            case 'bonus_action_attack':
+            case 'temp_buff':
+            case 'temp_hp_buff':
+            case 'damage_aura':
+            case 'combat_stance':
+            case 'initiative_action':
+            case 'resource_pool':
+            case 'attack_rider':
+            case 'spell_modifier':
+            case 'damage_bonus': {
+                if (setPopupHtml) {
+                    setPopupHtml({
+                        type: 'automation_info',
+                        name: action.name,
+                        automationType: auto.type,
+                        description: action.description || '',
+                        automation: auto,
+                    });
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    }, [cannotAct, setPopupHtml, playerStats.name, campaignName]);
     const getWeaponMastery = (weaponName) => {
         if (playerStats.rules !== '2024') {
         return null;
@@ -251,9 +332,20 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                         </Popup>
                                     )}
                 {playerStats.actions.map((action) => {
-                                        return <div key={action.name}>
-                          <b className={action.details ? "clickable" : ""} onClick={() => setPopupHtml(buildFeatureDetailHtml(action))}>{action.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }}></span>
-                     </div>
+                    const isClickable = action.details || hasAutomation(action);
+                    const handleClick = () => {
+                        if (hasAutomation(action)) {
+                            handleAutomationAction(action);
+                        } else {
+                            setPopupHtml(buildFeatureDetailHtml(action));
+                        }
+                    };
+                    return <div key={action.name}>
+                        <b className={isClickable ? "clickable" : ""} onClick={handleClick}>{action.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }}></span>
+                        {hasAutomation(action) && action.automation?.type === 'save_attack' && action.automation?.saveDc && <span className="automation-badge"> DC {action.automation.saveDc} {action.automation.saveType}</span>}
+                        {hasAutomation(action) && action.automation?.type === 'healing_pool' && <span className="automation-badge"> Pool: {action.automation.pool} HP</span>}
+                        {hasAutomation(action) && action.automation?.damage && <span className="automation-badge"> {action.automation.damage} {action.automation.damageType}</span>}
+                    </div>
                 })}
                 <div><b>Base Actions:</b> {actions.join(', ')}</div>
             </div>

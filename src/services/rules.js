@@ -16,6 +16,11 @@ import { getAttacks as getAttacks2024 } from './attackCalc2024.js';
 import { getSpellMaxLevel } from './shared/spell-utils.js';
 import { loadFeatData } from './dataLoader.js';
 import { computeAllFeatBuffs } from './featBuffService.js';
+import {
+    collectAutomationFromFeatures,
+    collectSaveModifiers,
+    getConditionImmunities,
+} from './automationService.js';
 
 /**
  * Determine which ruleset to use. Checks playerStats.rules first,
@@ -404,7 +409,17 @@ const rules = {
             playerStats.equipment = allEquipment;
          }
 
-          [playerStats.actions, playerStats.bonusActions, playerStats.reactions, playerStats.specialActions, playerStats.characterAdvancement] = rules.getActions(playerStats, playerSummary);
+           [playerStats.actions, playerStats.bonusActions, playerStats.reactions, playerStats.specialActions, playerStats.characterAdvancement] = rules.getActions(playerStats, playerSummary);
+
+        const allFeatures = [
+          ...(playerStats.actions || []),
+          ...(playerStats.bonusActions || []),
+          ...(playerStats.reactions || []),
+          ...(playerStats.specialActions || []),
+        ];
+        playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+        playerStats.saveModifiers = collectSaveModifiers(allFeatures);
+        playerStats.automationConditionImmunities = getConditionImmunities(allFeatures);
           [playerStats.languagesAllowed, playerStats.languages] = rules.getLanguages(playerStats, playerSummary);
           [playerStats.proficienciesAllowed, playerStats.proficiencies] = rules.getProficiencies(playerStats, false, playerSummary);
           [playerStats.skillProficienciesAllowed, playerStats.skillProficiencies] = rules.getProficiencies(playerStats, true, playerSummary);

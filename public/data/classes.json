@@ -37,7 +37,23 @@
                         "name": "Rage",
                         "level": 1,
                         "prerequisites": [],
-                        "description": "In battle, you fight with primal ferocity. On your turn, you can enter a rage as a bonus action. While raging, you gain the following benefits if you aren't wearing heavy armor:<br/><ul><li>You have advantage on Strength checks and Strength saving throws.</li> <li>When you make a melee weapon Attack using Strength, you gain a +2 bonus to the damage roll. This bonus increases as you level.</li> <li>You have Resistance to bludgeoning, piercing, and slashing damage.</li></ul>If you are able to cast Spells, you can't cast them or concentrate on them while raging. Your rage lasts for 1 minute. It ends early if you are knocked Unconscious or if Your Turn ends and you haven't attacked a hostile creature since your last turn or taken damage since then. You can also end your rage on Your Turn as a Bonus Action.<br/>Once you have raged the maximum number of times for your barbarian level, you must finish a Long Rest before you can rage again. You may rage 2 times at 1st level, 3 at 3rd, 4 at 6th, 5 at 12th, and 6 at 17th.<br/>"
+                        "description": "In battle, you fight with primal ferocity. On your turn, you can enter a rage as a bonus action. While raging, you gain the following benefits if you aren't wearing heavy armor:<br/><ul><li>You have advantage on Strength checks and Strength saving throws.</li> <li>When you make a melee weapon Attack using Strength, you gain a +2 bonus to the damage roll. This bonus increases as you level.</li> <li>You have Resistance to bludgeoning, piercing, and slashing damage.</li></ul>If you are able to cast Spells, you can't cast them or concentrate on them while raging. Your rage lasts for 1 minute. It ends early if you are knocked Unconscious or if Your Turn ends and you haven't attacked a hostile creature since your last turn or taken damage since then. You can also end your rage on Your Turn as a Bonus Action.<br/>Once you have raged the maximum number of times for your barbarian level, you must finish a Long Rest before you can rage again. You may rage 2 times at 1st level, 3 at 3rd, 4 at 6th, 5 at 12th, and 6 at 17th.<br/>",
+                        "automation": {
+                            "type": "combat_stance",
+                            "damageBonusExpression": "rage_damage",
+                            "resistanceTypes": [
+                                "Bludgeoning",
+                                "Piercing",
+                                "Slashing"
+                            ],
+                            "advantages": [
+                                "STR checks",
+                                "STR saves"
+                            ],
+                            "duration": "1_minute",
+                            "maxRages": "class_level_scaling",
+                            "recharge": "long_rest"
+                        }
                     },
                     {
                         "name": "Unarmored Defense",
@@ -62,13 +78,26 @@
                         "name": "Danger Sense",
                         "level": 2,
                         "prerequisites": [],
-                        "description": "You gain an uncanny sense of when things nearby aren't as they should be, giving you an edge when you dodge away from danger. You have advantage on Dexterity saving throws against effects that you can see, such as traps and spells. To gain this benefit, you can't be blinded, deafened, or incapacitated."
+                        "description": "You gain an uncanny sense of when things nearby aren't as they should be, giving you an edge when you dodge away from danger. You have advantage on Dexterity saving throws against effects that you can see, such as traps and spells. To gain this benefit, you can't be blinded, deafened, or incapacitated.",
+                        "automation": {
+                            "type": "conditional_advantage",
+                            "target": "saving_throw",
+                            "saveType": "DEX",
+                            "condition": "visible_effect",
+                            "effect": "advantage"
+                        }
                     },
                     {
                         "name": "Reckless Attack",
                         "level": 2,
                         "prerequisites": [],
-                        "description": "You can throw aside all concern for defense to attack with fierce desperation. When you make your first attack on your turn, you can decide to attack recklessly. Doing so gives you advantage on melee weapon attack rolls using Strength during this turn, but attack rolls against you have advantage until your next turn."
+                        "description": "You can throw aside all concern for defense to attack with fierce desperation. When you make your first attack on your turn, you can decide to attack recklessly. Doing so gives you advantage on melee weapon attack rolls using Strength during this turn, but attack rolls against you have advantage until your next turn.",
+                        "automation": {
+                            "type": "temp_buff",
+                            "effect": "advantage_attacks_disadvantage_against",
+                            "duration": "until_next_turn",
+                            "trigger": "first_attack_of_turn"
+                        }
                     }
                 ],
                 "class_specific": {
@@ -479,7 +508,11 @@
                                 "name": "Totemic Attunement",
                                 "level": 14,
                                 "prerequisites": [],
-                                "description": "You gain a magical benefit based on a totem animal of your choice. You can choose the same animal you selected previously or a different one.<br/><ul><li><b>Bear</b>. While you're raging, any creature within 5 feet of you that's hostile to you has disadvantage on attack rolls against targets other than you or another character with this feature. An enemy is immune to this effect if it can't see or hear you or if it can't be frightened.</li><li><b>Eagle</b>. While raging, you have a flying speed equal to your current walking speed. This benefit works only in short bursts; you fall if you end your turn in the air and nothing else is holding you aloft.</li><li><b>Wolf</b>. While you're raging, you can use a bonus action on your turn to knock a large or smaller creature prone when you hit it with melee weapon attack.</li></ul>"
+                                "description": "You gain a magical benefit based on a totem animal of your choice. You can choose the same animal you selected previously or a different one.<br/><ul><li><b>Bear</b>. While you're raging, any creature within 5 feet of you that's hostile to you has disadvantage on attack rolls against targets other than you or another character with this feature. An enemy is immune to this effect if it can't see or hear you or if it can't be frightened.</li><li><b>Eagle</b>. While raging, you have a flying speed equal to your current walking speed. This benefit works only in short bursts; you fall if you end your turn in the air and nothing else is holding you aloft.</li><li><b>Wolf</b>. While you're raging, you can use a bonus action on your turn to knock a large or smaller creature prone when you hit it with melee weapon attack.</li></ul>",
+                                "automation": {
+                                    "type": "sub_options",
+                                    "parent": "Totem Warrior"
+                                }
                             }
                         ]
                     }
@@ -559,7 +592,15 @@
                         "name": "Bardic Inspiration",
                         "level": 1,
                         "prerequisites": [],
-                        "description": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d6. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.<br/><br/>You can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest."
+                        "description": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d6. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.<br/><br/>You can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest.",
+                        "automation": {
+                            "type": "buff_ally",
+                            "buffExpression": "bardic_inspiration_die",
+                            "range": "60_ft",
+                            "action": "bonus_action",
+                            "uses_expression": "CHA modifier",
+                            "recharge": "long_rest"
+                        }
                     },
                     {
                         "name": "Spellcasting",
@@ -605,7 +646,13 @@
                         "name": "Song of Rest",
                         "level": 2,
                         "prerequisites": [],
-                        "description": "You can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d6 hit points."
+                        "description": "You can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d6 hit points.",
+                        "automation": {
+                            "type": "healing_bonus",
+                            "healExpression": "song_of_rest_die",
+                            "trigger": "short_rest",
+                            "target": "allies"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -737,7 +784,15 @@
                         "name": "Bardic Inspiration",
                         "level": 5,
                         "prerequisites": [],
-                        "description": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d8. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.<br/><br/>You can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest."
+                        "description": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d8. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.<br/><br/>You can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest.",
+                        "automation": {
+                            "type": "buff_ally",
+                            "buffExpression": "bardic_inspiration_die",
+                            "range": "60_ft",
+                            "action": "bonus_action",
+                            "uses_expression": "CHA modifier",
+                            "recharge": "long_rest"
+                        }
                     },
                     {
                         "name": "Font of Inspiration",
@@ -865,7 +920,13 @@
                         "name": "Song of Rest",
                         "level": 9,
                         "prerequisites": [],
-                        "description": "You can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d8 hit points."
+                        "description": "You can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d8 hit points.",
+                        "automation": {
+                            "type": "healing_bonus",
+                            "healExpression": "song_of_rest_die",
+                            "trigger": "short_rest",
+                            "target": "allies"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -899,7 +960,15 @@
                         "name": "Bardic Inspiration",
                         "level": 10,
                         "prerequisites": [],
-                        "description": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d10. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.<br/><br/>You can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest."
+                        "description": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d10. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.<br/><br/>You can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest.",
+                        "automation": {
+                            "type": "buff_ally",
+                            "buffExpression": "bardic_inspiration_die",
+                            "range": "60_ft",
+                            "action": "bonus_action",
+                            "uses_expression": "CHA modifier",
+                            "recharge": "long_rest"
+                        }
                     },
                     {
                         "name": "Expertise",
@@ -1029,7 +1098,13 @@
                         "name": "Song of Rest",
                         "level": 13,
                         "prerequisites": [],
-                        "description": "You can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d10 hit points."
+                        "description": "You can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d10 hit points.",
+                        "automation": {
+                            "type": "healing_bonus",
+                            "healExpression": "song_of_rest_die",
+                            "trigger": "short_rest",
+                            "target": "allies"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -1097,7 +1172,15 @@
                         "name": "Bardic Inspiration",
                         "level": 15,
                         "prerequisites": [],
-                        "description": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d12. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.<br/><br/>You can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest."
+                        "description": "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d12. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.<br/><br/>You can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest.",
+                        "automation": {
+                            "type": "buff_ally",
+                            "buffExpression": "bardic_inspiration_die",
+                            "range": "60_ft",
+                            "action": "bonus_action",
+                            "uses_expression": "CHA modifier",
+                            "recharge": "long_rest"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -1158,7 +1241,13 @@
                         "name": "Song of Rest",
                         "level": 17,
                         "prerequisites": [],
-                        "description": "You can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d12 hit points."
+                        "description": "You can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d12 hit points.",
+                        "automation": {
+                            "type": "healing_bonus",
+                            "healExpression": "song_of_rest_die",
+                            "trigger": "short_rest",
+                            "target": "allies"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -1299,7 +1388,13 @@
                                 "name": "Cutting Words",
                                 "level": 3,
                                 "prerequisites": [],
-                                "description": "You learn how to use your wit to distract, confuse, and otherwise sap the confidence and competence of others.  When a creature that you can see within 60 feet of you makes an attack roll, an ability check, or a damage roll, you can use your reaction to expend one of your uses of Bardic Inspiration, rolling a Bardic Inspiration die and subtracting the number rolled from the creature's roll. You can choose to use this feature after the creature makes its roll, but before the GM determines whether the attack roll or ability check succeeds or fails, or before the creature deals its damage. The creature is immune if it can't hear you or if it's immune to being charmed."
+                                "description": "You learn how to use your wit to distract, confuse, and otherwise sap the confidence and competence of others.  When a creature that you can see within 60 feet of you makes an attack roll, an ability check, or a damage roll, you can use your reaction to expend one of your uses of Bardic Inspiration, rolling a Bardic Inspiration die and subtracting the number rolled from the creature's roll. You can choose to use this feature after the creature makes its roll, but before the GM determines whether the attack roll or ability check succeeds or fails, or before the creature deals its damage. The creature is immune if it can't hear you or if it's immune to being charmed.",
+                                "automation": {
+                                    "type": "reaction_debuff",
+                                    "trigger": "creature_makes_roll",
+                                    "debuffExpression": "bardic_inspiration_die",
+                                    "range": "60_ft"
+                                }
                             }
                         ],
                         "subclass_specific": {
@@ -1357,7 +1452,16 @@
                                 "name": "Combat Inspiration",
                                 "level": 3,
                                 "prerequisites": [],
-                                "description": "You learn to inspire others in battle. A creature that has a Bardic Inspiration die from you can roll that die and add the number rolled to a weapon damage roll it just made. Alternatively, when an attack roll is made against the creature, it can use its reaction to roll the Bardic Inspiration die and add the number rolled to its AC against that attack, after seeing the roll but before knowing whether it hits or misses."
+                                "description": "You learn to inspire others in battle. A creature that has a Bardic Inspiration die from you can roll that die and add the number rolled to a weapon damage roll it just made. Alternatively, when an attack roll is made against the creature, it can use its reaction to roll the Bardic Inspiration die and add the number rolled to its AC against that attack, after seeing the roll but before knowing whether it hits or misses.",
+                                "automation": {
+                                    "type": "enhanced_buff_ally",
+                                    "buffExpression": "bardic_inspiration_die",
+                                    "extra_effects": [
+                                        "damage_bonus",
+                                        "ac_bonus"
+                                    ],
+                                    "range": "60_ft"
+                                }
                             }
                         ]
                     },
@@ -3406,7 +3510,7 @@
                     "Heavy Armor",
                     "Martial Weapons"
                 ],
-                "description": "War has many manifestations. It can make heroes of ordinary people. It can be desperate and horrific, with acts of cruelty and cowardice eclipsing instances of excellence and courage. In either case, the gods of war watch over warriors and reward them for their great deeds. The clerics of such gods excel in battle, inspiring others to fight the good fight or offering acts of violence asprayers.Godsofwarincludechampionsofhonor and chivalry (such as Torm, Heironeous, and Kiri\u00ad Jolith) as well as gods of destruction and pillage (such as Erythnul, the Fury, Gruumsh, and Ares) and gods of conquest and domination (such as Bane, Hextor, and Maglubiyet). Other war gods (such as Tempus, Nike, and Nuada) take a more neutral stance, promoting war in all its manifestations and supporting warriors in any circumstance."
+                "description": "War has many manifestations. It can make heroes of ordinary people. It can be desperate and horrific, with acts of cruelty and cowardice eclipsing instances of excellence and courage. In either case, the gods of war watch over warriors and reward them for their great deeds. The clerics of such gods excel in battle, inspiring others to fight the good fight or offering acts of violence asprayers.Godsofwarincludechampionsofhonor and chivalry (such as Torm, Heironeous, and Kiri­ Jolith) as well as gods of destruction and pillage (such as Erythnul, the Fury, Gruumsh, and Ares) and gods of conquest and domination (such as Bane, Hextor, and Maglubiyet). Other war gods (such as Tempus, Nike, and Nuada) take a more neutral stance, promoting war in all its manifestations and supporting warriors in any circumstance."
             }
         ],
         "book": "Player's Handbook",
@@ -5205,7 +5309,14 @@
                         "name": "Second Wind",
                         "level": 1,
                         "prerequisites": [],
-                        "description": "You have a limited well of stamina that you can draw on to protect yourself from harm. On your turn, you can use a bonus action to regain hit points equal to 1d10 + your fighter level. Once you use this feature, you must finish a short or long rest before you can use it again."
+                        "description": "You have a limited well of stamina that you can draw on to protect yourself from harm. On your turn, you can use a bonus action to regain hit points equal to 1d10 + your fighter level. Once you use this feature, you must finish a short or long rest before you can use it again.",
+                        "automation": {
+                            "type": "self_healing",
+                            "healExpression": "1d10 + fighter level",
+                            "action": "bonus_action",
+                            "uses": 1,
+                            "recharge": "short_rest"
+                        }
                     }
                 ],
                 "class_specific": {
@@ -5228,7 +5339,18 @@
                         "name": "Action Surge",
                         "level": 2,
                         "prerequisites": [],
-                        "description": "You can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action on top of your regular action and a possible bonus action. Once you use this feature, you must finish a short or long rest before you can use it again."
+                        "description": "You can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action on top of your regular action and a possible bonus action. Once you use this feature, you must finish a short or long rest before you can use it again.",
+                        "automation": {
+                            "type": "extra_action",
+                            "uses": 1,
+                            "recharge": "short_rest",
+                            "scaling": [
+                                {
+                                    "level": 17,
+                                    "uses": 2
+                                }
+                            ]
+                        }
                     }
                 ],
                 "class_specific": {
@@ -5435,7 +5557,18 @@
                         "name": "Action Surge",
                         "level": 17,
                         "prerequisites": [],
-                        "description": "You can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action on top of your regular action and a possible bonus action. You can use this twice before a short or long rest, but only once on the same turn."
+                        "description": "You can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action on top of your regular action and a possible bonus action. You can use this twice before a short or long rest, but only once on the same turn.",
+                        "automation": {
+                            "type": "extra_action",
+                            "uses": 1,
+                            "recharge": "short_rest",
+                            "scaling": [
+                                {
+                                    "level": 17,
+                                    "uses": 2
+                                }
+                            ]
+                        }
                     },
                     {
                         "name": "Indomitable",
@@ -5505,7 +5638,12 @@
                                 "name": "Improved Critical",
                                 "level": 3,
                                 "prerequisites": [],
-                                "description": "Your weapon attacks score a critical hit on a roll of 19 or 20."
+                                "description": "Your weapon attacks score a critical hit on a roll of 19 or 20.",
+                                "automation": {
+                                    "type": "passive_rule",
+                                    "effect": "critical_range",
+                                    "criticalRange": "19-20"
+                                }
                             }
                         ]
                     },
@@ -5551,7 +5689,12 @@
                                 "name": "Superior Critical",
                                 "level": 15,
                                 "prerequisites": [],
-                                "description": "Your weapon attacks score a critical hit on a roll of 18-20."
+                                "description": "Your weapon attacks score a critical hit on a roll of 18-20.",
+                                "automation": {
+                                    "type": "passive_rule",
+                                    "effect": "critical_range",
+                                    "criticalRange": "18-20"
+                                }
                             }
                         ]
                     },
@@ -6016,7 +6159,17 @@
                         "name": "Flurry of Blows",
                         "level": 2,
                         "prerequisites": [],
-                        "description": "Immediately after you take the Attack action on your turn, you can spend 1 ki point to make two unarmed strikes as a bonus action."
+                        "description": "Immediately after you take the Attack action on your turn, you can spend 1 ki point to make two unarmed strikes as a bonus action.",
+                        "automation": {
+                            "type": "bonus_attacks",
+                            "attacks": 2,
+                            "attackType": "unarmed_strike",
+                            "cost": {
+                                "resource": "ki_points",
+                                "amount": 1
+                            },
+                            "trigger": "after_attack_action"
+                        }
                     },
                     {
                         "name": "Ki",
@@ -6061,7 +6214,19 @@
                         "name": "Deflect Missiles",
                         "level": 3,
                         "prerequisites": [],
-                        "description": "You can use your reaction to deflect or catch the missile when you are hit by a ranged weapon attack. When you do so, the damage you take from the attack is reduced by 1d10 + your Dexterity modifier + your monk level. If you reduce the damage to 0, you can catch the missile if it is small enough for you to hold in one hand and you have at least one hand free. If you catch a missile in this way, you can spend 1 ki point to make a ranged attack with the weapon or piece of ammunition you just caught, as part of the same reaction. You make this attack with proficiency, regardless of your weapon proficiencies, and the missile counts as a monk weapon for the attack, which has a normal range of 20 feet and a long range of 60 feet."
+                        "description": "You can use your reaction to deflect or catch the missile when you are hit by a ranged weapon attack. When you do so, the damage you take from the attack is reduced by 1d10 + your Dexterity modifier + your monk level. If you reduce the damage to 0, you can catch the missile if it is small enough for you to hold in one hand and you have at least one hand free. If you catch a missile in this way, you can spend 1 ki point to make a ranged attack with the weapon or piece of ammunition you just caught, as part of the same reaction. You make this attack with proficiency, regardless of your weapon proficiencies, and the missile counts as a monk weapon for the attack, which has a normal range of 20 feet and a long range of 60 feet.",
+                        "automation": {
+                            "type": "damage_reduction",
+                            "reductionExpression": "1d10 + DEX modifier + monk level",
+                            "trigger": "ranged_weapon_attack_hit",
+                            "redirect": true,
+                            "redirectCost": {
+                                "resource": "ki_points",
+                                "amount": 1
+                            },
+                            "redirectDamage": "2 * martial_arts_die + DEX modifier",
+                            "redirectSave": "DEX"
+                        }
                     },
                     {
                         "name": "Monastic Tradition",
@@ -6088,7 +6253,13 @@
                         "name": "Slow Fall",
                         "level": 4,
                         "prerequisites": [],
-                        "description": "You can use your reaction when you fall to reduce any falling damage you take by an amount equal to five times your monk level."
+                        "description": "You can use your reaction when you fall to reduce any falling damage you take by an amount equal to five times your monk level.",
+                        "automation": {
+                            "type": "damage_reduction",
+                            "reductionExpression": "5 * monk level",
+                            "trigger": "falling",
+                            "reaction": true
+                        }
                     }
                 ],
                 "class_specific": {
@@ -6115,7 +6286,20 @@
                         "name": "Stunning Strike",
                         "level": 5,
                         "prerequisites": [],
-                        "description": "You can interfere with the flow of ki in an opponent's body. When you hit another creature with a melee weapon attack, you can spend 1 ki point to attempt a stunning strike. The target must succeed on a Constitution saving throw or be stunned until the end of your next turn."
+                        "description": "You can interfere with the flow of ki in an opponent's body. When you hit another creature with a melee weapon attack, you can spend 1 ki point to attempt a stunning strike. The target must succeed on a Constitution saving throw or be stunned until the end of your next turn.",
+                        "automation": {
+                            "type": "save_attack",
+                            "trigger": "melee_weapon_hit",
+                            "cost": {
+                                "resource": "ki_points",
+                                "amount": 1
+                            },
+                            "saveType": "CON",
+                            "saveDc": "ability",
+                            "conditionInflicted": "stunned",
+                            "duration": "until_end_of_next_turn",
+                            "oncePerTurn": true
+                        }
                     }
                 ],
                 "class_specific": {
@@ -6421,7 +6605,18 @@
                                 "name": "Open Hand Technique",
                                 "level": 3,
                                 "prerequisites": [],
-                                "description": "You can manipulate your enemy's ki when you harness your own. Whenever you hit a creature with one of the attacks granted by your Flurry of Blows, you can impose one of the following effects on that target:<ul><li>It must succeed on a Dexterity saving throw or be knocked prone.</li><li>It must make a Strength saving throw. If it fails, you can push it up to 15 feet away from you.</li><li>It can't take reactions until the end of your next turn.</li></ul>"
+                                "description": "You can manipulate your enemy's ki when you harness your own. Whenever you hit a creature with one of the attacks granted by your Flurry of Blows, you can impose one of the following effects on that target:<ul><li>It must succeed on a Dexterity saving throw or be knocked prone.</li><li>It must make a Strength saving throw. If it fails, you can push it up to 15 feet away from you.</li><li>It can't take reactions until the end of your next turn.</li></ul>",
+                                "automation": {
+                                    "type": "flurry_effect",
+                                    "options": [
+                                        "prone",
+                                        "push_15ft",
+                                        "no_reactions"
+                                    ],
+                                    "saveType": "varies",
+                                    "saveDc": "ability",
+                                    "trigger": "flurry_of_blows_hit"
+                                }
                             }
                         ]
                     },
@@ -6520,7 +6715,7 @@
                                 "name": "Disciple of the Elements",
                                 "level": 3,
                                 "prerequisites": [],
-                                "description": "You learn magical disciplines that harness the power of the four elements. A discipline requires you to spend ki points each time you use it.<br/><br/> You know the Elemental Attunement discipline and one other elemental discipline of your choice, which are detailed in the &quot;Elemental Disciplines&quot; section below. You learn one additional elemental discipline of your choice at 6th, 11th, and 17th level.<br/><br/> Whenever you learn a new elemental discipline, you can also replace one elemental discipline that you already know with a different discipline.<br/><br/> Casting Elemental Spells. Some elemental disciplines allow you to cast spells. See chapter 10 for the general rules of spellcasting. To cast one of these spells, you use its casting time and other rules, but you don't need to provide material components for it.<br/><br/> Once you reach 5th level in this class, you can spend additional ki points to increase the level of an elemental discipline spell that you cast, provided that the spell has an enhanced effect at a higher level, as burning hands does. The spell's level increases by 1 for each additional ki point you spend. For example, if you are a 5th-level monk and use Sweeping Cinder Strike to cast burning hands, you can spend 3 ki points to cast it as a 2nd-level spell (the discipline's base cost of 2 ki points plus 1).<br/><br/> The maximum number of ki points you can spend to cast a spell in this way (including its base ki point cost and any additional ki points you spend to increase its level) is determined by your monk level, as shown in the Spells and Ki Points table.<br/><br/> <b>Spells and KI Points</b><br/> <table class='table table-condensed table-striped table-hover'><thead><tr><th>Monk Levels</th><th>Maximum Ki Points for a Spell</th></tr></thead><tbody> <tr><td>5th-8th</td><td>3</td></tr> <tr><td>9th-12th</td><td>4</td></tr> <tr><td>13th-16th</td><td>5</td></tr> <tr><td>17th-20th</td><td>6</td></tr> </tbody></table> <br/> <b>Elemental Disciplines</b><br/> <ul> <li><b>Breath of Winter (17th Level Required)</b>: You can spend 6 ki points to cast cone of cold.</li> <li><b>Clench of the North Wind (6th Level Required)</b>: You can spend 3 ki points to cast hold person.</li> <li> <b>Elemental Attunement</b>: You can use your action to briefly control elemental forces within 30 feet of you, causing one of the following effects of your choice: <ul> <li>Create a harmless, instantaneous sensory effect related to air, earth, fire, or water, such as a shower of sparks, a puff of wind, a spray of light mist, or a gentle rumbling of stone.</li> <li>Instantaneously light or snuff out a candle, a torch, or a small campfire.</li> <li>Chill or warm up to 1 pound of nonliving material for up to 1 hour.</li> <li>Cause earth, fire, water, or mist that can fit within a I-foot cube to shape itself into a crude form you desig\u00ad nate for 1 minute.</li> </ul> </li> <li><b>Eternal Mountain Defense (17th Level Required)</b>: You can spend 5 ki points to cast stoneskin, target\u00ad ing yourself.</li> <li><b>Fangs of the Fire Snake</b>: When you use the Attack action on your turn, you can spend 1 ki point to cause tendrils of flame to stretch out from your fists and feet. Your reach with your unarmed strikes increases by 10 feet for that action, as well as the rest of the turn. A hit with such an attack deals fire damage instead of bludgeoning damage, and if you spend 1 ki point when the attack hits, it also deals an extra ldlO fire damage.</li> <li><b>Fist ofFour Thunders</b>: You can spend 2 ki points to cast thunderwave.</li> <li><b>Fist of Unbroken Air</b>: You can create a blast of compressed air that strikes like a mighty fist. As an action, you can spend 2 ki points and choose a creature within 30 feet of you. That creature must make a Strength saving throw. On a failed save, the creature takes 3d10 bludgeoning damage, plus an extra ldlO bludgeoning damage for each additional ki point you spend, and you can push the creature up to 20 feet away from you and knock it prone. On a successful save, the creature takes half as much damage, and you don't push it or knock it prone.</li> <li><b>Flames ofthe Phoenix (11th Level Required)</b>: You can spend 4 ki points to cast fireball.</li> <li><b>Gong ofthe Summit (6th Level Required)</b>: You can spend 3 ki points to cast shatter.</li> <li><b>Mist Stance (11th Level Required)</b>: You can spend 4 ki points to cast gaseous form, targeting yourself.</li> <li><b>Ride the Wind (11th Level Required)</b>: You can spend 4 ki points to cast fly, targeting yourself.</li> <li><b>River of Hungry Flame (17th Level Required)</b>: You can spend 5 ki points to cast wall of fire.</li> <li><b>Rush of the Gale Spirits</b>: You can spend 2 ki points to cast gust of wind.</li> <li><b>Shape the Flowing River</b>: As an action, you can spend 1 ki point to choose an area of ice or water no larger than 30 feet on a side within 120 feet of you. You can change water to ice within the area and vice versa, and you can reshape ice in the area in any manner you choose. You can raise or lower the ice's elevation, create or fill in a trench, erect or flatten a wall, or form a pillar. The extent of any such changes can't exceed half the area's largest dimension. For example, ifyou affect a 30-foot square, you can create a pillar up to 15 feet high, raise or lower the square's elevation by up to 1 5 feet, dig a trench up to 15 feet deep, and so on. You can't shape the ice to trap or damage a creature in the area.</li> <li><b>Sweeping Cinder Strike</b>: You can spend 2 ki points to cast burning hands.</li> <li><b>Water Whip</b>: You can spend 2 ki points as an action to create a whip of water that shoves and pulls a creature to unbalance it. A creature that you can see that is within 30 feet of you must make a Dexterity saving throw. On a failed save, the creature takes 3d10 bludgeoning damage, plus an extra ldlO bludgeoning damage for each additional ki point you spend, and you can either knock it prone or pull it up to 25 feet closer to you. On a successful save, the creature takes half as much damage, and you don't pull it or knock it prone.</li> <li><b>Wave of Rolling Earth (17th Level Required)</b>: You can spend 6 ki points to cast wall ofstone.</li> </ul>"
+                                "description": "You learn magical disciplines that harness the power of the four elements. A discipline requires you to spend ki points each time you use it.<br/><br/> You know the Elemental Attunement discipline and one other elemental discipline of your choice, which are detailed in the &quot;Elemental Disciplines&quot; section below. You learn one additional elemental discipline of your choice at 6th, 11th, and 17th level.<br/><br/> Whenever you learn a new elemental discipline, you can also replace one elemental discipline that you already know with a different discipline.<br/><br/> Casting Elemental Spells. Some elemental disciplines allow you to cast spells. See chapter 10 for the general rules of spellcasting. To cast one of these spells, you use its casting time and other rules, but you don't need to provide material components for it.<br/><br/> Once you reach 5th level in this class, you can spend additional ki points to increase the level of an elemental discipline spell that you cast, provided that the spell has an enhanced effect at a higher level, as burning hands does. The spell's level increases by 1 for each additional ki point you spend. For example, if you are a 5th-level monk and use Sweeping Cinder Strike to cast burning hands, you can spend 3 ki points to cast it as a 2nd-level spell (the discipline's base cost of 2 ki points plus 1).<br/><br/> The maximum number of ki points you can spend to cast a spell in this way (including its base ki point cost and any additional ki points you spend to increase its level) is determined by your monk level, as shown in the Spells and Ki Points table.<br/><br/> <b>Spells and KI Points</b><br/> <table class='table table-condensed table-striped table-hover'><thead><tr><th>Monk Levels</th><th>Maximum Ki Points for a Spell</th></tr></thead><tbody> <tr><td>5th-8th</td><td>3</td></tr> <tr><td>9th-12th</td><td>4</td></tr> <tr><td>13th-16th</td><td>5</td></tr> <tr><td>17th-20th</td><td>6</td></tr> </tbody></table> <br/> <b>Elemental Disciplines</b><br/> <ul> <li><b>Breath of Winter (17th Level Required)</b>: You can spend 6 ki points to cast cone of cold.</li> <li><b>Clench of the North Wind (6th Level Required)</b>: You can spend 3 ki points to cast hold person.</li> <li> <b>Elemental Attunement</b>: You can use your action to briefly control elemental forces within 30 feet of you, causing one of the following effects of your choice: <ul> <li>Create a harmless, instantaneous sensory effect related to air, earth, fire, or water, such as a shower of sparks, a puff of wind, a spray of light mist, or a gentle rumbling of stone.</li> <li>Instantaneously light or snuff out a candle, a torch, or a small campfire.</li> <li>Chill or warm up to 1 pound of nonliving material for up to 1 hour.</li> <li>Cause earth, fire, water, or mist that can fit within a I-foot cube to shape itself into a crude form you desig­ nate for 1 minute.</li> </ul> </li> <li><b>Eternal Mountain Defense (17th Level Required)</b>: You can spend 5 ki points to cast stoneskin, target­ ing yourself.</li> <li><b>Fangs of the Fire Snake</b>: When you use the Attack action on your turn, you can spend 1 ki point to cause tendrils of flame to stretch out from your fists and feet. Your reach with your unarmed strikes increases by 10 feet for that action, as well as the rest of the turn. A hit with such an attack deals fire damage instead of bludgeoning damage, and if you spend 1 ki point when the attack hits, it also deals an extra ldlO fire damage.</li> <li><b>Fist ofFour Thunders</b>: You can spend 2 ki points to cast thunderwave.</li> <li><b>Fist of Unbroken Air</b>: You can create a blast of compressed air that strikes like a mighty fist. As an action, you can spend 2 ki points and choose a creature within 30 feet of you. That creature must make a Strength saving throw. On a failed save, the creature takes 3d10 bludgeoning damage, plus an extra ldlO bludgeoning damage for each additional ki point you spend, and you can push the creature up to 20 feet away from you and knock it prone. On a successful save, the creature takes half as much damage, and you don't push it or knock it prone.</li> <li><b>Flames ofthe Phoenix (11th Level Required)</b>: You can spend 4 ki points to cast fireball.</li> <li><b>Gong ofthe Summit (6th Level Required)</b>: You can spend 3 ki points to cast shatter.</li> <li><b>Mist Stance (11th Level Required)</b>: You can spend 4 ki points to cast gaseous form, targeting yourself.</li> <li><b>Ride the Wind (11th Level Required)</b>: You can spend 4 ki points to cast fly, targeting yourself.</li> <li><b>River of Hungry Flame (17th Level Required)</b>: You can spend 5 ki points to cast wall of fire.</li> <li><b>Rush of the Gale Spirits</b>: You can spend 2 ki points to cast gust of wind.</li> <li><b>Shape the Flowing River</b>: As an action, you can spend 1 ki point to choose an area of ice or water no larger than 30 feet on a side within 120 feet of you. You can change water to ice within the area and vice versa, and you can reshape ice in the area in any manner you choose. You can raise or lower the ice's elevation, create or fill in a trench, erect or flatten a wall, or form a pillar. The extent of any such changes can't exceed half the area's largest dimension. For example, ifyou affect a 30-foot square, you can create a pillar up to 15 feet high, raise or lower the square's elevation by up to 1 5 feet, dig a trench up to 15 feet deep, and so on. You can't shape the ice to trap or damage a creature in the area.</li> <li><b>Sweeping Cinder Strike</b>: You can spend 2 ki points to cast burning hands.</li> <li><b>Water Whip</b>: You can spend 2 ki points as an action to create a whip of water that shoves and pulls a creature to unbalance it. A creature that you can see that is within 30 feet of you must make a Dexterity saving throw. On a failed save, the creature takes 3d10 bludgeoning damage, plus an extra ldlO bludgeoning damage for each additional ki point you spend, and you can either knock it prone or pull it up to 25 feet closer to you. On a successful save, the creature takes half as much damage, and you don't pull it or knock it prone.</li> <li><b>Wave of Rolling Earth (17th Level Required)</b>: You can spend 6 ki points to cast wall ofstone.</li> </ul>"
                             }
                         ]
                     }
@@ -6577,7 +6772,18 @@
                         "name": "Lay on Hands",
                         "level": 1,
                         "prerequisites": [],
-                        "description": "Your blessed touch can heal wounds. You have a pool of healing power that replenishes when you take a long rest. With that pool, you can restore a total number of hit points equal to your paladin level x 5. As an action, you can touch a creature and draw power from the pool to restore a number of hit points to that creature, up to the maximum amount remaining in your pool. Alternatively, you can expend 5 hit points from your pool of healing to cure the target of one disease or neutralize one poison affecting it. You can cure multiple diseases and neutralize multiple poisons with a single use of Lay on Hands, expending hit points separately for each one. This feature has no effect on undead and constructs."
+                        "description": "Your blessed touch can heal wounds. You have a pool of healing power that replenishes when you take a long rest. With that pool, you can restore a total number of hit points equal to your paladin level x 5. As an action, you can touch a creature and draw power from the pool to restore a number of hit points to that creature, up to the maximum amount remaining in your pool. Alternatively, you can expend 5 hit points from your pool of healing to cure the target of one disease or neutralize one poison affecting it. You can cure multiple diseases and neutralize multiple poisons with a single use of Lay on Hands, expending hit points separately for each one. This feature has no effect on undead and constructs.",
+                        "automation": {
+                            "type": "healing_pool",
+                            "poolExpression": "5 * paladin level",
+                            "action": "action",
+                            "recharge": "long_rest",
+                            "alsoCures": [
+                                "disease",
+                                "poison"
+                            ],
+                            "cureCost": 5
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -6601,7 +6807,15 @@
                         "name": "Divine Smite",
                         "level": 2,
                         "prerequisites": [],
-                        "description": "When you hit a creature with a melee weapon attack, you can expend one spell slot to deal radiant damage to the target, in addition to the weapon's damage. The extra damage is 2d8 for a 1st-level spell slot, plus 1d8 for each spell level higher than 1st, to a maximum of 5d8. The damage increases by 1d8 if the target is an undead or a fiend."
+                        "description": "When you hit a creature with a melee weapon attack, you can expend one spell slot to deal radiant damage to the target, in addition to the weapon's damage. The extra damage is 2d8 for a 1st-level spell slot, plus 1d8 for each spell level higher than 1st, to a maximum of 5d8. The damage increases by 1d8 if the target is an undead or a fiend.",
+                        "automation": {
+                            "type": "damage_bonus",
+                            "trigger": "melee_weapon_hit",
+                            "damageExpression": "2d8 + (spell_slot_level - 1)d8",
+                            "maxDamage": "5d8",
+                            "extraVsUndeadFiend": "1d8",
+                            "resourceType": "spell_slot"
+                        }
                     },
                     {
                         "name": "Fighting Style",
@@ -6737,7 +6951,14 @@
                         "name": "Aura of Protection",
                         "level": 6,
                         "prerequisites": [],
-                        "description": "Whenever you or a friendly creature within 10 feet of you must make a saving throw, the creature gains a bonus to the saving throw equal to your Charisma modifier (with a minimum bonus of +1). You must be conscious to grant this bonus."
+                        "description": "Whenever you or a friendly creature within 10 feet of you must make a saving throw, the creature gains a bonus to the saving throw equal to your Charisma modifier (with a minimum bonus of +1). You must be conscious to grant this bonus.",
+                        "automation": {
+                            "type": "passive_buff",
+                            "target": "allies_in_range",
+                            "range_expression": "10_ft",
+                            "effect": "saving_throw_bonus",
+                            "bonusExpression": "CHA modifier"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -6812,7 +7033,13 @@
                         "name": "Aura of Courage",
                         "level": 10,
                         "prerequisites": [],
-                        "description": "You and friendly creatures within 10 feet of you can't be frightened while you are conscious."
+                        "description": "You and friendly creatures within 10 feet of you can't be frightened while you are conscious.",
+                        "automation": {
+                            "type": "passive_immunity",
+                            "target": "allies_in_range",
+                            "range_expression": "10_ft",
+                            "conditionImmunity": "frightened"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -6969,13 +7196,26 @@
                         "name": "Aura of Courage",
                         "level": 18,
                         "prerequisites": [],
-                        "description": "You and friendly creatures within 30 feet of you can't be frightened while you are conscious."
+                        "description": "You and friendly creatures within 30 feet of you can't be frightened while you are conscious.",
+                        "automation": {
+                            "type": "passive_immunity",
+                            "target": "allies_in_range",
+                            "range_expression": "10_ft",
+                            "conditionImmunity": "frightened"
+                        }
                     },
                     {
                         "name": "Aura of Protection",
                         "level": 18,
                         "prerequisites": [],
-                        "description": "Whenever you or a friendly creature within 30 feet of you must make a saving throw, the creature gains a bonus to the saving throw equal to your Charisma modifier (with a minimum bonus of +1). You must be conscious to grant this bonus."
+                        "description": "Whenever you or a friendly creature within 30 feet of you must make a saving throw, the creature gains a bonus to the saving throw equal to your Charisma modifier (with a minimum bonus of +1). You must be conscious to grant this bonus.",
+                        "automation": {
+                            "type": "passive_buff",
+                            "target": "allies_in_range",
+                            "range_expression": "10_ft",
+                            "effect": "saving_throw_bonus",
+                            "bonusExpression": "CHA modifier"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -8235,7 +8475,7 @@
                                 "name": "Ranger's Companion",
                                 "level": 3,
                                 "prerequisites": [],
-                                "description": "You gain a beast companion that accompanies you on your adventures and is trained to fight alongside you. Choose a beast that is no larger than Medium and that has a challenge rating of 1/4 or lower (appendix D presents statistics for the hawk, mastiff, and panther as examples). Add your proficiency bonus to the beast's AC, attack rolls, and damage rolls, as well as to any saving throws and skills it is proficient in. Its hit point maximum equals the hit point number in its stat block or four times your ranger level, whichever is higher. Like any creature, it can spend Hit Dice during a short rest to regain hit points. The beast obeys your commands as best as it can. It takes its turn on your initiative. On your turn, you can verbally command the beast where to move (no action required by you). You can use your action to verbally command it to take the Attack, Dash, Disengage, or Help action. Once you have the Extra Attack feature, you can make one weapon attack yourself when you com\u00ad mand the beast to take the Attack action. If you don't issue a command, the beast takes the Dodge action. If you are incapacitated or absent, the beast acts on its own, focusing on protecting you and itself. The beast never requires your command to use its reaction, such as when making an opportunity attack. While traveling through your favored terrain with only the beast, you can move stealthily at a normal pace. If the beast dies, you can obtain a new companion by spending 8 hours magically bonding with a beast that isn't hostile to you and that meets the requirements."
+                                "description": "You gain a beast companion that accompanies you on your adventures and is trained to fight alongside you. Choose a beast that is no larger than Medium and that has a challenge rating of 1/4 or lower (appendix D presents statistics for the hawk, mastiff, and panther as examples). Add your proficiency bonus to the beast's AC, attack rolls, and damage rolls, as well as to any saving throws and skills it is proficient in. Its hit point maximum equals the hit point number in its stat block or four times your ranger level, whichever is higher. Like any creature, it can spend Hit Dice during a short rest to regain hit points. The beast obeys your commands as best as it can. It takes its turn on your initiative. On your turn, you can verbally command the beast where to move (no action required by you). You can use your action to verbally command it to take the Attack, Dash, Disengage, or Help action. Once you have the Extra Attack feature, you can make one weapon attack yourself when you com­ mand the beast to take the Attack action. If you don't issue a command, the beast takes the Dodge action. If you are incapacitated or absent, the beast acts on its own, focusing on protecting you and itself. The beast never requires your command to use its reaction, such as when making an opportunity attack. While traveling through your favored terrain with only the beast, you can move stealthily at a normal pace. If the beast dies, you can obtain a new companion by spending 8 hours magically bonding with a beast that isn't hostile to you and that meets the requirements."
                             }
                         ]
                     },
@@ -8809,7 +9049,7 @@
                                 "name": "Infiltration Expertise",
                                 "level": 9,
                                 "prerequisites": [],
-                                "description": "You can unfailingly create false identities for yourself. You must spend seven days and 25 gp to establish the history, profession, and affiliations for an identity. You can't establish an identity that belongs to someone else. For example, you might acquire appropriate clothing, letters of introduction, and official\u00ad looking certification to establish yourself as a member of a trading house from a remote city so you can insinuate yourself into the company of other wealthy merchants. Thereafter, ifyou adopt the new identity as a disguise, other creatures believe you to be that person until given an obvious reason not to."
+                                "description": "You can unfailingly create false identities for yourself. You must spend seven days and 25 gp to establish the history, profession, and affiliations for an identity. You can't establish an identity that belongs to someone else. For example, you might acquire appropriate clothing, letters of introduction, and official­ looking certification to establish yourself as a member of a trading house from a remote city so you can insinuate yourself into the company of other wealthy merchants. Thereafter, ifyou adopt the new identity as a disguise, other creatures believe you to be that person until given an obvious reason not to."
                             }
                         ]
                     },
@@ -11677,7 +11917,7 @@
                         "name": "Spellcasting",
                         "level": 1,
                         "prerequisites": [],
-                        "description": "As a student of arcane magic, you have a spellbook containing spells that show the first glimmerings of your true power.<br/><br/><h6>Cantrips</h6>At 1st level, you know three cantrips of your choice from the wizard spell list. You learn additional wizard cantrips of your choice at higher levels, as shown in the Cantrips Known column of the Wizard table.<br/><br/><h6>Spellbook</h6> At 1st level, you have a spellbook containing six 1st-level wizard spells of your choice. Your spellbook is the repository of the wizard spells you know, except your cantrips, which are fixed in your mind.<br/> <br/> <h6>Preparing and Casting Spells</h6> The Wizard table shows how many spell slots you have to cast your wizard spells of 1st level and higher. To cast one of these spells, you must expend a slot of the spell's level or higher. You regain all expended spell slots when you finish a long rest.<br/><br/> You prepare the list of wizard spells that are available for you to cast. To do so, choose a number of wizard spells from your spellbook equal to your Intelligence modifier + your wizard level (minimum of one spell). The spells must be of a level for which you have spell slots.<br/><br/> For example, if you're a 3rd-level wizard, you have four 1st-level and two 2nd-level spell slots. With an Intelli\u00adgence of 16, your list of prepared spells can include six spells of 1st or 2nd level, in any combination, chosen from your spellbook. If you prepare the 1st-level spell magic missile, you can cast it using a 1st-level or a 2nd-level slot. Casting the spell doesn't remove it from your list of prepared spells.<br/><br/> You can change your list of prepared spells when you finish a long rest. Preparing a new list of wizard spells requires time spent studying your spellbook and memorizing the incantations and gestures you must make to cast the spell: at least 1 minute per spell level for each spell on your list.<br/> <br/> <h6>Spellcasting Ability</h6> Intelligence is your spellcasting ability for your wizard spells, since you learn your spells through dedicated study and memorization. You use your Intelligence whenever a spell refers to your spellcasting ability. In addition, you use your Intelligence modifier when set\u00adting the saving throw DC for a wizard spell you cast and when making an attack roll with one.<br/><br/> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Spell save DC</b> = 8 + your proficiency bonus + your Intelligence modifier<br/> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Spell attack modifier</b> = your proficiency bonus + your Intelligence modifier<br/> <br/> <h6>Ritual Casting</h6> You can cast a wizard spell as a ritual if that spell has the ritual tag and you have the spell in your spellbook. You don't need to have the spell prepared.<br/> <br/> <h6>Spellcasting Focus</h6> You can use an arcane focus as a spellcasting focus for your wizard spells.<br/> <br/> <h6>Learning Spells of 1st Level and Higher</h6> Each time you gain a wizard level, you can add two wizard spells of your choice to your spellbook for free. Each of these spells must be of a level for which you have spell slots, as shown on the Wizard table. On your adventures, you might find other spells that you can add to your spellbook."
+                        "description": "As a student of arcane magic, you have a spellbook containing spells that show the first glimmerings of your true power.<br/><br/><h6>Cantrips</h6>At 1st level, you know three cantrips of your choice from the wizard spell list. You learn additional wizard cantrips of your choice at higher levels, as shown in the Cantrips Known column of the Wizard table.<br/><br/><h6>Spellbook</h6> At 1st level, you have a spellbook containing six 1st-level wizard spells of your choice. Your spellbook is the repository of the wizard spells you know, except your cantrips, which are fixed in your mind.<br/> <br/> <h6>Preparing and Casting Spells</h6> The Wizard table shows how many spell slots you have to cast your wizard spells of 1st level and higher. To cast one of these spells, you must expend a slot of the spell's level or higher. You regain all expended spell slots when you finish a long rest.<br/><br/> You prepare the list of wizard spells that are available for you to cast. To do so, choose a number of wizard spells from your spellbook equal to your Intelligence modifier + your wizard level (minimum of one spell). The spells must be of a level for which you have spell slots.<br/><br/> For example, if you're a 3rd-level wizard, you have four 1st-level and two 2nd-level spell slots. With an Intelli­gence of 16, your list of prepared spells can include six spells of 1st or 2nd level, in any combination, chosen from your spellbook. If you prepare the 1st-level spell magic missile, you can cast it using a 1st-level or a 2nd-level slot. Casting the spell doesn't remove it from your list of prepared spells.<br/><br/> You can change your list of prepared spells when you finish a long rest. Preparing a new list of wizard spells requires time spent studying your spellbook and memorizing the incantations and gestures you must make to cast the spell: at least 1 minute per spell level for each spell on your list.<br/> <br/> <h6>Spellcasting Ability</h6> Intelligence is your spellcasting ability for your wizard spells, since you learn your spells through dedicated study and memorization. You use your Intelligence whenever a spell refers to your spellcasting ability. In addition, you use your Intelligence modifier when set­ting the saving throw DC for a wizard spell you cast and when making an attack roll with one.<br/><br/> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Spell save DC</b> = 8 + your proficiency bonus + your Intelligence modifier<br/> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>Spell attack modifier</b> = your proficiency bonus + your Intelligence modifier<br/> <br/> <h6>Ritual Casting</h6> You can cast a wizard spell as a ritual if that spell has the ritual tag and you have the spell in your spellbook. You don't need to have the spell prepared.<br/> <br/> <h6>Spellcasting Focus</h6> You can use an arcane focus as a spellcasting focus for your wizard spells.<br/> <br/> <h6>Learning Spells of 1st Level and Higher</h6> Each time you gain a wizard level, you can add two wizard spells of your choice to your spellbook for free. Each of these spells must be of a level for which you have spell slots, as shown on the Wizard table. On your adventures, you might find other spells that you can add to your spellbook."
                     }
                 ],
                 "spellcasting": {
@@ -12485,7 +12725,7 @@
                                 "name": "Illusory Reality",
                                 "level": 14,
                                 "prerequisites": [],
-                                "description": "You have learned the secret of weaving shadow magic into your illusions to give them a semi\u00ad reality. When you cast an illusion spell of 1st level or higher, you can choose one inanimate, nonmagical object that is part of the illusion and make that object real. You can do this on your turn as a bonus action while the spell is ongoing. The object remains real for 1 minute. For example, you can create an illusion of a bridge over a chasm and then make it real long enough for your allies to cross. The object can't deal damage or otherwise directly harm anyone."
+                                "description": "You have learned the secret of weaving shadow magic into your illusions to give them a semi­ reality. When you cast an illusion spell of 1st level or higher, you can choose one inanimate, nonmagical object that is part of the illusion and make that object real. You can do this on your turn as a bonus action while the spell is ongoing. The object remains real for 1 minute. For example, you can create an illusion of a bridge over a chasm and then make it real long enough for your allies to cross. The object can't deal damage or otherwise directly harm anyone."
                             }
                         ]
                     }

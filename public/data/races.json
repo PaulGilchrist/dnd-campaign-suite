@@ -34,7 +34,31 @@
                 "index": "breath-weapon",
                 "name": "Breath Weapon",
                 "description": "You can use your action to exhale destructive energy. Your draconic ancestry determines the size, shape, and damage type of the exhalation. When you use your breath weapon, each creature in the area of the exhalation must make a saving throw, the type of which is determined by your draconic ancestry. The DC for this saving throw equals 8 + your Constitution modifier + your proficiency bonus. A creature takes 2d6 damage on a failed save, and half as much damage on a successful one. The damage increases to 3d6 at 6th level, 4d6 at 11th level, and 5d6 at 16th level. After you use your breath weapon, you cannot use it again until you complete a short or long rest.",
-                "proficiencies": []
+                "proficiencies": [],
+                "automation": {
+                    "type": "save_attack",
+                    "damage": "2d6",
+                    "damageType": "variable",
+                    "saveType": "DEX",
+                    "saveDc": "ability",
+                    "shape": "variable",
+                    "scaling": [
+                        {
+                            "level": 6,
+                            "damage": "3d6"
+                        },
+                        {
+                            "level": 11,
+                            "damage": "4d6"
+                        },
+                        {
+                            "level": 16,
+                            "damage": "5d6"
+                        }
+                    ],
+                    "uses": 1,
+                    "recharge": "short_rest"
+                }
             },
             {
                 "index": "damage-resistance",
@@ -143,7 +167,13 @@
                 "index": "dwarven-resilience",
                 "name": "Dwarven Resilience",
                 "description": "You have advantage on saving throws against poison, and you have resistance against poison damage.",
-                "proficiencies": []
+                "proficiencies": [],
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "saving_throw",
+                    "condition": "poison",
+                    "effect": "advantage"
+                }
             },
             {
                 "index": "stonecunning",
@@ -246,7 +276,13 @@
                 "index": "fey-ancestry",
                 "name": "Fey Ancestry",
                 "description": "You have advantage on saving throws against being charmed, and magic cannot put you to sleep.",
-                "proficiencies": []
+                "proficiencies": [],
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "saving_throw",
+                    "condition": "charmed",
+                    "effect": "advantage"
+                }
             },
             {
                 "index": "trance",
@@ -421,7 +457,7 @@
             {
                 "index": "earth-genasi",
                 "name": "Earth Genasi",
-                "description": "As an earth genasi, you are descended from the cruel and greedy dao, though you aren\u2019t necessarily evil. You have inherited some measure of control over earth, reveling in superior strength and solid power. You tend to avoid rash decisions, pausing long enough to consider your options before taking action. Elemental earth manifests differently from one individual to the next. Some earth genasi always have bits of dust falling from their bodies and mud clinging to their clothes, never getting clean no matter how often they bathe. Others are as shiny and polished as gemstones, with skin tones of deep brown or black, eyes sparkling like agates. Earth genasi can also have smooth metallic flesh, dull iron skin spotted with rust, a pebbled and rough hide, or even a coating of tiny embedded crystals. The most arresting have fissures in their flesh, from which faint light shines.",
+                "description": "As an earth genasi, you are descended from the cruel and greedy dao, though you aren’t necessarily evil. You have inherited some measure of control over earth, reveling in superior strength and solid power. You tend to avoid rash decisions, pausing long enough to consider your options before taking action. Elemental earth manifests differently from one individual to the next. Some earth genasi always have bits of dust falling from their bodies and mud clinging to their clothes, never getting clean no matter how often they bathe. Others are as shiny and polished as gemstones, with skin tones of deep brown or black, eyes sparkling like agates. Earth genasi can also have smooth metallic flesh, dull iron skin spotted with rust, a pebbled and rough hide, or even a coating of tiny embedded crystals. The most arresting have fissures in their flesh, from which faint light shines.",
                 "ability_bonuses": [
                     {
                         "ability_score": "STR",
@@ -559,7 +595,18 @@
                 "index": "gnome-cunning",
                 "name": "Gnome Cunning",
                 "description": "You have advantage on all Intelligence, Wisdom, and Charisma saving throws against magic.",
-                "proficiencies": []
+                "proficiencies": [],
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "saving_throw",
+                    "condition": "magic",
+                    "effect": "advantage",
+                    "abilities": [
+                        "INT",
+                        "WIS",
+                        "CHA"
+                    ]
+                }
             }
         ],
         "subraces": [
@@ -727,7 +774,13 @@
                 "index": "fey-ancestry",
                 "name": "Fey Ancestry",
                 "description": "You have advantage on saving throws against being charmed, and magic cannot put you to sleep.",
-                "proficiencies": []
+                "proficiencies": [],
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "saving_throw",
+                    "condition": "charmed",
+                    "effect": "advantage"
+                }
             },
             {
                 "index": "skill-versatility",
@@ -801,13 +854,25 @@
                 "index": "savage-attacks",
                 "name": "Savage Attacks",
                 "description": "When you score a critical hit with a melee weapon attack, you can roll one of the weapon's damage dice one additional time and add it to the extra damage of the critical hit.",
-                "proficiencies": []
+                "proficiencies": [],
+                "automation": {
+                    "type": "auto_effect",
+                    "trigger": "critical_hit",
+                    "effect": "extra_damage_die"
+                }
             },
             {
                 "index": "relentless-endurance",
                 "name": "Relentless Endurance",
                 "description": "When you are reduced to 0 hit points but not killed outright, you can drop to 1 hit point instead. you cannot use this feature again until you finish a long rest.",
-                "proficiencies": []
+                "proficiencies": [],
+                "automation": {
+                    "type": "auto_effect",
+                    "trigger": "reduced_to_0_hp",
+                    "effect": "drop_to_1_hp",
+                    "uses": 1,
+                    "recharge": "long_rest"
+                }
             }
         ],
         "subraces": [],
@@ -840,7 +905,13 @@
                 "index": "brave",
                 "name": "Brave",
                 "description": "You have advantage on saving throw against being frightened.",
-                "proficiencies": []
+                "proficiencies": [],
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "saving_throw",
+                    "condition": "frightened",
+                    "effect": "advantage"
+                }
             },
             {
                 "index": "halfling-nimbleness",
@@ -852,7 +923,13 @@
                 "index": "lucky",
                 "name": "Lucky",
                 "description": "When you roll a 1 on the d20 for an attack roll, ability check, or saving throw, you can reroll the die and must use the new roll.",
-                "proficiencies": []
+                "proficiencies": [],
+                "automation": {
+                    "type": "auto_reroll",
+                    "target": "d20",
+                    "condition": "roll_equals_1",
+                    "effect": "reroll"
+                }
             }
         ],
         "subraces": [

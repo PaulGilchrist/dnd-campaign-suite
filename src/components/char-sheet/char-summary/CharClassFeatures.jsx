@@ -5,11 +5,19 @@ import { getClassFeatures } from '../../../services/classFeatures.js';
 /* ─── Barbarian ─── */
 const BarbarianFeatures = function BarbarianFeatures({ playerStats }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+    const [rageActive, setRageActive] = React.useState(false);
     return (
          <div data-testid="char-class-barbarian">
              <div><b>Extra Attacks: </b>{classLevel?.extra_attacks || 0}</div>
              <TrackedResourceInput label="Rage Points" resourceKey="ragePoints" playerName={playerStats.name} getMax={() => classLevel?.rages || 0} deps={[playerStats]} />
-             <div><b>Rage Damage Bonus: </b>{classLevel?.rage_damage || 0}</div>
+             <div>
+                 <b>Rage Damage Bonus: </b>
+                 <span className={rageActive ? "stat--buffed" : ""}>{classLevel?.rage_damage || 0}</span>
+                 <button className="automation-btn" onClick={() => setRageActive(!rageActive)} title={rageActive ? "End Rage" : "Enter Rage (toggle for damage bonus)"}>
+                     <i className={`fas fa-${rageActive ? "fire-alt" : "fire"}`}></i> {rageActive ? "Raging" : "Rage"}
+                 </button>
+                 {rageActive && <span className="automation-badge">BPS Resist, STR Adv, +{classLevel?.rage_damage || 0} dmg</span>}
+             </div>
              <div><b>Weapon Mastery: </b>{classLevel?.weapon_mastery ?? 'N/A'}</div>
          </div>
     );
@@ -85,13 +93,26 @@ const MonkFeatures = function MonkFeatures({ playerStats }) {
     const wisdom = playerStats.abilities?.find((a) => a.name === 'Wisdom');
     const monkFeatures = getClassFeatures(playerStats);
     if (playerStats.level < 2) return null;
+    const focusSaveDc = 8 + (wisdom?.bonus || 0) + playerStats.proficiency;
     return (
          <div data-testid="char-class-monk">
              <div><b>Martial Arts Die:</b> d{monkFeatures?.martialArtsDie || 0}</div>
              <div><b>Extra Attacks: </b>{playerStats.class?.class_levels?.[playerStats.level - 1]?.extra_attacks || 0}</div>
              <TrackedResourceInput label="Focus Points" resourceKey="focusPoints" playerName={playerStats.name} getMax={() => monkFeatures?.maxFocusPoints || 0} deps={[playerStats]} />
-             <div><b>Focus Save DC: </b>{8 + (wisdom?.bonus || 0) + playerStats.proficiency}</div>
+             <div><b>Focus Save DC: </b>{focusSaveDc}</div>
              <div><b>Unarmored Movement:</b> +{monkFeatures?.unarmoredMovementIncrease || 0} ft.</div>
+             <div className="automation-actions">
+                 {playerStats.level >= 5 && (
+                     <button className="automation-btn" title="Stunning Strike: Spend 1 FP, target CON save or stunned">
+                         <i className="fas fa-hand-paper"></i> Stunning Strike (1 FP, DC {focusSaveDc})
+                     </button>
+                 )}
+                 {playerStats.reactions?.find(r => r.name === 'Deflect Missiles' || r.name === 'Deflect Attacks') && (
+                     <button className="automation-btn" title="Deflect Missiles/Attacks: Reduce ranged B/P/S damage by 1d10+DEX+level">
+                         <i className="fas fa-shield-alt"></i> {playerStats.reactions.find(r => r.name === 'Deflect Missiles' || r.name === 'Deflect Attacks').name}
+                     </button>
+                 )}
+            </div>
          </div>
     );
 };
@@ -99,12 +120,26 @@ const MonkFeatures = function MonkFeatures({ playerStats }) {
 /* ─── Paladin ─── */
 const PaladinFeatures = function PaladinFeatures({ playerStats }) {
     const paladinFeatures = getClassFeatures(playerStats);
+    const cha = playerStats.abilities?.find((a) => a.name === 'Charisma');
+    const layOnHandsPool = 5 * playerStats.level;
     return (
          <div data-testid="char-class-paladin">
              {playerStats.class.fightingStyles && <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles.join(', ')}</div>}
              <div><b>Extra Attacks: </b>{paladinFeatures?.extraAttacks || 0}</div>
              <div><b>Channel Divinity: </b>{paladinFeatures?.maxChannelDivinity || 0}</div>
              {paladinFeatures?.auraRange !== null && <div><b>Aura Range: </b>{paladinFeatures.auraRange}</div>}
+             <div><b>Lay On Hands Pool: </b>{layOnHandsPool} HP</div>
+             {cha && <div><b>Aura of Protection: </b>+{cha.bonus} to saves {playerStats.level >= 6 ? '(10 ft.)' : '(locked)'}</div>}
+             <div className="automation-actions">
+                 <button className="automation-btn" title={`Lay On Hands: Heal up to ${layOnHandsPool} HP from pool`}>
+                     <i className="fas fa-hands-helping"></i> Lay On Hands (Pool: {layOnHandsPool})
+                 </button>
+                 {playerStats.level >= 2 && (
+                     <button className="automation-btn" title="Divine Smite: Add radiant damage using a spell slot">
+                         <i className="fas fa-bolt"></i> Divine Smite (SPC)
+                     </button>
+                 )}
+            </div>
          </div>
     );
 };

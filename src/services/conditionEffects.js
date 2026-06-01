@@ -6,7 +6,35 @@ const CONDITIONS_THAT_SPEED_ZERO = new Set([
   'grappled', 'paralyzed', 'petrified', 'restrained', 'unconscious',
 ])
 
-function computeConditionEffects(conditions = []) {
+function saveModifierApplies(modifier, saveType, abilityName) {
+  if (modifier.target !== 'saving_throw' && modifier.target !== 'save') return false;
+  if (modifier.condition === 'charmed' && saveType === 'charmed') return true;
+  if (modifier.condition === 'frightened' && saveType === 'frightened') return true;
+  if (modifier.condition === 'poison' && saveType === 'poison') return true;
+  if (modifier.condition === 'magic') {
+    if (!modifier.abilities || modifier.abilities.length === 0) return true;
+    if (abilityName && modifier.abilities.includes(abilityName)) return true;
+    return true;
+  }
+  return false;
+}
+
+function applySaveModifiers(effects, modifiers, saveType, abilityName) {
+  if (!modifiers || modifiers.length === 0) return;
+  for (const mod of modifiers) {
+    if (!saveModifierApplies(mod, saveType, abilityName)) continue;
+    if (mod.effect === 'advantage') {
+      effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
+    } else if (mod.effect === 'disadvantage') {
+      effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
+    } else if (mod.effect === 'reroll') {
+      effects.autoReroll = true;
+      effects.autoRerollCondition = mod.condition;
+    }
+  }
+}
+
+function computeConditionEffects(conditions = [], saveModifiers = []) {
   const effects = {
     attackAdvantageCount: 0,
     attackDisadvantageCount: 0,
@@ -23,9 +51,15 @@ function computeConditionEffects(conditions = []) {
     autoCritWithin5ft: false,
     resistantToAll: false,
     poisonImmune: false,
+    saveAdvantageCount: 0,
+    saveDisadvantageCount: 0,
+    autoReroll: false,
+    autoRerollCondition: null,
   }
 
   const conditionSet = new Set(conditions)
+
+  applySaveModifiers(effects, saveModifiers, null, null);
 
   for (const key of conditionSet) {
     switch (key) {
@@ -130,4 +164,6 @@ export {
   combineAttackModes,
   CONDITIONS_THAT_CANNOT_ACT,
   CONDITIONS_THAT_SPEED_ZERO,
+  applySaveModifiers,
+  saveModifierApplies,
 }

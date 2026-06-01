@@ -2,7 +2,7 @@
     {
         "index": "barbarian",
         "name": "Barbarian",
-        "class_description": "<p><b>A fierce warrior of primal rage.</b></p><p>Barbarians are mighty warriors who are powered by primal forces of the multiverse that manifest as a Rage. More than a mere emotion\u2014and not limited to anger\u2014this Rage is an incarnation of a predator's ferocity, a storm's fury, and a sea's turmoil. Some Barbarians personify their Rage as a fierce spirit or revered forebear. Others see it as a connection to the pain and anguish of the world, as an impersonal tangle of wild magic, or as an expression of their own deepest self. For every Barbarian, their Rage is a power that fuels not just battle prowess, but also uncanny reflexes and heightened senses. Barbarians often serve as protectors and leaders in their communities. They charge headlong into danger so those under their protection don't have to. Their courage in the face of danger makes Barbarians perfectly suited for adventure.</p>",
+        "class_description": "<p><b>A fierce warrior of primal rage.</b></p><p>Barbarians are mighty warriors who are powered by primal forces of the multiverse that manifest as a Rage. More than a mere emotion—and not limited to anger—this Rage is an incarnation of a predator's ferocity, a storm's fury, and a sea's turmoil. Some Barbarians personify their Rage as a fierce spirit or revered forebear. Others see it as a connection to the pain and anguish of the world, as an impersonal tangle of wild magic, or as an expression of their own deepest self. For every Barbarian, their Rage is a power that fuels not just battle prowess, but also uncanny reflexes and heightened senses. Barbarians often serve as protectors and leaders in their communities. They charge headlong into danger so those under their protection don't have to. Their courage in the face of danger makes Barbarians perfectly suited for adventure.</p>",
         "primary_ability": "Strength",
         "hit_point_die": "12",
         "weapon_proficiencies": "Simple and Martial weapons",
@@ -27,7 +27,24 @@
                         "name": "Rage",
                         "description": "You can imbue yourself with a primal power called Rage, a force that grants you extraordinary might and resilience. You can enter it as a Bonus Action if you aren't wearing Heavy armor. You can enter your Rage the number of times shown for your Barbarian level in the Rages column of the Barbarian Features table. You Regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. While active, your Rage follows the rules below.<br/><br/><b>Damage Resistance.</b> You have Resistance to Bludgeoning, Piercing, and Slashing damage.<br/><br/><b>Rage Damage.</b> When you make an attack using Strength with either a weapon or an Unarmed Strike and deal damage to the target, you gain a bonus to the damage that increases as you gain levels as a Barbarian, as shown in the Rage Damage column of the Barbarian Features table.<br/><br/><b>Strength Advantage.</b> You have Advantage on Strength checks and Strength saving throws.<br/><br/><b>No Concentration or Spells.</b> You can't maintain Concentration, and you can't cast spells.<br/><br/><b>Duration.</b> The Rage lasts until the end of your next turn, and it ends early if you don Heavy armor or have the Incapacitated condition. If your Rage is still active on your next turn, you can extend the Rage for another round by doing one of the following:<ul><li>Make an attack roll against an enemy.</li><li>Force an enemy to make a saving throw.</li><li>Take a Bonus Action to extend your Rage.</li></ul><br/>Each time the Rage is extended, it lasts until the end of your next turn. You can maintain a Rage for up to 10 minutes.",
                         "level": 1,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "combat_stance",
+                            "damageBonusExpression": "rage_damage",
+                            "resistanceTypes": [
+                                "Bludgeoning",
+                                "Piercing",
+                                "Slashing"
+                            ],
+                            "advantages": [
+                                "STR checks",
+                                "STR saves"
+                            ],
+                            "duration": "until_next_turn_extendable",
+                            "maxRages": "class_level_scaling",
+                            "recharge_short_rest": "1_use",
+                            "recharge_long_rest": "all"
+                        }
                     },
                     {
                         "name": "Unarmored Defense",
@@ -55,13 +72,26 @@
                         "name": "Danger Sense",
                         "description": "You gain an uncanny sense of when things aren't as they should be, giving you an edge when you dodge perils. You have Advantage on Dexterity saving throws unless you have the Incapacitated condition.",
                         "level": 2,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "conditional_advantage",
+                            "target": "saving_throw",
+                            "saveType": "DEX",
+                            "condition": "visible_effect",
+                            "effect": "advantage"
+                        }
                     },
                     {
                         "name": "Reckless Attack",
                         "description": "You can throw aside all concern for defense to attack with increased ferocity. When you make your first attack roll on your turn, you can decide to attack recklessly. Doing so gives you Advantage on attack rolls using Strength until the start of your next turn, but attack rolls against you have Advantage during that time.",
                         "level": 2,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "temp_buff",
+                            "effect": "advantage_attacks_disadvantage_against",
+                            "duration": "until_start_of_next_turn",
+                            "trigger": "first_attack_of_turn"
+                        }
                     }
                 ]
             },
@@ -191,7 +221,21 @@
                         "name": "Brutal Strike",
                         "description": "If you use Reckless Attack, you can forgo any Advantage on one Strength-based attack roll of your choice on your turn. The chosen attack roll mustn't have Disadvantage. If the chosen attack roll hits, the target takes an extra 1d10 damage of the same type dealt by the weapon or Unarmed Strike, and you can cause one Brutal Strike effect of your choice. You have the following effect options. Forceful Blow. The target is pushed 15 feet straight away from you. You can then move up to half your Speed straight toward the target without provoking Opportunity Attacks. Hamstring Blow. The target's Speed is reduced by 15 feet until the start of your next turn. A target can be affected by only one Hamstring Blow at a time. The most recent one.",
                         "level": 9,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "attack_rider",
+                            "options": [
+                                {
+                                    "name": "Forceful Blow",
+                                    "effect": "push_15ft"
+                                },
+                                {
+                                    "name": "Hamstring Blow",
+                                    "effect": "speed_reduction",
+                                    "value": "15_ft_until_start_of_next_turn"
+                                }
+                            ]
+                        }
                     }
                 ]
             },
@@ -255,7 +299,21 @@
                         "name": "Improved Brutal Strike",
                         "description": "You have honed new ways to attack furiously. The following effects are now among your Brutal Strike options. Staggering Blow. The target has Disadvantage on the next saving throw it makes, and it can't make Opportunity Attacks until the start of your next turn. Sundering Blow. Before the start of your next turn, the next attack roll made by another creature against the target gains a +5 bonus to the roll. An attack roll can gain only one Sundering Blow bonus.",
                         "level": 13,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "attack_rider",
+                            "options": [
+                                {
+                                    "name": "Staggering Blow",
+                                    "effect": "disadvantage_on_next_save"
+                                },
+                                {
+                                    "name": "Sundering Blow",
+                                    "effect": "next_attack_advantage",
+                                    "value": "+5_to_next_attack_vs_target"
+                                }
+                            ]
+                        }
                     }
                 ]
             },
@@ -319,7 +377,21 @@
                         "name": "Improved Brutal Strike",
                         "description": "The extra damage of your Brutal Strike increases to 2d10. In addition, you can use two different Brutal Strike effects whenever you use your Brutal Strike feature.",
                         "level": 17,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "attack_rider",
+                            "options": [
+                                {
+                                    "name": "Staggering Blow",
+                                    "effect": "disadvantage_on_next_save"
+                                },
+                                {
+                                    "name": "Sundering Blow",
+                                    "effect": "next_attack_advantage",
+                                    "value": "+5_to_next_attack_vs_target"
+                                }
+                            ]
+                        }
                     }
                 ]
             },
@@ -527,7 +599,15 @@
                         "name": "Bardic Inspiration",
                         "description": "You can inspire others through stirring words or music. Up to three times per day, you can add one of your Bardic Inspiration dice to one ability check made by one other creature of your choice. You can do so when any creature (including yourself) makes an ability check after you say the words or perform the musical piece. You must be able to see the creature, and the creature must be able to hear you. Your Bardic Inspiration die is a d6.",
                         "level": 1,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "buff_ally",
+                            "buffExpression": "bardic_inspiration_die",
+                            "range": "60_ft",
+                            "action": "bonus_action",
+                            "uses_expression": "CHA modifier",
+                            "recharge": "short_rest"
+                        }
                     },
                     {
                         "name": "Spellcasting",
@@ -2942,7 +3022,7 @@
     {
         "index": "fighter",
         "name": "Fighter",
-        "class_description": "<p><b>Fighters rule the battlefields.</b></p><p>Questing knights, loyal champions, elite soldiers, and hardened mercenaries\u2014as Fighters, they all share an unparalleled prowess with weapons and armor. And they are well acquainted with death, both meeting it out and defying it. Fighters master various weapon techniques, and a well-equipped Fighter always has the right tool at hand for any combat situation. Likewise, a Fighter is adept with every form of armor. Beyond that basic degree of familiarity, each Fighter specializes in certain styles of combat. Some concentrate on archery, some on fighting with two weapons at once, and some on augmenting their martial skills with magic. This combination of broad ability and extensive specialization makes Fighters superior combatants.</p>",
+        "class_description": "<p><b>Fighters rule the battlefields.</b></p><p>Questing knights, loyal champions, elite soldiers, and hardened mercenaries—as Fighters, they all share an unparalleled prowess with weapons and armor. And they are well acquainted with death, both meeting it out and defying it. Fighters master various weapon techniques, and a well-equipped Fighter always has the right tool at hand for any combat situation. Likewise, a Fighter is adept with every form of armor. Beyond that basic degree of familiarity, each Fighter specializes in certain styles of combat. Some concentrate on archery, some on fighting with two weapons at once, and some on augmenting their martial skills with magic. This combination of broad ability and extensive specialization makes Fighters superior combatants.</p>",
         "primary_ability": "Strength or Dexterity",
         "hit_point_die": "10",
         "skill_proficiencies": "Choose 2: Acrobatics, Animal Handling, Athletics, History, Insight, Intimidation, Persuasion, Perception, or Survival",
@@ -2972,7 +3052,14 @@
                         "name": "Second Wind",
                         "description": "You have a limited well of physical and mental stamina that you can draw on. As a Bonus Action, you can use it to regain Hit Points equal to 1d10 plus your Fighter level. You can use this feature twice. You regain one expended use when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest.",
                         "level": 1,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "self_healing",
+                            "healExpression": "1d10 + fighter level",
+                            "action": "bonus_action",
+                            "uses": 1,
+                            "recharge": "short_rest"
+                        }
                     },
                     {
                         "name": "Weapon Mastery",
@@ -2998,7 +3085,12 @@
                         "name": "Action Surge",
                         "description": "You can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action, except the Magic action. Once you use this feature, you can't do so again until you finish a Short or Long Rest. Starting at level 17, you can use it twice before a rest but only once on a turn.",
                         "level": 2,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "extra_action",
+                            "uses": 1,
+                            "recharge": "short_rest"
+                        }
                     },
                     {
                         "name": "Tactical Mind",
@@ -3457,7 +3549,12 @@
                         "name": "Action Surge",
                         "description": "Starting at level 17, you can use Action Surge twice before a Long Rest.",
                         "level": 17,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "extra_action",
+                            "uses": 1,
+                            "recharge": "short_rest"
+                        }
                     },
                     {
                         "name": "Indomitable",
@@ -3788,7 +3885,15 @@
                         "name": "Uncanny Metabolism",
                         "description": "When you roll Initiative, you can regain all expended Focus Points. Roll your Martial Arts die and regain Hit Points equal to your Monk level plus the number rolled. Can't use again until Long Rest.",
                         "level": 1,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "initiative_action",
+                            "effect": "regain_focus_points_and_heal",
+                            "healExpression": "monk_level + martial_arts_die",
+                            "trigger": "roll_initiative",
+                            "uses": 1,
+                            "recharge": "long_rest"
+                        }
                     }
                 ]
             },
@@ -3816,7 +3921,20 @@
                         "name": "Deflect Attacks",
                         "description": "When an attack roll hits you and its damage includes Bludgeoning, Piercing, or Slashing damage, you can take a Reaction to reduce the damage by 1d10 + Dexterity modifier + Monk level. If damage reduced to 0, expend 1 Focus Point to redirect force to a creature within 5 feet (melee) or 60 feet (ranged). Target makes Dexterity save or takes damage equal to two Martial Arts die + Dexterity modifier.",
                         "level": 2,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "damage_reduction",
+                            "reductionExpression": "1d10 + DEX modifier + monk level",
+                            "trigger": "bludgeoning_piercing_slashing_damage",
+                            "reaction": true,
+                            "redirect": true,
+                            "redirectCost": {
+                                "resource": "focus_points",
+                                "amount": 1
+                            },
+                            "redirectDamage": "2 * martial_arts_die + DEX modifier",
+                            "redirectSave": "DEX"
+                        }
                     }
                 ]
             },
@@ -3838,7 +3956,13 @@
                         "name": "Slow Fall",
                         "description": "You can take a Reaction when you fall to reduce fall damage by an amount equal to five times your Monk level.",
                         "level": 3,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "damage_reduction",
+                            "reductionExpression": "5 * monk level",
+                            "trigger": "falling",
+                            "reaction": true
+                        }
                     }
                 ]
             },
@@ -3876,7 +4000,21 @@
                         "name": "Stunning Strike",
                         "description": "Once per turn when you hit a creature with a Monk weapon or Unarmed Strike, you can expend 1 Focus Point. Target makes Constitution save. Failed save: Stunned until start of next turn. Success: Speed halved until start of next turn, and next attack roll against target has Advantage.",
                         "level": 5,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "save_attack",
+                            "trigger": "monk_weapon_or_unarmed_hit",
+                            "cost": {
+                                "resource": "focus_points",
+                                "amount": 1
+                            },
+                            "saveType": "CON",
+                            "saveDc": "ability",
+                            "conditionInflicted": "stunned",
+                            "duration": "until_start_of_next_turn",
+                            "successEffect": "speed_halved_until_start_of_next_turn",
+                            "oncePerTurn": true
+                        }
                     }
                 ]
             },
@@ -4302,7 +4440,17 @@
                         "name": "Lay On Hands",
                         "description": "Your blessed touch can heal wounds. You have a pool of healing power that replenishes when you finish a Long Rest. With that pool, you can restore a total number of Hit Points equal to five times your Paladin level. As a Bonus Action, you can touch a creature and draw power from the pool to restore Hit Points up to the maximum remaining. You can also expend 5 Hit Points from the pool to remove the Poisoned condition from the creature.",
                         "level": 1,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "healing_pool",
+                            "poolExpression": "5 * paladin level",
+                            "action": "bonus_action",
+                            "recharge": "long_rest",
+                            "alsoCures": [
+                                "poison"
+                            ],
+                            "cureCost": 5
+                        }
                     },
                     {
                         "name": "Spellcasting",
@@ -4343,7 +4491,14 @@
                         "name": "Paladin's Smite",
                         "description": "You always have the Divine Smite spell prepared. You can cast it without expending a spell slot, but you must finish a Long Rest before you can cast it in this way again.",
                         "level": 2,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "free_spell",
+                            "spell": "Divine Smite",
+                            "uses": 1,
+                            "recharge": "long_rest",
+                            "level": 1
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -4371,7 +4526,14 @@
                         "name": "Channel Divinity",
                         "description": "You can channel divine energy directly from the Outer Planes. You start with one effect: Divine Sense. Divine Sense: As a Bonus Action, open your awareness to detect Celestials, Fiends, and Undead for 10 minutes or until Incapacitated. Know location and creature type of any such creature within 60 feet. Also detect consecrated/desecrated places/objects. You can use Channel Divinity twice. Regain one use on Short Rest, all on Long Rest. Additional use at level 11. Save DC = spell save DC from Spellcasting feature.",
                         "level": 3,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "resource_pool",
+                            "resource": "channel_divinity_charges",
+                            "uses_expression": "class_level_scaling",
+                            "recharge_short_rest": "1_use",
+                            "recharge_long_rest": "all"
+                        }
                     },
                     {
                         "name": "Paladin Subclass",
@@ -4452,7 +4614,14 @@
                         "name": "Aura of Protection",
                         "description": "You radiate a protective aura in a 10-foot Emanation originating from you. The aura is inactive while you have the Incapacitated condition. You and your allies in the aura gain a bonus to saving throws equal to your Charisma modifier (minimum +1). If another Paladin is present, a creature can benefit from only one Aura of Protection at a time.",
                         "level": 6,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_buff",
+                            "target": "allies_in_range",
+                            "range_expression": "10_ft",
+                            "effect": "saving_throw_bonus",
+                            "bonusExpression": "CHA modifier"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -6617,7 +6786,53 @@
                         "name": "Metamagic",
                         "description": "You gain two Metamagic options of your choice. You can use only one Metamagic option on a spell when you cast it unless otherwise noted. Whenever you gain a Sorcerer level, you can replace one option. You gain two more options at level 10 and two more at level 17.",
                         "level": 2,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "spell_modifier",
+                            "options": [
+                                {
+                                    "name": "Careful Spell",
+                                    "cost": 1,
+                                    "effect": "ally_auto_succeed_save"
+                                },
+                                {
+                                    "name": "Distant Spell",
+                                    "cost": 1,
+                                    "effect": "double_range"
+                                },
+                                {
+                                    "name": "Empowered Spell",
+                                    "cost": 1,
+                                    "effect": "reroll_damage_dice"
+                                },
+                                {
+                                    "name": "Extended Spell",
+                                    "cost": 1,
+                                    "effect": "double_duration"
+                                },
+                                {
+                                    "name": "Heightened Spell",
+                                    "cost": 3,
+                                    "effect": "disadvantage_on_save"
+                                },
+                                {
+                                    "name": "Quickened Spell",
+                                    "cost": 2,
+                                    "effect": "cast_spell_as_bonus_action"
+                                },
+                                {
+                                    "name": "Subtle Spell",
+                                    "cost": 1,
+                                    "effect": "no_verbal_somatic"
+                                },
+                                {
+                                    "name": "Twinned Spell",
+                                    "cost": "spell_level",
+                                    "effect": "target_two_creatures"
+                                }
+                            ],
+                            "resource": "sorcery_points"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -7167,7 +7382,7 @@
             {
                 "name": "Clockwork Sorcery",
                 "subtitle": "Channel Cosmic Forces of Order",
-                "description": "The cosmic force of order has suffused you with magic. That power arises from Mechanus or a realm like it\u2014a plane of existence shaped entirely by clockwork efficiency.",
+                "description": "The cosmic force of order has suffused you with magic. That power arises from Mechanus or a realm like it—a plane of existence shaped entirely by clockwork efficiency.",
                 "features": [
                     {
                         "name": "Clockwork Spells",
@@ -8111,7 +8326,7 @@
             {
                 "name": "Great Old One Patron",
                 "subtitle": "Unearth Forbidden Lore of Ineffable Being",
-                "description": "Your pact binds you to an unspeakable being from the Far Realm or an elder god\u2014a being such as Tharizdun, the Chained God; Zargon, the Returner; Hadar, the Dark Hunger; or Great Cthulhu. Or you might involve several entities without yoking yourself to one. The motives of these beings are incomprehensible, and the Great Old One might be indifferent to your existence.",
+                "description": "Your pact binds you to an unspeakable being from the Far Realm or an elder god—a being such as Tharizdun, the Chained God; Zargon, the Returner; Hadar, the Dark Hunger; or Great Cthulhu. Or you might involve several entities without yoking yourself to one. The motives of these beings are incomprehensible, and the Great Old One might be indifferent to your existence.",
                 "features": [
                     {
                         "name": "Awakened Mind",
@@ -8700,7 +8915,7 @@
             {
                 "name": "Abjurer",
                 "subtitle": "Shield Companions and Banish Foes",
-                "description": "Your study of magic is focused on spells that block, banish, or protect\u2014ending harmful effects, banishing evil influences, and protecting the weak.",
+                "description": "Your study of magic is focused on spells that block, banish, or protect—ending harmful effects, banishing evil influences, and protecting the weak.",
                 "features": [
                     {
                         "name": "Abjuration Savant",

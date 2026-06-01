@@ -6,6 +6,7 @@ import { sanitizeHtml } from '../../services/sanitize.js';
 import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/baseCombatActions.js'
+import { hasAutomation } from '../../services/automationService.js'
 
 function CharReactions({ playerStats, campaignName, cannotAct }) {
     const { popupHtml, setPopupHtml, rollAttack } = useLoggedDiceRoll(playerStats.name, campaignName);
@@ -30,6 +31,10 @@ function CharReactions({ playerStats, campaignName, cannotAct }) {
 
     const handleReactionClick = (reaction) => {
         if (cannotAct) return;
+        if (hasAutomation(reaction)) {
+            handleAutomationReaction(reaction);
+            return;
+        }
         if (reaction.name === OPPORTUNITY_ATTACK.name) {
             const meleeAttacks = playerStats.attacks.filter(a => a.type === 'Action' && a.range === MELEE_REACH_FEET);
             const attackRoll = meleeAttacks.length > 0 ? meleeAttacks[0] : playerStats.attacks[0];
@@ -39,6 +44,31 @@ function CharReactions({ playerStats, campaignName, cannotAct }) {
         } else {
             const html = buildFeatureDetailHtml(reaction);
             if (html) setPopupHtml(html);
+        }
+    };
+
+    const handleAutomationReaction = (reaction) => {
+        if (cannotAct) return;
+        const auto = reaction.automation;
+        if (!auto) return;
+        switch (auto.type) {
+            case 'damage_reduction': {
+                if (setPopupHtml) {
+                    setPopupHtml({
+                        type: 'automation_info',
+                        name: reaction.name,
+                        automationType: auto.type,
+                        description: reaction.description || '',
+                        automation: auto,
+                    });
+                }
+                break;
+            }
+            default: {
+                const html = buildFeatureDetailHtml(reaction);
+                if (html) setPopupHtml(html);
+                break;
+            }
         }
     };
 
@@ -52,8 +82,9 @@ function CharReactions({ playerStats, campaignName, cannotAct }) {
                 </Popup>
             )}
               {reactions.map((reaction) => {
+                const isClickable = reaction.details || reaction.name === OPPORTUNITY_ATTACK.name || hasAutomation(reaction);
                 return <div key={reaction.name}>
-                     <b className={reaction.details || reaction.name === OPPORTUNITY_ATTACK.name ? "clickable" : ""} onClick={() => handleReactionClick(reaction)}>{reaction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(reaction.description) }}></span>
+                     <b className={isClickable ? "clickable" : ""} onClick={() => handleReactionClick(reaction)}>{reaction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(reaction.description) }}></span>
                  </div>
              })}
         </div>

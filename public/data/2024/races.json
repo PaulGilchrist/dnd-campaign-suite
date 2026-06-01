@@ -8,7 +8,14 @@
         "traits": [
             {
                 "name": "Celestial Resistance",
-                "description": "You have Resistance to Necrotic damage and Radiant damage."
+                "description": "You have Resistance to Necrotic damage and Radiant damage.",
+                "automation": {
+                    "type": "resistance",
+                    "damageTypes": [
+                        "Necrotic",
+                        "Radiant"
+                    ]
+                }
             },
             {
                 "name": "Darkvision",
@@ -16,7 +23,13 @@
             },
             {
                 "name": "Healing Hands",
-                "description": "As a Magic action, you touch a creature and roll a number of d4s equal to your Proficiency Bonus. The creature regains a number of Hit Points equal to the total rolled. Once you use this trait, you can't use it again until you finish a Long Rest."
+                "description": "As a Magic action, you touch a creature and roll a number of d4s equal to your Proficiency Bonus. The creature regains a number of Hit Points equal to the total rolled. Once you use this trait, you can't use it again until you finish a Long Rest.",
+                "automation": {
+                    "type": "healing",
+                    "healExpression": "proficiency_bonus_d4",
+                    "uses": 1,
+                    "recharge": "long_rest"
+                }
             },
             {
                 "name": "LightBearer",
@@ -28,15 +41,38 @@
             },
             {
                 "name": "Heavenly Wings",
-                "description": "Two spectral wings sprout from your back temporarily. Until the transformation ends, you have a Fly Speed equal to your Speed."
+                "description": "Two spectral wings sprout from your back temporarily. Until the transformation ends, you have a Fly Speed equal to your Speed.",
+                "automation": {
+                    "type": "temp_buff",
+                    "effect": "fly_speed_equals_walk_speed",
+                    "duration": "1_minute",
+                    "recharge": "long_rest"
+                }
             },
             {
                 "name": "Inner Radiance",
-                "description": "Searing light temporarily radiates from your eyes and mouth. For the duration, you shed Bright Light in a 10-foot radius and Dim Light for an additional 10 feet, and at the end of each of your turns, each creature within 10 feet of you takes Radiant damage equal to your Proficiency Bonus."
+                "description": "Searing light temporarily radiates from your eyes and mouth. For the duration, you shed Bright Light in a 10-foot radius and Dim Light for an additional 10 feet, and at the end of each of your turns, each creature within 10 feet of you takes Radiant damage equal to your Proficiency Bonus.",
+                "automation": {
+                    "type": "damage_aura",
+                    "damageType": "Radiant",
+                    "damageExpression": "proficiency_bonus",
+                    "range": "10_ft",
+                    "duration": "1_minute",
+                    "recharge": "long_rest"
+                }
             },
             {
                 "name": "Necrotic Shroud",
-                "description": "Your eyes briefly become pools of darkness, and flightless wings sprout from your back temporarily. Creatures other than your allies within 10 feet of you must succeed on a Charisma saving throw (DC 8 plus your Charisma modifier and Proficiency Bonus) or have the Frightened condition until the end of your next turn."
+                "description": "Your eyes briefly become pools of darkness, and flightless wings sprout from your back temporarily. Creatures other than your allies within 10 feet of you must succeed on a Charisma saving throw (DC 8 plus your Charisma modifier and Proficiency Bonus) or have the Frightened condition until the end of your next turn.",
+                "automation": {
+                    "type": "save_attack",
+                    "saveType": "CHA",
+                    "saveDc": "ability",
+                    "conditionInflicted": "frightened",
+                    "range": "10_ft",
+                    "duration": "until_end_of_next_turn",
+                    "recharge": "long_rest"
+                }
             }
         ],
         "languages": [
@@ -46,7 +82,7 @@
     {
         "name": "Dragonborn",
         "creature_type": "Humanoid",
-        "description": "<p>The ancestors of dragonborn hatched from the eggs of chromatic and metallic dragons. One story holds that these eggs were blessed by the dragon gods Bahamut and Tiamat, who wanted to populate the multiverse with people created in their image. Another story claims that dragons created the first dragonborn without the gods' blessings. Whatever their origin, dragonborn have made homes for themselves on the Material Plane.</p><p>Dragonborn look like wingless, bipedal dragons\u2014sclaly, bright-eyed, and thick-boned with horns on their heads\u2014and their coloration and other features are reminiscent of their draconic ancestors.</p>",
+        "description": "<p>The ancestors of dragonborn hatched from the eggs of chromatic and metallic dragons. One story holds that these eggs were blessed by the dragon gods Bahamut and Tiamat, who wanted to populate the multiverse with people created in their image. Another story claims that dragons created the first dragonborn without the gods' blessings. Whatever their origin, dragonborn have made homes for themselves on the Material Plane.</p><p>Dragonborn look like wingless, bipedal dragons—sclaly, bright-eyed, and thick-boned with horns on their heads—and their coloration and other features are reminiscent of their draconic ancestors.</p>",
         "size": "Medium",
         "speed": 30,
         "subraces": [
@@ -62,7 +98,7 @@
             },
             {
                 "name": "Brass Dragonborn",
-                "desc": "Brass Dragonborn are talkative and warm-spirited, breathing fire and carrying the social, curious nature of brass dragons who thrive in sun\u2011baked deserts.",
+                "desc": "Brass Dragonborn are talkative and warm-spirited, breathing fire and carrying the social, curious nature of brass dragons who thrive in sun‑baked deserts.",
                 "damage_resistance": "Fire"
             },
             {
@@ -82,7 +118,7 @@
             },
             {
                 "name": "Green Dragonborn",
-                "desc": "Green Dragonborn exude a sharp, cunning presence, breathing toxic gas and reflecting the forest\u2011dwelling, manipulative instincts of green dragons.",
+                "desc": "Green Dragonborn exude a sharp, cunning presence, breathing toxic gas and reflecting the forest‑dwelling, manipulative instincts of green dragons.",
                 "damage_resistance": "Poison"
             },
             {
@@ -92,12 +128,12 @@
             },
             {
                 "name": "Silver Dragonborn",
-                "desc": "Silver Dragonborn are compassionate and steadfast, breathing frost and mirroring the protective, community\u2011oriented nature of silver dragons.",
+                "desc": "Silver Dragonborn are compassionate and steadfast, breathing frost and mirroring the protective, community‑oriented nature of silver dragons.",
                 "damage_resistance": "Cold"
             },
             {
                 "name": "White Dragonborn",
-                "desc": "White Dragonborn channel bitter cold through their frost breath, often displaying a rugged, survival\u2011driven mindset shaped by their arctic heritage.",
+                "desc": "White Dragonborn channel bitter cold through their frost breath, often displaying a rugged, survival‑driven mindset shaped by their arctic heritage.",
                 "damage_resistance": "Cold"
             }
         ],
@@ -108,7 +144,31 @@
             },
             {
                 "name": "Breath Weapon",
-                "description": "When you take the Attack action on your turn, you can replace one of your attacks with an exhalation of magical energy in either a 15-foot Cone or a 30-foot Line that is 5 feet wide (choose the shape each time). Each creature in that area must make a Dexterity saving throw (DC 8 plus your Constitution modifier and Proficiency Bonus). On a failed save, a creature takes 1d10 damage of the type determined by your Draconic Ancestry trait. On a successful save, a creature takes half as much damage. This damage increases by 1d10 when you reach character levels 5 (2d10), 11 (3d10), and 17 (4d10).<br>You can use this Breath Weapon a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest."
+                "description": "When you take the Attack action on your turn, you can replace one of your attacks with an exhalation of magical energy in either a 15-foot Cone or a 30-foot Line that is 5 feet wide (choose the shape each time). Each creature in that area must make a Dexterity saving throw (DC 8 plus your Constitution modifier and Proficiency Bonus). On a failed save, a creature takes 1d10 damage of the type determined by your Draconic Ancestry trait. On a successful save, a creature takes half as much damage. This damage increases by 1d10 when you reach character levels 5 (2d10), 11 (3d10), and 17 (4d10).<br>You can use this Breath Weapon a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+                "automation": {
+                    "type": "save_attack",
+                    "damage": "1d10",
+                    "damageType": "variable",
+                    "saveType": "DEX",
+                    "saveDc": "ability",
+                    "shape": "variable",
+                    "scaling": [
+                        {
+                            "level": 5,
+                            "damage": "2d10"
+                        },
+                        {
+                            "level": 11,
+                            "damage": "3d10"
+                        },
+                        {
+                            "level": 17,
+                            "damage": "4d10"
+                        }
+                    ],
+                    "uses": "proficiency_bonus",
+                    "recharge": "long_rest"
+                }
             },
             {
                 "name": "Damage Resistance",
@@ -120,7 +180,14 @@
             },
             {
                 "name": "Draconic Flight",
-                "description": "When you reach character level 5, you can channel draconic magic to give yourself temporary flight. As a Bonus Action, you sprout spectral wings on your back that last for 10 minutes or until you retract the wings (no action required) or have the Incapacitated condition. During that time, you have a Fly Speed equal to your Speed. Your wings appear to be made of the same energy as your Breath Weapon. Once you use this trait, you can't use it again until you finish a Long Rest."
+                "description": "When you reach character level 5, you can channel draconic magic to give yourself temporary flight. As a Bonus Action, you sprout spectral wings on your back that last for 10 minutes or until you retract the wings (no action required) or have the Incapacitated condition. During that time, you have a Fly Speed equal to your Speed. Your wings appear to be made of the same energy as your Breath Weapon. Once you use this trait, you can't use it again until you finish a Long Rest.",
+                "automation": {
+                    "type": "temp_buff",
+                    "effect": "fly_speed_equals_walk_speed",
+                    "duration": "10_minutes",
+                    "recharge": "long_rest",
+                    "requiredLevel": 5
+                }
             }
         ],
         "languages": [
@@ -160,7 +227,13 @@
             },
             {
                 "name": "Dwarven Resilience",
-                "description": "You have Resistance to Poison damage. You also have Advantage on saving throws you make to avoid or end the Poisoned condition."
+                "description": "You have Resistance to Poison damage. You also have Advantage on saving throws you make to avoid or end the Poisoned condition.",
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "saving_throw",
+                    "condition": "poison",
+                    "effect": "advantage"
+                }
             },
             {
                 "name": "Dwarven Toughness",
@@ -168,7 +241,13 @@
             },
             {
                 "name": "Stonecunning",
-                "description": "As a Bonus Action, you gain Tremorsense with a range of 60 feet for 10 minutes. You must be on a stone surface or touching a stone surface to use this Tremorsense. The stone can be natural or worked.<br/>You can use this Bonus Action a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest."
+                "description": "As a Bonus Action, you gain Tremorsense with a range of 60 feet for 10 minutes. You must be on a stone surface or touching a stone surface to use this Tremorsense. The stone can be natural or worked.<br/>You can use this Bonus Action a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest.",
+                "automation": {
+                    "type": "temp_buff",
+                    "effect": "tremorsense_60ft",
+                    "uses": "proficiency_bonus",
+                    "recharge": "long_rest"
+                }
             }
         ],
         "languages": [
@@ -216,7 +295,13 @@
             },
             {
                 "name": "Fey Ancestry",
-                "description": "You have Advantage on saving throws you make to avoid or end the Charmed condition."
+                "description": "You have Advantage on saving throws you make to avoid or end the Charmed condition.",
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "saving_throw",
+                    "condition": "charmed",
+                    "effect": "advantage"
+                }
             },
             {
                 "name": "Keen Senses",
@@ -265,7 +350,18 @@
             },
             {
                 "name": "Gnomish Cunning",
-                "description": "You have Advantage on Intelligence, Wisdom, and Charisma saving throws."
+                "description": "You have Advantage on Intelligence, Wisdom, and Charisma saving throws.",
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "saving_throw",
+                    "condition": "magic",
+                    "effect": "advantage",
+                    "abilities": [
+                        "INT",
+                        "WIS",
+                        "CHA"
+                    ]
+                }
             },
             {
                 "name": "Gnomish Lineage",
@@ -344,7 +440,62 @@
             },
             {
                 "name": "Giant Ancestry",
-                "description": "You are descended from Giants. Choose one of the following benefits-a supernatural boon from your ancestry; you can use the chosen benefit a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest:"
+                "description": "You are descended from Giants. Choose one of the following benefits-a supernatural boon from your ancestry; you can use the chosen benefit a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Long Rest:",
+                "automation": {
+                    "type": "resource_pool",
+                    "options": [
+                        {
+                            "name": "Cloud's Jaunt",
+                            "type": "teleport",
+                            "range": "30_ft",
+                            "uses": "proficiency_bonus",
+                            "recharge": "short_rest"
+                        },
+                        {
+                            "name": "Fire's Burn",
+                            "type": "damage",
+                            "damage": "1d10",
+                            "damageType": "Fire",
+                            "uses": "proficiency_bonus",
+                            "recharge": "short_rest"
+                        },
+                        {
+                            "name": "Frost's Chill",
+                            "type": "damage_with_condition",
+                            "damage": "1d6",
+                            "damageType": "Cold",
+                            "condition": "speed_reduction",
+                            "value": "10_ft",
+                            "uses": "proficiency_bonus",
+                            "recharge": "short_rest"
+                        },
+                        {
+                            "name": "Hill's Tumble",
+                            "type": "auto_effect",
+                            "trigger": "melee_hit",
+                            "effect": "prone",
+                            "uses": "proficiency_bonus",
+                            "recharge": "short_rest"
+                        },
+                        {
+                            "name": "Stone's Endurance",
+                            "type": "damage_reduction",
+                            "reductionExpression": "1d10 + CON modifier",
+                            "uses": "proficiency_bonus",
+                            "recharge": "short_rest"
+                        },
+                        {
+                            "name": "Storm's Thunder",
+                            "type": "reaction_damage",
+                            "damage": "1d8",
+                            "damageType": "Thunder",
+                            "range": "60_ft",
+                            "uses": "proficiency_bonus",
+                            "recharge": "short_rest"
+                        }
+                    ],
+                    "recharge": "short_rest"
+                }
             }
         ],
         "languages": [
@@ -355,14 +506,20 @@
     {
         "name": "Halfling",
         "creature_type": "Humanoid",
-        "description": "<p>Cheerished and guided by gods who value life, home, and hearth, halflings gravitate toward bucolic havens where family and community help shape their lives. That said, many halflings possess a brave and adventurous spirit that leads them on journeys of discovery, affording them the chance to explore a bigger world and make new friends along the way. Their size\u2014similar to that of a human child\u2014helps them pass through crowds unnoticed and slip through tight spaces. Anyone who has spent time around halflings, particularly halfling adventurers, has likely witnessed the storied \"luck of the halflings\" in action. When a halfling is in mortal danger, an unseen force seems to intervene on the halfling's behalf. Many halflings believe in the power of luck, and they attribute their unusual gift to one or more of their benevolent gods, including Yondalla, Brandobaris, and Charmalaine. The same gift might contribute to their robust life spans (about 150 years). Halfling communities come in all varieties. For every sequestered shire tucked away in an unspoiled part of the world, there's a crime syndicate like the Boromar Clan in the Eberron setting or a territorial mob of halflings like those in the Dark Sun setting. Halflings who prefer to live underground are sometimes called strongheart halflings or stouts. Nomadic halflings, as well as those who live among humans and other tall folk, are sometimes called lightfoot halflings or tallfellows.</p>",
+        "description": "<p>Cheerished and guided by gods who value life, home, and hearth, halflings gravitate toward bucolic havens where family and community help shape their lives. That said, many halflings possess a brave and adventurous spirit that leads them on journeys of discovery, affording them the chance to explore a bigger world and make new friends along the way. Their size—similar to that of a human child—helps them pass through crowds unnoticed and slip through tight spaces. Anyone who has spent time around halflings, particularly halfling adventurers, has likely witnessed the storied \"luck of the halflings\" in action. When a halfling is in mortal danger, an unseen force seems to intervene on the halfling's behalf. Many halflings believe in the power of luck, and they attribute their unusual gift to one or more of their benevolent gods, including Yondalla, Brandobaris, and Charmalaine. The same gift might contribute to their robust life spans (about 150 years). Halfling communities come in all varieties. For every sequestered shire tucked away in an unspoiled part of the world, there's a crime syndicate like the Boromar Clan in the Eberron setting or a territorial mob of halflings like those in the Dark Sun setting. Halflings who prefer to live underground are sometimes called strongheart halflings or stouts. Nomadic halflings, as well as those who live among humans and other tall folk, are sometimes called lightfoot halflings or tallfellows.</p>",
         "subtypes": [],
         "size": "Small (about 2-3 feet tall)",
         "speed": 30,
         "traits": [
             {
                 "name": "Brave",
-                "description": "You have Advantage on saving throws you make to avoid or end the Frightened condition."
+                "description": "You have Advantage on saving throws you make to avoid or end the Frightened condition.",
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "saving_throw",
+                    "condition": "frightened",
+                    "effect": "advantage"
+                }
             },
             {
                 "name": "Halfling Nimbleness",
@@ -370,7 +527,13 @@
             },
             {
                 "name": "Lucky",
-                "description": "When you roll a 1 on the d20 of a D20 Test, you can reroll the die, and you must use the new roll."
+                "description": "When you roll a 1 on the d20 of a D20 Test, you can reroll the die, and you must use the new roll.",
+                "automation": {
+                    "type": "auto_reroll",
+                    "target": "d20",
+                    "condition": "roll_equals_1",
+                    "effect": "reroll"
+                }
             },
             {
                 "name": "Naturally Stealthy",
@@ -391,7 +554,11 @@
         "traits": [
             {
                 "name": "Resourceful",
-                "description": "You gain Heroic Inspiration whenever you finish a Long Rest."
+                "description": "You gain Heroic Inspiration whenever you finish a Long Rest.",
+                "automation": {
+                    "type": "meta",
+                    "effect": "heroic_inspiration_on_long_rest"
+                }
             },
             {
                 "name": "Skillful",
@@ -415,7 +582,15 @@
         "traits": [
             {
                 "name": "Adrenaline Rush",
-                "description": "You can take the Dash action as a Bonus Action. When you do so, you gain a number of Temporary Hit Points equal to your Proficiency Bonus. You can use this trait a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Short or Long Rest."
+                "description": "You can take the Dash action as a Bonus Action. When you do so, you gain a number of Temporary Hit Points equal to your Proficiency Bonus. You can use this trait a number of times equal to your Proficiency Bonus, and you regain all expended uses when you finish a Short or Long Rest.",
+                "automation": {
+                    "type": "temp_buff",
+                    "effect": "bonus_action_dash",
+                    "bonusEffect": "temp_hp",
+                    "bonusExpression": "proficiency_bonus",
+                    "uses": "proficiency_bonus",
+                    "recharge": "short_rest"
+                }
             },
             {
                 "name": "Darkvision",
@@ -423,7 +598,14 @@
             },
             {
                 "name": "Relentless Endurance",
-                "description": "When you are reduced to 0 Hit Points but not killed outright, you can drop to 1 Hit Point instead. Once you use this trait, you can't do so again until you finish a Long Rest."
+                "description": "When you are reduced to 0 Hit Points but not killed outright, you can drop to 1 Hit Point instead. Once you use this trait, you can't do so again until you finish a Long Rest.",
+                "automation": {
+                    "type": "auto_effect",
+                    "trigger": "reduced_to_0_hp",
+                    "effect": "drop_to_1_hp",
+                    "uses": 1,
+                    "recharge": "long_rest"
+                }
             }
         ],
         "languages": [
@@ -478,7 +660,11 @@
             },
             {
                 "name": "Otherworldly Presence",
-                "description": "You know the Thaumaturgy cantrip. When you cast it with this trait, the spell uses the same spellcasting ability you use for your Fiendish Legacy trait."
+                "description": "You know the Thaumaturgy cantrip. When you cast it with this trait, the spell uses the same spellcasting ability you use for your Fiendish Legacy trait.",
+                "automation": {
+                    "type": "cantrip",
+                    "spell": "Thaumaturgy"
+                }
             }
         ],
         "languages": [

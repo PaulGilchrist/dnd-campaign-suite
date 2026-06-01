@@ -27,6 +27,56 @@
     grid-template-columns: 120px 80px 80px 80px 70px 80px;
 }
 
+/* save-dc-display used by save_attack automation */
+.char-actions .save-dc-display {
+    color: #8b5cf6;
+    font-weight: 700;
+}
+
+/* Automation UI elements */
+.automation-btn {
+    background: none;
+    border: 1px solid #8b5cf6;
+    color: #8b5cf6;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    margin-left: 6px;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+.automation-btn:hover {
+    background: rgba(139, 92, 246, 0.15);
+}
+.automation-btn i {
+    margin-right: 3px;
+}
+
+.automation-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #8b5cf6;
+    background: rgba(139, 92, 246, 0.1);
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.automation-actions {
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.stat--buffed {
+    color: #16a34a;
+    font-weight: 700;
+}
+
 @media print {
     .char-actions .attacks {
         grid-template-columns: 160px 120px 90px 120px 1fr;
@@ -36,5 +86,10 @@
     }
     .char-actions .attacks > div {
         padding-right: 4px;
+    }
+    .automation-btn,
+    .automation-badge,
+    .automation-actions {
+        display: none;
     }
 }

@@ -121,7 +121,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const exhaustionPenalty = 2 * exhaustionLevel;
 
     const activeConditions = loadActiveConditions(playerSummary?.name, campaignName)
-    const conditionEffects = computeConditionEffects(activeConditions)
+    const conditionEffects = computeConditionEffects(activeConditions, playerStats.saveModifiers)
     const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
     const conditionAttackMode = getNetAttackMode(conditionEffects.attackAdvantageCount, conditionEffects.attackDisadvantageCount)
 
