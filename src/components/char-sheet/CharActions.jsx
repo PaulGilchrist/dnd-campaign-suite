@@ -17,6 +17,8 @@ import { hasAutomation, getAutomationInfo } from '../../services/automationServi
 import storage from '../../services/storage.js'
 import utils from '../../services/utils.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
+import { getClassFeatures } from '../../services/classFeatures.js';
+import { addEntry } from '../../services/logService.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';
 
@@ -230,10 +232,43 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
       }
     }, [cannotAct, mapName, buildAttackContextSync, buildAttackContext, rollAttack, exhaustionPenalty]);
 
+    const MONK_KI_FEATURES = ['Flurry of Blows', 'Patient Defense', 'Step of the Wind', 'Heightened Flurry of Blows', 'Heightened Patient Defense', 'Heightened Step of the Wind'];
+
     const handleAutomationAction = async (action) => {
         if (cannotAct) return;
         const auto = action.automation;
         if (!auto) return;
+
+        // Spend 1 focus point for monk Ki features
+        if (MONK_KI_FEATURES.includes(action.name)) {
+            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+            const maxFP = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
+            const storedFP = storage.getProperty(playerStats.name, 'focusPoints', campaignName);
+              // If not yet stored, current equals max (same init logic as TrackedResourceInput)
+            const currentFP = storedFP != null ? Number(storedFP) : maxFP;
+            if (currentFP <= 0) {
+                 setPopupHtml(`<b>${action.name}</b><br/>No ${playerStats.rules === '2024' ? "Focus Points" : 'ki points'} remaining.`);
+              return;
+            }
+             await storage.setProperty(playerStats.name, 'focusPoints', currentFP - 1, campaignName);
+
+              // Notify other components that focus points changed
+            window.dispatchEvent(new CustomEvent('focus-points-updated'));
+
+             // Log the ability use and focus point consumption
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: action.name,
+                description: `${action.name} activated`,
+                focusPointsSpent: 1,
+                remainingFocusPoints: currentFP - 1
+            }).catch(() => {});
+
+            // Show activation confirmation
+            setPopupHtml(`<b>${action.name}</b><br/>${playerStats.rules === '2024' ? 'Focus Point' : 'Ki point'} spent. ${currentFP - 1} remaining.`);
+            return;
+        }
 
         switch (auto.type) {
             case 'save_attack': {

@@ -136,7 +136,7 @@ function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
     maxHp: creature.maxHp,
     isHealing: false,
     isUnconscious: isDead,
-  };
+   };
   if (threshold) entry.threshold = threshold;
 
   if (creature.type === 'player') {
@@ -144,8 +144,8 @@ function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
     if (oldHp > 0 && isDead) {
       storage.setProperty(creature.name, 'deathSaves', [false, false, false], campaignName);
       storage.setProperty(creature.name, 'deathFailures', [false, false, false], campaignName);
-    }
-  }
+       }
+     }
 
   fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
     method: 'POST',

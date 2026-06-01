@@ -4442,10 +4442,55 @@
                 "unarmored_movement_increase": 10,
                 "features": [
                     {
-                        "name": "Monk's Focus",
-                        "description": "Your focus and martial training allow you to harness a well of extraordinary energy within yourself. This energy is represented by Focus Points. You start knowing three features: Flurry of Blows (expend 1 Focus Point to make two Unarmed Strikes as Bonus Action), Patient Defense (take Disengage as Bonus Action, or expend 1 Focus Point for Disengage + Dodge), Step of the Wind (take Dash as Bonus Action, or expend 1 Focus Point for Disengage + Dash with doubled jump distance). When you expend a Focus Point, it is unavailable until you finish a Short or Long Rest. Save DC = 8 + Wisdom modifier + Proficiency Bonus.",
+                        "name": "Flurry of Blows",
+                        "description": "Expend 1 Focus Point to make two Unarmed Strikes as Bonus Action, increasing to three at level 10.",
                         "level": 2,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "bonus_attacks",
+                            "attacks": 2,
+                            "attackType": "unarmed_strike",
+                            "cost": {
+                                "resource": "focus_points",
+                                "amount": 1
+                            },
+                            "trigger": "after_attack_action",
+                            "casting_time": "1 bonus action"
+                        }
+                    },
+                    {
+                        "name": "Patient Defense",
+                        "description": "Take Disengage as Bonus Action, or expend 1 Focus Point for Disengage + Dodge.",
+                        "level": 2,
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "bonus_attacks",
+                            "attacks": 2,
+                            "attackType": "disengage_dodge",
+                            "cost": {
+                                "resource": "focus_points",
+                                "amount": 1
+                            },
+                            "trigger": "after_attack_action",
+                            "casting_time": "1 bonus action"
+                        }
+                    },
+                    {
+                        "name": "Step of the Wind",
+                        "description": "Take Dash as Bonus Action, or expend 1 Focus Point for Disengage + Dash with doubled jump distance.",
+                        "level": 2,
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "bonus_attacks",
+                            "attacks": 2,
+                            "attackType": "disengage_dash",
+                            "cost": {
+                                "resource": "focus_points",
+                                "amount": 1
+                            },
+                            "trigger": "after_attack_action",
+                            "casting_time": "1 bonus action"
+                        }
                     },
                     {
                         "name": "Unarmored Movement",
@@ -4630,10 +4675,55 @@
                 "unarmored_movement_increase": 20,
                 "features": [
                     {
-                        "name": "Heightened Focus",
-                        "description": "Flurry of Blows: expend 1 Focus Point for three Unarmed Strikes instead of two. Patient Defense: gain Temporary Hit Points equal to two Martial Arts die rolls. Step of the Wind: move a willing creature within 5 feet (Large or smaller) with you.",
-                        "level": 10,
-                        "type": "class_feature"
+                        "name": "Heightened Flurry of Blows",
+                        "description": "Expend 1 Focus Point to make three Unarmed Strikes as Bonus Action.",
+                        "level": 2,
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "bonus_attacks",
+                            "attacks": 3,
+                            "attackType": "unarmed_strike",
+                            "cost": {
+                                "resource": "focus_points",
+                                "amount": 1
+                            },
+                            "trigger": "after_attack_action",
+                            "casting_time": "1 bonus action"
+                        }
+                    },
+                    {
+                        "name": "Heightened Patient Defense",
+                        "description": "Take Disengage as Bonus Action, or expend 1 Focus Point for Disengage, Dodge, and Temporary Hit Points equal to two Martial Arts die rolls.",
+                        "level": 2,
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "bonus_attacks",
+                            "attacks": 2,
+                            "attackType": "disengage_dodge",
+                            "cost": {
+                                "resource": "focus_points",
+                                "amount": 1
+                            },
+                            "trigger": "after_attack_action",
+                            "casting_time": "1 bonus action"
+                        }
+                    },
+                    {
+                        "name": "Heightened Step of the Wind",
+                        "description": "Take Dash as Bonus Action, or expend 1 Focus Point for Disengage + Dash with doubled jump distance, moving a willing creature within 5 feet (Large or smaller) with you.",
+                        "level": 2,
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "bonus_attacks",
+                            "attacks": 2,
+                            "attackType": "disengage_dash",
+                            "cost": {
+                                "resource": "focus_points",
+                                "amount": 1
+                            },
+                            "trigger": "after_attack_action",
+                            "casting_time": "1 bonus action"
+                        }
                     },
                     {
                         "name": "Self-Restoration",

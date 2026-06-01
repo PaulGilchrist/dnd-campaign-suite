@@ -5,21 +5,35 @@ function useTrackedResource(storageKey, playerName, maxGetter, deps, campaignNam
   const [current, setCurrent] = React.useState(() => {
     const storedValue = storage.getProperty(playerName, storageKey, campaignName);
     return storedValue != null ? storedValue : maxGetter();
-  });
+   });
 
   React.useEffect(() => {
     const storedValue = storage.getProperty(playerName, storageKey, campaignName);
     if (storedValue != null) {
       setCurrent(storedValue);
-    } else {
+     } else {
       setCurrent(maxGetter());
-    }
-  }, [deps, maxGetter, playerName, storageKey, campaignName]);
+     }
+   }, [deps, maxGetter, playerName, storageKey, campaignName]);
 
-  const update = (val) => {
-    storage.setProperty(playerName, storageKey, val, campaignName);
+  // Listen for external updates to this resource (e.g., monk ki/focus point spend from CharActions)
+  React.useEffect(() => {
+    const handler = () => {
+      const storedValue = storage.getProperty(playerName, storageKey, campaignName);
+      if (storedValue != null) {
+        setCurrent(storedValue);
+       } else {
+        setCurrent(maxGetter());
+       }
+     };
+    window.addEventListener('focus-points-updated', handler);
+    return () => window.removeEventListener('focus-points-updated', handler);
+   }, [playerName, storageKey, campaignName]);
+
+  const update = async (val) => {
+    await storage.setProperty(playerName, storageKey, val, campaignName);
     setCurrent(val);
-  };
+   };
 
   return { current, max: maxGetter(), update };
 }

@@ -57,22 +57,22 @@ export function spellSlotLevels() {
   return [1, 2, 3, 4, 5, 6, 7, 8, 9]
 }
 
-export function applyShortRest(playerStats, campaignName, storage) {
+export async function applyShortRest(playerStats, campaignName, storage) {
   const name = playerStats.name
   const storedHp = storage.getProperty(name, 'currentHitPoints', campaignName)
   const currentHp = computeShortRestHpNewCurrent(storedHp, playerStats.hitPoints, 0)
 
-  getShortRestResources().forEach((key) => {
-    storage.setProperty(name, key, null, campaignName)
-  })
+  for (const key of getShortRestResources()) {
+    await storage.setProperty(name, key, null, campaignName)
+   }
 
-  storage.setProperty(name, 'currentHitPoints', currentHp, campaignName)
+  await storage.setProperty(name, 'currentHitPoints', currentHp, campaignName)
 }
 
-export function applyLongRest(playerStats, campaignName, storage) {
+export async function applyLongRest(playerStats, campaignName, storage) {
   const name = playerStats.name
 
-  // Read current full character data for atomic batch update
+   // Read current full character data for atomic batch update
   let charData = storage.get(name)
   if (!charData) charData = {}
 
@@ -84,27 +84,27 @@ export function applyLongRest(playerStats, campaignName, storage) {
       const max = playerStats.spellAbilities[key]
       if (max != null) {
         charData[key] = max
-      }
-    }
-  }
+       }
+     }
+   }
 
   charData.shortRestHitDice = playerStats.level
 
   getLongRestResources().forEach((key) => {
     charData[key] = null
-  })
+    })
 
   const currentExhaustion = charData.exhaustionLevel
   if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
     charData.exhaustionLevel = getLevelAfterLongRest(currentExhaustion)
-  }
+     }
 
-  // Grant Heroic Inspiration from Resourceful trait (Human 2024)
+   // Grant Heroic Inspiration from Resourceful trait (Human 2024)
   const hasResourceful = playerStats.characterAdvancement?.some(f => f.name === 'Resourceful')
   if (hasResourceful) {
     charData.hasInspiration = true
-  }
+     }
 
-  // Single atomic write fires ONE SSE event with the complete final state
-  storage.set(name, charData, campaignName)
+   // Single atomic write fires ONE SSE event with the complete final state
+  await storage.set(name, charData, campaignName)
 }

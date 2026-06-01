@@ -137,22 +137,33 @@ const classRules = {
         return categorizeFeatures(allFeatures, featureCategories, { descriptionField: 'description' });
         },
         getFeatures: (playerStats) => {
-                  // 2024 Rules: Process class and major features
-            const classLevels = playerStats.class?.class_levels?.filter(classLevel => classLevel.level <= playerStats.level) || [];
-            let features = classRules.addFeatures(classLevels);
+                    // 2024 Rules: Process class and major features
+             const classLevels = playerStats.class?.class_levels?.filter(classLevel => classLevel.level <= playerStats.level) || [];
 
-            if (playerStats.class.major) {
-                   // 2024 majors have features directly with level property, not class_levels
-                const majorFeaturesList = playerStats.class.major.features?.filter(feature => feature.level <= playerStats.level) || [];
-                   // Create a dummy level structure for addFeatures
-                const majorLevels = [{ features: majorFeaturesList }];
-                const majorFeatures = classRules.addFeatures(majorLevels);
+              // When level >= 10, Heightened versions replace base versions
+             const isHeightened = playerStats.level >= 10;
+             const replacedByHeightened = isHeightened ? ['Flurry of Blows', 'Patient Defense', 'Step of the Wind'] : [];
 
-                features = mergeCategorizedFeatures(features, majorFeatures);
-                  }
+             let features = classRules.addFeatures(classLevels);
+             if (replacedByHeightened.length > 0) {
+                 const toFilter = new Set(replacedByHeightened);
+                 Object.keys(features).forEach(cat => {
+                     features[cat] = features[cat].filter(f => !toFilter.has(f.name));
+                  });
+              }
 
-            return features;
-            },
+             if (playerStats.class.major) {
+                         // 2024 majors have features directly with level property, not class_levels
+                 const majorFeaturesList = playerStats.class.major.features?.filter(feature => feature.level <= playerStats.level) || [];
+                        // Create a dummy level structure for addFeatures
+                 const majorLevels = [{ features: majorFeaturesList }];
+                 const majorFeatures = classRules.addFeatures(majorLevels);
+
+                 features = mergeCategorizedFeatures(features, majorFeatures);
+                     }
+
+             return features;
+              },
     getHighestMajorLevel: (playerStats) => {
         let highestLevel = 0;
 

@@ -97,26 +97,14 @@ const MonkFeatures = function MonkFeatures({ playerStats }) {
     if (playerStats.level < 2) return null;
     const focusSaveDc = 8 + (wisdom?.bonus || 0) + playerStats.proficiency;
     return (
-         <div data-testid="char-class-monk">
-             <div><b>Martial Arts Die:</b> d{monkFeatures?.martialArtsDie || 0}</div>
-             <div><b>Extra Attacks: </b>{playerStats.class?.class_levels?.[playerStats.level - 1]?.extra_attacks || 0}</div>
-             <TrackedResourceInput label="Focus Points" resourceKey="focusPoints" playerName={playerStats.name} getMax={() => monkFeatures?.maxFocusPoints || 0} deps={[playerStats]} />
-             <div><b>Focus Save DC: </b>{focusSaveDc}</div>
-             <div><b>Unarmored Movement:</b> +{monkFeatures?.unarmoredMovementIncrease || 0} ft.</div>
-              <div className="automation-actions">
-                  {playerStats.level >= 2 && (
-                      <button className="automation-btn" title="Flurry of Blows: 2 Unarmed Strikes as Bonus Action (1 FP)">
-                          <i className="fas fa-fist-raised"></i> Flurry of Blows (1 FP)
-                      </button>
-                  )}
-                  {playerStats.level >= 10 && (
-                      <button className="automation-btn" title="Heightened Focus: Flurry gives 3 strikes, Patient Defense grants temp HP">
-                          <i className="fas fa-wind"></i> Heightened Focus
-                      </button>
-                  )}
-              </div>
-         </div>
-    );
+           <div data-testid="char-class-monk">
+               <div><b>Martial Arts Die:</b> d{monkFeatures?.martialArtsDie || 0}</div>
+               <div><b>Extra Attacks: </b>{playerStats.class?.class_levels?.[playerStats.level - 1]?.extra_attacks || 0}</div>
+               <TrackedResourceInput label="Focus Points" resourceKey="focusPoints" playerName={playerStats.name} getMax={() => monkFeatures?.maxFocusPoints || 0} deps={[playerStats]} />
+               <div><b>Focus Save DC: </b>{focusSaveDc}</div>
+               <div><b>Unarmored Movement:</b> +{monkFeatures?.unarmoredMovementIncrease || 0} ft.</div>
+           </div>
+      );
 };
 
 /* ─── Paladin ─── */
