@@ -416,6 +416,7 @@ const rules = {
           ...(playerStats.bonusActions || []),
           ...(playerStats.reactions || []),
           ...(playerStats.specialActions || []),
+          ...(playerStats.characterAdvancement || []),
         ];
         playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
         playerStats.saveModifiers = collectSaveModifiers(allFeatures);
