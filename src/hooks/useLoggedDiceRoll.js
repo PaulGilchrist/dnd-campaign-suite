@@ -532,7 +532,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
            popupHtml,
             setPopupHtml,
         rollAbilityCheck: (name, bonus) => logAndShow(name, bonus, 'check'),
-     rollSavingThrow: (name, saveBonus) => logAndShow(name, saveBonus, 'save'),
+     rollSavingThrow: (name, saveBonus, context) => logAndShow(name, saveBonus, 'save', context),
    rollSkillCheck: (name, bonus) => logAndShow(name, bonus, 'skill'),
     rollInitiative: (initBonus) => logAndShow('Initiative', initBonus, 'initiative'),
        rollAttack: (name, hitBonus, context) => logAndShow(name, hitBonus, 'attack', context),

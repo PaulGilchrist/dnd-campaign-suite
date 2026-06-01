@@ -281,7 +281,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     onClose={() => setShowAvatarModal(false)}
                 />
             )}
-              <CharConditions playerStats={playerStats} campaignName={campaignName} exhaustionLevel={exhaustionLevel} onExhaustionChange={onExhaustionChange} onConditionsChange={onConditionsChange} />
+              <CharConditions playerStats={playerStats} campaignName={campaignName} exhaustionLevel={exhaustionLevel} onExhaustionChange={onExhaustionChange} onConditionsChange={onConditionsChange} conditionEffects={conditionEffects} />
             </div>
   </div>
 )

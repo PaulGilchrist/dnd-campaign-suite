@@ -59,6 +59,20 @@ function computeConditionEffects(conditions = [], saveModifiers = []) {
 
   const conditionSet = new Set(conditions)
 
+  for (const mod of saveModifiers) {
+    if (mod.target !== 'saving_throw' && mod.target !== 'save') continue;
+    if (mod.condition === 'charmed' && conditionSet.has('charmed')) {
+      if (mod.effect === 'advantage') effects.saveAdvantageCount++;
+      if (mod.effect === 'disadvantage') effects.saveDisadvantageCount++;
+    } else if (mod.condition === 'frightened' && conditionSet.has('frightened')) {
+      if (mod.effect === 'advantage') effects.saveAdvantageCount++;
+      if (mod.effect === 'disadvantage') effects.saveDisadvantageCount++;
+    } else if (mod.condition === 'poison' && conditionSet.has('poisoned')) {
+      if (mod.effect === 'advantage') effects.saveAdvantageCount++;
+      if (mod.effect === 'disadvantage') effects.saveDisadvantageCount++;
+    }
+  }
+
   applySaveModifiers(effects, saveModifiers, null, null);
 
   for (const key of conditionSet) {

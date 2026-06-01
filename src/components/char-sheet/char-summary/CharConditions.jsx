@@ -26,7 +26,7 @@ export function loadActiveConditions(name, campaignName) {
   return loadConditions(name, campaignName)
 }
 
-function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhaustionChange, onConditionsChange }) {
+function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhaustionChange, onConditionsChange, conditionEffects }) {
   const [activeConditions, setActiveConditions] = React.useState(() =>
     loadConditions(playerStats.name, campaignName)
   )
@@ -49,8 +49,21 @@ function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhausti
     const condition = CONDITIONS.find(c => c.key === conditionKey)
     const conditionName = condition?.label || conditionKey
     const saveBonus = getAbilitySaveBonus(playerStats, saveAbility)
-    const roll = rollD20()
-    const total = roll + saveBonus
+    const hasAdvantage = (conditionEffects?.saveAdvantageCount || 0) > 0
+
+    let roll1, roll2, finalRoll, mode
+    if (hasAdvantage) {
+      roll1 = rollD20()
+      roll2 = rollD20()
+      finalRoll = Math.max(roll1, roll2)
+      mode = 'advantage'
+    } else {
+      roll1 = rollD20()
+      roll2 = 0
+      finalRoll = roll1
+      mode = 'normal'
+    }
+    const total = finalRoll + saveBonus
     const success = total >= CONDITION_SAVE_DC
 
     logEntry({
@@ -58,9 +71,9 @@ function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhausti
       characterName: playerStats.name,
       rollType: 'save',
       name: `${saveLabel} (${conditionName})`,
-      rolls: [roll],
-      mode: 'normal',
-      total: roll,
+      rolls: hasAdvantage ? [roll1, roll2] : [roll1],
+      mode,
+      total: finalRoll,
       bonus: saveBonus,
       dc: CONDITION_SAVE_DC,
       success,
@@ -71,10 +84,11 @@ function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhausti
       type: 'd20',
       rollType: 'save',
       name: `${saveLabel} (DC ${CONDITION_SAVE_DC})`,
-      rolls: [roll],
+      rolls: hasAdvantage ? [roll1, roll2] : [roll1],
       bonus: saveBonus,
       dc: CONDITION_SAVE_DC,
       success,
+      forcedMode: hasAdvantage ? 'advantage' : undefined,
     })
 
     if (success) {
