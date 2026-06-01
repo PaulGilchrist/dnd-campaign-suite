@@ -344,6 +344,17 @@ function buildAttackInfo(feature, playerStats) {
       }
     }
 
+    case 'reaction_bonus': {
+      return {
+        type: 'reaction_bonus',
+        name: feature.name,
+        trigger: auto.trigger || '',
+        bonusExpression: auto.bonusExpression || '',
+        condition: auto.condition || '',
+        hasAutomation: true
+      }
+    }
+
     case 'free_spell': {
       return {
         type: 'free_spell',
@@ -479,6 +490,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
       case 'bonus_action_attack':
       case 'reaction_damage':
       case 'reaction_debuff':
+      case 'reaction_bonus':
       case 'free_spell':
       case 'resource_pool':
       case 'attack_rider':

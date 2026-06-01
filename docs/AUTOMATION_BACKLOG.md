@@ -50,6 +50,7 @@ one-click die rolls, resource tracking, and automated effects during combat.
 | `resistance` | Damage resistance | Celestial Resistance, racial resistances |
 | `meta` | Meta-mechanical effect | Resourceful (Human) |
 | `healing_bonus` | Bonus healing on rest | Song of Rest (Bard) |
+| `reaction_bonus` | Bonus as reaction | Defensive Duelist |
 
 ---
 
@@ -79,6 +80,12 @@ one-click die rolls, resource tracking, and automated effects during combat.
 ### 5e Classes
 - **Barbarian** - Rage (combat_stance), Reckless Attack (temp_buff), Danger Sense (conditional_advantage), Berserker: Frenzy (bonus_action_attack), Mindless Rage (condition_immunity_while_active), Retaliation (reaction_damage), Totem Warrior: Bear/Eagle/Wolf options (resistance, passive_buff)
 - **Bard** - Bardic Inspiration (buff_ally), Song of Rest (healing_bonus), Lore: Cutting Words (reaction_debuff), Valor: Combat Inspiration (enhanced_buff)
+- **Cleric** - Channel Divinity (resource_pool), Nature: Dampen Elements (damage_reduction), Trickery: Cloak of Shadows (temp_buff), War: War Priest, etc.
+- **Druid** - Wild Shape (resource_pool), Land: Natural Recovery (resource_pool), Moon: Combat Wild Shape/Wild Shape CR boosts (resource_pool integration), Sea/Land/Circle features, Wild Resurgence (2024 only)
+- **Rogue** - Uncanny Dodge (damage_reduction), Evasion (conditional_advantage), Assassin: Assassinate (conditional_advantage), Sneak Attack (damage_bonus)
+- **Sorcerer** - Draconic: Elemental Affinity (damage_bonus), Wild Magic: Wild Magic Surge (auto_effect), Tides of Chaos (resource_pool), Metamagic (spell_modifier), Sorcery Points (resource_pool)
+- **Warlock** - Fiend: Dark One's Blessing (temp_hp_buff), Archfey: Misty Escape (temp_buff), Eldritch Invocations (various passive effects), Pact Boon effects
+- **Wizard** - Divination: Portent (passive_buff), Evocation: Sculpt Spells (passive_rule), Abjuration: Arcane Ward (damage_reduction), Arcane Recovery (resource_pool)
 - **Fighter** - Second Wind (self_healing), Action Surge (extra_action), Champion: Improved/Superior Critical (passive_rule), Battle Master: Combat Superiority (resource_pool), Maneuvers (attack_rider)
 - **Monk** - Deflect Missiles (damage_reduction), Slow Fall (damage_reduction), Stunning Strike (save_attack), Flurry of Blows (bonus_attacks), Open Hand Technique (flurry_effect), Wholeness of Body (self_healing)
 - **Paladin** - Lay on Hands (healing_pool), Aura of Protection (passive_buff), Aura of Courage (passive_immunity), Divine Smite (damage_bonus), Devotion: Sacred Weapon (temp_buff), Vengeance: Vow of Enmity (temp_buff)
@@ -111,22 +118,33 @@ one-click die rolls, resource tracking, and automated effects during combat.
 - **Lucky** - resource_pool (3 luck points to reroll)
 - **Heavy Armor Master** - damage_reduction (3 from nonmagical B/P/S)
 - **Inspiring Leader** - temp_hp_buff (level + CHA mod, 30 ft, 6 creatures)
-- **Sentinel** - reaction_debuff + passive_rule for opportunity attacks
-- **Polearm Master** - bonus_action_attack + passive_rule for opportunity attacks
-- **Mage Slayer** - reaction_damage + conditional_disadvantage for concentration
-- **Defensive Duelist** - conditional_advantage for AC as reaction
-- **Alert** - passive_buff for +5 initiative + passive_immunity for surprised
-- **War Caster** - passive_buff for advantage on concentration saves
+- **Sentinel** - passive_rule (speed 0 on OA hit, OA on Disengage)
+- **Polearm Master** - bonus_action_attack (d4 bludgeoning)
+- **Mage Slayer** - reaction_damage (melee attack when spellcaster within 5 ft casts)
+- **Defensive Duelist** - reaction_bonus (add prof bonus to AC as reaction)
+- **Alert** - passive_buff for +5 initiative
+- **War Caster** - conditional_advantage for advantage on concentration saves
 - **Healer** - healing (1d6+4+max HD from healer's kit)
 - **Observant** - passive_buff for +5 passive Perception and Investigation
-- **Mobile** - passive_buff for +10 speed and no opportunity attacks after melee
+- **Mobile** - passive_buff for +10 speed
 - **Durable** - passive_buff for minimum HP recovery from hit dice
 - **Tough** - passive_buff for +2 HP per level
-- **Dual Wielder** - bonus_attacks for two-weapon fighting + passive_buff +1 AC
-- **Crossbow Expert** - passive_rule for ignoring loading and melee disadvantage
+- **Dual Wielder** - passive_buff +1 AC while dual wielding
+- **Crossbow Expert** - passive_rule for ignoring loading property
 - **Shield Master** - passive_buff for shield AC bonus to DEX saves
 - **Resilient** - passive_buff for save proficiency
-- **Elemental Adept** - passive_rule for ignoring resistance + passive_buff for treating 1s as 2s
+- **Elemental Adept** - passive_rule for ignoring resistance + treating 1s as 2s
+- **Athlete** - passive_buff for climbing speed
+- **Charger** - attack_rider (+5 damage or push after Dash)
+- **Grappler** - conditional_advantage on attack rolls while grappling
+- **Martial Adept** - resource_pool (1 superiority die, d6)
+- **Savage Attacker** - passive_rule for rerolling damage once per turn
+- **Mounted Combat** - conditional_advantage on melee vs unmounted smaller
+- **Dungeon Delver** - conditional_advantage on saves vs traps
+- **Skulker** - passive_buff for dim light perception
+- **Spell Sniper** - passive_rule for doubled spell range
+- **Tavern Brawler** - passive_buff for improvised weapon proficiency
+- **Actor** - conditional_advantage on Deception/Performance while disguised
 
 ### 2024 Feats
 - **Crusher** - attack_rider (push + advantage after crit)
@@ -156,31 +174,8 @@ one-click die rolls, resource tracking, and automated effects during combat.
 
 These are NOT yet fully implemented but could be added following the same pattern:
 
-### 5e Classes (remaining work)
-- **Cleric**
-  - Some domain features still lack automation (Nature: Dampen Elements as reaction_dr, Trickery: Cloak of Shadows, etc.)
-- **Druid**
-  - Circle of the Land: Natural Recovery (resource_pool)
-  - Circle of Stars: Starry Form (temp_buff with options), Cosmic Omen (buff_ally)
-  - Circle of the Moon: Wild Shape improvements
-  - Circle of the Sea: Wrath of the Sea (damage_bonus)
-- **Rogue**
-  - Uncanny Dodge (damage_reduction as reaction)
-  - Evasion (auto save effect)
-  - Assassinate (Assassin) - auto-crit on surprised
-- **Sorcerer**
-  - Draconic Bloodline: Elemental Affinity (damage_bonus)
-  - Wild Magic Surge - roll on surge table
-  - Tides of Chaos (temp_buff)
-- **Warlock**
-  - Dark One's Blessing (Fiend) - temp_hp_buff
-  - Healing Light (Celestial) - healing_pool
-  - Misty Escape (Archfey) - temp_buff
-  - Form of Dread (Undead) - combat_stance
-- **Wizard**
-  - Portent (Divination) - pre-rolled d20 replacement
-  - Sculpt Spells (Evocation) - AoE ally protection
-  - Arcane Ward (Abjuration) - damage_reduction pool
+### 5e Classes (completed)
+All 5e class features with combat relevance in `classes.json` now have automation blocks. Supplemental source content (Tasha's, Xanathar's, Van Richten's) not yet in data files.
 
 ### 2024 Classes (remaining subclass work)
 - **Druid**: Wild Resurgence, Elemental Fury, all circle features need full automation review
@@ -194,13 +189,8 @@ These are NOT yet fully implemented but could be added following the same patter
 - **Genasi** - elemental resistances and movement traits (resistance, passive_buff)
 - **Aasimar 2024** - LightBearer cantrip automation (already partially done)
 
-### Feats (remaining low priority)
-- **Interception** - damage reduction for ally
-- **Mounted Combat** - various mounted benefits
-- **Ritual Caster** - depends on spellcasting system integration
-- **Spell Sniper** - range doubling (partially handled by range validation)
-- **Tavern Brawler** - unarmed strike improvements
-- **Weapon Master** - proficiency expansion
+### Feats (all combat-relevant 5e feats done)
+All 33 combat-relevant feats in `public/data/feats.json` now have automation. Non-combat feats (Heavily Armored, Keen Mind, Lightly Armored, Linguist, Magic Initiate, Ritual Caster, Skilled, Weapon Master, Moderately Armored) intentionally omitted.
 
 ### UI/Enhancement Work
 - Lay on Hands pool needs functional click-to-heal UI (currently shows info popup)
@@ -256,11 +246,11 @@ These are NOT yet fully implemented but could be added following the same patter
 |------|---------|
 | `public/data/races.json` | Added automation blocks to Dragonborn, Elf, Half-Elf, Dwarf, Gnome, Halfling, Half-Orc |
 | `public/data/2024/races.json` | All Aasimar, Dragonborn, Dwarf, Elf, Gnome, Goliath, Halfling, Human, Orc, Tiefling traits |
-| `public/data/classes.json` | All classes and subclasses with automation |
+| `public/data/classes.json` | All classes and subclasses with automation (5e + remaining features) |
 | `public/data/2024/classes.json` | All classes and subclasses with automation |
 | `public/data/feats.json` | All feats with combat automation |
 | `public/data/2024/feats.json` | All feats and Epic Boons with automation |
-| `src/services/automationService.js` | Processes 30+ automation types |
+| `src/services/automationService.js` | Processes 30+ automation types (+ reaction_bonus) |
 | `src/services/rules.js` | Integration point - calls automation processor |
 | `src/services/conditionEffects.js` | Added save modifiers (conditional_advantage) |
 | `src/services/restRules.js` | Added new resource pools for rest reset |

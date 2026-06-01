@@ -2853,12 +2853,19 @@
                     {
                         "level": 6,
                         "features": [
-                            {
-                                "name": "Dampen Elements",
-                                "level": 6,
-                                "prerequisites": [],
-                                "description": "When you or a creature within 30 feet of you takes acid, cold, fire, lightning, or thunder damage, you can use your reaction to grant resistance to the creature against that instance of the damage."
-                            }
+                             {
+                                 "name": "Dampen Elements",
+                                 "level": 6,
+                                 "prerequisites": [],
+                                 "description": "When you or a creature within 30 feet of you takes acid, cold, fire, lightning, or thunder damage, you can use your reaction to grant resistance to the creature against that instance of the damage.",
+                                 "automation": {
+                                     "type": "damage_reduction",
+                                     "reductionExpression": "resistance",
+                                     "trigger": "acid_cold_fire_lightning_thunder_damage",
+                                     "reaction": true,
+                                     "redirect": false
+                                 }
+                             }
                         ]
                     },
                     {
@@ -3261,12 +3268,19 @@
                     {
                         "level": 6,
                         "features": [
-                            {
-                                "name": "Channel Divinity: Cloak of Shadows",
-                                "level": 6,
-                                "prerequisites": [],
-                                "description": "You can use your Channel Divinity to vanish. As an action, you become invisible until the end of your next turn. You become visible ifyou attack or cast a spell."
-                            }
+                             {
+                                 "name": "Channel Divinity: Cloak of Shadows",
+                                 "level": 6,
+                                 "prerequisites": [],
+                                 "description": "You can use your Channel Divinity to vanish. As an action, you become invisible until the end of your next turn. You become visible ifyou attack or cast a spell.",
+                                 "automation": {
+                                     "type": "temp_buff",
+                                     "effect": "invisible",
+                                     "duration": "1_round",
+                                     "action": "action",
+                                     "recharge": "channel_divinity"
+                                 }
+                             }
                         ]
                     },
                     {
@@ -3594,27 +3608,34 @@
                 "class_specific": {
                     "wild_shape_max_cr": 0,
                     "wild_shape_swim": false,
-                    "wild_shape_fly": false
-                }
-            },
-            {
-                "level": 2,
-                "ability_score_bonuses": 0,
-                "prof_bonus": 2,
-                "features": [
-                    {
-                        "name": "Druid Circle",
-                        "level": 2,
-                        "prerequisites": [],
-                        "description": "You choose to identify with a circle of druids: the Circle of the Land or the Circle of the Moon, both detailed at the end of the class description. Your choice grants you features at 2nd level and again at 6th, 10th, and 14th level."
-                    },
-                    {
-                        "name": "Wild Shape",
-                        "level": 2,
-                        "prerequisites": [],
-                        "details": "Your druid level determines the beasts you can transform into, as shown in the Beast Shapes table. At 2nd level, for example, you can transform into any beast that has a challenge rating of 1/4 or lower that doesn't have a flying or swimming speed.<br/>You can stay in a beast shape for a number of hours equal to half your druid level (rounded down). You then revert to your normal form unless you expend another use of this feature. You can revert to your normal form earlier by using a bonus action on your turn. You automatically revert if you fall unconscious, drop to 0 hit points, or die.<br/>While you are transformed, the following rules apply:<br/><ul><li>Your game statistics are replaced by the statistics of the beast, but you retain your alignment, personality, and Intelligence, Wisdom, and Charisma scores. You also retain all of your skill and saving throw proficiencies, in addition to gaining those of the creature. If the creature has the same proficiency as you and the bonus in its stat block is higher than yours, use the creature's bonus instead of yours. If the creature has any legendary or lair actions, you can't use them.</li><li>When you transform, you assume the beast's hit points and Hit Dice. When you revert to your normal form, you return to the number of hit points you had before you transformed. However, if you revert as a result of dropping to 0 hit points, any excess damage carries over to your normal form. For example, if you take 10 damage in animal form and have only 1 hit point left, you revert and take 9 damage. As long as the excess damage doesn't reduce your normal form to 0 hit points, you aren't knocked unconscious.</li><li>You can't cast spells, and your ability to speak or take any action that requires hands is limited to the capabilities of your beast form. Transforming doesn't break your concentration on a spell you've already cast, however, or prevent you from taking actions that are part of a spell, such as call lightning, that you've already cast.</li><li>You retain the benefit of any features from your class, race, or other source and can use them if the new form is physically capable of doing so. However, you can't use any of your special senses, such as darkvision, unless your new form also has that sense.</li><li>You choose whether your equipment falls to the ground in your space, merges into your new form, or is worn by it. Worn equipment functions as normal, but the GM decides whether it is practical for the new form to wear a piece of equipment, based on the creature's shape and size. Your equipment doesn't change size or shape to match the new form, and any equipment that the new form can't wear must either fall to the ground or merge with it. Equipment that merges with the form has no effect until you leave the form.</li></ul>",
-                        "description": "You can use your action to magically assume the shape of a beast that you have seen before. You can use this feature twice. You regain expended uses when you finish a short or long rest."
-                    }
+                     "wild_shape_fly": false
+                 }
+             },
+             {
+                 "level": 2,
+                 "ability_score_bonuses": 0,
+                 "prof_bonus": 2,
+                 "features": [
+                     {
+                         "name": "Druid Circle",
+                         "level": 2,
+                         "prerequisites": [],
+                         "description": "You choose to identify with a circle of druids: the Circle of the Land or the Circle of the Moon, both detailed at the end of the class description. Your choice grants you features at 2nd level and again at 6th, 10th, and 14th level."
+                     },
+                     {
+                         "name": "Wild Shape",
+                         "level": 2,
+                         "prerequisites": [],
+                         "details": "Your druid level determines the beasts you can transform into, as shown in the Beast Shapes table. At 2nd level, for example, you can transform into any beast that has a challenge rating of 1/4 or lower that doesn't have a flying or swimming speed...",
+                         "description": "You can use your action to magically assume the shape of a beast that you have seen before. You can use this feature twice. You regain expended uses when you finish a short or long rest.",
+                         "automation": {
+                             "type": "resource_pool",
+                             "resource": "wild_shape_uses",
+                             "uses_expression": "2",
+                             "recharge_short_rest": "2",
+                             "recharge_long_rest": "2"
+                         }
+                     }
                 ],
                 "spellcasting": {
                     "cantrips_known": 2,
@@ -5131,10 +5152,17 @@
                                 "description": "You learn one additional druid cantrip of your choice."
                             },
                             {
-                                "name": "Natural Recovery",
-                                "level": 2,
-                                "prerequisites": [],
-                                "description": "You can regain some of your magical energy by sitting in meditation and communing with nature. During a short rest, you choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your druid level (rounded up), and none of the slots can be 6th level or higher. You can't use this feature again until you finish a long rest. For example, when you are a 4th-level druid, you can recover up to two levels worth of spell slots. You can recover either a 2nd-level slot or two 1st-level slots."
+                                 "name": "Natural Recovery",
+                                 "level": 2,
+                                 "prerequisites": [],
+                                 "description": "You can regain some of your magical energy by sitting in meditation and communing with nature. During a short rest, you choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your druid level (rounded up), and none of the slots can be 6th level or higher. You can't use this feature again until you finish a long rest. For example, when you are a 4th-level druid, you can recover up to two levels worth of spell slots. You can recover either a 2nd-level slot or two 1st-level slots.",
+                                 "automation": {
+                                     "type": "resource_pool",
+                                     "resource": "natural_recovery",
+                                     "uses_expression": "1",
+                                     "recharge_short_rest": "half_druid_level_spell_slots",
+                                     "recharge_long_rest": "half_druid_level_spell_slots"
+                                 }
                             }
                         ]
                     },
@@ -8687,7 +8715,8 @@
                         "name": "Uncanny Dodge",
                         "level": 5,
                         "prerequisites": [],
-                        "description": "When an attacker that you can see hits you with an attack, you can use your reaction to halve the attack's damage against you."
+                        "description": "When an attacker that you can see hits you with an attack, you can use your reaction to halve the attack's damage against you.",
+                        "automation": { "type": "damage_reduction", "reductionExpression": "half", "trigger": "attacker_hits_melee", "reaction": true }
                     }
                 ],
                 "class_specific": {
@@ -8757,7 +8786,8 @@
                         "name": "Evasion",
                         "level": 7,
                         "prerequisites": [],
-                        "description": "You can nimbly dodge out of the way of certain area effects, such as a red dragon's fiery breath or an ice storm spell. When you are subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw, and only half damage if you fail."
+                        "description": "You can nimbly dodge out of the way of certain area effects, such as a red dragon's fiery breath or an ice storm spell. When you are subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw, and only half damage if you fail.",
+                        "automation": { "type": "conditional_advantage", "target": "dex_saving_throw", "condition": "area_effect_half_damage", "effect": "no_damage_on_success" }
                     }
                 ],
                 "class_specific": {
@@ -9032,7 +9062,8 @@
                                 "name": "Assassinate",
                                 "level": 3,
                                 "prerequisites": [],
-                                "description": "You are at your deadliest when you get the drop on your enemies. You have advantage on attack rolls against any creature that hasn't taken a turn in the combat yet. In addition, any hit you score against a creature that is surprised is a critical hit."
+                                "description": "You are at your deadliest when you get the drop on your enemies. You have advantage on attack rolls against any creature that hasn't taken a turn in the combat yet. In addition, any hit you score against a creature that is surprised is a critical hit.",
+                                "automation": { "type": "conditional_advantage", "target": "attack_roll", "condition": "target_hasnt_taken_turn", "effect": "advantage" }
                             },
                             {
                                 "name": "Bonus Proficiencies",
@@ -10394,7 +10425,8 @@
                                 "name": "Elemental Affinity",
                                 "level": 6,
                                 "prerequisites": [],
-                                "description": "When you cast a spell that deals damage of the type associated with your draconic ancestry, you can add your Charisma modifier to one damage roll of that spell. At the same time, you can spend 1 sorcery point to gain resistance to that damage type for 1 hour."
+                                "description": "When you cast a spell that deals damage of the type associated with your draconic ancestry, you can add your Charisma modifier to one damage roll of that spell. At the same time, you can spend 1 sorcery point to gain resistance to that damage type for 1 hour.",
+                                "automation": { "type": "damage_bonus", "trigger": "draconic_ancestry_damage_type_spell", "damageExpression": "cha_modifier" }
                             }
                         ]
                     },
@@ -10437,13 +10469,15 @@
                                 "name": "Tides of Chaos",
                                 "level": 1,
                                 "prerequisites": [],
-                                "description": "You can manipulate the forces of chance and chaos to gain advantage on one attack roll, ability check, or saving throw. Once you do so, you must finish a long rest before you can use this feature again. Any time before you regain the use of this feature, the DM can have you roll on the Wild Magic Surge table immediately after you cast a sorcerer spell of 1st level or higher. You then regain the use of this feature."
+                                "description": "You can manipulate the forces of chance and chaos to gain advantage on one attack roll, ability check, or saving throw. Once you do so, you must finish a long rest before you can use this feature again. Any time before you regain the use of this feature, the DM can have you roll on the Wild Magic Surge table immediately after you cast a sorcerer spell of 1st level or higher. You then regain the use of this feature.",
+                                "automation": { "type": "resource_pool", "resource": "tides_of_chaos", "uses_expression": "1", "recharge_short_rest": "0", "recharge_long_rest": "1" }
                             },
                             {
                                 "name": "Wild Magic Surge",
                                 "level": 1,
                                 "prerequisites": [],
-                                "description": "Your spellcasting can unleash surges of untamed magic. Once per turn, the DM can have you roll a d20 immediately after you cast a sorcerer spell of 1st level or higher. If you roll a 1 , roll on the Wild Magic Surge table to create a magical effect. If that effect is a spell, it is too wild to be affected by your Metamagic, and if it normally requires concentration, it doesn't require concentration in this case; the spell lasts for its full duration."
+                                "description": "Your spellcasting can unleash surges of untamed magic. Once per turn, the DM can have you roll a d20 immediately after you cast a sorcerer spell of 1st level or higher. If you roll a 1 , roll on the Wild Magic Surge table to create a magical effect. If that effect is a spell, it is too wild to be affected by your Metamagic, and if it normally requires concentration, it doesn't require concentration in this case; the spell lasts for its full duration.",
+                                "automation": { "type": "auto_effect", "trigger": "roll_1_on_wild_magic_d20", "effect": "wild_magic_surge_table", "uses": 1, "recharge": "turn" }
                             }
                         ]
                     },
@@ -11487,7 +11521,8 @@
                                 "name": "Dark One's Blessing",
                                 "level": 1,
                                 "prerequisites": [],
-                                "description": "When you reduce a hostile creature to 0 hit points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum of 1)."
+                                "description": "When you reduce a hostile creature to 0 hit points, you gain temporary hit points equal to your Charisma modifier + your warlock level (minimum of 1).",
+                                "automation": { "type": "temp_hp_buff", "buffExpression": "cha_modifier + warlock level", "trigger": "reduce_creature_to_0_hp" }
                             }
                         ]
                     },
@@ -11673,7 +11708,8 @@
                                 "name": "Misty Escape",
                                 "level": 6,
                                 "prerequisites": [],
-                                "description": "You can vanish in a puff of mist in response to harm. When you take damage, you can use your reaction to turn invisible and teleport up to 60 feet to an unoccupied space you can see. You remain invisible until the start of your next turn or until you attack or cast a spell. Once you use this feature, you can't use it again until you finish a short or long rest."
+                                "description": "You can vanish in a puff of mist in response to harm. When you take damage, you can use your reaction to turn invisible and teleport up to 60 feet to an unoccupied space you can see. You remain invisible until the start of your next turn or until you attack or cast a spell. Once you use this feature, you can't use it again until you finish a short or long rest.",
+                                "automation": { "type": "temp_buff", "effect": "invisible_and_teleport", "duration": "next_turn", "action": "reaction", "recharge": "short_rest" }
                             }
                         ]
                     },
@@ -12397,7 +12433,8 @@
                                 "name": "Sculpt Spells",
                                 "level": 2,
                                 "prerequisites": [],
-                                "description": "You can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save."
+                                "description": "You can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save.",
+                                "automation": { "type": "passive_rule", "effect": "sculpt_spells_allies_auto_save", "count_expression": "1 + spell_level" }
                             }
                         ]
                     },
@@ -12456,7 +12493,8 @@
                                 "name": "Arcane Ward",
                                 "level": 2,
                                 "prerequisites": [],
-                                "description": "You can weave magic around yourself for protection. When you cast an abjuration spell of 1st level or higher, you can simultaneously use a strand of the spell's magic to create a magical ward on yourself that lasts until you finish a long rest. The ward has a hit point maximum equal to twice your wizard level + your I ntelligence modifier. Whenever you take damage, the ward takes the damage instead. If this damage reduces the ward to 0 hit points, you take any remaining damage. While the ward has 0 hit points, it can't absorb damage, but its magic remains. Whenever you cast an abjuration spell of 1st level or higher, the ward regains a number of hit points equal to twice the level of the spell. Once you create the ward, you can't create it again until you finish a long rest."
+                                "description": "You can weave magic around yourself for protection. When you cast an abjuration spell of 1st level or higher, you can simultaneously use a strand of the spell's magic to create a magical ward on yourself that lasts until you finish a long rest. The ward has a hit point maximum equal to twice your wizard level + your I ntelligence modifier. Whenever you take damage, the ward takes the damage instead. If this damage reduces the ward to 0 hit points, you take any remaining damage. While the ward has 0 hit points, it can't absorb damage, but its magic remains. Whenever you cast an abjuration spell of 1st level or higher, the ward regains a number of hit points equal to twice the level of the spell. Once you create the ward, you can't create it again until you finish a long rest.",
+                                "automation": { "type": "damage_reduction", "reductionExpression": "arcane_ward_pool", "trigger": "damage_taken", "reaction": false, "redirect": false }
                             }
                         ]
                     },
@@ -12574,7 +12612,8 @@
                                 "name": "Portent",
                                 "level": 2,
                                 "prerequisites": [],
-                                "description": "Glimpses of the future begin to press in on your awareness. When you finish a long rest, roll two d20s and record the numbers rolled. You can replace any attack roll, saving throw, or ability check made by you or a creature that you can see with one of these foretelling rolls. You must choose to do so before the roll, and you can replace a roll in this way only once per turn. Each foretelling roll can be used only once. When you finish a long rest, you lose any unused foretelling rolls."
+                                "description": "Glimpses of the future begin to press in on your awareness. When you finish a long rest, roll two d20s and record the numbers rolled. You can replace any attack roll, saving throw, or ability check made by you or a creature that you can see with one of these foretelling rolls. You must choose to do so before the roll, and you can replace a roll in this way only once per turn. Each foretelling roll can be used only once. When you finish a long rest, you lose any unused foretelling rolls.",
+                                "automation": { "type": "passive_buff", "target": "self_and_visible_creatures", "effect": "portent_d20_pool", "bonusExpression": "2d20" }
                             }
                         ]
                     },

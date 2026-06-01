@@ -22,7 +22,8 @@ export const SHORT_REST_RESOURCES = [
   'superiorityDice',
   'kiPoints',
   'actionSurgeUses',
-  'layOnHandsPool'
+  'layOnHandsPool',
+  'luckyPoints'
 ]
 
 export function getShortRestResources() {
@@ -43,7 +44,8 @@ export const LONG_REST_RESOURCES = [
   'kiPoints',
   'actionSurgeUses',
   'layOnHandsPool',
-  'warlockPactMagic'
+  'warlockPactMagic',
+  'luckyPoints'
 ]
 
 export function getLongRestResources() {
