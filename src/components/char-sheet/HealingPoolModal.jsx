@@ -26,11 +26,14 @@ function HealingPoolModal({ playerStats, campaignName, poolMax, alsoCures, cureC
     const combatTarget = combatSummary ? getTargetFromAttacker(combatSummary, playerStats.name) : null;
     const targetName = combatTarget ? combatTarget.name : playerStats.name;
     const targetMaxHp = combatTarget ? combatTarget.maxHp : playerStats.hitPoints;
-    const targetCurrentHp = combatTarget
-        ? combatTarget.currentHp
-        : (() => {
-            const stored = storage.getProperty(playerStats.name, 'currentHitPoints', campaignName);
-            return stored != null && stored !== '' ? Number(stored) : playerStats.hitPoints;
+    const targetCurrentHp = (() => {
+          if (combatTarget) {
+            const stored = storage.getProperty(combatTarget.name, 'currentHitPoints', campaignName);
+            if (stored != null && stored !== '') return Number(stored);
+            return combatTarget.currentHp;
+          }
+          const stored = storage.getProperty(playerStats.name, 'currentHitPoints', campaignName);
+          return stored != null && stored !== '' ? Number(stored) : playerStats.hitPoints;
         })();
 
     const applyHeal = () => {
