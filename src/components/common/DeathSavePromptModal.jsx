@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import utils from '../../services/utils.js';
-import { rollD20 } from '../../services/diceRoller.js';
+
 import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/savePromptService.js';
 import * as deathSaveRules from '../../services/deathSaveRules.js';
 import Subscriber from './Subscriber.jsx';

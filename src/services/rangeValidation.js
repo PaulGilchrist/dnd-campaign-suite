@@ -109,7 +109,7 @@ export function getNearestPlacedItem(placedItems, targetName, attackerPos) {
   return nearest
 }
 
-export function isHostileNPC(npc, characterName) {
+export function isHostileNPC(npc) {
   if (!npc) return false
   if (npc.attitude == null) return true
   const attitude = npc.attitude.toLowerCase()

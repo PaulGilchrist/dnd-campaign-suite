@@ -23,7 +23,7 @@ function useWizardRaceBuffs(formData, allRaces, setFormData) {
       applyRaceBuffsToPlayerData(next, buffs);
       return next;
     });
-  }, [formData.race, formData.race?.subrace, allRaces, formData.rules, setFormData]);
+  }, [formData, allRaces, setFormData]);
 
   const clearBuffs = useCallback(() => {
     setFormData(prev => {

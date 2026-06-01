@@ -158,7 +158,7 @@ function convertSpellcastingToLimits(spellcasting, className = null) {
 /**
  * Returns default spell limits for classes without spellcasting
  */
-function getDefaultSpellLimits(className) {
+function getDefaultSpellLimits() {
   return {
     spellType: 'prepared',
     isNonSpellcaster: true,

@@ -288,7 +288,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 setCombatSummary(cloneDeep(cs));
             }
         }
-    }, [campaignName]);
+    }, [campaignName, handleOverlayEvent]);
 
     React.useEffect(() => {
         if (!combatSummary) return;
@@ -345,7 +345,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             creatureList.push({ name: `NPC ${i + 1}`, type: 'npc', initiative: '', targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null, maxHp: 10, currentHp: 10, saveBonuses: {} });
         }
         return creatureList;
-    }, [characters, numOfNpc, loadCreatureHp, loadCreatureMaxHp]);
+    }, [characters, numOfNpc, loadCreatureHp, loadCreatureMaxHp, getSaveBonuses]);
 
     const handleAddNpc = React.useCallback(() => {
         if (!combatSummary) return;
@@ -465,7 +465,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             storage.set('activeCreatureName', firstName, campaignName);
             setActiveCreatureName(firstName);
         }
-    }, [characters, campaignName, setupCreatures, loadCreatureHp, loadCreatureMaxHp]);
+    }, [characters, campaignName, setupCreatures, loadCreatureHp, loadCreatureMaxHp, getSaveBonuses]);
 
     React.useEffect(() => {
         if (!combatSummary || !onNpcsChange) return;
@@ -1318,7 +1318,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 function buildMonsterSaveBonuses(monster) {
   const map = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
   const bonuses = {};
-  for (const [abbr, fullName] of Object.entries(map)) {
+  for (const [abbr] of Object.entries(map)) {
     const monAbbr = abbr === 'cha' ? 'cha' : abbr;
     if (monster.saving_throws?.[monAbbr]?.modifier != null) {
       bonuses[abbr] = monster.saving_throws[monAbbr].modifier;

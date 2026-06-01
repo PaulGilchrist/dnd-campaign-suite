@@ -8,7 +8,6 @@ describe('computeCover', () => {
       { gridX: 5, gridY: 5 },
       new Set(),
       [],
-      20,
     )
     expect(result).toEqual({ level: COVER.NONE, acBonus: 0 })
   })
@@ -19,7 +18,6 @@ describe('computeCover', () => {
       { gridX: 5, gridY: 0 },
       new Set(),
       [],
-      20,
     )
     expect(result).toEqual({ level: COVER.NONE, acBonus: 0 })
   })
@@ -32,7 +30,6 @@ describe('computeCover', () => {
       [
         { type: 'door', gridX: 2, gridY: 0, open: false },
       ],
-      20,
     )
     expect(result).toEqual({ level: COVER.FULL, acBonus: null })
   })
@@ -45,7 +42,6 @@ describe('computeCover', () => {
       [
         { type: 'door', gridX: 2, gridY: 0, open: true },
       ],
-      20,
     )
     expect(result).toEqual({ level: COVER.NONE, acBonus: 0 })
   })
@@ -56,7 +52,6 @@ describe('computeCover', () => {
       { gridX: 3, gridY: 0 },
       new Set(['2,0']),
       [],
-      20,
     )
     expect(result).toEqual({ level: COVER.FULL, acBonus: null })
   })
@@ -69,7 +64,6 @@ describe('computeCover', () => {
       [
         { type: 'altar', gridX: 2, gridY: 0, rotation: 0 },
       ],
-      20,
     )
     expect(result).toEqual({ level: COVER.THREE_QUARTER, acBonus: 5 })
   })
@@ -82,7 +76,6 @@ describe('computeCover', () => {
       [
         { type: 'barrel', gridX: 2, gridY: 0 },
       ],
-      20,
     )
     expect(result).toEqual({ level: COVER.HALF, acBonus: 2 })
   })
@@ -95,7 +88,6 @@ describe('computeCover', () => {
       [
         { type: 'table', gridX: 1, gridY: 0, rotation: 0 },
       ],
-      20,
     )
     expect(result).toEqual({ level: COVER.FULL, acBonus: null })
   })
@@ -109,7 +101,6 @@ describe('computeCover', () => {
         { type: 'barrel', gridX: 1, gridY: 0 },
         { type: 'table', gridX: 3, gridY: 0, rotation: 0 },
       ],
-      20,
     )
     expect(result).toEqual({ level: COVER.THREE_QUARTER, acBonus: 5 })
   })
@@ -120,7 +111,6 @@ describe('computeCover', () => {
       { gridX: 1, gridY: 0 },
       new Set(),
       [],
-      20,
     )
     expect(result).toEqual({ level: COVER.NONE, acBonus: 0 })
   })
@@ -133,7 +123,6 @@ describe('computeCover', () => {
       [
         { type: 'table', gridX: 2, gridY: 0, rotation: 0 },
       ],
-      20,
     )
     expect(result).toEqual({ level: COVER.THREE_QUARTER, acBonus: 5 })
   })
@@ -146,7 +135,6 @@ describe('computeCover', () => {
       [
         { type: 'bed', gridX: 0, gridY: 2, rotation: 90 },
       ],
-      20,
     )
     expect(result).toEqual({ level: COVER.THREE_QUARTER, acBonus: 5 })
   })
@@ -157,7 +145,6 @@ describe('computeCover', () => {
       { gridX: 3, gridY: 0 },
       ['2,0'],
       [],
-      20,
     )
     expect(result).toEqual({ level: COVER.FULL, acBonus: null })
   })

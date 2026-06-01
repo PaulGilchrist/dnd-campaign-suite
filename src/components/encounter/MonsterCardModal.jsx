@@ -135,7 +135,6 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
   const handleInitiative = (bonus) => rollInitiative(bonus);
 
   const renderAction = (action, i) => {
-    const target = getCombatTarget();
     const damageTypes = getDamageTypesForAction(action);
 
     return (

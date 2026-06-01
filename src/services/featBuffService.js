@@ -279,8 +279,6 @@ export function computeAllFeatBuffs(formData, allFeats) {
 export function applyFeatBuffsToFormData(formData, allFeats) {
   const buffs = computeAllFeatBuffs(formData, allFeats);
   const ruleset = formData.rules || '5e';
-  const level = formData.level || 1;
-
   if (formData.abilities) {
     formData.abilities.forEach(ability => {
       ability.miscBonus = 0;

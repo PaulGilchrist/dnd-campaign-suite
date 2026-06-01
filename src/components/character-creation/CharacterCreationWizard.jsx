@@ -32,7 +32,6 @@ const WizardStepRenderer = React.memo(({
   allSpells,
   preSelectedFeats,
   computedBuffs,
-  preSelectedSpells,
   preSelectedSkills,
   preSelectedLanguages,
   preSelectedFightingStyles,
@@ -189,7 +188,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, characterDat
   // Spells
   const {
     preSelectedSpells,
-   } = useWizardSpells(formData, setFormData);
+     } = useWizardSpells(formData, setFormData);
 
 	// Inventory
 	const [tempInventory, setTempInventory] = useState({ backpack: [], equipped: [] });

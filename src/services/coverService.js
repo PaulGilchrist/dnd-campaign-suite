@@ -31,7 +31,7 @@ function getOccupiedCells(item) {
   return cells
 }
 
-export function computeCover(attackerPos, targetPos, walls, placedItems, gridSize) {
+export function computeCover(attackerPos, targetPos, walls, placedItems) {
   const line = bresenham(attackerPos.gridX, attackerPos.gridY, targetPos.gridX, targetPos.gridY)
 
   const wallKeys = walls?.has ? walls : new Set(walls || [])

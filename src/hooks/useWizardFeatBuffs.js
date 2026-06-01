@@ -87,7 +87,7 @@ function useWizardFeatBuffs(formData, allFeats, setFormData) {
       }
       setComputedBuffs(null);
     }
-  }, [formData.feats, allFeats, formData.rules, formData.level, applyBuffs, clearBuffs]);
+  }, [formData, allFeats, applyBuffs, clearBuffs]);
 
   return { computedBuffs };
 }

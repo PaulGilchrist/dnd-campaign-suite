@@ -41,24 +41,8 @@ const SERVICE_TYPE_LABELS = {
   bank: 'Bank',
 };
 
-const SERVICE_TYPE_ICONS = {
-  inn: 'fa-bed',
-  tavern: 'fa-mug-hot',
-  blacksmith: 'fa-hammer',
-  general_store: 'fa-shop',
-  magic_shop: 'fa-wand-magic',
-  temple: 'fa-church',
-  guild: 'fa-shield-halved',
-  alchemist: 'fa-flask',
-  bakery: 'fa-bread-slice',
-  butcher: 'fa-drumstick-bite',
-  tailor: 'fa-scissors',
-  stable: 'fa-horse',
-  bank: 'fa-coins',
-};
-
 function Settlements({ campaignName, onBack }) {
-  const { settlements, loading, loadSettlementsList, saveSettlementAction, deleteSettlementAction } =
+  const { settlements, loading, saveSettlementAction, deleteSettlementAction } =
     useSettlementsManagement(campaignName);
 
   const [searchQuery, setSearchQuery] = useState('');

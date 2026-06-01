@@ -47,8 +47,6 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
     const hasAbilityIncrease = featBuffs && featBuffs.abilityScoreIncreases.length > 0;
     const hasProficiencies = featBuffs && featBuffs.proficiencies.length > 0;
     const hasResistances = featBuffs && featBuffs.resistances.length > 0;
-    const hasFeatures = featBuffs && featBuffs.features.length > 0;
-
         return (
             <div
                 key={feat.index || index}

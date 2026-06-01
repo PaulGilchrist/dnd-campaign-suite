@@ -45,7 +45,6 @@ function calculateMonsterCount(selectedMonsters) {
 function filterMonsters(monsters, searchQuery, playerLevels, difficultyIndex, totalThreshold, environmentFilter) {
   if (!monsters) return [];
   const maxXP = calculateMaxXP(playerLevels, difficultyIndex);
-  const avgLevel = playerLevels.reduce((sum, l) => sum + l, 0) / playerLevels.length;
   const minXP = totalThreshold * 0.15;
   return monsters.filter(m => {
     if (m.xp > maxXP) return false;
@@ -254,7 +253,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
 
   const difficultyMultiplier = useMemo(
       () => calculateDifficultyMultiplier(monsterCount, filter.playerLevels.length),
-    [monsterCount]
+    [monsterCount, filter.playerLevels.length]
   );
 
    const effectiveXP = Math.round(totalMonsterXP * difficultyMultiplier);

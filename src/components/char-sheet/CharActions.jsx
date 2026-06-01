@@ -61,8 +61,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const buildAttackContextSync = React.useCallback((attack) => {
         const target = getCombatTargetInfo();
-         const cs = getCombatContext();
-         const resistanceNotice = target ? getResistanceNotice([attack.damageType], target.resistances, target.immunities, target.name) : null;
+     const resistanceNotice = target ? getResistanceNotice([attack.damageType], target.resistances, target.immunities, target.name) : null;
          return {
              damageType: attack.damageType,
              resistanceNotice,
@@ -132,13 +131,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
               // Cover determination (ranged only - melee always has no cover)
               if (isRanged && !base.isAutoMiss && targetPos) {
                 const walls = mapData?.walls || new Set()
-                const gridSize = mapData?.gridSize || 20
                 const coverResult = computeCover(
                   { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
                   { gridX: targetPos.gridX, gridY: targetPos.gridY },
                   walls,
                   mapData?.placedItems || [],
-                  gridSize,
                 )
                 if (coverResult.level === 'full') {
                   base.isAutoMiss = true
@@ -169,7 +166,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
           } catch (e) { /* fallback, no range validation */ }
 
         return base;
-    }, [buildAttackContextSync, campaignName, mapName, playerStats.name, getCombatContext, getTargetFromAttacker, playerStats.feats, playerStats.rules, featRangeEffects]);
+    }, [buildAttackContextSync, campaignName, mapName, playerStats.name, featRangeEffects]);
 
     const handleDamageClick = (attack) => {
         const wasCrit = popupHtml?.isCrit;
