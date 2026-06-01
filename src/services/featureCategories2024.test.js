@@ -34,11 +34,14 @@ describe('featureCategories2024', () => {
          });
 
     it('should contain action features', () => {
-      expect(actions).toContain('Action Surge');
       expect(actions).toContain('Sneak Attack');
-      expect(actions).toContain('Reckless Attack');
       expect(actions).toContain('Eldritch Blast');
-         });
+          });
+
+    it('should exclude features with automations', () => {
+      expect(actions).not.toContain('Action Surge');
+      expect(actions).not.toContain('Reckless Attack');
+          });
        });
 
   describe('bonusActions', () => {
@@ -48,9 +51,9 @@ describe('featureCategories2024', () => {
 
     it('should contain bonus action features', () => {
       expect(bonusActions).toContain('Cunning Action');
-      expect(bonusActions).toContain('Second Wind');
-      expect(bonusActions).toContain('Flurry of Blows');
-         });
+      expect(bonusActions).not.toContain('Flurry of Blows');
+      expect(bonusActions).not.toContain('Second Wind');
+          });
        });
 
   describe('reactions', () => {
@@ -59,10 +62,10 @@ describe('featureCategories2024', () => {
          });
 
     it('should contain reaction features', () => {
-      expect(reactions).toContain('Uncanny Dodge');
-      expect(reactions).toContain('Deflect Attacks');
       expect(reactions).toContain('Opportunity Attack');
-         });
+      expect(reactions).not.toContain('Uncanny Dodge');
+      expect(reactions).not.toContain('Deflect Attacks');
+          });
        });
 
   describe('characterAdvancement', () => {
@@ -71,9 +74,10 @@ describe('featureCategories2024', () => {
          });
 
     it('should contain character advancement features', () => {
-      expect(characterAdvancement).toContain('Expertise');
-      expect(characterAdvancement).toContain('Metamagic');
       expect(characterAdvancement).toContain('Martial Arts');
-         });
+      expect(characterAdvancement).not.toContain('Expertise');
+      expect(characterAdvancement).not.toContain('Metamagic');
+      expect(characterAdvancement).not.toContain('Giant Ancestry');
+          });
        });
 });

@@ -2,7 +2,7 @@
     {
         "index": "barbarian",
         "name": "Barbarian",
-        "class_description": "<p><b>A fierce warrior of primal rage.</b></p><p>Barbarians are mighty warriors who are powered by primal forces of the multiverse that manifest as a Rage. More than a mere emotion—and not limited to anger—this Rage is an incarnation of a predator's ferocity, a storm's fury, and a sea's turmoil. Some Barbarians personify their Rage as a fierce spirit or revered forebear. Others see it as a connection to the pain and anguish of the world, as an impersonal tangle of wild magic, or as an expression of their own deepest self. For every Barbarian, their Rage is a power that fuels not just battle prowess, but also uncanny reflexes and heightened senses. Barbarians often serve as protectors and leaders in their communities. They charge headlong into danger so those under their protection don't have to. Their courage in the face of danger makes Barbarians perfectly suited for adventure.</p>",
+        "class_description": "<p><b>A fierce warrior of primal rage.</b></p><p>Barbarians are mighty warriors who are powered by primal forces of the multiverse that manifest as a Rage. More than a mere emotion\u2014and not limited to anger\u2014this Rage is an incarnation of a predator's ferocity, a storm's fury, and a sea's turmoil. Some Barbarians personify their Rage as a fierce spirit or revered forebear. Others see it as a connection to the pain and anguish of the world, as an impersonal tangle of wild magic, or as an expression of their own deepest self. For every Barbarian, their Rage is a power that fuels not just battle prowess, but also uncanny reflexes and heightened senses. Barbarians often serve as protectors and leaders in their communities. They charge headlong into danger so those under their protection don't have to. Their courage in the face of danger makes Barbarians perfectly suited for adventure.</p>",
         "primary_ability": "Strength",
         "hit_point_die": "12",
         "weapon_proficiencies": "Simple and Martial weapons",
@@ -43,7 +43,8 @@
                             "duration": "until_next_turn_extendable",
                             "maxRages": "class_level_scaling",
                             "recharge_short_rest": "1_use",
-                            "recharge_long_rest": "all"
+                            "recharge_long_rest": "all",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -78,7 +79,8 @@
                             "target": "saving_throw",
                             "saveType": "DEX",
                             "condition": "visible_effect",
-                            "effect": "advantage"
+                            "effect": "advantage",
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -90,7 +92,8 @@
                             "type": "temp_buff",
                             "effect": "advantage_attacks_disadvantage_against",
                             "duration": "until_start_of_next_turn",
-                            "trigger": "first_attack_of_turn"
+                            "trigger": "first_attack_of_turn",
+                            "casting_time": "1 action"
                         }
                     }
                 ]
@@ -234,7 +237,8 @@
                                     "effect": "speed_reduction",
                                     "value": "15_ft_until_start_of_next_turn"
                                 }
-                            ]
+                            ],
+                            "casting_time": "1 action"
                         }
                     }
                 ]
@@ -312,7 +316,8 @@
                                     "effect": "next_attack_advantage",
                                     "value": "+5_to_next_attack_vs_target"
                                 }
-                            ]
+                            ],
+                            "casting_time": "1 action"
                         }
                     }
                 ]
@@ -390,7 +395,8 @@
                                     "effect": "next_attack_advantage",
                                     "value": "+5_to_next_attack_vs_target"
                                 }
-                            ]
+                            ],
+                            "casting_time": "1 action"
                         }
                     }
                 ]
@@ -459,7 +465,8 @@
                             "trigger": "reckless_attack_hit_while_raging",
                             "damageExpression": "rage_damage_d6",
                             "damageType": "same_as_weapon",
-                            "oncePerTurn": true
+                            "oncePerTurn": true,
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -469,7 +476,8 @@
                         "automation": {
                             "type": "passive_immunity",
                             "target": "self",
-                            "conditionImmunity": "Charmed and Frightened while raging"
+                            "conditionImmunity": "Charmed and Frightened while raging",
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -480,7 +488,8 @@
                             "type": "reaction_damage",
                             "trigger": "damage_from_adjacent_creature",
                             "range": "5 ft",
-                            "effect": "melee_attack_reaction"
+                            "effect": "melee_attack_reaction",
+                            "casting_time": "1 reaction"
                         }
                     },
                     {
@@ -497,7 +506,8 @@
                             "shape": "emanation_30ft",
                             "duration": "1_minute_or_success_save",
                             "bonusAction": true,
-                            "recharge": "long_rest_or_expend_rage"
+                            "recharge": "long_rest_or_expend_rage",
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -521,11 +531,24 @@
                             "type": "combat_stance",
                             "effect": "animal_rage_option",
                             "options": [
-                                { "name": "Bear", "resistanceTypes": ["all_except_force_necrotic_psychic_radiant"] },
-                                { "name": "Eagle", "effect": "disengage_and_dash" },
-                                { "name": "Wolf", "effect": "ally_advantage_on_nearby_enemies", "range": "5 ft" }
+                                {
+                                    "name": "Bear",
+                                    "resistanceTypes": [
+                                        "all_except_force_necrotic_psychic_radiant"
+                                    ]
+                                },
+                                {
+                                    "name": "Eagle",
+                                    "effect": "disengage_and_dash"
+                                },
+                                {
+                                    "name": "Wolf",
+                                    "effect": "ally_advantage_on_nearby_enemies",
+                                    "range": "5 ft"
+                                }
                             ],
-                            "duration": "while_raging"
+                            "duration": "while_raging",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -535,7 +558,12 @@
                         "automation": {
                             "type": "passive_buff",
                             "effect": "animal_aspect",
-                            "options": ["darkvision_60ft", "climb_speed", "swim_speed"]
+                            "options": [
+                                "darkvision_60ft",
+                                "climb_speed",
+                                "swim_speed"
+                            ],
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -551,11 +579,23 @@
                             "type": "combat_stance",
                             "effect": "power_of_the_wilds_option",
                             "options": [
-                                { "name": "Falcon", "flySpeed": "speed", "noArmor": true },
-                                { "name": "Lion", "effect": "enemies_disadvantage_attacks", "range": "5 ft" },
-                                { "name": "Ram", "effect": "prone_on_melee_hit" }
+                                {
+                                    "name": "Falcon",
+                                    "flySpeed": "speed",
+                                    "noArmor": true
+                                },
+                                {
+                                    "name": "Lion",
+                                    "effect": "enemies_disadvantage_attacks",
+                                    "range": "5 ft"
+                                },
+                                {
+                                    "name": "Ram",
+                                    "effect": "prone_on_melee_hit"
+                                }
                             ],
-                            "duration": "while_raging"
+                            "duration": "while_raging",
+                            "casting_time": "1 bonus action"
                         }
                     }
                 ],
@@ -576,7 +616,8 @@
                             "trigger_on_rage": true,
                             "ongoingHealingExpression": "rage_damage_d6",
                             "healingRange": "10 ft",
-                            "healingStartOfTurn": true
+                            "healingStartOfTurn": true,
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -590,7 +631,8 @@
                             "saveType": "STR",
                             "saveDcExpression": "8 + STR modifier + proficiency_bonus",
                             "range": "30 ft",
-                            "teleportRange": "5 ft"
+                            "teleportRange": "5 ft",
+                            "casting_time": "1 reaction"
                         }
                     },
                     {
@@ -602,7 +644,11 @@
                             "effect": "extra_reach",
                             "bonus": "10 ft",
                             "condition": "heavy_or_versatile_melee_weapon",
-                            "extraMastery": ["Push", "Topple"]
+                            "extraMastery": [
+                                "Push",
+                                "Topple"
+                            ],
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -617,7 +663,8 @@
                             "oncePerRage": true,
                             "bringAllies": true,
                             "allyCount": 6,
-                            "teleportRange": "10 ft"
+                            "teleportRange": "10 ft",
+                            "casting_time": "1 bonus action"
                         }
                     }
                 ],
@@ -637,7 +684,8 @@
                             "trigger": "first_hit_while_raging",
                             "damageExpression": "1d6 + barbarian_level / 2",
                             "damageType": "Necrotic or Radiant",
-                            "oncePerTurn": true
+                            "oncePerTurn": true,
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -649,7 +697,12 @@
                             "poolExpression": "4d12",
                             "action": "bonus_action",
                             "recharge": "long_rest",
-                            "scaling": { "6": "5d12", "12": "6d12", "17": "7d12" }
+                            "scaling": {
+                                "6": "5d12",
+                                "12": "6d12",
+                                "17": "7d12"
+                            },
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -660,7 +713,8 @@
                             "type": "auto_reroll",
                             "trigger": "failed_save_while_raging",
                             "bonusExpression": "rage_damage",
-                            "oncePerRage": true
+                            "oncePerRage": true,
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -674,7 +728,8 @@
                             "targets": 10,
                             "duration": "until_start_of_next_turn",
                             "action": "bonus_action",
-                            "recharge": "long_rest_or_expend_rage"
+                            "recharge": "long_rest_or_expend_rage",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -686,9 +741,17 @@
                             "effect": "divine_warrior_form",
                             "duration": "1_minute",
                             "flySpeed": "speed",
-                            "resistanceTypes": ["Necrotic", "Psychic", "Radiant"],
-                            "reactionSave": { "range": "30 ft", "healTo": "barbarian_level" },
-                            "recharge": "long_rest"
+                            "resistanceTypes": [
+                                "Necrotic",
+                                "Psychic",
+                                "Radiant"
+                            ],
+                            "reactionSave": {
+                                "range": "30 ft",
+                                "healTo": "barbarian_level"
+                            },
+                            "recharge": "long_rest",
+                            "casting_time": "1 bonus action"
                         }
                     }
                 ],
@@ -733,7 +796,8 @@
                             "range": "60_ft",
                             "action": "bonus_action",
                             "uses_expression": "CHA modifier",
-                            "recharge": "short_rest"
+                            "recharge": "short_rest",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -1276,7 +1340,8 @@
                             "type": "conditional_advantage",
                             "target": "performance_checks",
                             "condition": "dancing",
-                            "effect": "advantage"
+                            "effect": "advantage",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -1291,7 +1356,8 @@
                             "allyMovement": "half_speed",
                             "allyRange": "30 ft",
                             "noOAs": true,
-                            "resourceCost": "bardic_inspiration"
+                            "resourceCost": "bardic_inspiration",
+                            "casting_time": "1 reaction"
                         }
                     },
                     {
@@ -1303,7 +1369,8 @@
                             "effect": "bonus_initiative_allies",
                             "bonusExpression": "bardic_inspiration_die",
                             "range": "30 ft",
-                            "resourceCost": "bardic_inspiration"
+                            "resourceCost": "bardic_inspiration",
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -1316,7 +1383,8 @@
                             "condition": "share_with_allies_5ft",
                             "effect": "zero_on_success_half_on_fail",
                             "shareable": true,
-                            "shareRange": "5 ft"
+                            "shareRange": "5 ft",
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -1334,8 +1402,19 @@
                         "automation": {
                             "type": "passive_rule",
                             "effect": "always_prepared_spells",
-                            "spells": ["Charm Person", "Mirror Image"],
-                            "riderSave": { "type": "WIS", "condition": "Charmed or Frightened", "duration": "1_minute", "after": "enchantment_or_illusion_spell", "range": "60 ft", "recharge": "long_rest" }
+                            "spells": [
+                                "Charm Person",
+                                "Mirror Image"
+                            ],
+                            "riderSave": {
+                                "type": "WIS",
+                                "condition": "Charmed or Frightened",
+                                "duration": "1_minute",
+                                "after": "enchantment_or_illusion_spell",
+                                "range": "60 ft",
+                                "recharge": "long_rest"
+                            },
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -1348,7 +1427,8 @@
                             "action": "bonus_action",
                             "range": "60 ft",
                             "targetsExpression": "CHA modifier",
-                            "bonusMovement": true
+                            "bonusMovement": true,
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -1361,7 +1441,8 @@
                             "freeCasts": "at_will_while_active",
                             "action": "bonus_action",
                             "duration": "1_minute",
-                            "concentration": true
+                            "concentration": true,
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -1375,7 +1456,8 @@
                             "saveType": "CHA",
                             "saveDc": "spell_save_dc",
                             "duration": "1_minute",
-                            "action": "bonus_action"
+                            "action": "bonus_action",
+                            "casting_time": "1 bonus action"
                         }
                     }
                 ],
@@ -1418,7 +1500,8 @@
                             "trigger": "damage_ability_check_or_attack_roll_within_60ft",
                             "debuffExpression": "bardic_inspiration_die",
                             "subtractive": true,
-                            "range": "60 ft"
+                            "range": "60 ft",
+                            "casting_time": "1 reaction"
                         }
                     },
                     {
@@ -1429,7 +1512,8 @@
                             "type": "auto_reroll",
                             "trigger": "failed_ability_check_or_attack_roll",
                             "effect": "add_to_failed_roll",
-                            "bonusExpression": "bardic_inspiration_die"
+                            "bonusExpression": "bardic_inspiration_die",
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -1448,8 +1532,12 @@
                         "automation": {
                             "type": "buff_ally",
                             "buffExpression": "bardic_inspiration_die",
-                            "options": ["defense_add_to_ac", "offense_add_to_damage"],
-                            "range": "60 ft"
+                            "options": [
+                                "defense_add_to_ac",
+                                "offense_add_to_damage"
+                            ],
+                            "range": "60 ft",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -1460,7 +1548,8 @@
                             "type": "bonus_action_attack",
                             "trigger": "after_casting_action_spell",
                             "action": "bonus_action",
-                            "weaponAttack": true
+                            "weaponAttack": true,
+                            "casting_time": "1 bonus action"
                         }
                     }
                 ],
@@ -1543,7 +1632,11 @@
                             "uses_expression": "proficiency_bonus",
                             "recharge_short_rest": "1",
                             "recharge_long_rest": "all",
-                            "effects": ["Divine Spark", "Turn Undead"]
+                            "effects": [
+                                "Divine Spark",
+                                "Turn Undead"
+                            ],
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -1631,7 +1724,8 @@
                             "trigger": "turn_undead_fail",
                             "damageExpression": "WIS modifier d8",
                             "damageType": "Radiant",
-                            "extraVs": "undead"
+                            "extraVs": "undead",
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -1693,7 +1787,11 @@
                             "damageExpression": "1d8",
                             "damageType": "Necrotic or Radiant",
                             "oncePerTurn": true,
-                            "options": ["Divine Strike", "Potent Spellcasting"]
+                            "options": [
+                                "Divine Strike",
+                                "Potent Spellcasting"
+                            ],
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -1773,7 +1871,8 @@
                             "type": "free_spell",
                             "spell": "any_cleric_spell_level_5_or_lower",
                             "action": "action",
-                            "recharge": "long_rest"
+                            "recharge": "long_rest",
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -1875,7 +1974,8 @@
                             "damageExpression": "2d8",
                             "damageType": "Necrotic or Radiant",
                             "oncePerTurn": true,
-                            "tempHpExpression": "2 * WIS modifier"
+                            "tempHpExpression": "2 * WIS modifier",
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -2030,7 +2130,8 @@
                             "spell": "Wish",
                             "action": "action",
                             "recharge": "2d4_long_rests",
-                            "upgradeTo": "wish"
+                            "upgradeTo": "wish",
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -2063,7 +2164,8 @@
                         "automation": {
                             "type": "passive_rule",
                             "effect": "bonus_healing",
-                            "bonusExpression": "2 + spell_slot_level"
+                            "bonusExpression": "2 + spell_slot_level",
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -2075,7 +2177,8 @@
                             "action": "action",
                             "healExpression": "5 * cleric_level",
                             "range": "30 ft",
-                            "resourceCost": "channel_divinity"
+                            "resourceCost": "channel_divinity",
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -2086,7 +2189,8 @@
                             "type": "self_healing",
                             "action": "passive",
                             "healExpression": "2 + spell_slot_level",
-                            "condition": "after_casting_healing_spell_on_others"
+                            "condition": "after_casting_healing_spell_on_others",
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -2095,7 +2199,8 @@
                         "level": 17,
                         "automation": {
                             "type": "passive_rule",
-                            "effect": "maximize_healing_dice"
+                            "effect": "maximize_healing_dice",
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -2161,7 +2266,8 @@
                             "saveType": "CON",
                             "saveDc": "ability",
                             "shape": "emanation_30ft",
-                            "resourceCost": "channel_divinity"
+                            "resourceCost": "channel_divinity",
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -2173,7 +2279,8 @@
                             "trigger": "attack_roll_within_30ft",
                             "effect": "disadvantage_on_attack_roll",
                             "uses_expression": "WIS modifier_min_1",
-                            "recharge": "proficiency_bonus"
+                            "recharge": "proficiency_bonus",
+                            "casting_time": "1 reaction"
                         }
                     },
                     {
@@ -2184,7 +2291,8 @@
                             "type": "temp_hp_buff",
                             "tempHpExpression": "2d6 + WIS modifier",
                             "trigger": "after_warding_flare_use",
-                            "target": "attacker_target"
+                            "target": "attacker_target",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -2197,7 +2305,11 @@
                             "duration": "1_minute",
                             "action": "action",
                             "range": "60_ft",
-                            "enemies_disadvantage_saves": ["Fire", "Radiant"]
+                            "enemies_disadvantage_saves": [
+                                "Fire",
+                                "Radiant"
+                            ],
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -2259,7 +2371,8 @@
                             "action": "action",
                             "range": "30 ft",
                             "target": "willing_creature",
-                            "duration": "long_rest"
+                            "duration": "long_rest",
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -2272,7 +2385,8 @@
                             "effect": "create_illusion",
                             "duration": "1_minute",
                             "resourceCost": "channel_divinity",
-                            "range": "30 ft"
+                            "range": "30 ft",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -2283,7 +2397,8 @@
                             "type": "temp_buff",
                             "effect": "teleport_swap_with_illusion",
                             "action": "bonus_action",
-                            "duration": "while_illusion_active"
+                            "duration": "while_illusion_active",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -2295,7 +2410,8 @@
                             "effect": "enhanced_distraction_and_healing",
                             "bonusExpression": "cleric_level",
                             "healingRange": "5_ft",
-                            "attackAdvantageRange": "5_ft"
+                            "attackAdvantageRange": "5_ft",
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -2357,7 +2473,8 @@
                             "effect": "bonus_to_miss",
                             "bonus": 10,
                             "range": "30 ft",
-                            "resourceCost": "channel_divinity"
+                            "resourceCost": "channel_divinity",
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -2368,7 +2485,8 @@
                             "type": "bonus_action_attack",
                             "action": "bonus_action",
                             "uses_expression": "WIS modifier_min_1",
-                            "recharge": "short_rest"
+                            "recharge": "short_rest",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -2380,7 +2498,8 @@
                             "spell": "Shield of Faith or Spiritual Weapon",
                             "resourceCost": "channel_divinity",
                             "noConcentration": true,
-                            "duration": "1_minute"
+                            "duration": "1_minute",
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -2389,7 +2508,12 @@
                         "level": 17,
                         "automation": {
                             "type": "resistance",
-                            "damageTypes": ["Bludgeoning", "Piercing", "Slashing"]
+                            "damageTypes": [
+                                "Bludgeoning",
+                                "Piercing",
+                                "Slashing"
+                            ],
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -2526,7 +2650,8 @@
                             "tempHpExpression": "druid_level",
                             "uses": 2,
                             "recharge_short_rest": 1,
-                            "recharge_long_rest": "all"
+                            "recharge_long_rest": "all",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -2629,7 +2754,8 @@
                             "resource": "Wild Shape",
                             "conversion": "spell_slot_to_wild_shape",
                             "reverseConversion": "wild_shape_to_spell_slot",
-                            "reverseRecharge": "long_rest"
+                            "reverseRecharge": "long_rest",
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -2697,7 +2823,11 @@
                             "damageExpression": "1d8",
                             "damageType": "Cold Fire Lightning or Thunder",
                             "oncePerTurn": true,
-                            "options": ["Potent Spellcasting", "Primal Strike"]
+                            "options": [
+                                "Potent Spellcasting",
+                                "Primal Strike"
+                            ],
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -2924,7 +3054,8 @@
                             "damageExpression": "2d8",
                             "damageType": "Cold Fire Lightning or Thunder",
                             "oncePerTurn": true,
-                            "rangeBonusCantrip": "300 ft"
+                            "rangeBonusCantrip": "300 ft",
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -3073,7 +3204,8 @@
                             "type": "passive_buff",
                             "effect": "wild_shape_regen_on_initiative",
                             "conversion": "wild_shape_to_spell_slot",
-                            "conversionRate": "2_levels_per_use"
+                            "conversionRate": "2_levels_per_use",
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -3415,7 +3547,7 @@
     {
         "index": "fighter",
         "name": "Fighter",
-        "class_description": "<p><b>Fighters rule the battlefields.</b></p><p>Questing knights, loyal champions, elite soldiers, and hardened mercenaries—as Fighters, they all share an unparalleled prowess with weapons and armor. And they are well acquainted with death, both meeting it out and defying it. Fighters master various weapon techniques, and a well-equipped Fighter always has the right tool at hand for any combat situation. Likewise, a Fighter is adept with every form of armor. Beyond that basic degree of familiarity, each Fighter specializes in certain styles of combat. Some concentrate on archery, some on fighting with two weapons at once, and some on augmenting their martial skills with magic. This combination of broad ability and extensive specialization makes Fighters superior combatants.</p>",
+        "class_description": "<p><b>Fighters rule the battlefields.</b></p><p>Questing knights, loyal champions, elite soldiers, and hardened mercenaries\u2014as Fighters, they all share an unparalleled prowess with weapons and armor. And they are well acquainted with death, both meeting it out and defying it. Fighters master various weapon techniques, and a well-equipped Fighter always has the right tool at hand for any combat situation. Likewise, a Fighter is adept with every form of armor. Beyond that basic degree of familiarity, each Fighter specializes in certain styles of combat. Some concentrate on archery, some on fighting with two weapons at once, and some on augmenting their martial skills with magic. This combination of broad ability and extensive specialization makes Fighters superior combatants.</p>",
         "primary_ability": "Strength or Dexterity",
         "hit_point_die": "10",
         "skill_proficiencies": "Choose 2: Acrobatics, Animal Handling, Athletics, History, Insight, Intimidation, Persuasion, Perception, or Survival",
@@ -3451,7 +3583,8 @@
                             "healExpression": "1d10 + fighter level",
                             "action": "bonus_action",
                             "uses": 1,
-                            "recharge": "short_rest"
+                            "recharge": "short_rest",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -3482,7 +3615,8 @@
                         "automation": {
                             "type": "extra_action",
                             "uses": 1,
-                            "recharge": "short_rest"
+                            "recharge": "short_rest",
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -3695,7 +3829,8 @@
                             "type": "auto_reroll",
                             "trigger": "failed_saving_throw",
                             "bonusExpression": "fighter_level",
-                            "recharge": "long_rest"
+                            "recharge": "long_rest",
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -3952,7 +4087,8 @@
                         "automation": {
                             "type": "extra_action",
                             "uses": 1,
-                            "recharge": "short_rest"
+                            "recharge": "short_rest",
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -4291,7 +4427,8 @@
                             "healExpression": "monk_level + martial_arts_die",
                             "trigger": "roll_initiative",
                             "uses": 1,
-                            "recharge": "long_rest"
+                            "recharge": "long_rest",
+                            "casting_time": "1 action"
                         }
                     }
                 ]
@@ -4332,7 +4469,8 @@
                                 "amount": 1
                             },
                             "redirectDamage": "2 * martial_arts_die + DEX modifier",
-                            "redirectSave": "DEX"
+                            "redirectSave": "DEX",
+                            "casting_time": "1 reaction"
                         }
                     }
                 ]
@@ -4360,7 +4498,8 @@
                             "type": "damage_reduction",
                             "reductionExpression": "5 * monk level",
                             "trigger": "falling",
-                            "reaction": true
+                            "reaction": true,
+                            "casting_time": "1 reaction"
                         }
                     }
                 ]
@@ -4412,7 +4551,8 @@
                             "conditionInflicted": "stunned",
                             "duration": "until_start_of_next_turn",
                             "successEffect": "speed_halved_until_start_of_next_turn",
-                            "oncePerTurn": true
+                            "oncePerTurn": true,
+                            "casting_time": "1 action"
                         }
                     }
                 ]
@@ -4681,8 +4821,12 @@
                             "damageType": "Necrotic",
                             "saveType": "CON",
                             "saveDc": "ability",
-                            "scaling": { "11": "2d6", "17": "3d6" },
-                            "alsoInflicts": "disadvantage_next_attack"
+                            "scaling": {
+                                "11": "2d6",
+                                "17": "3d6"
+                            },
+                            "alsoInflicts": "disadvantage_next_attack",
+                            "casting_time": "1 reaction"
                         }
                     },
                     {
@@ -4693,7 +4837,8 @@
                             "type": "healing",
                             "healExpression": "martial_arts_die + WIS modifier",
                             "action": "bonus_action",
-                            "resourceCost": "focus_point"
+                            "resourceCost": "focus_point",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -4703,7 +4848,14 @@
                         "automation": {
                             "type": "passive_rule",
                             "effect": "cure_conditions_on_heal",
-                            "cureConditions": ["Blinded", "Deafened", "Paralyzed", "Poisoned", "Stunned"]
+                            "cureConditions": [
+                                "Blinded",
+                                "Deafened",
+                                "Paralyzed",
+                                "Poisoned",
+                                "Stunned"
+                            ],
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -4746,7 +4898,8 @@
                         "automation": {
                             "type": "free_spell",
                             "spell": "Darkness, Darkvision, Pass Without Trace, Silence",
-                            "recharge": "long_rest"
+                            "recharge": "long_rest",
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -4758,7 +4911,8 @@
                             "effect": "shadow_step_teleport",
                             "distance": "60 ft",
                             "condition": "dim_light_or_darkness",
-                            "bonus": "advantage_on_next_melee_attack"
+                            "bonus": "advantage_on_next_melee_attack",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -4768,8 +4922,12 @@
                         "automation": {
                             "type": "temp_buff",
                             "effect": "shadow_step_area_debuff",
-                            "conditions_inflicted": ["Blinded", "disadvantage_perception"],
-                            "saveType": "WIS"
+                            "conditions_inflicted": [
+                                "Blinded",
+                                "disadvantage_perception"
+                            ],
+                            "saveType": "WIS",
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -4815,7 +4973,13 @@
                             "saveType": "varies",
                             "range": "60 ft",
                             "duration": "1_minute",
-                            "options": ["Cold", "Fire", "Lightning", "Thunder"]
+                            "options": [
+                                "Cold",
+                                "Fire",
+                                "Lightning",
+                                "Thunder"
+                            ],
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -4825,7 +4989,13 @@
                         "automation": {
                             "type": "temp_buff",
                             "effect": "elemental_movement",
-                            "options": ["ice_walk", "speed_boost_10", "fly_speed", "teleport_30"]
+                            "options": [
+                                "ice_walk",
+                                "speed_boost_10",
+                                "fly_speed",
+                                "teleport_30"
+                            ],
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -4837,7 +5007,11 @@
                             "trigger": "unarmed_or_monk_weapon_hit",
                             "damageExpression": "1d6",
                             "damageType": "elemental_attunement_type",
-                            "scaling": { "11": "2d6", "17": "3d6" }
+                            "scaling": {
+                                "11": "2d6",
+                                "17": "3d6"
+                            },
+                            "casting_time": "1 action"
                         }
                     },
                     {
@@ -4880,13 +5054,23 @@
                         "automation": {
                             "type": "flurry_effect",
                             "options": [
-                                { "name": "Push", "distance": "15 ft" },
-                                { "name": "Disadvantage Next Attack", "duration": "until_next_attack" },
-                                { "name": "No Reactions", "duration": "until_start_of_next_turn" }
+                                {
+                                    "name": "Push",
+                                    "distance": "15 ft"
+                                },
+                                {
+                                    "name": "Disadvantage Next Attack",
+                                    "duration": "until_next_attack"
+                                },
+                                {
+                                    "name": "No Reactions",
+                                    "duration": "until_start_of_next_turn"
+                                }
                             ],
                             "saveType": "STR",
                             "saveDcExpression": "8 + WIS modifier + proficiency_bonus",
-                            "trigger": "flurry_of_blows_unarmed_strike_hit"
+                            "trigger": "flurry_of_blows_unarmed_strike_hit",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -4897,7 +5081,8 @@
                             "type": "self_healing",
                             "healExpression": "3 * monk_level",
                             "action": "bonus_action",
-                            "recharge": "long_rest"
+                            "recharge": "long_rest",
+                            "casting_time": "1 bonus action"
                         }
                     }
                 ],
@@ -4945,7 +5130,8 @@
                             "alsoCures": [
                                 "poison"
                             ],
-                            "cureCost": 5
+                            "cureCost": 5,
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -4993,7 +5179,8 @@
                             "spell": "Divine Smite",
                             "uses": 1,
                             "recharge": "long_rest",
-                            "level": 1
+                            "level": 1,
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -5028,7 +5215,8 @@
                             "resource": "channel_divinity_charges",
                             "uses_expression": "class_level_scaling",
                             "recharge_short_rest": "1_use",
-                            "recharge_long_rest": "all"
+                            "recharge_long_rest": "all",
+                            "casting_time": "1 bonus action"
                         }
                     },
                     {
@@ -5116,7 +5304,8 @@
                             "target": "allies_in_range",
                             "range_expression": "10_ft",
                             "effect": "saving_throw_bonus",
-                            "bonusExpression": "CHA modifier"
+                            "bonusExpression": "CHA modifier",
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -7327,7 +7516,8 @@
                                     "effect": "target_two_creatures"
                                 }
                             ],
-                            "resource": "sorcery_points"
+                            "resource": "sorcery_points",
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -7878,7 +8068,7 @@
             {
                 "name": "Clockwork Sorcery",
                 "subtitle": "Channel Cosmic Forces of Order",
-                "description": "The cosmic force of order has suffused you with magic. That power arises from Mechanus or a realm like it—a plane of existence shaped entirely by clockwork efficiency.",
+                "description": "The cosmic force of order has suffused you with magic. That power arises from Mechanus or a realm like it\u2014a plane of existence shaped entirely by clockwork efficiency.",
                 "features": [
                     {
                         "name": "Clockwork Spells",
@@ -8822,7 +9012,7 @@
             {
                 "name": "Great Old One Patron",
                 "subtitle": "Unearth Forbidden Lore of Ineffable Being",
-                "description": "Your pact binds you to an unspeakable being from the Far Realm or an elder god—a being such as Tharizdun, the Chained God; Zargon, the Returner; Hadar, the Dark Hunger; or Great Cthulhu. Or you might involve several entities without yoking yourself to one. The motives of these beings are incomprehensible, and the Great Old One might be indifferent to your existence.",
+                "description": "Your pact binds you to an unspeakable being from the Far Realm or an elder god\u2014a being such as Tharizdun, the Chained God; Zargon, the Returner; Hadar, the Dark Hunger; or Great Cthulhu. Or you might involve several entities without yoking yourself to one. The motives of these beings are incomprehensible, and the Great Old One might be indifferent to your existence.",
                 "features": [
                     {
                         "name": "Awakened Mind",
@@ -9411,7 +9601,7 @@
             {
                 "name": "Abjurer",
                 "subtitle": "Shield Companions and Banish Foes",
-                "description": "Your study of magic is focused on spells that block, banish, or protect—ending harmful effects, banishing evil influences, and protecting the weak.",
+                "description": "Your study of magic is focused on spells that block, banish, or protect\u2014ending harmful effects, banishing evil influences, and protecting the weak.",
                 "features": [
                     {
                         "name": "Abjuration Savant",

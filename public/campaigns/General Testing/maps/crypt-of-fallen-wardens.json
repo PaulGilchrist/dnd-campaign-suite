@@ -504,5 +504,6 @@
   "zoom": 1,
   "panX": 0,
   "panY": 0,
-  "displayName": "Crypt of Fallen Wardens"
+  "displayName": "Crypt of Fallen Wardens",
+  "rooms": []
 }

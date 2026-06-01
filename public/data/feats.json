@@ -15,7 +15,10 @@
             "target": "skill_check",
             "condition": "disguised",
             "effect": "advantage",
-            "abilities": ["Charisma"]
+            "abilities": [
+                "Charisma"
+            ],
+            "casting_time": "1 action"
         }
     },
     {
@@ -33,7 +36,8 @@
             "type": "passive_buff",
             "target": "self",
             "effect": "initiative_bonus",
-            "bonusExpression": "5"
+            "bonusExpression": "5",
+            "casting_time": "1 action"
         }
     },
     {
@@ -52,7 +56,8 @@
             "type": "passive_buff",
             "target": "self",
             "effect": "climbing_speed",
-            "bonusExpression": "speed"
+            "bonusExpression": "speed",
+            "casting_time": "1 action"
         }
     },
     {
@@ -65,12 +70,19 @@
         "automation": {
             "type": "attack_rider",
             "options": [
-                { "option": "damage_bonus", "dice": "5" },
-                { "option": "push", "distance": "10 ft" }
+                {
+                    "option": "damage_bonus",
+                    "dice": "5"
+                },
+                {
+                    "option": "push",
+                    "distance": "10 ft"
+                }
             ],
             "chooseOne": true,
             "cost": "bonus_action",
-            "trigger": "melee_hit_after_10ft_dash"
+            "trigger": "melee_hit_after_10ft_dash",
+            "casting_time": "1 bonus action"
         }
     },
     {
@@ -91,7 +103,8 @@
         "automation": {
             "type": "passive_rule",
             "effect": "ignore_loading_property",
-            "weaponType": "crossbow"
+            "weaponType": "crossbow",
+            "casting_time": "1 action"
         }
     },
     {
@@ -105,7 +118,8 @@
             "type": "reaction_bonus",
             "trigger": "melee_attack_hit",
             "bonusExpression": "proficiency_bonus",
-            "condition": "wielding_finesse_weapon"
+            "condition": "wielding_finesse_weapon",
+            "casting_time": "1 reaction"
         }
     },
     {
@@ -124,7 +138,8 @@
             "target": "self",
             "effect": "ac_bonus",
             "bonusExpression": "1",
-            "condition": "dual_wielding"
+            "condition": "dual_wielding",
+            "casting_time": "1 action"
         }
     },
     {
@@ -143,7 +158,8 @@
             "type": "conditional_advantage",
             "target": "saving_throw",
             "condition": "traps",
-            "effect": "advantage"
+            "effect": "advantage",
+            "casting_time": "1 action"
         }
     },
     {
@@ -160,7 +176,8 @@
             "type": "passive_buff",
             "target": "self",
             "effect": "min_hp_recovery_hit_die",
-            "bonusExpression": "2 * con_modifier"
+            "bonusExpression": "2 * con_modifier",
+            "casting_time": "1 action"
         }
     },
     {
@@ -173,7 +190,10 @@
         "automation": {
             "type": "passive_rule",
             "effect": "ignore_resistance_and_treat_1s_as_2s",
-            "damageTypes": ["player_choice"]
+            "damageTypes": [
+                "player_choice"
+            ],
+            "casting_time": "1 action"
         }
     },
     {
@@ -191,7 +211,8 @@
             "type": "conditional_advantage",
             "target": "attack_roll",
             "condition": "grappling_target",
-            "effect": "advantage"
+            "effect": "advantage",
+            "casting_time": "1 action"
         }
     },
     {
@@ -207,10 +228,14 @@
         "automation": {
             "type": "attack_rider",
             "options": [
-                { "option": "damage_bonus", "label": "+10 damage, -5 to hit" }
+                {
+                    "option": "damage_bonus",
+                    "label": "+10 damage, -5 to hit"
+                }
             ],
             "cost": "melee_attack",
-            "trigger": "melee_heavy_attack"
+            "trigger": "melee_heavy_attack",
+            "casting_time": "1 action"
         }
     },
     {
@@ -228,7 +253,8 @@
             "healExpression": "1d6 + 4 + healer_kit",
             "action": "action",
             "uses": null,
-            "recharge": "short_rest"
+            "recharge": "short_rest",
+            "casting_time": "1 action"
         }
     },
     {
@@ -258,7 +284,8 @@
             "type": "damage_reduction",
             "reductionExpression": "3",
             "trigger": "nonmagical_bludgeoning_piercing_slashing",
-            "reaction": false
+            "reaction": false,
+            "casting_time": "1 action"
         }
     },
     {
@@ -273,7 +300,8 @@
             "buffExpression": "level + cha_modifier",
             "range": "30 ft",
             "targets": 6,
-            "action": "action"
+            "action": "action",
+            "casting_time": "1 action"
         }
     },
     {
@@ -327,7 +355,8 @@
             "resource": "lucky_points",
             "uses_expression": "3",
             "recharge_short_rest": "3",
-            "recharge_long_rest": "3"
+            "recharge_long_rest": "3",
+            "casting_time": "1 action"
         }
     },
     {
@@ -345,7 +374,8 @@
             "type": "reaction_damage",
             "trigger": "creature_within_5ft_casts_spell",
             "damageExpression": "weapon_attack",
-            "range": "5 ft"
+            "range": "5 ft",
+            "casting_time": "1 reaction"
         }
     },
     {
@@ -372,7 +402,8 @@
             "resource": "superiority_dice",
             "uses_expression": "1d6",
             "recharge_short_rest": "1d6",
-            "recharge_long_rest": "1d6"
+            "recharge_long_rest": "1d6",
+            "casting_time": "1 action"
         }
     },
     {
@@ -383,14 +414,15 @@
         ],
         "benefits": [
             "Wearing medium armor doesn't impose disadvantage on your Dexterity (Stealth) checks.",
-             "When you wear medium armor, you can add 3, rather than 2, to your AC if you have a Dexterity of 16 or higher."
+            "When you wear medium armor, you can add 3, rather than 2, to your AC if you have a Dexterity of 16 or higher."
         ],
         "prerequisite": "Proficiency with medium armor",
         "automation": {
             "type": "passive_buff",
             "target": "self",
             "effect": "medium_armor_dex_bonus_increase",
-            "bonusExpression": "1"
+            "bonusExpression": "1",
+            "casting_time": "1 action"
         }
     },
     {
@@ -408,7 +440,8 @@
             "type": "passive_buff",
             "target": "self",
             "effect": "speed_increase",
-            "bonusExpression": "10 ft"
+            "bonusExpression": "10 ft",
+            "casting_time": "1 action"
         }
     },
     {
@@ -438,7 +471,8 @@
             "type": "conditional_advantage",
             "target": "melee_attack_roll",
             "condition": "mounted_vs_unmounted_smaller",
-            "effect": "advantage"
+            "effect": "advantage",
+            "casting_time": "1 action"
         }
     },
     {
@@ -456,7 +490,8 @@
             "type": "passive_buff",
             "target": "self",
             "effect": "passive_perception_investigation_bonus",
-            "bonusExpression": "5"
+            "bonusExpression": "5",
+            "casting_time": "1 action"
         }
     },
     {
@@ -472,7 +507,8 @@
         "automation": {
             "type": "bonus_action_attack",
             "extraDamageExpression": "1d4",
-            "resourceKey": "polearmMaster"
+            "resourceKey": "polearmMaster",
+            "casting_time": "1 bonus action"
         }
     },
     {
@@ -489,7 +525,8 @@
             "type": "passive_buff",
             "target": "self",
             "effect": "save_proficiency",
-            "bonusExpression": "proficiency_bonus"
+            "bonusExpression": "proficiency_bonus",
+            "casting_time": "1 action"
         }
     },
     {
@@ -510,7 +547,8 @@
         ],
         "automation": {
             "type": "passive_rule",
-            "effect": "reroll_damage_once_per_turn"
+            "effect": "reroll_damage_once_per_turn",
+            "casting_time": "1 action"
         }
     },
     {
@@ -528,7 +566,8 @@
             "type": "passive_rule",
             "effect": "opportunity_attack_speed_zero",
             "on_cutting_off": true,
-            "disengage_does_not_prevent_oa": true
+            "disengage_does_not_prevent_oa": true,
+            "casting_time": "1 action"
         }
     },
     {
@@ -548,10 +587,14 @@
         "automation": {
             "type": "attack_rider",
             "options": [
-                { "option": "damage_bonus", "label": "+10 damage, -5 to hit ranged" }
+                {
+                    "option": "damage_bonus",
+                    "label": "+10 damage, -5 to hit ranged"
+                }
             ],
             "cost": "ranged_attack",
-            "trigger": "ranged_attack_sharpshooter"
+            "trigger": "ranged_attack_sharpshooter",
+            "casting_time": "1 action"
         }
     },
     {
@@ -569,7 +612,8 @@
             "type": "passive_buff",
             "target": "self",
             "effect": "shield_bonus_to_saves",
-            "bonusExpression": "shield_ac_bonus"
+            "bonusExpression": "shield_ac_bonus",
+            "casting_time": "1 action"
         }
     },
     {
@@ -594,7 +638,8 @@
         "automation": {
             "type": "passive_buff",
             "target": "self",
-            "effect": "dim_light_no_disadvantage_perception"
+            "effect": "dim_light_no_disadvantage_perception",
+            "casting_time": "1 action"
         }
     },
     {
@@ -615,7 +660,8 @@
         },
         "automation": {
             "type": "passive_rule",
-            "effect": "spell_range_doubled"
+            "effect": "spell_range_doubled",
+            "casting_time": "1 action"
         }
     },
     {
@@ -633,7 +679,8 @@
         "automation": {
             "type": "passive_buff",
             "target": "self",
-            "effect": "improvised_weapon_proficiency"
+            "effect": "improvised_weapon_proficiency",
+            "casting_time": "1 action"
         }
     },
     {
@@ -646,7 +693,8 @@
             "type": "passive_buff",
             "target": "self",
             "effect": "max_hp_increase",
-            "bonusExpression": "2 * level"
+            "bonusExpression": "2 * level",
+            "casting_time": "1 action"
         }
     },
     {
@@ -666,7 +714,10 @@
             "target": "saving_throw",
             "condition": "concentration_spell_damage",
             "effect": "advantage",
-            "abilities": ["Constitution"]
+            "abilities": [
+                "Constitution"
+            ],
+            "casting_time": "1 action"
         }
     },
     {

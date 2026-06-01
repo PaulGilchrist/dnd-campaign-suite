@@ -690,7 +690,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             const overlayId = targetName.slice('overlay-'.length);
             const overlay = overlays.find(o => o.id === overlayId);
             if (overlay) {
-                combatSummary.creatures[idx].targetName = overlay.label || `${SHAPE_LABELS[overlay.shape] || overlay.shape} (${overlay.radiusFt || overlay.distanceFt || overlay.sizeFt || 0}ft)`;
+                combatSummary.creatures[idx].targetName = targetName;
                 const players = mapData?.players || [];
                 const npcs = (mapData?.placedItems || []).filter(i => i.type === 'npc');
                 try {

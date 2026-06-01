@@ -24,13 +24,11 @@ export const featuresToIgnore = [
 ];
 
 export const actions = [
-    "Action Surge",
     "Arcane Charge",
     "Avenging Angel",
     "Bestial Fury",
     "Channel Divinity: Abjure Enemy",
     "Channel Divinity: Charm Animals and Plants",
-    "Channel Divinity: Cloak of Shadows",
     "Channel Divinity: Invoke Duplicity",
     "Channel Divinity: Knowledge of the Ages",
     "Channel Divinity: Nature's Wrath",
@@ -41,14 +39,11 @@ export const actions = [
     "Channel Divinity: Turn Undead",
     "Cleansing Touch",
     "Cloak of Shadows",
-    "Corona of Light",
     "Countercharm",
     "Dark Delirium",
     "Destroy Undead",
     "Divine Sense",
-    "Divine Smite",
     "Divine Strike",
-    "Disciple of Life",
     "Draconic Presence",
     "Eldritch Strike",
     "Empty Body",
@@ -56,34 +51,25 @@ export const actions = [
     "Holy Nimbus",
     "Improved Divine Smite",
     "Improved War Magic",
-    "Intimidating Presence",
-    "Lay on Hands",
     "Master Transmuter",
     "Primeval Awareness",
     "Quivering Palm",
-    "Savage Attacks",
-    "Sculpt Spells",
     "Sneak Attack",
     "Stillness of Mind",
-    "Stunning Strike",
     "The Third Eye",
-    "Vanish",
-    "War Priest",
-    "Wholeness of Body"
+    "Vanish"
 ];
 
 export const bonusActions = [
     "Channel Divinity: Vow of Enmity",
+    "Combat Wild Shape (Wild Companion)",
     "Combat Wild Shape",
     "Cunning Action",
     "Exceptional Training",
     "Fast Hands",
     "Flexible Casting: Converting Spell Slot",
     "Flexible Casting: Creating Spell Slots",
-    "Flurry of Blows",
-    "Frenzy",
     "Patient Defense",
-    "Second Wind",
     "Step of the Wind",
     "Versatile Trickster",
     "War Magic"
@@ -92,18 +78,10 @@ export const bonusActions = [
 export const reactions = [
     "Beguiling Defenses",
     "Channel Divinity: War God's Blessing",
-    "Cutting Words",
-    "Dampen Elements",
-    "Deflect Missiles",
     "Entropic Ward",
     "Instinctive Charm",
-    "Misty Escape",
     "Projected Ward",
-    "Retaliation",
-    "Slow Fall",
     "Soul of Vengeance",
-    "Uncanny Dodge",
-    "Warding Flare",
     "Wrath of the Storm"
 ];
 
@@ -125,7 +103,6 @@ export const characterAdvancement = [
     "Dwarven Toughness",
     "Eldritch Invocations",
     "Evocation Savant",
-    "Expertise",
     "Fast Movement",
     "Favored Enemy",
     "Fighting Style",

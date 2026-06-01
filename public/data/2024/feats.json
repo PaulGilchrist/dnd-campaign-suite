@@ -62,7 +62,8 @@
                     "target": "deception_performance_checks",
                     "condition": "disguised",
                     "effect": "advantage",
-                    "ability": "Charisma"
+                    "ability": "Charisma",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -121,7 +122,8 @@
                 "automation": {
                     "type": "passive_buff",
                     "effect": "climb_speed",
-                    "bonusExpression": "speed"
+                    "bonusExpression": "speed",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -131,7 +133,8 @@
                 "automation": {
                     "type": "passive_buff",
                     "effect": "stand_from_prone",
-                    "movementCost": "5 ft"
+                    "movementCost": "5 ft",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -141,7 +144,8 @@
                 "automation": {
                     "type": "passive_buff",
                     "effect": "reduced_running_jump_requirement",
-                    "runningStartRequirement": "5 ft"
+                    "runningStartRequirement": "5 ft",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -189,7 +193,8 @@
                     "type": "auto_reroll",
                     "trigger": "attack_roll_miss",
                     "effect": "convert_miss_to_hit",
-                    "oncePerTurn": true
+                    "oncePerTurn": true,
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -239,7 +244,8 @@
                     "trigger": "after_attack_or_magic_action",
                     "effect": "bonus_teleport",
                     "distance": "30 ft",
-                    "requiresLineOfSight": true
+                    "requiresLineOfSight": true,
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -291,10 +297,18 @@
                         "player_choice_2_from_list"
                     ],
                     "validTypes": [
-                        "Acid", "Cold", "Fire", "Lightning",
-                        "Necrotic", "Poison", "Psychic", "Radiant", "Thunder"
+                        "Acid",
+                        "Cold",
+                        "Fire",
+                        "Lightning",
+                        "Necrotic",
+                        "Poison",
+                        "Psychic",
+                        "Radiant",
+                        "Thunder"
                     ],
-                    "recharge": "long_rest"
+                    "recharge": "long_rest",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -310,7 +324,8 @@
                     "saveDcExpression": "8 + CON modifier + proficiency_bonus",
                     "range": "60 ft",
                     "requiresLineOfSight": true,
-                    "targets": 1
+                    "targets": 1,
+                    "casting_time": "1 reaction"
                 }
             }
         ],
@@ -363,7 +378,8 @@
                     "modifier": "2d4",
                     "canBeBonusOrPenalty": true,
                     "range": "60 ft",
-                    "recharge": "initiative_or_short_or_long_rest"
+                    "recharge": "initiative_or_short_or_long_rest",
+                    "casting_time": "1 bonus action"
                 }
             }
         ],
@@ -415,7 +431,8 @@
                     "alsoSelfHealing": {
                         "extraHealingExpression": "CON modifier",
                         "oncePerTurn": true
-                    }
+                    },
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -467,7 +484,8 @@
                         "Bludgeoning",
                         "Piercing",
                         "Slashing"
-                    ]
+                    ],
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -479,7 +497,8 @@
                     "trigger": "natural_20_attack_roll",
                     "effect": "extra_damage",
                     "extraDamageExpression": "increased_ability_score",
-                    "extraDamageType": "same_as_attack"
+                    "extraDamageType": "same_as_attack",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -527,7 +546,8 @@
                     "effect": "survive_and_heal",
                     "minHp": 1,
                     "healExpression": "half_max_hp",
-                    "recharge": "long_rest"
+                    "recharge": "long_rest",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -538,7 +558,8 @@
                     "type": "healing_pool",
                     "poolExpression": "10d10",
                     "action": "bonus_action",
-                    "recharge": "long_rest"
+                    "recharge": "long_rest",
+                    "casting_time": "1 bonus action"
                 }
             }
         ],
@@ -586,7 +607,8 @@
                 "type": "proficiency",
                 "automation": {
                     "type": "passive_buff",
-                    "effect": "all_skill_proficiencies"
+                    "effect": "all_skill_proficiencies",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -597,7 +619,8 @@
                     "type": "passive_buff",
                     "effect": "expertise",
                     "count": 1,
-                    "requirement": "no_existing_expertise"
+                    "requirement": "no_existing_expertise",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -648,7 +671,8 @@
                     "action": "bonus_action",
                     "effect": "disengage_end_grappled",
                     "additionalEffect": "end_grappled",
-                    "noOpportunityAttacks": true
+                    "noOpportunityAttacks": true,
+                    "casting_time": "1 bonus action"
                 }
             },
             {
@@ -658,7 +682,8 @@
                 "automation": {
                     "type": "passive_buff",
                     "effect": "speed_increase",
-                    "bonus": "30 ft"
+                    "bonus": "30 ft",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -707,7 +732,8 @@
                 "automation": {
                     "type": "passive_buff",
                     "effect": "truesight",
-                    "range": "60 ft"
+                    "range": "60 ft",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -767,7 +793,8 @@
                     "trigger": "dash_action",
                     "effect": "speed_bonus",
                     "bonus": "10 ft",
-                    "duration": "same_action"
+                    "duration": "same_action",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -789,7 +816,8 @@
                         }
                     ],
                     "chooseOne": true,
-                    "oncePerTurn": true
+                    "oncePerTurn": true,
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -842,7 +870,8 @@
                     "trigger": "short_rest_food_healing",
                     "effect": "extra_healing_hit_dice",
                     "extraHealing": "1d8",
-                    "targets": "4 + proficiency_bonus"
+                    "targets": "4 + proficiency_bonus",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -855,7 +884,8 @@
                     "tempHpExpression": "proficiency_bonus",
                     "craftCount": "proficiency_bonus",
                     "craftTime": "1_hour_or_long_rest",
-                    "duration": "8_hours"
+                    "duration": "8_hours",
+                    "casting_time": "1 bonus action"
                 }
             }
         ],
@@ -940,7 +970,8 @@
                     "effect": "push",
                     "distance": "5 ft",
                     "oncePerTurn": true,
-                    "sizeLimit": "one_size_larger"
+                    "sizeLimit": "one_size_larger",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -952,7 +983,8 @@
                     "trigger": "critical_hit_bludgeoning",
                     "target": "all_attackers_vs_target",
                     "effect": "advantage",
-                    "duration": "until_start_of_next_turn"
+                    "duration": "until_start_of_next_turn",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -994,7 +1026,8 @@
                     "type": "passive_buff",
                     "effect": "ac_bonus",
                     "bonus": 1,
-                    "condition": "wearing_light_medium_or_heavy_armor"
+                    "condition": "wearing_light_medium_or_heavy_armor",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -1038,7 +1071,8 @@
                     "trigger": "melee_attack_hit_while_holding_finesse",
                     "effect": "ac_bonus",
                     "bonusExpression": "proficiency_bonus",
-                    "duration": "until_start_of_next_turn"
+                    "duration": "until_start_of_next_turn",
+                    "casting_time": "1 reaction"
                 }
             }
         ],
@@ -1093,10 +1127,13 @@
                     "trigger": "attack_action_with_light_weapon",
                     "extraAttacks": 1,
                     "weaponRequirements": {
-                        "mustHave": ["Light"],
+                        "mustHave": [
+                            "Light"
+                        ],
                         "twoHanded": false
                     },
-                    "weaponRestriction": "must_differ_from_main_hand"
+                    "weaponRestriction": "must_differ_from_main_hand",
+                    "casting_time": "1 bonus action"
                 }
             },
             {
@@ -1143,7 +1180,8 @@
                     "type": "passive_buff",
                     "effect": "damage_bonus_dueling",
                     "bonus": 2,
-                    "condition": "holding_melee_weapon_one_hand_no_other_weapons"
+                    "condition": "holding_melee_weapon_one_hand_no_other_weapons",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -1179,7 +1217,8 @@
                 "automation": {
                     "type": "conditional_advantage",
                     "target": "death_saving_throws",
-                    "effect": "advantage"
+                    "effect": "advantage",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -1190,7 +1229,8 @@
                     "type": "self_healing",
                     "action": "bonus_action",
                     "hitDiceCost": 1,
-                    "healExpression": "hit_die_roll"
+                    "healExpression": "hit_die_roll",
+                    "casting_time": "1 bonus action"
                 }
             }
         ],
@@ -1333,7 +1373,8 @@
                     "type": "conditional_advantage",
                     "target": "attack_rolls",
                     "condition": "creature_grappled_by_you",
-                    "effect": "advantage"
+                    "effect": "advantage",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -1419,7 +1460,8 @@
                     "type": "damage_bonus",
                     "trigger": "heavy_weapon_hit_during_attack_action",
                     "extraDamageExpression": "proficiency_bonus",
-                    "damageType": "same_as_weapon"
+                    "damageType": "same_as_weapon",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -1430,7 +1472,8 @@
                     "type": "bonus_action_attack",
                     "trigger": "critical_hit_or_kill_with_melee_weapon",
                     "action": "bonus_action",
-                    "effect": "free_melee_attack_after_crit_or_kill"
+                    "effect": "free_melee_attack_after_crit_or_kill",
+                    "casting_time": "1 bonus action"
                 }
             }
         ],
@@ -1469,7 +1512,8 @@
                     "action": "action",
                     "healExpression": "ally_hit_die + proficiency_bonus",
                     "range": "5 ft",
-                    "requiresHealersKit": true
+                    "requiresHealersKit": true,
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -1553,8 +1597,13 @@
                 "automation": {
                     "type": "damage_reduction",
                     "reductionExpression": "proficiency_bonus",
-                    "damageTypes": ["Bludgeoning", "Piercing", "Slashing"],
-                    "condition": "wearing_heavy_armor"
+                    "damageTypes": [
+                        "Bludgeoning",
+                        "Piercing",
+                        "Slashing"
+                    ],
+                    "condition": "wearing_heavy_armor",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -1611,7 +1660,8 @@
                     "tempHpExpression": "character_level + ability_modifier",
                     "range": "30 ft",
                     "targets": 6,
-                    "includesSelf": true
+                    "includesSelf": true,
+                    "casting_time": "1 bonus action"
                 }
             }
         ],
@@ -1654,7 +1704,8 @@
                     "reductionExpression": "1d10 + proficiency_bonus",
                     "reaction": true,
                     "target": "ally",
-                    "requiresShieldOrWeapon": true
+                    "requiresShieldOrWeapon": true,
+                    "casting_time": "1 reaction"
                 }
             }
         ],
@@ -1818,7 +1869,8 @@
                 "automation": {
                     "type": "passive_rule",
                     "effect": "concentration_disadvantage_on_damage_dealt",
-                    "target": "creature_you_damage"
+                    "target": "creature_you_damage",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -1829,7 +1881,8 @@
                     "type": "auto_reroll",
                     "trigger": "failed_int_wis_cha_save",
                     "effect": "override_fail_to_success",
-                    "oncePer": "short_or_long_rest"
+                    "oncePer": "short_or_long_rest",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -2036,7 +2089,8 @@
                     "type": "conditional_advantage",
                     "target": "attack_rolls_vs_unmounted_near_mount",
                     "condition": "mounted_and_target_one_size_smaller",
-                    "effect": "advantage"
+                    "effect": "advantage",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -2048,7 +2102,8 @@
                     "trigger": "mount_makes_dex_save_for_half",
                     "effect": "zero_on_success_half_on_fail_for_mount",
                     "mount": true,
-                    "requiresRiding": true
+                    "requiresRiding": true,
+                    "casting_time": "1 reaction"
                 }
             },
             {
@@ -2059,7 +2114,8 @@
                     "type": "reaction_bonus",
                     "trigger": "attack_hits_mount",
                     "effect": "redirect_attack_to_self",
-                    "mount": true
+                    "mount": true,
+                    "casting_time": "1 reaction"
                 }
             }
         ],
@@ -2198,7 +2254,8 @@
                     "effect": "reroll_damage_die",
                     "rerollCount": 1,
                     "oncePerTurn": true,
-                    "mustUseNew": true
+                    "mustUseNew": true,
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -2210,7 +2267,8 @@
                     "trigger": "critical_hit_piercing",
                     "effect": "extra_damage_die",
                     "extraDice": 1,
-                    "diceType": "weapon_die"
+                    "diceType": "weapon_die",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -2315,7 +2373,8 @@
                     "damage": "1d4",
                     "damageType": "Bludgeoning",
                     "weaponRequirement": "quarterstaff_spear_heavy_reach",
-                    "trigger": "after_attack_action_with_polearm"
+                    "trigger": "after_attack_action_with_polearm",
+                    "casting_time": "1 bonus action"
                 }
             },
             {
@@ -2326,7 +2385,8 @@
                     "type": "reaction_damage",
                     "trigger": "creature_enters_reach_while_holding_polearm",
                     "range": "5_ft",
-                    "effect": "melee_attack"
+                    "effect": "melee_attack",
+                    "casting_time": "1 reaction"
                 }
             }
         ],
@@ -2370,7 +2430,8 @@
                     "trigger": "creature_attacks_ally_within_5ft_while_holding_shield",
                     "effect": "disadvantage_on_attacks_vs_ally",
                     "duration": "until_start_of_next_turn",
-                    "requiresShield": true
+                    "requiresShield": true,
+                    "casting_time": "1 reaction"
                 }
             }
         ],
@@ -2486,7 +2547,8 @@
                     "trigger": "creature_disengages_or_hits_other_within_5ft",
                     "effect": "opportunity_attack",
                     "range": "5_ft",
-                    "oaType": "any_attack_miss_or_disengage"
+                    "oaType": "any_attack_miss_or_disengage",
+                    "casting_time": "1 reaction"
                 }
             },
             {
@@ -2496,7 +2558,8 @@
                 "automation": {
                     "type": "passive_rule",
                     "effect": "speed_0_on_oa_hit",
-                    "duration": "end_of_turn"
+                    "duration": "end_of_turn",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -2590,7 +2653,11 @@
                 "automation": {
                     "type": "passive_rule",
                     "effect": "ignore_cover_ranged",
-                    "coverTypes": ["Half", "Three-Quarters"]
+                    "coverTypes": [
+                        "Half",
+                        "Three-Quarters"
+                    ],
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -2599,7 +2666,8 @@
                 "type": "passive",
                 "automation": {
                     "type": "passive_rule",
-                    "effect": "no_melee_disadvantage_ranged"
+                    "effect": "no_melee_disadvantage_ranged",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -2608,7 +2676,8 @@
                 "type": "passive",
                 "automation": {
                     "type": "passive_rule",
-                    "effect": "no_long_range_disadvantage_ranged"
+                    "effect": "no_long_range_disadvantage_ranged",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -2664,7 +2733,8 @@
                     "saveDcExpression": "8 + STR modifier + proficiency_bonus",
                     "distance": "5 ft",
                     "oncePerTurn": true,
-                    "requiresShield": true
+                    "requiresShield": true,
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -2677,7 +2747,8 @@
                     "effect": "zero_on_success_half_on_fail",
                     "reaction": true,
                     "saveType": "DEX",
-                    "requiresShield": true
+                    "requiresShield": true,
+                    "casting_time": "1 reaction"
                 }
             }
         ],
@@ -2802,7 +2873,8 @@
                 "automation": {
                     "type": "passive_buff",
                     "effect": "blindsight",
-                    "range": "10 ft"
+                    "range": "10 ft",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -2813,7 +2885,8 @@
                     "type": "conditional_advantage",
                     "target": "stealth_checks",
                     "condition": "combat_hide_action",
-                    "effect": "advantage"
+                    "effect": "advantage",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -2822,7 +2895,8 @@
                 "type": "passive",
                 "automation": {
                     "type": "passive_rule",
-                    "effect": "hidden_miss_doesnt_reveal"
+                    "effect": "hidden_miss_doesnt_reveal",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -2871,7 +2945,8 @@
                     "effect": "reduce_speed",
                     "speedReduction": "10 ft",
                     "duration": "until_start_of_next_turn",
-                    "oncePerTurn": true
+                    "oncePerTurn": true,
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -2883,7 +2958,8 @@
                     "trigger": "critical_hit_slashing",
                     "target": "target_attack_rolls",
                     "effect": "disadvantage",
-                    "duration": "until_start_of_next_turn"
+                    "duration": "until_start_of_next_turn",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -2939,7 +3015,8 @@
                 "automation": {
                     "type": "passive_buff",
                     "effect": "speed_increase",
-                    "bonus": "10 ft"
+                    "bonus": "10 ft",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -2949,7 +3026,8 @@
                 "automation": {
                     "type": "passive_rule",
                     "effect": "ignore_difficult_terrain_on_dash",
-                    "duration": "rest_of_turn"
+                    "duration": "rest_of_turn",
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -2958,7 +3036,8 @@
                 "type": "passive",
                 "automation": {
                     "type": "passive_rule",
-                    "effect": "opportunity_attacks_disadvantage"
+                    "effect": "opportunity_attacks_disadvantage",
+                    "casting_time": "1 action"
                 }
             }
         ],
@@ -3287,7 +3366,10 @@
                     "type": "conditional_advantage",
                     "target": "concentration_saving_throws",
                     "effect": "advantage",
-                    "abilities": ["CON"]
+                    "abilities": [
+                        "CON"
+                    ],
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -3298,7 +3380,8 @@
                     "type": "reaction_damage",
                     "trigger": "creature_leaves_reach",
                     "effect": "cast_spell_as_reaction",
-                    "range": "melee_reach"
+                    "range": "melee_reach",
+                    "casting_time": "1 reaction"
                 }
             },
             {
@@ -3398,7 +3481,12 @@
                 "automation": {
                     "type": "passive_rule",
                     "effect": "ignore_loading_crossbows",
-                    "weapons": ["Hand Crossbow", "Heavy Crossbow", "Light Crossbow"]
+                    "weapons": [
+                        "Hand Crossbow",
+                        "Heavy Crossbow",
+                        "Light Crossbow"
+                    ],
+                    "casting_time": "1 action"
                 }
             },
             {
@@ -3407,7 +3495,8 @@
                 "type": "passive",
                 "automation": {
                     "type": "passive_rule",
-                    "effect": "no_melee_disadvantage_crossbows"
+                    "effect": "no_melee_disadvantage_crossbows",
+                    "casting_time": "1 action"
                 }
             },
             {

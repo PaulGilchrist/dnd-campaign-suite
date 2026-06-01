@@ -212,6 +212,59 @@ describe('featureCategorizationUtils', () => {
       expect(result.actions[0].details).toBe('Extra details');
          });
 
+    it('should categorize features by casting_time on automation', () => {
+      const items = [
+        { name: 'Action Surge', description: 'Extra action', automation: { casting_time: '1 action', type: 'extra_action' } },
+        { name: 'Second Wind', description: 'Heal', automation: { casting_time: '1 bonus action', type: 'self_healing' } },
+        { name: 'Slow Fall', description: 'Reduce damage', automation: { casting_time: '1 reaction', type: 'damage_reduction', reaction: true } }
+            ];
+
+      const result = categorizeFeatures(items, mockCategories);
+
+      expect(result.actions).toHaveLength(1);
+      expect(result.actions[0].name).toBe('Action Surge');
+      expect(result.bonusActions).toHaveLength(1);
+      expect(result.bonusActions[0].name).toBe('Second Wind');
+      expect(result.reactions).toHaveLength(1);
+      expect(result.reactions[0].name).toBe('Slow Fall');
+         });
+
+    it('should prefer casting_time over name-based categorization', () => {
+      const items = [
+        // "Second Wind" is in mockCategories.actions by name, but casting_time should override
+        { name: 'Second Wind', description: 'Bonus action heal', automation: { casting_time: '1 bonus action', type: 'self_healing' } }
+            ];
+
+      const result = categorizeFeatures(items, mockCategories);
+
+      expect(result.actions).toHaveLength(0);
+      expect(result.bonusActions).toHaveLength(1);
+      expect(result.bonusActions[0].name).toBe('Second Wind');
+         });
+
+    it('should fall back to name-based categorization when no casting_time present', () => {
+      const items = [
+        { name: 'Second Wind', description: 'Heal' }
+            ];
+
+      const result = categorizeFeatures(items, mockCategories);
+
+      // "Second Wind" in mockCategories.actions
+      expect(result.actions).toHaveLength(1);
+      expect(result.actions[0].name).toBe('Second Wind');
+         });
+
+    it('should categorize features with unknown casting_time as special actions', () => {
+      const items = [
+        { name: 'Mystery Feature', description: 'Unknown', automation: { casting_time: '1 minute', type: 'ritual' } }
+            ];
+
+      const result = categorizeFeatures(items, mockCategories);
+
+      expect(result.specialActions).toHaveLength(1);
+      expect(result.specialActions[0].name).toBe('Mystery Feature');
+         });
+
     it('should categorize mixed features correctly', () => {
       const items = [
             { name: 'Action Surge', description: 'Action' },

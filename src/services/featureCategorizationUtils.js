@@ -58,7 +58,22 @@ export const categorizeFeatures = (items, categories, options = {}) => {
       return;
     }
 
-    // Categorize based on category definitions, checking for duplicates
+    // Categorize by casting_time for features that have automations with casting_time
+    if (item.automation?.casting_time) {
+      const ct = item.automation.casting_time;
+      if (ct === '1 action' && !categorized.actions.some(f => f.name === item.name)) {
+        categorized.actions.push(itemSummary);
+      } else if (ct === '1 bonus action' && !categorized.bonusActions.some(f => f.name === item.name)) {
+        categorized.bonusActions.push(itemSummary);
+      } else if (ct === '1 reaction' && !categorized.reactions.some(f => f.name === item.name)) {
+        categorized.reactions.push(itemSummary);
+      } else if (!categorized.specialActions.some(f => f.name === item.name)) {
+        categorized.specialActions.push(itemSummary);
+      }
+      return;
+    }
+
+    // Fallback: Categorize based on category definitions (name-based, for features without automation)
     if (characterAdvancement.includes(item.name) && !categorized.characterAdvancement.some(f => f.name === item.name)) {
       categorized.characterAdvancement.push(itemSummary);
     } else if (actions.includes(item.name) && !categorized.actions.some(action => action.name === item.name)) {

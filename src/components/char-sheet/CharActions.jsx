@@ -7,7 +7,7 @@ import { parseMagicItemName } from '../../services/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { buildFeatureDetailHtml, showWeaponMasteryPopup } from '../../hooks/useActionPopup.js'
 import { rollExpression, rollExpressionDoubled } from '../../services/diceRoller.js';
-import { getTargetFromAttacker, getCombatContext, getResistanceNotice } from '../../services/damageUtils.js';
+import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetName } from '../../services/damageUtils.js';
 import * as mapsService from '../../services/mapsService.js';
 import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem } from '../../services/rangeValidation.js';
 import { computeCover } from '../../services/coverService.js';
@@ -63,12 +63,16 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const buildAttackContextSync = React.useCallback((attack) => {
         const target = getCombatTargetInfo();
-     const resistanceNotice = target ? getResistanceNotice([attack.damageType], target.resistances, target.immunities, target.name) : null;
-         return {
-             damageType: attack.damageType,
-             resistanceNotice,
-             targetName: target?.name,
-             saveDc: attack.saveDc,
+        const targetName = target?.name || (() => {
+            const cs = getCombatContext();
+            return cs ? getAttackerTargetName(cs, playerStats.name) : undefined;
+        })();
+        const resistanceNotice = target ? getResistanceNotice([attack.damageType], target.resistances, target.immunities, target.name) : null;
+        return {
+            damageType: attack.damageType,
+            resistanceNotice,
+            targetName,
+            saveDc: attack.saveDc,
             saveType: attack.saveType,
             dcSuccess: attack.saveSuccess,
             attackerName: playerStats.name,
@@ -197,7 +201,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
       }
     }, [cannotAct, mapName, buildAttackContextSync, buildAttackContext, rollAttack, exhaustionPenalty]);
 
-    const handleAutomationAction = React.useCallback((action) => {
+    const handleAutomationAction = async (action) => {
         if (cannotAct) return;
         const auto = action.automation;
         if (!auto) return;
@@ -205,22 +209,26 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         switch (auto.type) {
             case 'save_attack': {
                 const damageResult = rollExpression(auto.damage);
-                if (damageResult && setPopupHtml) {
+                if (damageResult) {
                     const dcSuccess = auto.shape === 'cone' ? 0.5 : 0;
-                    setPopupHtml({
-                        type: 'save-prompt',
+                    // Resolve save DC: "ability" means 8 + CON mod + proficiency
+                    let saveDc;
+                    if (auto.saveDc === 'ability') {
+                        const conBonus = playerStats.abilities?.find(a => a.name === 'CON')?.bonus || 0;
+                        const prof = playerStats.proficiency || 0;
+                        saveDc = 8 + conBonus + prof;
+                    } else {
+                        saveDc = auto.saveDc || 10;
+                    }
+                    const ctx = buildAttackContextSync({
                         name: action.name,
-                        formula: auto.damage,
-                        rolls: damageResult.rolls,
-                        modifier: damageResult.modifier,
-                        damageType: auto.damageType,
-                        saveDc: auto.saveDc,
-                        saveType: auto.saveType,
-                        dcSuccess,
-                        targetName: '',
-                        attackerName: playerStats.name,
-                        campaignName,
+                        damage: auto.damage,
+                        damageType: auto.damageType || '',
+                        saveDc,
+                        saveType: auto.saveType || 'DEX',
+                        saveSuccess: dcSuccess,
                     });
+                    rollDamage(action.name, auto.damage, damageResult.total, damageResult.rolls, damageResult.modifier, ctx);
                 }
                 break;
             }
@@ -247,8 +255,42 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                   });
                 break;
             }
+            case 'free_spell': {
+                const spellName = auto.spell || action.name;
+                let spellData = (playerStats.spellAbilities?.spells || []).find(s => s.name === spellName);
+                if (!spellData) {
+                    try {
+                        const spellsUrl = playerStats.rules === '2024' ? '/data/2024/spells.json' : '/data/spells.json';
+                        const response = await fetch(spellsUrl);
+                        const allSpells = await response.json();
+                        spellData = allSpells.find(s => s.name === spellName);
+                    } catch (e) {
+                        // Fetch failed, fall through to description popup
+                    }
+                }
+                if (spellData?.damage) {
+                    const slotDmg = spellData.damage.damage_at_slot_level;
+                    const formula = slotDmg?.[Object.keys(slotDmg)[0]];
+                    if (formula) {
+                        const result = rollExpression(formula);
+                        if (result) {
+                            const target = getCombatTargetInfo();
+                            rollDamage(spellName, formula, result.total, result.rolls, result.modifier, {
+                                damageType: spellData.damage.damage_type || 'Radiant',
+                                targetName: target?.name,
+                                attackerName: playerStats.name,
+                            });
+                            break;
+                        }
+                    }
+                }
+                if (setPopupHtml) {
+                    const usesInfo = auto.uses ? ` (${auto.uses}/long rest)` : '';
+                    setPopupHtml(`<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Free cast of:</b> ${spellName}${usesInfo}`);
+                }
+                break;
+            }
             case 'extra_action':
-            case 'free_spell':
             case 'bonus_attacks':
             case 'bonus_action_attack':
             case 'temp_buff':
@@ -274,7 +316,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             default:
                 break;
         }
-    }, [cannotAct, setPopupHtml, playerStats.name, campaignName]);
+    };
     const getWeaponMastery = (weaponName) => {
         if (playerStats.rules !== '2024') {
         return null;
