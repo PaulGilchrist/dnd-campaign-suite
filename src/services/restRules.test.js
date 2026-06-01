@@ -163,6 +163,8 @@ describe('spellSlotLevels', () => {
 function createMockStorage() {
   const store = {}
   return {
+    get: vi.fn((name) => store[name]),
+    set: vi.fn((name, value) => { store[name] = value }),
     getProperty: vi.fn((name, key) => store[name]?.[key]),
     setProperty: vi.fn((name, key, value) => {
       if (!store[name]) store[name] = {}
@@ -206,12 +208,18 @@ describe('applyShortRest', () => {
 })
 
 describe('applyLongRest', () => {
-  it('restores currentHitPoints to max', () => {
+  it('performs a single atomic storage.set with all changes', () => {
     const playerStats = { name: 'Frog', hitPoints: 50, level: 10 }
     const storage = createMockStorage()
     applyLongRest(playerStats, 'C1', storage)
 
-    expect(storage.setProperty).toHaveBeenCalledWith('Frog', 'currentHitPoints', 50, 'C1')
+    expect(storage.get).toHaveBeenCalledWith('Frog')
+    expect(storage.set).toHaveBeenCalledTimes(1)
+    const result = storage.set.mock.calls[0]
+    expect(result[0]).toBe('Frog')
+    expect(result[1].currentHitPoints).toBe(50)
+    expect(result[1].shortRestHitDice).toBe(10)
+    expect(result[2]).toBe('C1')
   })
 
   it('restores spell slots to max when spellAbilities exists', () => {
@@ -228,25 +236,19 @@ describe('applyLongRest', () => {
     const storage = createMockStorage()
     applyLongRest(playerStats, 'C1', storage)
 
-    expect(storage.setProperty).toHaveBeenCalledWith('Frog', 'spell_slots_level_1', 4, 'C1')
-    expect(storage.setProperty).toHaveBeenCalledWith('Frog', 'spell_slots_level_2', 3, 'C1')
-    expect(storage.setProperty).toHaveBeenCalledWith('Frog', 'spell_slots_level_3', 0, 'C1')
-     })
+    const data = storage.set.mock.calls[0][1]
+    expect(data.spell_slots_level_1).toBe(4)
+    expect(data.spell_slots_level_2).toBe(3)
+    expect(data.spell_slots_level_3).toBe(0)
+  })
 
-  it('skips spell slots when no spellAbilities', () => {
+  it('does not set spell slots when no spellAbilities', () => {
     const playerStats = { name: 'Barb', hitPoints: 60, level: 8 }
     const storage = createMockStorage()
     applyLongRest(playerStats, 'C1', storage)
 
-    expect(storage.setProperty).not.toHaveBeenCalledWith('Barb', expect.stringMatching(/spell_slots/), expect.anything(), expect.anything())
-  })
-
-  it('restores hit dice to level', () => {
-    const playerStats = { name: 'Frog', hitPoints: 50, level: 10 }
-    const storage = createMockStorage()
-    applyLongRest(playerStats, 'C1', storage)
-
-    expect(storage.setProperty).toHaveBeenCalledWith('Frog', 'shortRestHitDice', 10, 'C1')
+    const data = storage.set.mock.calls[0][1]
+    expect(data.spell_slots_level_1).toBeUndefined()
   })
 
   it('resets long rest resources to null', () => {
@@ -254,44 +256,90 @@ describe('applyLongRest', () => {
     const storage = createMockStorage()
     applyLongRest(playerStats, 'C1', storage)
 
+    const data = storage.set.mock.calls[0][1]
     LONG_REST_RESOURCES.forEach((key) => {
-      expect(storage.setProperty).toHaveBeenCalledWith('Frog', key, null, 'C1')
+      expect(data[key]).toBeNull()
     })
   })
 
   it('reduces exhaustion by one', () => {
     const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
     const storage = createMockStorage()
-    storage.getProperty.mockReturnValue(3)
+    storage.get.mockReturnValue({ exhaustionLevel: 3 })
     applyLongRest(playerStats, 'C1', storage)
 
-    expect(storage.setProperty).toHaveBeenCalledWith('Frog', 'exhaustionLevel', 2, 'C1')
+    const data = storage.set.mock.calls[0][1]
+    expect(data.exhaustionLevel).toBe(2)
   })
 
   it('keeps exhaustion at 0 when already at 0', () => {
     const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
     const storage = createMockStorage()
-    storage.getProperty.mockReturnValue(0)
+    storage.get.mockReturnValue({ exhaustionLevel: 0 })
     applyLongRest(playerStats, 'C1', storage)
 
-    expect(storage.setProperty).not.toHaveBeenCalledWith('Frog', 'exhaustionLevel', expect.anything(), expect.anything())
+    const data = storage.set.mock.calls[0][1]
+    expect(data.exhaustionLevel).toBe(0)
   })
 
   it('skips exhaustion update when value is null', () => {
     const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
     const storage = createMockStorage()
-    storage.getProperty.mockReturnValue(null)
+    storage.get.mockReturnValue({ exhaustionLevel: null })
     applyLongRest(playerStats, 'C1', storage)
 
-    expect(storage.setProperty).not.toHaveBeenCalledWith('Frog', 'exhaustionLevel', expect.anything(), expect.anything())
+    const data = storage.set.mock.calls[0][1]
+    expect(data.exhaustionLevel).toBeNull()
   })
 
   it('reduces exhaustion from level 1 to 0', () => {
     const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
     const storage = createMockStorage()
-    storage.getProperty.mockReturnValue(1)
+    storage.get.mockReturnValue({ exhaustionLevel: 1 })
     applyLongRest(playerStats, 'C1', storage)
 
-    expect(storage.setProperty).toHaveBeenCalledWith('Frog', 'exhaustionLevel', 0, 'C1')
+    const data = storage.set.mock.calls[0][1]
+    expect(data.exhaustionLevel).toBe(0)
+  })
+
+  it('sets hasInspiration when character has Resourceful trait', () => {
+    const playerStats = {
+      name: 'Frog',
+      hitPoints: 50,
+      level: 5,
+      characterAdvancement: [
+        { name: 'Resourceful', description: 'Heroic Inspiration on Long Rest' }
+      ]
+    }
+    const storage = createMockStorage()
+    applyLongRest(playerStats, 'C1', storage)
+
+    const data = storage.set.mock.calls[0][1]
+    expect(data.hasInspiration).toBe(true)
+  })
+
+  it('does not set hasInspiration when character lacks Resourceful trait', () => {
+    const playerStats = {
+      name: 'Frog',
+      hitPoints: 50,
+      level: 5,
+      characterAdvancement: [
+        { name: 'Brave', description: 'Advantage vs frightened' }
+      ]
+    }
+    const storage = createMockStorage()
+    applyLongRest(playerStats, 'C1', storage)
+
+    const data = storage.set.mock.calls[0][1]
+    expect(data.hasInspiration).toBeUndefined()
+  })
+
+  it('does not set hasInspiration when characterAdvancement is missing', () => {
+    const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
+    const storage = createMockStorage()
+    applyLongRest(playerStats, 'C1', storage)
+
+    const data = storage.set.mock.calls[0][1]
+    expect(data.hasInspiration).toBeUndefined()
   })
 })

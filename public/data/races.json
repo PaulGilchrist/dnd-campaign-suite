@@ -174,7 +174,7 @@
                     "target": "saving_throw",
                     "condition": "poison",
                     "effect": "advantage",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             },
             {
@@ -284,7 +284,7 @@
                     "target": "saving_throw",
                     "condition": "charmed",
                     "effect": "advantage",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             },
             {
@@ -609,7 +609,7 @@
                         "WIS",
                         "CHA"
                     ],
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             }
         ],
@@ -784,7 +784,7 @@
                     "target": "saving_throw",
                     "condition": "charmed",
                     "effect": "advantage",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             },
             {
@@ -918,7 +918,7 @@
                     "target": "saving_throw",
                     "condition": "frightened",
                     "effect": "advantage",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             },
             {

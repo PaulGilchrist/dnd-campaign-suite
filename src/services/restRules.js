@@ -71,26 +71,39 @@ export function applyShortRest(playerStats, campaignName, storage) {
 export function applyLongRest(playerStats, campaignName, storage) {
   const name = playerStats.name
 
-  storage.setProperty(name, 'currentHitPoints', playerStats.hitPoints, campaignName)
+  // Read current full character data for atomic batch update
+  let charData = storage.get(name)
+  if (!charData) charData = {}
+
+  charData.currentHitPoints = playerStats.hitPoints
 
   if (playerStats.spellAbilities) {
     for (const level of spellSlotLevels()) {
       const key = `spell_slots_level_${level}`
       const max = playerStats.spellAbilities[key]
       if (max != null) {
-        storage.setProperty(name, key, max, campaignName)
+        charData[key] = max
       }
     }
   }
 
-  storage.setProperty(name, 'shortRestHitDice', playerStats.level, campaignName)
+  charData.shortRestHitDice = playerStats.level
 
   getLongRestResources().forEach((key) => {
-    storage.setProperty(name, key, null, campaignName)
+    charData[key] = null
   })
 
-  const currentExhaustion = storage.getProperty(name, 'exhaustionLevel', campaignName)
+  const currentExhaustion = charData.exhaustionLevel
   if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
-    storage.setProperty(name, 'exhaustionLevel', getLevelAfterLongRest(currentExhaustion), campaignName)
+    charData.exhaustionLevel = getLevelAfterLongRest(currentExhaustion)
   }
+
+  // Grant Heroic Inspiration from Resourceful trait (Human 2024)
+  const hasResourceful = playerStats.characterAdvancement?.some(f => f.name === 'Resourceful')
+  if (hasResourceful) {
+    charData.hasInspiration = true
+  }
+
+  // Single atomic write fires ONE SSE event with the complete final state
+  storage.set(name, charData, campaignName)
 }

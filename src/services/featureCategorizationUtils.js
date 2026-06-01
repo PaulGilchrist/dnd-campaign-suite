@@ -67,6 +67,8 @@ export const categorizeFeatures = (items, categories, options = {}) => {
         categorized.bonusActions.push(itemSummary);
       } else if (ct === '1 reaction' && !categorized.reactions.some(f => f.name === item.name)) {
         categorized.reactions.push(itemSummary);
+      } else if (ct === 'passive' && !categorized.characterAdvancement.some(f => f.name === item.name)) {
+        categorized.characterAdvancement.push(itemSummary);
       } else if (!categorized.specialActions.some(f => f.name === item.name)) {
         categorized.specialActions.push(itemSummary);
       }
