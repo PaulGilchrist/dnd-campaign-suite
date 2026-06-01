@@ -3,6 +3,7 @@ import React from 'react'
 import storage from '../../services/storage.js'
 import { rollDice } from '../../services/diceRoller.js'
 import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES } from '../../services/restRules.js'
+import { getClassFeatures } from '../../services/classFeatures.js'
 
 function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [remainingHitDice, setRemainingHitDice] = React.useState(() => {
@@ -11,10 +12,13 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
      });
     const [recoveredHp, setRecoveredHp] = React.useState(0);
     const [rollLog, setRollLog] = React.useState([]);
+    const [songOfRestApplied, setSongOfRestApplied] = React.useState(false);
 
     const maxHitDice = playerStats.level;
     const hitDie = getHitDieSize(playerStats);
     const conBonus = playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0;
+    const classFeatures = getClassFeatures(playerStats);
+    const songOfRestDie = classFeatures?.songOfRestDie || null;
 
     const handleRollOne = () => {
         if (remainingHitDice <= 0) return;
@@ -38,6 +42,15 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         setRemainingHitDice(0);
         setRecoveredHp(prev => prev + totalHp);
         setRollLog(prev => [...prev, ...newRolls]);
+     };
+
+    const handleApplySongOfRest = () => {
+        if (!songOfRestDie || songOfRestApplied) return;
+        const { total } = rollDice(1, songOfRestDie);
+        const bonus = Math.max(1, total + conBonus);
+        setRecoveredHp(prev => prev + bonus);
+        setRollLog(prev => [...prev, { roll: total, hp: bonus, isSongOfRest: true }]);
+        setSongOfRestApplied(true);
      };
 
     const handleComplete = () => {
@@ -82,25 +95,37 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                             <i className="fa-solid fa-dice-d6"></i> Roll All ({remainingHitDice})
                         </button>
                     </div>
-                    {rollLog.length > 0 && (
-                        <div className="short-rest-roll-log">
-                            <table>
-                                <thead>
-                                    <tr><th>Roll</th><th>HP Recovered</th></tr>
-                                </thead>
-                                <tbody>
-                                    {rollLog.map((entry, i) => (
-                                        <tr key={i}>
-                                            <td>{entry.roll}</td>
-                                            <td>{entry.hp}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                            <p className="short-rest-total"><b>Total HP Recovered:</b> {recoveredHp}</p>
-                        </div>
-                    )}
-                </div>
+                     {rollLog.length > 0 && (
+                         <div className="short-rest-roll-log">
+                             <table>
+                                 <thead>
+                                     <tr><th>Roll</th><th>HP Recovered</th></tr>
+                                 </thead>
+                                 <tbody>
+                                     {rollLog.map((entry, i) => (
+                                         <tr key={i} className={entry.isSongOfRest ? 'short-rest-song-row' : ''}>
+                                             <td>{entry.roll}{entry.isSongOfRest ? ' (Song of Rest)' : ''}</td>
+                                             <td>{entry.hp}</td>
+                                         </tr>
+                                     ))}
+                                 </tbody>
+                             </table>
+                             <p className="short-rest-total"><b>Total HP Recovered:</b> {recoveredHp}</p>
+                         </div>
+                     )}
+                 </div>
+
+                 {songOfRestDie && !songOfRestApplied && (
+                     <div className="short-rest-section">
+                         <h4>Song of Rest</h4>
+                         <p>Roll d{songOfRestDie} + CON bonus and add to recovered HP.</p>
+                         <div className="short-rest-dice-row">
+                             <button className="char-btn" onClick={handleApplySongOfRest}>
+                                 <i className="fa-solid fa-music"></i> Apply Song of Rest (d{songOfRestDie})
+                             </button>
+                         </div>
+                     </div>
+                 )}
 
                 <div className="short-rest-section">
                     <h4>Resources Restored</h4>

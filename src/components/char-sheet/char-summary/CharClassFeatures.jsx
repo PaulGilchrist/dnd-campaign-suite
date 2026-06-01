@@ -158,24 +158,19 @@ const MonkFeatures = function MonkFeatures({ playerStats }) {
 const PaladinFeatures = function PaladinFeatures({ playerStats }) {
     const paladinFeatures = getClassFeatures(playerStats);
     const cha = playerStats.abilities?.find((a) => a.name === 'Charisma');
-    const layOnHandsPool = 5 * playerStats.level;
+    const layOnHandsPoolMax = 5 * playerStats.level;
     return (
          <div data-testid="char-class-paladin">
              {playerStats.class.fightingStyles && <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles.join(', ')}</div>}
              <div><b>Extra Attacks: </b>{paladinFeatures?.extraAttacks || 0}</div>
              <div><b>Channel Divinity: </b>{paladinFeatures?.maxChannelDivinity || 0}</div>
              {paladinFeatures?.auraRange !== null && <div><b>Aura Range: </b>{paladinFeatures.auraRange}</div>}
-             <div><b>Lay On Hands Pool: </b>{layOnHandsPool} HP</div>
+             <TrackedResourceInput label="Lay On Hands Pool" resourceKey="layOnHandsPool" playerName={playerStats.name} getMax={() => layOnHandsPoolMax} deps={[playerStats]} />
              {cha && <div><b>Aura of Protection: </b>+{cha.bonus} to saves {playerStats.level >= 6 ? '(10 ft.)' : '(locked)'}</div>}
              <div className="automation-actions">
-                 <button className="automation-btn" title={`Lay On Hands: Heal up to ${layOnHandsPool} HP from pool`}>
-                     <i className="fas fa-hands-helping"></i> Lay On Hands (Pool: {layOnHandsPool})
+                 <button className="automation-btn" title="Divine Smite: Add radiant damage using a spell slot">
+                     <i className="fas fa-bolt"></i> Divine Smite (SPC)
                  </button>
-                 {playerStats.level >= 2 && (
-                     <button className="automation-btn" title="Divine Smite: Add radiant damage using a spell slot">
-                         <i className="fas fa-bolt"></i> Divine Smite (SPC)
-                     </button>
-                 )}
              </div>
          </div>
     );

@@ -58,6 +58,10 @@
     padding: 2px 8px;
     text-align: center;
 }
+.short-rest-song-row td {
+    color: #8b5cf6;
+    font-style: italic;
+}
 .short-rest-total {
     margin-top: 6px;
     font-size: 0.95em;

@@ -13,7 +13,8 @@ import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHos
 import { computeCover } from '../../services/coverService.js';
 import { computeFeatRangeEffects } from '../../services/featRangeService.js';
 import { loadNPCs } from '../../services/npcsService.js';
-import { hasAutomation } from '../../services/automationService.js';
+import { hasAutomation } from '../../services/automationService.js'
+import HealingPoolModal from './HealingPoolModal.jsx'
 import './CharActions.css'
 import { isEqual } from 'lodash';
 
@@ -24,6 +25,7 @@ const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextPr
 const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName }) {
     const [actions, setActions] = useState([]);
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
+    const [healingPoolModal, setHealingPoolModal] = useState(null);
 
     useEffect(() => {
       computeFeatRangeEffects(playerStats.feats, playerStats.rules).then(setFeatRangeEffects).catch(() => {});
@@ -236,17 +238,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 break;
             }
             case 'healing_pool': {
-                if (setPopupHtml) {
-                    setPopupHtml({
-                        type: 'healing_pool',
-                        name: action.name,
-                        pool: auto.pool,
-                        poolExpression: auto.poolExpression,
-                        resourceKey: auto.resourceKey,
-                        alsoCures: auto.alsoCures || [],
-                        cureCost: auto.cureCost || 5,
-                    });
-                }
+                setHealingPoolModal({
+                    name: action.name,
+                    pool: auto.pool,
+                    poolExpression: auto.poolExpression,
+                    resourceKey: auto.resourceKey,
+                    alsoCures: auto.alsoCures || [],
+                    cureCost: auto.cureCost || 5,
+                });
                 break;
             }
             case 'extra_action':
@@ -329,6 +328,17 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                              <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
                                         </Popup>
                                     )}
+                {healingPoolModal && (
+                    <HealingPoolModal
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        poolMax={healingPoolModal.pool}
+                        resourceKey={healingPoolModal.resourceKey}
+                        alsoCures={healingPoolModal.alsoCures}
+                        cureCost={healingPoolModal.cureCost}
+                        onClose={() => setHealingPoolModal(null)}
+                    />
+                )}
                 {playerStats.actions.map((action) => {
                     const isClickable = action.details || hasAutomation(action);
                     const handleClick = () => {
