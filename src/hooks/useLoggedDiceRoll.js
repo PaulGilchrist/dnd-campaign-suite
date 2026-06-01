@@ -240,16 +240,16 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                 const combatSummary = JSON.parse(stored);
                 const creature = combatSummary.creatures.find(
                     c => c.type === 'player' && c.name === firstName
-                );
+                  );
                 if (creature) {
                     creature.initiative = String(r1 + bonus);
                     combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
                     storage.set('combatSummary', combatSummary, campaignName);
-                    window.dispatchEvent(new CustomEvent('initiative-rolled'));
-                }
-            } catch (e) { /* ignore parse errors */ }
-        }
-    }
+                  }
+              } catch (e) { /* ignore parse errors */ }
+          }
+        window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + bonus } }));
+      }
      }
 
    function logDamageAndShow(name, formula, total, rolls, modifier, context) {

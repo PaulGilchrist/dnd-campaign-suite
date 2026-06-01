@@ -396,10 +396,12 @@ function buildAttackInfo(feature, playerStats) {
         healExpression: auto.healExpression || '',
         trigger: auto.trigger || 'roll_initiative',
         uses: auto.uses ?? 1,
+        usesMax: auto.uses ?? 1,
         recharge: auto.recharge || 'long_rest',
+        resourceKey: feature.name.toLowerCase().replace(/\s+/g, '') + 'Uses',
         hasAutomation: true
-      }
-    }
+       }
+     }
 
     case 'spell_modifier': {
       return {

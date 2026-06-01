@@ -15,6 +15,7 @@ import { computeFeatRangeEffects } from '../../services/featRangeService.js';
 import { loadNPCs } from '../../services/npcsService.js';
 import { hasAutomation, getAutomationInfo } from '../../services/automationService.js'
 import storage from '../../services/storage.js'
+import utils from '../../services/utils.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
 import './CharActions.css'
 import { isEqual } from 'lodash';
@@ -28,16 +29,43 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
     const [healingPoolModal, setHealingPoolModal] = useState(null);
 
-    useEffect(() => {
-      computeFeatRangeEffects(playerStats.feats, playerStats.rules).then(setFeatRangeEffects).catch(() => {});
-    }, [playerStats.feats, playerStats.rules]);
+     useEffect(() => {
+       computeFeatRangeEffects(playerStats.feats, playerStats.rules).then(setFeatRangeEffects).catch(() => {});
+      }, [playerStats.feats, playerStats.rules]);
 
     useEffect(() => {
-      fetch('/data/actions.json')
-             .then(response => response.json())
-              .then(data => setActions(data))
-           .catch(error => console.error('Error loading actions:', error));
-        }, []);
+       fetch('/data/actions.json')
+               .then(response => response.json())
+                .then(data => setActions(data))
+             .catch(error => console.error('Error loading actions:', error));
+          }, []);
+
+     // Passive: recover Focus Points when anyone rolls initiative
+    useEffect(() => {
+       const handleInitiativeRolled = (e) => {
+         if (!playerStats || !e.detail || !e.detail.characterName) return;
+         const rollingName = utils.getName(e.detail.characterName);
+         const myName = utils.getName(playerStats.name);
+         if (rollingName !== myName) return;
+
+          // Check if this character has an initiative_action with regain_focus_points_and_heal effect
+        const hasInitAction = playerStats.actions?.some(a => a.automation?.type === 'initiative_action');
+       if (!hasInitAction) return;
+
+         // Get max focus points from class data and set current to max
+         const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+         const maxFP = classLevel?.focus_points || storage.getProperty(playerStats.name, 'focusPoints', campaignName) || 0;
+         if (!maxFP) return;
+
+         // Only recover if current is less than max (avoid unnecessary writes when already full)
+         const currentFP = Number(storage.getProperty(playerStats.name, 'focusPoints', campaignName)) || 0;
+         if (currentFP >= maxFP) return;
+
+         storage.setProperty(playerStats.name, 'focusPoints', maxFP, campaignName);
+       };
+       window.addEventListener('initiative-rolled', handleInitiativeRolled);
+       return () => window.removeEventListener('initiative-rolled', handleInitiativeRolled);
+     }, [playerStats, campaignName]);
       const { popupHtml, setPopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
         autoDamageRoll: (autoDamage, isCrit) => {
           const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
@@ -331,7 +359,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             case 'bonus_action_attack':
             case 'damage_aura':
             case 'combat_stance':
-            case 'initiative_action':
             case 'resource_pool':
             case 'attack_rider':
             case 'spell_modifier':
@@ -343,10 +370,117 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         automationType: auto.type,
                         description: action.description || '',
                         automation: auto,
-                     });
+                      });
+                  }
+                break;
+              }
+             case 'initiative_action': {
+               if (auto.effect === 'regain_focus_points_and_heal') {
+
+                    // Check use tracking against long-rest limit
+                   const resourceKey = auto.resourceKey || action.name.toLowerCase().replace(/\s+/g, '') + 'Uses';
+                  const usesUsed = Number(storage.getProperty(playerStats.name, resourceKey, campaignName) ?? 0);
+                 if (usesUsed >= (auto.usesMax || auto.uses || 1)) {
+                    if (setPopupHtml) {
+                       setPopupHtml({
+                          type: 'automation_info',
+                           name: action.name,
+                          automationType: auto.type,
+                           description: `${action.name} has been used and cannot be used again until a long rest.` +
+                             (auto.recharge === 'long_rest' ? '' : ` Recharges on ${auto.recharge || 'short rest'}.`),
+                         });
+                        }
+                     return;
+                    }
+
+                  // Get martial arts die from class data
+                 const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+                const martialArtsDie = classLevel?.martial_arts_die || 4;
+               const monkLevel = playerStats.level;
+
+                   // Roll the martial arts die
+                  const rollResult = rollExpression(`${martialArtsDie}d1`);
+                 if (!rollResult) return;
+
+                   const healAmount = monkLevel + rollResult.total;
+
+                  // Get current HP from storage
+                const currentHp = Number(storage.getProperty(playerStats.name, 'currentHitPoints', campaignName)) || 0;
+               const maxHp = playerStats.hitPoints;
+                  const newHp = Math.min(maxHp, currentHp + healAmount);
+
+                 // Update HP in storage (triggers SSE broadcast to other clients)
+                   storage.setProperty(playerStats.name, 'currentHitPoints', newHp, campaignName);
+
+                   // Also update combat summary if in combat
+                   const combatSummary = (() => {
+                         try {
+                                 const cs = getCombatContext();
+                                return cs;
+                             } catch (e) { return null; }
+                           })();
+                     if (combatSummary) {
+                          const creature = combatSummary.creatures.find(c => c.name === playerStats.name || c.name.startsWith(playerStats.name + ' '));
+                             if (creature) {
+                                 creature.currentHp = newHp;
+                                  storage.set('combatSummary', combatSummary, campaignName);
+                               }
+                            }
+
+                    // Increment use count
+                   const newUsesUsed = usesUsed + 1;
+                 storage.setProperty(playerStats.name, resourceKey, newUsesUsed, campaignName);
+
+                   // Log to campaign log as a healing entry with source name
+                 fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+                        method: 'POST',
+                       headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                          type: 'hp_change',
+                           targetName: playerStats.name,
+                           sourceName: action.name,
+                           delta: newHp - currentHp,
+                          currentHp: newHp,
+                           maxHp,
+                         isHealing: true,
+                           isUnconscious: false,
+                        }),
+                     }).catch(() => {});
+
+                   // Also dispatch combat-summary-updated for local sync
+                  window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+
+                   // Show popup with roll result and healing info
+                 if (setPopupHtml) {
+                      setPopupHtml({
+                         type: 'healing',
+                          name: action.name,
+                           formula: `${martialArtsDie}d1 + ${monkLevel}`,
+                          rolls: rollResult.rolls,
+                            bonus: monkLevel,
+                             modifier: 0,
+                           healAmount: healAmount,
+                         description: `${action.name}: Rolled ${rollResult.total} (${martialArtsDie}d1) + ${monkLevel} (Monk level) = <strong>${healAmount}</strong> HP`,
+                            targetName: playerStats.name,
+                          targetCurrentHp: newHp,
+                             targetMaxHp: maxHp,
+                         damageApplied: true,
+                  });
+                   }
+               } else {
+                 if (setPopupHtml) {
+                     setPopupHtml({
+                        type: 'automation_info',
+                       name: action.name,
+                       automationType: auto.type,
+                        description: action.description || '',
+                       automation: auto,
+                      });
+                   }
+                  break;
                 }
                break;
-            }
+              }
             default:
                 break;
         }

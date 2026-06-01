@@ -281,12 +281,12 @@ function HpChangeEntry({ entry }) {
               {entry.threshold === 'recovering' && 'Recovering'}
               {entry.delta !== 0 && ` (${entry.delta > 0 ? '+' : ''}${entry.delta})`}
             </>
-          ) : (
-            <>
-              {entry.isUnconscious && 'Knocked Unconscious — '}
-              {isDamage ? 'Takes Damage' : 'Healed'}
-            </>
-          )}
+             ) : (
+                <>
+                  {entry.isUnconscious && 'Knocked Unconscious — '}
+                  {isDamage ? 'Takes Damage' : (entry.sourceName ? `Healed (${entry.sourceName})` : 'Healed')}
+                </>
+              )}
         </span>
         <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
       </div>
