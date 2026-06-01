@@ -245,8 +245,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         name: action.name,
                         pool: auto.pool,
                         poolExpression: auto.poolExpression,
-                        description: `${action.name}: Pool of ${auto.pool} HP. Click to heal or cure.`,
                         resourceKey: auto.resourceKey,
+                        alsoCures: auto.alsoCures || [],
+                        cureCost: auto.cureCost || 5,
                     });
                 }
                 break;

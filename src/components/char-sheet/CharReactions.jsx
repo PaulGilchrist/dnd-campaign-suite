@@ -7,6 +7,7 @@ import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/baseCombatActions.js'
 import { hasAutomation } from '../../services/automationService.js'
+import { rollExpression } from '../../services/diceRoller.js'
 
 function CharReactions({ playerStats, campaignName, cannotAct }) {
     const { popupHtml, setPopupHtml, rollAttack } = useLoggedDiceRoll(playerStats.name, campaignName);
@@ -53,13 +54,30 @@ function CharReactions({ playerStats, campaignName, cannotAct }) {
         if (!auto) return;
         switch (auto.type) {
             case 'damage_reduction': {
-                if (setPopupHtml) {
+                if (auto.redirect && setPopupHtml) {
+                    const reductionExpr = auto.reductionExpression || '0';
+                    const damageResult = rollExpression(reductionExpr);
+                    if (damageResult) {
+                        setPopupHtml({
+                            type: 'damage_reduction_redirect',
+                            name: reaction.name,
+                            description: reaction.description || '',
+                            reductionExpression: reductionExpr,
+                            reductionRolls: damageResult.rolls,
+                            reductionModifier: damageResult.modifier,
+                            reductionTotal: damageResult.total,
+                            redirectCost: auto.redirectCost || null,
+                            redirectDamage: auto.redirectDamage || '',
+                            redirectSave: auto.redirectSave || 'DEX',
+                        });
+                    }
+                } else if (setPopupHtml) {
                     setPopupHtml({
-                        type: 'automation_info',
+                        type: 'damage_reduction',
                         name: reaction.name,
-                        automationType: auto.type,
                         description: reaction.description || '',
-                        automation: auto,
+                        reductionExpression: auto.reductionExpression || '',
+                        trigger: auto.trigger || '',
                     });
                 }
                 break;
