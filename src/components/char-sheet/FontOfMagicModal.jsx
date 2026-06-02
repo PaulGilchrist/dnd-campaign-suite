@@ -1,6 +1,7 @@
 
 import React from 'react'
 import { getRuntimeValue, setRuntimeBatch } from '../../hooks/useRuntimeState.js'
+import { getClassFeatures } from '../../services/classFeatures.js'
 import './FontOfMagicModal.css'
 
 const COSTS_2024 = [0, 2, 3, 4, 5, 6];
@@ -25,17 +26,19 @@ function FontOfMagicModal({ playerStats, campaignName, onClose }) {
   };
   const slotCosts = getSlotCosts(playerStats);
 
+  const maxSP = getClassFeatures(playerStats)?.maxSorceryPoints || 0;
   const currentSP = (() => {
     const stored = getRuntimeValue(name, 'sorceryPoints');
-    return stored != null ? Number(stored) : 0;
+    return stored != null ? Number(stored) : maxSP;
   })();
-  const currentSlots = (() => ({
-    1: Math.min(maxSlots[1], Number(getRuntimeValue(name, 'spell_slots_level_1')) ?? maxSlots[1]),
-    2: Math.min(maxSlots[2], Number(getRuntimeValue(name, 'spell_slots_level_2')) ?? maxSlots[2]),
-    3: Math.min(maxSlots[3], Number(getRuntimeValue(name, 'spell_slots_level_3')) ?? maxSlots[3]),
-    4: Math.min(maxSlots[4], Number(getRuntimeValue(name, 'spell_slots_level_4')) ?? maxSlots[4]),
-    5: Math.min(maxSlots[5], Number(getRuntimeValue(name, 'spell_slots_level_5')) ?? maxSlots[5]),
-  }))();
+  const currentSlots = (() => {
+    const slots = {};
+    for (let lvl = 1; lvl <= 5; lvl++) {
+      const stored = getRuntimeValue(name, `spell_slots_level_${lvl}`);
+      slots[lvl] = stored != null ? Math.min(maxSlots[lvl], Number(stored)) : maxSlots[lvl];
+    }
+    return slots;
+  })();
   const [toSP, setToSP] = React.useState({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
   const [toSlots, setToSlots] = React.useState({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
 
