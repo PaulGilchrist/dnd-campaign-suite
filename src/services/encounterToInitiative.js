@@ -1,4 +1,5 @@
 import utils from './utils.js'
+import { getRuntimeValue } from '../hooks/useRuntimeState.js';
 import storage from './storage.js';
 import { cloneDeep } from 'lodash';
 import { rollD20 } from './diceRoller.js';
@@ -75,8 +76,8 @@ export async function expandMonstersToCreatures(selectedMonsters, characters, ca
 
     const playerChars = await Promise.all(characters.map(async (character) => {
       const maxHp = character.hitPoints || 0;
-      const currentHp = storage.getProperty(character.name, 'currentHitPoints', campaignName) ?? maxHp;
-      const storedMaxHp = storage.getProperty(character.name, 'hitPoints', campaignName);
+      const currentHp = getRuntimeValue(character.name, 'currentHitPoints') ?? maxHp;
+      const storedMaxHp = getRuntimeValue(character.name, 'hitPoints');
       return {
         name: utils.getName(character.name),
         type: 'player',

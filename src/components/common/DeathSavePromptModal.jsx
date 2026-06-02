@@ -4,7 +4,7 @@ import utils from '../../services/utils.js';
 import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/savePromptService.js';
 import * as deathSaveRules from '../../services/deathSaveRules.js';
 import Subscriber from './Subscriber.jsx';
-import storage from '../../services/storage.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import './deathSavePromptModal.css';
 
 function DeathSavePromptModal({ campaignName, characters }) {
@@ -40,8 +40,8 @@ function DeathSavePromptModal({ campaignName, characters }) {
     let currentSaves = [false, false, false];
     let currentFailures = [false, false, false];
     try {
-      const savedSaves = storage.getProperty(current.targetName, 'deathSaves', campaignName);
-      const savedFailures = storage.getProperty(current.targetName, 'deathFailures', campaignName);
+      const savedSaves = getRuntimeValue(current.targetName, 'deathSaves');
+      const savedFailures = getRuntimeValue(current.targetName, 'deathFailures');
       if (savedSaves) currentSaves = savedSaves;
       if (savedFailures) currentFailures = savedFailures;
     } catch { /* ignore */ }
@@ -75,12 +75,12 @@ function DeathSavePromptModal({ campaignName, characters }) {
        },
      }));
 
-    storage.setProperty(current.targetName, 'deathSaves', result.newSaves, campaignName);
-    storage.setProperty(current.targetName, 'deathFailures', result.newFailures, campaignName);
+    setRuntimeValue(current.targetName, 'deathSaves', result.newSaves, campaignName);
+    setRuntimeValue(current.targetName, 'deathFailures', result.newFailures, campaignName);
     clearDeathSavePrompt(campaignName, current.targetName);
 
     if (result.restoredToHp !== null) {
-      storage.setProperty(current.targetName, 'currentHitPoints', result.restoredToHp, campaignName);
+      setRuntimeValue(current.targetName, 'currentHitPoints', result.restoredToHp, campaignName);
     }
 
     setPrompts(prev => prev.map((p, i) =>

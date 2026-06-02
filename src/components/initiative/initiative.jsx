@@ -2,6 +2,7 @@
 import React from 'react'
 import { cloneDeep } from 'lodash';
 import utils from '../../services/utils.js'
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import storage from '../../services/storage.js'
 import { clearDeathSavePrompt } from '../../services/savePromptService.js'
 import { getMonsterImageUrl, getMonsterData } from '../../services/monsterUtils.js';
@@ -192,13 +193,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     }, [campaignName, mapName]);
 
     const loadCreatureHp = React.useCallback((characterName, fallbackMaxHp) => {
-        const stored = storage.getProperty(characterName, 'currentHitPoints', campaignName);
+        const stored = getRuntimeValue(characterName, 'currentHitPoints', campaignName);
         if (stored != null) return stored;
         return fallbackMaxHp;
     }, [campaignName]);
 
     const loadCreatureMaxHp = React.useCallback((characterName, fallbackMaxHp) => {
-        const stored = storage.getProperty(characterName, 'hitPoints', campaignName);
+        const stored = getRuntimeValue(characterName, 'hitPoints', campaignName);
         if (stored != null) return stored;
         return fallbackMaxHp;
     }, [campaignName]);
@@ -571,7 +572,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             );
             if (creature) {
                 creature.currentHp = e.detail.restoredToHp;
-                storage.setProperty(creature.name, 'currentHitPoints', e.detail.restoredToHp, campaignName);
+                setRuntimeValue(creature.name, 'currentHitPoints', e.detail.restoredToHp, campaignName);
                 storage.set('combatSummary', combatSummary, campaignName);
                 setCombatSummary(cloneDeep(combatSummary));
             }
@@ -590,10 +591,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
          creature.currentHp = newValue;
         if (creature.type === 'player') {
-            storage.setProperty(creature.name, 'currentHitPoints', newValue, campaignName);
+            setRuntimeValue(creature.name, 'currentHitPoints', newValue, campaignName);
             if (oldHp <= 0 && newValue > 0) {
-                storage.setProperty(creature.name, 'deathSaves', [false, false, false], campaignName);
-                storage.setProperty(creature.name, 'deathFailures', [false, false, false], campaignName);
+                setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
+                setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
                 clearDeathSavePrompt(campaignName, creature.name);
             }
 

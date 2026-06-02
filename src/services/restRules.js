@@ -1,4 +1,5 @@
 import { getLevelAfterLongRest } from './exhaustionRules.js'
+import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../hooks/useRuntimeState.js'
 
 export function getHitDieSize(playerStats) {
   return playerStats.class?.class_levels?.[playerStats.level - 1]?.hit_die || 8
@@ -57,24 +58,23 @@ export function spellSlotLevels() {
   return [1, 2, 3, 4, 5, 6, 7, 8, 9]
 }
 
-export async function applyShortRest(playerStats, campaignName, storage) {
+export async function applyShortRest(playerStats, campaignName) {
   const name = playerStats.name
-  const storedHp = storage.getProperty(name, 'currentHitPoints', campaignName)
+  const storedHp = getRuntimeValue(name, 'currentHitPoints')
   const currentHp = computeShortRestHpNewCurrent(storedHp, playerStats.hitPoints, 0)
 
+  const updates = { currentHitPoints: currentHp }
   for (const key of getShortRestResources()) {
-    await storage.setProperty(name, key, null, campaignName)
+    updates[key] = null
    }
 
-  await storage.setProperty(name, 'currentHitPoints', currentHp, campaignName)
+  setRuntimeBatch(name, updates, campaignName)
 }
 
-export async function applyLongRest(playerStats, campaignName, storage) {
+export async function applyLongRest(playerStats, campaignName) {
   const name = playerStats.name
 
-   // Read current full character data for atomic batch update
-  let charData = storage.get(name)
-  if (!charData) charData = {}
+  const charData = {}
 
   charData.currentHitPoints = playerStats.hitPoints
 
@@ -86,7 +86,7 @@ export async function applyLongRest(playerStats, campaignName, storage) {
         charData[key] = max
        }
      }
-   }
+    }
 
   charData.shortRestHitDice = playerStats.level
 
@@ -94,7 +94,7 @@ export async function applyLongRest(playerStats, campaignName, storage) {
     charData[key] = null
     })
 
-  const currentExhaustion = charData.exhaustionLevel
+  const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel')
   if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
     charData.exhaustionLevel = getLevelAfterLongRest(currentExhaustion)
      }
@@ -106,5 +106,5 @@ export async function applyLongRest(playerStats, campaignName, storage) {
      }
 
    // Single atomic write fires ONE SSE event with the complete final state
-  await storage.set(name, charData, campaignName)
+  setRuntimeBatch(name, charData, campaignName)
 }

@@ -1,26 +1,21 @@
  
 import React from 'react'
 
-import storage from '../../../services/storage.js'
+import { setRuntimeValue, useRuntimeValue } from '../../../hooks/useRuntimeState.js'
 import HiddenInput from '../../common/HiddenInput.jsx'
 
 function CharGold({ playerStats, campaignName }) {
 
-    const [gold, setGold] = React.useState(0);
+    const storedGold = useRuntimeValue(playerStats.name, 'gold', campaignName);
+    const gold = storedGold ? storedGold : playerStats.inventory.gold;
     const [showInputGold, setShowInputGold] = React.useState(false);
 
-    React.useEffect(() => {
-        let value = storage.getProperty(playerStats.name, 'gold', campaignName);
-        setGold(value ? value : playerStats.inventory.gold);
-    }, [playerStats, campaignName]);
-    
     const handleInputToggleGold = () => {
         setShowInputGold((showInputGold) => !showInputGold);
     };
     
     const handleValueChangeGold = (value) => {
-        storage.setProperty(playerStats.name, 'gold', value, campaignName);
-        setGold(value);
+        setRuntimeValue(playerStats.name, 'gold', value, campaignName);
     };
 
     return (

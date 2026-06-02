@@ -1,25 +1,21 @@
  
 import React from 'react'
-import storage from '../../../services/storage.js'
+import { setRuntimeValue, useRuntimeValue } from '../../../hooks/useRuntimeState.js'
 import { clearDeathSavePrompt } from '../../../services/savePromptService.js'
 import HiddenInput from '../../common/HiddenInput.jsx'
 import DeathSavingThrows from './DeathSavingThrows.jsx'
 
 function CharHitPoints({ playerStats, campaignName }) {
-     const [currentHitPoints, setCurrentHitPoints] = React.useState(0);
+     const storedHp = useRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
+     const currentHitPoints = storedHp != null ? storedHp : playerStats.hitPoints;
      const [showInputCurrentHitPoints, setShowInputCurrentHitPoints] = React.useState(false);
-     React.useEffect(() => {
-         let value = storage.getProperty(playerStats.name, 'currentHitPoints', campaignName);
-         setCurrentHitPoints(value != null ? value : playerStats.hitPoints);
-     }, [playerStats, campaignName]);
      const handleInputToggleCurrentHitPoints = () => {
          setShowInputCurrentHitPoints((showInputCurrentHitPoints) => !showInputCurrentHitPoints);
      };
       const handleValueChangeCurrentHitPoints = (value) => {
           const oldHp = currentHitPoints;
           const delta = value - oldHp;
-          storage.setProperty(playerStats.name, 'currentHitPoints', value, campaignName);
-          setCurrentHitPoints(value);
+          setRuntimeValue(playerStats.name, 'currentHitPoints', value, campaignName);
 
           if (delta !== 0) {
               fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
@@ -38,8 +34,8 @@ function CharHitPoints({ playerStats, campaignName }) {
           }
 
           if (value > 0) {
-              storage.setProperty(playerStats.name, 'deathSaves', [false, false, false], campaignName);
-              storage.setProperty(playerStats.name, 'deathFailures', [false, false, false], campaignName);
+              setRuntimeValue(playerStats.name, 'deathSaves', [false, false, false], campaignName);
+              setRuntimeValue(playerStats.name, 'deathFailures', [false, false, false], campaignName);
               clearDeathSavePrompt(campaignName, playerStats.name);
           }
       };
@@ -48,8 +44,7 @@ function CharHitPoints({ playerStats, campaignName }) {
           const handler = (e) => {
               if (!e.detail || e.detail.targetName !== playerStats.name) return;
               if (e.detail.restoredToHp) {
-                  storage.setProperty(playerStats.name, 'currentHitPoints', e.detail.restoredToHp, campaignName);
-                  setCurrentHitPoints(e.detail.restoredToHp);
+                  setRuntimeValue(playerStats.name, 'currentHitPoints', e.detail.restoredToHp, campaignName);
               }
           };
           window.addEventListener('death-save-result', handler);

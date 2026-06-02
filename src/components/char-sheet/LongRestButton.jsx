@@ -1,10 +1,9 @@
 
-import storage from '../../services/storage.js'
 import { applyLongRest } from '../../services/restRules.js'
 
 function LongRestButton({ playerStats, campaignName, onLongRest }) {
   const handleLongRest = () => {
-    applyLongRest(playerStats, campaignName, storage)
+    applyLongRest(playerStats, campaignName)
     onLongRest && onLongRest()
    };
 

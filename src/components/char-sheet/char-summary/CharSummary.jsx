@@ -18,13 +18,13 @@ import { sanitizeHtml } from '../../../services/sanitize.js';
 import LongRestButton from '../LongRestButton.jsx'
 import ShortRestButton from '../ShortRestButton.jsx'
 import ShortRestModal from '../ShortRestModal.jsx'
-import storage from '../../../services/storage.js';
+import { setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { getActiveBuffs } from './buffService.js';
 import CharConditions from './CharConditions.jsx'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
-function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters, onLongRest, exhaustionLevel, onExhaustionChange, conditionEffects, onConditionsChange }) {
+function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters, onLongRest, exhaustionLevel, conditionEffects, onConditionsChange }) {
     const { popupHtml, setPopupHtml, rollInitiative } = useLoggedDiceRoll(playerStats.name, campaignName);
     const [showShortRest, setShowShortRest] = React.useState(false);
     const [showXpModal, setShowXpModal] = React.useState(false);
@@ -67,14 +67,14 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         }
         const newXp = Math.max(0, displayXp + delta);
         setDisplayXp(newXp);
-        storage.setProperty(playerStats.name, 'xp', newXp, campaignName);
+        setRuntimeValue(playerStats.name, 'xp', newXp, campaignName);
         setShowXpModal(false);
     };
 
     const handleXpModeToggle = (e) => {
         const newMode = e.target.checked ? 'milestone' : 'experience';
         playerStats.xpMode = newMode;
-        storage.setProperty(playerStats.name, 'xpMode', newMode, campaignName);
+        setRuntimeValue(playerStats.name, 'xpMode', newMode, campaignName);
         setShowXpModal(false);
     };
 
@@ -281,7 +281,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     onClose={() => setShowAvatarModal(false)}
                 />
             )}
-              <CharConditions playerStats={playerStats} campaignName={campaignName} activeMapName={activeMapName} characters={characters} exhaustionLevel={exhaustionLevel} onExhaustionChange={onExhaustionChange} onConditionsChange={onConditionsChange} conditionEffects={conditionEffects} />
+              <CharConditions playerStats={playerStats} campaignName={campaignName} activeMapName={activeMapName} characters={characters} exhaustionLevel={exhaustionLevel} onConditionsChange={onConditionsChange} conditionEffects={conditionEffects} />
             </div>
   </div>
 )

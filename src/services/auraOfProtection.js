@@ -1,84 +1,51 @@
 import { loadMapData } from './mapsService.js';
 import { getDistanceFeet } from './rangeValidation.js';
-import storage from './storage.js';
+import { getRuntimeValue } from '../hooks/useRuntimeState.js';
 
 const CANNOT_ACT_CONDITIONS = ['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious'];
 const DEFAULT_AURA_RANGE_FT = 10;
 const EXPANDED_AURA_RANGE_FT = 30;
 
-let classesCache = null;
+function hasAuraOfProtection(character) {
+  const cls = character?.class;
+  if (!cls || !character.level) return false;
 
-async function getClasses(rules) {
-  if (!classesCache) {
-    try {
-      const [e5, r2024] = await Promise.all([
-        fetch('/data/classes.json').then(r => r.json()),
-        fetch('/data/2024/classes.json').then(r => r.json()),
-      ]);
-      classesCache = { '5e': e5, '2024': r2024 };
-    } catch {
-      classesCache = { '5e': [], '2024': [] };
+  if (cls.class_levels) {
+    for (const lvl of cls.class_levels) {
+      if (lvl.level > character.level) break;
+      if (lvl.class_specific?.aura_range >= 10) return true;
     }
+    return false;
   }
-  return classesCache[rules || '5e'] || [];
+
+  return cls.name === 'Paladin' && character.level >= 6;
+}
+
+function getAuraRange(character) {
+  const cls = character?.class;
+  if (!cls || !character.level) return DEFAULT_AURA_RANGE_FT;
+
+  if (cls.class_levels) {
+    const idx = Math.min(character.level, cls.class_levels.length) - 1;
+    const entry = cls.class_levels[Math.max(0, idx)];
+    const range = entry?.class_specific?.aura_range;
+    if (range >= 30) return EXPANDED_AURA_RANGE_FT;
+    return DEFAULT_AURA_RANGE_FT;
+  }
+
+  return character.level >= 18 ? EXPANDED_AURA_RANGE_FT : DEFAULT_AURA_RANGE_FT;
 }
 
 function getChaModifier(character) {
   const cha = character.abilities?.find(a => a.name === 'Charisma');
-  return cha?.bonus || 0;
-}
-
-function hasAuraFeature(classData, level) {
-  if (!classData?.class_levels) return false;
-  for (const lvl of classData.class_levels) {
-    if (lvl.level > level) break;
-    if (lvl.class_specific?.aura_range >= 10) return true;
-  }
-  return false;
-}
-
-function getAuraRangeFromClass(classData, level) {
-  if (!classData?.class_levels) return DEFAULT_AURA_RANGE_FT;
-  const entry = classData.class_levels.find(cl => cl.level === Math.min(level, classData.class_levels.length));
-  const range = entry?.class_specific?.aura_range;
-  if (range >= 30) return EXPANDED_AURA_RANGE_FT;
-  if (range >= 10) return DEFAULT_AURA_RANGE_FT;
-  return DEFAULT_AURA_RANGE_FT;
-}
-
-async function hasAuraOfProtection(character) {
-  if (!character?.class?.name || !character.level) {
-    console.log('[Aura] Missing class.name or level:', character?.name, character?.class?.name, character?.level);
-    return false;
-  }
-  if (character.class?.class_levels) {
-    return hasAuraFeature(character.class, character.level);
-  }
-  const classes = await getClasses(character.rules);
-  const classData = classes.find(c => c.name === character.class.name);
-  if (!classData) {
-    console.log('[Aura] Class not found in JSON:', character.class.name, 'rules:', character.rules);
-    return false;
-  }
-  const result = hasAuraFeature(classData, character.level);
-  console.log('[Aura] hasAuraOfProtection:', character.name, character.class.name, 'level', character.level, '=>', result);
-  return result;
-}
-
-async function getAuraRange(character) {
-  if (!character?.class?.name || !character.level) return DEFAULT_AURA_RANGE_FT;
-  if (character.class?.class_levels) {
-    return getAuraRangeFromClass(character.class, character.level);
-  }
-  const classes = await getClasses(character.rules);
-  const classData = classes.find(c => c.name === character.class.name);
-  if (!classData) return character.level >= 18 ? EXPANDED_AURA_RANGE_FT : DEFAULT_AURA_RANGE_FT;
-  return getAuraRangeFromClass(classData, character.level);
+  if (cha?.bonus != null) return cha.bonus;
+  if (cha) return Math.floor((cha.baseScore + cha.abilityImprovements + cha.miscBonus - 10) / 2);
+  return 0;
 }
 
 function hasCannotActCondition(sourceName, campaignName) {
   try {
-    const conditions = storage.getProperty(sourceName, 'activeConditions', campaignName);
+    const conditions = getRuntimeValue(sourceName, 'activeConditions');
     if (!Array.isArray(conditions)) return false;
     return conditions.some(c => CANNOT_ACT_CONDITIONS.includes(c));
   } catch {
@@ -97,7 +64,7 @@ async function isWithinRange(sourceName, targetName, campaignName, activeMapName
     const dist = getDistanceFeet(sourcePlayer, targetPlayer);
     if (dist == null) return true;
     const sourceChar = characters?.find(c => c.name === sourceName);
-    const range = await (sourceChar ? getAuraRange(sourceChar) : Promise.resolve(DEFAULT_AURA_RANGE_FT));
+    const range = sourceChar ? getAuraRange(sourceChar) : DEFAULT_AURA_RANGE_FT;
     return dist <= range;
   } catch {
     return true;
@@ -105,21 +72,16 @@ async function isWithinRange(sourceName, targetName, campaignName, activeMapName
 }
 
 export async function computeAuraBonus({ targetName, characters, campaignName, activeMapName }) {
-  await Promise.all([getClasses('5e'), getClasses('2024')]);
-
   let bestBonus = 0;
   let bestSource = null;
 
-  console.log('[Aura] computeAuraBonus called:', { targetName, characterCount: characters?.length, campaignName, activeMapName });
   for (const character of characters) {
     const name = character.name;
     if (!name || name === targetName) continue;
-    if (!(await hasAuraOfProtection(character))) continue;
-    console.log('[Aura] Found aura granter:', name);
+    if (!hasAuraOfProtection(character)) continue;
     if (hasCannotActCondition(name, campaignName)) continue;
     const chaMod = getChaModifier(character);
     const bonus = Math.max(1, chaMod);
-    console.log('[Aura] CHA mod for', name, ':', chaMod, 'bonus:', bonus);
     const inRange = await isWithinRange(name, targetName, campaignName, activeMapName, characters);
     if (!inRange) continue;
     if (bonus > bestBonus) {
@@ -128,6 +90,5 @@ export async function computeAuraBonus({ targetName, characters, campaignName, a
     }
   }
 
-  console.log('[Aura] Result:', { bonus: bestBonus, sourceName: bestSource });
   return { bonus: bestBonus, sourceName: bestSource };
 }

@@ -1,6 +1,6 @@
 
 import React from 'react'
-import storage from '../../services/storage.js'
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
 import { rollDice } from '../../services/diceRoller.js'
 import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES } from '../../services/restRules.js'
 import { getClassFeatures } from '../../services/classFeatures.js'
@@ -9,7 +9,7 @@ import { applyHealingToTarget } from '../../services/applyHealing.js'
 
 function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [remainingHitDice, setRemainingHitDice] = React.useState(() => {
-        const stored = storage.getProperty(playerStats.name, 'shortRestHitDice', campaignName);
+        const stored = getRuntimeValue(playerStats.name, 'shortRestHitDice');
         return stored != null ? stored : playerStats.level;
      });
     const [recoveredHp, setRecoveredHp] = React.useState(0);
@@ -65,18 +65,18 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
      };
 
     const handleComplete = () => {
-        storage.setProperty(playerStats.name, 'shortRestHitDice', remainingHitDice, campaignName);
+        setRuntimeValue(playerStats.name, 'shortRestHitDice', remainingHitDice, campaignName);
 
-        let currentHp = storage.getProperty(playerStats.name, 'currentHitPoints', campaignName);
+        let currentHp = getRuntimeValue(playerStats.name, 'currentHitPoints');
         if (currentHp == null || currentHp === '') {
             currentHp = playerStats.hitPoints;
          } else {
             currentHp = Number(currentHp) + recoveredHp;
          }
-        storage.setProperty(playerStats.name, 'currentHitPoints', Math.min(playerStats.hitPoints, currentHp), campaignName);
+        setRuntimeValue(playerStats.name, 'currentHitPoints', Math.min(playerStats.hitPoints, currentHp), campaignName);
 
         SHORT_REST_RESOURCES.forEach((key) => {
-            storage.setProperty(playerStats.name, key, null, campaignName);
+            setRuntimeValue(playerStats.name, key, null, campaignName);
         });
 
         onComplete && onComplete();

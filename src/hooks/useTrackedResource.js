@@ -1,14 +1,14 @@
 import React from 'react';
-import storage from '../services/storage.js';
+import { getRuntimeValue, setRuntimeValue } from './useRuntimeState.js';
 
 function useTrackedResource(storageKey, playerName, maxGetter, deps, campaignName) {
   const [current, setCurrent] = React.useState(() => {
-    const storedValue = storage.getProperty(playerName, storageKey, campaignName);
+    const storedValue = getRuntimeValue(playerName, storageKey);
     return storedValue != null ? storedValue : maxGetter();
    });
 
   React.useEffect(() => {
-    const storedValue = storage.getProperty(playerName, storageKey, campaignName);
+    const storedValue = getRuntimeValue(playerName, storageKey);
     if (storedValue != null) {
       setCurrent(storedValue);
      } else {
@@ -19,7 +19,7 @@ function useTrackedResource(storageKey, playerName, maxGetter, deps, campaignNam
   // Listen for external updates to this resource (e.g., monk ki/focus point spend from CharActions)
   React.useEffect(() => {
     const handler = () => {
-      const storedValue = storage.getProperty(playerName, storageKey, campaignName);
+      const storedValue = getRuntimeValue(playerName, storageKey);
       if (storedValue != null) {
         setCurrent(storedValue);
        } else {
@@ -31,7 +31,7 @@ function useTrackedResource(storageKey, playerName, maxGetter, deps, campaignNam
    }, [playerName, storageKey, campaignName]);
 
   const update = async (val) => {
-    await storage.setProperty(playerName, storageKey, val, campaignName);
+    await setRuntimeValue(playerName, storageKey, val, campaignName);
     setCurrent(val);
    };
 

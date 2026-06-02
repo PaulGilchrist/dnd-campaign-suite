@@ -1,4 +1,5 @@
 
+import { setRuntimeValue } from '../hooks/useRuntimeState.js';
 import storage from './storage.js';
 
 export function applyHealingToTarget(combatSummary, targetName, healAmount, campaignName) {
@@ -24,10 +25,10 @@ export function applyHealingToTarget(combatSummary, targetName, healAmount, camp
     };
 
     if (creature.type === 'player') {
-        storage.setProperty(creature.name, 'currentHitPoints', newHp, campaignName);
+        setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
         if (oldHp <= 0 && newHp > 0) {
-            storage.setProperty(creature.name, 'deathSaves', [false, false, false], campaignName);
-            storage.setProperty(creature.name, 'deathFailures', [false, false, false], campaignName);
+            setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
+            setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
         }
     }
 

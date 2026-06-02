@@ -14,6 +14,7 @@ import { computeCover } from '../../services/coverService.js';
 import { computeFeatRangeEffects } from '../../services/featRangeService.js';
 import { loadNPCs } from '../../services/npcsService.js';
 import { hasAutomation, getAutomationInfo } from '../../services/automationService.js'
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
 import storage from '../../services/storage.js'
 import utils from '../../services/utils.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
@@ -56,14 +57,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
          // Get max focus points from class data and set current to max
          const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-         const maxFP = classLevel?.focus_points || storage.getProperty(playerStats.name, 'focusPoints', campaignName) || 0;
+         const maxFP = classLevel?.focus_points || getRuntimeValue(playerStats.name, 'focusPoints', campaignName) || 0;
          if (!maxFP) return;
 
          // Only recover if current is less than max (avoid unnecessary writes when already full)
-         const currentFP = Number(storage.getProperty(playerStats.name, 'focusPoints', campaignName)) || 0;
+         const currentFP = Number(getRuntimeValue(playerStats.name, 'focusPoints', campaignName)) || 0;
          if (currentFP >= maxFP) return;
 
-         storage.setProperty(playerStats.name, 'focusPoints', maxFP, campaignName);
+         setRuntimeValue(playerStats.name, 'focusPoints', maxFP, campaignName);
        };
        window.addEventListener('initiative-rolled', handleInitiativeRolled);
        return () => window.removeEventListener('initiative-rolled', handleInitiativeRolled);
@@ -243,14 +244,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         if (MONK_KI_FEATURES.includes(action.name)) {
             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
             const maxFP = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
-            const storedFP = storage.getProperty(playerStats.name, 'focusPoints', campaignName);
+            const storedFP = getRuntimeValue(playerStats.name, 'focusPoints', campaignName);
               // If not yet stored, current equals max (same init logic as TrackedResourceInput)
             const currentFP = storedFP != null ? Number(storedFP) : maxFP;
             if (currentFP <= 0) {
                  setPopupHtml(`<b>${action.name}</b><br/>No ${playerStats.rules === '2024' ? "Focus Points" : 'ki points'} remaining.`);
               return;
             }
-             await storage.setProperty(playerStats.name, 'focusPoints', currentFP - 1, campaignName);
+             await setRuntimeValue(playerStats.name, 'focusPoints', currentFP - 1, campaignName);
 
               // Notify other components that focus points changed
             window.dispatchEvent(new CustomEvent('focus-points-updated'));
@@ -356,11 +357,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }
             case 'temp_buff': {
                 const activeBuffsKey = 'activeBuffs';
-                const stored = storage.getProperty(playerStats.name, activeBuffsKey, campaignName);
+                const stored = getRuntimeValue(playerStats.name, activeBuffsKey, campaignName);
                 const activeBuffs = Array.isArray(stored) ? stored : [];
                 const isActive = activeBuffs.some(b => b.name === action.name);
                 const newBuffs = isActive ? activeBuffs.filter(b => b.name !== action.name) : [...activeBuffs, { name: action.name, effect: auto.effect, duration: auto.duration }];
-                storage.setProperty(playerStats.name, activeBuffsKey, newBuffs, campaignName);
+                setRuntimeValue(playerStats.name, activeBuffsKey, newBuffs, campaignName);
                 if (onBuffsChange) onBuffsChange();
                 if (setPopupHtml) {
                     setPopupHtml({
@@ -414,7 +415,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
                     // Check use tracking against long-rest limit
                    const resourceKey = auto.resourceKey || action.name.toLowerCase().replace(/\s+/g, '') + 'Uses';
-                  const usesUsed = Number(storage.getProperty(playerStats.name, resourceKey, campaignName) ?? 0);
+                  const usesUsed = Number(getRuntimeValue(playerStats.name, resourceKey, campaignName) ?? 0);
                  if (usesUsed >= (auto.usesMax || auto.uses || 1)) {
                     if (setPopupHtml) {
                        setPopupHtml({
@@ -440,12 +441,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                    const healAmount = monkLevel + rollResult.total;
 
                   // Get current HP from storage
-                const currentHp = Number(storage.getProperty(playerStats.name, 'currentHitPoints', campaignName)) || 0;
+                const currentHp = Number(getRuntimeValue(playerStats.name, 'currentHitPoints', campaignName)) || 0;
                const maxHp = playerStats.hitPoints;
                   const newHp = Math.min(maxHp, currentHp + healAmount);
 
                  // Update HP in storage (triggers SSE broadcast to other clients)
-                   storage.setProperty(playerStats.name, 'currentHitPoints', newHp, campaignName);
+                   setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
 
                    // Also update combat summary if in combat
                    const combatSummary = (() => {
@@ -464,7 +465,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
                     // Increment use count
                    const newUsesUsed = usesUsed + 1;
-                 storage.setProperty(playerStats.name, resourceKey, newUsesUsed, campaignName);
+                 setRuntimeValue(playerStats.name, resourceKey, newUsesUsed, campaignName);
 
                    // Log to campaign log as a healing entry with source name
                  fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {

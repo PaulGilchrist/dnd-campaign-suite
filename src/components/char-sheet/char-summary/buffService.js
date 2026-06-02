@@ -1,6 +1,7 @@
-import storage from '../../../services/storage.js';
+import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 export function getActiveBuffs(playerName, campaignName) {
-  const buffs = storage.getProperty(playerName, 'activeBuffs', campaignName);
+  void campaignName;
+  const buffs = getRuntimeValue(playerName, 'activeBuffs');
   return Array.isArray(buffs) ? buffs : [];
 }

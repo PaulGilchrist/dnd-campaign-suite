@@ -14,7 +14,7 @@ import { loadEncounterToInitiative } from '../../services/encounterToInitiative.
 import { generateLootSuggestions } from '../../services/lootGenerator.js';
 import { calculateXPThreshold, calculateDifficultyMultiplier } from '../../services/encounterGenerator.js';
 import { ENCOUNTER_CONFIG } from '../../config/encounterConfig.js';
-import storage from '../../services/storage.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import * as logService from '../../services/logService.js';
 import './EncounterBuilder.css';
 
@@ -440,8 +440,8 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
      if (!window.confirm(`Award ${xpPerChar} XP to each of ${numChars} party members and log the loot?`)) return;
 
      for (const charData of (characters || [])) {
-       const currentXp = storage.getProperty(charData.name, 'xp', campaignName) || 0;
-       storage.setProperty(charData.name, 'xp', currentXp + xpPerChar, campaignName);
+       const currentXp = getRuntimeValue(charData.name, 'xp') || 0;
+       setRuntimeValue(charData.name, 'xp', currentXp + xpPerChar, campaignName);
      }
 
      await logService.addEntry(campaignName, {

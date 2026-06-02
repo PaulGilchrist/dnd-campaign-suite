@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react'
-import storage from '../../../services/storage.js'
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
 import { rollD20 } from '../../../services/diceRoller.js'
 import { CONDITIONS, CONDITION_SAVE_DC, CONDITION_SAVE_MAP, getAbilityLabel, getAbilitySaveBonus } from '../../../services/conditionUtils.js'
 import { EXHAUSTION_LEVELS, isDeadFromExhaustion, getExhaustionSaveDC } from '../../../services/exhaustionRules.js'
@@ -13,12 +13,13 @@ import './CharConditions.css'
 const STORAGE_KEY = 'activeConditions'
 
 function loadConditions(name, campaignName) {
-  const stored = storage.getProperty(name, STORAGE_KEY, campaignName)
+  void campaignName;
+  const stored = getRuntimeValue(name, STORAGE_KEY)
   return Array.isArray(stored) ? stored : []
 }
 
 function saveConditions(name, campaignName, conditions) {
-  storage.setProperty(name, STORAGE_KEY, conditions, campaignName)
+  setRuntimeValue(name, STORAGE_KEY, conditions, campaignName)
 }
 
 export { EXHAUSTION_LEVELS }
@@ -27,7 +28,7 @@ export function loadActiveConditions(name, campaignName) {
   return loadConditions(name, campaignName)
 }
 
-function CharConditions({ playerStats, campaignName, activeMapName, characters, exhaustionLevel, onExhaustionChange, onConditionsChange, conditionEffects }) {
+function CharConditions({ playerStats, campaignName, activeMapName, characters, exhaustionLevel, onConditionsChange, conditionEffects }) {
   const [activeConditions, setActiveConditions] = React.useState(() =>
     loadConditions(playerStats.name, campaignName)
   )
@@ -171,13 +172,11 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
 
       if (success) {
         const next = Math.max(0, exhaustionLevel - 1)
-        storage.setProperty(playerStats.name, 'exhaustionLevel', next, campaignName)
-        onExhaustionChange(next)
+        setRuntimeValue(playerStats.name, 'exhaustionLevel', next, campaignName)
       }
     } else if (delta > 0) {
       const next = Math.min(EXHAUSTION_LEVELS, exhaustionLevel + delta)
-      storage.setProperty(playerStats.name, 'exhaustionLevel', next, campaignName)
-      onExhaustionChange(next)
+      setRuntimeValue(playerStats.name, 'exhaustionLevel', next, campaignName)
     }
   }
 

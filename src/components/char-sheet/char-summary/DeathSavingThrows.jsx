@@ -1,5 +1,5 @@
 import React from 'react'
-import storage from '../../../services/storage.js'
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
 import { clearDeathSavePrompt } from '../../../services/savePromptService.js'
 import * as deathSaveRules from '../../../services/deathSaveRules.js'
 import './CharSummary.css'
@@ -10,8 +10,8 @@ function DeathSavingThrows({ playerStats, campaignName }) {
     const [lastRoll, setLastRoll] = React.useState(null)
 
     React.useEffect(() => {
-        const savedSaves = storage.getProperty(playerStats.name, 'deathSaves', campaignName)
-        const savedFailures = storage.getProperty(playerStats.name, 'deathFailures', campaignName)
+        const savedSaves = getRuntimeValue(playerStats.name, 'deathSaves')
+        const savedFailures = getRuntimeValue(playerStats.name, 'deathFailures')
         if (savedSaves) setSaves(savedSaves)
         if (savedFailures) setFailures(savedFailures)
     }, [playerStats, campaignName])
@@ -62,13 +62,13 @@ function DeathSavingThrows({ playerStats, campaignName }) {
         });
 
         if (result.restoredToHp !== null) {
-            storage.setProperty(playerStats.name, 'currentHitPoints', result.restoredToHp, campaignName);
+            setRuntimeValue(playerStats.name, 'currentHitPoints', result.restoredToHp, campaignName);
         }
 
         setSaves(result.newSaves);
         setFailures(result.newFailures);
-        storage.setProperty(playerStats.name, 'deathSaves', result.newSaves, campaignName);
-        storage.setProperty(playerStats.name, 'deathFailures', result.newFailures, campaignName);
+        setRuntimeValue(playerStats.name, 'deathSaves', result.newSaves, campaignName);
+        setRuntimeValue(playerStats.name, 'deathFailures', result.newFailures, campaignName);
         clearDeathSavePrompt(campaignName, playerStats.name);
     }
 

@@ -14,7 +14,7 @@ import {
   generateRandomEvent,
 } from '../services/randomEventService.js';
 import { generateEncounterSuggestions } from '../services/encounterGenerator.js';
-import storage from '../services/storage.js';
+import { getRuntimeValue, setRuntimeValue } from './useRuntimeState.js';
 
 const MODES = {
   INACTIVE: 'inactive',
@@ -209,7 +209,7 @@ export default function useTravelManagement({
   const partyHasMaxExhaustion = useCallback(() => {
     return characters.some(char => {
       const name = char.name || char;
-      const level = storage.getProperty(name, 'exhaustionLevel', campaignName);
+      const level = getRuntimeValue(name, 'exhaustionLevel');
       return (typeof level === 'number' ? level : 0) >= EXHAUSTION_LEVELS;
     });
   }, [characters, campaignName]);
@@ -217,10 +217,10 @@ export default function useTravelManagement({
   const addExhaustionToAll = useCallback(() => {
     characters.forEach(char => {
       const name = char.name || char;
-      const current = storage.getProperty(name, 'exhaustionLevel', campaignName);
+      const current = getRuntimeValue(name, 'exhaustionLevel');
       const level = typeof current === 'number' ? current : 0;
       if (level < EXHAUSTION_LEVELS) {
-        storage.setProperty(name, 'exhaustionLevel', level + 1, campaignName);
+        setRuntimeValue(name, 'exhaustionLevel', level + 1, campaignName);
       }
     });
   }, [characters, campaignName]);

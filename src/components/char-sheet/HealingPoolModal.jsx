@@ -1,6 +1,6 @@
 
 import React from 'react'
-import storage from '../../services/storage.js'
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
 import useTrackedResource from '../../hooks/useTrackedResource.js'
 import { getTargetFromAttacker, getCombatContext } from '../../services/damageUtils.js'
 import { applyHealingToTarget } from '../../services/applyHealing.js'
@@ -28,11 +28,11 @@ function HealingPoolModal({ playerStats, campaignName, poolMax, alsoCures, cureC
     const targetMaxHp = combatTarget ? combatTarget.maxHp : playerStats.hitPoints;
     const targetCurrentHp = (() => {
           if (combatTarget) {
-            const stored = storage.getProperty(combatTarget.name, 'currentHitPoints', campaignName);
+            const stored = getRuntimeValue(combatTarget.name, 'currentHitPoints');
             if (stored != null && stored !== '') return Number(stored);
             return combatTarget.currentHp;
           }
-          const stored = storage.getProperty(playerStats.name, 'currentHitPoints', campaignName);
+          const stored = getRuntimeValue(playerStats.name, 'currentHitPoints');
           return stored != null && stored !== '' ? Number(stored) : playerStats.hitPoints;
         })();
 
@@ -50,7 +50,7 @@ function HealingPoolModal({ playerStats, campaignName, poolMax, alsoCures, cureC
             }
         } else {
             const newHp = Math.min(playerStats.hitPoints, targetCurrentHp + amount);
-            storage.setProperty(playerStats.name, 'currentHitPoints', newHp, campaignName);
+            setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
             fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

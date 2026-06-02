@@ -15,6 +15,8 @@ import useCharacterManagement from './hooks/useCharacterManagement.js';
 import useCampaignManagement from './hooks/useCampaignManagement.js';
 import { useCharacterWizard } from './hooks/useCharacterWizard.js';
 import rulesFactory from './services/rulesFactory.js';
+import Subscriber from './components/common/Subscriber.jsx';
+import { setRuntimeObject } from './hooks/useRuntimeState.js';
 import Notes from './components/notes/Notes.jsx';
 import Quests from './components/quests/Quests.jsx';
 import NPCs from './components/npcs/NPCs.jsx';
@@ -58,22 +60,24 @@ function App() {
   const { characters, activeCharacter, setActiveCharacter, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, inputRef } = charMgmt;
   const { showCharacterWizard, showEditCharacterWizard, handleAddCharacter, handleWizardComplete, handleWizardCancel, handleEditCharacter, handleEditWizardComplete, handleEditWizardCancel } = wizard;
 
-  // Compute hitPoints for each character using the rules engine so Initiative has max HP
-   const [charactersWithHp, setCharactersWithHp] = useState([]);
+  // Compute full stats for all characters through the rules engine
+   const [computedCharacters, setComputedCharacters] = useState([]);
+   const [processingCharacters, setProcessingCharacters] = useState(false);
    const computedKeyRef = useRef('');
    useEffect(() => {
      if (!characters || characters.length === 0) {
-       setCharactersWithHp([]);
+       setComputedCharacters([]);
+       setProcessingCharacters(false);
        computedKeyRef.current = '';
        return;
      }
      const key = characters.map(c => c.name).join(',');
-     if (key === computedKeyRef.current && charactersWithHp.length > 0) return;
+     if (key === computedKeyRef.current && computedCharacters.length > 0) return;
      computedKeyRef.current = key;
      let cancelled = false;
+     setProcessingCharacters(true);
      (async () => {
        const enriched = await Promise.all(characters.map(async (character) => {
-         if (character.hitPoints != null) return character;
          try {
            const is2024 = character.rules === '2024';
            const effectiveClasses = is2024 ? classes2024 : classes;
@@ -81,12 +85,15 @@ function App() {
            const effectiveMagicItems = is2024 ? magicItems2024 : magicItems;
            const spellData = is2024 ? spells2024 : spells;
            const playerStats = await rulesFactory.getPlayerStats(effectiveClasses, equipment, effectiveMagicItems, effectiveRaces, spellData, character);
-           return { ...character, hitPoints: playerStats.hitPoints };
+           return { ...character, computedStats: playerStats };
          } catch {
            return character;
          }
        }));
-       if (!cancelled) setCharactersWithHp(enriched);
+       if (!cancelled) {
+         setComputedCharacters(enriched);
+         setProcessingCharacters(false);
+       }
      })();
      return () => { cancelled = true; };
    }, [characters, classes, classes2024, equipment, magicItems, magicItems2024, races, races2024, spells, spells2024]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -281,6 +288,15 @@ function App() {
     }
   };
 
+  const handleRuntimeEvent = useCallback((event) => {
+    if (event.key == null || event.data == null) return;
+    if (!event.key.startsWith('change-')) return;
+    const prefix = `change-${campaignName}-`;
+    if (!event.key.startsWith(prefix)) return;
+    const characterKey = event.key.slice(prefix.length);
+    setRuntimeObject(characterKey, event.data);
+  }, [campaignName]);
+
   const handleDeleteCharacter = async (characterName) => {
     try {
       await handleDeleteCharacterRaw(characterName);
@@ -333,14 +349,14 @@ function App() {
              allMagicItems2024={magicItems2024}
               campaignName={campaignName}
               activeMapName={activeMapName}
-              characters={charactersWithHp}
+              characters={computedCharacters}
               onDeleteCharacter={handleDeleteCharacter}
              onEditCharacter={() => handleEditCharacter(activeCharacter)}
              onUploadClick={handleUploadClick}
              onSaveClick={handleSaveClick}
            />
         )}
-        {activeView === 'initiative' && <Initiative characters={charactersWithHp} campaignName={campaignName} onNpcsChange={setNpcs} isLocalhost={isLocalhost} mapName={activeMapName} />}
+        {activeView === 'initiative' && <Initiative characters={computedCharacters} campaignName={campaignName} onNpcsChange={setNpcs} isLocalhost={isLocalhost} mapName={activeMapName} />}
         {activeView === 'mapsManager' && mapsView.type === 'manager' && (
           <MapsManager
             campaignName={campaignName}
@@ -411,9 +427,11 @@ function App() {
                               <br />
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allRaces={races} allRaces2024={races2024} allClasses={classes} allSpells={spells} allSpells2024={spells2024} />}
         {showEditCharacterWizard && <CharacterCreationWizard onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allRaces={races} allClasses={classes} allSpells={spells} allSpells2024={spells2024} characterData={activeCharacter} isEditing={true} />}
-        <SavePromptModal campaignName={campaignName} characters={charactersWithHp} activeMapName={activeMapName} />
-        <DeathSavePromptModal campaignName={campaignName} characters={charactersWithHp} />
-        <ConcentrationPromptModal campaignName={campaignName} characters={charactersWithHp} activeMapName={activeMapName} />
+        <SavePromptModal campaignName={campaignName} characters={computedCharacters} activeMapName={activeMapName} />
+        <DeathSavePromptModal campaignName={campaignName} characters={computedCharacters} />
+        <ConcentrationPromptModal campaignName={campaignName} characters={computedCharacters} activeMapName={activeMapName} />
+        <Subscriber campaignName={campaignName} handleEvent={handleRuntimeEvent} />
+        {processingCharacters && <div className="loading-overlay"><div className="loading-spinner">Loading party stats...</div></div>}
       </div>
     </div>
   );
