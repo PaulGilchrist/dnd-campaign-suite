@@ -349,14 +349,7 @@ describe('CharSpells', () => {
     expect(mockHandleTogglePreparedSpells).toHaveBeenCalled();
     });
 
-  it('should call showPopup when spell name is clicked', () => {
-    const mockShowPopup = vi.fn();
-    useActionPopup.mockImplementation(() => ({
-      showPopup: mockShowPopup,
-      popupHtml: null,
-      setPopupHtml: vi.fn(),
-      }));
-
+it('should show spell detail popup when spell name is clicked', () => {
     render(
         <CharSpells
           playerStats={mockPlayerStats}
@@ -367,8 +360,9 @@ describe('CharSpells', () => {
     const fireballLink = screen.getByText('Fireball');
     fireEvent.click(fireballLink);
 
-    expect(mockShowPopup).toHaveBeenCalled();
-    });
+    // Spell detail popup should show with Cast button
+    expect(screen.getByText('Cast Spell')).toBeInTheDocument();
+  });
 
   it('should filter spells when toggle prepared filter is clicked', () => {
     render(

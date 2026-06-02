@@ -1,7 +1,8 @@
   
-
+import React from 'react'
 import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
+import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
@@ -11,20 +12,16 @@ import { rollExpression } from '../../services/diceRoller.js'
 
 function CharReactions({ playerStats, campaignName, cannotAct }) {
     const { popupHtml, setPopupHtml, rollAttack } = useLoggedDiceRoll(playerStats.name, campaignName);
+    const [selectedSpell, setSelectedSpell] = React.useState(null);
        // Build reactions list immutably
     let reactions = [...(playerStats.reactions || [])];
 
+    let reactionSpells = [];
     if (playerStats.spellAbilities && playerStats.spellAbilities.spells.length > 0) {
-        let reactionSpells = playerStats.spellAbilities.spells.filter(spell => spell.casting_time === '1 reaction' && (spell.prepared === 'Always' || spell.prepared === 'Prepared'));
-        reactionSpells.forEach(spell => {
-            if (!reactions.some((reaction) => reaction.name === spell.name)) {
-                reactions.push({
-                     "name": spell.name,
-                     "description": spell.desc
-                  });
-              }
-          });
-      }
+        const reactionCastingTimes = ['1 reaction', '1 Reaction', 'reaction', 'Reaction'];
+        const attackNames = new Set((playerStats.attacks || []).map(a => a.name));
+        reactionSpells = playerStats.spellAbilities.spells.filter(spell => reactionCastingTimes.includes(spell.casting_time) && (spell.prepared === 'Always' || spell.prepared === 'Prepared') && !attackNames.has(spell.name));
+    }
      // Add base reactions to reaction list
     if (!reactions.find((reaction) => reaction.name === OPPORTUNITY_ATTACK.name)) {
         reactions.push(OPPORTUNITY_ATTACK);
@@ -91,11 +88,38 @@ function CharReactions({ playerStats, campaignName, cannotAct }) {
     };
 
     return (
-        <div>
+        <div className='char-reactions'>
             <div className='sectionHeader'>Reactions</div>
-            {popupHtml && (
+             {selectedSpell && (
+                 <Popup onClickOrKeyDown={() => setSelectedSpell(null)}>
+                     <SpellDetailPopup
+                         spell={selectedSpell}
+                         playerStats={playerStats}
+                         campaignName={campaignName}
+                         onClose={() => setSelectedSpell(null)}
+                         onCast={() => setSelectedSpell(null)}
+                     />
+                 </Popup>
+             )}
+             {reactionSpells.length > 0 && <div className='attacks'>
+                 <div className='left'><b>Name</b></div>
+                 <div><b>Range</b></div>
+                 <div><b>Hit</b></div>
+                 <div><b>Damage</b></div>
+                 <div className='left'><b>Type</b></div>
+                 {reactionSpells.map((spell) => {
+                     return <React.Fragment key={spell.name}>
+                         <div className='left clickable' onClick={() => setSelectedSpell(spell)}>{spell.name}</div>
+                         <div>{spell.range}</div>
+                         <div>—</div>
+                         <div>Utility</div>
+                         <div className='left'></div>
+                     </React.Fragment>;
+                 })}<div className='half-line'></div>
+             </div>}
+             {popupHtml && (
                 <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
-                    {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
+                    {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> :
                      <DiceRollResult {...popupHtml} />}
                 </Popup>
             )}

@@ -7,6 +7,7 @@ import useMetamagic, { getCurrentSorceryPoints } from '../../../hooks/useMetamag
 import Popup from '../../common/Popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
 import MetamagicPopup from '../MetamagicPopup.jsx'
+import SpellDetailPopup from './SpellDetailPopup.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
 import { rollExpression, rollExpressionDoubled } from '../../../services/diceRoller.js';
 import { sanitizeHtml } from '../../../services/sanitize.js';
@@ -36,6 +37,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const isSorcerer = playerStats.class?.name === 'Sorcerer';
     const metamagic = useMetamagic(playerStats, campaignName);
     const [pendingMetamagic, setPendingMetamagic] = React.useState(null);
+    const [selectedSpell, setSelectedSpell] = React.useState(null);
 
     // When metamagic is confirmed, proceed with the pending action
     const handleMetamagicConfirm = React.useCallback((result) => {
@@ -67,6 +69,23 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
       if (!pending) return;
       pending.action({});
     }, [pendingMetamagic]);
+
+    // Handle casting a spell from the spell detail popup
+    const handleSpellCast = React.useCallback((spell) => {
+      setSelectedSpell(null);
+      if (isSorcerer) {
+        const currentSP = getCurrentSorceryPoints(playerStats.name);
+        setPendingMetamagic({
+          spellName: spell.name,
+          action: (metaCtx) => {
+            // Spell is cast, metamagic context is set
+            // The actual spell effect would be handled here
+          },
+          _currentSP: currentSP,
+          spellLevel: spell.level,
+        });
+      }
+    }, [isSorcerer, playerStats.name]);
 
     const getDamageFormula = (effect) => {
         const match = effect.match(/^(\d+d\d+(?:[+-]\d+)?)/);
@@ -148,13 +167,24 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         spells.sort((a, b) => a.name.localeCompare(b.name));
         setSpells(spells);
     }
-    return (
+return (
         <div className="char-spells">
             {(playerStats.spellAbilities && playerStats.spellAbilities.spells.length > 0) && <div className="spell-popup-parent">
-                    {popupHtml && (
+                    {popupHtml && !selectedSpell && (
                         <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
                             {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
                              <DiceRollResult {...popupHtml} />}
+                        </Popup>
+                    )}
+                    {selectedSpell && (
+                        <Popup onClickOrKeyDown={() => setSelectedSpell(null)}>
+                            <SpellDetailPopup
+                                spell={selectedSpell}
+                                playerStats={playerStats}
+                                campaignName={campaignName}
+                                onClose={() => setSelectedSpell(null)}
+                                onCast={handleSpellCast}
+                            />
                         </Popup>
                     )}
                     {dicePopupHtml && (
@@ -165,7 +195,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                     )}
                     {pendingMetamagic && (
                       <MetamagicPopup
-                        spell={{ name: pendingMetamagic.spellName, level: spells.find(s => s.name === pendingMetamagic.spellName)?.level || 0 }}
+                        spell={{ name: pendingMetamagic.spellName, level: pendingMetamagic.spellLevel || 0 }}
                         playerStats={{ ...playerStats, _metamagicCurrentSP: pendingMetamagic._currentSP }}
                         campaignName={campaignName}
                         onConfirm={handleMetamagicConfirm}
@@ -237,7 +267,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                             }
                         }
                         return <tr key={spell.name}>
-                            <td className='left spell-name clickable' onClick={() => showPopup(spell)}>{spell.name}</td>
+                            <td className='left spell-name clickable' onClick={() => setSelectedSpell(spell)}>{spell.name}</td>
                             <td>{spell.level === 0 ? 'Cantrip' : spell.level}</td>
                             {!is2024 && (spell.prepared !== 'Prepared' && spell.prepared !== '') && <td>{spell.prepared}</td>}
                             {!is2024 && (spell.prepared === 'Prepared' || spell.prepared === '') && <td><input tabIndex={0} type="checkbox" checked={spell.prepared === 'Prepared'} onChange={() => handleTogglePreparedSpells(spell.name)}/></td>}

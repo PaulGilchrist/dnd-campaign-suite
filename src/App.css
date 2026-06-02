@@ -12,6 +12,11 @@
     min-height: 0;
 }
 
+.half-line {
+  height: 0.5em;      /* half of the font-size */
+  line-height: 0.5em; /* optional: aligns content if any */
+}
+
 .icon-button {
     color: darkred;
     margin-left: 8px;
