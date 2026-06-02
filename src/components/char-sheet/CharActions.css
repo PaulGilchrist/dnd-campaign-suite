@@ -1,6 +1,6 @@
 .char-actions .attacks {
     display: grid;
-    grid-template-columns: 120px 80px 80px 80px 70px;
+    grid-template-columns: 120px 80px 100px 80px 70px;
     text-align: center;
 }
 .char-actions .attacks > div {
@@ -24,7 +24,7 @@
 
 /* Add extra column for Mastery when using 2024 rules */
 .char-actions .attacks.mastery-enabled {
-    grid-template-columns: 120px 80px 80px 80px 70px 80px;
+    grid-template-columns: 120px 80px 100px 80px 70px 80px;
 }
 
 /* save-dc-display used by save_attack automation */
@@ -79,10 +79,10 @@
 
 @media print {
     .char-actions .attacks {
-        grid-template-columns: 160px 120px 90px 120px 1fr;
+        grid-template-columns: 160px 120px 100px 120px 1fr;
     }
     .char-actions .attacks.mastery-enabled {
-        grid-template-columns: 140px 100px 80px 110px 80px 1fr;
+        grid-template-columns: 140px 100px 100px 110px 80px 1fr;
     }
     .char-actions .attacks > div {
         padding-right: 4px;
