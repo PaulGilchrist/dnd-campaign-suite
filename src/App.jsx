@@ -57,46 +57,50 @@ function App() {
   }, []);
 
   const { showCampaignSelection, campaignName, isLocalhost, handleCampaignSelect, handleRenameCampaign: handleRenameCampaignRaw, handleDeleteCampaign: handleDeleteCampaignRaw, handleBackToCampaigns } = campaignMgmt;
-  const { characters, activeCharacter, setActiveCharacter, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, inputRef } = charMgmt;
+  const { characters, activeCharacter, setCharacters, setActiveCharacter, handleUploadChange, handleSaveClick, handleUploadClick, handleDeleteCharacter: handleDeleteCharacterRaw, inputRef } = charMgmt;
   const { showCharacterWizard, showEditCharacterWizard, handleAddCharacter, handleWizardComplete, handleWizardCancel, handleEditCharacter, handleEditWizardComplete, handleEditWizardCancel } = wizard;
 
-  // Compute full stats for all characters through the rules engine
-   const [computedCharacters, setComputedCharacters] = useState([]);
-   const [processingCharacters, setProcessingCharacters] = useState(false);
-   const computedKeyRef = useRef('');
-   useEffect(() => {
-     if (!characters || characters.length === 0) {
-       setComputedCharacters([]);
-       setProcessingCharacters(false);
-       computedKeyRef.current = '';
-       return;
-     }
-     const key = characters.map(c => c.name).join(',');
-     if (key === computedKeyRef.current && computedCharacters.length > 0) return;
-     computedKeyRef.current = key;
-     let cancelled = false;
-     setProcessingCharacters(true);
-     (async () => {
-       const enriched = await Promise.all(characters.map(async (character) => {
-         try {
-           const is2024 = character.rules === '2024';
-           const effectiveClasses = is2024 ? classes2024 : classes;
-           const effectiveRaces = is2024 ? races2024 : races;
-           const effectiveMagicItems = is2024 ? magicItems2024 : magicItems;
-           const spellData = is2024 ? spells2024 : spells;
-           const playerStats = await rulesFactory.getPlayerStats(effectiveClasses, equipment, effectiveMagicItems, effectiveRaces, spellData, character);
-           return { ...character, computedStats: playerStats };
-         } catch {
-           return character;
-         }
-       }));
-       if (!cancelled) {
-         setComputedCharacters(enriched);
-         setProcessingCharacters(false);
-       }
-     })();
-     return () => { cancelled = true; };
-   }, [characters, classes, classes2024, equipment, magicItems, magicItems2024, races, races2024, spells, spells2024]); // eslint-disable-line react-hooks/exhaustive-deps
+   // Compute full stats for all characters through the rules engine
+    const [computedCharacters, setComputedCharacters] = useState([]);
+    const [processingCharacters, setProcessingCharacters] = useState(false);
+    const computedKeyRef = useRef('');
+    const charactersSerialRef = useRef('');
+    useEffect(() => {
+      if (!characters || characters.length === 0) {
+        setComputedCharacters([]);
+        setProcessingCharacters(false);
+        computedKeyRef.current = '';
+        charactersSerialRef.current = '';
+        return;
+      }
+      const key = characters.map(c => c.name).join(',');
+      const serial = JSON.stringify(characters);
+      if (key === computedKeyRef.current && serial === charactersSerialRef.current && computedCharacters.length > 0) return;
+      computedKeyRef.current = key;
+      charactersSerialRef.current = serial;
+      let cancelled = false;
+      setProcessingCharacters(true);
+      (async () => {
+        const enriched = await Promise.all(characters.map(async (character) => {
+          try {
+            const is2024 = character.rules === '2024';
+            const effectiveClasses = is2024 ? classes2024 : classes;
+            const effectiveRaces = is2024 ? races2024 : races;
+            const effectiveMagicItems = is2024 ? magicItems2024 : magicItems;
+            const spellData = is2024 ? spells2024 : spells;
+            const playerStats = await rulesFactory.getPlayerStats(effectiveClasses, equipment, effectiveMagicItems, effectiveRaces, spellData, character);
+            return { ...character, computedStats: playerStats };
+          } catch {
+            return character;
+          }
+        }));
+        if (!cancelled) {
+          setComputedCharacters(enriched);
+          setProcessingCharacters(false);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [characters, classes, classes2024, equipment, magicItems, magicItems2024, races, races2024, spells, spells2024]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
   const [mapsView, setMapsView] = useState({ type: 'none' });
@@ -290,12 +294,28 @@ function App() {
 
   const handleRuntimeEvent = useCallback((event) => {
     if (event.key == null || event.data == null) return;
+    if (event.key.startsWith('character-')) {
+      if (event.key.startsWith('character-delete-')) {
+        const file = event.key.replace(/^character-delete-.+-/, '');
+        setCharacters(prev => prev.filter(c => `${c.name.replace(/[^a-zA-Z0-9]/g, '_')}.json` !== file));
+      } else if (!event.key.startsWith('character-create-')) {
+        const updated = event.data;
+        setCharacters(prev => {
+          const idx = prev.findIndex(c => c.name === updated.name);
+          if (idx === -1) return prev;
+          const next = [...prev];
+          next[idx] = updated;
+          return next;
+        });
+      }
+      return;
+    }
     if (!event.key.startsWith('change-')) return;
     const prefix = `change-${campaignName}-`;
     if (!event.key.startsWith(prefix)) return;
     const characterKey = event.key.slice(prefix.length);
     setRuntimeObject(characterKey, event.data);
-  }, [campaignName]);
+  }, [campaignName, setCharacters]);
 
   const handleDeleteCharacter = async (characterName) => {
     try {
