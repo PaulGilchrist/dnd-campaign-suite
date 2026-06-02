@@ -12,19 +12,19 @@ vi.mock('../../../services/storage.js', () => ({
 vi.mock('../../../hooks/useRuntimeState.js', () => {
   const listeners = new Map();
   return {
-    getRuntimeValue: vi.fn((characterKey, propertyName) => {
+    getRuntimeValue: vi.fn((_characterKey, _propertyName) => {
       return null;
-    }),
-    setRuntimeValue: vi.fn((characterKey, propertyName, value, campaignName) => {
-      // Notify listeners
+     }),
+    setRuntimeValue: vi.fn((characterKey, _propertyName, _value, _campaignName) => {
+       // Notify listeners
       const key = characterKey;
       if (listeners.has(key)) {
         listeners.get(key).forEach(fn => fn());
-      }
-    }),
-    useRuntimeValue: vi.fn((characterKey, propertyName) => {
+       }
+     }),
+    useRuntimeValue: vi.fn((_characterKey, _propertyName) => {
       return null;
-    }),
+     }),
   };
 });
 

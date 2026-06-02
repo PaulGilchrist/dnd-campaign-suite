@@ -108,7 +108,7 @@ Object.defineProperty(window, 'localStorage', {
 });
 
 import rulesFactory from '../../services/rulesFactory.js';
-import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue, useRuntimeValue } from '../../hooks/useRuntimeState.js';
 import utils from '../../services/utils.js';
 
 const mockPlayerSummary = {

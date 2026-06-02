@@ -19,7 +19,7 @@ vi.mock('../hooks/useRuntimeState.js', () => ({
   setRuntimeBatch: vi.fn(),
 }))
 
-import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeBatch } from '../hooks/useRuntimeState.js'
 
 beforeEach(() => {
   vi.clearAllMocks()
