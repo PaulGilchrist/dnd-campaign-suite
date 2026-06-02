@@ -25,8 +25,8 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
           forcedMode = 'disadvantage'
         }
         if (!autoFail && !forcedMode && (conditionEffects?.saveAdvantageCount || 0) > 0) {
-          forcedMode = 'advantage'
-        }
+           forcedMode = 'advantage'
+           }
         if (conditionEffects?.autoReroll) {
           return { forcedMode, autoFail: autoFail || undefined, autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition }
         }

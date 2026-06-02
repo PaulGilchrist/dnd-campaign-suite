@@ -5,6 +5,7 @@ import {
   combineAttackModes,
   CONDITIONS_THAT_CANNOT_ACT,
   CONDITIONS_THAT_SPEED_ZERO,
+  hasSaveAdvantage,
 } from './conditionEffects.js'
 
 describe('computeConditionEffects', () => {
@@ -214,11 +215,101 @@ describe('CONDITIONS_THAT_CANNOT_ACT', () => {
 })
 
 describe('CONDITIONS_THAT_SPEED_ZERO', () => {
-  it('includes all conditions that set speed to 0', () => {
-    expect(CONDITIONS_THAT_SPEED_ZERO.has('grappled')).toBe(true)
-    expect(CONDITIONS_THAT_SPEED_ZERO.has('paralyzed')).toBe(true)
-    expect(CONDITIONS_THAT_SPEED_ZERO.has('petrified')).toBe(true)
-    expect(CONDITIONS_THAT_SPEED_ZERO.has('restrained')).toBe(true)
-    expect(CONDITIONS_THAT_SPEED_ZERO.has('unconscious')).toBe(true)
+    it('includes all conditions that set speed to 0', () => {
+      expect(CONDITIONS_THAT_SPEED_ZERO.has('grappled')).toBe(true)
+      expect(CONDITIONS_THAT_SPEED_ZERO.has('paralyzed')).toBe(true)
+      expect(CONDITIONS_THAT_SPEED_ZERO.has('petrified')).toBe(true)
+      expect(CONDITIONS_THAT_SPEED_ZERO.has('restrained')).toBe(true)
+      expect(CONDITIONS_THAT_SPEED_ZERO.has('unconscious')).toBe(true)
+     })
   })
-})
+
+describe('hasSaveAdvantage', () => {
+    it('returns false for null effects', () => {
+      expect(hasSaveAdvantage(null, 'poison')).toBe(false)
+     })
+
+    it('returns true when global saveAdvantageCount is positive', () => {
+      const effects = computeConditionEffects([])
+      effects.saveAdvantageCount = 1;
+      expect(hasSaveAdvantage(effects, 'con')).toBe(true);
+     })
+
+    it('returns true when condition-specific advantage matches', () => {
+      const saveModifiers = [{
+          target: 'saving_throw',
+       condition: 'poison',
+        effect: 'advantage',
+       source: 'Dwarven Resilience'
+      }];
+      const effects = computeConditionEffects(['poisoned'], saveModifiers);
+      expect(hasSaveAdvantage(effects, 'poisoned')).toBe(true);
+        })
+
+    it('returns false when condition-specific advantage does not match', () => {
+      const saveModifiers = [{
+          target: 'saving_throw',
+       condition: 'poison',
+        effect: 'advantage',
+       source: 'Dwarven Resilience'
+      }];
+      const effects = computeConditionEffects(['poisoned'], saveModifiers);
+      expect(hasSaveAdvantage(effects, 'con')).toBe(false);
+      expect(hasSaveAdvantage(effects, 'str')).toBe(false);
+      expect(hasSaveAdvantage(effects, 'dex')).toBe(false);
+     })
+
+    it('does not increment global saveAdvantageCount for condition-specific advantage', () => {
+      const saveModifiers = [{
+          target: 'saving_throw',
+       condition: 'poison',
+        effect: 'advantage',
+       source: 'Dwarven Resilience'
+        }];
+      const effects = computeConditionEffects(['poisoned'], saveModifiers);
+      expect(effects.saveAdvantageCount).toBe(0);
+      expect(effects.saveAdvantage).toContain('poisoned');
+     })
+
+    it('tracks poisoned condition advantage in saveAdvantage array', () => {
+      const saveModifiers = [{
+          target: 'saving_throw',
+       condition: 'poison',
+        effect: 'advantage',
+       source: 'Dwarven Resilience'
+      }];
+      expect(computeConditionEffects([], saveModifiers).saveAdvantage).toEqual([]);
+      expect(computeConditionEffects(['poisoned'], saveModifiers).saveAdvantage).toContain('poisoned');
+    })
+
+    it('tracks frightened condition advantage in saveAdvantage array', () => {
+      const saveModifiers = [{
+          target: 'saving_throw',
+       condition: 'frightened',
+        effect: 'advantage'
+      }];
+      expect(computeConditionEffects([], saveModifiers).saveAdvantage).toEqual([]);
+      expect(computeConditionEffects(['frightened'], saveModifiers).saveAdvantage).toContain('frightened');
+     })
+
+    it('tracks charmed condition advantage in saveAdvantage array', () => {
+      const saveModifiers = [{
+          target: 'saving_throw',
+       condition: 'charmed',
+        effect: 'advantage'
+      }];
+      expect(computeConditionEffects([], saveModifiers).saveAdvantage).toEqual([]);
+      expect(computeConditionEffects(['charmed'], saveModifiers).saveAdvantage).toContain('charmed');
+     })
+
+    it('gives advantage for both global count and condition-specific', () => {
+      const effects2 = computeConditionEffects(['poisoned'], [{
+          target: 'saving_throw',
+       condition: 'poison',
+        effect: 'advantage'
+       }]);
+      effects2.saveAdvantageCount = 1;
+      expect(hasSaveAdvantage(effects2, 'con')).toBe(true);
+      expect(hasSaveAdvantage(effects2, 'poisoned')).toBe(true);
+       })
+    })

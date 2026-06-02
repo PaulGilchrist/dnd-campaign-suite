@@ -1,9 +1,9 @@
 const CONDITIONS_THAT_CANNOT_ACT = new Set([
-  'incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious',
+   'incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious',
 ])
 
 const CONDITIONS_THAT_SPEED_ZERO = new Set([
-  'grappled', 'paralyzed', 'petrified', 'restrained', 'unconscious',
+   'grappled', 'paralyzed', 'petrified', 'restrained', 'unconscious',
 ])
 
 function saveModifierApplies(modifier, saveType, abilityName) {
@@ -15,7 +15,7 @@ function saveModifierApplies(modifier, saveType, abilityName) {
     if (!modifier.abilities || modifier.abilities.length === 0) return true;
     if (abilityName && modifier.abilities.includes(abilityName)) return true;
     return true;
-  }
+   }
   return false;
 }
 
@@ -25,13 +25,13 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName) {
     if (!saveModifierApplies(mod, saveType, abilityName)) continue;
     if (mod.effect === 'advantage') {
       effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
-    } else if (mod.effect === 'disadvantage') {
+     } else if (mod.effect === 'disadvantage') {
       effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
-    } else if (mod.effect === 'reroll') {
+     } else if (mod.effect === 'reroll') {
       effects.autoReroll = true;
       effects.autoRerollCondition = mod.condition;
+     }
     }
-  }
 }
 
 function computeConditionEffects(conditions = [], saveModifiers = []) {
@@ -51,58 +51,59 @@ function computeConditionEffects(conditions = [], saveModifiers = []) {
     autoCritWithin5ft: false,
     resistantToAll: false,
     poisonImmune: false,
+    saveAdvantage: [],
     saveAdvantageCount: 0,
     saveDisadvantageCount: 0,
     autoReroll: false,
     autoRerollCondition: null,
-  }
+   }
 
   const conditionSet = new Set(conditions)
 
   for (const mod of saveModifiers) {
     if (mod.target !== 'saving_throw' && mod.target !== 'save') continue;
     if (mod.condition === 'charmed' && conditionSet.has('charmed')) {
-      if (mod.effect === 'advantage') effects.saveAdvantageCount++;
-      if (mod.effect === 'disadvantage') effects.saveDisadvantageCount++;
-    } else if (mod.condition === 'frightened' && conditionSet.has('frightened')) {
-      if (mod.effect === 'advantage') effects.saveAdvantageCount++;
-      if (mod.effect === 'disadvantage') effects.saveDisadvantageCount++;
-    } else if (mod.condition === 'poison' && conditionSet.has('poisoned')) {
-      if (mod.effect === 'advantage') effects.saveAdvantageCount++;
-      if (mod.effect === 'disadvantage') effects.saveDisadvantageCount++;
+      if (mod.effect === 'advantage') effects.saveAdvantage.push('charmed');
+      if (mod.effect === 'disadvantage') effects.saveDisadvantage.push('charmed');
+     } else if (mod.condition === 'frightened' && conditionSet.has('frightened')) {
+      if (mod.effect === 'advantage') effects.saveAdvantage.push('frightened');
+      if (mod.effect === 'disadvantage') effects.saveDisadvantage.push('frightened');
+      } else if (mod.condition === 'poison' && conditionSet.has('poisoned')) {
+        if (mod.effect === 'advantage') effects.saveAdvantage.push('poisoned');
+        if (mod.effect === 'disadvantage') effects.saveDisadvantage.push('poisoned');
+       }
     }
-  }
 
   applySaveModifiers(effects, saveModifiers, null, null);
 
   for (const key of conditionSet) {
     switch (key) {
-      case 'blinded':
+       case 'blinded':
         effects.attackDisadvantageCount++
         effects.targetAdvantageCount++
         break
 
-      case 'frightened':
+       case 'frightened':
         effects.attackDisadvantageCount++
         effects.abilityCheckDisadvantage = true
         break
 
-      case 'grappled':
+       case 'grappled':
         effects.speedZero = true
         effects.attackDisadvantageCount++
         break
 
-      case 'incapacitated':
+       case 'incapacitated':
         effects.cannotAct = true
         effects.concentrationBroken = true
         break
 
-      case 'invisible':
+       case 'invisible':
         effects.attackAdvantageCount++
         effects.targetDisadvantageCount++
         break
 
-      case 'paralyzed':
+       case 'paralyzed':
         effects.cannotAct = true
         effects.speedZero = true
         effects.autoFailSaves.push('str', 'dex')
@@ -110,7 +111,7 @@ function computeConditionEffects(conditions = [], saveModifiers = []) {
         effects.autoCritWithin5ft = true
         break
 
-      case 'petrified':
+       case 'petrified':
         effects.cannotAct = true
         effects.speedZero = true
         effects.targetAdvantageCount++
@@ -119,39 +120,39 @@ function computeConditionEffects(conditions = [], saveModifiers = []) {
         effects.poisonImmune = true
         break
 
-      case 'poisoned':
+       case 'poisoned':
         effects.attackDisadvantageCount++
         effects.abilityCheckDisadvantage = true
         break
 
-      case 'prone':
+       case 'prone':
         effects.attackDisadvantageCount++
         effects.targetAdvantageIfWithin5ft = true
         effects.targetDisadvantageIfBeyond5ft = true
         break
 
-      case 'restrained':
+       case 'restrained':
         effects.speedZero = true
         effects.attackDisadvantageCount++
         effects.targetAdvantageCount++
         effects.saveDisadvantage.push('dex')
         break
 
-      case 'stunned':
+       case 'stunned':
         effects.cannotAct = true
         effects.autoFailSaves.push('str', 'dex')
         effects.targetAdvantageCount++
         break
 
-      case 'unconscious':
+       case 'unconscious':
         effects.cannotAct = true
         effects.speedZero = true
         effects.targetAdvantageCount++
         effects.autoFailSaves.push('str', 'dex')
         effects.autoCritWithin5ft = true
         break
+      }
     }
-  }
 
   return effects
 }
@@ -172,6 +173,13 @@ function combineAttackModes(attackerEffects, targetEffects, attackRange) {
   return getNetAttackMode(adv, dis)
 }
 
+function hasSaveAdvantage(effects, saveType) {
+  if (!effects) return false;
+  if ((effects.saveAdvantageCount || 0) > 0) return true;
+  if (saveType && effects.saveAdvantage?.includes(saveType)) return true;
+  return false;
+}
+
 export {
   computeConditionEffects,
   getNetAttackMode,
@@ -180,4 +188,5 @@ export {
   CONDITIONS_THAT_SPEED_ZERO,
   applySaveModifiers,
   saveModifierApplies,
+  hasSaveAdvantage,
 }
