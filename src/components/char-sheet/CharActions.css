@@ -27,12 +27,6 @@
     grid-template-columns: 120px 80px 100px 80px 70px 80px;
 }
 
-/* save-dc-display used by save_attack automation */
-.char-actions .save-dc-display {
-    color: #8b5cf6;
-    font-weight: 700;
-}
-
 /* Automation UI elements */
 .automation-btn {
     background: none;
