@@ -1,6 +1,4 @@
   
-import React from 'react'
-
 import './CharSpellSlotLevel.css'
 import { setRuntimeValue, useRuntimeValue } from '../../../hooks/useRuntimeState.js'
 

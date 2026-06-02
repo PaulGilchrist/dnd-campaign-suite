@@ -13,7 +13,7 @@ import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHos
 import { computeCover } from '../../services/coverService.js';
 import { computeFeatRangeEffects } from '../../services/featRangeService.js';
 import { loadNPCs } from '../../services/npcsService.js';
-import { hasAutomation, getAutomationInfo } from '../../services/automationService.js'
+import { hasAutomation } from '../../services/automationService.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
 import storage from '../../services/storage.js'
 import utils from '../../services/utils.js'

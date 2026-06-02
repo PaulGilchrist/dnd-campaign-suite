@@ -26,7 +26,7 @@ export function getChaModifier(playerStats) {
   return 0;
 }
 
-export function hasCannotActCondition(sourceName, campaignName) {
+export function hasCannotActCondition(sourceName, _campaignName) {
   try {
     const conditions = getRuntimeValue(sourceName, 'activeConditions');
     if (!Array.isArray(conditions)) return false;

@@ -1,5 +1,5 @@
 import { getLevelAfterLongRest } from './exhaustionRules.js'
-import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeBatch } from '../hooks/useRuntimeState.js'
 
 export function getHitDieSize(playerStats) {
   return playerStats.class?.class_levels?.[playerStats.level - 1]?.hit_die || 8

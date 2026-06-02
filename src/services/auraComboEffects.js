@@ -1,4 +1,4 @@
-import { hasAura, hasAuraOfProtection, getAuraRangeFromStats, hasCannotActCondition, isWithinRange } from './auraOfProtection.js';
+import { hasAuraOfProtection, hasCannotActCondition, isWithinRange } from './auraOfProtection.js';
 
 export async function computeAuraComboEffects({ targetName, characters, campaignName, activeMapName }) {
   let speedBonus = 0;

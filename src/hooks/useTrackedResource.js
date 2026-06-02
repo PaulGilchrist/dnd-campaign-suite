@@ -28,7 +28,7 @@ function useTrackedResource(storageKey, playerName, maxGetter, deps, campaignNam
      };
     window.addEventListener('focus-points-updated', handler);
     return () => window.removeEventListener('focus-points-updated', handler);
-   }, [playerName, storageKey, campaignName]);
+   }, [playerName, storageKey, campaignName, maxGetter]);
 
   const update = async (val) => {
     await setRuntimeValue(playerName, storageKey, val, campaignName);

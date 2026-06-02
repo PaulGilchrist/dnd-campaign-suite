@@ -70,7 +70,7 @@ function logRoll(campaignName, name, rollResult) {
      }).catch(() => {});
 }
 
-export async function expandMonstersToCreatures(selectedMonsters, characters, campaignName) {
+export async function expandMonstersToCreatures(selectedMonsters, characters, _campaignName) {
     const creatureList = [];
     const npcRollResults = [];
 

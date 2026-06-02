@@ -6,7 +6,7 @@ import { getTargetFromAttacker, getCombatContext } from '../../services/damageUt
 import { applyHealingToTarget } from '../../services/applyHealing.js'
 import './CharSheet.css'
 
-function HealingPoolModal({ playerStats, campaignName, poolMax, alsoCures, cureCost, onClose }) {
+function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, onClose }) {
     const layOnHandsPoolMax = 5 * (playerStats.level || 1);
 
     const { current: poolRemaining, max: poolMaxFromHook, update: setPoolRemaining } = useTrackedResource(

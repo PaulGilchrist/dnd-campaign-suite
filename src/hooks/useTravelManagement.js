@@ -212,7 +212,7 @@ export default function useTravelManagement({
       const level = getRuntimeValue(name, 'exhaustionLevel');
       return (typeof level === 'number' ? level : 0) >= EXHAUSTION_LEVELS;
     });
-  }, [characters, campaignName]);
+  }, [characters]);
 
   const addExhaustionToAll = useCallback(() => {
     characters.forEach(char => {
