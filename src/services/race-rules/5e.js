@@ -69,13 +69,15 @@ const raceRules = {
         return racialBonus;
         },
     getResistances: (playerSummary) => {
-           // Dependencies: None
+            // Dependencies: None
         let resistances = [];
-        if(playerSummary.race.subrace && playerSummary.race.subrace.damage_resistance) {
+        if(playerSummary.race.name === "Dwarf") {
+            resistances.push("Poison"); // Dwarven Resilience
+        } else if(playerSummary.race.subrace && playerSummary.race.subrace.damage_resistance) {
             resistances.push(playerSummary.race.subrace.damage_resistance);
-        } else if(playerSummary.race.name === "Elf") {
+         } else if(playerSummary.race.name === "Elf") {
             resistances.push("Charm"); // Fey Ancestry
-        } else if(playerSummary.race.name === "Halfling") {
+         } else if(playerSummary.race.name === "Halfling") {
             resistances.push("Frightened"); // Brave
             if(playerSummary.race.subrace && playerSummary.race.subrace.name === "Scout Halfling") {
                 resistances.push("Poison"); // Scout Resilience
