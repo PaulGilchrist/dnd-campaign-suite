@@ -7116,7 +7116,7 @@
                         "prerequisites": [],
                         "description": "You and friendly creatures within 10 feet of you can't be frightened while you are conscious.",
                         "automation": {
-                            "type": "passive_immunity",
+                            "type": "passive_buff",
                             "target": "allies_in_range",
                             "range_expression": "10_ft",
                             "conditionImmunity": "frightened",

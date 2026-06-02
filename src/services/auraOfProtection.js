@@ -2,48 +2,31 @@ import { loadMapData } from './mapsService.js';
 import { getDistanceFeet } from './rangeValidation.js';
 import { getRuntimeValue } from '../hooks/useRuntimeState.js';
 
-const CANNOT_ACT_CONDITIONS = ['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious'];
-const DEFAULT_AURA_RANGE_FT = 10;
-const EXPANDED_AURA_RANGE_FT = 30;
+export const CANNOT_ACT_CONDITIONS = ['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious'];
+export const DEFAULT_AURA_RANGE_FT = 10;
+export const EXPANDED_AURA_RANGE_FT = 30;
 
-function hasAuraOfProtection(character) {
-  const cls = character?.class;
-  if (!cls || !character.level) return false;
-
-  if (cls.class_levels) {
-    for (const lvl of cls.class_levels) {
-      if (lvl.level > character.level) break;
-      if (lvl.class_specific?.aura_range >= 10) return true;
-    }
-    return false;
-  }
-
-  return cls.name === 'Paladin' && character.level >= 6;
+export function hasAura(playerStats, auraName) {
+  return playerStats?.automation?.passives?.some(p => p.name === auraName) ?? false;
 }
 
-function getAuraRange(character) {
-  const cls = character?.class;
-  if (!cls || !character.level) return DEFAULT_AURA_RANGE_FT;
-
-  if (cls.class_levels) {
-    const idx = Math.min(character.level, cls.class_levels.length) - 1;
-    const entry = cls.class_levels[Math.max(0, idx)];
-    const range = entry?.class_specific?.aura_range;
-    if (range >= 30) return EXPANDED_AURA_RANGE_FT;
-    return DEFAULT_AURA_RANGE_FT;
-  }
-
-  return character.level >= 18 ? EXPANDED_AURA_RANGE_FT : DEFAULT_AURA_RANGE_FT;
+export function hasAuraOfProtection(playerStats) {
+  return hasAura(playerStats, 'Aura of Protection');
 }
 
-function getChaModifier(character) {
-  const cha = character.abilities?.find(a => a.name === 'Charisma');
+export function getAuraRangeFromStats(playerStats) {
+  if (hasAura(playerStats, 'Aura Expansion')) return EXPANDED_AURA_RANGE_FT;
+  return DEFAULT_AURA_RANGE_FT;
+}
+
+export function getChaModifier(playerStats) {
+  const cha = playerStats.abilities?.find(a => a.name === 'Charisma');
   if (cha?.bonus != null) return cha.bonus;
   if (cha) return Math.floor((cha.baseScore + cha.abilityImprovements + cha.miscBonus - 10) / 2);
   return 0;
 }
 
-function hasCannotActCondition(sourceName, campaignName) {
+export function hasCannotActCondition(sourceName, campaignName) {
   try {
     const conditions = getRuntimeValue(sourceName, 'activeConditions');
     if (!Array.isArray(conditions)) return false;
@@ -53,7 +36,7 @@ function hasCannotActCondition(sourceName, campaignName) {
   }
 }
 
-async function isWithinRange(sourceName, targetName, campaignName, activeMapName, characters) {
+export async function isWithinRange(sourceName, targetName, campaignName, activeMapName, computedCharacters) {
   if (!activeMapName) return true;
   try {
     const data = await loadMapData(campaignName, activeMapName);
@@ -63,8 +46,8 @@ async function isWithinRange(sourceName, targetName, campaignName, activeMapName
     if (!sourcePlayer || !targetPlayer) return true;
     const dist = getDistanceFeet(sourcePlayer, targetPlayer);
     if (dist == null) return true;
-    const sourceChar = characters?.find(c => c.name === sourceName);
-    const range = sourceChar ? getAuraRange(sourceChar) : DEFAULT_AURA_RANGE_FT;
+    const sourceEntry = computedCharacters?.find(c => c.name === sourceName);
+    const range = sourceEntry?.computedStats ? getAuraRangeFromStats(sourceEntry.computedStats) : DEFAULT_AURA_RANGE_FT;
     return dist <= range;
   } catch {
     return true;
@@ -75,12 +58,13 @@ export async function computeAuraBonus({ targetName, characters, campaignName, a
   let bestBonus = 0;
   let bestSource = null;
 
-  for (const character of characters) {
-    const name = character.name;
+  for (const entry of characters) {
+    const name = entry.name;
+    const stats = entry.computedStats;
     if (!name || name === targetName) continue;
-    if (!hasAuraOfProtection(character)) continue;
+    if (!stats || !hasAuraOfProtection(stats)) continue;
     if (hasCannotActCondition(name, campaignName)) continue;
-    const chaMod = getChaModifier(character);
+    const chaMod = getChaModifier(stats);
     const bonus = Math.max(1, chaMod);
     const inRange = await isWithinRange(name, targetName, campaignName, activeMapName, characters);
     if (!inRange) continue;

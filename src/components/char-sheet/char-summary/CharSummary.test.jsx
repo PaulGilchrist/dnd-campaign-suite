@@ -562,7 +562,8 @@ describe('CharSummary', () => {
     render(<CharSummary playerStats={statsWithResistances} onDeleteCharacter={vi.fn()} />);
 
     expect(screen.getByText(/Resistances/)).toBeInTheDocument();
-    expect(screen.getByText(/Fire, Cold/)).toBeInTheDocument();
+    expect(screen.getByText(/Fire/)).toBeInTheDocument();
+    expect(screen.getByText(/Cold/)).toBeInTheDocument();
   });
 
   it('should render immunities', () => {
@@ -574,7 +575,9 @@ describe('CharSummary', () => {
     render(<CharSummary playerStats={statsWithImmunities} onDeleteCharacter={vi.fn()} />);
 
     expect(screen.getByText(/Immunities/)).toBeInTheDocument();
-    expect(screen.getByText(/Poison, Disease/)).toBeInTheDocument();
+    const immunityDiv = screen.getByText(/Immunities:/).closest('div');
+    expect(immunityDiv).toHaveTextContent('Poison');
+    expect(immunityDiv).toHaveTextContent('Disease');
   });
 
   it('should render vulnerabilities', () => {

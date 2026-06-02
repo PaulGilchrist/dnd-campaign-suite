@@ -11,7 +11,7 @@ import CharSpecialActions from './CharSpecialActions.jsx'
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx'
 import CharSpells from './char-spells/CharSpells.jsx'
 import CharSummary from './char-summary/CharSummary.jsx'
-import { EXHAUSTION_LEVELS } from './char-summary/CharConditions.jsx'
+import { computeAuraComboEffects } from '../../services/auraComboEffects.js';
 import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/conditionEffects.js'
 import './CharSheet.css'
 
@@ -89,6 +89,17 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
     const conditionAttackMode = getNetAttackMode(conditionEffects.attackAdvantageCount, conditionEffects.attackDisadvantageCount)
 
+    const [auraComboEffects, setAuraComboEffects] = React.useState(null);
+    React.useEffect(() => {
+      if (!playerStats || !characters?.length) { setAuraComboEffects(null); return; }
+      computeAuraComboEffects({
+        targetName: playerStats.name,
+        characters,
+        campaignName,
+        activeMapName,
+      }).then(setAuraComboEffects);
+    }, [playerStats, characters, campaignName, activeMapName]);
+
     return (<React.Fragment>
         {playerStats && <div className='char-sheet' data-testid='char-sheet'>
             <CharSummary
@@ -104,6 +115,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
               exhaustionLevel={exhaustionLevel}
               conditionEffects={conditionEffects}
               onConditionsChange={handleConditionsChange}
+              auraComboEffects={auraComboEffects}
             ></CharSummary><hr />
               <CharAbilities
                 allAbilityScores={allAbilityScores}

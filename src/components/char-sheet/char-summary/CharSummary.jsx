@@ -24,7 +24,7 @@ import CharConditions from './CharConditions.jsx'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
-function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters, onLongRest, exhaustionLevel, conditionEffects, onConditionsChange }) {
+function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters, onLongRest, exhaustionLevel, conditionEffects, onConditionsChange, auraComboEffects }) {
     const { popupHtml, setPopupHtml, rollInitiative } = useLoggedDiceRoll(playerStats.name, campaignName);
     const [showShortRest, setShowShortRest] = React.useState(false);
     const [showXpModal, setShowXpModal] = React.useState(false);
@@ -93,6 +93,19 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
      }
     speed = Math.max(0, speed - (5 * exhaustionLevel));
     if (conditionEffects?.speedZero) speed = 0;
+    const auraSpeedBonus = auraComboEffects?.speedBonus || 0;
+    const auraSpeedSource = auraComboEffects?.speedSource || null;
+    const totalSpeed = speed + auraSpeedBonus;
+
+    const baseImmunities = playerStats.immunities || [];
+    const auraImmunities = auraComboEffects?.immunities || [];
+    const auraImmunitySources = auraComboEffects?.immunitySources || {};
+    const allImmunities = [...new Set([...baseImmunities, ...auraImmunities])];
+
+    const baseResistances = playerStats.resistances || [];
+    const auraResistances = auraComboEffects?.resistances || [];
+    const auraResistanceSource = auraComboEffects?.resistanceSource || null;
+    const allResistances = [...new Set([...baseResistances, ...auraResistances])];
 
     let flySpeed = null;
     activeBuffs.forEach(buff => {
@@ -158,7 +171,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 <div>
                     <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{playerStats.armorClass}</div>
                     <CharHitPoints playerStats={playerStats} campaignName={campaignName}></CharHitPoints>
-                      <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{speed}{flySpeed !== null ? `, fly ${flySpeed}` : ''}</span> ft.<br />
+                      <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeed}{flySpeed !== null ? `, fly ${flySpeed + auraSpeedBonus}` : ''}</span> ft.{auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}<br />
                     <CharGold playerStats={playerStats} campaignName={campaignName}></CharGold>
                 </div>
                 <div>
@@ -207,13 +220,23 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                       <CharClassFeatures playerStats={playerStats} />
                 </div>
       </div>
-          {playerStats.resistances != null && playerStats.resistances.length > 0 && <div>
+          {allResistances.length > 0 && <div>
               <b>Resistances: </b>
-              {playerStats.resistances.join(', ')}
+              {allResistances.map((r, i) => (
+                <span key={r}>
+                  {i > 0 ? ', ' : ''}{r}
+                  {auraResistances.includes(r) && auraResistanceSource && <span className="aura-source" title={`From ${auraResistanceSource}'s Aura of Warding`}>*</span>}
+                </span>
+              ))}
           </div>}
-          {playerStats.immunities != null && playerStats.immunities.length > 0 && <div>
+          {allImmunities.length > 0 && <div>
               <b>Immunities: </b>
-              {playerStats.immunities.join(', ')}
+              {allImmunities.map((imm, i) => (
+                <span key={imm}>
+                  {i > 0 ? ', ' : ''}{imm}
+                  {auraImmunities.includes(imm) && auraImmunitySources[imm] && <span className="aura-source" title={`From ${auraImmunitySources[imm]}'s aura`}>*</span>}
+                </span>
+              ))}
           </div>}
           {playerStats.vulnerabilities != null && playerStats.vulnerabilities.length > 0 && <span><b>Vulnerabilities: </b>{playerStats.vulnerabilities.join(', ')}</span>}
             {playerStats.senses != null && playerStats.senses.length > 0 && <div><b>Senses: </b>{playerStats.senses.map((sense) => { return `${sense.name} ${sense.value}`;}).join(', ')}</div>}

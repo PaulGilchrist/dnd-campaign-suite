@@ -247,6 +247,8 @@ function buildAttackInfo(feature, playerStats) {
         range_expression: auto.range_expression || '10_ft',
         effect: auto.effect || '',
         bonusExpression: auto.bonusExpression || '',
+        conditionImmunity: auto.conditionImmunity || '',
+        resistances: auto.resistances || [],
         hasAutomation: true
       }
     }

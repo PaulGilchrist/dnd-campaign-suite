@@ -808,7 +808,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         let saveBonus = 0;
         if (creature.type === 'player') {
             const character = characters.find(c => utils.getName(c.name) === creature.name);
-            saveBonus = getAbilitySaveBonus(character, condition.ability);
+            saveBonus = getAbilitySaveBonus(character?.computedStats || character, condition.ability);
         } else {
             try {
                 const monster = await getMonsterData(creature.name);
@@ -919,7 +919,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         let saveBonus = 0;
         if (creature.type === 'player') {
             const character = characters.find(c => utils.getName(c.name) === creature.name);
-            saveBonus = getAbilitySaveBonus(character, 'con');
+            saveBonus = getAbilitySaveBonus(character?.computedStats || character, 'con');
         } else {
             try {
                 const monster = await getMonsterData(creature.name);
