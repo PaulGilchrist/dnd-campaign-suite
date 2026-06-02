@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   getHitDieSize,
   computeHitDieRecovery,
@@ -11,6 +11,19 @@ import {
   applyShortRest,
   applyLongRest
 } from './restRules.js'
+
+// Mock useRuntimeState before importing restRules
+vi.mock('../hooks/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn(),
+  setRuntimeBatch: vi.fn(),
+}))
+
+import { getRuntimeValue, setRuntimeValue, setRuntimeBatch } from '../hooks/useRuntimeState.js'
+
+beforeEach(() => {
+  vi.clearAllMocks()
+})
 
 describe('getHitDieSize', () => {
   it('returns class hit die when class_levels exists', () => {
@@ -160,66 +173,51 @@ describe('spellSlotLevels', () => {
   })
 })
 
-function createMockStorage() {
-  const store = {}
-  return {
-    get: vi.fn((name) => store[name]),
-    set: vi.fn((name, value) => { store[name] = value }),
-    getProperty: vi.fn((name, key) => store[name]?.[key]),
-    setProperty: vi.fn((name, key, value) => {
-      if (!store[name]) store[name] = {}
-      store[name][key] = value
-    })
-  }
-}
-
 describe('applyShortRest', () => {
-  it('resets short rest resources to null', () => {
+  it('resets short rest resources to null via setRuntimeBatch', () => {
     const playerStats = { name: 'Frog', hitPoints: 30, level: 5 }
-    const storage = createMockStorage()
-    applyShortRest(playerStats, 'Campaign1', storage)
+    getRuntimeValue.mockReturnValue(20)
+    applyShortRest(playerStats, 'Campaign1')
 
+    expect(getRuntimeValue).toHaveBeenCalledWith('Frog', 'currentHitPoints')
+    expect(setRuntimeBatch).toHaveBeenCalledTimes(1)
+    const data = setRuntimeBatch.mock.calls[0][1]
     SHORT_REST_RESOURCES.forEach((key) => {
-      expect(storage.setProperty).toHaveBeenCalledWith('Frog', key, null, 'Campaign1')
+      expect(data[key]).toBeNull()
     })
   })
 
   it('preserves current hp when no recovery passed', () => {
     const playerStats = { name: 'Frog', hitPoints: 30 }
-    const store = { Frog: { currentHitPoints: 20 } }
-    const storage = {
-      getProperty: vi.fn((name, key) => store[name]?.[key]),
-      setProperty: vi.fn((name, key, value) => {
-        if (!store[name]) store[name] = {}
-        store[name][key] = value
-       })
-     }
-    applyShortRest(playerStats, 'Campaign1', storage)
-    expect(storage.setProperty).toHaveBeenCalledWith('Frog', 'currentHitPoints', 20, 'Campaign1')
-    })
+    getRuntimeValue.mockReturnValue(20)
+    applyShortRest(playerStats, 'Campaign1')
+    
+    const data = setRuntimeBatch.mock.calls[0][1]
+    expect(data.currentHitPoints).toBe(20)
+    expect(setRuntimeBatch.mock.calls[0][2]).toBe('Campaign1')
+  })
 
   it('uses campaign name in all storage calls', () => {
     const playerStats = { name: 'Grog', hitPoints: 40 }
-    const storage = createMockStorage()
-    applyShortRest(playerStats, 'MyCampaign', storage)
+    getRuntimeValue.mockReturnValue(30)
+    applyShortRest(playerStats, 'MyCampaign')
 
-    expect(storage.setProperty).toHaveBeenCalledWith('Grog', expect.any(String), expect.anything(), 'MyCampaign')
+    expect(setRuntimeBatch).toHaveBeenCalledWith('Grog', expect.any(Object), 'MyCampaign')
   })
 })
 
 describe('applyLongRest', () => {
-  it('performs a single atomic storage.set with all changes', () => {
+  it('performs a single atomic setRuntimeBatch with all changes', () => {
     const playerStats = { name: 'Frog', hitPoints: 50, level: 10 }
-    const storage = createMockStorage()
-    applyLongRest(playerStats, 'C1', storage)
+    getRuntimeValue.mockReturnValue(null)
+    applyLongRest(playerStats, 'C1')
 
-    expect(storage.get).toHaveBeenCalledWith('Frog')
-    expect(storage.set).toHaveBeenCalledTimes(1)
-    const result = storage.set.mock.calls[0]
-    expect(result[0]).toBe('Frog')
-    expect(result[1].currentHitPoints).toBe(50)
-    expect(result[1].shortRestHitDice).toBe(10)
-    expect(result[2]).toBe('C1')
+    expect(setRuntimeBatch).toHaveBeenCalledTimes(1)
+    const callArgs = setRuntimeBatch.mock.calls[0]
+    expect(callArgs[0]).toBe('Frog')
+    expect(callArgs[1].currentHitPoints).toBe(50)
+    expect(callArgs[1].shortRestHitDice).toBe(10)
+    expect(callArgs[2]).toBe('C1')
   })
 
   it('restores spell slots to max when spellAbilities exists', () => {
@@ -233,10 +231,10 @@ describe('applyLongRest', () => {
         spell_slots_level_3: 0
       }
     }
-    const storage = createMockStorage()
-    applyLongRest(playerStats, 'C1', storage)
+    getRuntimeValue.mockReturnValue(null)
+    applyLongRest(playerStats, 'C1')
 
-    const data = storage.set.mock.calls[0][1]
+    const data = setRuntimeBatch.mock.calls[0][1]
     expect(data.spell_slots_level_1).toBe(4)
     expect(data.spell_slots_level_2).toBe(3)
     expect(data.spell_slots_level_3).toBe(0)
@@ -244,19 +242,19 @@ describe('applyLongRest', () => {
 
   it('does not set spell slots when no spellAbilities', () => {
     const playerStats = { name: 'Barb', hitPoints: 60, level: 8 }
-    const storage = createMockStorage()
-    applyLongRest(playerStats, 'C1', storage)
+    getRuntimeValue.mockReturnValue(null)
+    applyLongRest(playerStats, 'C1')
 
-    const data = storage.set.mock.calls[0][1]
+    const data = setRuntimeBatch.mock.calls[0][1]
     expect(data.spell_slots_level_1).toBeUndefined()
   })
 
   it('resets long rest resources to null', () => {
     const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
-    const storage = createMockStorage()
-    applyLongRest(playerStats, 'C1', storage)
+    getRuntimeValue.mockReturnValue(null)
+    applyLongRest(playerStats, 'C1')
 
-    const data = storage.set.mock.calls[0][1]
+    const data = setRuntimeBatch.mock.calls[0][1]
     LONG_REST_RESOURCES.forEach((key) => {
       expect(data[key]).toBeNull()
     })
@@ -264,41 +262,38 @@ describe('applyLongRest', () => {
 
   it('reduces exhaustion by one', () => {
     const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
-    const storage = createMockStorage()
-    storage.get.mockReturnValue({ exhaustionLevel: 3 })
-    applyLongRest(playerStats, 'C1', storage)
+    getRuntimeValue.mockReturnValue(3)
+    applyLongRest(playerStats, 'C1')
 
-    const data = storage.set.mock.calls[0][1]
+    const data = setRuntimeBatch.mock.calls[0][1]
     expect(data.exhaustionLevel).toBe(2)
   })
 
   it('keeps exhaustion at 0 when already at 0', () => {
     const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
-    const storage = createMockStorage()
-    storage.get.mockReturnValue({ exhaustionLevel: 0 })
-    applyLongRest(playerStats, 'C1', storage)
+    getRuntimeValue.mockReturnValue(0)
+    applyLongRest(playerStats, 'C1')
 
-    const data = storage.set.mock.calls[0][1]
-    expect(data.exhaustionLevel).toBe(0)
+    // When exhaustion is 0, the key should not be in the data
+    const data = setRuntimeBatch.mock.calls[0][1]
+    expect(data.exhaustionLevel).toBeUndefined()
   })
 
   it('skips exhaustion update when value is null', () => {
     const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
-    const storage = createMockStorage()
-    storage.get.mockReturnValue({ exhaustionLevel: null })
-    applyLongRest(playerStats, 'C1', storage)
+    getRuntimeValue.mockReturnValue(null)
+    applyLongRest(playerStats, 'C1')
 
-    const data = storage.set.mock.calls[0][1]
-    expect(data.exhaustionLevel).toBeNull()
+    const data = setRuntimeBatch.mock.calls[0][1]
+    expect(data.exhaustionLevel).toBeUndefined()
   })
 
   it('reduces exhaustion from level 1 to 0', () => {
     const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
-    const storage = createMockStorage()
-    storage.get.mockReturnValue({ exhaustionLevel: 1 })
-    applyLongRest(playerStats, 'C1', storage)
+    getRuntimeValue.mockReturnValue(1)
+    applyLongRest(playerStats, 'C1')
 
-    const data = storage.set.mock.calls[0][1]
+    const data = setRuntimeBatch.mock.calls[0][1]
     expect(data.exhaustionLevel).toBe(0)
   })
 
@@ -311,10 +306,10 @@ describe('applyLongRest', () => {
         { name: 'Resourceful', description: 'Heroic Inspiration on Long Rest' }
       ]
     }
-    const storage = createMockStorage()
-    applyLongRest(playerStats, 'C1', storage)
+    getRuntimeValue.mockReturnValue(null)
+    applyLongRest(playerStats, 'C1')
 
-    const data = storage.set.mock.calls[0][1]
+    const data = setRuntimeBatch.mock.calls[0][1]
     expect(data.hasInspiration).toBe(true)
   })
 
@@ -327,19 +322,19 @@ describe('applyLongRest', () => {
         { name: 'Brave', description: 'Advantage vs frightened' }
       ]
     }
-    const storage = createMockStorage()
-    applyLongRest(playerStats, 'C1', storage)
+    getRuntimeValue.mockReturnValue(null)
+    applyLongRest(playerStats, 'C1')
 
-    const data = storage.set.mock.calls[0][1]
+    const data = setRuntimeBatch.mock.calls[0][1]
     expect(data.hasInspiration).toBeUndefined()
   })
 
   it('does not set hasInspiration when characterAdvancement is missing', () => {
     const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
-    const storage = createMockStorage()
-    applyLongRest(playerStats, 'C1', storage)
+    getRuntimeValue.mockReturnValue(null)
+    applyLongRest(playerStats, 'C1')
 
-    const data = storage.set.mock.calls[0][1]
+    const data = setRuntimeBatch.mock.calls[0][1]
     expect(data.hasInspiration).toBeUndefined()
   })
 })

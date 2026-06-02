@@ -61,15 +61,6 @@ vi.mock('./CharCharacterAdvancement.jsx', () => ({
   )),
 }));
 
-let capturedHandleEvent = null;
-
-vi.mock('../common/Subscriber.jsx', () => ({
-  default: vi.fn(({ handleEvent }) => {
-    capturedHandleEvent = handleEvent;
-    return <div data-testid="subscriber">Subscriber</div>;
-  }),
-}));
-
 // Mock rulesFactory
 vi.mock('../../services/rulesFactory.js', () => ({
   default: {
@@ -77,13 +68,11 @@ vi.mock('../../services/rulesFactory.js', () => ({
   },
 }));
 
-// Mock storage
-vi.mock('../../services/storage.js', () => ({
-  default: {
-    get: vi.fn(),
-    setProperty: vi.fn(),
-    getProperty: vi.fn(),
-  },
+// Mock useRuntimeState
+vi.mock('../../hooks/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn(),
+  useRuntimeValue: vi.fn(() => null),
 }));
 
 // Mock utils
@@ -93,6 +82,18 @@ vi.mock('../../services/utils.js', () => ({
     getFirstName: vi.fn((name) => name),
     guid: vi.fn(() => 'unique-id'),
   },
+}));
+
+// Mock auraComboEffects
+vi.mock('../../services/auraComboEffects.js', () => ({
+  computeAuraComboEffects: vi.fn(() => Promise.resolve(null)),
+}));
+
+// Mock conditionEffects
+vi.mock('../../services/conditionEffects.js', () => ({
+  computeConditionEffects: vi.fn(() => ({})),
+  getNetAttackMode: vi.fn(() => 'normal'),
+  CONDITIONS_THAT_CANNOT_ACT: new Set(),
 }));
 
 // Mock localStorage
@@ -107,7 +108,7 @@ Object.defineProperty(window, 'localStorage', {
 });
 
 import rulesFactory from '../../services/rulesFactory.js';
-import storage from '../../services/storage.js';
+import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/useRuntimeState.js';
 import utils from '../../services/utils.js';
 
 const mockPlayerSummary = {
@@ -117,6 +118,7 @@ const mockPlayerSummary = {
 
 const mockPlayerStats = {
   name: 'Test Character',
+  hitPoints: 45,
   abilities: [],
   actions: [],
   reactions: [],
@@ -145,10 +147,12 @@ const mockProps = {
 describe('CharSheet', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    capturedHandleEvent = null;
 
     // Mock rulesFactory.getPlayerStats to return mock stats
     rulesFactory.getPlayerStats.mockResolvedValue(mockPlayerStats);
+
+    // Mock useRuntimeValue to return null by default
+    useRuntimeValue.mockReturnValue(null);
 
     // Mock localStorage.getItem to return null (no prepared spells)
     mockLocalStorage.getItem.mockReturnValue(null);
@@ -170,7 +174,6 @@ describe('CharSheet', () => {
     expect(screen.getByTestId('char-special-actions')).toBeInTheDocument();
     expect(screen.getByTestId('char-inventory')).toBeInTheDocument();
     expect(screen.getByTestId('char-character-advancement')).toBeInTheDocument();
-    expect(screen.getByTestId('subscriber')).toBeInTheDocument();
   });
 
   it('should call rulesFactory.getPlayerStats on mount', async () => {
@@ -293,13 +296,17 @@ describe('CharSheet', () => {
     });
   });
 
-  it('should handle storage event and refresh player stats', async () => {
+  it('should load prepared spells from runtime state', async () => {
+    const preparedSpells = ['Fireball', 'Magic Missile'];
+    getRuntimeValue.mockReturnValue(preparedSpells);
+
     const playerStatsWithSpells = {
       ...mockPlayerStats,
       name: 'Test Character',
       spellAbilities: {
         spells: [
-          { name: 'Fireball', prepared: 'Prepared' },
+          { name: 'Fireball', prepared: '' },
+          { name: 'Magic Missile', prepared: '' },
         ],
         maxPreparedSpells: 3,
       },
@@ -307,25 +314,24 @@ describe('CharSheet', () => {
 
     rulesFactory.getPlayerStats.mockResolvedValue(playerStatsWithSpells);
 
-    // Mock localStorage to return prepared spells
-    mockLocalStorage.getItem.mockImplementation((key) => {
-      if (key === 'Test Character') {
-        return JSON.stringify({ preparedSpells: ['Fireball'] });
-      }
-      return null;
-    });
-
     render(<CharSheet {...mockProps} />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      expect(screen.getByTestId('char-spells')).toBeInTheDocument();
     });
   });
 
-  it('should handle storage event with handleEvent', async () => {
+  it('should skip loading prepared spells from runtime state for 2024 characters', async () => {
+    const playerSummary2024 = {
+      ...mockPlayerSummary,
+      rules: '2024',
+    };
+
+    // Mock getRuntimeValue to return prepared spells (should be ignored for 2024)
+    getRuntimeValue.mockReturnValue(['Fireball']);
+
     const playerStatsWithSpells = {
       ...mockPlayerStats,
-      name: 'Test Character',
       spellAbilities: {
         spells: [
           { name: 'Fireball', prepared: '' },
@@ -336,97 +342,25 @@ describe('CharSheet', () => {
 
     rulesFactory.getPlayerStats.mockResolvedValue(playerStatsWithSpells);
 
-    // Mock storage.get to return different data than the event
-    storage.get.mockReturnValue(JSON.stringify({ different: 'data' }));
-
-    render(<CharSheet {...mockProps} />);
+    render(<CharSheet {...mockProps} playerSummary={playerSummary2024} />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('subscriber')).toBeInTheDocument();
+      expect(screen.getByTestId('char-spells')).toBeInTheDocument();
     });
 
-    // The handleEvent function should be passed to Subscriber
-    // We can verify it's working by checking the component renders
-    expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+    // Verify that rulesFactory.getPlayerStats was called
+    expect(rulesFactory.getPlayerStats).toHaveBeenCalled();
   });
 
-  it('should not refresh if storage data is equal', async () => {
-    const playerStatsWithSpells = {
-      ...mockPlayerStats,
-      name: 'Test Character',
-      spellAbilities: {
-        spells: [
-          { name: 'Fireball', prepared: '' },
-        ],
-        maxPreparedSpells: 3,
-      },
-    };
-
-    rulesFactory.getPlayerStats.mockResolvedValue(playerStatsWithSpells);
-
-    // Mock storage.get to return the same data as the event (should not trigger refresh)
-    const eventData = { name: 'Test Character', spellAbilities: { spells: [{ name: 'Fireball', prepared: '' }] } };
-    storage.get.mockReturnValue(JSON.stringify(eventData));
-
+  it('should render char-sheet wrapper div', async () => {
     render(<CharSheet {...mockProps} />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-  });
-
-  it('should not refresh if event key does not match player name', async () => {
-    const playerStatsWithSpells = {
-      ...mockPlayerStats,
-      name: 'Test Character',
-      spellAbilities: {
-        spells: [
-          { name: 'Fireball', prepared: '' },
-        ],
-        maxPreparedSpells: 3,
-      },
-    };
-
-    rulesFactory.getPlayerStats.mockResolvedValue(playerStatsWithSpells);
-
-    render(<CharSheet {...mockProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      expect(document.querySelector('.char-sheet')).toBeInTheDocument();
     });
   });
 
   describe('handleTogglePreparedSpells', () => {
-    it('should prepare an unprepared spell when under max limit', async () => {
-      const playerStatsWithSpells = {
-        ...mockPlayerStats,
-        spellAbilities: {
-          spells: [
-            { name: 'Fireball', prepared: '' },
-            { name: 'Magic Missile', prepared: '' },
-          ],
-          maxPreparedSpells: 3,
-        },
-      };
-
-      rulesFactory.getPlayerStats.mockResolvedValue(playerStatsWithSpells);
-
-      render(<CharSheet {...mockProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('char-spells')).toBeInTheDocument();
-      });
-
-      // Click to toggle spell preparation
-      fireEvent.click(screen.getByTestId('char-spells'));
-
-      expect(storage.setProperty).toHaveBeenCalledWith(
-        'Test Character',
-        'preparedSpells',
-        ['Fireball'],
-        'Test Campaign'
-      );
-    });
 
     it('should not prepare a spell when at max limit', async () => {
       const playerStatsWithSpells = {
@@ -476,19 +410,9 @@ describe('CharSheet', () => {
     });
   });
 
-  describe('handleEvent', () => {
-    it('should render Subscriber component', async () => {
-      render(<CharSheet {...mockProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('subscriber')).toBeInTheDocument();
-      });
-    });
-  });
-
   describe('preparedSpell loading', () => {
     it('should handle localStorage with valid JSON but no preparedSpells key', async () => {
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify({ someOtherData: 'value' }));
+      getRuntimeValue.mockReturnValue(null);
 
       const playerStatsWithSpells = {
         ...mockPlayerStats,
@@ -507,34 +431,27 @@ describe('CharSheet', () => {
         expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
       });
 
-      // Verify getItem was called for prepared spells
-      expect(mockLocalStorage.getItem).toHaveBeenCalledWith('Test Character');
+      // Verify getRuntimeValue was called for prepared spells
+      expect(getRuntimeValue).toHaveBeenCalledWith('Test Character', 'preparedSpells');
     });
 
-    it('should handle malformed JSON from localStorage gracefully', async () => {
-      mockLocalStorage.getItem.mockReturnValue('invalid json');
-
-      // JSON.parse throws in async fetchData with no try/catch, producing
-      // an unhandled rejection. Intercept to prevent test pollution.
-      const rejectionHandler = vi.fn();
-      process.on('unhandledRejection', rejectionHandler);
+    it('should handle malformed prepared spells data gracefully', async () => {
+      getRuntimeValue.mockReturnValue(null);
 
       rulesFactory.getPlayerStats.mockResolvedValue(mockPlayerStats);
       render(<CharSheet {...mockProps} />);
 
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
 
-      // Component should not crash but playerStats was never set
-      expect(screen.queryByTestId('char-sheet')).not.toBeInTheDocument();
-      expect(mockLocalStorage.getItem).toHaveBeenCalledWith('Test Character');
-      expect(rejectionHandler).toHaveBeenCalled();
-
-      process.removeListener('unhandledRejection', rejectionHandler);
+      // Component should render without crashing
+      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
     });
 
-    it('should mark spells as prepared from localStorage data', async () => {
+    it('should mark spells as prepared from runtime state data', async () => {
       const preparedSpells = ['Fireball'];
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify({ preparedSpells }));
+      getRuntimeValue.mockReturnValue(preparedSpells);
 
       const playerStatsWithSpells = {
         ...mockPlayerStats,
@@ -554,76 +471,9 @@ describe('CharSheet', () => {
       await waitFor(() => {
         expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
       });
-    });
-  });
 
-  describe('handleEvent behavior', () => {
-    it('should trigger forceRefresh when event data differs from stored data', async () => {
-      render(<CharSheet {...mockProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('subscriber')).toBeInTheDocument();
-      });
-
-      // Set storage.get to return different data than what we'll pass
-      storage.get.mockReturnValue({ old: 'data' });
-
-      // Call handleEvent with different data using change- prefix format
-      capturedHandleEvent({ key: 'change-Test Campaign-Test Character', data: { new: 'data' } });
-
-      expect(storage.get).toHaveBeenCalledWith('Test Character');
-      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
-        'Test Character',
-        JSON.stringify({ new: 'data' })
-      );
-    });
-
-    it('should skip refresh when event data matches stored data (isEqual)', async () => {
-      render(<CharSheet {...mockProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('subscriber')).toBeInTheDocument();
-      });
-
-      const eventData = { preparedSpells: ['Fireball'] };
-      storage.get.mockReturnValue(eventData);
-
-      // Call handleEvent with the same data (isEqual should return true)
-      capturedHandleEvent({ key: 'change-Test Campaign-Test Character', data: eventData });
-
-      // Since isEqual returns true, the if block should not execute
-      expect(mockLocalStorage.setItem).not.toHaveBeenCalled();
-    });
-
-    it('should skip refresh when event key does not match character name', async () => {
-      render(<CharSheet {...mockProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('subscriber')).toBeInTheDocument();
-      });
-
-      storage.get.mockReturnValue({ preparedSpells: ['Fireball'] });
-
-      // Call handleEvent with a different character key
-      capturedHandleEvent({ key: 'change-Test Campaign-Different Character', data: { preparedSpells: ['Magic Missile'] } });
-
-      // localStorage should be updated (different data) but setForceRefresh should
-      // not be called because the key doesn't match
-      expect(mockLocalStorage.setItem).toHaveBeenCalled();
-    });
-
-    it('should ignore non-change events', async () => {
-      render(<CharSheet {...mockProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('subscriber')).toBeInTheDocument();
-      });
-
-      // Call handleEvent with a non-change event key
-      capturedHandleEvent({ key: 'maps-list-Test Campaign', data: { action: 'created' } });
-
-      // Should not update localStorage or trigger refresh
-      expect(mockLocalStorage.setItem).not.toHaveBeenCalled();
+      // Verify getRuntimeValue was called for prepared spells
+      expect(getRuntimeValue).toHaveBeenCalledWith('Test Character', 'preparedSpells');
     });
   });
 

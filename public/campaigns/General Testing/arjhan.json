@@ -44,7 +44,7 @@
   "class": {
     "name": "Paladin",
     "subclass": {
-      "name": "Oath of Glory",
+      "name": "Oath of the Ancients",
       "type": ""
     },
     "fightingStyles": [
@@ -57,7 +57,7 @@
   "race": {
     "name": "Dragonborn",
     "subrace": {
-      "name": "Black Dragonborn",
+      "name": "Blue Dragonborn",
       "description": ""
     }
   },

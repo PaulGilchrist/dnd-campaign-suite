@@ -11,6 +11,11 @@ vi.mock('../../services/storage.js', () => ({
   },
 }));
 
+vi.mock('../../hooks/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(() => null),
+  setRuntimeValue: vi.fn(),
+}));
+
 vi.mock('../../services/utils.js', () => {
   return {
     default: {
@@ -430,9 +435,9 @@ describe('Initiative', () => {
    });
 
   it('should apply creature-unconscious class when player HP is 0', async () => {
-    const storageModule = await import('../../services/storage.js');
-    vi.mocked(storageModule.default.getProperty).mockReturnValue(0);
-    render(<Initiative characters={[{ name: 'Gandalf', hitPoints: 30 }]} isLocalhost={true} />);
+    const { getRuntimeValue } = await import('../../hooks/useRuntimeState.js');
+    vi.mocked(getRuntimeValue).mockReturnValue(0);
+    render(<Initiative characters={[{ name: 'Gandalf', hitPoints: 30 }]} isLocalhost={true} campaignName="test" />);
     await act(async () => {
       await vi.waitFor(() => {
         const unconsciousCards = document.querySelectorAll('.creature-unconscious');

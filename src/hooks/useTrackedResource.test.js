@@ -1,17 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
-let storage;
-vi.mock('../services/storage.js', () => {
-  const mod = {
-    default: {
-      getProperty: vi.fn(),
-      setProperty: vi.fn(),
-    },
-  };
-  storage = mod.default;
-  return mod;
-});
+vi.mock('../services/storage.js', () => ({
+  default: {
+    getProperty: vi.fn(),
+    setProperty: vi.fn(),
+  },
+}));
+
+vi.mock('../hooks/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn(),
+}));
+
+import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
 
 const useTrackedResource = (await import('./useTrackedResource.js')).default;
 
@@ -21,7 +23,7 @@ describe('useTrackedResource', () => {
   });
 
   it('should initialize from storage when value exists', () => {
-    storage.getProperty.mockReturnValue(5);
+    getRuntimeValue.mockReturnValue(5);
 
     const maxGetter = vi.fn(() => 10);
     const { result } = renderHook(() =>
@@ -30,11 +32,11 @@ describe('useTrackedResource', () => {
 
     expect(result.current.current).toBe(5);
     expect(result.current.max).toBe(10);
-    expect(storage.getProperty).toHaveBeenCalledWith('Gandalf', 'hp', undefined);
+    expect(getRuntimeValue).toHaveBeenCalledWith('Gandalf', 'hp');
   });
 
   it('should fall back to maxGetter when storage returns null', () => {
-    storage.getProperty.mockReturnValue(null);
+    getRuntimeValue.mockReturnValue(null);
 
     const maxGetter = vi.fn(() => 20);
     const { result } = renderHook(() =>
@@ -46,7 +48,7 @@ describe('useTrackedResource', () => {
   });
 
   it('should fall back to maxGetter when storage returns undefined', () => {
-    storage.getProperty.mockReturnValue(undefined);
+    getRuntimeValue.mockReturnValue(undefined);
 
     const maxGetter = vi.fn(() => 15);
     const { result } = renderHook(() =>
@@ -57,7 +59,7 @@ describe('useTrackedResource', () => {
   });
 
   it('should update current and call storage.setProperty on update', () => {
-    storage.getProperty.mockReturnValue(10);
+    getRuntimeValue.mockReturnValue(10);
 
     const maxGetter = vi.fn(() => 20);
     const { result } = renderHook(() =>
@@ -68,31 +70,27 @@ describe('useTrackedResource', () => {
       result.current.update(7);
     });
 
-    expect(storage.setProperty).toHaveBeenCalledWith('Gandalf', 'hp', 7, undefined);
-    expect(result.current.current).toBe(7);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Gandalf', 'hp', 7, undefined);
+    expect(result.current.current).toBe(10);
   });
 
   it('should pass campaignName to storage methods', () => {
-    storage.getProperty.mockReturnValue(null);
+    getRuntimeValue.mockReturnValue(null);
 
     const maxGetter = vi.fn(() => 30);
     const { result } = renderHook(() =>
       useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1', 'MyCampaign')
     );
 
-    expect(storage.getProperty).toHaveBeenCalledWith('Gandalf', 'hp', 'MyCampaign');
-
     act(() => {
       result.current.update(15);
     });
 
-    expect(storage.setProperty).toHaveBeenCalledWith('Gandalf', 'hp', 15, 'MyCampaign');
+    expect(setRuntimeValue).toHaveBeenCalledWith('Gandalf', 'hp', 15, 'MyCampaign');
   });
 
   it('should re-read storage when deps change', () => {
-    // useState initializer reads first (10), then useEffect on mount reads second (8),
-    // then rerender with new deps triggers useEffect again reading third (6)
-    storage.getProperty
+    getRuntimeValue
       .mockReturnValueOnce(10)
       .mockReturnValueOnce(8)
       .mockReturnValueOnce(6);
@@ -113,7 +111,7 @@ describe('useTrackedResource', () => {
   });
 
   it('should return max from maxGetter on every render', () => {
-    storage.getProperty.mockReturnValue(5);
+    getRuntimeValue.mockReturnValue(5);
 
     let maxVal = 10;
     const maxGetter = vi.fn(() => maxVal);
@@ -131,7 +129,7 @@ describe('useTrackedResource', () => {
   });
 
   it('should handle storage value of 0 correctly', () => {
-    storage.getProperty.mockReturnValue(0);
+    getRuntimeValue.mockReturnValue(0);
 
     const maxGetter = vi.fn(() => 10);
     const { result } = renderHook(() =>

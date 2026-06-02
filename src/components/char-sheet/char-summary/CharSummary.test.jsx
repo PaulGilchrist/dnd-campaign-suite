@@ -1,8 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
-import storage from '../../../services/storage.js';
-import CharFeats from '../char-feats/CharFeats.jsx';
 
 vi.mock('../../../services/storage.js', () => ({
   default: {
@@ -10,6 +8,16 @@ vi.mock('../../../services/storage.js', () => ({
     setProperty: vi.fn(),
     },
 }));
+
+vi.mock('../../../hooks/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(() => null),
+  setRuntimeValue: vi.fn(),
+  useRuntimeValue: vi.fn(() => null),
+}));
+
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import storage from '../../../services/storage.js';
+import CharFeats from '../char-feats/CharFeats.jsx';
 
 vi.mock('../../common/HiddenInput.jsx', () => ({
   default: vi.fn(({ value, showInput, handleInputToggle, handleValueChange }) => {
@@ -84,7 +92,7 @@ vi.mock('../../../services/classRules2024.js', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  storage.getProperty.mockReturnValue(null);
+  getRuntimeValue.mockReturnValue(null);
   vi.spyOn(window, 'location', 'get').mockReturnValue({ hostname: 'localhost' });
   window.confirm = vi.fn(() => true);
 });
@@ -266,7 +274,7 @@ describe('CharSummary', () => {
     });
 
   it('should show stored inspiration value', () => {
-    storage.getProperty.mockReturnValue(true);
+    getRuntimeValue.mockReturnValue(true);
 
     render(<CharSummary playerStats={mockPlayerStats} onDeleteCharacter={vi.fn()} />);
 
@@ -747,7 +755,7 @@ describe('CharSummary', () => {
       const applyBtn = screen.getByText('Apply');
       fireEvent.click(applyBtn);
 
-      expect(storage.setProperty).toHaveBeenCalledWith('Test Character', 'xp', 850, undefined);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'xp', 850, undefined);
     });
 
     it('should handle negative XP delta on save', () => {
@@ -768,7 +776,7 @@ describe('CharSummary', () => {
       const applyBtn = screen.getByText('Apply');
       fireEvent.click(applyBtn);
 
-      expect(storage.setProperty).toHaveBeenCalledWith('Test Character', 'xp', 700, undefined);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'xp', 700, undefined);
     });
 
     it('should toggle milestone mode when checkbox is clicked in modal', () => {
@@ -788,7 +796,7 @@ describe('CharSummary', () => {
 
       fireEvent.click(checkbox);
 
-      expect(storage.setProperty).toHaveBeenCalledWith('Test Character', 'xpMode', 'milestone', undefined);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'xpMode', 'milestone', undefined);
     });
 
     it('should uncheck milestone checkbox when in experience mode', () => {

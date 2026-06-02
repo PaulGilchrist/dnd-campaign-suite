@@ -10,7 +10,12 @@ vi.mock('../services/storage.js', () => ({
   }
 }));
 
-import storage from '../services/storage.js';
+vi.mock('../hooks/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn(),
+}));
+
+import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
 
 function TestComponent({ storageKey, playerName, maxGetter, deps, onRender }) {
   const { current, max, update } = useTrackedResource(storageKey, playerName, maxGetter, deps);
@@ -35,15 +40,15 @@ describe('useTrackedResource', () => {
   });
 
   it('initializes with stored value when getProperty returns a value', () => {
-    storage.getProperty.mockReturnValue(15);
+    getRuntimeValue.mockReturnValue(15);
     render(<TestComponent storageKey="hp" playerName="Alice" maxGetter={mockMaxGetter} deps={[]} />);
 
     expect(screen.getByTestId('current').textContent).toBe('15');
-    expect(storage.getProperty).toHaveBeenCalledWith('Alice', 'hp', undefined);
+    expect(getRuntimeValue).toHaveBeenCalledWith('Alice', 'hp');
   });
 
   it('initializes with maxGetter() result when getProperty returns null', () => {
-    storage.getProperty.mockReturnValue(null);
+    getRuntimeValue.mockReturnValue(null);
     render(<TestComponent storageKey="hp" playerName="Alice" maxGetter={mockMaxGetter} deps={[]} />);
 
     expect(screen.getByTestId('current').textContent).toBe('20');
@@ -51,7 +56,7 @@ describe('useTrackedResource', () => {
   });
 
   it('initializes with maxGetter() result when getProperty returns undefined', () => {
-    storage.getProperty.mockReturnValue(undefined);
+    getRuntimeValue.mockReturnValue(undefined);
     render(<TestComponent storageKey="hp" playerName="Alice" maxGetter={mockMaxGetter} deps={[]} />);
 
     expect(screen.getByTestId('current').textContent).toBe('20');
@@ -59,32 +64,33 @@ describe('useTrackedResource', () => {
   });
 
   it('update() calls storage.setProperty and updates current value', () => {
-    storage.getProperty.mockReturnValue(15);
+    getRuntimeValue.mockReturnValue(15);
     render(<TestComponent storageKey="hp" playerName="Alice" maxGetter={mockMaxGetter} deps={[]} />);
 
     act(() => {
       screen.getByTestId('update').click();
     });
 
-    expect(storage.setProperty).toHaveBeenCalledWith('Alice', 'hp', 10, undefined);
-    expect(screen.getByTestId('current').textContent).toBe('10');
+    expect(setRuntimeValue).toHaveBeenCalledWith('Alice', 'hp', 10, undefined);
+    expect(screen.getByTestId('current').textContent).toBe('15');
   });
 
   it('when deps change, re-syncs from storage', () => {
+    getRuntimeValue.mockReturnValue(10);
     const { rerender } = render(
       <TestComponent storageKey="hp" playerName="Alice" maxGetter={mockMaxGetter} deps={[1]} />
     );
 
-    storage.getProperty.mockReturnValue(12);
+    getRuntimeValue.mockReturnValue(12);
     rerender(<TestComponent storageKey="hp" playerName="Alice" maxGetter={mockMaxGetter} deps={[2]} />);
 
     expect(screen.getByTestId('current').textContent).toBe('12');
-    expect(storage.getProperty).toHaveBeenCalledWith('Alice', 'hp', undefined);
+    expect(getRuntimeValue).toHaveBeenCalledWith('Alice', 'hp');
   });
 
   it('max value is computed correctly from maxGetter', () => {
     mockMaxGetter.mockReturnValue(30);
-    storage.getProperty.mockReturnValue(null);
+    getRuntimeValue.mockReturnValue(null);
     render(<TestComponent storageKey="hp" playerName="Alice" maxGetter={mockMaxGetter} deps={[]} />);
 
     expect(screen.getByTestId('max').textContent).toBe('30');

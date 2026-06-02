@@ -234,6 +234,11 @@ vi.mock('./components/quests/Quests.jsx', () => ({ default: MockQuests }));
 vi.mock('./components/npcs/NPCs.jsx', () => ({ default: MockNPCs }));
 vi.mock('./components/factions/Factions.jsx', () => ({ default: MockFactions }));
 
+// Mock Subscriber to avoid EventSource in tests
+vi.mock('./components/common/Subscriber.jsx', () => ({
+  default: vi.fn(() => null),
+}));
+
 // ──────────────────────────────────────────────
 // Test suite
 // ──────────────────────────────────────────────

@@ -9,6 +9,25 @@ vi.mock('../../../services/storage.js', () => ({
    },
 }));
 
+vi.mock('../../../hooks/useRuntimeState.js', () => {
+  const listeners = new Map();
+  return {
+    getRuntimeValue: vi.fn((characterKey, propertyName) => {
+      return null;
+    }),
+    setRuntimeValue: vi.fn((characterKey, propertyName, value, campaignName) => {
+      // Notify listeners
+      const key = characterKey;
+      if (listeners.has(key)) {
+        listeners.get(key).forEach(fn => fn());
+      }
+    }),
+    useRuntimeValue: vi.fn((characterKey, propertyName) => {
+      return null;
+    }),
+  };
+});
+
 vi.mock('../../common/HiddenInput.jsx', () => ({
   default: vi.fn(({ value, showInput, handleInputToggle, handleValueChange }) => {
     if (showInput) {
@@ -20,7 +39,7 @@ vi.mock('../../common/HiddenInput.jsx', () => ({
            onChange={(e) => handleValueChange(e.target.value)}
            onBlur={handleInputToggle}
             />
-          );
+         );
        }
     return <span data-testid="hidden-value">{value}</span>;
       }),
@@ -288,6 +307,7 @@ vi.mock('../../../services/classRules2024.js', () => ({
    },
 }));
 
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import storage from '../../../services/storage.js';
 import classRules from '../../../services/classRules.js';
 import classRules2024 from '../../../services/classRules2024.js';
@@ -308,7 +328,7 @@ describe('Barbarian', () => {
       class_levels: Array.from({ length: 5 }, (_, i) => ({ level: i + 1, rages: 4, extra_attacks: 1, rage_damage: 2, weapon_mastery: 'Slashing' })),
      },
     };
-  beforeEach(() => { vi.clearAllMocks(); storage.getProperty.mockReturnValue(null); });
+  beforeEach(() => { vi.clearAllMocks(); getRuntimeValue.mockReturnValue(null); });
 
   it('renders barbarian features', () => {
     render(<CharClassFeatures playerStats={mockStats} />);
@@ -332,7 +352,7 @@ describe('Barbarian', () => {
   it('persists rage points to storage', () => {
     render(<CharClassFeatures playerStats={mockStats} />);
     toggleFirstClickChangeAndSet('3');
-    expect(storage.setProperty).toHaveBeenCalledWith('Barb', 'ragePoints', '3', undefined);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Barb', 'ragePoints', '3', undefined);
      });
 });
 
@@ -356,7 +376,7 @@ describe('Bard', () => {
     abilities: [{ name: 'Charisma', bonus: 3 }],
     class: { name: 'Bard', class_levels: Array(5).fill({ bardic_die: 8 }) },
     };
-  beforeEach(() => { vi.clearAllMocks(); storage.getProperty.mockReturnValue(null); });
+  beforeEach(() => { vi.clearAllMocks(); getRuntimeValue.mockReturnValue(null); });
 
   it('renders bardic inspiration', () => {
     render(<CharClassFeatures playerStats={mockStats} />);
@@ -377,7 +397,7 @@ describe('Bard', () => {
   it('persists bardic inspiration to storage', () => {
     render(<CharClassFeatures playerStats={mockStats} />);
     toggleFirstClickChangeAndSet('1');
-    expect(storage.setProperty).toHaveBeenCalledWith('Bard', 'bardicInspirationUses', '1', undefined);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Bard', 'bardicInspirationUses', '1', undefined);
      });
 });
 
@@ -392,7 +412,7 @@ describe('Cleric', () => {
       class_levels: Array.from({ length: 5 }, (_, i) => ({ level: i + 1, class_specific: { channel_divinity_charges: 2, destroy_undead_cr: '1/2' } })),
      },
     };
-  beforeEach(() => { vi.clearAllMocks(); storage.getProperty.mockReturnValue(null); });
+  beforeEach(() => { vi.clearAllMocks(); getRuntimeValue.mockReturnValue(null); });
 
   it('renders channel divinity (5e)', () => {
     render(<CharClassFeatures playerStats={mockStats} />);
@@ -409,7 +429,7 @@ describe('Cleric', () => {
   it('persists channel divinity to storage', () => {
     render(<CharClassFeatures playerStats={mockStats} />);
     toggleFirstClickChangeAndSet('1');
-    expect(storage.setProperty).toHaveBeenCalledWith('Cleric', 'channelDivinityCharges', '1', undefined);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Cleric', 'channelDivinityCharges', '1', undefined);
      });
 });
 
@@ -461,7 +481,7 @@ describe('Druid', () => {
   it('persists wild shape uses to storage', () => {
     render(<CharClassFeatures playerStats={mockStats5e} />);
     toggleFirstClickChangeAndSet('1');
-    expect(storage.setProperty).toHaveBeenCalledWith('Druid', 'wildShapeUses', '1', undefined);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Druid', 'wildShapeUses', '1', undefined);
      });
 });
 
@@ -476,7 +496,7 @@ describe('Fighter', () => {
       class_levels: Array.from({ length: 5 }, (_, i) => ({ level: i + 1, extra_attacks: 1, second_wind: 2, weapon_mastery: 'Slashing' })),
      },
     };
-  beforeEach(() => { vi.clearAllMocks(); storage.getProperty.mockReturnValue(null); });
+  beforeEach(() => { vi.clearAllMocks(); getRuntimeValue.mockReturnValue(null); });
 
   it('renders fighter features', () => {
     render(<CharClassFeatures playerStats={mockStats} />);
@@ -490,7 +510,7 @@ describe('Fighter', () => {
     fireEvent.click(clickable);
     const input = screen.getByTestId('hidden-input');
     fireEvent.change(input, { target: { value: '0' } });
-    expect(storage.setProperty).toHaveBeenCalledWith('Fighter', 'secondWindUses', '0', undefined);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Fighter', 'secondWindUses', '0', undefined);
      });
 
   it('renders psionic energy for Psi Warrior', () => {
@@ -560,7 +580,7 @@ describe('Monk', () => {
   it('persists focus points to storage', () => {
     render(<CharClassFeatures playerStats={mockStats} />);
     toggleFirstClickChangeAndSet('0');
-    expect(storage.setProperty).toHaveBeenCalledWith('Monk', 'focusPoints', '0', undefined);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Monk', 'focusPoints', '0', undefined);
      });
 });
 
@@ -671,7 +691,7 @@ describe('Sorcerer', () => {
     rules: '2024',
     class: { name: 'Sorcerer', class_levels: Array(5).fill({ sorcery_points: 4 }) },
     };
-  beforeEach(() => { vi.clearAllMocks(); storage.getProperty.mockReturnValue(null); });
+  beforeEach(() => { vi.clearAllMocks(); getRuntimeValue.mockReturnValue(null); });
 
   it('renders sorcery points (5e)', () => {
     render(<CharClassFeatures playerStats={mockStats5e} />);
@@ -692,7 +712,7 @@ describe('Sorcerer', () => {
   it('persists sorcery points to storage', () => {
     render(<CharClassFeatures playerStats={mockStats5e} />);
     toggleFirstClickChangeAndSet('2');
-    expect(storage.setProperty).toHaveBeenCalledWith('Sorcerer', 'sorceryPoints', '2', undefined);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Sorcerer', 'sorceryPoints', '2', undefined);
      });
 });
 
@@ -779,7 +799,7 @@ describe('Wizard', () => {
       class_levels: Array.from({ length: 5 }, (_, i) => ({ level: i + 1, class_specific: { arcane_recovery_levels: 1 } })),
      },
     };
-  beforeEach(() => { vi.clearAllMocks(); storage.getProperty.mockReturnValue(null); });
+  beforeEach(() => { vi.clearAllMocks(); getRuntimeValue.mockReturnValue(null); });
 
   it('does not render for 2024 rules', () => {
     const stats = { ...mockStats5e, rules: '2024', class: { name: 'Wizard' } };
@@ -795,7 +815,7 @@ describe('Wizard', () => {
   it('persists arcane recovery levels to storage', () => {
     render(<CharClassFeatures playerStats={mockStats5e} />);
     toggleFirstClickChangeAndSet('0');
-    expect(storage.setProperty).toHaveBeenCalledWith('Wizard', 'arcaneRecoveryLevels', '0', undefined);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Wizard', 'arcaneRecoveryLevels', '0', undefined);
      });
 
   it('renders when showWizardFeatures is undefined (defaults to true)', () => {

@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpellSlotLevel from './CharSpellSlotLevel.jsx';
 
-// Mock the storage service with factory function
+// Mock the storage service
 vi.mock('../../../services/storage.js', () => ({
   default: {
     getProperty: vi.fn(),
@@ -10,7 +10,13 @@ vi.mock('../../../services/storage.js', () => ({
    },
 }));
 
-import storage from '../../../services/storage.js';
+// Mock useRuntimeState
+vi.mock('../../../hooks/useRuntimeState.js', () => ({
+  useRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn(),
+}));
+
+import { useRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 const mockPlayerStats = {
   name: 'Test Character',
@@ -22,7 +28,7 @@ describe('CharSpellSlotLevel', () => {
   });
 
   it('should render the level number', () => {
-    storage.getProperty.mockReturnValue(null);
+    useRuntimeValue.mockReturnValue(null);
 
     render(
       <CharSpellSlotLevel
@@ -36,7 +42,7 @@ describe('CharSpellSlotLevel', () => {
   });
 
   it('should initialize availableSlots from storage when value exists', () => {
-    storage.getProperty.mockReturnValue(2);
+    useRuntimeValue.mockReturnValue(2);
 
     render(
       <CharSpellSlotLevel
@@ -46,7 +52,7 @@ describe('CharSpellSlotLevel', () => {
        />
        );
 
-    expect(storage.getProperty).toHaveBeenCalledWith(
+    expect(useRuntimeValue).toHaveBeenCalledWith(
         'Test Character',
         'spell_slots_level_1',
         undefined
@@ -54,7 +60,7 @@ describe('CharSpellSlotLevel', () => {
       });
 
   it('should use totalSlots as default when storage value is null', () => {
-    storage.getProperty.mockReturnValue(null);
+    useRuntimeValue.mockReturnValue(null);
 
     render(
       <CharSpellSlotLevel
@@ -64,7 +70,7 @@ describe('CharSpellSlotLevel', () => {
        />
        );
 
-    expect(storage.getProperty).toHaveBeenCalledWith(
+    expect(useRuntimeValue).toHaveBeenCalledWith(
         'Test Character',
         'spell_slots_level_2',
         undefined
@@ -72,7 +78,7 @@ describe('CharSpellSlotLevel', () => {
       });
 
   it('should decrement available slots on click when slots are available', () => {
-    storage.getProperty.mockReturnValue(3);
+    useRuntimeValue.mockReturnValue(3);
 
     const { container } = render(
       <CharSpellSlotLevel
@@ -85,7 +91,7 @@ describe('CharSpellSlotLevel', () => {
     const levelDiv = container.querySelector('.level');
     fireEvent.click(levelDiv);
 
-    expect(storage.setProperty).toHaveBeenCalledWith(
+    expect(setRuntimeValue).toHaveBeenCalledWith(
         'Test Character',
         'spell_slots_level_1',
         2,
@@ -94,7 +100,7 @@ describe('CharSpellSlotLevel', () => {
       });
 
   it('should reset to totalSlots when availableSlots is 0', () => {
-    storage.getProperty.mockReturnValue(0);
+    useRuntimeValue.mockReturnValue(0);
 
     const { container } = render(
       <CharSpellSlotLevel
@@ -107,7 +113,7 @@ describe('CharSpellSlotLevel', () => {
     const levelDiv = container.querySelector('.level');
     fireEvent.click(levelDiv);
 
-    expect(storage.setProperty).toHaveBeenCalledWith(
+    expect(setRuntimeValue).toHaveBeenCalledWith(
         'Test Character',
         'spell_slots_level_1',
         3,
@@ -116,7 +122,7 @@ describe('CharSpellSlotLevel', () => {
       });
 
   it('should not decrement on Tab key press', () => {
-    storage.getProperty.mockReturnValue(3);
+    useRuntimeValue.mockReturnValue(3);
 
     const { container } = render(
       <CharSpellSlotLevel
@@ -129,11 +135,11 @@ describe('CharSpellSlotLevel', () => {
     const levelDiv = container.querySelector('.level');
     fireEvent.keyDown(levelDiv, { key: 'Tab' });
 
-    expect(storage.setProperty).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalled();
      });
 
   it('should decrement on Enter key press', () => {
-    storage.getProperty.mockReturnValue(3);
+    useRuntimeValue.mockReturnValue(3);
 
     const { container } = render(
       <CharSpellSlotLevel
@@ -146,7 +152,7 @@ describe('CharSpellSlotLevel', () => {
     const levelDiv = container.querySelector('.level');
     fireEvent.keyDown(levelDiv, { key: 'Enter' });
 
-    expect(storage.setProperty).toHaveBeenCalledWith(
+    expect(setRuntimeValue).toHaveBeenCalledWith(
         'Test Character',
         'spell_slots_level_1',
         2,
@@ -155,7 +161,7 @@ describe('CharSpellSlotLevel', () => {
       });
 
   it('should render the correct number of slot divs', () => {
-    storage.getProperty.mockReturnValue(3);
+    useRuntimeValue.mockReturnValue(3);
 
     const { container } = render(
       <CharSpellSlotLevel
@@ -170,7 +176,7 @@ describe('CharSpellSlotLevel', () => {
   });
 
   it('should mark slots as active when availableSlots > slot index', () => {
-    storage.getProperty.mockReturnValue(3);
+    useRuntimeValue.mockReturnValue(3);
 
     const { container } = render(
       <CharSpellSlotLevel
@@ -188,7 +194,7 @@ describe('CharSpellSlotLevel', () => {
   });
 
   it('should mark all slots as inactive when availableSlots is 0 but totalSlots > 0', () => {
-    storage.getProperty.mockReturnValue(0);
+    useRuntimeValue.mockReturnValue(0);
 
     const { container } = render(
       <CharSpellSlotLevel
@@ -205,7 +211,7 @@ describe('CharSpellSlotLevel', () => {
   });
 
   it('should not mark slots when totalSlots is 0', () => {
-    storage.getProperty.mockReturnValue(0);
+    useRuntimeValue.mockReturnValue(0);
 
     const { container } = render(
       <CharSpellSlotLevel
@@ -223,7 +229,7 @@ describe('CharSpellSlotLevel', () => {
      });
 
   it('should have clickable class and tabIndex', () => {
-    storage.getProperty.mockReturnValue(2);
+    useRuntimeValue.mockReturnValue(2);
 
     const { container } = render(
       <CharSpellSlotLevel

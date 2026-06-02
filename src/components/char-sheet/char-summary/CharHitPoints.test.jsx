@@ -1,7 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharHitPoints from './CharHitPoints.jsx';
-import storage from '../../../services/storage.js';
 
 vi.mock('../../../services/storage.js', () => ({
   default: {
@@ -9,6 +8,13 @@ vi.mock('../../../services/storage.js', () => ({
     setProperty: vi.fn(),
   },
 }));
+
+vi.mock('../../../hooks/useRuntimeState.js', () => ({
+  useRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn(),
+}));
+
+import { useRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 vi.mock('../../common/HiddenInput.jsx', () => ({
   default: vi.fn(({ value, showInput, handleInputToggle, handleValueChange }) => {
@@ -27,10 +33,21 @@ vi.mock('../../common/HiddenInput.jsx', () => ({
   }),
 }));
 
+// Mock DeathSavingThrows
+vi.mock('./DeathSavingThrows.jsx', () => ({
+  default: vi.fn(() => <div>DeathSavingThrows</div>),
+}));
+
+// Mock savePromptService
+vi.mock('../../../services/savePromptService.js', () => ({
+  clearDeathSavePrompt: vi.fn(),
+}));
+
 describe('CharHitPoints', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    storage.getProperty.mockReturnValue(null);
+    useRuntimeValue.mockReturnValue(null);
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
   });
 
   const mockPlayerStats = {
@@ -56,7 +73,7 @@ describe('CharHitPoints', () => {
   });
 
   it('should use stored current HP when available', () => {
-    storage.getProperty.mockReturnValue(30);
+    useRuntimeValue.mockReturnValue(30);
     render(<CharHitPoints playerStats={mockPlayerStats} />);
     expect(screen.getByTestId('hidden-value')).toHaveTextContent('30');
   });
@@ -76,14 +93,14 @@ describe('CharHitPoints', () => {
     expect(screen.getByTestId('hidden-input')).toBeInTheDocument();
   });
 
-  it('should call storage.setProperty when HP value changes', () => {
-    storage.getProperty.mockReturnValue(30);
+  it('should call setRuntimeValue when HP value changes', () => {
+    useRuntimeValue.mockReturnValue(30);
     render(<CharHitPoints playerStats={mockPlayerStats} />);
     const clickable = document.querySelector('.clickable');
     fireEvent.click(clickable);
     const input = screen.getByTestId('hidden-input');
     fireEvent.change(input, { target: { value: '20' } });
-    expect(storage.setProperty).toHaveBeenCalledWith('Test Character', 'currentHitPoints', '20', undefined);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'currentHitPoints', '20', undefined);
   });
 
   it('should show max/cur label', () => {
@@ -98,28 +115,28 @@ describe('CharHitPoints', () => {
   });
 
   it('should show DeathSavingThrows when HP is 0', () => {
-    storage.getProperty.mockReturnValue(0);
+    useRuntimeValue.mockReturnValue(0);
     render(<CharHitPoints playerStats={mockPlayerStats} />);
-    expect(screen.getByText(/Successes:/)).toBeInTheDocument();
-    expect(screen.getByText(/Failures:/)).toBeInTheDocument();
+    expect(screen.getByText(/DeathSavingThrows/)).toBeInTheDocument();
   });
 
   it('should hide DeathSavingThrows when HP is > 0', () => {
-    storage.getProperty.mockReturnValue(10);
+    useRuntimeValue.mockReturnValue(10);
     render(<CharHitPoints playerStats={mockPlayerStats} />);
-    expect(screen.queryByText(/Successes:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/DeathSavingThrows/)).not.toBeInTheDocument();
   });
 
   it('should reset death saves when HP is raised above 0', () => {
-    storage.getProperty.mockReturnValue(0);
+    useRuntimeValue.mockReturnValue(0);
     render(<CharHitPoints playerStats={mockPlayerStats} />);
-    
+
     const clickable = document.querySelector('.clickable');
     fireEvent.click(clickable);
     const input = screen.getByTestId('hidden-input');
     fireEvent.change(input, { target: { value: '10' } });
 
-    expect(storage.setProperty).toHaveBeenCalledWith('Test Character', 'deathSaves', [false, false, false], undefined);
-    expect(storage.setProperty).toHaveBeenCalledWith('Test Character', 'deathFailures', [false, false, false], undefined);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'currentHitPoints', '10', undefined);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'deathSaves', [false, false, false], undefined);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'deathFailures', [false, false, false], undefined);
   });
 });
