@@ -10,9 +10,9 @@ export function spendSorceryPoints(characterName, amount, campaignName) {
   return newValue;
 }
 
-export function getCurrentSorceryPoints(characterName) {
+export function getCurrentSorceryPoints(characterName, fallback = 0) {
   const val = getRuntimeValue(characterName, 'sorceryPoints');
-  return val != null ? Number(val) : 0;
+  return val != null ? Number(val) : fallback;
 }
 
 export function getMaxSorceryPoints(playerStats) {

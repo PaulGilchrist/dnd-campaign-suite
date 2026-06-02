@@ -1,19 +1,23 @@
-  
-import React from 'react'
-import Popup from '../common/Popup.jsx'
-import DiceRollResult from './DiceRollResult.jsx'
-import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
-import { sanitizeHtml } from '../../services/sanitize.js';
-import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
-import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
-import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/baseCombatActions.js'
-import { hasAutomation } from '../../services/automationService.js'
-import { rollExpression } from '../../services/diceRoller.js'
+   import React from 'react'
+   import Popup from '../common/Popup.jsx'
+   import DiceRollResult from './DiceRollResult.jsx'
+   import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
+   import MetamagicPopup from './MetamagicPopup.jsx'
+    import { sanitizeHtml } from '../../services/sanitize.js';
+    import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
+    import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
+    import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/baseCombatActions.js'
+    import { hasAutomation } from '../../services/automationService.js'
+    import { rollExpression } from '../../services/diceRoller.js'
+    import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../hooks/useMetamagic.js'
+    import { addEntry } from '../../services/logService.js'
 
 function CharReactions({ playerStats, campaignName, cannotAct }) {
     const { popupHtml, setPopupHtml, rollAttack } = useLoggedDiceRoll(playerStats.name, campaignName);
     const [selectedSpell, setSelectedSpell] = React.useState(null);
-       // Build reactions list immutably
+    const [pendingMetamagic, setPendingMetamagic] = React.useState(null);
+
+     // Build reactions list immutably
     let reactions = [...(playerStats.reactions || [])];
 
     let reactionSpells = [];
@@ -84,23 +88,91 @@ function CharReactions({ playerStats, campaignName, cannotAct }) {
                 if (html) setPopupHtml(html);
                 break;
             }
-        }
-    };
+          }
+      };
+
+     const isReactionSorcerer = playerStats.class?.name === 'Sorcerer';
+
+       // Reaction spell - click through to select metamagic
+   const handleReactionSpellSelectMeta = (spell) => {
+     if (!isReactionSorcerer) {
+          addEntry(campaignName, {
+            type: 'spell',
+             characterName: playerStats.name,
+             spellName: spell.name,
+              spellLevel: spell.level || 0,
+             castingTime: spell.casting_time,
+             metamagic: [],
+             timestamp: Date.now(),
+           });
+          return;
+          }
+       const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
+       setPendingMetamagic({
+            spellName: spell.name,
+            spellLevel: spell.level || 0,
+             _currentSP: currentSP,
+             castingTime: spell.casting_time,
+          });
+        setSelectedSpell(null);
+      };
+
+     const handleReactionMetamagicConfirm = React.useCallback((result) => {
+         if (result && result.totalCost && result.totalCost > 0) {
+            spendSorceryPoints(playerStats.name, result.totalCost, campaignName);
+           }
+         addEntry(campaignName, {
+              type: 'spell',
+             characterName: playerStats.name,
+             spellName: pendingMetamagic.spellName,
+             spellLevel: pendingMetamagic.spellLevel || 0,
+            castingTime: pendingMetamagic.castingTime,
+           metamagic: result ? (result.options || []) : [],
+              spCost: result ? (result.totalCost || 0) : 0,
+             timestamp: Date.now(),
+          });
+       setPendingMetamagic(null);
+      }, [playerStats.name, campaignName, pendingMetamagic]);
+
+   const handleReactionMetamagicSkip = React.useCallback(() => {
+        addEntry(campaignName, {
+           type: 'spell',
+           characterName: playerStats.name,
+            spellName: pendingMetamagic.spellName,
+            spellLevel: pendingMetamagic.spellLevel || 0,
+             castingTime: pendingMetamagic.castingTime,
+            metamagic: [],
+              spCost: 0,
+           timestamp: Date.now(),
+         });
+       setPendingMetamagic(null);
+      }, [playerStats.name, campaignName, pendingMetamagic]);
 
     return (
         <div className='char-reactions'>
             <div className='sectionHeader'>Reactions</div>
-             {selectedSpell && (
-                 <Popup onClickOrKeyDown={() => setSelectedSpell(null)}>
-                     <SpellDetailPopup
-                         spell={selectedSpell}
-                         playerStats={playerStats}
+               {selectedSpell && (
+                   <Popup onClickOrKeyDown={() => setSelectedSpell(null)}>
+                       <SpellDetailPopup
+                          spell={selectedSpell}
+                          playerStats={playerStats}
+                          campaignName={campaignName}
+                          onClose={() => setSelectedSpell(null)}
+                          onCast={(spell) => { handleReactionSpellSelectMeta(spell); }}
+                       />
+                   </Popup>
+               )}
+               {pendingMetamagic && (
+                   <div>
+                    <MetamagicPopup
+                         spell={{ name: pendingMetamagic.spellName, level: pendingMetamagic.spellLevel || 0 }}
+                         playerStats={{ ...playerStats, _metamagicCurrentSP: pendingMetamagic._currentSP }}
                          campaignName={campaignName}
-                         onClose={() => setSelectedSpell(null)}
-                         onCast={() => setSelectedSpell(null)}
-                     />
-                 </Popup>
-             )}
+                         onConfirm={handleReactionMetamagicConfirm}
+                         onSkip={handleReactionMetamagicSkip}
+                      />
+                   </div>
+               )}
              {reactionSpells.length > 0 && <div className='attacks'>
                  <div className='left'><b>Name</b></div>
                  <div><b>Range</b></div>

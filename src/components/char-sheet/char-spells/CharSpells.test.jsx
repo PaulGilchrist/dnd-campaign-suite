@@ -29,7 +29,8 @@ vi.mock('../../../hooks/useMetamagic.js', () => {
     clearLastDamageEvent: vi.fn(),
   });
   mockFn.getCurrentSorceryPoints = vi.fn(() => 10);
-  return { default: mockFn, getCurrentSorceryPoints: mockFn.getCurrentSorceryPoints };
+  mockFn.getMaxSorceryPoints = vi.fn(() => 10);
+  return { default: mockFn, getCurrentSorceryPoints: mockFn.getCurrentSorceryPoints, getMaxSorceryPoints: mockFn.getMaxSorceryPoints };
 });
 
 // Mock MetamagicPopup component

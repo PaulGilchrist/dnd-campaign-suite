@@ -70,9 +70,14 @@ describe('getCurrentSorceryPoints', () => {
     expect(getCurrentSorceryPoints('TestSorcerer')).toBe(7);
   });
 
-  it('returns 0 when no value stored', async () => {
+  it('returns 0 when no value stored and no fallback', async () => {
     const { getCurrentSorceryPoints } = await import('./useMetamagic.js');
     expect(getCurrentSorceryPoints('Unknown')).toBe(0);
+  });
+
+  it('returns fallback when no value stored', async () => {
+    const { getCurrentSorceryPoints } = await import('./useMetamagic.js');
+    expect(getCurrentSorceryPoints('Unknown', 10)).toBe(10);
   });
 });
 

@@ -9,6 +9,7 @@ vi.mock('../../hooks/useLoggedDiceRoll.js', () => ({
 
 vi.mock('../../hooks/useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 10),
+  getMaxSorceryPoints: vi.fn(() => 10),
   spendSorceryPoints: vi.fn(),
   getLastDamageEvent: vi.fn(() => null),
   saveLastDamageEvent: vi.fn(),
