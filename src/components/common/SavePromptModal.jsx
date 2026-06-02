@@ -90,6 +90,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
         roll,
         total,
         saveBonus: saveBonus + auraBonus,
+        bonusDetail,
         rawDamage: current.rawDamage,
         dcSuccess: current.dcSuccess,
       },

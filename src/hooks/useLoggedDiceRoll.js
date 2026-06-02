@@ -74,6 +74,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         saveResult: e.detail.success ? 'success' : 'failure',
         saveRoll: e.detail.roll,
         saveBonus: e.detail.saveBonus,
+        bonusDetail: e.detail.bonusDetail,
         finalDamage: applyResult?.finalDamage ?? finalDamage,
         isAoe: pending.isAoe || false,
         aoeAffectedCount: pending.isAoe ? (e.detail.aoeAffectedCount || null) : null,
@@ -115,7 +116,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
 
     window.addEventListener('concentration-result', (e) => {
       logEntry({
-        type: 'concentration-save',
+        type: 'roll',
         characterName: e.detail.targetName,
         rollType: 'concentration-save',
         name: 'Constitution',
@@ -123,6 +124,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         mode: 'normal',
         total: e.detail.total,
         bonus: e.detail.saveBonus,
+        bonusDetail: e.detail.bonusDetail,
         condition: `Concentration: ${e.detail.spellName}`,
         dc: e.detail.dc,
         success: e.detail.success,

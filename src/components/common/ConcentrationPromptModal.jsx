@@ -79,6 +79,7 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
         roll,
         total,
         saveBonus: saveBonus + auraBonus,
+        bonusDetail,
         spellName: current.spellName,
         dc: current.dc,
       },
