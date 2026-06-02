@@ -40,6 +40,14 @@ const raceRules = {
                 Object.assign(race, playerSummary.race);
                  }
 
+            // Resolve subrace from JSON data to get full subrace fields (e.g. damage_resistance)
+            if (race.subraces && playerSummary.race && playerSummary.race.subrace) {
+                const foundSubrace = race.subraces.find((sr) => sr.name === playerSummary.race.subrace.name);
+                if (foundSubrace) {
+                    race.subrace = Object.assign(cloneDeep(foundSubrace), playerSummary.race.subrace);
+                }
+            }
+
             // 2024: Handle lineage selection if present
         if (playerSummary.race.lineage) {
             const lineage = playerSummary.race.lineage;
@@ -75,21 +83,24 @@ const raceRules = {
             // 2024 Rules: Extract resistances from racial traits
         let resistances = [];
 
+        if (playerSummary.race && playerSummary.race.subrace && playerSummary.race.subrace.damage_resistance) {
+            resistances.push(playerSummary.race.subrace.damage_resistance);
+        }
+
         if (playerSummary.race && playerSummary.race.traits) {
             playerSummary.race.traits.forEach(trait => {
                 if (trait.description) {
-                        // Look for resistance patterns in description
                     const resistanceMatch = trait.description.match(/Resistance to ([^\s.]+)/i);
-                    if (resistanceMatch) {
+                    if (resistanceMatch && resistanceMatch[1].toLowerCase() !== 'the') {
                         resistances.push(resistanceMatch[1]);
-                        }
                     }
-               });
-            }
+                }
+           });
+        }
 
         if(playerSummary.resistances) {
             resistances = [...new Set([...resistances, ...playerSummary.resistances])];
-            }
+        }
 
         return resistances.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
          },

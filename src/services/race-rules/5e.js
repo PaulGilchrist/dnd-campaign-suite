@@ -71,29 +71,18 @@ const raceRules = {
     getResistances: (playerSummary) => {
            // Dependencies: None
         let resistances = [];
-        if(playerSummary.race.name === "Dragonborn") {
-            switch(playerSummary.race.type) {
-                case 'Black': resistances.push("Acid"); break;
-                case 'Blue': resistances.push("Lightning"); break;
-                case 'Brass': resistances.push("Fire"); break;
-                case 'Bronze': resistances.push("Ligntning"); break;
-                case 'Copper': resistances.push("Acid"); break;
-                case 'Gold': resistances.push("Fire"); break;
-                case 'Green': resistances.push("Poison"); break;
-                case 'Red': resistances.push("Fire"); break;
-                case 'Silver': resistances.push("Cold"); break;
-                case 'White': resistances.push("Cold"); break;
-               }
-           } else if(playerSummary.race.name === "Elf") {
+        if(playerSummary.race.subrace && playerSummary.race.subrace.damage_resistance) {
+            resistances.push(playerSummary.race.subrace.damage_resistance);
+        } else if(playerSummary.race.name === "Elf") {
             resistances.push("Charm"); // Fey Ancestry
-           } else if(playerSummary.race.name === "Halfling") {
+        } else if(playerSummary.race.name === "Halfling") {
             resistances.push("Frightened"); // Brave
             if(playerSummary.race.subrace && playerSummary.race.subrace.name === "Scout Halfling") {
                 resistances.push("Poison"); // Scout Resilience
-               }
-           } else if(playerSummary.race.name === "Tiefling") {
-            resistances.push("Fire"); // Hellish Resistance
            }
+        } else if(playerSummary.race.name === "Tiefling") {
+            resistances.push("Fire"); // Hellish Resistance
+        }
         if(playerSummary.resistances) {
             resistances = [...new Set([...resistances, ...playerSummary.resistances])];
            }
