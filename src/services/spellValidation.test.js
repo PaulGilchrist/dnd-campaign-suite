@@ -117,7 +117,7 @@ describe('spellValidation', () => {
                {
                   name: 'Spellseeker',
                   features: [
-                         { desc: ['You know the <em>Prestidigitation</em> cantrip.'] }
+                           { description: ['You know the <em>Prestidigitation</em> cantrip.'] }
                       ]
                   }
               ]);
@@ -289,11 +289,11 @@ describe('spellValidation', () => {
                  { name: 'Fighter', class_levels: [] }
               ]);
           vi.mocked(dataLoader.loadRaceData).mockResolvedValue([
-                 {
+                {
                     name: 'Tiefling',
-                    traits: [{ desc: '<em>Darkness</em>' }]
+                    traits: [{ description: '<em>Darkness</em>' }]
                   }
-              ]);
+      ]);
           vi.mocked(dataLoader.loadBackgroundData).mockResolvedValue([]);
 
           const allSpells = [
@@ -346,12 +346,12 @@ describe('spellValidation', () => {
        });
 
   describe('getSpellSourceName (via getSpellSources)', () => {
-      it('should identify spell source as race', async () => {
-          vi.mocked(dataLoader.loadClassData).mockResolvedValue([]);
-          vi.mocked(dataLoader.loadRaceData).mockResolvedValue([
-              { name: 'Elf', traits: [{ desc: 'You know the <em>Darkvision</em> spell.' }] }
-          ]);
-          vi.mocked(dataLoader.loadBackgroundData).mockResolvedValue([]);
+    it('should identify spell source as race', async () => {
+        vi.mocked(dataLoader.loadClassData).mockResolvedValue([]);
+        vi.mocked(dataLoader.loadRaceData).mockResolvedValue([
+            { name: 'Elf', traits: [{ description: 'You know the <em>Darkvision</em> spell.' }] }
+        ]);
+        vi.mocked(dataLoader.loadBackgroundData).mockResolvedValue([]);
 
           const result = await getSpellSources(
               { race: { name: 'Elf' } },

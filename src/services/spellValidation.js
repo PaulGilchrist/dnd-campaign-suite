@@ -44,35 +44,35 @@ function extractRaceSpells(raceData, version = '5e') {
     // Check traits for spell-granting features
     if (raceData.traits) {
       raceData.traits.forEach(trait => {
-        const desc = trait.description || trait.desc || '';
+        const desc = trait.description || '';
         extractSpellsFromDescription(desc, result);
-      });
-    }
+       });
+      }
     
-    // Check subraces for spell-granting features
+     // Check subraces for spell-granting features
     if (raceData.subraces) {
       raceData.subraces.forEach(subrace => {
-        const desc = subrace.description || subrace.desc || '';
+        const desc = subrace.description || '';
         extractSpellsFromDescription(desc, result);
       });
     }
-  } else {
-    // Check 5e race structure
+    } else {
+      // Check 5e race structure
     if (raceData.traits) {
       raceData.traits.forEach(trait => {
-        const desc = Array.isArray(trait.desc) ? trait.desc.join(' ') : (trait.desc || '');
+        const desc = Array.isArray(trait.description) ? trait.description.join(' ') : (trait.description || '');
         extractSpellsFromDescription(desc, result);
-      });
-    }
-    
-    // Check subraces
+        });
+       }
+
+      // Check subraces
     if (raceData.subraces) {
       raceData.subraces.forEach(subrace => {
-        const desc = Array.isArray(subrace.desc) ? subrace.desc.join(' ') : (subrace.desc || '');
+        const desc = Array.isArray(subrace.description) ? subrace.description.join(' ') : (subrace.description || '');
         extractSpellsFromDescription(desc, result);
-      });
+        });
+       }
     }
-  }
   
   return result;
 }
@@ -145,7 +145,7 @@ function extractBackgroundSpells(backgroundData) {
   // Check features/traits for spell-granting abilities
   const features = backgroundData.features || backgroundData.traits || [];
   features.forEach(feature => {
-    const desc = Array.isArray(feature.desc) ? feature.desc.join(' ') : (feature.description || feature.desc || '');
+    const desc = Array.isArray(feature.description) ? feature.description.join(' ') : (feature.description || '');
     extractSpellsFromDescription(desc, result);
   });
   
@@ -172,7 +172,7 @@ function extractFeatSpells(featData) {
   }
   
   const featName = featData.name || '';
-  const desc = featData.description || featData.desc || '';
+  const desc = featData.description || '';
   
   // Magic Initiate feat
   if (featName === 'Magic Initiate') {

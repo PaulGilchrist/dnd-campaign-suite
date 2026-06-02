@@ -59,14 +59,14 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
 
   const traits = race.traits || [];
   traits.forEach(trait => {
-    result.traits.push({ name: trait.name, description: trait.desc });
+    result.traits.push({ name: trait.name, description: trait.description });
 
     if (ruleset === '5e') {
       if (trait.proficiencies) {
         trait.proficiencies.forEach(prof => {
           result.proficiencies.push({ name: prof });
-        });
-      }
+         });
+       }
       if (trait.proficiency_choices) {
         trait.proficiency_choices.forEach(pc => {
           result.proficiencies.push({
@@ -74,20 +74,20 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
             isChoice: true,
             choose: pc.choose,
             from: pc.from,
-          });
-        });
-      }
-    }
+           });
+         });
+       }
+     }
 
     if (trait.trait_type === 'speed' || (trait.name && trait.name.toLowerCase().includes('speed'))) {
-      const speedMatch = trait.desc ? trait.desc.match(/(\d+)\s*feet?/i) : null;
+      const speedMatch = trait.description ? trait.description.match(/(\d+)\s*feet?/i) : null;
       if (speedMatch) {
         result.speed = parseInt(speedMatch[1], 10);
-      }
-    }
+       }
+     }
 
     if (ruleset === '5e') {
-      const resistMatch = trait.desc ? trait.desc.match(/(?:resistance|resistant) to (\w+)/i) : null;
+      const resistMatch = trait.description ? trait.description.match(/(?:resistance|resistant) to (\w+)/i) : null;
       if (resistMatch) {
         result.resistances.push(resistMatch[1]);
       }
@@ -135,7 +135,7 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
 
     if (subrace.racial_traits) {
       subrace.racial_traits.forEach(trait => {
-        result.traits.push({ name: trait.name, description: trait.desc });
+        result.traits.push({ name: trait.name, description: trait.description });
         if (trait.proficiencies) {
           trait.proficiencies.forEach(prof => {
             result.proficiencies.push({ name: prof });

@@ -22,10 +22,10 @@ function extract5eRaceResistances(raceData, subraceName) {
 
   // Check base race traits
   raceData.traits.forEach(trait => {
-    const desc = Array.isArray(trait.desc) ? trait.desc.join(' ') : (trait.desc || '');
+    const desc = Array.isArray(trait.description) ? trait.description.join(' ') : (trait.description || '');
     const name = trait.name || '';
 
-    // Tiefling: Hellish Resistance - fire damage resistance
+     // Tiefling: Hellish Resistance - fire damage resistance
     if (name.includes('Hellish Resistance') && desc.includes('resistance to fire damage')) {
       resistances.add('Fire');
     }
@@ -50,10 +50,10 @@ function extract5eRaceResistances(raceData, subraceName) {
     );
     if (subrace && subrace.racial_traits) {
       subrace.racial_traits.forEach(trait => {
-        const desc = Array.isArray(trait.desc) ? trait.desc.join(' ') : (trait.desc || '');
+        const desc = Array.isArray(trait.description) ? trait.description.join(' ') : (trait.description || '');
         const name = trait.name || '';
 
-        // Stout Halfling: Scout Resilience - poison damage resistance
+          // Stout Halfling: Scout Resilience - poison damage resistance
         if (name.includes('Scout Resilience') && desc.includes('resistance against poison damage')) {
           resistances.add('Poison');
           }
@@ -196,10 +196,10 @@ function extractClassImmunities(classData, version, level) {
 
     const features = levelData.features || [];
     features.forEach(feature => {
-      const desc = feature.description || '';
+      const desc = Array.isArray(feature.description) ? feature.description.join(' ') : (feature.description || '');
       const name = feature.name || '';
 
-      // 2024 Barbarian Path of the Berserker: Mindless Rage gives Immunity to Charmed and Frightened
+       // 2024 Barbarian Path of the Berserker: Mindless Rage gives Immunity to Charmed and Frightened
       if (name.includes('Mindless Rage') && desc.includes('Immunity to')) {
           // These are condition immunities, not damage immunities
           // We don't track condition immunities in the resistances step
@@ -315,7 +315,7 @@ export async function getResistanceLimits(formData) {
       const subrace = raceData?.subraces?.find(sr => sr.name === subraceName);
       if (subrace) {
           // Check subrace description for resistance type
-        const desc = subrace.desc || subrace.description || '';
+         const desc = subrace.description || '';
         if (desc.match(/resistance to (\w+)/i)) {
           const match = desc.match(/resistance to (\w+)/i);
           const resistanceType = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();

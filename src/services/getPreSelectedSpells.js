@@ -60,32 +60,32 @@ function extractRaceSpells(raceData, version = '5e') {
   if (version === '2024') {
     if (raceData.traits) {
       raceData.traits.forEach(trait => {
-        const desc = trait.description || trait.desc || '';
+        const desc = trait.description || '';
         extractSpellsFromDescription(desc, result);
-      });
-    }
+         });
+       }
 
     if (raceData.subraces) {
       raceData.subraces.forEach(subrace => {
-        const desc = subrace.description || subrace.desc || '';
+        const desc = subrace.description || '';
         extractSpellsFromDescription(desc, result);
       });
     }
-  } else {
+    } else {
     if (raceData.traits) {
       raceData.traits.forEach(trait => {
-        const desc = Array.isArray(trait.desc) ? trait.desc.join(' ') : (trait.desc || '');
+        const desc = Array.isArray(trait.description) ? trait.description.join(' ') : (trait.description || '');
         extractSpellsFromDescription(desc, result);
-      });
-    }
+          });
+        }
 
     if (raceData.subraces) {
       raceData.subraces.forEach(subrace => {
-        const desc = Array.isArray(subrace.desc) ? subrace.desc.join(' ') : (subrace.desc || '');
+        const desc = Array.isArray(subrace.description) ? subrace.description.join(' ') : (subrace.description || '');
         extractSpellsFromDescription(desc, result);
-      });
+          });
+        }
     }
-  }
 
   return result;
 }
@@ -101,17 +101,17 @@ function extractSubraceSpells(subraceData, version = '5e') {
 
   if (version === '2024') {
     traits.forEach(trait => {
-      const desc = trait.description || trait.desc || '';
+      const desc = trait.description || '';
       extractSpellsFromDescription(desc, result);
-    });
-  } else {
+        });
+      } else {
     traits.forEach(trait => {
-      const desc = Array.isArray(trait.desc) ? trait.desc.join(' ') : (trait.desc || '');
+      const desc = Array.isArray(trait.description) ? trait.description.join(' ') : (trait.description || '');
       extractSpellsFromDescription(desc, result);
-    });
-  }
+        });
+      }
 
-  const desc = subraceData.description || subraceData.desc || '';
+  const desc = subraceData.description || '';
   if (desc) {
     extractSpellsFromDescription(desc, result);
   }
@@ -133,7 +133,7 @@ function extractFeatSpells(featData) {
   }
 
   const featName = featData.name || '';
-  const desc = featData.description || featData.desc || '';
+  const desc = featData.description || '';
 
   if (featName === 'Magic Initiate') {
     result.details.push('Magic Initiate grants 2 cantrips and 1 first-level spell from a chosen class spell list');

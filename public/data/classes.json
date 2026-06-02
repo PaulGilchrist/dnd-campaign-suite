@@ -525,7 +525,7 @@
             }
         ],
         "book": "Player's Handbook",
-        "desc": "A fierce warrior of primitive background who can enter a battle rage",
+        "description": "A fierce warrior of primitive background who can enter a battle rage",
         "page": 46,
         "starting_wealth": "2d4 x 10 gp",
         "features": []
@@ -1500,7 +1500,7 @@
             }
         ],
         "book": "Player's Handbook",
-        "desc": "An inspiring magician whose power echoes the music of creation",
+        "description": "An inspiring magician whose power echoes the music of creation",
         "page": 51,
         "spell_casting_ability": "Charisma",
         "starting_wealth": "5d4 x 10 gp",
@@ -3544,7 +3544,7 @@
             }
         ],
         "book": "Player's Handbook",
-        "desc": "A priestly champion who wields divine magic in service of a higher power",
+        "description": "A priestly champion who wields divine magic in service of a higher power",
         "page": 56,
         "spell_casting_ability": "Wisdom",
         "starting_wealth": "5d4 x 10 gp",
@@ -5287,7 +5287,7 @@
             }
         ],
         "book": "Player's Handbook",
-        "desc": "A priest of the Old Faith, wielding the powers of nature, moonlight and plant growth, fire and lightning, and adopting animal forms",
+        "description": "A priest of the Old Faith, wielding the powers of nature, moonlight and plant growth, fire and lightning, and adopting animal forms",
         "page": 64,
         "spell_casting_ability": "Wisdom",
         "starting_wealth": "2d4 x 10 gp",
@@ -6103,7 +6103,7 @@
             }
         ],
         "book": "Player's Handbook",
-        "desc": "A master of martial combat, skilled with a variety of weapons and armor",
+        "description": "A master of martial combat, skilled with a variety of weapons and armor",
         "page": 70,
         "spell_casting_ability": "Intelligence",
         "starting_wealth": "5d4 x 10 gp",
@@ -6802,7 +6802,7 @@
             }
         ],
         "book": "Player's Handbook",
-        "desc": "A master of martial arts, harnessing the power of the body in pursuit of physical and spiritual perfection",
+        "description": "A master of martial arts, harnessing the power of the body in pursuit of physical and spiritual perfection",
         "page": 76,
         "starting_wealth": "5d4",
         "features": []
@@ -7897,7 +7897,7 @@
             }
         ],
         "book": "Player's Handbook",
-        "desc": "A holy warrior bound to a sacred oath",
+        "description": "A holy warrior bound to a sacred oath",
         "page": 82,
         "spell_casting_ability": "Charisma",
         "starting_wealth": "5d4 x 10 gp",
@@ -8579,7 +8579,7 @@
             }
         ],
         "book": "Player's Handbook",
-        "desc": "A warrior who uses martial prowess and nature magic to combat threats on the edges of civilization",
+        "description": "A warrior who uses martial prowess and nature magic to combat threats on the edges of civilization",
         "page": 89,
         "spell_casting_ability": "Wisdom",
         "starting_wealth": "5d4 x 10 gp",
@@ -9373,7 +9373,7 @@
             }
         ],
         "book": "Player's Handbook",
-        "desc": "A scoundrel who uses stealth and trickery to overcome obstacles and enemies",
+        "description": "A scoundrel who uses stealth and trickery to overcome obstacles and enemies",
         "page": 94,
         "spell_casting_ability": "Intelligence",
         "starting_wealth": "4d4 x 10 gp",
@@ -10597,7 +10597,7 @@
             }
         ],
         "book": "Player's Handbook",
-        "desc": "A spellcaster who draws on inherent magic from a gift or bloodline",
+        "description": "A spellcaster who draws on inherent magic from a gift or bloodline",
         "page": 99,
         "spell_casting_ability": "Charisma",
         "starting_wealth": "3d4 x 10 gp",
@@ -11994,7 +11994,7 @@
             }
         ],
         "book": "Player's Handbook",
-        "desc": "A wielder of magic that is derived from a bargain with an extraplanar entity",
+        "description": "A wielder of magic that is derived from a bargain with an extraplanar entity",
         "page": 105,
         "spell_casting_ability": "Charisma",
         "starting_wealth": "4d4 x 10 gp",
@@ -12999,7 +12999,7 @@
             }
         ],
         "book": "Player's Handbook",
-        "desc": "A scholarly magic-user capable of manipulating the structures of reality",
+        "description": "A scholarly magic-user capable of manipulating the structures of reality",
         "page": 112,
         "spell_casting_ability": "Intelligence",
         "starting_wealth": "4d4 x 10 gp",

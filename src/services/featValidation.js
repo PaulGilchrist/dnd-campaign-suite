@@ -236,30 +236,6 @@ export function normalizeFeatDescription(feat) {
         }
     }
 
-    // Try 5e format (desc field) - text/plain
-    if (!descriptionData.isHtml && feat.desc) {
-        const desc = feat.desc;
-        if (typeof desc === 'string') {
-            descriptionData = { text: desc, isHtml: false };
-        } else if (Array.isArray(desc) && desc[0]) {
-            const firstItem = desc[0];
-            if (typeof firstItem === 'string') {
-                descriptionData = { text: firstItem, isHtml: false };
-            } else if (typeof firstItem === 'object') {
-                if (firstItem.text) {
-                    descriptionData = { text: firstItem.text, isHtml: false };
-                } else if (firstItem.content) {
-                    descriptionData = { text: firstItem.content, isHtml: false };
-                } else if (firstItem.description) {
-                    descriptionData = { text: firstItem.description, isHtml: false };
-                } else if (firstItem.level !== undefined) {
-                    console.warn('Unexpected description object structure:', firstItem);
-                    descriptionData = { text: '', isHtml: false };
-                }
-            }
-        }
-    }
-
     return descriptionData;
 }
 

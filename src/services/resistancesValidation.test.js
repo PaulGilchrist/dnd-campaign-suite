@@ -26,7 +26,7 @@ describe('resistancesValidation', () => {
             vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
                 name: 'Tiefling',
                 traits: [
-                    { name: 'Hellish Resistance', desc: ['You have resistance to fire damage.'] }
+                    { name: 'Hellish Resistance', description: ['You have resistance to fire damage.'] }
                  ]
               });
             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
@@ -47,7 +47,7 @@ describe('resistancesValidation', () => {
             vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
                 name: 'Dwarf',
                 traits: [
-                     { name: 'Dwarven Resilience', desc: ['You have resistance against poison damage.'] }
+                     { name: 'Dwarven Resilience', description: ['You have resistance against poison damage.'] }
                  ]
               });
             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
@@ -122,7 +122,7 @@ describe('resistancesValidation', () => {
             vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
                 name: 'Dragonborn',
                 traits: [
-                    { name: 'Damage Resistance', desc: ['You have resistance to one damage type.'] }
+                    { name: 'Damage Resistance', description: ['You have resistance to one damage type.'] }
                 ]
             });
             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
@@ -150,17 +150,17 @@ describe('resistancesValidation', () => {
                 .mockResolvedValueOnce({
                     name: 'Dragonborn',
                     traits: [
-                        { name: 'Damage Resistance', desc: ['You have resistance to one damage type.'] }
+                        { name: 'Damage Resistance', description: ['You have resistance to one damage type.'] }
                     ]
                     // no subraces in first call to avoid subraceStr bug
                 })
                 .mockResolvedValueOnce({
                     name: 'Dragonborn',
                     traits: [
-                        { name: 'Damage Resistance', desc: ['You have resistance to one damage type.'] }
+                        { name: 'Damage Resistance', description: ['You have resistance to one damage type.'] }
                     ],
                     subraces: [
-                        { name: 'Gold Dragon', desc: 'You have resistance to fire damage.' }
+                        { name: 'Gold Dragon', description: 'You have resistance to fire damage.' }
                     ]
                 });
             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
@@ -182,7 +182,7 @@ describe('resistancesValidation', () => {
             vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
                 name: 'Tiefling',
                 traits: [
-                    { name: 'Hellish Resistance', desc: 'You have resistance to fire damage.' }
+                    { name: 'Hellish Resistance', description: 'You have resistance to fire damage.' }
                 ]
             });
             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
@@ -621,7 +621,7 @@ describe('resistancesValidation', () => {
             vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
                 name: 'Tiefling',
                 traits: [
-                     { name: 'Hellish Resistance', desc: ['You have resistance to fire damage.'] }
+                     { name: 'Hellish Resistance', description: ['You have resistance to fire damage.'] }
                  ]
               });
             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
@@ -699,7 +699,7 @@ describe('resistancesValidation', () => {
         it('should warn about duplicate resistances', async () => {
             vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
                 traits: [
-                     { name: 'Hellish Resistance', desc: ['You have resistance to fire damage.'] }
+                     { name: 'Hellish Resistance', description: ['You have resistance to fire damage.'] }
                  ]
               });
             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
@@ -725,7 +725,7 @@ describe('resistancesValidation', () => {
             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
                 class_levels: [
                      { level: 10, features: [
-                         { name: 'Immunity', desc: ['Immunity to Fire'] }
+                         { name: 'Immunity', description: ['Immunity to Fire'] }
                      ]}
                  ]
               });
@@ -765,7 +765,7 @@ describe('resistancesValidation', () => {
         it('should warn about unselected granted resistances', async () => {
             vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
                 traits: [
-                     { name: 'Hellish Resistance', desc: ['You have resistance to fire damage.'] }
+                     { name: 'Hellish Resistance', description: ['You have resistance to fire damage.'] }
                  ]
               });
             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
@@ -874,7 +874,7 @@ describe('resistancesValidation', () => {
             vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
                 name: 'Tiefling',
                 traits: [
-                     { name: 'Hellish Resistance', desc: ['You have resistance to fire damage.'] }
+                     { name: 'Hellish Resistance', description: ['You have resistance to fire damage.'] }
                  ]
               });
             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
@@ -1017,7 +1017,7 @@ describe('resistancesValidation', () => {
             vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
                 name: 'Tiefling',
                 traits: [
-                    { name: 'Hellish Resistance', desc: ['You have resistance to fire damage.'] }
+                    { name: 'Hellish Resistance', description: ['You have resistance to fire damage.'] }
                 ]
             });
             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
@@ -1093,7 +1093,7 @@ describe('resistancesValidation', () => {
             vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
                 name: 'Dwarf',
                 traits: [
-                    { name: 'Dwarven Resilience', desc: ['You have resistance against poison damage.'] }
+                    { name: 'Dwarven Resilience', description: ['You have resistance against poison damage.'] }
                 ]
             });
             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({

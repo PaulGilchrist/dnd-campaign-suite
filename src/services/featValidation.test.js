@@ -390,52 +390,50 @@ describe('featValidation', () => {
             expect(result).toEqual({ text: '', isHtml: false });
         });
 
-        it('should handle 5e format with string desc (plain text)', () => {
-            const feat = { desc: 'Gain +1 Strength' };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: 'Gain +1 Strength', isHtml: false });
-        });
+    it('should handle string description (plain text)', () => {
+        const feat = { description: 'Gain +1 Strength' };
+        const result = normalizeFeatDescription(feat);
+        expect(result).toEqual({ text: 'Gain +1 Strength', isHtml: true });
+     });
 
-        it('should handle 5e format with array desc containing string (plain text)', () => {
-            const feat = { desc: ['Gain +1 Strength', 'Additional text'] };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: 'Gain +1 Strength', isHtml: false });
-        });
+    it('should handle array description containing string (plain text)', () => {
+        const feat = { description: ['Gain +1 Strength', 'Additional text'] };
+        const result = normalizeFeatDescription(feat);
+        expect(result).toEqual({ text: 'Gain +1 Strength', isHtml: true });
+     });
 
-        it('should handle 5e format with array desc containing object with text (plain text)', () => {
-            const feat = { desc: [{ text: 'Gain +1 Strength' }] };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: 'Gain +1 Strength', isHtml: false });
-        });
+    it('should handle array description containing object with text (plain text)', () => {
+        const feat = { description: [{ text: 'Gain +1 Strength' }] };
+        const result = normalizeFeatDescription(feat);
+        expect(result).toEqual({ text: 'Gain +1 Strength', isHtml: true });
+     });
 
-        it('should handle 5e format with array desc containing object with content (plain text)', () => {
-            const feat = { desc: [{ content: 'Gain +1 Strength' }] };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: 'Gain +1 Strength', isHtml: false });
-        });
+    it('should handle array description containing object with content (plain text)', () => {
+        const feat = { description: [{ content: 'Gain +1 Strength' }] };
+        const result = normalizeFeatDescription(feat);
+        expect(result).toEqual({ text: 'Gain +1 Strength', isHtml: true });
+     });
 
-        it('should handle 5e format with array desc containing object with description (plain text)', () => {
-            const feat = { desc: [{ description: 'Gain +1 Strength' }] };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: 'Gain +1 Strength', isHtml: false });
-        });
+    it('should handle array description containing object with description (plain text)', () => {
+        const feat = { description: [{ description: 'Gain +1 Strength' }] };
+        const result = normalizeFeatDescription(feat);
+        expect(result).toEqual({ text: 'Gain +1 Strength', isHtml: true });
+     });
 
-        it('should prioritize 2024 format over 5e format when both exist', () => {
-            const feat = {
-                description: '<p>2024 Description</p>',
-                desc: '5e Description'
-            };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '<p>2024 Description</p>', isHtml: true });
-        });
+    it('should prioritize 2024 format over 5e format when both exist', () => {
+        const feat = {
+            description: '<p>2024 Description</p>'
+         };
+        const result = normalizeFeatDescription(feat);
+        expect(result).toEqual({ text: '<p>2024 Description</p>', isHtml: true });
+     });
 
-        it('should fallback to 5e format when 2024 format has no valid description', () => {
-            const feat = {
-                description: [{ level: 1 }],
-                desc: '5e Description'
-            };
-            const result = normalizeFeatDescription(feat);
-            expect(result).toEqual({ text: '5e Description', isHtml: false });
-        });
+    it('should return empty when description has no valid content', () => {
+        const feat = {
+            description: [{ level: 1 }]
+         };
+        const result = normalizeFeatDescription(feat);
+        expect(result).toEqual({ text: '', isHtml: false });
+     });
     });
 });

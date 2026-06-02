@@ -2,7 +2,7 @@
     {
         "index": "actor",
         "name": "Actor",
-        "desc": [
+        "description": [
             "Skilled at mimicry and dramatics, you gain the following benefits:"
         ],
         "benefits": [
@@ -24,7 +24,7 @@
     {
         "index": "alert",
         "name": "Alert",
-        "desc": [
+        "description": [
             "Always on the lookout for danger, you gain the following benefits:"
         ],
         "benefits": [
@@ -43,7 +43,7 @@
     {
         "index": "athlete",
         "name": "Athlete",
-        "desc": [
+        "description": [
             "You have undergone extensive physical training to gain the following benefits:"
         ],
         "benefits": [
@@ -63,7 +63,7 @@
     {
         "index": "charger",
         "name": "Charger",
-        "desc": [
+        "description": [
             "When you use your action to Dash, you can use a bonus action to make one melee weapon attack or to shove a creature.",
             "If you move at least 10 feet in a straight line imme\u00addiately before taking this bonus action, you either gain a +5 bonus to the attack's damage roll (if you chose to make a melee attack and hit) or push the target up to 10 feet away from you (if you chose to shove and you succeed)."
         ],
@@ -88,7 +88,7 @@
     {
         "index": "crossbow-expert",
         "name": "Crossbow Expert",
-        "desc": [
+        "description": [
             "Thanks to extensive practice with the crossbow, you gain the following benefits:"
         ],
         "benefits": [
@@ -110,7 +110,7 @@
     {
         "index": "defensive-duelist",
         "name": "Defensive Duelist",
-        "desc": [
+        "description": [
             "When you are wielding a finesse weapon with which you are proficient and another creature hits you with a melee attack, you can use your reaction to add your proficiency bonus to your AC for that attack, potentially causing the attack to miss you."
         ],
         "prerequisite": "Dexterity 13 or higher",
@@ -125,7 +125,7 @@
     {
         "index": "dual-wielder",
         "name": "Dual Wielder",
-        "desc": [
+        "description": [
             "You master fighting with two weapons, gaining the following benefits:"
         ],
         "benefits": [
@@ -145,7 +145,7 @@
     {
         "index": "dungeon-delver",
         "name": "Dungeon Delver",
-        "desc": [
+        "description": [
             "Alert to the hidden traps and secret doors found in many dungeons, you gain the following benefits:"
         ],
         "benefits": [
@@ -165,7 +165,7 @@
     {
         "index": "durable",
         "name": "Durable",
-        "desc": [
+        "description": [
             "Hardy and resilient, you gain the following benefits:"
         ],
         "benefits": [
@@ -183,7 +183,7 @@
     {
         "index": "elemental-adept",
         "name": "Elemental Adept",
-        "desc": [
+        "description": [
             "When you gain this feat, choose one of the following damage types: acid, cold, fire, lightning, or thunder. Spells you cast ignore resistance to damage of the chosen type. In addition, when you roll damage for a spell you cast that deals damage of that type, you can treat any 1 on a damage die as a 2. You can select this feat multiple times. Each time you do so, you must choose a different damage type."
         ],
         "prerequisite": "The ability to cast at least one spell",
@@ -199,7 +199,7 @@
     {
         "index": "grappler",
         "name": "Grappler",
-        "desc": [
+        "description": [
             "You've developed the skills necessary to hold your own in close-quarters grappling. You gain the following benefits:"
         ],
         "benefits": [
@@ -218,7 +218,7 @@
     {
         "index": "great-weapon-master",
         "name": "Great Weapon Master",
-        "desc": [
+        "description": [
             "You've learned to put the weight of a weapon to your advantage, letting its momentum empower your strikes. You gain the following benefits:"
         ],
         "benefits": [
@@ -241,7 +241,7 @@
     {
         "index": "healer",
         "name": "Healer",
-        "desc": [
+        "description": [
             "You are an able physician, allowing you to mend wounds quickly and get your allies back in the fight. You gain the following benefits:"
         ],
         "benefits": [
@@ -260,7 +260,7 @@
     {
         "index": "heavily-armored",
         "name": "Heavily Armored",
-        "desc": [
+        "description": [
             "You have trained to master the use of heavy armor, gaining the following benefits:"
         ],
         "benefits": [
@@ -272,7 +272,7 @@
     {
         "index": "heavy-armor-master",
         "name": "Heavy Armor Master",
-        "desc": [
+        "description": [
             "You can use your armor to deflect strikes that would kill others. You gain the following benefits:"
         ],
         "benefits": [
@@ -291,7 +291,7 @@
     {
         "index": "inspiring-leader",
         "name": "Inspiring Leader",
-        "desc": [
+        "description": [
             "You can spend 10 minutes inspiring your companions, shoring up their resolve to fight. When you do so, choose up to six friendly creatures (which can include yourself) within 30 feet of you who can see or hear you and who can understand you. Each creature can gain temporary hit points equal to your level + your Charisma modifier. A creature can't gain temporary hit points from this feat again until it has finished a short or long rest."
         ],
         "prerequisite": "Charisma 13 or higher",
@@ -307,7 +307,7 @@
     {
         "index": "keen-mind",
         "name": "Keen Mind",
-        "desc": [
+        "description": [
             "You have a mind that can track time, direction, and detail with uncanny precision. You gain the following benefits."
         ],
         "benefits": [
@@ -320,7 +320,7 @@
     {
         "index": "lightly-armored",
         "name": "Lightly Armored",
-        "desc": [
+        "description": [
             "You have trained to master the use of light armor, gaining the following benefits:"
         ],
         "benefits": [
@@ -331,7 +331,7 @@
     {
         "index": "linguist",
         "name": "Linguist",
-        "desc": [
+        "description": [
             "You have studied languages and codes, gaining the following benefits:"
         ],
         "benefits": [
@@ -343,7 +343,7 @@
     {
         "index": "lucky",
         "name": "Lucky",
-        "desc": [
+        "description": [
             "You have inexplicable luck that seems to kick in at just the right moment.",
             "You have 3 luck points. Whenever you make an attack roll, an ability check, or a saving throw, you can spend one luck point to roll an additional d20. You can choose to spend one of your luck points after you roll the die, but before the outcome is determined. You choose which of the d20s is used for the attack roll, ability check, or saving throw.",
             "You can also spend one luck point when an attack roll is made against you. Roll a d20, and then choose whether the attack uses the attacker's roll or yours.",
@@ -362,7 +362,7 @@
     {
         "index": "mage-slayer",
         "name": "Mage Slayer",
-        "desc": [
+        "description": [
             "You have practiced techniques useful in melee combat against spellcasters, gaining the following benefits:"
         ],
         "benefits": [
@@ -381,7 +381,7 @@
     {
         "index": "magic-initiate",
         "name": "Magic Initiate",
-        "desc": [
+        "description": [
             "Choose a class: bard, cleric, druid, sorcerer, warlock, or wizard. You learn two cantrips of your choice from that class's spell list.",
             "In addition, choose one 1st-level spell to learn from that same list. Using this feat, you can cast the spell once at its lowest level, and you must finish a long rest before you can cast it in this way again.",
             "Your spellcasting ability for these spells depends on the class you chose: Charisma for bard, sorcerer, or warlock; Wisdom for cleric or druid; or Intelli\u00ad gence for wizard."
@@ -390,7 +390,7 @@
     {
         "index": "martial-adept",
         "name": "Martial Adept",
-        "desc": [
+        "description": [
             "You have martial training that allows you to perform special combat maneuvers. You gain the following benefits:"
         ],
         "benefits": [
@@ -409,7 +409,7 @@
     {
         "index": "medium-armor-master",
         "name": "Medium Armor Master",
-        "desc": [
+        "description": [
             "You have practiced moving in medium armor to gain the following benefits:"
         ],
         "benefits": [
@@ -428,7 +428,7 @@
     {
         "index": "mobile",
         "name": "Mobile",
-        "desc": [
+        "description": [
             "You are exceptionally speedy and agile. You gain the following benefits:"
         ],
         "benefits": [
@@ -447,7 +447,7 @@
     {
         "index": "moderately-armored",
         "name": "Moderately Armored",
-        "desc": [
+        "description": [
             "You have trained to master the use of medium armor and shields, gaining the following benefits:"
         ],
         "benefits": [
@@ -459,7 +459,7 @@
     {
         "index": "mounted-combat",
         "name": "Mounted Combat",
-        "desc": [
+        "description": [
             "You are a dangerous foe to face while mounted. While you are mounted and aren't incapacitated, you gain the following benefits:"
         ],
         "benefits": [
@@ -478,7 +478,7 @@
     {
         "index": "observant",
         "name": "Observant",
-        "desc": [
+        "description": [
             "Quick to notice details of your environment, you gain the following benefits:"
         ],
         "benefits": [
@@ -497,7 +497,7 @@
     {
         "index": "polearm-master",
         "name": "Polearm Master",
-        "desc": [
+        "description": [
             "You gain the following benefits:"
         ],
         "benefits": [
@@ -514,7 +514,7 @@
     {
         "index": "resilient",
         "name": "Resilient",
-        "desc": [
+        "description": [
             "Choose one ability score. You gain the following benefits:"
         ],
         "benefits": [
@@ -532,7 +532,7 @@
     {
         "index": "ritual-caster",
         "name": "Ritual Caster",
-        "desc": [
+        "description": [
             "You have learned a number of spells that you can cast as rituals. These spells are written in a ritual book, which you must have in hand while casting one of them.",
             "When you choose this feat, you acquire a ritual book holding two 1st-level spells of your choice. Choose one of the following classes: bard, cleric, druid, sorcerer, warlock, or wizard. You must choose your spells from that class's spell list, and the spells you choose must have the ritual tag. The class you choose also determines your spellcasting ability for these spells: Charisma for bard, sorcerer, or warlock; Wisdom for cleric or druid; or Intelligence for wizard.",
             "If you come across a spell in written form, such as a magical spell scroll or a wizard's spellbook, you might be able to add it to your ritual book. The spell must be on the spell list for the class you chose, the spell's level can be no higher than half your level (rounded up), and it must have the ritual tag. The process of copying the spell into your ritual book takes 2 hours per level of the spell, and costs 50 gp per level. The cost represents material components you expend as you experiment with the spell to master it, as well as the fine inks you need to record it."
@@ -542,7 +542,7 @@
     {
         "index": "savage-attacker",
         "name": "Savage Attacker",
-        "desc": [
+        "description": [
             "Once per turn when you roll damage for a melee weapon attack, you can reroll the weapon's damage dice and use either total."
         ],
         "automation": {
@@ -554,7 +554,7 @@
     {
         "index": "sentinel",
         "name": "Sentinel",
-        "desc": [
+        "description": [
             "You have mastered techniques to take advantage of every drop in any enemy's guard, gaining the following benefits:"
         ],
         "benefits": [
@@ -573,7 +573,7 @@
     {
         "index": "sharpshooter",
         "name": "Sharpshooter",
-        "desc": [
+        "description": [
             "You have mastered ranged weapons and can make shots that others find impossible. You gain the following benefits:"
         ],
         "benefits": [
@@ -600,7 +600,7 @@
     {
         "index": "shield-master",
         "name": "Shield Master",
-        "desc": [
+        "description": [
             "You use shields not just for protection but also for offense. You gain the following benefits while you are wielding a shield:"
         ],
         "benefits": [
@@ -619,14 +619,14 @@
     {
         "index": "skilled",
         "name": "Skilled",
-        "desc": [
+        "description": [
             "You gain proficiency in any combination of three skills or tools of your choice."
         ]
     },
     {
         "index": "skulker",
         "name": "Skulker",
-        "desc": [
+        "description": [
             "You are expert at slinking through shadows. You gain the following benefits:"
         ],
         "benefits": [
@@ -645,7 +645,7 @@
     {
         "index": "spell-sniper",
         "name": "Spell Sniper",
-        "desc": [
+        "description": [
             "You have learned techniques to enhance your attacks with certain kinds of spells, gaining the following benefits:"
         ],
         "benefits": [
@@ -667,7 +667,7 @@
     {
         "index": "tavern-brawler",
         "name": "Tavern Brawler",
-        "desc": [
+        "description": [
             "Accustomed to rough-and-tumble fighting using whatever weapons happen to be at hand, you gain the following benefits:"
         ],
         "benefits": [
@@ -686,7 +686,7 @@
     {
         "index": "tough",
         "name": "Tough",
-        "desc": [
+        "description": [
             "Your hit point maximum increases by an amount equal to twice your level when you gain this feat. Whenever you gain a level thereafter, your hit point maximum increases by an additional 2 hit points."
         ],
         "automation": {
@@ -700,7 +700,7 @@
     {
         "index": "war-caster",
         "name": "War Caster",
-        "desc": [
+        "description": [
             "You have practiced casting spells in the midst of combat, learning techniques that grant you the following benefits:"
         ],
         "benefits": [
@@ -723,7 +723,7 @@
     {
         "index": "weapon-master",
         "name": "Weapon Master",
-        "desc": [
+        "description": [
             "You have practiced extensively with a variety of weapons, gaining the following benefits:"
         ],
         "benefits": [

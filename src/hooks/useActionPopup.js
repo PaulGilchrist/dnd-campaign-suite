@@ -8,8 +8,8 @@ export function buildFeatureDetailHtml(entity) {
 }
 
 function buildSpellDetailHtml(entity) {
-    if (entity.desc) {
-        return `<b>${entity.name}</b><br/><br/>${entity.desc}<br/>`;
+    if (entity.description) {
+        return `<b>${entity.name}</b><br/><br/>${entity.description}<br/>`;
     }
     return null;
 }
@@ -18,7 +18,7 @@ export function buildAbilityDetailHtml(allAbilityScores) {
     return (name) => {
         const abilityScore = allAbilityScores.find((a) => a.full_name === name);
         if (abilityScore) {
-            return `<h3>${name}</h3>${abilityScore.desc}<br/>`;
+            return `<h3>${name}</h3>${abilityScore.description}<br/>`;
          }
         return null;
      };

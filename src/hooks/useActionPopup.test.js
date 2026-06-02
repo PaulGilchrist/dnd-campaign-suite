@@ -56,8 +56,8 @@ describe('useActionPopup', () => {
   describe('buildAbilityDetailHtml', () => {
     it('should return a function that returns HTML for a matching ability name', () => {
       const allAbilityScores = [
-        { full_name: 'Strength', desc: 'Measures physical power.' },
-        { full_name: 'Dexterity', desc: 'Measures agility.' },
+        { full_name: 'Strength', description: 'Measures physical power.' },
+        { full_name: 'Dexterity', description: 'Measures agility.' },
       ];
       const lookup = buildAbilityDetailHtml(allAbilityScores);
       const result = lookup('Strength');
@@ -65,18 +65,18 @@ describe('useActionPopup', () => {
     });
 
     it('should return null for unknown ability', () => {
-      const allAbilityScores = [
-        { full_name: 'Strength', desc: 'Measures physical power.' },
-      ];
+       const allAbilityScores = [
+         { full_name: 'Strength', description: 'Measures physical power.' },
+        ];
       const lookup = buildAbilityDetailHtml(allAbilityScores);
       const result = lookup('Unknown');
       expect(result).toBeNull();
     });
 
     it('should match full_name case-sensitively', () => {
-      const allAbilityScores = [
-        { full_name: 'Strength', desc: 'Measures physical power.' },
-      ];
+       const allAbilityScores = [
+           { full_name: 'Strength', description: 'Measures physical power.' },
+         ];
       const lookup = buildAbilityDetailHtml(allAbilityScores);
       const result = lookup('strength');
       expect(result).toBeNull();

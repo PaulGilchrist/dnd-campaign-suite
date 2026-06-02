@@ -145,7 +145,7 @@
                     "type": "object",
                     "properties": {
                         "name": { "type": "string" },
-                        "desc": { "type": "string" }
+                        "description": { "type": "string" }
                     }
                 },
                 "description": "Actions the NPC can take"
