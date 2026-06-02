@@ -16,7 +16,7 @@ function CharCharacterAdvancement({ playerStats }) {
                 return <div key={feature.name || `character-advancement-${index}`}>
                       <b className={feature.details ? "clickable" : ""} onClick={() => showPopup(feature)}>{feature.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(feature.description) }}></span>
                   </div>
-              })}
+              })}<div className='half-line'></div>
           </div>
       )
 }

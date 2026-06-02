@@ -20,6 +20,7 @@ import utils from '../../services/utils.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
 import FontOfMagicModal from './FontOfMagicModal.jsx'
 import MetamagicPopup from './MetamagicPopup.jsx'
+import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import { getClassFeatures } from '../../services/classFeatures.js';
 import { addEntry } from '../../services/logService.js';
 import { getCurrentSorceryPoints, spendSorceryPoints, getLastDamageEvent, saveLastDamageEvent } from '../../hooks/useMetamagic.js';
@@ -34,6 +35,7 @@ const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextPr
 
 const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, onBuffsChange }) {
     const [actions, setActions] = useState([]);
+    const [selectedBonusSpell, setSelectedBonusSpell] = useState(null);
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
     const [healingPoolModal, setHealingPoolModal] = useState(null);
     const [fontOfMagicModal, setFontOfMagicModal] = useState(null);
@@ -867,8 +869,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     const handleBonusSpellClick = (spellName) => {
                         const spell = bonusSpellNames[spellName];
                         if (!spell) return;
-                        const desc = Array.isArray(spell.description) ? spell.description.join('') : (spell.description || spell.desc || '');
-                        setPopupHtml(`<b>${spell.name}</b><br/><br/>${sanitizeHtml(desc)}<br/>`);
+                        setSelectedBonusSpell(spell);
                     };
 
                     if (bonusActionAttacks.length > 0 || bonusActionSpells.length > 0) {
