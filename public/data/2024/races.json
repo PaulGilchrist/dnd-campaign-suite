@@ -93,52 +93,52 @@
         "subraces": [
             {
                 "name": "Black Dragonborn",
-                "desc": "Black Dragonborn inherit the corrosive power of their chromatic ancestors, marked by acid breath and a harsh resilience shaped by swamps and desolate marshlands.",
+                "description": "Black Dragonborn inherit the corrosive power of their chromatic ancestors, marked by acid breath and a harsh resilience shaped by swamps and desolate marshlands.",
                 "damage_resistance": "Acid"
             },
             {
                 "name": "Blue Dragonborn",
-                "desc": "Blue Dragonborn channel crackling lightning, often displaying disciplined focus and a commanding presence reminiscent of the desert-dwelling blue dragons.",
+                "description": "Blue Dragonborn channel crackling lightning, often displaying disciplined focus and a commanding presence reminiscent of the desert-dwelling blue dragons.",
                 "damage_resistance": "Lightning"
             },
             {
                 "name": "Brass Dragonborn",
-                "desc": "Brass Dragonborn are talkative and warm-spirited, breathing fire and carrying the social, curious nature of brass dragons who thrive in sun\u2011baked deserts.",
+                "description": "Brass Dragonborn are talkative and warm-spirited, breathing fire and carrying the social, curious nature of brass dragons who thrive in sun\u2011baked deserts.",
                 "damage_resistance": "Fire"
             },
             {
                 "name": "Bronze Dragonborn",
-                "desc": "Bronze Dragonborn wield lightning and possess a strong sense of duty, echoing the coastal guardianship and martial instincts of bronze dragons.",
+                "description": "Bronze Dragonborn wield lightning and possess a strong sense of duty, echoing the coastal guardianship and martial instincts of bronze dragons.",
                 "damage_resistance": "Lightning"
             },
             {
                 "name": "Copper Dragonborn",
-                "desc": "Copper Dragonborn are clever and quick-witted, breathing acid and often showing the playful, prank-loving tendencies of their copper dragon lineage.",
+                "description": "Copper Dragonborn are clever and quick-witted, breathing acid and often showing the playful, prank-loving tendencies of their copper dragon lineage.",
                 "damage_resistance": "Acid"
             },
             {
                 "name": "Gold Dragonborn",
-                "desc": "Gold Dragonborn embody nobility and inner fire, inheriting a powerful flame breath and the disciplined, honorable nature of gold dragons.",
+                "description": "Gold Dragonborn embody nobility and inner fire, inheriting a powerful flame breath and the disciplined, honorable nature of gold dragons.",
                 "damage_resistance": "Fire"
             },
             {
                 "name": "Green Dragonborn",
-                "desc": "Green Dragonborn exude a sharp, cunning presence, breathing toxic gas and reflecting the forest\u2011dwelling, manipulative instincts of green dragons.",
+                "description": "Green Dragonborn exude a sharp, cunning presence, breathing toxic gas and reflecting the forest\u2011dwelling, manipulative instincts of green dragons.",
                 "damage_resistance": "Poison"
             },
             {
                 "name": "Red Dragonborn",
-                "desc": "Red Dragonborn carry the fierce pride and fiery wrath of their volcanic ancestors, unleashing devastating fire breath and a bold, intense temperament.",
+                "description": "Red Dragonborn carry the fierce pride and fiery wrath of their volcanic ancestors, unleashing devastating fire breath and a bold, intense temperament.",
                 "damage_resistance": "Fire"
             },
             {
                 "name": "Silver Dragonborn",
-                "desc": "Silver Dragonborn are compassionate and steadfast, breathing frost and mirroring the protective, community\u2011oriented nature of silver dragons.",
+                "description": "Silver Dragonborn are compassionate and steadfast, breathing frost and mirroring the protective, community\u2011oriented nature of silver dragons.",
                 "damage_resistance": "Cold"
             },
             {
                 "name": "White Dragonborn",
-                "desc": "White Dragonborn channel bitter cold through their frost breath, often displaying a rugged, survival\u2011driven mindset shaped by their arctic heritage.",
+                "description": "White Dragonborn channel bitter cold through their frost breath, often displaying a rugged, survival\u2011driven mindset shaped by their arctic heritage.",
                 "damage_resistance": "Cold"
             }
         ],

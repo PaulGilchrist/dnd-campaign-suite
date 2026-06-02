@@ -384,44 +384,44 @@ describe('raceRules', () => {
        });
 
     it('should return Fire resistance for Red Dragonborn', () => {
-      const playerSummary = {
-        race: { name: 'Dragonborn', type: 'Red' }
-         };
+       const playerSummary = {
+         race: { name: 'Dragonborn', subrace: { damage_resistance: 'Fire' } }
+           };
 
-      const result = raceRules.getResistances(playerSummary);
+       const result = raceRules.getResistances(playerSummary);
 
-      expect(result).toContain('Fire');
-       });
+       expect(result).toContain('Fire');
+         });
 
     it('should return Acid resistance for Black Dragonborn', () => {
-      const playerSummary = {
-        race: { name: 'Dragonborn', type: 'Black' }
-         };
+       const playerSummary = {
+         race: { name: 'Dragonborn', subrace: { damage_resistance: 'Acid' } }
+           };
 
-      const result = raceRules.getResistances(playerSummary);
+       const result = raceRules.getResistances(playerSummary);
 
-      expect(result).toContain('Acid');
-       });
+       expect(result).toContain('Acid');
+         });
 
     it('should return Lightning resistance for Blue Dragonborn', () => {
-      const playerSummary = {
-        race: { name: 'Dragonborn', type: 'Blue' }
-         };
+       const playerSummary = {
+         race: { name: 'Dragonborn', subrace: { damage_resistance: 'Lightning' } }
+           };
 
-      const result = raceRules.getResistances(playerSummary);
+       const result = raceRules.getResistances(playerSummary);
 
-      expect(result).toContain('Lightning');
-       });
+       expect(result).toContain('Lightning');
+         });
 
     it('should return Cold resistance for White Dragonborn', () => {
-      const playerSummary = {
-        race: { name: 'Dragonborn', type: 'White' }
-         };
+       const playerSummary = {
+         race: { name: 'Dragonborn', subrace: { damage_resistance: 'Cold' } }
+           };
 
-      const result = raceRules.getResistances(playerSummary);
+       const result = raceRules.getResistances(playerSummary);
 
-      expect(result).toContain('Cold');
-       });
+       expect(result).toContain('Cold');
+         });
 
     it('should return Poison resistance for Scout Halfling', () => {
       const playerSummary = {
