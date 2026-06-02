@@ -25,7 +25,7 @@ import { isEqual } from 'lodash';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
-const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats);
+const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats) && prevProps.conditionAttackMode === nextProps.conditionAttackMode && prevProps.exhaustionPenalty === nextProps.exhaustionPenalty && prevProps.cannotAct === nextProps.cannotAct;
 
 const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, onBuffsChange }) {
     const [actions, setActions] = useState([]);
