@@ -968,6 +968,17 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                                 <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
                                 </Popup>
                             )}
+                            {selectedBonusSpell && (
+                                <Popup onClickOrKeyDown={() => setSelectedBonusSpell(null)}>
+                                    <SpellDetailPopup
+                                        spell={selectedBonusSpell}
+                                        playerStats={playerStats}
+                                        campaignName={campaignName}
+                                        onClose={() => setSelectedBonusSpell(null)}
+                                        onCast={() => setSelectedBonusSpell(null)}
+                                    />
+                                </Popup>
+                            )}
                             {(popupHtml && hasBonusActions) && <br />}
                             {hasBonusActions && <div>
                                 {playerStats.bonusActions.map((bonusAction) => {
