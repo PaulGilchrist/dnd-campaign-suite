@@ -6,7 +6,7 @@ import { sanitizeHtml } from '../../services/sanitize.js';
 import { parseMagicItemName } from '../../services/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { buildFeatureDetailHtml, showWeaponMasteryPopup } from '../../hooks/useActionPopup.js'
-import { rollExpression, rollExpressionDoubled } from '../../services/diceRoller.js';
+import { rollExpression, rollExpressionDoubled, parseExpression } from '../../services/diceRoller.js';
 import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetName } from '../../services/damageUtils.js';
 import * as mapsService from '../../services/mapsService.js';
 import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem } from '../../services/rangeValidation.js';
@@ -20,6 +20,9 @@ import utils from '../../services/utils.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
 import { getClassFeatures } from '../../services/classFeatures.js';
 import { addEntry } from '../../services/logService.js';
+import { getCurrentSorceryPoints, spendSorceryPoints, getLastDamageEvent, saveLastDamageEvent } from '../../hooks/useMetamagic.js';
+import { getChaModifier } from '../../services/metamagicRules.js';
+import { applyDamageToTarget } from '../../services/applyDamage.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';
 
@@ -235,6 +238,167 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const MONK_KI_FEATURES = ['Flurry of Blows', 'Patient Defense', 'Step of the Wind', 'Heightened Flurry of Blows', 'Heightened Patient Defense', 'Heightened Step of the Wind'];
 
+    function getCombatSummary() {
+      const stored = localStorage.getItem('combatSummary');
+      if (!stored) return null;
+      try { return JSON.parse(stored); } catch { return null; }
+    }
+
+    const handleMetamagicAction = () => {
+      const name = playerStats.name;
+      const currentSP = getCurrentSorceryPoints(name);
+      const lastEvent = getLastDamageEvent(name);
+      const chaMod = getChaModifier(playerStats);
+
+      if (lastEvent && lastEvent.rolls && lastEvent.damageFormula) {
+        const parsed = parseExpression(lastEvent.damageFormula);
+        if (!parsed) {
+          setPopupHtml({
+            type: 'empowered_spell',
+            name: 'Metamagic - Empowered Spell',
+            currentSP,
+            lastEvent: null,
+            chaMod,
+            error: 'Could not parse damage formula',
+          });
+          return;
+        }
+        setPopupHtml({
+          type: 'empowered_spell',
+          name: 'Metamagic - Empowered Spell',
+          currentSP,
+          lastEvent,
+          chaMod: Math.min(chaMod, parsed.count),
+          formulaParsed: parsed,
+        });
+      } else {
+        setPopupHtml({
+          type: 'empowered_spell',
+          name: 'Metamagic - Empowered Spell',
+          currentSP,
+          lastEvent: null,
+          chaMod,
+          error: lastEvent ? 'No dice roll data available' : 'No recent damage event found. Cast a spell that deals damage first.',
+        });
+      }
+    };
+
+    const handleEmpoweredReroll = (lastEvent, chaMod, campaignName) => {
+      const parsed = parseExpression(lastEvent.damageFormula);
+      if (!parsed) return;
+
+      const name = playerStats.name;
+      const currentSP = getCurrentSorceryPoints(name);
+      if (currentSP < 1) {
+        setPopupHtml({
+          type: 'empowered_spell',
+          name: 'Metamagic - Empowered Spell',
+          currentSP,
+          lastEvent,
+          chaMod,
+          error: 'Not enough sorcery points. Empowered Spell costs 1 SP.',
+        });
+        return;
+      }
+
+      const { sides, modifier } = parsed;
+      const originalRolls = lastEvent.rolls || [];
+
+      // Reroll the lowest N dice where N = chaMod
+      const rerollCount = Math.min(chaMod, originalRolls.length);
+      const sortedWithIndex = originalRolls.map((r, i) => ({ value: r, index: i }))
+        .sort((a, b) => a.value - b.value);
+      const rerollIndices = new Set(sortedWithIndex.slice(0, rerollCount).map(x => x.index));
+
+      const newRolls = originalRolls.map((r, i) => rerollIndices.has(i) ? Math.floor(Math.random() * sides) + 1 : r);
+      const newTotal = newRolls.reduce((sum, r) => sum + r, 0) + modifier;
+      const damageDifference = newTotal - lastEvent.rawDamage;
+
+      const combatSummary = getCombatSummary();
+      if (!combatSummary || !lastEvent.targetName) {
+        setPopupHtml({
+          type: 'empowered_spell',
+          name: 'Metamagic - Empowered Spell',
+          currentSP,
+          lastEvent,
+          chaMod,
+          error: 'No combat summary found. Cannot reapply damage.',
+        });
+        return;
+      }
+
+      // Deduct SP
+      spendSorceryPoints(name, 1, campaignName);
+
+      // Apply damage difference — positive means more damage, negative means less
+      if (damageDifference !== 0) {
+        const applyResult = applyDamageToTarget(combatSummary, lastEvent.targetName, damageDifference, lastEvent.damageType ? [lastEvent.damageType] : [], campaignName);
+        addEntry(campaignName, {
+          type: 'metamagic',
+          characterName: name,
+          rollType: 'empowered-spell',
+          spellName: lastEvent.spellName,
+          originalDamage: lastEvent.rawDamage,
+          newTotal,
+          damageDifference,
+          targetName: lastEvent.targetName,
+          rerolledDiceCount: rerollCount,
+          originalDice: originalRolls,
+          newDice: newRolls,
+        });
+        setPopupHtml({
+          type: 'empowered_spell',
+          name: 'Metamagic - Empowered Spell',
+          currentSP: currentSP - 1,
+          lastEvent: {
+            ...lastEvent,
+            rawDamage: newTotal,
+            rolls: newRolls,
+          },
+          chaMod,
+          result: {
+            oldTotal: lastEvent.rawDamage,
+            newTotal,
+            damageDifference,
+            rerollCount,
+            rerolledDice: rerollIndices,
+            originalDice: originalRolls,
+            newDice: newRolls,
+            targetCurrentHp: applyResult?.newHp,
+          },
+          completed: true,
+        });
+      } else {
+        // No change in damage, SP still spent
+        setPopupHtml({
+          type: 'empowered_spell',
+          name: 'Metamagic - Empowered Spell',
+          currentSP: currentSP - 1,
+          lastEvent: {
+            ...lastEvent,
+            rolls: newRolls,
+          },
+          chaMod,
+          result: {
+            oldTotal: lastEvent.rawDamage,
+            newTotal,
+            damageDifference: 0,
+            rerollCount,
+            message: 'Reroll did not change the damage total.',
+          },
+          completed: true,
+        });
+      }
+
+      // Update saved event for potential subsequent rerolls
+      saveLastDamageEvent(name, {
+        ...lastEvent,
+        rawDamage: newTotal,
+        rolls: newRolls,
+        timestamp: Date.now(),
+      }, campaignName);
+    };
+
     const handleAutomationAction = async (action) => {
         if (cannotAct) return;
         const auto = action.automation;
@@ -397,7 +561,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             case 'combat_stance':
             case 'resource_pool':
             case 'attack_rider':
-            case 'spell_modifier':
             case 'damage_bonus': {
                 if (setPopupHtml) {
                     setPopupHtml({
@@ -408,6 +571,20 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         automation: auto,
                       });
                   }
+                break;
+              }
+            case 'spell_modifier': {
+                if (action.name === 'Metamagic') {
+                  handleMetamagicAction();
+                } else if (setPopupHtml) {
+                  setPopupHtml({
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: action.description || '',
+                    automation: auto,
+                  });
+                }
                 break;
               }
              case 'initiative_action': {
@@ -567,13 +744,67 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                       })}
                   </div>
                   <br />
-                                      {popupHtml && (
-                                          <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
-                                              {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
-                                               popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
-                                               <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
-                                          </Popup>
-                                      )}
+                                  {popupHtml && (
+                                      <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
+                                          {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
+                                           popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
+                                           popupHtml.type === 'empowered_spell' ? <div className="dice-roll-result">
+                                             <div className="dice-roll-header"><i className="fa-solid fa-wand-magic-sparkles"></i>{popupHtml.name}</div>
+                                             <div className="metamagic-sp-display">Sorcery Points: <strong>{popupHtml.currentSP}</strong> / {popupHtml.lastEvent ? popupHtml.lastEvent.maxSP : '?'}</div>
+                                             {popupHtml.error && <div className="empowered-error" style={{color: 'var(--stat-penalized, #cc4444)', marginTop: '8px'}}>{popupHtml.error}</div>}
+                                             {popupHtml.lastEvent && !popupHtml.completed && popupHtml.lastEvent.rolls && (
+                                               <div className="empowered-damage-info" style={{marginTop: '8px'}}>
+                                                 <div><strong>Spell:</strong> {popupHtml.lastEvent.spellName}</div>
+                                                 <div><strong>Target:</strong> {popupHtml.lastEvent.targetName}</div>
+                                                 <div><strong>Formula:</strong> {popupHtml.lastEvent.damageFormula}</div>
+                                                 <div><strong>Original Damage:</strong> {popupHtml.lastEvent.rawDamage}</div>
+                                                 <div><strong>CHA Modifier:</strong> {popupHtml.chaMod} — can reroll up to {popupHtml.chaMod} dice</div>
+                                                 <div style={{display: 'flex', gap: '8px', marginTop: '12px'}}>
+                                                   <button className="btn btn-primary" onClick={() => handleEmpoweredReroll(popupHtml.lastEvent, popupHtml.chaMod, campaignName)} style={{padding: '4px 12px', cursor: 'pointer'}}>
+                                                     <i className="fa-solid fa-dice"></i> Reroll (1 SP)
+                                                   </button>
+                                                   <button className="btn btn-secondary" onClick={() => setPopupHtml && setPopupHtml(null)} style={{padding: '4px 12px', cursor: 'pointer'}}>
+                                                     Cancel
+                                                   </button>
+                                                 </div>
+                                               </div>
+                                             )}
+                                             {popupHtml.completed && popupHtml.result && (
+                                               <div className="empowered-result" style={{marginTop: '8px'}}>
+                                                 <hr />
+                                                 {popupHtml.result.message ? (
+                                                   <div>{popupHtml.result.message}</div>
+                                                 ) : (
+                                                   <>
+                                                     <div><strong>Original Damage:</strong> {popupHtml.result.oldTotal}</div>
+                                                     <div><strong>New Damage:</strong> {popupHtml.result.newTotal}</div>
+                                                     <div><strong>Difference:</strong> {popupHtml.result.damageDifference > 0 ? '+' : ''}{popupHtml.result.damageDifference}</div>
+                                                     <div><strong>Dice Rerolled:</strong> {popupHtml.result.rerollCount}</div>
+                                                     <div style={{fontSize: '0.85em', marginTop: '4px'}}>
+                                                       Original dice: ({popupHtml.result.originalDice.join(', ')})<br />
+                                                       New dice: ({popupHtml.result.newDice.join(', ')})
+                                                     </div>
+                                                     {popupHtml.result.targetCurrentHp != null && (
+                                                       <div style={{marginTop: '4px'}}><strong>Target HP:</strong> {popupHtml.result.targetCurrentHp}</div>
+                                                     )}
+                                                   </>
+                                                 )}
+                                                 <div style={{marginTop: '8px', color: 'var(--stat-penalized, #cc4444)'}}>Spent 1 Sorcery Point</div>
+                                                 <div className="dice-roll-hint" style={{marginTop: '4px'}}>click to dismiss</div>
+                                               </div>
+                                             )}
+                                             {!popupHtml.lastEvent && !popupHtml.error && (
+                                               <div className="empowered-no-event" style={{marginTop: '8px'}}>
+                                                 No recent damage event found. Cast a spell that deals damage first.
+                                               </div>
+                                             )}
+                                             {popupHtml.lastEvent && !popupHtml.lastEvent.rolls && !popupHtml.completed && (
+                                               <div className="dice-roll-hint" style={{marginTop: '8px'}}>click to dismiss</div>
+                                             )}
+                                           </div> :
+                                           <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
+                                      </Popup>
+                                  )}
                   {healingPoolModal && (
                       <HealingPoolModal
                          playerStats={playerStats}
@@ -651,6 +882,60 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                      <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
                          {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
                           popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
+                          popupHtml.type === 'empowered_spell' ? <div className="dice-roll-result">
+                            <div className="dice-roll-header"><i className="fa-solid fa-wand-magic-sparkles"></i>{popupHtml.name}</div>
+                            <div className="metamagic-sp-display">Sorcery Points: <strong>{popupHtml.currentSP}</strong> / {popupHtml.lastEvent ? popupHtml.lastEvent.maxSP : '?'}</div>
+                            {popupHtml.error && <div className="empowered-error" style={{color: 'var(--stat-penalized, #cc4444)', marginTop: '8px'}}>{popupHtml.error}</div>}
+                            {popupHtml.lastEvent && !popupHtml.completed && popupHtml.lastEvent.rolls && (
+                              <div className="empowered-damage-info" style={{marginTop: '8px'}}>
+                                <div><strong>Spell:</strong> {popupHtml.lastEvent.spellName}</div>
+                                <div><strong>Target:</strong> {popupHtml.lastEvent.targetName}</div>
+                                <div><strong>Formula:</strong> {popupHtml.lastEvent.damageFormula}</div>
+                                <div><strong>Original Damage:</strong> {popupHtml.lastEvent.rawDamage}</div>
+                                <div><strong>CHA Modifier:</strong> {popupHtml.chaMod} — can reroll up to {popupHtml.chaMod} dice</div>
+                                <div style={{display: 'flex', gap: '8px', marginTop: '12px'}}>
+                                  <button className="btn btn-primary" onClick={() => handleEmpoweredReroll(popupHtml.lastEvent, popupHtml.chaMod, campaignName)} style={{padding: '4px 12px', cursor: 'pointer'}}>
+                                    <i className="fa-solid fa-dice"></i> Reroll (1 SP)
+                                  </button>
+                                  <button className="btn btn-secondary" onClick={() => setPopupHtml && setPopupHtml(null)} style={{padding: '4px 12px', cursor: 'pointer'}}>
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            {popupHtml.completed && popupHtml.result && (
+                              <div className="empowered-result" style={{marginTop: '8px'}}>
+                                <hr />
+                                {popupHtml.result.message ? (
+                                  <div>{popupHtml.result.message}</div>
+                                ) : (
+                                  <>
+                                    <div><strong>Original Damage:</strong> {popupHtml.result.oldTotal}</div>
+                                    <div><strong>New Damage:</strong> {popupHtml.result.newTotal}</div>
+                                    <div><strong>Difference:</strong> {popupHtml.result.damageDifference > 0 ? '+' : ''}{popupHtml.result.damageDifference}</div>
+                                    <div><strong>Dice Rerolled:</strong> {popupHtml.result.rerollCount}</div>
+                                    <div style={{fontSize: '0.85em', marginTop: '4px'}}>
+                                      Original dice: ({popupHtml.result.originalDice.join(', ')})<br />
+                                      New dice: ({popupHtml.result.newDice.join(', ')})
+                                    </div>
+                                    {popupHtml.result.targetCurrentHp != null && (
+                                      <div style={{marginTop: '4px'}}><strong>Target HP:</strong> {popupHtml.result.targetCurrentHp}</div>
+                                    )}
+                                  </>
+                                )}
+                                <div style={{marginTop: '8px', color: 'var(--stat-penalized, #cc4444)'}}>Spent 1 Sorcery Point</div>
+                                <div className="dice-roll-hint" style={{marginTop: '4px'}}>click to dismiss</div>
+                              </div>
+                            )}
+                            {!popupHtml.lastEvent && !popupHtml.error && (
+                              <div className="empowered-no-event" style={{marginTop: '8px'}}>
+                                No recent damage event found. Cast a spell that deals damage first.
+                              </div>
+                            )}
+                            {popupHtml.lastEvent && !popupHtml.lastEvent.rolls && !popupHtml.completed && (
+                              <div className="dice-roll-hint" style={{marginTop: '8px'}}>click to dismiss</div>
+                            )}
+                          </div> :
                           <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
                      </Popup>
                  )}

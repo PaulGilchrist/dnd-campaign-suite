@@ -11,6 +11,7 @@ import {
 } from '../services/applyDamage.js';
 import { sendSavePrompt, sendSaveResult } from '../services/savePromptService.js';
 import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../services/aoeService.js';
+import { saveLastDamageEvent } from './useMetamagic.js';
 
 function readAoeContext(campaignName) {
   try {
@@ -341,7 +342,8 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
 
       if (saveDc && saveType && target) {
         if (target.type === 'npc') {
-          const saveResult = rollSaveForCreature(target, saveType, saveDc);
+          const disadvantage = context?.metamagicHeighten || false;
+          const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage);
           const finalDamage = computeDamageAfterSave(total, saveResult.success, dcSuccess);
           const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, damageType ? [damageType] : [], campaignName);
 
@@ -383,14 +385,122 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             damageApplied: true,
             damageReduced: applyResult?.damageReduced,
            });
+
+          if (context?.metamagicHeighten || context?.metamagicCareful || context?.metamagicTwinTarget) {
+            saveLastDamageEvent(characterName, {
+              targetName: target.name,
+              spellName: name,
+              damageFormula: formula,
+              rawDamage: total,
+              damageType,
+              saveDc,
+              saveType,
+              saveResult: saveResult.success ? 'success' : 'failure',
+              context,
+              rolls,
+              modifier,
+              timestamp: Date.now(),
+            }, campaignName);
+          }
+
+          if (context?.metamagicTwinTarget) {
+            const twinTarget = combatSummary?.creatures?.find(c => c.name === context.metamagicTwinTarget);
+            if (twinTarget && twinTarget.name !== target.name) {
+              const twinDisadvantage = context?.metamagicHeighten || false;
+              const twinSaveResult = rollSaveForCreature(twinTarget, saveType, saveDc, twinDisadvantage);
+              const twinFinalDamage = computeDamageAfterSave(total, twinSaveResult.success, dcSuccess);
+              const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, damageType ? [damageType] : [], campaignName);
+              logEntry({
+                type: 'roll',
+                characterName,
+                rollType: 'save-damage',
+                name: `${name} (Twinned)`,
+                formula,
+                rolls,
+                total,
+                modifier,
+                damageType,
+                targetName: twinTarget.name,
+                saveType,
+                saveDc,
+                saveResult: twinSaveResult.success ? 'success' : 'failure',
+                saveRoll: twinSaveResult.roll,
+                saveBonus: twinSaveResult.bonus,
+                finalDamage: twinApplyResult?.finalDamage ?? total,
+              });
+              setPopupHtml(prev => ({
+                ...prev,
+                twinTargetName: twinTarget.name,
+                twinFinalDamage: twinApplyResult?.finalDamage,
+                twinTargetCurrentHp: twinApplyResult?.newHp,
+                twinTargetMaxHp: twinTarget.maxHp,
+              }));
+            }
+          }
           return;
           }
 
         if (target.type === 'player') {
+          const isCarefulAlly = context?.metamagicCareful || false;
+          if (isCarefulAlly) {
+            const applyResult = applyDamageToTarget(combatSummary, target.name, 0, damageType ? [damageType] : [], campaignName);
+            logEntry({
+              type: 'roll',
+              characterName,
+              rollType: 'save-auto-success',
+              name,
+              formula,
+              rolls,
+              total: 0,
+              modifier,
+              damageType,
+              targetName: target.name,
+              saveType,
+              saveDc,
+              note: 'Careful Spell: ally automatically succeeds save',
+            });
+            saveLastDamageEvent(characterName, {
+              targetName: target.name,
+              spellName: name,
+              damageFormula: formula,
+              rawDamage: 0,
+              damageType,
+              saveDc,
+              saveType,
+              saveResult: 'success',
+              carefulSpell: true,
+              context,
+              rolls,
+              modifier,
+              timestamp: Date.now(),
+            }, campaignName);
+            setPopupHtml({
+              type: 'save-damage',
+              name,
+              formula,
+              rolls,
+              bonus: 0,
+              modifier,
+              damageType,
+              targetName: target.name,
+              targetCurrentHp: applyResult?.newHp,
+              targetMaxHp: target.maxHp,
+              saveDc,
+              saveType,
+              dcSuccess,
+              saveResult: { success: true, roll: 20, total: saveDc, bonus: 0 },
+              finalDamage: 0,
+              damageApplied: true,
+              damageReduced: false,
+              carefulSpell: true,
+            });
+            return;
+          }
           const promptId = utils.guid();
           pendingSaves[promptId] = {
             targetName: target.name, rawDamage: total, saveDc, saveType, dcSuccess,
             damageType, attackerName: attackerName || characterName, name, formula, modifier, rolls, campaignName, setPopupHtml,
+            metamagicHeighten: context?.metamagicHeighten || false,
            };
 
           sendSavePrompt(campaignName, {
@@ -404,6 +514,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             sourceName: name,
             sourceAttackerName: attackerName || characterName,
             rawDamage: total,
+            disadvantage: context?.metamagicHeighten || false,
            });
 
           logEntry({
@@ -484,7 +595,49 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
          popupData.damageReduced = applyResult.damageReduced;
        }
 
-       setPopupHtml(popupData);
+        setPopupHtml(popupData);
+
+      if (context?.metamagicTwinTarget && target) {
+        const twinTarget = combatSummary?.creatures?.find(c => c.name === context.metamagicTwinTarget);
+        if (twinTarget && twinTarget.name !== target.name) {
+          const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, total, damageType ? [damageType] : [], campaignName);
+          logEntry({
+            type: 'roll',
+            characterName,
+            rollType: 'damage',
+            name: `${name} (Twinned)`,
+            formula,
+            rolls,
+            total,
+            modifier,
+            damageType,
+            targetName: twinTarget.name,
+            finalDamage: twinApplyResult?.finalDamage,
+          });
+          setPopupHtml(prev => ({
+            ...prev,
+            twinTargetName: twinTarget.name,
+            twinFinalDamage: twinApplyResult?.finalDamage,
+            twinTargetCurrentHp: twinApplyResult?.newHp,
+            twinTargetMaxHp: twinTarget.maxHp,
+          }));
+        }
+      }
+
+      if (context?.empowerPending !== undefined || context?.metamagicHeighten || context?.metamagicCareful || context?.metamagicTwinTarget) {
+        saveLastDamageEvent(characterName, {
+          targetName: target?.name,
+          spellName: name,
+          damageFormula: formula,
+          rawDamage: total,
+          damageType,
+          twinTarget: context?.metamagicTwinTarget || null,
+          context,
+          rolls,
+          modifier,
+          timestamp: Date.now(),
+        }, campaignName);
+      }
         }
 
   function quickRollPlayerSave(promptId, targetName, saveType, saveDc) {
@@ -495,7 +648,8 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
     const target = combatSummary?.creatures?.find(c => c.name === pending.targetName);
     if (!target) return;
 
-    const saveResult = rollSaveForCreature(target, saveType, saveDc);
+    const disadvantage = pending.metamagicHeighten || false;
+    const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage);
     const finalDamage = computeDamageAfterSave(pending.rawDamage, saveResult.success, pending.dcSuccess);
     const applyResult = applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName);
 
@@ -508,6 +662,21 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       total: saveResult.total,
       saveBonus: saveResult.bonus,
     });
+
+    saveLastDamageEvent(characterName, {
+      targetName: target.name,
+      spellName: pending.name,
+      damageFormula: pending.formula,
+      rawDamage: finalDamage,
+      damageType: pending.damageType,
+      saveDc,
+      saveType,
+      saveResult: saveResult.success ? 'success' : 'failure',
+      context: pending.context,
+      rolls: pending.rolls,
+      modifier: pending.modifier,
+      timestamp: Date.now(),
+    }, campaignName);
 
     setPopupHtml({
       type: 'save-damage',

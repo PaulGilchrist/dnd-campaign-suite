@@ -21,12 +21,14 @@ export function computeDamageAfterSave(rawDamage, saveSuccess, dcSuccess) {
   return 0;
 }
 
-export function rollSaveForCreature(creature, saveType, saveDc) {
+export function rollSaveForCreature(creature, saveType, saveDc, disadvantage = false) {
   const bonus = creature?.saveBonuses?.[saveType] ?? 0;
-  const roll = rollD20();
-  const total = roll + bonus;
+  const roll1 = rollD20();
+  const roll2 = disadvantage ? rollD20() : roll1;
+  const finalRoll = disadvantage ? Math.min(roll1, roll2) : roll1;
+  const total = finalRoll + bonus;
   const success = total >= saveDc;
-  return { roll, total, bonus, success };
+  return { roll: finalRoll, total, bonus, success, rawRolls: [roll1, roll2] };
 }
 
 export function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName) {

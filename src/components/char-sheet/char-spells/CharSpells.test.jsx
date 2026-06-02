@@ -17,6 +17,37 @@ vi.mock('../../../hooks/useLoggedDiceRoll.js', () => ({
   })),
 }));
 
+// Mock useMetamagic hook
+vi.mock('../../../hooks/useMetamagic.js', () => {
+  const mockFn = () => ({
+    currentSP: 10,
+    maxSP: 10,
+    spendSorceryPoints: vi.fn(),
+    logMetamagic: vi.fn(),
+    saveLastDamageEvent: vi.fn(),
+    getLastDamageEvent: vi.fn(() => null),
+    clearLastDamageEvent: vi.fn(),
+  });
+  mockFn.getCurrentSorceryPoints = vi.fn(() => 10);
+  return { default: mockFn, getCurrentSorceryPoints: mockFn.getCurrentSorceryPoints };
+});
+
+// Mock MetamagicPopup component
+vi.mock('../MetamagicPopup.jsx', () => ({
+  default: function MockMetamagicPopup({ onConfirm, onSkip }) {
+    return (
+      <div data-testid="metamagic-popup">
+        <button data-testid="mock-confirm" onClick={() => onConfirm({ options: [], totalCost: 0, twinTarget: null })}>
+          Mock Confirm
+        </button>
+        <button data-testid="mock-skip" onClick={onSkip}>
+          Mock Skip
+        </button>
+      </div>
+    );
+  },
+}));
+
 // Mock sanitizeHtml
 vi.mock('../../../services/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),

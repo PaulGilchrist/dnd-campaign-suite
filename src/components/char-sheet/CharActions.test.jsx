@@ -7,6 +7,22 @@ vi.mock('../../hooks/useLoggedDiceRoll.js', () => ({
   default: vi.fn(),
 }));
 
+vi.mock('../../hooks/useMetamagic.js', () => ({
+  getCurrentSorceryPoints: vi.fn(() => 10),
+  spendSorceryPoints: vi.fn(),
+  getLastDamageEvent: vi.fn(() => null),
+  saveLastDamageEvent: vi.fn(),
+  default: vi.fn(() => ({
+    currentSP: 10,
+    maxSP: 10,
+    spendSorceryPoints: vi.fn(),
+    logMetamagic: vi.fn(),
+    saveLastDamageEvent: vi.fn(),
+    getLastDamageEvent: vi.fn(() => null),
+    clearLastDamageEvent: vi.fn(),
+  })),
+}));
+
 vi.mock('../../services/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
@@ -51,15 +67,18 @@ const mockPlayerStats = {
 };
 
 describe('CharActions', () => {
+  let mockSetPopupHtml;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSetPopupHtml = vi.fn();
     global.fetch = vi.fn().mockResolvedValue({
       json: () => Promise.resolve(['Dash', 'Disengage', 'Dodge', 'Hide', 'Withdraw']),
     });
 
     useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: null,
-      setPopupHtml: vi.fn(),
+      setPopupHtml: mockSetPopupHtml,
       rollAttack: vi.fn(),
       rollDamage: vi.fn(),
     }));
@@ -396,6 +415,102 @@ describe('CharActions', () => {
       expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
       expect(screen.getByText('Handaxe')).toBeInTheDocument();
       expect(screen.getByText(/Cunning Action:/)).toBeInTheDocument();
+    });
+  });
+
+  it('should show Empowered Spell popup when clicking Metamagic action with damage event', async () => {
+    const { getLastDamageEvent } = await import('../../hooks/useMetamagic.js');
+    getLastDamageEvent.mockReturnValue({
+      targetName: 'Goblin',
+      spellName: 'Fireball',
+      damageFormula: '8d6',
+      rawDamage: 28,
+      damageType: 'Fire',
+      rolls: [3, 5, 2, 6, 4, 3, 1, 4],
+      modifier: 0,
+    });
+
+    const sorcererStats = {
+      ...mockPlayerStats,
+      name: 'TestSorcerer',
+      class: { name: 'Sorcerer' },
+      level: 5,
+      abilities: [
+        { name: 'Charisma', bonus: 4, score: 18 },
+      ],
+      actions: [
+        {
+          name: 'Metamagic',
+          description: 'You can bend the fabric of reality..',
+          automation: {
+            type: 'spell_modifier',
+            options: ['Careful Spell', 'Distant Spell', 'Empowered Spell', 'Extended Spell', 'Heightened Spell', 'Quickened Spell', 'Subtle Spell', 'Twinned Spell'],
+            resource: 'sorcery_points',
+            casting_time: '1 action',
+          },
+        },
+      ],
+    };
+
+    render(<CharActions playerStats={sorcererStats} campaignName="test-campaign" />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Metamagic:/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/Metamagic:/));
+
+    await waitFor(() => {
+      expect(mockSetPopupHtml).toHaveBeenCalled();
+      const callArg = mockSetPopupHtml.mock.calls[0][0];
+      expect(callArg.type).toBe('empowered_spell');
+      expect(callArg.lastEvent).toBeTruthy();
+      expect(callArg.lastEvent.spellName).toBe('Fireball');
+      expect(callArg.chaMod).toBe(4);
+    });
+  });
+
+  it('should show info message when no last damage event exists for Empowered Spell', async () => {
+    const { getLastDamageEvent } = await import('../../hooks/useMetamagic.js');
+    // Reset back to default null return after previous test may have changed it
+    getLastDamageEvent.mockImplementation(() => null);
+
+    const sorcererStats = {
+      ...mockPlayerStats,
+      name: 'TestSorcerer',
+      class: { name: 'Sorcerer' },
+      level: 5,
+      abilities: [
+        { name: 'Charisma', bonus: 4, score: 18 },
+      ],
+      actions: [
+        {
+          name: 'Metamagic',
+          description: 'You can bend the fabric of reality..',
+          automation: {
+            type: 'spell_modifier',
+            options: ['Careful Spell', 'Distant Spell', 'Empowered Spell', 'Extended Spell', 'Heightened Spell', 'Quickened Spell', 'Subtle Spell', 'Twinned Spell'],
+            resource: 'sorcery_points',
+            casting_time: '1 action',
+          },
+        },
+      ],
+    };
+
+    render(<CharActions playerStats={sorcererStats} campaignName="test-campaign" />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Metamagic:/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/Metamagic:/));
+
+    await waitFor(() => {
+      expect(mockSetPopupHtml).toHaveBeenCalled();
+      const callArg = mockSetPopupHtml.mock.calls[0][0];
+      expect(callArg.type).toBe('empowered_spell');
+      expect(callArg.lastEvent).toBeNull();
+      expect(callArg.error).toContain('No recent damage event found');
     });
   });
 });

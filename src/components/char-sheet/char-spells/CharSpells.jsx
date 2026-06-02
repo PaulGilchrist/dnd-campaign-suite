@@ -3,8 +3,10 @@ import React from 'react'
 import { cloneDeep } from 'lodash';
 import useActionPopup from '../../../hooks/useActionPopup.js'
 import useLoggedDiceRoll from '../../../hooks/useLoggedDiceRoll.js'
+import useMetamagic, { getCurrentSorceryPoints } from '../../../hooks/useMetamagic.js'
 import Popup from '../../common/Popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
+import MetamagicPopup from '../MetamagicPopup.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
 import { rollExpression, rollExpressionDoubled } from '../../../services/diceRoller.js';
 import { sanitizeHtml } from '../../../services/sanitize.js';
@@ -22,15 +24,49 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
               targetName: autoDamage.targetName,
               attackerName: autoDamage.attackerName,
              };
-           if (autoDamage.saveDc) {
-              context.saveDc = autoDamage.saveDc;
-              context.saveType = autoDamage.saveType;
-              context.dcSuccess = autoDamage.dcSuccess;
-             }
+            if (autoDamage.saveDc) {
+               context.saveDc = autoDamage.saveDc;
+               context.saveType = autoDamage.saveType;
+               context.dcSuccess = autoDamage.dcSuccess;
+              }
             rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
             }
            },
          });
+    const isSorcerer = playerStats.class?.name === 'Sorcerer';
+    const metamagic = useMetamagic(playerStats, campaignName);
+    const [pendingMetamagic, setPendingMetamagic] = React.useState(null);
+
+    // When metamagic is confirmed, proceed with the pending action
+    const handleMetamagicConfirm = React.useCallback((result) => {
+      const pending = pendingMetamagic;
+      setPendingMetamagic(null);
+      if (!pending) return;
+
+      // Spend sorcery points
+      metamagic.spendSorceryPoints(result.totalCost);
+
+      // Log metamagic usage
+      if (result.options.length > 0) {
+        metamagic.logMetamagic(pending.spellName, result.options, result.totalCost);
+      }
+
+      // Build metamagic context to pass to the roll
+      const metaCtx = {};
+      if (result.options.includes('Heightened Spell')) metaCtx.metamagicHeighten = true;
+      if (result.options.includes('Careful Spell')) metaCtx.metamagicCareful = true;
+      if (result.options.includes('Twinned Spell') && result.twinTarget) metaCtx.metamagicTwinTarget = result.twinTarget;
+      if (result.options.includes('Distant Spell')) metaCtx.metamagicDistant = true;
+
+      // Proceed with the pending action
+      pending.action(metaCtx);
+    }, [pendingMetamagic, metamagic]);
+    const handleMetamagicSkip = React.useCallback(() => {
+      const pending = pendingMetamagic;
+      setPendingMetamagic(null);
+      if (!pending) return;
+      pending.action({});
+    }, [pendingMetamagic]);
 
     const getDamageFormula = (effect) => {
         const match = effect.match(/^(\d+d\d+(?:[+-]\d+)?)/);
@@ -48,20 +84,33 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         if (wasCrit && setDicePopupHtml) setDicePopupHtml(null);
         const result = wasCrit ? rollExpressionDoubled(formula) : rollExpression(formula);
         if (result) {
-            const target = getCombatTargetInfo();
-            const context = {
-                targetName: target?.name,
-                attackerName: playerStats.name,
-             };
-            if (spell.dc) {
-                context.dc = playerStats.spellAbilities.saveDc;
-                context.dcType = spell.dc.dc_type;
-                context.dcSuccess = spell.dc.dc_success;
-                context.saveDc = playerStats.spellAbilities.saveDc;
-                context.saveType = spell.dc.dc_type;
-                context.dcSuccess = spell.dc.dc_success;
+            const doDamage = (metaCtx) => {
+                const target = getCombatTargetInfo();
+                const context = {
+                    targetName: target?.name,
+                    attackerName: playerStats.name,
+                    ...metaCtx,
+                 };
+                if (spell.dc) {
+                    context.dc = playerStats.spellAbilities.saveDc;
+                    context.dcType = spell.dc.dc_type;
+                    context.dcSuccess = spell.dc.dc_success;
+                    context.saveDc = playerStats.spellAbilities.saveDc;
+                    context.saveType = spell.dc.dc_type;
+                    context.dcSuccess = spell.dc.dc_success;
+                }
+                rollDamage(spellName, formula, result.total, result.rolls, result.modifier, context);
+            };
+            if (isSorcerer) {
+                const currentSP = getCurrentSorceryPoints(playerStats.name);
+                setPendingMetamagic({
+                    spellName,
+                    action: doDamage,
+                    _currentSP: currentSP,
+                });
+            } else {
+                doDamage({});
             }
-            rollDamage(spellName, formula, result.total, result.rolls, result.modifier, context);
         }
     };
     const [filterPrepared, setFilterPrepared] = React.useState(false);
@@ -114,11 +163,35 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                              <DiceRollResult {...dicePopupHtml} onQuickRoll={dicePopupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(dicePopupHtml.promptId, dicePopupHtml.targetName, dicePopupHtml.saveType, dicePopupHtml.saveDc) : undefined} />}
                         </Popup>
                     )}
+                    {pendingMetamagic && (
+                      <MetamagicPopup
+                        spell={{ name: pendingMetamagic.spellName, level: spells.find(s => s.name === pendingMetamagic.spellName)?.level || 0 }}
+                        playerStats={{ ...playerStats, _metamagicCurrentSP: pendingMetamagic._currentSP }}
+                        campaignName={campaignName}
+                        onConfirm={handleMetamagicConfirm}
+                        onSkip={handleMetamagicSkip}
+                      />
+                    )}
             <hr />
             <div className='spell-abilities'>
                 <div className="sectionHeader"><h4>&nbsp;Spells</h4></div>
                 <div>
-                    <b className={'clickable' + (cannotAct ? ' disabled-attack' : '') + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? ' stat--penalized' : '')} onClick={() => !cannotAct && rollAttack('Spell Attack', playerStats.spellAbilities.toHit - exhaustionPenalty, { forcedMode: conditionAttackMode !== 'normal' ? conditionAttackMode : undefined })}>Attack (to hit):</b> <span className={exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.toHit - exhaustionPenalty}</span><br/>
+                    <b className={'clickable' + (cannotAct ? ' disabled-attack' : '') + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? ' stat--penalized' : '')} onClick={() => {
+                      if (cannotAct) return;
+                      const doAttack = (metaCtx) => {
+                        rollAttack('Spell Attack', playerStats.spellAbilities.toHit - exhaustionPenalty, { forcedMode: conditionAttackMode !== 'normal' ? conditionAttackMode : undefined, ...metaCtx });
+                      };
+                      if (isSorcerer) {
+                        const currentSP = getCurrentSorceryPoints(playerStats.name);
+                        setPendingMetamagic({
+                          spellName: 'Spell Attack',
+                          action: doAttack,
+                          _currentSP: currentSP,
+                        });
+                      } else {
+                        doAttack({});
+                      }
+                    }}>Attack (to hit):</b> <span className={exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.toHit - exhaustionPenalty}</span><br/>
                     <b>Modifier:</b> <span className={exhaustionPenalty > 0 ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.modifier - exhaustionPenalty}</span><br/>
                     <b>Save DC:</b> {playerStats.spellAbilities.saveDc}
                 </div>
