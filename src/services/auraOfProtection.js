@@ -61,7 +61,7 @@ export async function computeAuraBonus({ targetName, characters, campaignName, a
   for (const entry of characters) {
     const name = entry.name;
     const stats = entry.computedStats;
-    if (!name || name === targetName) continue;
+    if (!name) continue;
     if (!stats || !hasAuraOfProtection(stats)) continue;
     if (hasCannotActCondition(name, campaignName)) continue;
     const chaMod = getChaModifier(stats);

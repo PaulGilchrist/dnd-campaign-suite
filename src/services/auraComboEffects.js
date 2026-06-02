@@ -11,7 +11,7 @@ export async function computeAuraComboEffects({ targetName, characters, campaign
   for (const entry of characters) {
     const name = entry.name;
     const stats = entry.computedStats;
-    if (!name || name === targetName) continue;
+    if (!name) continue;
     if (!stats || !hasAuraOfProtection(stats)) continue;
     if (hasCannotActCondition(name, campaignName)) continue;
     const inRange = await isWithinRange(name, targetName, campaignName, activeMapName, characters);

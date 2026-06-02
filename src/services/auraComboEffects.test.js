@@ -102,15 +102,14 @@ describe('computeAuraComboEffects', () => {
     expect(result.resistances).toEqual(expect.arrayContaining(['Necrotic', 'Psychic', 'Radiant']));
   });
 
-  it('does not apply effects from self', async () => {
+  it('applies aura effects to the Paladin themselves', async () => {
     const chars = [
       makeCharacter('Paladin', [AURA_OF_PROTECTION, AURA_OF_ALACRITY]),
-    ];
+     ];
     const result = await computeAuraComboEffects({ targetName: 'Paladin', characters: chars, campaignName: 'test', activeMapName: null });
-    expect(result.speedBonus).toBe(0);
-    expect(result.immunities).toEqual([]);
-    expect(result.resistances).toEqual([]);
-  });
+    expect(result.speedBonus).toBe(10);
+    expect(result.speedSource).toBe('Paladin');
+   });
 
   it('does not apply effects from incapacitated source', async () => {
     hasCannotActCondition.mockReturnValueOnce(true);
