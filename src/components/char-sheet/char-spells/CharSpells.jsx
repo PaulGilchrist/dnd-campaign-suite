@@ -92,31 +92,69 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     pending.action({});
    }, [pendingMetamagic, playerStats.name, campaignName]);
 
-   // Handle casting a spell from the spell detail popup
+    // Handle casting a spell from the spell detail popup
   const handleSpellCast = React.useCallback((spell) => {
       setSelectedSpell(null);
 
-     if (!isSorcerer) {
-         addEntry(campaignName, {
-            type: 'spell',
-           characterName: playerStats.name,
-            spellName: spell.name,
-             spellLevel: spell.level || 0,
-            castingTime: spell.casting_time,
-             metamagic: [],
-            spCost: 0,
-            timestamp: Date.now(),
-          });
-        return;
-       }
+      const slotDmg = spell.damage?.damage_at_slot_level;
+       const charDmg = spell.damage?.damage_at_character_level;
+        const dmgObj = slotDmg && Object.keys(slotDmg).length ? slotDmg : charDmg;
+         const formula = dmgObj ? dmgObj[Object.keys(dmgObj)[0]] : null;
+          const damageType = spell.damage?.damage_type || '';
 
-   const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
-      setPendingMetamagic({
-         spellName: spell.name,
-         castingTime: spell.casting_time,
-          _currentSP: currentSP,
-         spellLevel: spell.level || 0,
-        });
+       const castAction = (metaCtx) => {
+           if (!formula) return;
+
+           if (spell.dc) {
+               // Saving throw spell - always hits, save determines damage
+              const result = rollExpression(formula);
+               if (result) {
+                   const target = getCombatTargetInfo();
+                  const context = {
+                       targetName: target?.name,
+                        attackerName: playerStats.name,
+                        ...metaCtx,
+                      saveDc: playerStats.spellAbilities.saveDc,
+                       saveType: spell.dc.dc_type,
+                      dcSuccess: spell.dc.dc_success,
+                       damageType,
+                    };
+                   rollDamage(spell.name, formula, result.total, result.rolls, result.modifier, context);
+                }
+            } else {
+               // Attack roll spell - to hit first, auto-damage on hit
+              rollAttack(spell.name, playerStats.spellAbilities.toHit, {
+                  autoDamageFormula: formula,
+                   autoDamageName: spell.name,
+                    damageType,
+                   ...metaCtx,
+                 });
+           }
+          };
+
+      if (!isSorcerer) {
+          addEntry(campaignName, {
+             type: 'spell',
+            characterName: playerStats.name,
+             spellName: spell.name,
+              spellLevel: spell.level || 0,
+             castingTime: spell.casting_time,
+              metamagic: [],
+             spCost: 0,
+             timestamp: Date.now(),
+            });
+          castAction({});
+         return;
+        }
+
+    const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
+       setPendingMetamagic({
+          spellName: spell.name,
+          castingTime: spell.casting_time,
+            _currentSP: currentSP,
+          spellLevel: spell.level || 0,
+         action: castAction,
+      });
     }, [isSorcerer, playerStats.name, campaignName]);
 
     const getDamageFormula = (effect) => {
