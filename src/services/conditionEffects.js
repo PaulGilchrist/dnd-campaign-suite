@@ -14,8 +14,8 @@ function saveModifierApplies(modifier, saveType, abilityName) {
   if (modifier.condition === 'magic') {
     if (!modifier.abilities || modifier.abilities.length === 0) return true;
     if (abilityName && modifier.abilities.includes(abilityName)) return true;
-    return true;
-   }
+    return false;
+    }
   return false;
 }
 
@@ -65,14 +65,18 @@ function computeConditionEffects(conditions = [], saveModifiers = []) {
     if (mod.condition === 'charmed' && conditionSet.has('charmed')) {
       if (mod.effect === 'advantage') effects.saveAdvantage.push('charmed');
       if (mod.effect === 'disadvantage') effects.saveDisadvantage.push('charmed');
-     } else if (mod.condition === 'frightened' && conditionSet.has('frightened')) {
+       } else if (mod.condition === 'frightened' && conditionSet.has('frightened')) {
       if (mod.effect === 'advantage') effects.saveAdvantage.push('frightened');
       if (mod.effect === 'disadvantage') effects.saveDisadvantage.push('frightened');
-      } else if (mod.condition === 'poison' && conditionSet.has('poisoned')) {
+       } else if (mod.condition === 'poison' && conditionSet.has('poisoned')) {
         if (mod.effect === 'advantage') effects.saveAdvantage.push('poisoned');
         if (mod.effect === 'disadvantage') effects.saveDisadvantage.push('poisoned');
+        } else if (mod.condition === 'magic' && mod.abilities && mod.abilities.length > 0) {
+        // Track per-ability advantage for traits like Gnomish Cunning
+        if (mod.effect === 'advantage') effects.saveAdvantageAbilities = [...(effects.saveAdvantageAbilities || []), ...mod.abilities];
+        if (mod.effect === 'disadvantage') effects.saveDisadvantageAbilities = [...(effects.saveDisadvantageAbilities || []), ...mod.abilities];
        }
-    }
+     }
 
   applySaveModifiers(effects, saveModifiers, null, null);
 
@@ -177,6 +181,10 @@ function hasSaveAdvantage(effects, saveType) {
   if (!effects) return false;
   if ((effects.saveAdvantageCount || 0) > 0) return true;
   if (saveType && effects.saveAdvantage?.includes(saveType)) return true;
+  if (saveType && effects.saveAdvantageAbilities?.length) {
+    const abbr = saveType.substring(0, 3).toUpperCase();
+    if (effects.saveAdvantageAbilities.includes(abbr)) return true;
+  }
   return false;
 }
 

@@ -24,18 +24,21 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
         if (!autoFail && conditionEffects?.saveDisadvantage?.includes(abbr)) {
           forcedMode = 'disadvantage'
         }
-        if (!autoFail && !forcedMode && (conditionEffects?.saveAdvantageCount || 0) > 0) {
-           forcedMode = 'advantage'
+         if (!autoFail && !forcedMode && (conditionEffects?.saveAdvantageCount || 0) > 0) {
+          forcedMode = 'advantage'
            }
+        if (!autoFail && !forcedMode && conditionEffects?.saveAdvantageAbilities?.includes(abilityName.substring(0, 3).toUpperCase())) {
+          forcedMode = 'advantage'
+         }
         if (conditionEffects?.autoReroll) {
           return { forcedMode, autoFail: autoFail || undefined, autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition }
         }
         return { forcedMode, autoFail: autoFail || undefined }
       }
 
-      const hasSaveAdvantage = () => {
-        return (conditionEffects?.saveAdvantageCount || 0) > 0;
-      }
+        const hasSaveAdvantage = (abilityName) => {
+         return (conditionEffects?.saveAdvantageCount || 0) > 0 || conditionEffects?.saveAdvantageAbilities?.includes(abilityName.substring(0, 3).toUpperCase());
+        }
 
     return (
         <div className='abilities-popup-parent'>

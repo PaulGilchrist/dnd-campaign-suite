@@ -51,7 +51,7 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
     const condition = CONDITIONS.find(c => c.key === conditionKey)
     const conditionName = condition?.label || conditionKey
     const saveBonus = getAbilitySaveBonus(playerStats, saveAbility)
-    const hasAdvantage = (conditionEffects?.saveAdvantageCount || 0) > 0 || conditionEffects?.saveAdvantage?.includes(conditionKey)
+    const hasAdvantage = (conditionEffects?.saveAdvantageCount || 0) > 0 || conditionEffects?.saveAdvantage?.includes(conditionKey) || conditionEffects?.saveAdvantageAbilities?.includes(saveAbility);
 
     let roll1, roll2, finalRoll, mode
     if (hasAdvantage) {
