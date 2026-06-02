@@ -7,6 +7,7 @@ import { EXHAUSTION_LEVELS, isDeadFromExhaustion, getExhaustionSaveDC } from '..
 import usePopup from '../../../hooks/usePopup.js'
 import Popup from '../../common/Popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
+import { computeAuraBonus } from '../../../services/auraOfProtection.js'
 import './CharConditions.css'
 
 const STORAGE_KEY = 'activeConditions'
@@ -26,7 +27,7 @@ export function loadActiveConditions(name, campaignName) {
   return loadConditions(name, campaignName)
 }
 
-function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhaustionChange, onConditionsChange, conditionEffects }) {
+function CharConditions({ playerStats, campaignName, activeMapName, characters, exhaustionLevel, onExhaustionChange, onConditionsChange, conditionEffects }) {
   const [activeConditions, setActiveConditions] = React.useState(() =>
     loadConditions(playerStats.name, campaignName)
   )
@@ -45,7 +46,7 @@ function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhausti
     }).catch(() => {})
   }
 
-  function handleConditionSave(conditionKey, saveAbility, saveLabel) {
+  async function handleConditionSave(conditionKey, saveAbility, saveLabel) {
     const condition = CONDITIONS.find(c => c.key === conditionKey)
     const conditionName = condition?.label || conditionKey
     const saveBonus = getAbilitySaveBonus(playerStats, saveAbility)
@@ -63,8 +64,13 @@ function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhausti
       finalRoll = roll1
       mode = 'normal'
     }
-    const total = finalRoll + saveBonus
+
+    const aura = await computeAuraBonus({ targetName: playerStats.name, characters, campaignName, activeMapName })
+    const auraBonus = aura.bonus
+    const total = finalRoll + saveBonus + auraBonus
     const success = total >= CONDITION_SAVE_DC
+
+    const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined
 
     logEntry({
       type: 'roll',
@@ -73,11 +79,25 @@ function CharConditions({ playerStats, campaignName, exhaustionLevel, onExhausti
       name: `${saveLabel} (${conditionName})`,
       rolls: hasAdvantage ? [roll1, roll2] : [roll1],
       mode,
-      total: finalRoll,
-      bonus: saveBonus,
+      total,
+      bonus: saveBonus + auraBonus,
+      bonusDetail,
       dc: CONDITION_SAVE_DC,
       success,
       condition: conditionName,
+    })
+
+    setPopupHtml({
+      type: 'd20',
+      rollType: 'save',
+      name: `${saveLabel} (DC ${CONDITION_SAVE_DC})`,
+      rolls: hasAdvantage ? [roll1, roll2] : [roll1],
+      bonus: saveBonus + auraBonus,
+      bonusDetail,
+      total,
+      dc: CONDITION_SAVE_DC,
+      success,
+      forcedMode: hasAdvantage ? 'advantage' : undefined,
     })
 
     setPopupHtml({

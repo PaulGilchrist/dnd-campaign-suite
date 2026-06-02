@@ -3,9 +3,10 @@ import utils from '../../services/utils.js';
 import { rollD20 } from '../../services/diceRoller.js';
 import { sendSaveResult, clearSavePrompt } from '../../services/savePromptService.js';
 import Subscriber from './Subscriber.jsx';
+import { computeAuraBonus } from '../../services/auraOfProtection.js';
 import './savePromptModal.css';
 
-function SavePromptModal({ campaignName, characters }) {
+function SavePromptModal({ campaignName, characters, activeMapName }) {
   const [prompts, setPrompts] = useState([]);
 
   const characterNames = useMemo(() => new Set((characters || []).map(c => {
@@ -47,7 +48,7 @@ function SavePromptModal({ campaignName, characters }) {
     }
   }, [campaignName, current, advance]);
 
-  const handleRollSave = useCallback(() => {
+  const handleRollSave = useCallback(async () => {
     if (!current) return;
 
     let saveBonus = 0;
@@ -64,16 +65,19 @@ function SavePromptModal({ campaignName, characters }) {
       }
     } catch { /* ignore */ }
 
+    const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName });
+    const auraBonus = aura.bonus;
     const roll = rollD20();
-    const total = roll + saveBonus;
+    const total = roll + saveBonus + auraBonus;
     const success = total >= current.saveDc;
+    const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined;
 
     sendSaveResult(campaignName, current.targetName, {
       promptId: current.promptId,
       success,
       roll,
       total,
-      saveBonus,
+      saveBonus: saveBonus + auraBonus,
     });
 
     window.dispatchEvent(new CustomEvent('save-result', {
@@ -85,7 +89,7 @@ function SavePromptModal({ campaignName, characters }) {
         success,
         roll,
         total,
-        saveBonus,
+        saveBonus: saveBonus + auraBonus,
         rawDamage: current.rawDamage,
         dcSuccess: current.dcSuccess,
       },
@@ -93,10 +97,10 @@ function SavePromptModal({ campaignName, characters }) {
 
     setPrompts(prev => prev.map((p, i) =>
       i === 0
-        ? { ...p, result: { success, roll, total, saveBonus } }
+        ? { ...p, result: { success, roll, total, saveBonus: saveBonus + auraBonus, bonusDetail } }
         : p
     ));
-  }, [campaignName, current]);
+  }, [campaignName, current, characters, activeMapName]);
 
   const handleNext = useCallback(() => {
     advance();
@@ -136,7 +140,7 @@ function SavePromptModal({ campaignName, characters }) {
                 <div className={`sp-result ${current.result.success ? 'sp-result-success' : 'sp-result-fail'}`}>
                   <p className="sp-result-label">{current.result.success ? 'SAVE SUCCESS' : 'SAVE FAILURE'}</p>
                   <p className="sp-result-total">Total: <strong>{current.result.total}</strong> vs DC {current.saveDc}</p>
-                  <p className="sp-result-breakdown">d20 ({current.result.roll}) + {current.result.saveBonus}</p>
+                  <p className="sp-result-breakdown">d20 ({current.result.roll}) + {current.result.saveBonus}{current.result.bonusDetail ? ' ' + current.result.bonusDetail : ''}</p>
                 </div>
               )}
             </div>

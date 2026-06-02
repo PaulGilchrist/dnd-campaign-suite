@@ -5395,7 +5395,7 @@
                             "range_expression": "10_ft",
                             "effect": "saving_throw_bonus",
                             "bonusExpression": "CHA modifier",
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     }
                 ],
@@ -5488,7 +5488,14 @@
                         "name": "Aura of Courage",
                         "description": "You and your allies have Immunity to the Frightened condition while in your Aura of Protection.",
                         "level": 10,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_buff",
+                            "target": "allies_in_range",
+                            "range_expression": "10_ft",
+                            "conditionImmunity": "frightened",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -5672,7 +5679,13 @@
                         "name": "Aura Expansion",
                         "description": "Your Aura of Protection is now a 30-foot Emanation.",
                         "level": 18,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_rule",
+                            "target": "allies_in_range",
+                            "range_expression": "30_ft",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -5745,7 +5758,14 @@
                     {
                         "name": "Aura of Devotion",
                         "description": "You and your allies have Immunity to Charmed condition while in Aura of Protection.",
-                        "level": 7
+                        "level": 7,
+                        "automation": {
+                            "type": "passive_buff",
+                            "target": "allies_in_range",
+                            "range_expression": "10_ft",
+                            "conditionImmunity": "charmed",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Smite of Protection",
@@ -5819,7 +5839,15 @@
                     {
                         "name": "Aura of Alacrity",
                         "description": "Your Speed +10 feet. Allies entering Aura of Protection or starting turn there get +10 feet Speed until end of their next turn.",
-                        "level": 7
+                        "level": 7,
+                        "automation": {
+                            "type": "passive_buff",
+                            "target": "allies_in_range",
+                            "range_expression": "10_ft",
+                            "effect": "speed_bonus",
+                            "bonusExpression": "+10 ft.",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Glorious Defense",
@@ -5888,7 +5916,14 @@
                     {
                         "name": "Aura of Warding",
                         "description": "You and allies have Resistance to Necrotic, Psychic, and Radiant damage while in Aura of Protection.",
-                        "level": 7
+                        "level": 7,
+                        "automation": {
+                            "type": "passive_buff",
+                            "target": "allies_in_range",
+                            "range_expression": "10_ft",
+                            "resistances": ["Necrotic", "Psychic", "Radiant"],
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Undying Sentinel",

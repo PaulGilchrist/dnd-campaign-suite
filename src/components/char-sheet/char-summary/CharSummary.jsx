@@ -24,7 +24,7 @@ import CharConditions from './CharConditions.jsx'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
-function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, onLongRest, exhaustionLevel, onExhaustionChange, conditionEffects, onConditionsChange }) {
+function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters, onLongRest, exhaustionLevel, onExhaustionChange, conditionEffects, onConditionsChange }) {
     const { popupHtml, setPopupHtml, rollInitiative } = useLoggedDiceRoll(playerStats.name, campaignName);
     const [showShortRest, setShowShortRest] = React.useState(false);
     const [showXpModal, setShowXpModal] = React.useState(false);
@@ -281,7 +281,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     onClose={() => setShowAvatarModal(false)}
                 />
             )}
-              <CharConditions playerStats={playerStats} campaignName={campaignName} exhaustionLevel={exhaustionLevel} onExhaustionChange={onExhaustionChange} onConditionsChange={onConditionsChange} conditionEffects={conditionEffects} />
+              <CharConditions playerStats={playerStats} campaignName={campaignName} activeMapName={activeMapName} characters={characters} exhaustionLevel={exhaustionLevel} onExhaustionChange={onExhaustionChange} onConditionsChange={onConditionsChange} conditionEffects={conditionEffects} />
             </div>
   </div>
 )

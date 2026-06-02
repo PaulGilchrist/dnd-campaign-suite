@@ -17,7 +17,7 @@ import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT }
 import Subscriber from '../common/Subscriber.jsx';
 import './CharSheet.css'
 
-function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName }) {
+function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters }) {
     const [playerStats, setPlayerStats] = React.useState(null);
     const [forceRefresh, setForceRefresh] = React.useState(0);
     const readExhaustionLevel = () => {
@@ -135,6 +135,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
               onUploadClick={onUploadClick}
               onSaveClick={onSaveClick}
               campaignName={campaignName}
+              activeMapName={activeMapName}
+              characters={characters}
               onLongRest={() => setForceRefresh(utils.guid())}
               exhaustionLevel={exhaustionLevel}
               onExhaustionChange={setExhaustionLevel}

@@ -7038,7 +7038,7 @@
                             "range_expression": "10_ft",
                             "effect": "saving_throw_bonus",
                             "bonusExpression": "CHA modifier",
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     }
                 ],
@@ -7120,7 +7120,7 @@
                             "target": "allies_in_range",
                             "range_expression": "10_ft",
                             "conditionImmunity": "frightened",
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     }
                 ],
@@ -7275,30 +7275,15 @@
                 "prof_bonus": 6,
                 "features": [
                     {
-                        "name": "Aura of Courage",
+                        "name": "Aura Expansion",
                         "level": 18,
                         "prerequisites": [],
-                        "description": "You and friendly creatures within 30 feet of you can't be frightened while you are conscious.",
+                        "description": "Your Auras are now a 30-foot Emanation.",
                         "automation": {
-                            "type": "passive_immunity",
+                            "type": "passive_rule",
                             "target": "allies_in_range",
-                            "range_expression": "10_ft",
-                            "conditionImmunity": "frightened",
-                            "casting_time": "1 action"
-                        }
-                    },
-                    {
-                        "name": "Aura of Protection",
-                        "level": 18,
-                        "prerequisites": [],
-                        "description": "Whenever you or a friendly creature within 30 feet of you must make a saving throw, the creature gains a bonus to the saving throw equal to your Charisma modifier (with a minimum bonus of +1). You must be conscious to grant this bonus.",
-                        "automation": {
-                            "type": "passive_buff",
-                            "target": "allies_in_range",
-                            "range_expression": "10_ft",
-                            "effect": "saving_throw_bonus",
-                            "bonusExpression": "CHA modifier",
-                            "casting_time": "1 action"
+                            "range_expression": "30_ft",
+                            "casting_time": "passive"
                         }
                     }
                 ],
@@ -7486,7 +7471,14 @@
                                 "name": "Aura of Devotion",
                                 "level": 7,
                                 "prerequisites": [],
-                                "description": "You and friendly creatures within 10 feet of you can't be charmed while you are conscious."
+                                "description": "You and friendly creatures within 10 feet of you can't be charmed while you are conscious.",
+                                "automation": {
+                                    "type": "passive_buff",
+                                    "target": "allies_in_range",
+                                    "range_expression": "10_ft",
+                                    "conditionImmunity": "charmed",
+                                    "casting_time": "passive"
+                                }
                             }
                         ],
                         "subclass_specific": {
@@ -7509,14 +7501,7 @@
                     },
                     {
                         "level": 18,
-                        "features": [
-                            {
-                                "name": "Aura of Devotion",
-                                "level": 18,
-                                "prerequisites": [],
-                                "description": "You and friendly creatures within 30 feet of you can't be charmed while you are conscious."
-                            }
-                        ],
+                        "features": [],
                         "subclass_specific": {
                             "aura_range": 30
                         }
@@ -7695,7 +7680,14 @@
                                 "name": "Aura of Warding",
                                 "level": 7,
                                 "prerequisites": [],
-                                "description": "Ancient magic lies so heavily upon you that it forms an eldritch ward. You and friendly creatures within 10 feet of you have resistance to damage from spells."
+                                "description": "Ancient magic lies so heavily upon you that it forms an eldritch ward. You and friendly creatures within 10 feet of you have resistance to damage from spells.",
+                                "automation": {
+                                    "type": "passive_buff",
+                                    "target": "allies_in_range",
+                                    "range_expression": "10_ft",
+                                    "resistances": ["spells"],
+                                    "casting_time": "passive"
+                                }
                             }
                         ]
                     },
@@ -7712,14 +7704,7 @@
                     },
                     {
                         "level": 18,
-                        "features": [
-                            {
-                                "name": "Aura of Warding",
-                                "level": 18,
-                                "prerequisites": [],
-                                "description": "Ancient magic lies so heavily upon you that it forms an eldritch ward. You and friendly creatures within 30 feet of you have resistance to damage from spells."
-                            }
-                        ]
+                        "features": []
                     }
                 ],
                 "description": "The Oath of the Ancients is as old as the race of elves and the rituals of the druids. Sometimes called fey knights, green knights, or horned knights, paladins who swear this oath cast their lot with the side of the light in the cosmic struggle against darkness because they love the beautiful and life-giving things of the world, not necessarily because they believe in principles of honor, courage, and justice. They adorn their armor and clothing with images of growing things-leaves, antlers, or flowers-to reflect their commitment to preserving life and light in the world.<br/><br/><ul><li><b>Kindle the Light:</b> Through your acts of mercy, kindness, and forgiveness, kindle the light of hope in the world, beating back despair.</li><li><b>Shelter the Light:</b> Where there is good, beauty, love, and laughter in the world, stand against the wickedness that would swallow it. Where life flourishes, stand against the forces that would render it barren.</li><li><b>Preserve Your Own Light:</b> Delight in song and laughter, in beauty and art. Ifyou allow the light to die in your own heart, you can't preserve it in the world.</li><li><b>Be the Light:</b> Be a glorious beacon for all who live in despair. Let the light of your joy and courage shine forth in all your deeds.</li></ul>"

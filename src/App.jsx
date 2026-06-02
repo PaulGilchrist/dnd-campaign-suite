@@ -333,7 +333,8 @@ function App() {
              allMagicItems2024={magicItems2024}
               campaignName={campaignName}
               activeMapName={activeMapName}
-             onDeleteCharacter={handleDeleteCharacter}
+              characters={charactersWithHp}
+              onDeleteCharacter={handleDeleteCharacter}
              onEditCharacter={() => handleEditCharacter(activeCharacter)}
              onUploadClick={handleUploadClick}
              onSaveClick={handleSaveClick}
@@ -410,9 +411,9 @@ function App() {
                               <br />
         {showCharacterWizard && <CharacterCreationWizard onComplete={handleWizardComplete} onCancel={handleWizardCancel} allRaces={races} allRaces2024={races2024} allClasses={classes} allSpells={spells} allSpells2024={spells2024} />}
         {showEditCharacterWizard && <CharacterCreationWizard onComplete={handleEditWizardComplete} onCancel={handleEditWizardCancel} allRaces={races} allClasses={classes} allSpells={spells} allSpells2024={spells2024} characterData={activeCharacter} isEditing={true} />}
-        <SavePromptModal campaignName={campaignName} characters={charactersWithHp} />
+        <SavePromptModal campaignName={campaignName} characters={charactersWithHp} activeMapName={activeMapName} />
         <DeathSavePromptModal campaignName={campaignName} characters={charactersWithHp} />
-        <ConcentrationPromptModal campaignName={campaignName} characters={charactersWithHp} />
+        <ConcentrationPromptModal campaignName={campaignName} characters={charactersWithHp} activeMapName={activeMapName} />
       </div>
     </div>
   );

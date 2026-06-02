@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus }) {
+function DiceRollResult({ name, type, rolls, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
 
     const isD20 = type === 'd20';
@@ -51,8 +51,8 @@ function DiceRollResult({ name, type, rolls, bonus = 0, formula = '', modifier =
                       : safeRolls.join(', ')
                   }
                 </span>
-                {(bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${bonus + modifier}` :
-                 (bonus + modifier) < 0 ? ` ${bonus + modifier}` : ''}
+                {(bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` :
+                 (bonus + modifier) < 0 ? ` ${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` : ''}
             </div>
 
               {isD20 && (

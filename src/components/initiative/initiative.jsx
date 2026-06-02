@@ -7,6 +7,7 @@ import { clearDeathSavePrompt } from '../../services/savePromptService.js'
 import { getMonsterImageUrl, getMonsterData } from '../../services/monsterUtils.js';
 import { rollD20 } from '../../services/diceRoller.js';
 import * as concentrationRules from '../../services/concentrationRules.js';
+import { computeAuraBonus } from '../../services/auraOfProtection.js';
 import { getAbilitySaveBonus, getAbilityLabel, getDefaultAbility, CONDITIONS } from '../../services/conditionUtils.js';
 import { computeConditionEffects } from '../../services/conditionEffects.js';
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx';
@@ -818,9 +819,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             } catch { /* ignore */ }
         }
 
+        const aura = await computeAuraBonus({ targetName: creatureName, characters, campaignName, activeMapName: mapName });
+        const auraBonus = aura.bonus;
         const r1 = rollD20();
-        const total = r1 + saveBonus;
+        const total = r1 + saveBonus + auraBonus;
         const success = total >= condition.dc;
+        const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined;
 
         if (success) {
             creature.conditions = creature.conditions.filter(c => c.id !== condition.id);
@@ -834,7 +838,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             rollType: 'condition-save',
             name: getAbilityLabel(condition.ability),
             rolls: [r1],
-            bonus: saveBonus,
+            bonus: saveBonus + auraBonus,
+            bonusDetail,
             targetName: null,
             targetAc: null,
             hit: undefined,
@@ -854,7 +859,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 rolls: [r1],
                 mode: 'normal',
                 total: r1,
-                bonus: saveBonus,
+                bonus: saveBonus + auraBonus,
+                bonusDetail,
                 condition: condition.label,
                 dc: condition.dc,
                 success,
@@ -924,7 +930,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             } catch { /* ignore */ }
         }
 
-        const { roll: r1, success } = concentrationRules.rollConcentrationSave(saveBonus, concentration.dc);
+        const aura = await computeAuraBonus({ targetName: creatureName, characters, campaignName, activeMapName: mapName });
+        const auraBonus = aura.bonus;
+        const effectiveSaveBonus = saveBonus + auraBonus;
+        const { roll: r1, success } = concentrationRules.rollConcentrationSave(effectiveSaveBonus, concentration.dc);
+        const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined;
 
         if (!success) {
             creature.concentration = null;
@@ -938,7 +948,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             rollType: 'condition-save',
             name: 'Concentration',
             rolls: [r1],
-            bonus: saveBonus,
+            bonus: effectiveSaveBonus,
+            bonusDetail,
             targetName: null,
             targetAc: null,
             hit: undefined,
@@ -958,7 +969,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 rolls: [r1],
                 mode: 'normal',
                 total: r1,
-                bonus: saveBonus,
+                bonus: effectiveSaveBonus,
+                bonusDetail,
                 condition: `Concentration: ${concentration.spell}`,
                 dc: concentration.dc,
                 success,

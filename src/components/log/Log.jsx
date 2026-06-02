@@ -89,7 +89,7 @@ function RollEntry({ entry }) {
           {(isDamage || isSaveDamage || isAoeDamage) && entry.formula && (
             <span className="log-dice-formula">{entry.formula}</span>
           )}
-          <span className="log-total"><b>{entry.total}{isDamage ? '' : (isSaveDamage || isAoeDamage) ? '' : (entry.bonus >= 0 ? `+${entry.bonus}` : `${entry.bonus}`)}</b></span>
+          <span className="log-total"><b>{entry.total}{isDamage ? '' : (isSaveDamage || isAoeDamage) ? '' : (entry.bonus >= 0 ? `+${entry.bonus}` : `${entry.bonus}`)}{entry.bonusDetail ? ' ' + entry.bonusDetail : ''}</b></span>
         </div>
         {isSaveDamage && entry.finalDamage != null && entry.damageType && (
           <span className="log-final-damage">→ {entry.finalDamage} {entry.damageType} damage</span>
