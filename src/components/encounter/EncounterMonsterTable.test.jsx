@@ -180,7 +180,7 @@ describe('EncounterMonsterTable', () => {
   });
 
   it('should show desc sort indicator', () => {
-    render(<EncounterMonsterTable {...props} sortDirection="desc" />);
+    render(<EncounterMonsterTable {...props} sortDirection="description" />);
     const nameHeader = screen.getByText('Monster').closest('th');
     expect(nameHeader.textContent).toContain('\u25BC');
   });

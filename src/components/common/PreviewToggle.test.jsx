@@ -53,7 +53,7 @@ describe('PreviewToggle', () => {
             <PreviewToggle
                 value=""
                 onChange={() => {}}
-                id="desc"
+                id="description"
                 label="Description"
             />
         );
