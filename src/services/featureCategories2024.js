@@ -64,6 +64,7 @@ export const bonusActions = [
     "Exceptional Training",
     "Fast Hands",
     "Fighting Style Bonus",
+    "Font of Magic",
     "Innate Sorcery",
     "Instinctive Pounce",
     "Large Form",

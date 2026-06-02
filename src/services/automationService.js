@@ -415,6 +415,15 @@ function buildAttackInfo(feature, playerStats) {
       }
     }
 
+    case 'font_of_magic': {
+      return {
+        type: 'font_of_magic',
+        name: feature.name,
+        casting_time: auto.casting_time || '1 bonus action',
+        hasAutomation: true
+      }
+    }
+
     case 'bonus_action_attack': {
       return {
         type: 'bonus_action_attack',
@@ -504,6 +513,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
       case 'attack_rider':
       case 'initiative_action':
       case 'spell_modifier':
+      case 'font_of_magic':
         result.actions.push(info)
         break
       case 'damage_reduction':

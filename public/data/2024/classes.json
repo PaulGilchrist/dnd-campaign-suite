@@ -7590,7 +7590,11 @@
                         "name": "Font of Magic",
                         "description": "You can tap into the wellspring of magic within yourself. This wellspring is represented by Sorcery Points. You have 2 Sorcery Points, gaining more at higher levels. Converting Spell Slots to Sorcery Points. You can expend a spell slot to gain Sorcery Points equal to the slot's level (no action required). Creating Spell Slots. As a Bonus Action, transform unexpended Sorcery Points into one spell slot. Cost: 1st=2 SP, 2nd=3 SP, 3rd=4 SP, 4th=5 SP, 5th=6 SP. Minimum levels: 2, 3, 5, 7, 9. Any spell slot created with this feature vanishes when you finish a Long Rest.",
                         "level": 2,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "font_of_magic",
+                            "casting_time": "1 bonus action"
+                        }
                     },
                     {
                         "name": "Metamagic",

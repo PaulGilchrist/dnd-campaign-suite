@@ -18,6 +18,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js
 import storage from '../../services/storage.js'
 import utils from '../../services/utils.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
+import FontOfMagicModal from './FontOfMagicModal.jsx'
 import { getClassFeatures } from '../../services/classFeatures.js';
 import { addEntry } from '../../services/logService.js';
 import { getCurrentSorceryPoints, spendSorceryPoints, getLastDamageEvent, saveLastDamageEvent } from '../../hooks/useMetamagic.js';
@@ -34,6 +35,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [actions, setActions] = useState([]);
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
     const [healingPoolModal, setHealingPoolModal] = useState(null);
+    const [fontOfMagicModal, setFontOfMagicModal] = useState(null);
 
      useEffect(() => {
        computeFeatRangeEffects(playerStats.feats, playerStats.rules).then(setFeatRangeEffects).catch(() => {});
@@ -587,6 +589,10 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 }
                 break;
               }
+            case 'font_of_magic': {
+                setFontOfMagicModal(true);
+                break;
+              }
              case 'initiative_action': {
                if (auto.effect === 'regain_focus_points_and_heal') {
 
@@ -805,18 +811,25 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                            <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
                                       </Popup>
                                   )}
-                  {healingPoolModal && (
-                      <HealingPoolModal
-                         playerStats={playerStats}
-                         campaignName={campaignName}
-                         poolMax={healingPoolModal.pool}
-                         poolExpression={healingPoolModal.poolExpression}
-                         alsoCures={healingPoolModal.alsoCures}
-                         cureCost={healingPoolModal.cureCost}
-                         onClose={() => setHealingPoolModal(null)}
-                      />
-                  )}
-                {playerStats.actions.map((action) => {
+                   {healingPoolModal && (
+                       <HealingPoolModal
+                          playerStats={playerStats}
+                          campaignName={campaignName}
+                          poolMax={healingPoolModal.pool}
+                          poolExpression={healingPoolModal.poolExpression}
+                          alsoCures={healingPoolModal.alsoCures}
+                          cureCost={healingPoolModal.cureCost}
+                          onClose={() => setHealingPoolModal(null)}
+                       />
+                   )}
+                   {fontOfMagicModal && (
+                       <FontOfMagicModal
+                          playerStats={playerStats}
+                          campaignName={campaignName}
+                          onClose={() => setFontOfMagicModal(null)}
+                       />
+                   )}
+                 {playerStats.actions.map((action) => {
                     const isClickable = action.details || hasAutomation(action);
                     const handleClick = () => {
                         if (hasAutomation(action)) {

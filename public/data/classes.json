@@ -9491,7 +9491,11 @@
             "name": "Font of Magic",
             "level": 2,
             "prerequisites": [],
-            "description": "You tap into a deep wellspring of magic within yourself. This wellspring is represented by sorcery points, which allow you to create a variety of magical effects.<br/><br/><b>Sorcery Points</b><br/>You have 2 sorcery points, and you gain more as you reach higher levels, as shown in the Sorcery Points column of the Sorcerer table. You can never have more sorcery points than shown on the table for your level. You regain all spent sorcery points when you finish a long rest."
+            "description": "You tap into a deep wellspring of magic within yourself. This wellspring is represented by sorcery points, which allow you to create a variety of magical effects.<br/><br/><b>Sorcery Points</b><br/>You have 2 sorcery points, and you gain more as you reach higher levels, as shown in the Sorcery Points column of the Sorcerer table. You can never have more sorcery points than shown on the table for your level. You regain all spent sorcery points when you finish a long rest.",
+            "automation": {
+              "type": "font_of_magic",
+              "casting_time": "1 bonus action"
+            }
           }
         ],
         "spellcasting": {

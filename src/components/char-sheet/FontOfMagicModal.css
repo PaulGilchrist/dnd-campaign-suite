@@ -1,0 +1,100 @@
+.font-of-magic-overlay {
+  position: fixed;
+  top: 0;
+  left: 180px;
+  width: calc(100vw - 180px);
+  height: 100vh;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.font-of-magic-modal {
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #222);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 520px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+
+.font-of-magic-modal h3 {
+  margin: 0 0 4px;
+  font-size: 1.3em;
+}
+
+.font-of-magic-subtitle {
+  margin: 0 0 12px;
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+
+.font-of-magic-summary {
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: 6px;
+  font-size: 1.05em;
+}
+
+.font-of-magic-section {
+  margin-bottom: 16px;
+}
+
+.font-of-magic-section h4 {
+  margin: 0 0 2px;
+  font-size: 1em;
+}
+
+.font-of-magic-hint {
+  margin: 0 0 8px;
+  font-size: 0.8em;
+  opacity: 0.65;
+}
+
+.font-of-magic-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.font-of-magic-table th,
+.font-of-magic-table td {
+  padding: 4px 8px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-color, #ddd);
+}
+
+.font-of-magic-table th {
+  font-weight: 600;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.font-of-magic-table input[type="number"] {
+  width: 52px;
+  text-align: center;
+  padding: 2px 4px;
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 4px;
+}
+
+.font-of-magic-total {
+  margin-top: 6px;
+  text-align: right;
+  font-size: 0.9em;
+}
+
+.font-of-magic-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+  border-top: 1px solid var(--border-color, #ddd);
+  padding-top: 12px;
+}
