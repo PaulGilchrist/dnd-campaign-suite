@@ -178,8 +178,9 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                 const context = {
                     targetName: target?.name,
                     attackerName: playerStats.name,
+                    damageType: spell.damage?.damage_type || '',
                     ...metaCtx,
-                 };
+                };
                 if (spell.dc) {
                     context.dc = playerStats.spellAbilities.saveDc;
                     context.dcType = spell.dc.dc_type;

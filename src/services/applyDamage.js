@@ -6,12 +6,13 @@ import { sendDeathSavePrompt, sendConcentrationPrompt } from './savePromptServic
 import { rollConcentrationSave } from './concentrationRules.js';
 
 export function computeDamageAfterResistances(rawDamage, damageTypes, resistances, immunities) {
-  if (!damageTypes || damageTypes.length === 0) return rawDamage;
+  if (!damageTypes || damageTypes.length === 0) throw new Error('computeDamageAfterResistances: damageTypes is required');
   for (const dt of damageTypes) {
+    if (!dt) throw new Error('computeDamageAfterResistances: each damageType must be a non-empty string');
     const lower = dt.toLowerCase();
     if (immunities?.some(i => i.toLowerCase() === lower)) return 0;
     if (resistances?.some(r => r.toLowerCase() === lower)) return Math.floor(rawDamage / 2);
-  }
+   }
   return rawDamage;
 }
 

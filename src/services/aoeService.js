@@ -33,7 +33,7 @@ export function processAoeNpcs(combatSummary, affected, rawDamage, damageType, s
     if (creature.type !== 'npc') continue;
     const saveResult = rollSaveForCreature(creature, saveType, saveDc);
     const finalDamage = computeDamageAfterSave(rawDamage, saveResult.success, dcSuccess);
-    const applyResult = applyDamageToTarget(combatSummary, creature.name, finalDamage, damageType ? [damageType] : [], campaignName);
+    const applyResult = applyDamageToTarget(combatSummary, creature.name, finalDamage, [damageType], campaignName);
     results.push({
       creatureName: creature.name,
       saveSuccess: saveResult.success,

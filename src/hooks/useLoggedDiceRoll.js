@@ -56,7 +56,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
        }
       const applyResult = applyDamageToTarget(
         combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName
-       );
+         );
 
       logEntry({
         type: 'roll',
@@ -296,7 +296,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           const npcResults = saveDc && saveType
              ? processAoeNpcs(combatSummary, affected, total, damageType, saveDc, saveType, dcSuccess, campaignName)
              : affected.map(({ creature }) => {
-                const applyResult = applyDamageToTarget(combatSummary, creature.name, total, damageType ? [damageType] : [], campaignName);
+                const applyResult = applyDamageToTarget(combatSummary, creature.name, total, [damageType], campaignName);
                 return { creatureName: creature.name, finalDamage: applyResult?.finalDamage, newHp: applyResult?.newHp, damageReduced: applyResult?.damageReduced, saveSuccess: null };
                });
           const playerAffected = affected.filter(a => a.creature.type === 'player');
@@ -345,7 +345,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           const disadvantage = context?.metamagicHeighten || false;
           const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage);
           const finalDamage = computeDamageAfterSave(total, saveResult.success, dcSuccess);
-          const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, damageType ? [damageType] : [], campaignName);
+          const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName);
 
           logEntry({
             type: 'roll',
@@ -409,7 +409,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
               const twinDisadvantage = context?.metamagicHeighten || false;
               const twinSaveResult = rollSaveForCreature(twinTarget, saveType, saveDc, twinDisadvantage);
               const twinFinalDamage = computeDamageAfterSave(total, twinSaveResult.success, dcSuccess);
-              const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, damageType ? [damageType] : [], campaignName);
+              const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName);
               logEntry({
                 type: 'roll',
                 characterName,
@@ -443,7 +443,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         if (target.type === 'player') {
           const isCarefulAlly = context?.metamagicCareful || false;
           if (isCarefulAlly) {
-            const applyResult = applyDamageToTarget(combatSummary, target.name, 0, damageType ? [damageType] : [], campaignName);
+            const applyResult = applyDamageToTarget(combatSummary, target.name, 0, [damageType], campaignName);
             logEntry({
               type: 'roll',
               characterName,
@@ -556,7 +556,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
 
       let applyResult = null;
       if (target) {
-        applyResult = applyDamageToTarget(combatSummary, target.name, total, damageType ? [damageType] : [], campaignName);
+        applyResult = applyDamageToTarget(combatSummary, target.name, total, [damageType], campaignName);
        }
 
      logEntry({
@@ -600,7 +600,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       if (context?.metamagicTwinTarget && target) {
         const twinTarget = combatSummary?.creatures?.find(c => c.name === context.metamagicTwinTarget);
         if (twinTarget && twinTarget.name !== target.name) {
-          const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, total, damageType ? [damageType] : [], campaignName);
+          const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, total, [damageType], campaignName);
           logEntry({
             type: 'roll',
             characterName,
