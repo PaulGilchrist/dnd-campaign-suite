@@ -331,6 +331,63 @@ function DeathSaveEntry({ entry }) {
   );
 }
 
+function SpellEntry({ entry }) {
+  const hasMetamagic = entry.metamagic && entry.metamagic.length > 0;
+  return (
+    <div className="log-entry log-spell">
+      <div className="log-entry-header">
+        <span className="log-icon"><i className="fas fa-wand-magic-sparkles"></i></span>
+        <span className="log-character">{entry.characterName}</span>
+        <span className="log-name">Cast {entry.spellName}</span>
+        <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
+      </div>
+      <div className="log-spell-details">
+        <span className="log-spell-level">Level {entry.spellLevel}</span>
+        <span className="log-spell-casting-time">{entry.castingTime}</span>
+        {hasMetamagic ? (
+          <span className="log-metamagic-list">
+            {entry.metamagic.map((opt, i) => (
+              <span key={i} className="log-metamagic-option">{opt}</span>
+            ))}
+            {entry.spCost > 0 && (
+              <span className="log-metamagic-cost">{entry.spCost} SP</span>
+            )}
+          </span>
+        ) : (
+          <span className="log-no-metamagic">No Metamagic</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MetamagicEntry({ entry }) {
+  const isPositive = entry.damageDifference > 0;
+  const isNegative = entry.damageDifference < 0;
+  return (
+    <div className="log-entry log-metamagic">
+      <div className="log-entry-header">
+        <span className="log-icon"><i className="fas fa-dice"></i></span>
+        <span className="log-character">{entry.characterName}</span>
+        <span className="log-name">Empowered Spell — {entry.spellName}</span>
+        <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
+      </div>
+      <div className="log-empowered-details">
+        <span className="log-target">→ {entry.targetName}</span>
+        <span className="log-empowered-damage">
+          {entry.originalDamage} → {entry.newTotal}
+        </span>
+        <span className={`log-empowered-difference${isPositive ? ' log-empowered-positive' : ''}${isNegative ? ' log-empowered-negative' : ''}${!isPositive && !isNegative ? ' log-empowered-neutral' : ''}`}>
+          {isPositive ? '+' : ''}{entry.damageDifference}
+        </span>
+        <span className="log-empowered-dice-info">
+          Rerolled {entry.rerolledDiceCount} die{entry.rerolledDiceCount !== 1 ? 's' : ''}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function Log({ campaignName, characters }) {
   const { logEntries, initialized, addEntry } = useLog(campaignName);
   const [noteText, setNoteText] = useState('');
@@ -398,6 +455,8 @@ export default function Log({ campaignName, characters }) {
             {entry.type === 'encounter' && <EncounterEntry entry={entry}/>}
             {entry.type === 'hp_change' && <HpChangeEntry entry={entry}/>}
             {entry.type === 'death_save' && <DeathSaveEntry entry={entry}/>}
+            {entry.type === 'spell' && <SpellEntry entry={entry}/>}
+            {entry.type === 'metamagic' && <MetamagicEntry entry={entry}/>}
           </div>
         ))}
       </div>

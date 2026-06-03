@@ -527,3 +527,110 @@
   border-radius: 3px;
   font-weight: 600;
 }
+
+/* Spell entry */
+.log-spell {
+  border-left: 3px solid #7c3aed;
+}
+
+.log-spell-details {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 28px;
+  flex-wrap: wrap;
+}
+
+.log-spell-level {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(124, 58, 237, 0.15);
+  color: #7c3aed;
+  text-transform: uppercase;
+}
+
+.log-spell-casting-time {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.log-metamagic-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.log-metamagic-option {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 188, 212, 0.15);
+  color: #00bcd4;
+}
+
+.log-metamagic-cost {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+}
+
+.log-no-metamagic {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Empowered Spell / Metamagic entry */
+.log-metamagic {
+  border-left: 3px solid #9c27b0;
+}
+
+.log-empowered-details {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 28px;
+  flex-wrap: wrap;
+}
+
+.log-empowered-damage {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.log-empowered-difference {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.log-empowered-positive {
+  color: #4CAF50;
+  background: rgba(76, 175, 80, 0.15);
+}
+
+.log-empowered-negative {
+  color: #f44336;
+  background: rgba(244, 67, 54, 0.15);
+}
+
+.log-empowered-neutral {
+  color: var(--color-text-muted);
+  background: var(--background-color-input);
+}
+
+.log-empowered-dice-info {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
