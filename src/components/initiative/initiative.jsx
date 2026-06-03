@@ -22,6 +22,7 @@ import Popup from '../common/Popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 import * as mapsService from '../../services/mapsService.js';
 import { OverlayShape } from '../../models/SpellOverlay.js';
+import { expireStaleEffects } from '../../services/turnExpirations.js';
 import './initiative.css'
 
 const SHAPE_LABELS = {
@@ -261,13 +262,16 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
         const dataKey = event.key.slice(`change-${campaignName}-`.length);
 
-        if (dataKey === 'combatSummary') {
-            localStorage.setItem('combatSummary', JSON.stringify(event.data));
-            combatSummaryRef.current = event.data;
+         if (dataKey === 'combatSummary') {
+            const prevRound = combatSummaryRef.current?.round ?? 1;
+             localStorage.setItem('combatSummary', JSON.stringify(event.data));
+             combatSummaryRef.current = event.data;
             setCombatSummary(event.data);
-        } else if (dataKey === 'activeCreatureName') {
+             if (event.data.round !== prevRound) expireStaleEffects(campaignName);
+           } else if (dataKey === 'activeCreatureName') {
             localStorage.setItem('activeCreatureName', JSON.stringify(event.data));
             setActiveCreatureName(event.data);
+            expireStaleEffects(campaignName);
         } else {
             const cs = combatSummaryRef.current;
             if (!cs) return;
@@ -383,44 +387,46 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     }, [combatSummary, campaignName]);
 
     const handleAddCombatRound = React.useCallback(() => {
-        if (!combatSummary) return;
+         if (!combatSummary) return;
         combatSummary.round++;
         storage.set('combatSummary', combatSummary, campaignName);
-        setCombatSummary({...combatSummary});
-    }, [combatSummary, campaignName]);
+         setCombatSummary({...combatSummary});
+         expireStaleEffects(campaignName);
+       }, [combatSummary, campaignName]);
 
     const handleRemoveCombatRound = React.useCallback(() => {
-        if (!combatSummary) return;
-        combatSummary.round = Math.max(0, combatSummary.round - 1);
+         if (!combatSummary) return;
+         combatSummary.round = Math.max(0, combatSummary.round - 1);
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary({...combatSummary});
-    }, [combatSummary, campaignName]);
+     }, [combatSummary, campaignName]);
 
-    const handleNextCreature = React.useCallback(() => {
-        const cs = combatSummaryRef.current;
-        if (!cs) return;
+     const handleNextCreature = React.useCallback(() => {
+         const cs = combatSummaryRef.current;
+         if (!cs) return;
         const currentIndex = cs.creatures.findIndex((creature) => creature.name === activeCreatureName);
-        if (currentIndex < cs.creatures.length - 1) {
-            const nextName = cs.creatures[currentIndex + 1].name;
+         if (currentIndex < cs.creatures.length - 1) {
+             const nextName = cs.creatures[currentIndex + 1].name;
             storage.set('activeCreatureName', nextName, campaignName);
             setActiveCreatureName(nextName);
-        } else {
-            const firstName = cs.creatures[0].name;
+          } else {
+             const firstName = cs.creatures[0].name;
             storage.set('activeCreatureName', firstName, campaignName);
-            setActiveCreatureName(firstName);
-        }
-    }, [activeCreatureName, campaignName]);
+             setActiveCreatureName(firstName);
+           }
+         expireStaleEffects(campaignName);
+       }, [activeCreatureName, campaignName]);
 
     const handlePreviousCreature = React.useCallback(() => {
-        const cs = combatSummaryRef.current;
+         const cs = combatSummaryRef.current;
         if (!cs) return;
-        const currentIndex = cs.creatures.findIndex((creature) => creature.name === activeCreatureName);
-        if (currentIndex > 0) {
+         const currentIndex = cs.creatures.findIndex((creature) => creature.name === activeCreatureName);
+         if (currentIndex > 0) {
             const prevName = cs.creatures[currentIndex - 1].name;
-            storage.set('activeCreatureName', prevName, campaignName);
+             storage.set('activeCreatureName', prevName, campaignName);
             setActiveCreatureName(prevName);
-        } else {
-            const lastName = cs.creatures[cs.creatures.length - 1].name;
+          } else {
+             const lastName = cs.creatures[cs.creatures.length - 1].name;
             storage.set('activeCreatureName', lastName, campaignName);
             setActiveCreatureName(lastName);
         }

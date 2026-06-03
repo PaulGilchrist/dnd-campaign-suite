@@ -17,7 +17,8 @@ import { computeFeatRangeEffects } from '../../services/featRangeService.js';
 import { loadNPCs } from '../../services/npcsService.js';
 import { hasAutomation } from '../../services/automationService.js'
 import { sendSavePrompt } from '../../services/savePromptService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { addTurnExpiration } from '../../services/turnExpirations.js';
 import storage from '../../services/storage.js'
 import utils from '../../services/utils.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
@@ -81,37 +82,10 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
              setRuntimeValue(playerStats.name, 'focusPoints', maxFP, campaignName);
           };
 
-         window.addEventListener('initiative-rolled', handleInitiativeRolled);
-
-         // Extend: expire all until_start_of_next_turn duration effects when any initiative is rolled
-          const handleInitiativeRolledDurations = (e) => {
-              if (!e.detail || !e.detail.characterName) return;
-             try {
-                const storedCs = localStorage.getItem('combatSummary');
-                 if (!storedCs) return;
-               const combatData = JSON.parse(storedCs);
-               for (const creature of (combatData.creatures || [])) {
-                    const name = creature.name;
-                   const speedHalvedTime = getRuntimeValue(name, 'stunned_speedHalved', campaignName);
-                     if (speedHalvedTime) {
-                           // Expire: clear all until_start_of_next_turn effects for this creature and associated advantage
-                        setRuntimeValue(name, 'stunned_speedHalved', null, campaignName);
-                          const advKey = `_advantageOn_${name}`;
-                      for (const playerName of combatData.creatures.map(c => c.name)) {
-                              const storedAdv = getRuntimeValue(playerName, advKey);
-                            if (Array.isArray(storedAdv) && storedAdv.includes(name)) {
-                                setRuntimeValue(playerName, advKey, storedAdv.filter(tn => tn !== name), campaignName);
-                            }
-                           }
-                        }
-                    }
-                 } catch {}
-             };
-         window.addEventListener('initiative-rolled', handleInitiativeRolledDurations);
+        window.addEventListener('initiative-rolled', handleInitiativeRolled);
 
          return () => {
              window.removeEventListener('initiative-rolled', handleInitiativeRolled);
-             window.removeEventListener('initiative-rolled', handleInitiativeRolledDurations);
           };
       }, [playerStats, campaignName]);
     const { popupHtml, setPopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
@@ -570,40 +544,49 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                        const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
                        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
 
-                        if (detail.success) {
-                               // Success: speed halved until start of next turn
-                            addEntry(campaignName, {
-                                type: 'save_result',
+                         if (detail.success) {
+                              // Success: speed halved until start of attacker's next turn
+                             addEntry(campaignName, {
+                                 type: 'save_result',
                                 characterName: playerStats.name,
                                 rollType: `save-${auto.type}`,
-                                targetName,
-                                saveDc,
-                                saveType: auto.saveType,
-                                success: true,
-                                description: `${targetName} succeeded on ${auto.saveType} save. Speed halved until start of next turn.`
-                               });
+                                  targetName,
+                                  saveDc,
+                                  saveType: auto.saveType,
+                                  success: true,
+                                  description: `${targetName} succeeded on ${auto.saveType} save. Speed halved until start of next turn.`
+                                  });
 
-                            setRuntimeValue(targetName, `${auto.conditionInflicted}_speedHalved`, Date.now(), campaignName);
-                            // Next attack roll against target has advantage (consumed on use)
-                            const advKey = `_advantageOn_${targetName}`;
-                            const attackerStoredAdv = getRuntimeValue(playerStats.name, advKey) || [];
-                            setRuntimeValue(playerStats.name, advKey, [...attackerStoredAdv, targetName], campaignName);
-                          } else {
-                             // Fail: apply the stunned condition
-                           addEntry(campaignName, {
-                               type: 'save_result',
-                               characterName: playerStats.name,
-                               rollType: `save-${auto.type}`,
-                               targetName,
-                               saveDc,
-                               saveType: auto.saveType,
-                               success: false,
-                               description: `${targetName} failed ${auto.saveType} save. Stunned until start of next turn.`
-                             });
+                             setRuntimeValue(targetName, `${auto.conditionInflicted}_speedHalved`, Date.now(), campaignName);
+                              // Next attack roll against target has advantage (consumed on use)
+                             const advKey = `_advantageOn_${targetName}`;
+                             const attackerStoredAdv = getRuntimeValue(playerStats.name, advKey) || [];
+                             setRuntimeValue(playerStats.name, advKey, [...attackerStoredAdv, targetName], campaignName);
 
-                           const newConditions = [...conditions, 'stunned'];
-                           setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
-                        }
+                             addTurnExpiration(playerStats.name, targetName, [
+                               { type: 'stunned', condition: 'speed_halved' },
+                               { type: 'advantage_on_target' }
+                              ], campaignName);
+                            } else {
+                    // Fail: apply the stunned condition
+                   addEntry(campaignName, {
+                       type: 'save_result',
+                      characterName: playerStats.name,
+                       rollType: `save-${auto.type}`,
+                        targetName,
+                        saveDc,
+                        saveType: auto.saveType,
+                        success: false,
+                        description: `${targetName} failed ${auto.saveType} save. Stunned until start of next turn.`
+                         });
+
+                const newConditions = [...conditions, 'stunned'];
+                   setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
+
+                   addTurnExpiration(playerStats.name, targetName, [
+                        { type: 'stunned', condition: 'stunned' }
+                      ], campaignName);
+                           }
 
                        window.removeEventListener('save-result', handleSaveResult);
                     };
