@@ -1,7 +1,9 @@
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
+import MetamagicPopup from './MetamagicPopup.jsx'
+import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { parseMagicItemName } from '../../services/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
@@ -23,6 +25,8 @@ import CharBonusActions from './CharBonusActions.jsx'
 import { getClassFeatures } from '../../services/classFeatures.js';
 import { addEntry } from '../../services/logService.js';
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints, getLastDamageEvent, saveLastDamageEvent } from '../../hooks/useMetamagic.js';
+import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
+import { executeSpellCast } from '../../services/spellCastService.js'
 import { getChaModifier } from '../../services/metamagicRules.js';
 import { applyDamageToTarget } from '../../services/applyDamage.js';
 import './CharActions.css'
@@ -723,6 +727,30 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         return null;
     };
 
+    const actionCastingTimes = ['1 action', '1 Action', 'action', 'Action'];
+    const actionAttackNames = new Set(playerStats.attacks?.filter(a => a.type === 'Action').map(a => a.name) || []);
+    const actionSpells = playerStats.spellAbilities?.spells?.filter(spell =>
+        actionCastingTimes.includes(spell.casting_time) &&
+        (spell.prepared === 'Always' || spell.prepared === 'Prepared') &&
+        !actionAttackNames.has(spell.name)
+    ) || [];
+    const actionSpellNames = actionSpells.reduce((acc, spell) => { acc[spell.name] = spell; return acc; }, {});
+
+    const handleActionSpellClick = (spellName) => {
+        const spell = actionSpellNames[spellName];
+        if (!spell) return;
+        setSelectedActionSpell(spell);
+    };
+
+    const actionCastAction = React.useCallback((spell, metaCtx) => {
+        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getCombatTargetInfo });
+    }, [rollAttack, rollDamage, playerStats, getCombatTargetInfo]);
+    const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction);
+    const handleActionSpellCast = React.useCallback((spell) => {
+        setSelectedActionSpell(null);
+        actionGateMetamagic(spell);
+    }, [actionGateMetamagic]);
+
     const isBonusSorcerer = playerStats.class?.name === 'Sorcerer';
 
     const is2024Rules = playerStats.rules === '2024';
@@ -853,7 +881,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     {playerStats.attacks.map((attack) => {
                         if (attack.type != 'Action') return '';
                         return <React.Fragment key={attack.name}>
-                            <div className='left'>{attack.name}</div>
+                            <div className='left clickable' onClick={() => attack.saveDc ? handleActionSpellClick(attack.name) : undefined}>{attack.name}</div>
                             <div>{attack.range} ft.</div>
                             {attack.saveDc
                                 ? <div className="save-dc-display">DC {attack.saveDc} {attack.saveType}</div>
@@ -862,6 +890,16 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
                             <div className='left'>{attack.damageType}</div>
                             {is2024Rules && <div className={getWeaponMastery(attack.name) ? "clickable" : ""} onClick={() => { const mastery = getWeaponMastery(attack.name); if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{getWeaponMastery(attack.name) || ''}</div>}
+                        </React.Fragment>;
+                    })}
+                    {actionSpells.map((spell) => {
+                        return <React.Fragment key={spell.name}>
+                            <div className='left clickable' onClick={() => handleActionSpellClick(spell.name)}>{spell.name}</div>
+                            <div>{spell.range}</div>
+                            <div>-</div>
+                            <div>Utility</div>
+                            <div className='left'></div>
+                            {is2024Rules && <div></div>}
                         </React.Fragment>;
                     })}
                 </div>
@@ -945,6 +983,26 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         onClose={() => setFontOfMagicModal(null)}
                     />
                 )}
+                {selectedActionSpell && (
+                    <Popup onClickOrKeyDown={() => setSelectedActionSpell(null)}>
+                        <SpellDetailPopup
+                            spell={selectedActionSpell}
+                            playerStats={playerStats}
+                            campaignName={campaignName}
+                            onClose={() => setSelectedActionSpell(null)}
+                            onCast={handleActionSpellCast}
+                        />
+                    </Popup>
+                )}
+                {actionPendingMetamagic && (
+                    <MetamagicPopup
+                        spell={{ name: actionPendingMetamagic.spellName, level: actionPendingMetamagic.spellLevel || 0 }}
+                        playerStats={{ ...playerStats, _metamagicCurrentSP: actionPendingMetamagic._currentSP }}
+                        campaignName={campaignName}
+                        onConfirm={actionHandleConfirm}
+                        onSkip={actionHandleSkip}
+                    />
+                )}
                 {playerStats.actions.map((action) => {
                     const isClickable = action.details || hasAutomation(action);
                     const handleClick = () => {
@@ -974,6 +1032,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                   onDamageClick={handleDamageClick}
                   onAutomationAction={handleAutomationAction}
                   getWeaponMastery={getWeaponMastery}
+                  rollAttack={rollAttack}
+                  rollDamage={rollDamage}
+                  getCombatTargetInfo={getCombatTargetInfo}
               />
           </div>
       )

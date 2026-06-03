@@ -3,7 +3,6 @@ import React from 'react'
 import { cloneDeep } from 'lodash';
 import useActionPopup from '../../../hooks/useActionPopup.js'
 import useLoggedDiceRoll from '../../../hooks/useLoggedDiceRoll.js'
-import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../../hooks/useMetamagic.js'
 import Popup from '../../common/Popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
 import MetamagicPopup from '../MetamagicPopup.jsx'
@@ -12,7 +11,9 @@ import CharSpellSlots from './CharSpellSlots.jsx'
 import { rollExpression, rollExpressionDoubled } from '../../../services/diceRoller.js';
 import { sanitizeHtml } from '../../../services/sanitize.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../services/damageUtils.js';
-import { addEntry } from '../../../services/logService.js';
+import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../../hooks/useMetamagic.js'
+import { useSpellMetamagicFlow } from '../../../hooks/useSpellMetamagicFlow.js'
+import { executeSpellCast } from '../../../services/spellCastService.js'
 import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct }) {
@@ -35,127 +36,31 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
             }
            },
          });
-    const isSorcerer = playerStats.class?.name === 'Sorcerer';
-    const [pendingMetamagic, setPendingMetamagic] = React.useState(null);
     const [selectedSpell, setSelectedSpell] = React.useState(null);
+    const isSorcerer = playerStats.class?.name === 'Sorcerer';
+    const [pendingSimpleMetamagic, setPendingSimpleMetamagic] = React.useState(null);
 
-   // When metamagic is confirmed, proceed with the spell cast
-  const handleMetamagicConfirm = React.useCallback((result) => {
-     const pending = pendingMetamagic;
-      setPendingMetamagic(null);
-    if (!pending) return;
+    const handleSimpleConfirm = React.useCallback((result) => {
+      const pending = pendingSimpleMetamagic;
+      setPendingSimpleMetamagic(null);
+      if (!pending) return;
+      if (result?.totalCost > 0) spendSorceryPoints(playerStats.name, result.totalCost, campaignName);
+      const metaCtx = {};
+      if (result?.options) {
+        if (result.options.includes('Heightened Spell')) metaCtx.metamagicHeighten = true;
+        if (result.options.includes('Careful Spell')) metaCtx.metamagicCareful = true;
+        if (result.options.includes('Twinned Spell') && result.twinTarget) metaCtx.metamagicTwinTarget = result.twinTarget;
+        if (result.options.includes('Distant Spell')) metaCtx.metamagicDistant = true;
+      }
+      pending.action(metaCtx);
+    }, [pendingSimpleMetamagic, playerStats.name, campaignName]);
 
-       // Spend sorcery points
-     if (result && result.totalCost && result.totalCost > 0) {
-         spendSorceryPoints(playerStats.name, result.totalCost, campaignName);
-        }
-
-      addEntry(campaignName, {
-          type: 'spell',
-         characterName: playerStats.name,
-          spellName: pending.spellName,
-          spellLevel: pending.spellLevel || 0,
-         castingTime: pending.castingTime,
-          metamagic: result ? (result.options || []) : [],
-          spCost: result ? (result.totalCost || 0) : 0,
-          timestamp: Date.now(),
-        });
-
-       // Build metamagic context to pass to the roll
-     const metaCtx = {};
-      if (result && result.options) {
-         if (result.options.includes('Heightened Spell')) metaCtx.metamagicHeighten = true;
-          if (result.options.includes('Careful Spell')) metaCtx.metamagicCareful = true;
-           if (result.options.includes('Twinned Spell') && result.twinTarget) metaCtx.metamagicTwinTarget = result.twinTarget;
-         if (result.options.includes('Distant Spell')) metaCtx.metamagicDistant = true;
-        }
-
-       // Proceed with the pending action
-     pending.action(metaCtx);
-   }, [pendingMetamagic, playerStats.name, campaignName]);
-  const handleMetamagicSkip = React.useCallback(() => {
-     const pending = pendingMetamagic;
-      setPendingMetamagic(null);
-    if (!pending) return;
-
-    addEntry(campaignName, {
-         type: 'spell',
-        characterName: playerStats.name,
-         spellName: pending.spellName,
-         spellLevel: pending.spellLevel || 0,
-        castingTime: pending.castingTime,
-         metamagic: [],
-          spCost: 0,
-        timestamp: Date.now(),
-       });
-
-    pending.action({});
-   }, [pendingMetamagic, playerStats.name, campaignName]);
-
-    // Handle casting a spell from the spell detail popup
-  const handleSpellCast = React.useCallback((spell) => {
-      setSelectedSpell(null);
-
-      const slotDmg = spell.damage?.damage_at_slot_level;
-       const charDmg = spell.damage?.damage_at_character_level;
-        const dmgObj = slotDmg && Object.keys(slotDmg).length ? slotDmg : charDmg;
-         const formula = dmgObj ? dmgObj[Object.keys(dmgObj)[0]] : null;
-          const damageType = spell.damage?.damage_type || '';
-
-       const castAction = (metaCtx) => {
-           if (!formula) return;
-
-           if (spell.dc) {
-               // Saving throw spell - always hits, save determines damage
-              const result = rollExpression(formula);
-               if (result) {
-                   const target = getCombatTargetInfo();
-                  const context = {
-                       targetName: target?.name,
-                        attackerName: playerStats.name,
-                        ...metaCtx,
-                      saveDc: playerStats.spellAbilities.saveDc,
-                       saveType: spell.dc.dc_type,
-                      dcSuccess: spell.dc.dc_success,
-                       damageType,
-                    };
-                   rollDamage(spell.name, formula, result.total, result.rolls, result.modifier, context);
-                }
-            } else {
-               // Attack roll spell - to hit first, auto-damage on hit
-              rollAttack(spell.name, playerStats.spellAbilities.toHit, {
-                  autoDamageFormula: formula,
-                   autoDamageName: spell.name,
-                    damageType,
-                   ...metaCtx,
-                 });
-           }
-          };
-
-      if (!isSorcerer) {
-          addEntry(campaignName, {
-             type: 'spell',
-            characterName: playerStats.name,
-             spellName: spell.name,
-              spellLevel: spell.level || 0,
-             castingTime: spell.casting_time,
-              metamagic: [],
-             spCost: 0,
-             timestamp: Date.now(),
-            });
-          castAction({});
-         return;
-        }
-
-    const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
-       setPendingMetamagic({
-          spellName: spell.name,
-          castingTime: spell.casting_time,
-            _currentSP: currentSP,
-          spellLevel: spell.level || 0,
-         action: castAction,
-      });
-    }, [isSorcerer, playerStats.name, campaignName]);
+    const handleSimpleSkip = React.useCallback(() => {
+      const pending = pendingSimpleMetamagic;
+      setPendingSimpleMetamagic(null);
+      if (!pending) return;
+      pending.action({});
+    }, [pendingSimpleMetamagic]);
 
     const getDamageFormula = (effect) => {
         const match = effect.match(/^(\d+d\d+(?:[+-]\d+)?)/);
@@ -167,6 +72,15 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         if (!cs) return null;
         return getTargetFromAttacker(cs, playerStats.name);
     }, [playerStats.name]);
+
+    const castAction = React.useCallback((spell, metaCtx) => {
+      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getCombatTargetInfo });
+    }, [rollAttack, rollDamage, playerStats, getCombatTargetInfo]);
+    const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
+    const handleSpellCast = React.useCallback((spell) => {
+      setSelectedSpell(null);
+      gateMetamagic(spell);
+    }, [gateMetamagic]);
 
     const handleDamageRoll = (formula, spellName, spell) => {
         const wasCrit = dicePopupHtml?.isCrit;
@@ -193,7 +107,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
             };
             if (isSorcerer) {
                 const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
-                setPendingMetamagic({
+                setPendingSimpleMetamagic({
                     spellName,
                     action: doDamage,
                     _currentSP: currentSP,
@@ -269,8 +183,17 @@ return (
                         spell={{ name: pendingMetamagic.spellName, level: pendingMetamagic.spellLevel || 0 }}
                         playerStats={{ ...playerStats, _metamagicCurrentSP: pendingMetamagic._currentSP }}
                         campaignName={campaignName}
-                        onConfirm={handleMetamagicConfirm}
-                        onSkip={handleMetamagicSkip}
+                        onConfirm={handleConfirm}
+                        onSkip={handleSkip}
+                      />
+                    )}
+                    {pendingSimpleMetamagic && (
+                      <MetamagicPopup
+                        spell={{ name: pendingSimpleMetamagic.spellName, level: pendingSimpleMetamagic.spellLevel || 0 }}
+                        playerStats={{ ...playerStats, _metamagicCurrentSP: pendingSimpleMetamagic._currentSP }}
+                        campaignName={campaignName}
+                        onConfirm={handleSimpleConfirm}
+                        onSkip={handleSimpleSkip}
                       />
                     )}
             <hr />
@@ -284,7 +207,7 @@ return (
                       };
                       if (isSorcerer) {
                         const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
-                        setPendingMetamagic({
+                        setPendingSimpleMetamagic({
                           spellName: 'Spell Attack',
                           action: doAttack,
                           _currentSP: currentSP,

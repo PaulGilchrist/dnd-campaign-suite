@@ -1,22 +1,21 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState } from 'react'
 import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import MetamagicPopup from './MetamagicPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import { sanitizeHtml } from '../../services/sanitize.js';
-import { addEntry } from '../../services/logService.js';
-import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../hooks/useMetamagic.js';
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import { hasAutomation } from '../../services/automationService.js'
+import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
+import { executeSpellCast } from '../../services/spellCastService.js'
 import './CharActions.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 const bonusActionCastingTimes = ['1 bonus action', '1 Bonus Action', 'bonus action', 'Bonus Action'];
 
-function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, onAttackClick, onDamageClick, onAutomationAction, getWeaponMastery }) {
+function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, onAttackClick, onDamageClick, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getCombatTargetInfo }) {
     const [popupHtml, setPopupHtml] = useState(null);
     const [selectedBonusSpell, setSelectedBonusSpell] = useState(null);
-    const [bonusPendingMetamagic, setBonusPendingMetamagic] = useState(null);
 
     const is2024Rules = playerStats.rules === '2024';
 
@@ -26,63 +25,14 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         setSelectedBonusSpell(spell);
      };
 
-    const handleBonusSpellsSelectMeta = (spell) => {
-        setSelectedBonusSpell(null);
-
-        const isBonusSorcerer = playerStats.class?.name === 'Sorcerer';
-        if (!isBonusSorcerer) {
-            addEntry(campaignName, {
-                type: 'spell',
-                characterName: playerStats.name,
-                spellName: spell.name,
-                spellLevel: spell.level || 0,
-                castingTime: spell.casting_time,
-                metamagic: [],
-                spCost: 0,
-                timestamp: Date.now(),
-             });
-            return;
-         }
-
-        const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
-        setBonusPendingMetamagic({
-            spellName: spell.name,
-            spellLevel: spell.level || 0,
-             _currentSP: currentSP,
-            castingTime: spell.casting_time,
-         });
-     };
-
-    const handleBonusMetamagicConfirm = useCallback((result) => {
-        if (result && result.totalCost && result.totalCost > 0) {
-            spendSorceryPoints(playerStats.name, result.totalCost, campaignName);
-         }
-        addEntry(campaignName, {
-            type: 'spell',
-            characterName: playerStats.name,
-            spellName: bonusPendingMetamagic.spellName,
-            spellLevel: bonusPendingMetamagic.spellLevel || 0,
-            castingTime: bonusPendingMetamagic.castingTime,
-            metamagic: result ? (result.options || []) : [],
-            spCost: result ? (result.totalCost || 0) : 0,
-            timestamp: Date.now(),
-         });
-        setBonusPendingMetamagic(null);
-     }, [playerStats.name, campaignName, bonusPendingMetamagic]);
-
-    const handleBonusMetamagicSkip = useCallback(() => {
-        addEntry(campaignName, {
-            type: 'spell',
-            characterName: playerStats.name,
-            spellName: bonusPendingMetamagic.spellName,
-            spellLevel: bonusPendingMetamagic.spellLevel || 0,
-            castingTime: bonusPendingMetamagic.castingTime,
-            metamagic: [],
-            spCost: 0,
-            timestamp: Date.now(),
-         });
-        setBonusPendingMetamagic(null);
-     }, [playerStats.name, campaignName, bonusPendingMetamagic]);
+    const bonusCastAction = React.useCallback((spell, metaCtx) => {
+      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getCombatTargetInfo });
+    }, [rollAttack, rollDamage, playerStats, getCombatTargetInfo]);
+    const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, bonusCastAction);
+    const handleBonusSpellCast = React.useCallback((spell) => {
+      setSelectedBonusSpell(null);
+      gateMetamagic(spell);
+    }, [gateMetamagic]);
 
     const bonusActionAttacks = playerStats.attacks.filter((attack) => attack.type === 'Bonus Action');
     const attackNames = new Set((playerStats.attacks || []).map(a => a.name));
@@ -178,21 +128,21 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                         playerStats={playerStats}
                         campaignName={campaignName}
                         onClose={() => setSelectedBonusSpell(null)}
-                        onCast={(spell) => { handleBonusSpellsSelectMeta(spell); }}
+                         onCast={handleBonusSpellCast}
                      />
                  </Popup>
              )}
-             {bonusPendingMetamagic && (
-                 <div>
-                     <MetamagicPopup
-                        spell={{ name: bonusPendingMetamagic.spellName, level: bonusPendingMetamagic.spellLevel || 0 }}
-                        playerStats={{ ...playerStats, _metamagicCurrentSP: bonusPendingMetamagic._currentSP }}
-                        campaignName={campaignName}
-                        onConfirm={handleBonusMetamagicConfirm}
-                        onSkip={handleBonusMetamagicSkip}
-                     />
-                 </div>
-             )}
+              {pendingMetamagic && (
+                  <div>
+                      <MetamagicPopup
+                         spell={{ name: pendingMetamagic.spellName, level: pendingMetamagic.spellLevel || 0 }}
+                         playerStats={{ ...playerStats, _metamagicCurrentSP: pendingMetamagic._currentSP }}
+                         campaignName={campaignName}
+                         onConfirm={handleConfirm}
+                         onSkip={handleSkip}
+                      />
+                  </div>
+              )}
              {(popupHtml && hasBonusActions) && <br />}
              {hasBonusActions && <div>
                  {playerStats.bonusActions.map((bonusAction) => {
