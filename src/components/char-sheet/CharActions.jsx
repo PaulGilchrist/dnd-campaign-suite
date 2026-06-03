@@ -84,22 +84,29 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
          window.addEventListener('initiative-rolled', handleInitiativeRolled);
 
          // Extend: expire all until_start_of_next_turn duration effects when any initiative is rolled
-         const handleInitiativeRolledDurations = (e) => {
-             if (!e.detail || !e.detail.characterName) return;
+          const handleInitiativeRolledDurations = (e) => {
+              if (!e.detail || !e.detail.characterName) return;
              try {
-                 const storedCs = localStorage.getItem('combatSummary');
+                const storedCs = localStorage.getItem('combatSummary');
                  if (!storedCs) return;
-                 const combatData = JSON.parse(storedCs);
-                 for (const creature of (combatData.creatures || [])) {
-                     const name = creature.name;
-                     const speedHalvedTime = getRuntimeValue(name, 'stunned_speedHalved', campaignName);
+               const combatData = JSON.parse(storedCs);
+               for (const creature of (combatData.creatures || [])) {
+                    const name = creature.name;
+                   const speedHalvedTime = getRuntimeValue(name, 'stunned_speedHalved', campaignName);
                      if (speedHalvedTime) {
-                          // Expire: clear all until_start_of_next_turn effects for this creature
-                         setRuntimeValue(name, 'stunned_speedHalved', null, campaignName);
-                      }
-                 }
-             } catch {}
-          };
+                           // Expire: clear all until_start_of_next_turn effects for this creature and associated advantage
+                        setRuntimeValue(name, 'stunned_speedHalved', null, campaignName);
+                          const advKey = `_advantageOn_${name}`;
+                      for (const playerName of combatData.creatures.map(c => c.name)) {
+                              const storedAdv = getRuntimeValue(playerName, advKey);
+                            if (Array.isArray(storedAdv) && storedAdv.includes(name)) {
+                                setRuntimeValue(playerName, advKey, storedAdv.filter(tn => tn !== name), campaignName);
+                            }
+                           }
+                        }
+                    }
+                 } catch {}
+             };
          window.addEventListener('initiative-rolled', handleInitiativeRolledDurations);
 
          return () => {
@@ -143,8 +150,29 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         const targetName = target?.name || (() => {
             const cs = getCombatContext();
             return cs ? getAttackerTargetName(cs, playerStats.name) : undefined;
-        })();
+         })();
         const resistanceNotice = target ? getResistanceNotice([attack.damageType], target.resistances, target.immunities, target.name) : null;
+
+         // Check for Stunning Strike save advantage (consumed on use)
+        let hasSaveAdvantage = false;
+        if (targetName) {
+            const advKey = `_advantageOn_${targetName}`;
+            const storedAdvantage = getRuntimeValue(playerStats.name, advKey);
+            if (Array.isArray(storedAdvantage)) {
+                const idx = storedAdvantage.indexOf(targetName);
+                if (idx !== -1) {
+                    hasSaveAdvantage = true;
+                    storedAdvantage.splice(idx, 1);
+                    setRuntimeValue(playerStats.name, advKey, storedAdvantage, campaignName);
+                   }
+               }
+           }
+
+        let forcedMode = conditionAttackMode !== 'normal' ? conditionAttackMode : undefined;
+        if (hasSaveAdvantage && forcedMode === undefined) {
+            forcedMode = 'advantage';
+           }
+
         return {
             damageType: attack.damageType,
             resistanceNotice,
@@ -153,11 +181,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             saveType: attack.saveType,
             dcSuccess: attack.saveSuccess,
             attackerName: playerStats.name,
-            forcedMode: conditionAttackMode !== 'normal' ? conditionAttackMode : undefined,
+            forcedMode,
             autoDamageFormula: attack.damage,
             autoDamageName: attack.name,
-        };
-    }, [getCombatTargetInfo, conditionAttackMode, playerStats.name]);
+           };
+          }, [getCombatTargetInfo, conditionAttackMode, playerStats.name, campaignName]);
 
     const buildAttackContext = React.useCallback(async (attack) => {
         if (!mapName) {
@@ -504,12 +532,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 }
                 break;
              }
-             case 'save_only': {
-                  const cs = getCombatContext();
-                  const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-                  const targetName = target?.name || playerStats.name;
+        case 'save_only': {
+             const cs = getCombatContext();
+             const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+             const targetName = target?.name || playerStats.name;
 
-                  const promptId = utils.guid();
+             const promptId = utils.guid();
                   let saveDc;
                   if (auto.saveDc === 'ability') {
                       const conBonus = playerStats.abilities?.find(a => a.name === 'CON')?.bonus || 0;
@@ -542,21 +570,25 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                        const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
                        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
 
-                       if (detail.success) {
-                             // Success: speed halved until start of next turn
-                           addEntry(campaignName, {
-                               type: 'save_result',
-                               characterName: playerStats.name,
-                               rollType: `save-${auto.type}`,
-                               targetName,
-                               saveDc,
-                               saveType: auto.saveType,
-                               success: true,
-                               description: `${targetName} succeeded on ${auto.saveType} save. Speed halved until start of next turn.`
-                             });
+                        if (detail.success) {
+                               // Success: speed halved until start of next turn
+                            addEntry(campaignName, {
+                                type: 'save_result',
+                                characterName: playerStats.name,
+                                rollType: `save-${auto.type}`,
+                                targetName,
+                                saveDc,
+                                saveType: auto.saveType,
+                                success: true,
+                                description: `${targetName} succeeded on ${auto.saveType} save. Speed halved until start of next turn.`
+                               });
 
-                           setRuntimeValue(targetName, `${auto.conditionInflicted}_speedHalved`, Date.now(), campaignName);
-                        } else {
+                            setRuntimeValue(targetName, `${auto.conditionInflicted}_speedHalved`, Date.now(), campaignName);
+                            // Next attack roll against target has advantage (consumed on use)
+                            const advKey = `_advantageOn_${targetName}`;
+                            const attackerStoredAdv = getRuntimeValue(playerStats.name, advKey) || [];
+                            setRuntimeValue(playerStats.name, advKey, [...attackerStoredAdv, targetName], campaignName);
+                          } else {
                              // Fail: apply the stunned condition
                            addEntry(campaignName, {
                                type: 'save_result',
