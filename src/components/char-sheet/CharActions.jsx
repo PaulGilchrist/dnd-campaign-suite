@@ -979,6 +979,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         });
     };
 
+    const getEmpoweredSpellDescription = (action) => {
+        if (action.details) {
+            const match = action.details.match(/<li><b>Empowered Spell<\/b>\.?\s*([\s\S]*?)<\/li>/i);
+            if (match) return match[1].trim();
+        }
+        return 'When you roll damage for a spell, you can spend 1 sorcery point to reroll a number of the damage dice up to your Charisma modifier (minimum of one). You must use the new rolls.';
+    };
+
     return (
         <div className="char-actions">
             <div>
@@ -1131,6 +1139,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     />
                 )}
                 {playerStats.actions.map((action) => {
+                    const isMetamagic = action.name === 'Metamagic' && action.automation?.type === 'spell_modifier';
                     const isClickable = action.details || hasAutomation(action);
                     const handleClick = () => {
                         if (hasAutomation(action)) {
@@ -1139,8 +1148,10 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             setPopupHtml(buildFeatureDetailHtml(action));
                         }
                     };
+                    const displayName = isMetamagic ? 'Empowered Spell' : action.name;
+                    const displayDesc = isMetamagic ? getEmpoweredSpellDescription(action) : action.description;
                     return <div key={action.name}>
-                        <b className={isClickable ? "clickable" : ""} onClick={handleClick}>{action.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(action.description) }}></span>
+                        <b className={isClickable ? "clickable" : ""} onClick={handleClick}>{displayName}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayDesc) }}></span>
                         {hasAutomation(action) && action.automation?.type === 'save_attack' && action.automation?.saveDc && <span className="automation-badge"> DC {action.automation.saveDc} {action.automation.saveType}</span>}
                         {hasAutomation(action) && action.automation?.type === 'healing_pool' && <span className="automation-badge"> Pool: {action.automation.pool} HP</span>}
                         {hasAutomation(action) && action.automation?.damage && <span className="automation-badge"> {action.automation.damage} {action.automation.damageType}</span>}

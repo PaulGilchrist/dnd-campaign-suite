@@ -456,10 +456,10 @@ describe('CharActions', () => {
     render(<CharActions playerStats={sorcererStats} campaignName="test-campaign" />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Metamagic:/)).toBeInTheDocument();
+      expect(screen.getByText(/Empowered Spell:/)).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText(/Metamagic:/));
+    fireEvent.click(screen.getByText(/Empowered Spell:/));
 
     await waitFor(() => {
       expect(mockSetPopupHtml).toHaveBeenCalled();
@@ -501,10 +501,10 @@ describe('CharActions', () => {
     render(<CharActions playerStats={sorcererStats} campaignName="test-campaign" />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Metamagic:/)).toBeInTheDocument();
+      expect(screen.getByText(/Empowered Spell:/)).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText(/Metamagic:/));
+    fireEvent.click(screen.getByText(/Empowered Spell:/));
 
     await waitFor(() => {
       expect(mockSetPopupHtml).toHaveBeenCalled();
