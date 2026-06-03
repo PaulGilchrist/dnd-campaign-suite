@@ -9,11 +9,12 @@ vi.mock('../services/storage.js', () => ({
 }));
 
 vi.mock('../hooks/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(),
+    addStorageChangeListener: vi.fn().mockImplementation(() => () => {}),
 }));
 
-import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from '../hooks/useRuntimeState.js';
 
 const useTrackedResource = (await import('./useTrackedResource.js')).default;
 

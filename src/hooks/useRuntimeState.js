@@ -20,6 +20,13 @@ function notify(characterKey) {
   if (set) set.forEach(fn => fn());
 }
 
+export function addStorageChangeListener(characterKey, listener) {
+    if (!listeners.has(characterKey)) listeners.set(characterKey, new Set());
+    const set = listeners.get(characterKey);
+    set.add(listener);
+    return () => set.delete(listener);
+}
+
 export function getRuntimeValue(characterKey, propertyName) {
   const store = getStore(characterKey);
   return store.has(propertyName) ? store.get(propertyName) : null;

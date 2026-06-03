@@ -11,11 +11,12 @@ vi.mock('../services/storage.js', () => ({
 }));
 
 vi.mock('../hooks/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(),
+    addStorageChangeListener: vi.fn().mockImplementation(() => () => {}),
 }));
 
-import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from '../hooks/useRuntimeState.js';
 
 function TestComponent({ storageKey, playerName, maxGetter, deps, onRender }) {
   const { current, max, update } = useTrackedResource(storageKey, playerName, maxGetter, deps);
