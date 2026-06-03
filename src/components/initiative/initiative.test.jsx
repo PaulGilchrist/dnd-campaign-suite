@@ -114,11 +114,9 @@ describe('Initiative', () => {
     render(<Initiative characters={[]} />);
     expect(screen.getByText('Clear')).toBeInTheDocument();
     expect(screen.getByText('+ NPC')).toBeInTheDocument();
-    expect(screen.getByText('\u2191 Round')).toBeInTheDocument();
-    expect(screen.getByText('Round \u2193')).toBeInTheDocument();
     expect(screen.getByText('\u2190 Prev')).toBeInTheDocument();
     expect(screen.getByText('Next \u2192')).toBeInTheDocument();
-   });
+    });
 
   it('should add NPC when + NPC clicked', async () => {
     render(<Initiative characters={[]} />);
@@ -158,24 +156,27 @@ describe('Initiative', () => {
      });
    });
 
-  it('should increment round when up arrow clicked', () => {
-    render(<Initiative characters={[]} />);
-    fireEvent.click(screen.getByText('\u2191 Round'));
-    expect(screen.getByText(/round 2/)).toBeInTheDocument();
-   });
+  it('should increment round when next wraps past last creature', () => {
+    render(<Initiative characters={[{ name: 'A' }]} />);
+    const nextBtn = screen.getByText('Next →');
+    for (let i = 0; i < 10; i++) fireEvent.click(nextBtn);
+    expect(screen.queryByText(/round 1/)).not.toBeInTheDocument();
+      });
 
-  it('should decrement round when down arrow clicked', () => {
-    render(<Initiative characters={[]} />);
-    fireEvent.click(screen.getByText('\u2191 Round'));
-    fireEvent.click(screen.getByText('Round \u2193'));
+  it('should decrement round when prev wraps from first creature and round > 1', () => {
+    render(<Initiative characters={[{ name: 'A' }]} />);
+    const nextBtn = screen.getByText('Next →');
+    for (let i = 0; i < 5; i++) fireEvent.click(nextBtn);
+    expect(screen.queryByText(/round 1/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('\u2190 Prev'));
     expect(screen.getByText(/round 1/)).toBeInTheDocument();
-   });
+       });
 
-  it('should not decrement round below 0', () => {
-    render(<Initiative characters={[]} />);
-    fireEvent.click(screen.getByText('Round \u2193'));
-    expect(screen.getByText(/round 0/)).toBeInTheDocument();
-   });
+   it('should not decrement round below 1 when prev wraps', () => {
+    render(<Initiative characters={[{ name: 'A' }]} />);
+    fireEvent.click(screen.getByText('\u2190 Prev'));
+    expect(screen.getByText(/round 1/)).toBeInTheDocument();
+      });
 
   it('should handle initiative input change', () => {
     render(<Initiative characters={[{ name: 'Gandalf' }]} />);
@@ -230,11 +231,12 @@ describe('Initiative', () => {
     expect(npcAvatar).toBeInTheDocument();
    });
 
-  it('should handle keyboard shortcuts for round control', () => {
+  it('should not handle ArrowUp/ArrowDown keyboard shortcuts', () => {
     render(<Initiative characters={[]} />);
     fireEvent.keyDown(window, { key: 'ArrowUp' });
-    expect(screen.getByText(/round 2/)).toBeInTheDocument();
-   });
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
+    expect(screen.getByText(/round 1/)).toBeInTheDocument();
+      });
 
   it('should handle keyboard shortcuts for navigation', () => {
     render(<Initiative characters={[{ name: 'A' }, { name: 'B' }]} />);

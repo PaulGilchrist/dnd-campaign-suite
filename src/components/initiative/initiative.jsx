@@ -386,51 +386,49 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         setCombatSummary(cloneDeep(combatSummary));
     }, [combatSummary, campaignName]);
 
-    const handleAddCombatRound = React.useCallback(() => {
-         if (!combatSummary) return;
-        combatSummary.round++;
-        storage.set('combatSummary', combatSummary, campaignName);
-         setCombatSummary({...combatSummary});
-         expireStaleEffects(campaignName);
-       }, [combatSummary, campaignName]);
-
-    const handleRemoveCombatRound = React.useCallback(() => {
-         if (!combatSummary) return;
-         combatSummary.round = Math.max(0, combatSummary.round - 1);
-        storage.set('combatSummary', combatSummary, campaignName);
-        setCombatSummary({...combatSummary});
-     }, [combatSummary, campaignName]);
+    const isPrevDisabled = !!(combatSummary && activeCreatureName === combatSummary.creatures[0]?.name && combatSummary.round === 1);
 
      const handleNextCreature = React.useCallback(() => {
          const cs = combatSummaryRef.current;
          if (!cs) return;
         const currentIndex = cs.creatures.findIndex((creature) => creature.name === activeCreatureName);
-         if (currentIndex < cs.creatures.length - 1) {
+        const isLast = currentIndex >= cs.creatures.length - 1;
+         if (!isLast) {
              const nextName = cs.creatures[currentIndex + 1].name;
             storage.set('activeCreatureName', nextName, campaignName);
             setActiveCreatureName(nextName);
-          } else {
+           } else {
+             cs.round++;
              const firstName = cs.creatures[0].name;
+            storage.set('combatSummary', cs, campaignName);
+            setCombatSummary(cloneDeep(cs));
             storage.set('activeCreatureName', firstName, campaignName);
              setActiveCreatureName(firstName);
            }
          expireStaleEffects(campaignName);
-       }, [activeCreatureName, campaignName]);
+        }, [activeCreatureName, campaignName]);
 
     const handlePreviousCreature = React.useCallback(() => {
+          if (isPrevDisabled) return;
          const cs = combatSummaryRef.current;
-        if (!cs) return;
-         const currentIndex = cs.creatures.findIndex((creature) => creature.name === activeCreatureName);
+         if (!cs) return;
+          const currentIndex = cs.creatures.findIndex((creature) => creature.name === activeCreatureName);
          if (currentIndex > 0) {
             const prevName = cs.creatures[currentIndex - 1].name;
              storage.set('activeCreatureName', prevName, campaignName);
             setActiveCreatureName(prevName);
-          } else {
+           } else {
+             if (cs.round > 1) {
+                 cs.round--;
+                storage.set('combatSummary', cs, campaignName);
+                setCombatSummary(cloneDeep(cs));
+               }
              const lastName = cs.creatures[cs.creatures.length - 1].name;
             storage.set('activeCreatureName', lastName, campaignName);
             setActiveCreatureName(lastName);
-        }
-    }, [activeCreatureName, campaignName]);
+          }
+         expireStaleEffects(campaignName);
+      }, [activeCreatureName, campaignName]);
 
     React.useEffect(() => {
         const stored = localStorage.getItem('combatSummary');
@@ -486,27 +484,21 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     React.useEffect(() => {
         if (!combatSummary) return;
         const handleKeyDown = (event) => {
-            if (event.key === 'ArrowUp') {
-                event.preventDefault();
-                handleAddCombatRound();
-            } else if (event.key === 'ArrowDown') {
-                event.preventDefault();
-                handleRemoveCombatRound();
-            } else if (event.key === 'ArrowRight') {
+            if (event.key === 'ArrowRight') {
                 event.preventDefault();
                 handleNextCreature();
-            } else if (event.key === 'ArrowLeft') {
+              } else if (event.key === 'ArrowLeft' && !isPrevDisabled) {
                 event.preventDefault();
                 handlePreviousCreature();
-            } else if (event.key === '+') {
+              } else if (event.key === '+') {
                 event.preventDefault();
                 handleAddNpc();
-            }
-        };
+              }
+          };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [combatSummary, activeCreatureName, handleAddCombatRound, handleAddNpc, handleNextCreature, handlePreviousCreature, handleRemoveCombatRound]);
+         }, [combatSummary, activeCreatureName, isPrevDisabled, handleAddNpc, handleNextCreature, handlePreviousCreature]);
 
     React.useEffect(() => {
         if (!carouselRef.current || !activeCreatureName) return;
@@ -1214,14 +1206,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     );
                 })}
             </div>
-            <div className='combat-controls'>
-                <button className='clear-button' onClick={handleClear}>Clear</button>
-                <button onClick={handleAddNpc}>+ NPC</button>
-                <button onClick={handleAddCombatRound}>↑ Round</button>
-                <button onClick={handleRemoveCombatRound}>Round ↓</button>
-                <button onClick={handlePreviousCreature}>← Prev</button>
-                <button onClick={handleNextCreature}>Next →</button>
-            </div>
+              <div className='combat-controls'>
+                  <button className='clear-button' onClick={handleClear}>Clear</button>
+                  <button onClick={handleAddNpc}>+ NPC</button>
+                  <button onClick={handlePreviousCreature} disabled={isPrevDisabled}>← Prev</button>
+                  <button onClick={handleNextCreature}>Next →</button>
+              </div>
             {viewingMonster && (
                 <MonsterCardModal
                     monster={viewingMonster}
