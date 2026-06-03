@@ -1,6 +1,6 @@
 {
   "name": "Bramdur",
-  "level": 10,
+  "level": 20,
   "alignment": "Neutral Good",
   "abilities": [
     {
@@ -83,7 +83,9 @@
     "magicItems": []
   },
   "languages": [],
-  "resistances": [],
+  "resistances": [
+    "Poison"
+  ],
   "skillProficiencies": [
     "Animal Handling",
     "Insight",

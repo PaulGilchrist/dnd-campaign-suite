@@ -320,9 +320,22 @@ function toggleFirstClickChangeAndSet(value) {
 
 /* -- Barbarian -- */
 describe('Barbarian', () => {
-  const mockStats = {
-    name: 'Barb',
+  const mockStats5e = {
+    name: 'Barb5e',
     level: 5,
+    rules: '5e',
+    class: {
+      name: 'Barbarian',
+      class_levels: Array.from({ length: 5 }, (_, i) => ({
+        level: i + 1,
+        class_specific: { rage_count: i >= 4 ? 3 : 2, rage_damage_bonus: 2, brutal_critical_dice: 0, unarmored_movement: i >= 4 ? 10 : 0 },
+      })),
+     },
+    };
+  const mockStats2024 = {
+    name: 'Barb2024',
+    level: 5,
+    rules: '2024',
     class: {
       name: 'Barbarian',
       class_levels: Array.from({ length: 5 }, (_, i) => ({ level: i + 1, rages: 4, extra_attacks: 1, rage_damage: 2, weapon_mastery: 'Slashing' })),
@@ -330,29 +343,63 @@ describe('Barbarian', () => {
     };
   beforeEach(() => { vi.clearAllMocks(); getRuntimeValue.mockReturnValue(null); });
 
-  it('renders barbarian features', () => {
-    render(<CharClassFeatures playerStats={mockStats} />);
+  it('renders barbarian features (5e)', () => {
+    render(<CharClassFeatures playerStats={mockStats5e} />);
     expect(screen.getByText(/Extra Attacks:/)).toBeInTheDocument();
     expect(screen.getByText(/Rage Points:/)).toBeInTheDocument();
     expect(screen.getByText(/Rage Damage Bonus:/)).toBeInTheDocument();
     expect(screen.getByText(/Weapon Mastery:/)).toBeInTheDocument();
      });
 
-  it('handles weapon mastery undefined', () => {
-    const stats = { ...mockStats, level: 1, class: { name: 'Barbarian', class_levels: [{ rages: 2, extra_attacks: 0, rage_damage: 2, weapon_mastery: undefined }] } };
+  it('renders barbarian features (2024)', () => {
+    render(<CharClassFeatures playerStats={mockStats2024} />);
+    expect(screen.getByText(/Extra Attacks:/)).toBeInTheDocument();
+    expect(screen.getByText(/Rage Points:/)).toBeInTheDocument();
+    expect(screen.getByText(/Rage Damage Bonus:/)).toBeInTheDocument();
+    expect(screen.getByText(/Weapon Mastery:/)).toBeInTheDocument();
+     });
+
+  it('shows extra attacks = 1 for 5e at level 5', () => {
+    render(<CharClassFeatures playerStats={mockStats5e} />);
+    expect(screen.getByText(/Extra Attacks:/).parentElement.textContent).toContain('1');
+     });
+
+  it('shows extra attacks = 0 for 5e at level 4', () => {
+    const stats = { ...mockStats5e, level: 4 };
+    render(<CharClassFeatures playerStats={stats} />);
+    expect(screen.getByText(/Extra Attacks:/).parentElement.textContent).toContain('0');
+     });
+
+  it('shows rage count from class_specific.rage_count (5e)', () => {
+    render(<CharClassFeatures playerStats={mockStats5e} />);
+    expect(screen.getByText(/\(max\/cur\)/)).toBeInTheDocument();
+     });
+
+  it('shows rage damage from class_specific.rage_damage_bonus (5e)', () => {
+    render(<CharClassFeatures playerStats={mockStats5e} />);
+    expect(screen.getByText(/Rage Damage Bonus:/).parentElement.textContent).toContain('2');
+     });
+
+  it('shows N/A for weapon mastery in 5e', () => {
+    render(<CharClassFeatures playerStats={mockStats5e} />);
+    expect(screen.getByText(/Weapon Mastery:/).parentElement.textContent).toContain('N/A');
+     });
+
+  it('handles weapon mastery undefined (2024)', () => {
+    const stats = { ...mockStats2024, level: 1, class: { name: 'Barbarian', class_levels: [{ level: 1, rages: 2, extra_attacks: 0, rage_damage: 2, weapon_mastery: undefined }] } };
     render(<CharClassFeatures playerStats={stats} />);
     expect(screen.getByText(/Weapon Mastery:/).parentElement.textContent).toContain('N/A');
      });
 
-  it('shows max/cur label', () => {
-    render(<CharClassFeatures playerStats={mockStats} />);
+  it('shows max/cur label (2024)', () => {
+    render(<CharClassFeatures playerStats={mockStats2024} />);
     expect(screen.getByText(/\(max\/cur\)/)).toBeInTheDocument();
      });
 
   it('persists rage points to storage', () => {
-    render(<CharClassFeatures playerStats={mockStats} />);
+    render(<CharClassFeatures playerStats={mockStats2024} />);
     toggleFirstClickChangeAndSet('3');
-    expect(setRuntimeValue).toHaveBeenCalledWith('Barb', 'ragePoints', '3', undefined);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Barb2024', 'ragePoints', '3', undefined);
      });
 });
 

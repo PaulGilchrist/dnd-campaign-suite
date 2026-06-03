@@ -1,6 +1,6 @@
 {
   "name": "Aeralyn",
-  "level": 10,
+  "level": 20,
   "alignment": "Neutral Good",
   "abilities": [
     {
@@ -83,7 +83,8 @@
   },
   "languages": [],
   "resistances": [
-    "Fire"
+    "Fire",
+    "Lightning"
   ],
   "skillProficiencies": [
     "Insight",

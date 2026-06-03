@@ -5,20 +5,38 @@ import { getClassFeatures } from '../../../services/classFeatures.js';
 /* ─── Barbarian ─── */
 const BarbarianFeatures = function BarbarianFeatures({ playerStats }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+    const is2024 = playerStats.rules === '2024';
     const [rageActive, setRageActive] = React.useState(false);
+
+    const extraAttacks = is2024
+        ? (classLevel?.extra_attacks || 0)
+        : (playerStats.level > 4 ? 1 : 0);
+
+    const rageCount = is2024
+        ? (classLevel?.rages || 0)
+        : (classLevel?.class_specific?.rage_count || 0);
+
+    const rageDamage = is2024
+        ? (classLevel?.rage_damage || 0)
+        : (classLevel?.class_specific?.rage_damage_bonus || 0);
+
+    const weaponMastery = is2024
+        ? (classLevel?.weapon_mastery ?? 'N/A')
+        : 'N/A';
+
     return (
          <div data-testid="char-class-barbarian">
-             <div><b>Extra Attacks: </b>{classLevel?.extra_attacks || 0}</div>
-             <TrackedResourceInput label="Rage Points" resourceKey="ragePoints" playerName={playerStats.name} getMax={() => classLevel?.rages || 0} deps={[playerStats]} />
+             <div><b>Extra Attacks: </b>{extraAttacks}</div>
+             <TrackedResourceInput label="Rage Points" resourceKey="ragePoints" playerName={playerStats.name} getMax={() => rageCount} deps={[playerStats]} />
              <div>
                  <b>Rage Damage Bonus: </b>
-                 <span className={rageActive ? "stat--buffed" : ""}>{classLevel?.rage_damage || 0}</span>
+                 <span className={rageActive ? "stat--buffed" : ""}>{rageDamage}</span>
                  <button className="automation-btn" onClick={() => setRageActive(!rageActive)} title={rageActive ? "End Rage" : "Enter Rage (toggle for damage bonus)"}>
                      <i className={`fas fa-${rageActive ? "fire-alt" : "fire"}`}></i> {rageActive ? "Raging" : "Rage"}
                  </button>
-                 {rageActive && <span className="automation-badge">BPS Resist, STR Adv, +{classLevel?.rage_damage || 0} dmg</span>}
+                 {rageActive && <span className="automation-badge">BPS Resist, STR Adv, +{rageDamage} dmg</span>}
              </div>
-             <div><b>Weapon Mastery: </b>{classLevel?.weapon_mastery ?? 'N/A'}</div>
+             <div><b>Weapon Mastery: </b>{weaponMastery}</div>
          </div>
     );
 };
