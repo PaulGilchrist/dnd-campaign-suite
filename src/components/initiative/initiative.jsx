@@ -329,7 +329,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     const setupCreatures = React.useCallback(() => {
         const creatureList = characters.map((character) => {
-            const maxHp = character.hitPoints || 0;
+            const maxHp = character.computedStats?.hitPoints ?? character.hitPoints ?? 0;
             return {
                 name: utils.getName(character.name),
                 type: 'player',
