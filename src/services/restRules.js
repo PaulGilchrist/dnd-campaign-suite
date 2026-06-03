@@ -17,13 +17,13 @@ export function computeShortRestHpNewCurrent(currentHp, maxHp, recoveredAmount) 
 export const SHORT_REST_RESOURCES = [
   'channelDivinityCharges',
   'wildShapeUses',
-  'secondWindUses',
+  'secondwindUses',
   'psionicEnergy',
   'focusPoints',
   'superiorityDice',
   'kiPoints',
-  'actionSurgeUses',
-  'layOnHandsPool',
+  'actionsurgeUses',
+  'layonhandsPool',
   'luckyPoints'
 ]
 
@@ -32,23 +32,23 @@ export function getShortRestResources() {
 }
 
 export const LONG_REST_RESOURCES = [
-   'ragePoints',
-   'bardicInspirationUses',
-   'channelDivinityCharges',
-   'wildShapeUses',
-   'secondWindUses',
-   'psionicEnergy',
-   'focusPoints',
-   'uncannyMetabolismUses',
-   'sorceryPoints',
-   'arcaneRecoveryLevels',
-   'superiorityDice',
-   'kiPoints',
-   'actionSurgeUses',
-   'layOnHandsPool',
-   'warlockPactMagic',
-   'luckyPoints'
- ]
+  'ragePoints',
+  'bardicInspirationUses',
+  'channelDivinityCharges',
+  'wildShapeUses',
+  'secondwindUses',
+  'psionicEnergy',
+  'focusPoints',
+  'uncannymetabolismUses',
+  'sorceryPoints',
+  'arcaneRecoveryLevels',
+  'superiorityDice',
+  'kiPoints',
+  'actionsurgeUses',
+  'layonhandsPool',
+  'warlockPactMagic',
+  'luckyPoints'
+]
 
 export function getLongRestResources() {
   return [...LONG_REST_RESOURCES]
