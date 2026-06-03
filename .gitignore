@@ -1,5 +1,6 @@
 # Per-campaign character change data (debounced in-memory state)
 public/campaigns/*/data/character-change-data.json
+public/campaigns/*/data/campaign-log.json
 
 # Logs
 logs
