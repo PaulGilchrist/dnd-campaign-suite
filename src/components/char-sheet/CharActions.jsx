@@ -732,12 +732,16 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const actionSpells = playerStats.spellAbilities?.spells?.filter(spell =>
         actionCastingTimes.includes(spell.casting_time) &&
         (spell.prepared === 'Always' || spell.prepared === 'Prepared') &&
-        !actionAttackNames.has(spell.name)
+        !actionAttackNames.has(spell.name) &&
+        spell.damage
     ) || [];
     const actionSpellNames = actionSpells.reduce((acc, spell) => { acc[spell.name] = spell; return acc; }, {});
 
     const handleActionSpellClick = (spellName) => {
-        const spell = actionSpellNames[spellName];
+        let spell = actionSpellNames[spellName];
+        if (!spell) {
+            spell = playerStats.spellAbilities?.spells?.find(s => s.name === spellName);
+        }
         if (!spell) return;
         setSelectedActionSpell(spell);
     };
@@ -881,7 +885,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     {playerStats.attacks.map((attack) => {
                         if (attack.type != 'Action') return '';
                         return <React.Fragment key={attack.name}>
-                            <div className='left clickable' onClick={() => attack.saveDc ? handleActionSpellClick(attack.name) : undefined}>{attack.name}</div>
+                            <div className='left clickable' onClick={() => handleActionSpellClick(attack.name)}>{attack.name}</div>
                             <div>{attack.range} ft.</div>
                             {attack.saveDc
                                 ? <div className="save-dc-display">DC {attack.saveDc} {attack.saveType}</div>

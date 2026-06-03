@@ -24,7 +24,7 @@
 
 /* Add extra column for Mastery when using 2024 rules */
 .char-actions .attacks.mastery-enabled {
-    grid-template-columns: 120px 80px 100px 80px 70px 80px;
+    grid-template-columns: 120px 80px 100px 80px 90px 80px;
 }
 
 /* Automation UI elements */
@@ -76,7 +76,7 @@
         grid-template-columns: 160px 120px 100px 120px 1fr;
     }
     .char-actions .attacks.mastery-enabled {
-        grid-template-columns: 140px 100px 100px 110px 80px 1fr;
+        grid-template-columns: 140px 100px 100px 110px 90px 1fr;
     }
     .char-actions .attacks > div {
         padding-right: 4px;
