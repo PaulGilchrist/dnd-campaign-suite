@@ -156,6 +156,7 @@ function CreatureHp({ creature, isLocalhost, onChange }) {
 
 function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
+    const [refreshKey, setRefreshKey] = React.useState(0);
     const [numOfNpc, setNumOfNpc] = React.useState(4);
     const [activeCreatureName, setActiveCreatureName] = React.useState(null);
     const [npcImages, setNpcImages] = React.useState({});
@@ -471,7 +472,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             storage.set('activeCreatureName', firstName, campaignName);
             setActiveCreatureName(firstName);
         }
-    }, [characters, campaignName, setupCreatures, loadCreatureHp, loadCreatureMaxHp, getSaveBonuses]);
+    }, [characters, campaignName, setupCreatures, loadCreatureHp, loadCreatureMaxHp, getSaveBonuses, refreshKey]);
 
     React.useEffect(() => {
         if (!combatSummary || !onNpcsChange) return;
@@ -639,16 +640,15 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
      }, [combatSummary, campaignName]);
 
     const handleClear = () => {
-        if (window.confirm('Are you sure you want to clear all combat status?')) {
-            const creatures = setupCreatures();
-            const combatSummary = { round: 1, creatures };
-            storage.set('combatSummary', combatSummary, campaignName);
-            setCombatSummary(combatSummary);
-            const firstCreatureName = creatures[0].name;
-            storage.set('activeCreatureName', firstCreatureName, campaignName);
-            setActiveCreatureName(firstCreatureName);
-        }
-    };
+         if (window.confirm('Are you sure you want to clear all combat status?')) {
+             const creatures = setupCreatures();
+             const newSummary = { round: 1, creatures };
+             storage.set('combatSummary', newSummary, campaignName);
+             const firstCreatureName = creatures[0].name;
+             storage.set('activeCreatureName', firstCreatureName, campaignName);
+             setRefreshKey(prev => prev + 1);
+            }
+       };
     const handleInitiativeChange = (creatureName, value) => {
         if (!combatSummary) return;
         const index = combatSummary.creatures.findIndex((creature) => creature.name === creatureName);
