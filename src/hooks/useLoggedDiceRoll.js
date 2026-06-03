@@ -75,6 +75,8 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         saveResult: e.detail.success ? 'success' : 'failure',
         saveRoll: e.detail.roll,
         saveBonus: e.detail.saveBonus,
+        saveRawRolls: e.detail.rawRolls,
+        mode: pending.metamagicHeighten ? 'disadvantage' : 'normal',
         bonusDetail: e.detail.bonusDetail,
         finalDamage: applyResult?.finalDamage ?? finalDamage,
         isAoe: pending.isAoe || false,
@@ -193,6 +195,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         saveType: context.saveType,
         dcSuccess: context.dcSuccess,
         metamagicTwinTarget: context.metamagicTwinTarget,
+        metamagicHeighten: context.metamagicHeighten,
        } : undefined;
 
      logEntry({
@@ -364,6 +367,8 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             saveResult: saveResult.success ? 'success' : 'failure',
             saveRoll: saveResult.roll,
             saveBonus: saveResult.bonus,
+            saveRawRolls: saveResult.rawRolls,
+            mode: disadvantage ? 'disadvantage' : 'normal',
             finalDamage: applyResult?.finalDamage ?? total,
            });
 
@@ -427,6 +432,8 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                 saveResult: twinSaveResult.success ? 'success' : 'failure',
                 saveRoll: twinSaveResult.roll,
                 saveBonus: twinSaveResult.bonus,
+                saveRawRolls: twinSaveResult.rawRolls,
+                mode: twinDisadvantage ? 'disadvantage' : 'normal',
                 finalDamage: twinApplyResult?.finalDamage ?? total,
               });
               setPopupHtml(prev => ({
@@ -532,11 +539,13 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             rolls,
             total,
             modifier,
+            bonus: modifier,
             damageType,
             targetName: target.name,
             saveType,
             saveDc,
             dcSuccess,
+            mode: context?.metamagicHeighten ? 'disadvantage' : 'normal',
            });
 
           setPopupHtml({

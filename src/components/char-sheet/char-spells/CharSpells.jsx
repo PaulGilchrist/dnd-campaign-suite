@@ -35,6 +35,9 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
             if (autoDamage.metamagicTwinTarget) {
               context.metamagicTwinTarget = autoDamage.metamagicTwinTarget;
             }
+            if (autoDamage.metamagicHeighten) {
+              context.metamagicHeighten = autoDamage.metamagicHeighten;
+            }
             rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
             }
            },

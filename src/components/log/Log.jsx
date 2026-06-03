@@ -67,7 +67,10 @@ function RollEntry({ entry }) {
         )}
         {(isSaveDamage || isAoeDamage) && entry.saveType && entry.saveDc && (
           <span className="log-save-info">
-            {entry.saveType.toUpperCase()} save DC {entry.saveDc}
+            {entry.saveType.toUpperCase()} save DC {entry.saveDc}&nbsp;
+            {entry.mode === 'disadvantage' && (
+              <span className="log-mode-badge disadvantage">DISADVANTAGE</span>
+            )}
           </span>
         )}
         {isSaveDamage && entry.saveResult && (

@@ -1,636 +1,636 @@
 .log-view {
-  flex: 1;
-  padding: 20px 32px 20px 20px;
-  width: 100%;
+    flex: 1;
+    padding: 20px 32px 20px 20px;
+    width: 100%;
 }
 
 .log-toolbar h2 {
-  margin: 0 0 16px 0;
-  color: var(--color-header);
-  font-size: 1.4em;
+    margin: 0 0 16px 0;
+    color: var(--color-header);
+    font-size: 1.4em;
 }
 
 .log-toolbar h2 i {
-  margin-right: 8px;
-  color: var(--color-primary);
+    margin-right: 8px;
+    color: var(--color-primary);
 }
 
 /* Add note input area */
 .log-add-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 16px;
 }
 
 .log-add-note select {
-  padding: 6px 10px;
-  font-size: 0.88rem;
-  background: var(--background-color-input);
-  color: var(--color-text);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  outline: none;
-  max-width: 180px;
-  height: 32px;
+    padding: 6px 10px;
+    font-size: 0.88rem;
+    background: var(--background-color-input);
+    color: var(--color-text);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    outline: none;
+    max-width: 180px;
+    height: 32px;
 }
 
 .log-add-note select:focus {
-  border-color: var(--color-primary);
+    border-color: var(--color-primary);
 }
 
 .log-add-note input[type="text"] {
-  flex: 1;
-  padding: 6px 12px;
-  font-size: 0.88rem;
-  background: var(--background-color-input);
-  color: var(--color-text);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  outline: none;
+    flex: 1;
+    padding: 6px 12px;
+    font-size: 0.88rem;
+    background: var(--background-color-input);
+    color: var(--color-text);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    outline: none;
 }
 
 .log-add-note input[type="text"]:focus {
-  border-color: var(--color-primary);
+    border-color: var(--color-primary);
 }
 
 .log-add-note textarea {
-  flex: 1;
-  min-height: 50px;
-  resize: vertical;
-  padding: 8px 12px;
-  font-size: 0.88rem;
-  background: var(--background-color-input);
-  color: var(--color-text);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  outline: none;
+    flex: 1;
+    min-height: 50px;
+    resize: vertical;
+    padding: 8px 12px;
+    font-size: 0.88rem;
+    background: var(--background-color-input);
+    color: var(--color-text);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    outline: none;
 }
 
 .log-add-note textarea:focus {
-  border-color: var(--color-primary);
+    border-color: var(--color-primary);
 }
 
 .log-add-btn {
-  padding: 6px 12px;
-  font-size: 0.88rem;
-  border-radius: 4px;
-  border: 1px solid var(--color-primary);
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  cursor: pointer;
-  height: 32px;
+    padding: 6px 12px;
+    font-size: 0.88rem;
+    border-radius: 4px;
+    border: 1px solid var(--color-primary);
+    background: var(--color-primary);
+    color: var(--color-text-inverse);
+    cursor: pointer;
+    height: 32px;
 }
 
 .log-add-btn:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
 }
 
 /* Loading & empty states */
 .log-loading,
 .log-empty {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--color-text-muted);
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--color-text-muted);
 }
 
 /* Log entries list */
 .log-entries {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: calc(100vh - 180px);
-  overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: calc(100vh - 180px);
+    overflow-y: auto;
 }
 
 /* Entry base */
 .log-entry {
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 8px 12px;
-  background: var(--background-color-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 12px;
+    background: var(--background-color-card);
 }
 
 .log-entry-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
 }
 
 .log-icon {
-  color: var(--color-text-muted);
-  font-size: 0.85rem;
-  width: 20px;
-  text-align: center;
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+    width: 20px;
+    text-align: center;
 }
 
 .log-character {
-  font-weight: 600;
-  color: var(--color-primary);
-  font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    font-size: 0.9rem;
 }
 
 .log-name {
-  flex: 1;
-  color: var(--color-text);
-  font-size: 0.88rem;
+    flex: 1;
+    color: var(--color-text);
+    font-size: 0.88rem;
 }
 
 .log-time {
-  color: var(--color-text-muted);
-  font-size: 0.78rem;
-  white-space: nowrap;
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    white-space: nowrap;
 }
 
 /* Roll details */
 .log-roll-details {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
 }
 
 .log-dice-values {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .log-die {
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-  background: var(--background-color-input);
-  padding: 1px 6px;
-  border-radius: 3px;
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    background: var(--background-color-input);
+    padding: 1px 6px;
+    border-radius: 3px;
 }
 
 .log-die-selected {
-  color: var(--color-text);
-  font-weight: 600;
-  background: var(--border-color);
+    color: var(--color-text);
+    font-weight: 600;
+    background: var(--border-color);
 }
 
 .log-total b {
-  font-size: 1.1em;
-  color: var(--color-header);
-  margin-left: 8px;
+    font-size: 1.1em;
+    color: var(--color-header);
+    margin-left: 8px;
 }
 
 /* Mode badges (adv/disadv/normal) */
 .log-mode-badge {
-  font-size: 0.7rem;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-weight: 600;
-  text-transform: uppercase;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    text-transform: uppercase;
 }
 
 .log-mode-badge.advantage {
-  background: rgba(76, 175, 80, 0.2);
-  color: #4CAF50;
+    background: rgba(76, 175, 80, 0.2);
+    color: #4CAF50;
 }
 
 .log-mode-badge.disadvantage {
-  background: rgba(244, 67, 54, 0.2);
-  color: #f44336;
+    background: rgba(244, 67, 54, 0.2);
+    color: #f44336;
 }
 
 .log-mode-badge.normal {
-  background: var(--background-color-input);
-  color: var(--color-text-muted);
+    background: var(--background-color-input);
+    color: var(--color-text-muted);
 }
 
 /* Nat 20 and Fumble badges */
 .log-nat-badge {
-  font-size: 0.7rem;
-  padding: 2px 8px;
-  border-radius: 3px;
-  font-weight: 700;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: 700;
 }
 
 .log-nat20,
 .log-entry.log-nat20 {
-  border-color: #4CAF50;
+    border-color: #4CAF50;
 }
 
 .log-nat-badge.log-nat20 {
-  background: rgba(76, 175, 80, 0.3);
-  color: #4CAF50;
+    background: rgba(76, 175, 80, 0.3);
+    color: #4CAF50;
 }
 
 .log-entry.log-nat20 {
-  background: rgba(76, 175, 80, 0.05);
+    background: rgba(76, 175, 80, 0.05);
 }
 
 .log-nat1,
 .log-entry.log-nat1 {
-  border-color: #f44336;
+    border-color: #f44336;
 }
 
 .log-nat-badge.log-nat1 {
-  background: rgba(244, 67, 54, 0.3);
-  color: #f44336;
+    background: rgba(244, 67, 54, 0.3);
+    color: #f44336;
 }
 
 .log-entry.log-nat1 {
-  background: rgba(244, 67, 54, 0.05);
+    background: rgba(244, 67, 54, 0.05);
 }
 
 /* Note entries */
 .log-note .log-note-text {
-  flex: 1;
-  padding-left: 28px;
-  color: var(--color-text);
-  font-size: 0.88rem;
-  word-break: break-word;
+    flex: 1;
+    padding-left: 28px;
+    color: var(--color-text);
+    font-size: 0.88rem;
+    word-break: break-word;
 }
 
 /* Travel entries */
 .log-travel {
-  border-left: 3px solid #4a90d9;
+    border-left: 3px solid #4a90d9;
 }
 
 .log-travel-action {
-  font-weight: 600;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
 
 .log-travel-coords {
-  font-family: 'Courier New', monospace;
-  font-size: 0.82rem;
-  color: var(--color-text);
-  background: var(--background-color-input);
-  padding: 1px 6px;
-  border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.82rem;
+    color: var(--color-text);
+    background: var(--background-color-input);
+    padding: 1px 6px;
+    border-radius: 3px;
 }
 
 .log-travel-details {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-left: 28px;
-  margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-left: 28px;
+    margin-top: 2px;
 }
 
 .log-travel-terrain,
 .log-travel-weather {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .log-travel-event {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding-left: 28px;
-  margin-top: 4px;
-  font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 28px;
+    margin-top: 4px;
+    font-size: 0.85rem;
 }
 
 .log-travel-event-type {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #e87040;
-  background: rgba(232, 112, 64, 0.12);
-  padding: 1px 6px;
-  border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #e87040;
+    background: rgba(232, 112, 64, 0.12);
+    padding: 1px 6px;
+    border-radius: 3px;
 }
 
 .log-travel-event-title {
-  color: var(--color-text);
+    color: var(--color-text);
 }
 
 /* Loot entries */
 .log-loot {
-  border-left: 3px solid var(--color-warning);
+    border-left: 3px solid var(--color-warning);
 }
 
 .log-loot-details {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-left: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-left: 28px;
 }
 
 .log-loot-xp {
-  font-size: 0.85rem;
-  color: var(--color-warning);
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 4px;
+    font-size: 0.85rem;
+    color: var(--color-warning);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .log-loot-items {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 }
 
 .log-loot-item {
-  font-size: 0.85rem;
-  color: var(--color-text);
-  padding: 3px 8px;
-  background: var(--background-color-input);
-  border-radius: 4px;
+    font-size: 0.85rem;
+    color: var(--color-text);
+    padding: 3px 8px;
+    background: var(--background-color-input);
+    border-radius: 4px;
 }
 
 /* Target name */
 .log-target {
-  font-size: 0.78rem;
-  color: #ffcc00;
-  font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: rgba(255, 204, 0, 0.1);
+    font-size: 0.78rem;
+    color: #ffcc00;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(255, 204, 0, 0.1);
 }
 
 /* Hit/Miss badges */
 .log-hit-miss {
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 3px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
 }
 
 .log-hit-miss.log-hit {
-  color: #4CAF50;
-  background: rgba(76, 175, 80, 0.2);
+    color: #4CAF50;
+    background: rgba(76, 175, 80, 0.2);
 }
 
 .log-hit-miss.log-miss {
-  color: #f44336;
-  background: rgba(244, 67, 54, 0.2);
+    color: #f44336;
+    background: rgba(244, 67, 54, 0.2);
 }
 
 /* Damage type pill */
 .log-damage-type {
-  font-size: 0.72rem;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-weight: 600;
-  background: rgba(100, 149, 237, 0.2);
-  color: #6495ed;
-  text-transform: capitalize;
+    font-size: 0.72rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    background: rgba(100, 149, 237, 0.2);
+    color: #6495ed;
+    text-transform: capitalize;
 }
 
 /* Cover indicator */
 .log-cover {
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 3px;
-  color: #9C27B0;
-  background: rgba(156, 39, 176, 0.2);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #9C27B0;
+    background: rgba(156, 39, 176, 0.2);
 }
 
 /* Range reason (out of range, long range, etc.) */
 .log-range-reason {
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 3px;
-  color: #FF9800;
-  background: rgba(255, 152, 0, 0.2);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: #FF9800;
+    background: rgba(255, 152, 0, 0.2);
 }
 
 /* Resistance/Immunity notice */
 .log-resistance-notice {
-  width: 100%;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #ff9800;
-  background: rgba(255, 152, 0, 0.12);
-  padding: 3px 8px;
-  border-radius: 4px;
-  margin-top: 4px;
+    width: 100%;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #ff9800;
+    background: rgba(255, 152, 0, 0.12);
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-top: 4px;
 }
 
 /* Condition entries */
 .log-condition {
-  border-left: 3px solid #e74c3c;
+    border-left: 3px solid #e74c3c;
 }
 
 .log-condition-broken {
-  border-left-color: #2ecc71;
+    border-left-color: #2ecc71;
 }
 
 .log-condition-details {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-left: 28px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 28px;
 }
 
 .log-condition-name {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-text);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text);
 }
 
 .log-condition-dc {
-  font-size: 0.78rem;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: rgba(220, 38, 38, 0.15);
-  color: #e74c3c;
-  font-weight: 700;
+    font-size: 0.78rem;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(220, 38, 38, 0.15);
+    color: #e74c3c;
+    font-weight: 700;
 }
 
 .log-condition-ability {
-  font-size: 0.72rem;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: rgba(100, 149, 237, 0.2);
-  color: #6495ed;
-  font-weight: 600;
+    font-size: 0.72rem;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(100, 149, 237, 0.2);
+    color: #6495ed;
+    font-weight: 600;
 }
 
 /* Condition save in roll entry */
 .log-condition-save {
-  font-size: 0.78rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 3px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
 }
 
 .log-condition-save.log-condition-success {
-  color: #2ecc71;
-  background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+    background: rgba(46, 204, 113, 0.15);
 }
 
 .log-condition-save.log-condition-failure {
-  color: #e74c3c;
-  background: rgba(231, 76, 60, 0.15);
+    color: #e74c3c;
+    background: rgba(231, 76, 60, 0.15);
 }
 
 /* Save info in roll entries (save-damage, aoe-damage) */
 .log-save-info {
-  font-size: 0.75rem;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-weight: 600;
-  background: rgba(100, 149, 237, 0.15);
-  color: #6495ed;
-  text-transform: uppercase;
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+    background: rgba(100, 149, 237, 0.15);
+    color: #6495ed;
+    text-transform: uppercase;
 }
 
 .log-save-result {
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
 }
 
 .log-save-result.log-condition-success {
-  color: #2ecc71;
-  background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+    background: rgba(46, 204, 113, 0.15);
 }
 
 .log-save-result.log-condition-failure {
-  color: #e74c3c;
-  background: rgba(231, 76, 60, 0.15);
+    color: #e74c3c;
+    background: rgba(231, 76, 60, 0.15);
 }
 
 .log-final-damage {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: #ffcc00;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: rgba(255, 204, 0, 0.08);
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #ffcc00;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(255, 204, 0, 0.08);
 }
 
 .log-aoe-affect {
-  font-size: 0.72rem;
-  font-style: italic;
-  color: var(--color-text-muted);
+    font-size: 0.72rem;
+    font-style: italic;
+    color: var(--color-text-muted);
 }
 
 .log-dice-formula {
-  font-size: 0.82rem;
-  color: var(--color-text);
-  background: var(--background-color-input);
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-weight: 600;
+    font-size: 0.82rem;
+    color: var(--color-text);
+    background: var(--background-color-input);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-weight: 600;
 }
 
 /* Spell entry */
 .log-spell {
-  border-left: 3px solid #7c3aed;
+    border-left: 3px solid #7c3aed;
 }
 
 .log-spell-details {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding-left: 28px;
-  flex-wrap: wrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 28px;
+    flex-wrap: wrap;
 }
 
 .log-spell-level {
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: rgba(124, 58, 237, 0.15);
-  color: #7c3aed;
-  text-transform: uppercase;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(124, 58, 237, 0.15);
+    color: #7c3aed;
+    text-transform: uppercase;
 }
 
 .log-spell-casting-time {
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
-  font-style: italic;
+    font-size: 0.78rem;
+    color: var(--color-text-muted);
+    font-style: italic;
 }
 
 .log-metamagic-list {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
 }
 
 .log-metamagic-option {
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: rgba(0, 188, 212, 0.15);
-  color: #00bcd4;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(0, 188, 212, 0.15);
+    color: #00bcd4;
 }
 
 .log-metamagic-cost {
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 3px;
-  background: rgba(255, 193, 7, 0.2);
-  color: #ffc107;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
 }
 
 .log-no-metamagic {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-  font-style: italic;
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    font-style: italic;
 }
 
 /* Empowered Spell / Metamagic entry */
 .log-metamagic {
-  border-left: 3px solid #9c27b0;
+    border-left: 3px solid #9c27b0;
 }
 
 .log-empowered-details {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding-left: 28px;
-  flex-wrap: wrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 28px;
+    flex-wrap: wrap;
 }
 
 .log-empowered-damage {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-text);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text);
 }
 
 .log-empowered-difference {
-  font-size: 0.78rem;
-  font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 3px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
 }
 
 .log-empowered-positive {
-  color: #4CAF50;
-  background: rgba(76, 175, 80, 0.15);
+    color: #4CAF50;
+    background: rgba(76, 175, 80, 0.15);
 }
 
 .log-empowered-negative {
-  color: #f44336;
-  background: rgba(244, 67, 54, 0.15);
+    color: #f44336;
+    background: rgba(244, 67, 54, 0.15);
 }
 
 .log-empowered-neutral {
-  color: var(--color-text-muted);
-  background: var(--background-color-input);
+    color: var(--color-text-muted);
+    background: var(--background-color-input);
 }
 
 .log-empowered-dice-info {
-  font-size: 0.72rem;
-  color: var(--color-text-muted);
-  font-style: italic;
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+    font-style: italic;
 }

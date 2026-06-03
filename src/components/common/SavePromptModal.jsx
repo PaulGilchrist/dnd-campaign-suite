@@ -67,17 +67,20 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
 
     const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName });
     const auraBonus = aura.bonus;
-    const roll = rollD20();
-    const total = roll + saveBonus + auraBonus;
+    const roll1 = rollD20();
+    const roll2 = current.disadvantage ? rollD20() : roll1;
+    const finalRoll = current.disadvantage ? Math.min(roll1, roll2) : roll1;
+    const total = finalRoll + saveBonus + auraBonus;
     const success = total >= current.saveDc;
     const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined;
 
     sendSaveResult(campaignName, current.targetName, {
       promptId: current.promptId,
       success,
-      roll,
+      roll: finalRoll,
       total,
       saveBonus: saveBonus + auraBonus,
+      rawRolls: [roll1, roll2],
     });
 
     window.dispatchEvent(new CustomEvent('save-result', {
@@ -87,18 +90,19 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
         saveType: current.saveType,
         saveDc: current.saveDc,
         success,
-        roll,
+        roll: finalRoll,
         total,
         saveBonus: saveBonus + auraBonus,
         bonusDetail,
         rawDamage: current.rawDamage,
         dcSuccess: current.dcSuccess,
+        rawRolls: [roll1, roll2],
       },
     }));
 
     setPrompts(prev => prev.map((p, i) =>
       i === 0
-        ? { ...p, result: { success, roll, total, saveBonus: saveBonus + auraBonus, bonusDetail } }
+        ? { ...p, result: { success, roll: finalRoll, total, saveBonus: saveBonus + auraBonus, bonusDetail, rawRolls: [roll1, roll2] } }
         : p
     ));
   }, [campaignName, current, characters, activeMapName]);
