@@ -78,6 +78,7 @@ export const bonusActions = [
 
 export const reactions = [
     "Beguiling Defenses",
+    "Bend Fate",
     "Channel Divinity: War God's Blessing",
     "Entropic Ward",
     "Instinctive Charm",

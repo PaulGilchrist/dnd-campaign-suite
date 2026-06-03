@@ -76,6 +76,7 @@ export const bonusActions = [
 ];
 
 export const reactions = [
+    "Bend Fate",
     "Countercharm",
     "Deflect Energy",
     "Feather Fall",
