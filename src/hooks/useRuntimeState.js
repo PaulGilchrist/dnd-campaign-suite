@@ -33,6 +33,10 @@ export function setRuntimeValue(characterKey, propertyName, value, campaignName)
   const obj = Object.fromEntries(store);
   try { localStorage.setItem(characterKey, JSON.stringify(obj)); } catch { /* ignore */ }
 
+  if (!campaignName) {
+    console.error('setRuntimeValue called with undefined campaignName', { characterKey, propertyName, value, stack: new Error().stack });
+  }
+
   fetch(`/api/campaigns/${campaignName}/${characterKey}`, {
     method: 'POST',
     mode: 'cors',
@@ -93,6 +97,10 @@ export function setRuntimeBatch(characterKey, properties, campaignName) {
 
   const obj = Object.fromEntries(store);
   try { localStorage.setItem(characterKey, JSON.stringify(obj)); } catch { /* ignore */ }
+
+  if (!campaignName) {
+    console.error('setRuntimeBatch called with undefined campaignName', { characterKey, properties, stack: new Error().stack });
+  }
 
   fetch(`/api/campaigns/${campaignName}/${characterKey}`, {
     method: 'POST',

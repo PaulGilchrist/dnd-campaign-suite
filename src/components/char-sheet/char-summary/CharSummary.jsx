@@ -217,7 +217,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                         }
                     }} />
                       {playerStats.background && <div><b>Background: </b><span className="clickable" onClick={() => showBackgroundPopup(playerStats.background, setPopupHtml)}>{playerStats.background}</span></div>}
-                      <CharClassFeatures playerStats={playerStats} />
+                      <CharClassFeatures playerStats={playerStats} campaignName={campaignName} />
                 </div>
       </div>
           {allResistances.length > 0 && <div>

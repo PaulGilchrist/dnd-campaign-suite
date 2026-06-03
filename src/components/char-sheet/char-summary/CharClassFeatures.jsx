@@ -3,7 +3,7 @@ import React from 'react'
 import TrackedResourceInput from './TrackedResourceInput.jsx';
 import { getClassFeatures } from '../../../services/classFeatures.js';
 /* ─── Barbarian ─── */
-const BarbarianFeatures = function BarbarianFeatures({ playerStats }) {
+const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const is2024 = playerStats.rules === '2024';
     const [rageActive, setRageActive] = React.useState(false);
@@ -27,7 +27,7 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats }) {
     return (
          <div data-testid="char-class-barbarian">
              <div><b>Extra Attacks: </b>{extraAttacks}</div>
-             <TrackedResourceInput label="Rage Points" resourceKey="ragePoints" playerName={playerStats.name} getMax={() => rageCount} deps={[playerStats]} />
+             <TrackedResourceInput label="Rage Points" resourceKey="ragePoints" playerName={playerStats.name} getMax={() => rageCount} deps={[playerStats]} campaignName={campaignName} />
              <div>
                  <b>Rage Damage Bonus: </b>
                  <span className={rageActive ? "stat--buffed" : ""}>{rageDamage}</span>
@@ -42,13 +42,13 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats }) {
 };
 
 /* ─── Bard ─── */
-const BardFeatures = function BardFeatures({ playerStats }) {
+const BardFeatures = function BardFeatures({ playerStats, campaignName }) {
     const bardFeatures = getClassFeatures(playerStats);
     return (
          <div data-testid="char-class-bard">
              {playerStats.level > 5 && (bardFeatures?.magicalSecrets ?? false) && <div><b>Extra Attacks: </b>1</div>}
              <div><b>Bardic Inspiration Die: </b>d{bardFeatures?.bardicDie ?? 0}</div>
-             <TrackedResourceInput label="Bardic Inspiration Uses" resourceKey="bardicInspirationUses" playerName={playerStats.name} getMax={() => { const charisma = playerStats.abilities?.find((a) => a.name === 'Charisma'); return charisma?.bonus || 0; }} deps={[playerStats]} />
+             <TrackedResourceInput label="Bardic Inspiration Uses" resourceKey="bardicInspirationUses" playerName={playerStats.name} getMax={() => { const charisma = playerStats.abilities?.find((a) => a.name === 'Charisma'); return charisma?.bonus || 0; }} deps={[playerStats]} campaignName={campaignName} />
              {bardFeatures?.songOfRestDie && <div><b>Song of Rest Die: </b>d{bardFeatures.songOfRestDie}</div>}
              {bardFeatures?.magicalSecrets !== null && <div><b>Magical Secrets: </b>{bardFeatures.magicalSecrets + bardFeatures.subclassMagicalSecrets}</div>}
              {playerStats.level > 2 && playerStats.class.expertise && <div><b>Expertise: </b>{playerStats.class.expertise.join(', ')}</div>}
@@ -57,11 +57,11 @@ const BardFeatures = function BardFeatures({ playerStats }) {
 };
 
 /* ─── Cleric ─── */
-const ClericFeatures = function ClericFeatures({ playerStats }) {
+const ClericFeatures = function ClericFeatures({ playerStats, campaignName }) {
     const clericFeatures = getClassFeatures(playerStats);
     return (
          <div data-testid="char-class-cleric">
-             <TrackedResourceInput label="Channel Divinity Charges" resourceKey="channelDivinityCharges" playerName={playerStats.name} getMax={() => clericFeatures?.maxChannelDivinity || 0} deps={[playerStats]} />
+             <TrackedResourceInput label="Channel Divinity Charges" resourceKey="channelDivinityCharges" playerName={playerStats.name} getMax={() => clericFeatures?.maxChannelDivinity || 0} deps={[playerStats]} campaignName={campaignName} />
              {clericFeatures?.destroyUndeadCR !== null && <div><b>Destroy Undead Challenge Rating: </b>{clericFeatures.destroyUndeadCR}</div>}
 
          </div>
@@ -69,12 +69,12 @@ const ClericFeatures = function ClericFeatures({ playerStats }) {
 };
 
 /* ─── Druid ─── */
-const DruidFeatures = function DruidFeatures({ playerStats }) {
+const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
     const druidFeatures = getClassFeatures(playerStats);
     if (playerStats.level < 2) return null;
     return (
          <div data-testid="char-class-druid">
-             <TrackedResourceInput label="Wild Shape Uses" resourceKey="wildShapeUses" playerName={playerStats.name} getMax={() => druidFeatures?.maxWildShapeUses || 0} deps={[playerStats]} />
+             <TrackedResourceInput label="Wild Shape Uses" resourceKey="wildShapeUses" playerName={playerStats.name} getMax={() => druidFeatures?.maxWildShapeUses || 0} deps={[playerStats]} campaignName={campaignName} />
              <div><b>Wild Shape Max Challenge Rating: </b>{druidFeatures?.maxWildShapeChallengeRating}</div>
              {druidFeatures?.beastKnownForms > 0 && <div><b>Beast Forms Known: </b>{druidFeatures.beastKnownForms}</div>}
              <div><b>Wild Shape Limitations: </b>{druidFeatures.wildShapeLimitations}</div>
@@ -84,7 +84,7 @@ const DruidFeatures = function DruidFeatures({ playerStats }) {
 };
 
 /* ─── Fighter ─── */
-const FighterFeatures = function FighterFeatures({ playerStats }) {
+const FighterFeatures = function FighterFeatures({ playerStats, campaignName }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name;
     const hasEnergy = classLevel?.energy && classLevel.energy.required_major === majorName;
@@ -96,11 +96,11 @@ const FighterFeatures = function FighterFeatures({ playerStats }) {
              <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles?.join(', ') || 'N/A'}</div>
              <div><b>Extra Attacks: </b>{classLevel.extra_attacks || 0}</div>
              <div><b>Weapon Mastery: </b>{classLevel.weapon_mastery}</div>
-             <TrackedResourceInput label="Second Wind" resourceKey="secondWindUses" playerName={playerStats.name} getMax={() => classLevel?.second_wind || 0} deps={[playerStats]} displayFormat="cur-max" />
+             <TrackedResourceInput label="Second Wind" resourceKey="secondWindUses" playerName={playerStats.name} getMax={() => classLevel?.second_wind || 0} deps={[playerStats]} displayFormat="cur-max" campaignName={campaignName} />
              {hasEnergy && (
                  <div>
                      <div><b>Psionic Energy (Psi Warrior):</b></div>
-                     <TrackedResourceInput label="Energy Dice" resourceKey="psionicEnergy" playerName={playerStats.name} getMax={() => hasEnergy ? classLevel?.energy?.energy_die_num || 0 : 0} deps={[playerStats]} displayFormat="cur-max" />
+                     <TrackedResourceInput label="Energy Dice" resourceKey="psionicEnergy" playerName={playerStats.name} getMax={() => hasEnergy ? classLevel?.energy?.energy_die_num || 0 : 0} deps={[playerStats]} displayFormat="cur-max" campaignName={campaignName} />
                      <div><b>Energy Die Type: </b>d{classLevel.energy.energy_die_type}</div>
                  </div>
              )}
@@ -109,7 +109,7 @@ const FighterFeatures = function FighterFeatures({ playerStats }) {
 };
 
 /* ─── Monk ─── */
-const MonkFeatures = function MonkFeatures({ playerStats }) {
+const MonkFeatures = function MonkFeatures({ playerStats, campaignName }) {
     const wisdom = playerStats.abilities?.find((a) => a.name === 'Wisdom');
     const monkFeatures = getClassFeatures(playerStats);
     if (playerStats.level < 2) return null;
@@ -118,7 +118,7 @@ const MonkFeatures = function MonkFeatures({ playerStats }) {
            <div data-testid="char-class-monk">
                <div><b>Martial Arts Die:</b> d{monkFeatures?.martialArtsDie || 0}</div>
                <div><b>Extra Attacks: </b>{playerStats.class?.class_levels?.[playerStats.level - 1]?.extra_attacks || 0}</div>
-               <TrackedResourceInput label="Focus Points" resourceKey="focusPoints" playerName={playerStats.name} getMax={() => monkFeatures?.maxFocusPoints || 0} deps={[playerStats]} />
+               <TrackedResourceInput label="Focus Points" resourceKey="focusPoints" playerName={playerStats.name} getMax={() => monkFeatures?.maxFocusPoints || 0} deps={[playerStats]} campaignName={campaignName} />
                <div><b>Focus Save DC: </b>{focusSaveDc}</div>
                <div><b>Unarmored Movement:</b> +{monkFeatures?.unarmoredMovementIncrease || 0} ft.</div>
            </div>
@@ -126,7 +126,7 @@ const MonkFeatures = function MonkFeatures({ playerStats }) {
 };
 
 /* ─── Paladin ─── */
-const PaladinFeatures = function PaladinFeatures({ playerStats }) {
+const PaladinFeatures = function PaladinFeatures({ playerStats, campaignName }) {
     const paladinFeatures = getClassFeatures(playerStats);
     const cha = playerStats.abilities?.find((a) => a.name === 'Charisma');
     const layOnHandsPoolMax = 5 * playerStats.level;
@@ -136,7 +136,7 @@ const PaladinFeatures = function PaladinFeatures({ playerStats }) {
              <div><b>Extra Attacks: </b>{paladinFeatures?.extraAttacks || 0}</div>
              <div><b>Channel Divinity: </b>{paladinFeatures?.maxChannelDivinity || 0}</div>
              {paladinFeatures?.auraRange !== null && <div><b>Aura Range: </b>{paladinFeatures.auraRange}</div>}
-             <TrackedResourceInput label="Lay On Hands Pool" resourceKey="layOnHandsPool" playerName={playerStats.name} getMax={() => layOnHandsPoolMax} deps={[playerStats]} />
+             <TrackedResourceInput label="Lay On Hands Pool" resourceKey="layOnHandsPool" playerName={playerStats.name} getMax={() => layOnHandsPoolMax} deps={[playerStats]} campaignName={campaignName} />
              {cha && <div><b>Aura of Protection: </b>+{cha.bonus} to saves {playerStats.level >= 6 ? '(10 ft.)' : '(locked)'}</div>}
 
          </div>
@@ -189,11 +189,11 @@ const RogueFeatures = function RogueFeatures({ playerStats }) {
 };
 
 /* ─── Sorcerer ─── */
-const SorcererFeatures = function SorcererFeatures({ playerStats }) {
+const SorcererFeatures = function SorcererFeatures({ playerStats, campaignName }) {
     const sorcererFeatures = getClassFeatures(playerStats);
     return (
          <div data-testid="char-class-sorcerer">
-             <TrackedResourceInput label="Sorcery Points" resourceKey="sorceryPoints" playerName={playerStats.name} getMax={() => sorcererFeatures?.maxSorceryPoints || 0} deps={[playerStats]} />
+             <TrackedResourceInput label="Sorcery Points" resourceKey="sorceryPoints" playerName={playerStats.name} getMax={() => sorcererFeatures?.maxSorceryPoints || 0} deps={[playerStats]} campaignName={campaignName} />
              <div><b>Metamagic Known: </b>{sorcererFeatures?.metamagicKnown}</div>
              {sorcererFeatures?.creatingSpellSlotCosts?.length > 0 && <div><b>Spell Slot (level 1-5) Costs: </b>{sorcererFeatures.creatingSpellSlotCosts.join(', ')}</div>}
 
@@ -234,12 +234,12 @@ const WarlockFeatures = function WarlockFeatures({ playerStats }) {
 };
 
 /* ─── Wizard ─── */
-const WizardFeatures = function WizardFeatures({ playerStats }) {
+const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
     const wizardFeatures = getClassFeatures(playerStats);
     if ((wizardFeatures?.showWizardFeatures ?? true) === false) return null;
     return (
          <div data-testid="char-class-wizard">
-             <TrackedResourceInput label="Arcane Recovery Levels" resourceKey="arcaneRecoveryLevels" playerName={playerStats.name} getMax={() => wizardFeatures?.arcaneRecoveryLevels || 0} deps={[playerStats]} />
+             <TrackedResourceInput label="Arcane Recovery Levels" resourceKey="arcaneRecoveryLevels" playerName={playerStats.name} getMax={() => wizardFeatures?.arcaneRecoveryLevels || 0} deps={[playerStats]} campaignName={campaignName} />
              <div className="automation-actions">
                  <button className="automation-btn" title="Arcane Recovery: Regain spell slots on short rest">
                      <i className="fas fa-book-open"></i> Arcane Recovery
@@ -266,10 +266,10 @@ const CLASS_COMPONENTS = {
 };
 
 /* ─── Entry point ─── */
-function CharClassFeatures({ playerStats }) {
+function CharClassFeatures({ playerStats, campaignName }) {
     const Cmp = CLASS_COMPONENTS[playerStats?.class?.name];
     if (!Cmp) return null;
-    return <Cmp playerStats={playerStats} />;
+    return <Cmp playerStats={playerStats} campaignName={campaignName} />;
 }
 
 export default CharClassFeatures;

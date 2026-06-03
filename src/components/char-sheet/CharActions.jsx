@@ -29,6 +29,7 @@ import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
 import { executeSpellCast } from '../../services/spellCastService.js'
 import { getChaModifier } from '../../services/metamagicRules.js';
 import { applyDamageToTarget } from '../../services/applyDamage.js';
+import { applyHealingToTarget } from '../../services/applyHealing.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';
 
@@ -253,7 +254,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         }
     }, [cannotAct, mapName, buildAttackContextSync, buildAttackContext, rollAttack, exhaustionPenalty]);
 
-    const MONK_KI_FEATURES = ['Flurry of Blows', 'Patient Defense', 'Step of the Wind', 'Heightened Flurry of Blows', 'Heightened Patient Defense', 'Heightened Step of the Wind'];
+    const MONK_KI_FEATURES = ['Flurry of Blows', 'Patient Defense', 'Step of the Wind', 'Heightened Flurry of Blows', 'Heightened Patient Defense', 'Heightened Step of the Wind', 'Hand of Healing'];
 
     function getCombatSummary() {
         const stored = localStorage.getItem('combatSummary');
@@ -435,18 +436,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
             const maxFP = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
             const storedFP = getRuntimeValue(playerStats.name, 'focusPoints', campaignName);
-            // If not yet stored, current equals max (same init logic as TrackedResourceInput)
             const currentFP = storedFP != null ? Number(storedFP) : maxFP;
             if (currentFP <= 0) {
                 setPopupHtml(`<b>${action.name}</b><br/>No ${playerStats.rules === '2024' ? "Focus Points" : 'ki points'} remaining.`);
                 return;
             }
             await setRuntimeValue(playerStats.name, 'focusPoints', currentFP - 1, campaignName);
-
-            // Notify other components that focus points changed
             window.dispatchEvent(new CustomEvent('focus-points-updated'));
-
-            // Log the ability use and focus point consumption
             addEntry(campaignName, {
                 type: 'ability_use',
                 characterName: playerStats.name,
@@ -455,10 +451,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 focusPointsSpent: 1,
                 remainingFocusPoints: currentFP - 1
             }).catch(() => { });
-
-            // Show activation confirmation
-            setPopupHtml(`<b>${action.name}</b><br/>${playerStats.rules === '2024' ? 'Focus Point' : 'Ki point'} spent. ${currentFP - 1} remaining.`);
-            return;
         }
 
         switch (auto.type) {
@@ -489,14 +481,87 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }
             case 'healing':
             case 'self_healing': {
-                const healAmount = auto.healAmount || auto.healExpression;
-                if (setPopupHtml) {
-                    setPopupHtml({
-                        type: 'healing',
-                        name: action.name,
-                        healAmount: typeof healAmount === 'number' ? healAmount : auto.healExpression,
-                        description: `${action.name}: Restores ${auto.healExpression} HP`,
-                    });
+                const expression = auto.healExpression || '';
+                const isMonkHealing = expression.includes('martial_arts_die') && expression.includes('WIS');
+
+                if (isMonkHealing) {
+                    const monkFeatures = getClassFeatures(playerStats);
+                    const martialArtsDie = monkFeatures?.martialArtsDie || 4;
+                    const wisdom = playerStats.abilities?.find(a => a.name === 'Wisdom');
+                    const wisModifier = wisdom?.bonus || 0;
+
+                    const rollResult = rollExpression(`1d${martialArtsDie}`);
+                    if (!rollResult) break;
+
+                    const healAmount = rollResult.total + wisModifier;
+
+                    const combatSummary = (() => {
+                        try { return getCombatContext(); } catch (e) { return null; }
+                    })();
+                    const combatTarget = combatSummary ? getTargetFromAttacker(combatSummary, playerStats.name) : null;
+                    const targetName = combatTarget ? combatTarget.name : playerStats.name;
+                    const targetMaxHp = combatTarget ? combatTarget.maxHp : playerStats.hitPoints;
+                    const targetCurrentHp = (() => {
+                        if (combatTarget) {
+                            const stored = getRuntimeValue(combatTarget.name, 'currentHitPoints', campaignName);
+                            if (stored != null && stored !== '') return Number(stored);
+                            return combatTarget.currentHp;
+                        }
+                        const stored = getRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
+                        return stored != null && stored !== '' ? Number(stored) : playerStats.hitPoints;
+                    })();
+                    const newHp = Math.min(targetMaxHp, targetCurrentHp + healAmount);
+                    const actualHeal = newHp - targetCurrentHp;
+
+                    if (combatTarget && combatSummary) {
+                        const result = applyHealingToTarget(combatSummary, combatTarget.name, healAmount, campaignName);
+                    } else {
+                        setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
+                    }
+
+                    fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'hp_change',
+                            targetName: targetName,
+                            sourceName: action.name,
+                            delta: actualHeal,
+                            currentHp: newHp,
+                            maxHp: targetMaxHp,
+                            isHealing: true,
+                            isUnconscious: false,
+                        }),
+                    }).catch(() => { });
+
+                    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+
+                    if (setPopupHtml) {
+                        setPopupHtml({
+                            type: 'healing',
+                            name: action.name,
+                            formula: `1d${martialArtsDie} + ${wisModifier}`,
+                            rolls: rollResult.rolls,
+                            bonus: wisModifier,
+                            modifier: 0,
+                            healAmount: healAmount,
+                            description: `${action.name}: Rolled ${rollResult.total} (1d${martialArtsDie}) + ${wisModifier} (WIS) = <strong>${healAmount}</strong> HP`,
+                            targetName: targetName,
+                            targetCurrentHp: newHp,
+                            targetMaxHp: targetMaxHp,
+                            damageApplied: true,
+                        });
+                    }
+                } else {
+                    const healAmount = auto.healAmount || auto.healExpression;
+                    if (setPopupHtml) {
+                        setPopupHtml({
+                            type: 'healing',
+                            name: action.name,
+                            healAmount: typeof healAmount === 'number' ? healAmount : auto.healExpression,
+                            description: `${action.name}: Restores ${auto.healExpression} HP`,
+                        });
+                    }
                 }
                 break;
             }

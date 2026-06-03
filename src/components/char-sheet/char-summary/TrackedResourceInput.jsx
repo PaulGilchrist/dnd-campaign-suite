@@ -3,10 +3,10 @@ import React from 'react'
 import useTrackedResource from '../../../hooks/useTrackedResource.js'
 import HiddenInput from '../../common/HiddenInput.jsx'
 
-function TrackedResourceInput({ label, resourceKey, playerName, getMax, deps, displayFormat = 'max-cur' }) {
+function TrackedResourceInput({ label, resourceKey, playerName, getMax, deps, displayFormat = 'max-cur', campaignName }) {
     const [showInput, setShowInput] = React.useState(false);
     const handleToggle = () => setShowInput((s) => !s);
-    const { current, max, update: handleChange } = useTrackedResource(resourceKey, playerName, getMax, deps);
+    const { current, max, update: handleChange } = useTrackedResource(resourceKey, playerName, getMax, deps, campaignName);
 
     if (displayFormat === 'cur-max') {
         return (

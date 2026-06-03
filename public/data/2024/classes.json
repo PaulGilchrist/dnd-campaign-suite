@@ -4921,7 +4921,7 @@
                     },
                     {
                         "name": "Hand of Healing",
-                        "description": "As a Bonus Action, or when you use Flurry of Healing and Harm, you can touch a creature and expend one use of your Focus Points. Roll a Martial Arts die, and the creature regains a number of Hit Points equal to 1d4 plus your Wisdom modifier.",
+                        "description": "As a Bonus Action, or when you use Flurry of Healing and Harm, you can touch a creature and expend one use of your Focus Points. Roll a Martial Arts die, and the creature regains a number of Hit Points equal to that roll plus your Wisdom modifier.",
                         "level": 3,
                         "automation": {
                             "type": "healing",
