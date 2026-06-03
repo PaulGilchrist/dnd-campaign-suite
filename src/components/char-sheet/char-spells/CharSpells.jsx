@@ -32,6 +32,9 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                context.saveType = autoDamage.saveType;
                context.dcSuccess = autoDamage.dcSuccess;
               }
+            if (autoDamage.metamagicTwinTarget) {
+              context.metamagicTwinTarget = autoDamage.metamagicTwinTarget;
+            }
             rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
             }
            },

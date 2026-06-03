@@ -192,6 +192,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         saveDc: context.saveDc,
         saveType: context.saveType,
         dcSuccess: context.dcSuccess,
+        metamagicTwinTarget: context.metamagicTwinTarget,
        } : undefined;
 
      logEntry({

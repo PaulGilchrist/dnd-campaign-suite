@@ -85,14 +85,18 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         autoDamageRoll: (autoDamage, isCrit) => {
             const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
             if (result) {
-                rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, {
+                const context = {
                     damageType: autoDamage.damageType,
                     targetName: autoDamage.targetName,
                     attackerName: autoDamage.attackerName,
                     saveDc: autoDamage.saveDc,
                     saveType: autoDamage.saveType,
                     dcSuccess: autoDamage.dcSuccess,
-                });
+                };
+                if (autoDamage.metamagicTwinTarget) {
+                    context.metamagicTwinTarget = autoDamage.metamagicTwinTarget;
+                }
+                rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
             }
         },
     });
