@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import MetamagicPopup from './MetamagicPopup.jsx'
@@ -39,7 +39,7 @@ const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextPr
 const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, onBuffsChange }) {
     const [actions, setActions] = useState([]);
     const [selectedActionSpell, setSelectedActionSpell] = useState(null);
-    const [actionSpellPendingMetamagic, setActionSpellPendingMetamagic] = useState(null);
+    const [pendingActionMetamagic, setPendingActionMetamagic] = useState(null);
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
     const [healingPoolModal, setHealingPoolModal] = useState(null);
     const [fontOfMagicModal, setFontOfMagicModal] = useState(null);
@@ -759,6 +759,57 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const is2024Rules = playerStats.rules === '2024';
 
+    // Unified metamagic confirm/skip for spell hit/damage clicks on Sorcerers
+    const handleActionMetamagicConfirm = React.useCallback((result) => {
+        const pending = pendingActionMetamagic;
+        setPendingActionMetamagic(null);
+        if (!pending) return;
+
+        if (result?.totalCost > 0) {
+            spendSorceryPoints(playerStats.name, result.totalCost, campaignName);
+        }
+
+        addEntry(campaignName, {
+            type: 'spell',
+            characterName: playerStats.name,
+            spellName: pending.spellName,
+            spellLevel: pending.spellLevel || 0,
+            castingTime: pending.castingTime || 'Action',
+            metamagic: result?.options || [],
+            spCost: result?.totalCost || 0,
+            timestamp: Date.now(),
+        });
+
+        const metaCtx = {};
+        if (result?.options) {
+            if (result.options.includes('Heightened Spell')) metaCtx.metamagicHeighten = true;
+            if (result.options.includes('Careful Spell')) metaCtx.metamagicCareful = true;
+            if (result.options.includes('Twinned Spell') && result.twinTarget) metaCtx.metamagicTwinTarget = result.twinTarget;
+            if (result.options.includes('Distant Spell')) metaCtx.metamagicDistant = true;
+        }
+
+        pending.action(metaCtx);
+    }, [pendingActionMetamagic, playerStats.name, campaignName]);
+
+    const handleActionMetamagicSkip = React.useCallback(() => {
+        const pending = pendingActionMetamagic;
+        setPendingActionMetamagic(null);
+        if (!pending) return;
+
+        addEntry(campaignName, {
+            type: 'spell',
+            characterName: playerStats.name,
+            spellName: pending.spellName,
+            spellLevel: pending.spellLevel || 0,
+            castingTime: pending.castingTime || 'Action',
+            metamagic: [],
+            spCost: 0,
+            timestamp: Date.now(),
+        });
+
+        pending.action({});
+    }, [pendingActionMetamagic, playerStats.name, campaignName]);
+
     // Action spell (save-based) damage click - gate through metamagic for sorcerers
     const handleActionSpellDamageClick = (attack) => {
         if (!isBonusSorcerer) {
@@ -772,7 +823,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 spCost: 0,
                 timestamp: Date.now(),
             });
-            // Roll damage directly
             const wasCrit = popupHtml?.isCrit;
             if (wasCrit && setPopupHtml) setPopupHtml(null);
             const result = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
@@ -789,86 +839,95 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         }
 
         // Sorcerer - show metamagic popup
-        setActionSpellPendingMetamagic({
-            attack,
+        const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
+        setPendingActionMetamagic({
+            spellName: attack.name,
             spellLevel: attack.spellLevel || 0,
             castingTime: attack.castingTime || 'Action',
-            damageFormula: attack.damage,
+            _currentSP: currentSP,
+            action: (metaCtx) => {
+                const wasCrit = popupHtml?.isCrit;
+                if (wasCrit && setPopupHtml) setPopupHtml(null);
+                const r = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
+                if (!r) return;
+                if (!mapName) {
+                    rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, { ...buildAttackContextSync(attack), ...metaCtx });
+                } else {
+                    buildAttackContext(attack).then(ctx => {
+                        rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, { ...ctx, ...metaCtx });
+                    }).catch(() => { });
+                }
+            },
         });
     };
 
-    const handleActionSpellDamageConfirm = React.useCallback((result) => {
-        const pending = actionSpellPendingMetamagic;
-        if (!pending || !pending.attack) {
-            setActionSpellPendingMetamagic(null);
+    // Hit column click on spell attacks - gate through metamagic for sorcerers
+    const handleSpellAttackClick = (attack) => {
+        if (cannotAct) return;
+        const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attack.name);
+        if (!spell) {
+            handleAttackClick(attack);
             return;
         }
-        if (result && result.totalCost && result.totalCost > 0) {
-            spendSorceryPoints(playerStats.name, result.totalCost, campaignName);
+        if (!isBonusSorcerer) {
+            handleAttackClick(attack);
+            return;
         }
 
-        const attack = pending.attack;
-        addEntry(campaignName, {
-            type: 'spell',
-            characterName: playerStats.name,
+        // Sorcerer - show metamagic popup
+        const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
+        setPendingActionMetamagic({
             spellName: attack.name,
-            spellLevel: pending.spellLevel || 0,
-            castingTime: pending.castingTime,
-            metamagic: result ? (result.options || []) : [],
-            spCost: result ? (result.totalCost || 0) : 0,
-            timestamp: Date.now(),
+            spellLevel: spell.level || 0,
+            castingTime: spell.casting_time || 'Action',
+            _currentSP: currentSP,
+            action: (metaCtx) => {
+                if (!mapName) {
+                    const ctx = buildAttackContextSync(attack);
+                    rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, { ...ctx, ...metaCtx });
+                } else {
+                    buildAttackContext(attack).then(ctx => {
+                        rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, { ...ctx, ...metaCtx });
+                    }).catch(() => { });
+                }
+            },
         });
+    };
 
-        // Roll damage after metamagic selected
-        const wasCrit = popupHtml?.isCrit;
-        if (wasCrit && setPopupHtml) setPopupHtml(null);
-        const r = wasCrit ? rollExpressionDoubled(pending.damageFormula) : rollExpression(pending.damageFormula);
-        if (!r) { setActionSpellPendingMetamagic(null); return; }
-
-        if (!mapName) {
-            rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, buildAttackContextSync(attack));
-        } else {
-            buildAttackContext(attack).then(ctx => {
-                rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, ctx);
-            }).catch(() => { });
+    // Damage column click on attack-roll spells - gate through metamagic for sorcerers
+    const handleSpellDamageClick = (attack) => {
+        const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attack.name);
+        if (!spell) {
+            handleDamageClick(attack);
+            return;
         }
-
-        setActionSpellPendingMetamagic(null);
-    }, [playerStats.name, campaignName, mapName, actionSpellPendingMetamagic]);
-
-    const handleActionSpellDamageSkip = React.useCallback(() => {
-        const pending = actionSpellPendingMetamagic;
-        if (!pending || !pending.attack) {
-            setActionSpellPendingMetamagic(null);
+        if (!isBonusSorcerer) {
+            handleDamageClick(attack);
             return;
         }
 
-        addEntry(campaignName, {
-            type: 'spell',
-            characterName: playerStats.name,
-            spellName: pending.attack.name,
-            spellLevel: pending.spellLevel || 0,
-            castingTime: pending.castingTime,
-            metamagic: [],
-            spCost: 0,
-            timestamp: Date.now(),
+        // Sorcerer - show metamagic popup
+        const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
+        setPendingActionMetamagic({
+            spellName: attack.name,
+            spellLevel: spell.level || 0,
+            castingTime: spell.casting_time || 'Action',
+            _currentSP: currentSP,
+            action: (metaCtx) => {
+                const wasCrit = popupHtml?.isCrit;
+                if (wasCrit && setPopupHtml) setPopupHtml(null);
+                const r = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
+                if (!r) return;
+                if (!mapName) {
+                    rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, { ...buildAttackContextSync(attack), ...metaCtx });
+                } else {
+                    buildAttackContext(attack).then(ctx => {
+                        rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, { ...ctx, ...metaCtx });
+                    }).catch(() => { });
+                }
+            },
         });
-
-        const wasCrit = popupHtml?.isCrit;
-        if (wasCrit && setPopupHtml) setPopupHtml(null);
-        const r = wasCrit ? rollExpressionDoubled(pending.damageFormula) : rollExpression(pending.damageFormula);
-        if (!r) { setActionSpellPendingMetamagic(null); return; }
-
-        if (!mapName) {
-            rollDamage(pending.attack.name, pending.damageFormula, r.total, r.rolls, r.modifier, buildAttackContextSync(pending.attack));
-        } else {
-            buildAttackContext(pending.attack).then(ctx => {
-                rollDamage(pending.attack.name, pending.damageFormula, r.total, r.rolls, r.modifier, ctx);
-            }).catch(() => { });
-        }
-
-        setActionSpellPendingMetamagic(null);
-      }, [playerStats.name, campaignName, mapName, actionSpellPendingMetamagic]);
+    };
 
     return (
         <div className="char-actions">
@@ -889,8 +948,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             <div>{attack.range} ft.</div>
                             {attack.saveDc
                                 ? <div className="save-dc-display">DC {attack.saveDc} {attack.saveType}</div>
-                                : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
-                            <div className={attack.damage ? "clickable" : ""} onClick={() => !cannotAct && attack.saveDc ? handleActionSpellDamageClick(attack) : handleDamageClick(attack)}>{attack.damage}</div>
+                                : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleSpellAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
+                            <div className={attack.damage ? "clickable" : ""} onClick={() => {
+                                if (cannotAct) return;
+                                if (attack.saveDc) { handleActionSpellDamageClick(attack); return; }
+                                const isSpell = playerStats.spellAbilities?.spells?.some(s => s.name === attack.name);
+                                isSpell ? handleSpellDamageClick(attack) : handleDamageClick(attack);
+                            }}>{attack.damage}</div>
 
                             <div className='left'>{attack.damageType}</div>
                             {is2024Rules && <div className={getWeaponMastery(attack.name) ? "clickable" : ""} onClick={() => { const mastery = getWeaponMastery(attack.name); if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{getWeaponMastery(attack.name) || ''}</div>}
@@ -1005,6 +1069,15 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         campaignName={campaignName}
                         onConfirm={actionHandleConfirm}
                         onSkip={actionHandleSkip}
+                    />
+                )}
+                {pendingActionMetamagic && (
+                    <MetamagicPopup
+                        spell={{ name: pendingActionMetamagic.spellName, level: pendingActionMetamagic.spellLevel || 0 }}
+                        playerStats={{ ...playerStats, _metamagicCurrentSP: pendingActionMetamagic._currentSP }}
+                        campaignName={campaignName}
+                        onConfirm={handleActionMetamagicConfirm}
+                        onSkip={handleActionMetamagicSkip}
                     />
                 )}
                 {playerStats.actions.map((action) => {
