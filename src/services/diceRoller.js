@@ -28,6 +28,7 @@ function rollDisadvantage() {
 }
 
 function parseExpression(formula) {
+  if (!formula) return null;
   const cleaned = formula.replace(/\s/g, '');
   const match = cleaned.match(/^(\d+)?d(\d+)([+-]\d+)?$/i);
   if (!match) return null;

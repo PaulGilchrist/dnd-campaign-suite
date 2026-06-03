@@ -4584,21 +4584,21 @@
                         "description": "Once per turn when you hit a creature with a Monk weapon or Unarmed Strike, you can expend 1 Focus Point. Target makes Constitution save. Failed save: Stunned until start of next turn. Success: Speed halved until start of next turn, and next attack roll against target has Advantage.",
                         "level": 5,
                         "type": "class_feature",
-                        "automation": {
-                            "type": "save_attack",
-                            "trigger": "monk_weapon_or_unarmed_hit",
-                            "cost": {
-                                "resource": "focus_points",
-                                "amount": 1
-                            },
-                            "saveType": "CON",
-                            "saveDc": "ability",
-                            "conditionInflicted": "stunned",
-                            "duration": "until_start_of_next_turn",
-                            "successEffect": "speed_halved_until_start_of_next_turn",
-                            "oncePerTurn": true,
-                            "casting_time": "1 action"
-                        }
+"automation": {
+                              "type": "save_only",
+                              "trigger": "monk_weapon_or_unarmed_hit",
+                              "cost": {
+                                  "resource": "focus_points",
+                                  "amount": 1
+                              },
+                              "saveType": "CON",
+                              "saveDc": "ability",
+                              "conditionInflicted": "stunned",
+                              "duration": "until_start_of_next_turn",
+                              "successEffect": "speed_halved_until_start_of_next_turn",
+                              "oncePerTurn": true,
+                              "casting_time": "1 action"
+                          }
                     }
                 ]
             },

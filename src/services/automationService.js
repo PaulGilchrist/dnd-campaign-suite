@@ -61,6 +61,19 @@ function buildAttackInfo(feature, playerStats) {
       }
     }
 
+    case 'save_only': {
+      return {
+        type: 'save_only',
+        name: feature.name,
+        saveType: auto.saveType || 'DEX',
+        saveDc: (auto.saveDc === 'ability') ? getSaveDc(playerStats, 'CON', playerStats.proficiency) : auto.saveDc || 10,
+        conditionInflicted: auto.conditionInflicted || null,
+        duration: auto.duration || '',
+        successEffect: auto.successEffect || null,
+        hasAutomation: true,
+      };
+    }
+
     case 'healing': {
       const healAmount = auto.healExpression
         ? evaluateAutoExpression(auto.healExpression, playerStats, prof, level)
@@ -497,6 +510,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
 
     switch (info.type) {
       case 'save_attack':
+      case 'save_only':
       case 'healing':
       case 'healing_pool':
       case 'self_healing':
