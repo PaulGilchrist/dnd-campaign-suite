@@ -11,7 +11,7 @@ const router = express.Router();
 // (maps, encounters, notes, npcs, quests, factions) to avoid intercepting them
 router.get('/api/campaigns/:campaign/:file', (req, res, next) => {
     const { campaign, file } = req.params;
-    if (file === 'log') return next();
+    if (file === 'log' || !file.endsWith('.json')) return next();
     const campaignDir = path.join(process.cwd(), 'public', 'campaigns', campaign);
     const filePath = path.join(campaignDir, file);
     
@@ -31,7 +31,7 @@ router.get('/api/campaigns/:campaign/:file', (req, res, next) => {
 // API endpoint to update an existing character in a campaign
 router.put('/api/campaigns/:campaign/:file', (req, res, next) => {
     const { campaign, file } = req.params;
-    if (file === 'log') return next();
+    if (file === 'log' || !file.endsWith('.json')) return next();
     const character = req.body;
     
     if (!campaign || !file || !character) {
@@ -123,7 +123,7 @@ router.put('/api/campaigns/:campaign/:file', (req, res, next) => {
 // API endpoint to delete a character file and its associated image
 router.delete('/api/campaigns/:campaign/:file', (req, res, next) => {
     const { campaign, file } = req.params;
-    if (file === 'log') return next();
+    if (file === 'log' || !file.endsWith('.json')) return next();
     const campaignDir = path.join(process.cwd(), 'public', 'campaigns', campaign);
     const filePath = path.join(campaignDir, file);
     
