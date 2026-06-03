@@ -639,7 +639,6 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         }
       }
 
-      if (context?.empowerPending !== undefined || context?.metamagicHeighten || context?.metamagicCareful || context?.metamagicTwinTarget) {
         saveLastDamageEvent(characterName, {
           targetName: target?.name,
           spellName: name,
@@ -652,7 +651,6 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           modifier,
           timestamp: Date.now(),
         }, campaignName);
-      }
         }
 
   function quickRollPlayerSave(promptId, targetName, saveType, saveDc) {

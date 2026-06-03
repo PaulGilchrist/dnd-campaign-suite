@@ -1,4 +1,3 @@
- 
 import React from 'react'
 import { cloneDeep } from 'lodash';
 import { setRuntimeValue, getRuntimeValue, useRuntimeValue } from '../../hooks/useRuntimeState.js'
@@ -139,10 +138,11 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 playerStats={playerStats}
                 campaignName={campaignName}
                 cannotAct={cannotAct}
+                mapName={activeMapName}
               ></CharReactions>
             {playerSummary.rules === '2024'
-  ? <CharSpells playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct}></CharSpells>
-  : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct}></CharSpells>
+  ? <CharSpells playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName}></CharSpells>
+  : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName}></CharSpells>
 }<hr />
             <CharSpecialActions playerStats={playerStats}></CharSpecialActions><hr />
             <CharInventory playerStats={playerStats}></CharInventory><hr />

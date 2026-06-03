@@ -5,6 +5,8 @@ import {
   computeMeleeProximityEffect,
   isHostileNPC,
   getNearestPlacedItem,
+  rangeToFeet,
+  computeEffectiveSpellRange,
 } from './rangeValidation.js'
 
 describe('getDistanceFeet', () => {
@@ -26,6 +28,76 @@ describe('getDistanceFeet', () => {
   it('computes diagonal distance', () => {
     const dist = getDistanceFeet({ gridX: 0, gridY: 0 }, { gridX: 3, gridY: 4 })
     expect(dist).toBeCloseTo(25)
+  })
+})
+
+describe('rangeToFeet', () => {
+  it('passes numbers through', () => {
+    expect(rangeToFeet(5)).toBe(5)
+    expect(rangeToFeet(100)).toBe(100)
+    expect(rangeToFeet(0)).toBe(0)
+  })
+
+  it('converts "Touch" to melee range', () => {
+    expect(rangeToFeet('Touch')).toBe(8)
+    expect(rangeToFeet('touch')).toBe(8)
+  })
+
+  it('returns null for self-targeted ranges', () => {
+    expect(rangeToFeet('Self')).toBeNull()
+    expect(rangeToFeet('Self (cone)')).toBeNull()
+    expect(rangeToFeet('Self (15-foot cone)')).toBeNull()
+    expect(rangeToFeet('Self (sphere)')).toBeNull()
+  })
+
+  it('returns Infinity for sight and unlimited', () => {
+    expect(rangeToFeet('Sight')).toBe(Infinity)
+    expect(rangeToFeet('Unlimited')).toBe(Infinity)
+  })
+
+  it('returns null for special', () => {
+    expect(rangeToFeet('Special')).toBeNull()
+  })
+
+  it('parses numeric ranges', () => {
+    expect(rangeToFeet('120 feet')).toBe(120)
+    expect(rangeToFeet('30 ft')).toBe(30)
+    expect(rangeToFeet('10 ft.')).toBe(10)
+    expect(rangeToFeet('60 foot')).toBe(60)
+  })
+
+  it('parses mile ranges', () => {
+    expect(rangeToFeet('1 mile')).toBe(5280)
+    expect(rangeToFeet('0.5 mile')).toBe(2640)
+  })
+
+  it('returns null for unparseable strings', () => {
+    expect(rangeToFeet(null)).toBeNull()
+    expect(rangeToFeet(undefined)).toBeNull()
+    expect(rangeToFeet('')).toBeNull()
+  })
+})
+
+describe('computeEffectiveSpellRange', () => {
+  it('returns base feet without metamagic', () => {
+    expect(computeEffectiveSpellRange('Touch')).toBe(8)
+    expect(computeEffectiveSpellRange('120 feet')).toBe(120)
+  })
+
+  it('doubles numeric ranges with Distant Spell', () => {
+    const meta = { metamagicDistant: true }
+    expect(computeEffectiveSpellRange('120 feet', meta)).toBe(240)
+    expect(computeEffectiveSpellRange('30 ft', meta)).toBe(60)
+  })
+
+  it('converts Touch to 30 ft with Distant Spell', () => {
+    const meta = { metamagicDistant: true }
+    expect(computeEffectiveSpellRange('Touch', meta)).toBe(30)
+  })
+
+  it('returns null for self/special ranges', () => {
+    expect(computeEffectiveSpellRange('Self')).toBeNull()
+    expect(computeEffectiveSpellRange('Special')).toBeNull()
   })
 })
 
@@ -58,6 +130,31 @@ describe('computeRangeEffect', () => {
 
   it('returns normal when distance is null', () => {
     expect(computeRangeEffect(100, null)).toEqual({ mode: 'normal' })
+  })
+
+  it('treats "Touch" as melee range and auto-misses beyond 8 ft', () => {
+    const result = computeRangeEffect('Touch', 10)
+    expect(result.mode).toBe('miss')
+    expect(result.reason).toContain('out of melee range')
+  })
+
+  it('hits with touch range when adjacent', () => {
+    expect(computeRangeEffect('Touch', 0)).toEqual({ mode: 'normal' })
+    expect(computeRangeEffect('Touch', 5)).toEqual({ mode: 'normal' })
+    expect(computeRangeEffect('Touch', 8)).toEqual({ mode: 'normal' })
+  })
+
+  it('parses "120 feet" string range for ranged spells', () => {
+    expect(computeRangeEffect('120 feet', 50)).toEqual({ mode: 'normal' })
+    const result = computeRangeEffect('120 feet', 150)
+    expect(result.mode).toBe('disadvantage')
+    const miss = computeRangeEffect('120 feet', 250)
+    expect(miss.mode).toBe('miss')
+  })
+
+  it('skips range check for unparseable strings', () => {
+    expect(computeRangeEffect('Self', 10)).toEqual({ mode: 'normal' })
+    expect(computeRangeEffect('Special', 10)).toEqual({ mode: 'normal' })
   })
 
   it('returns normal when within attack range', () => {

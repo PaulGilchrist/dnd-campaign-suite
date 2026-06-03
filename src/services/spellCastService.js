@@ -1,6 +1,7 @@
 import { rollExpression } from './diceRoller.js';
+import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet } from './rangeValidation.js';
 
-export function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getCombatTargetInfo }) {
+export function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getCombatTargetInfo, attackerPos, targetPos, featEffects }) {
   const slotDmg = spell.damage?.damage_at_slot_level;
   const charDmg = spell.damage?.damage_at_character_level;
   const dmgObj = slotDmg && Object.keys(slotDmg).length ? slotDmg : charDmg;
@@ -9,16 +10,29 @@ export function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playe
 
   if (!formula) return;
 
+  const rollContext = { ...metaCtx, damageType };
+
+  if (attackerPos && targetPos) {
+    const effectiveRange = computeEffectiveSpellRange(spell.range, metaCtx);
+    if (effectiveRange != null) {
+      const distanceFt = getDistanceFeet(attackerPos, targetPos);
+      const rangeResult = computeRangeEffect(effectiveRange, distanceFt, featEffects || {});
+      if (rangeResult.mode === 'miss') {
+        rollContext.isAutoMiss = true;
+        rollContext.rangeReason = rangeResult.reason;
+      }
+    }
+  }
+
   if (spell.dc) {
     const target = getCombatTargetInfo();
     const context = {
       targetName: target?.name,
       attackerName: playerStats.name,
-      ...metaCtx,
+      ...rollContext,
       saveDc: playerStats.spellAbilities.saveDc,
       saveType: spell.dc.dc_type,
       dcSuccess: spell.dc.dc_success,
-      damageType,
     };
     const result = rollExpression(formula);
     if (result) {
@@ -28,8 +42,7 @@ export function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playe
     rollAttack(spell.name, playerStats.spellAbilities.toHit, {
       autoDamageFormula: formula,
       autoDamageName: spell.name,
-      damageType,
-      ...metaCtx,
+      ...rollContext,
     });
   }
 }

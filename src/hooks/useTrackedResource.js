@@ -16,7 +16,7 @@ function useTrackedResource(storageKey, playerName, maxGetter, deps, campaignNam
      }
    }, [deps, maxGetter, playerName, storageKey, campaignName]);
 
-  // Listen for external updates to this resource (e.g., monk ki/focus point spend from CharActions)
+  // Listen for external updates to this resource (e.g., sorcery point or focus point spend)
   React.useEffect(() => {
     const handler = () => {
       const storedValue = getRuntimeValue(playerName, storageKey);
@@ -27,7 +27,11 @@ function useTrackedResource(storageKey, playerName, maxGetter, deps, campaignNam
        }
      };
     window.addEventListener('focus-points-updated', handler);
-    return () => window.removeEventListener('focus-points-updated', handler);
+    window.addEventListener('sorcery-points-updated', handler);
+    return () => {
+      window.removeEventListener('focus-points-updated', handler);
+      window.removeEventListener('sorcery-points-updated', handler);
+    };
    }, [playerName, storageKey, campaignName, maxGetter]);
 
   const update = async (val) => {

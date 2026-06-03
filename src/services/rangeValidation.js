@@ -16,12 +16,38 @@ export function getDistanceFeet(pos1, pos2) {
   return toFeet(gridDistance(pos1.gridX, pos1.gridY, pos2.gridX, pos2.gridY))
 }
 
+export function rangeToFeet(range) {
+  if (typeof range === 'number') return range
+  if (!range || typeof range !== 'string') return null
+
+  const s = range.toLowerCase().trim()
+
+  if (s === 'touch') return MELEE_RANGE_FT
+  if (s === 'self' || s.startsWith('self (')) return null
+  if (s === 'sight') return Infinity
+  if (s === 'unlimited') return Infinity
+  if (s === 'special') return null
+
+  const match = s.match(/^(-?\d+(?:\.\d+)?)\s*(feet|foot|ft\.?)?$/)
+  if (match) return parseFloat(match[1])
+
+  const mileMatch = s.match(/^(-?\d+(?:\.\d+)?)\s*mile/)
+  if (mileMatch) return parseFloat(mileMatch[1]) * 5280
+
+  return null
+}
+
 export function computeRangeEffect(attackRange, distanceFt, featEffects = {}) {
+  const numericRange = rangeToFeet(attackRange)
+  if (numericRange == null) {
+    return { mode: 'normal' }
+  }
+
   if (distanceFt == null) {
     return { mode: 'normal' }
   }
 
-  if (attackRange <= MELEE_RANGE_FT) {
+  if (numericRange <= MELEE_RANGE_FT) {
     if (distanceFt <= MELEE_RANGE_FT) {
       return { mode: 'normal' }
     }
@@ -31,7 +57,7 @@ export function computeRangeEffect(attackRange, distanceFt, featEffects = {}) {
     }
   }
 
-  const effectiveRange = attackRange * (featEffects.rangeMultiplier || 1)
+  const effectiveRange = numericRange * (featEffects.rangeMultiplier || 1)
   const longRange = effectiveRange * 2
 
   if (featEffects.ignoresLongRangeDisadvantage) {
@@ -60,6 +86,18 @@ export function computeRangeEffect(attackRange, distanceFt, featEffects = {}) {
     mode: 'miss',
     reason: `Out of range (${Math.round(distanceFt)} ft > ${longRange} ft)`,
   }
+}
+
+export function computeEffectiveSpellRange(spellRange, metaCtx = {}) {
+  const baseFeet = rangeToFeet(spellRange)
+  if (baseFeet == null) return null
+
+  if (metaCtx.metamagicDistant) {
+    if (String(spellRange).toLowerCase().trim() === 'touch') return 30
+    return baseFeet * 2
+  }
+
+  return baseFeet
 }
 
 export function computeMeleeProximityEffect(isRanged, attackerPos, nearbyThreats = [], featEffects = {}) {

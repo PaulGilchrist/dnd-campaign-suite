@@ -11,7 +11,7 @@ import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/useA
 import { rollExpression, rollExpressionDoubled, parseExpression } from '../../services/diceRoller.js';
 import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetName } from '../../services/damageUtils.js';
 import * as mapsService from '../../services/mapsService.js';
-import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem } from '../../services/rangeValidation.js';
+import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem, rangeToFeet } from '../../services/rangeValidation.js';
 import { computeCover } from '../../services/coverService.js';
 import { computeFeatRangeEffects } from '../../services/featRangeService.js';
 import { loadNPCs } from '../../services/npcsService.js';
@@ -165,11 +165,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     }
                 }
 
-                const isRanged = attack.range > 5;
+                const numericRange = rangeToFeet(attack.range) || 0;
+                const isRanged = numericRange > 8;
                 const feats = featRangeEffects || { ignoresMeleeDisadvantage: false, ignoresLongRangeDisadvantage: false, rangeMultiplier: 1, spellRangeBonus: 0 };
 
                 if (targetPos) {
-                    const effectiveRange = isRanged ? attack.range + (feats.spellRangeBonus || 0) : attack.range;
+                    const effectiveRange = isRanged ? numericRange + (feats.spellRangeBonus || 0) : attack.range;
                     const distanceFt = getDistanceFeet(
                         { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
                         targetPos
@@ -262,7 +263,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const handleMetamagicAction = () => {
         const name = playerStats.name;
-        const currentSP = getCurrentSorceryPoints(name, getMaxSorceryPoints(playerStats));
+        const maxSP = getMaxSorceryPoints(playerStats);
+        const currentSP = getCurrentSorceryPoints(name, maxSP);
         const lastEvent = getLastDamageEvent(name);
         const chaMod = getChaModifier(playerStats);
 
@@ -273,6 +275,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     type: 'empowered_spell',
                     name: 'Metamagic - Empowered Spell',
                     currentSP,
+                    maxSP,
                     lastEvent: null,
                     chaMod,
                     error: 'Could not parse damage formula',
@@ -283,6 +286,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 type: 'empowered_spell',
                 name: 'Metamagic - Empowered Spell',
                 currentSP,
+                maxSP,
                 lastEvent,
                 chaMod: Math.min(chaMod, parsed.count),
                 formulaParsed: parsed,
@@ -292,6 +296,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 type: 'empowered_spell',
                 name: 'Metamagic - Empowered Spell',
                 currentSP,
+                maxSP,
                 lastEvent: null,
                 chaMod,
                 error: lastEvent ? 'No dice roll data available' : 'No recent damage event found. Cast a spell that deals damage first.',
@@ -304,12 +309,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         if (!parsed) return;
 
         const name = playerStats.name;
-        const currentSP = getCurrentSorceryPoints(name, getMaxSorceryPoints(playerStats));
+        const maxSP = getMaxSorceryPoints(playerStats);
+        const currentSP = getCurrentSorceryPoints(name, maxSP);
         if (currentSP < 1) {
             setPopupHtml({
                 type: 'empowered_spell',
                 name: 'Metamagic - Empowered Spell',
                 currentSP,
+                maxSP,
                 lastEvent,
                 chaMod,
                 error: 'Not enough sorcery points. Empowered Spell costs 1 SP.',
@@ -336,6 +343,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 type: 'empowered_spell',
                 name: 'Metamagic - Empowered Spell',
                 currentSP,
+                maxSP,
                 lastEvent,
                 chaMod,
                 error: 'No combat summary found. Cannot reapply damage.',
@@ -366,6 +374,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 type: 'empowered_spell',
                 name: 'Metamagic - Empowered Spell',
                 currentSP: currentSP - 1,
+                maxSP,
                 lastEvent: {
                     ...lastEvent,
                     rawDamage: newTotal,
@@ -390,6 +399,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 type: 'empowered_spell',
                 name: 'Metamagic - Empowered Spell',
                 currentSP: currentSP - 1,
+                maxSP,
                 lastEvent: {
                     ...lastEvent,
                     rolls: newRolls,
@@ -753,14 +763,47 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setSelectedActionSpell(spell);
     };
 
+    const cachedActionCastPosRef = React.useRef(null);
+
     const actionCastAction = React.useCallback((spell, metaCtx) => {
-        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getCombatTargetInfo });
-    }, [rollAttack, rollDamage, playerStats, getCombatTargetInfo]);
+        const pos = cachedActionCastPosRef.current;
+        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getCombatTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, featEffects: featRangeEffects });
+        cachedActionCastPosRef.current = null;
+    }, [rollAttack, rollDamage, playerStats, getCombatTargetInfo, featRangeEffects]);
     const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction);
-    const handleActionSpellCast = React.useCallback((spell) => {
+    const handleActionSpellCast = React.useCallback(async (spell) => {
         setSelectedActionSpell(null);
+        if (mapName) {
+            try {
+                const [mapData] = await Promise.all([
+                    mapsService.loadMapData(campaignName, mapName),
+                ]);
+                const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
+                if (attackerPlayer) {
+                    const cs = getCombatContext();
+                    const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                    if (target) {
+                        const targetPlayer = mapData?.players?.find(p => p.name === target.name);
+                        const targetNpc = mapData?.placedItems?.length
+                            ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlayer)
+                            : null;
+                        const targetPos = targetPlayer
+                            ? { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY }
+                            : targetNpc
+                                ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY }
+                                : null;
+                        if (targetPos) {
+                            cachedActionCastPosRef.current = {
+                                attackerPos: { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
+                                targetPos,
+                            };
+                        }
+                    }
+                }
+            } catch { /* positions unavailable */ }
+        }
         actionGateMetamagic(spell);
-    }, [actionGateMetamagic]);
+    }, [actionGateMetamagic, mapName, campaignName, playerStats.name]);
 
     const isBonusSorcerer = playerStats.class?.name === 'Sorcerer';
 
@@ -985,7 +1028,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
                                 popupHtml.type === 'empowered_spell' ? <div className="dice-roll-result">
                                     <div className="dice-roll-header"><i className="fa-solid fa-wand-magic-sparkles"></i>{popupHtml.name}</div>
-                                    <div className="metamagic-sp-display">Sorcery Points: <strong>{popupHtml.currentSP}</strong> / {popupHtml.lastEvent ? popupHtml.lastEvent.maxSP : '?'}</div>
+                                    <div className="metamagic-sp-display">Sorcery Points: <strong>{popupHtml.currentSP}</strong> / {popupHtml.maxSP}</div>
                                     {popupHtml.error && <div className="empowered-error" style={{ color: 'var(--stat-penalized, #cc4444)', marginTop: '8px' }}>{popupHtml.error}</div>}
                                     {popupHtml.lastEvent && !popupHtml.completed && popupHtml.lastEvent.rolls && (
                                         <div className="empowered-damage-info" style={{ marginTop: '8px' }}>

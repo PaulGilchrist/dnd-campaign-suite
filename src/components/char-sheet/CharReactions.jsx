@@ -12,8 +12,10 @@
      import { getCombatContext, getTargetFromAttacker } from '../../services/damageUtils.js'
      import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
      import { executeSpellCast } from '../../services/spellCastService.js'
+     import * as mapsService from '../../services/mapsService.js';
+     import { getNearestPlacedItem } from '../../services/rangeValidation.js';
 
-function CharReactions({ playerStats, campaignName, cannotAct }) {
+function CharReactions({ playerStats, campaignName, cannotAct, mapName }) {
     const { popupHtml, setPopupHtml, rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName);
     const [selectedSpell, setSelectedSpell] = React.useState(null);
 
@@ -97,14 +99,47 @@ function CharReactions({ playerStats, campaignName, cannotAct }) {
         return getTargetFromAttacker(cs, playerStats.name);
     }, [playerStats.name]);
 
+      const cachedReactionCastPosRef = React.useRef(null);
+
       const reactionCastAction = React.useCallback((spell, metaCtx) => {
-        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getCombatTargetInfo });
+        const pos = cachedReactionCastPosRef.current;
+        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getCombatTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos });
+        cachedReactionCastPosRef.current = null;
       }, [rollAttack, rollDamage, playerStats, getCombatTargetInfo]);
       const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, reactionCastAction);
-      const handleReactionSpellCast = React.useCallback((spell) => {
+      const handleReactionSpellCast = React.useCallback(async (spell) => {
         setSelectedSpell(null);
+        if (mapName) {
+          try {
+            const [mapData] = await Promise.all([
+              mapsService.loadMapData(campaignName, mapName),
+            ]);
+            const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
+            if (attackerPlayer) {
+              const cs = getCombatContext();
+              const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+              if (target) {
+                const targetPlayer = mapData?.players?.find(p => p.name === target.name);
+                const targetNpc = mapData?.placedItems?.length
+                  ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlayer)
+                  : null;
+                const targetPos = targetPlayer
+                  ? { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY }
+                  : targetNpc
+                    ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY }
+                    : null;
+                if (targetPos) {
+                  cachedReactionCastPosRef.current = {
+                    attackerPos: { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
+                    targetPos,
+                  };
+                }
+              }
+            }
+          } catch { /* positions unavailable */ }
+        }
         gateMetamagic(spell);
-      }, [gateMetamagic]);
+      }, [gateMetamagic, mapName, campaignName, playerStats.name]);
 
     return (
         <div className='char-reactions'>

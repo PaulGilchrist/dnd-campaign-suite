@@ -7,6 +7,7 @@ export function spendSorceryPoints(characterName, amount, campaignName) {
   const current = Number(getRuntimeValue(characterName, 'sorceryPoints')) || 0;
   const newValue = Math.max(0, current - amount);
   setRuntimeValue(characterName, 'sorceryPoints', newValue, campaignName);
+  window.dispatchEvent(new CustomEvent('sorcery-points-updated'));
   return newValue;
 }
 

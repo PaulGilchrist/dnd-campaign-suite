@@ -8,6 +8,9 @@ import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/useA
 import { hasAutomation } from '../../services/automationService.js'
 import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
 import { executeSpellCast } from '../../services/spellCastService.js'
+import * as mapsService from '../../services/mapsService.js';
+import { getNearestPlacedItem } from '../../services/rangeValidation.js';
+import { getCombatContext, getTargetFromAttacker } from '../../services/damageUtils.js';
 import './CharActions.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
@@ -25,14 +28,47 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         setSelectedBonusSpell(spell);
      };
 
+    const cachedBonusCastPosRef = React.useRef(null);
+
     const bonusCastAction = React.useCallback((spell, metaCtx) => {
-      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getCombatTargetInfo });
+      const pos = cachedBonusCastPosRef.current;
+      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getCombatTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos });
+      cachedBonusCastPosRef.current = null;
     }, [rollAttack, rollDamage, playerStats, getCombatTargetInfo]);
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, bonusCastAction);
-    const handleBonusSpellCast = React.useCallback((spell) => {
+    const handleBonusSpellCast = React.useCallback(async (spell) => {
       setSelectedBonusSpell(null);
+      if (mapName) {
+        try {
+          const [mapData] = await Promise.all([
+            mapsService.loadMapData(campaignName, mapName),
+          ]);
+          const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
+          if (attackerPlayer) {
+            const cs = getCombatContext();
+            const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+            if (target) {
+              const targetPlayer = mapData?.players?.find(p => p.name === target.name);
+              const targetNpc = mapData?.placedItems?.length
+                ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlayer)
+                : null;
+              const targetPos = targetPlayer
+                ? { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY }
+                : targetNpc
+                  ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY }
+                  : null;
+              if (targetPos) {
+                cachedBonusCastPosRef.current = {
+                  attackerPos: { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
+                  targetPos,
+                };
+              }
+            }
+          }
+        } catch { /* positions unavailable */ }
+      }
       gateMetamagic(spell);
-    }, [gateMetamagic]);
+    }, [gateMetamagic, mapName, campaignName, playerStats.name]);
 
     const bonusActionAttacks = playerStats.attacks.filter((attack) => attack.type === 'Bonus Action');
     const attackNames = new Set((playerStats.attacks || []).map(a => a.name));
@@ -92,7 +128,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                         popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
                             popupHtml.type === 'empowered_spell' ? <div className="dice-roll-result">
                                  <div className="dice-roll-header"><i className="fa-solid fa-wand-magic-sparkles"></i>{popupHtml.name}</div>
-                                 <div className="metamagic-sp-display">Sorcery Points: <strong>{popupHtml.currentSP}</strong> / {popupHtml.lastEvent ? popupHtml.lastEvent.maxSP : '?'}</div>
+                                 <div className="metamagic-sp-display">Sorcery Points: <strong>{popupHtml.currentSP}</strong> / {popupHtml.maxSP}</div>
                                  {popupHtml.error && <div className="empowered-error" style={{ color: 'var(--stat-penalized, #cc4444)', marginTop: '8px' }}>{popupHtml.error}</div>}
                                  {popupHtml.lastEvent && !popupHtml.completed && popupHtml.lastEvent.rolls && (
                                      <div className="empowered-damage-info" style={{ marginTop: '8px' }}>

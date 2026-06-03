@@ -400,7 +400,7 @@
     },
     {
       "id": "door-4",
-      "gridX": 9,
+      "gridX": 11,
       "gridY": 16,
       "type": "door",
       "visible": true,
@@ -479,26 +479,26 @@
     {
       "id": "arjhan",
       "name": "Arjhan",
-      "gridX": 12,
-      "gridY": 11
+      "gridX": 10,
+      "gridY": 19
     },
     {
       "id": "selthara",
       "name": "Selthara",
-      "gridX": 10,
+      "gridX": 8,
       "gridY": 17
     },
     {
       "id": "seris",
       "name": "Seris",
-      "gridX": 11,
-      "gridY": 18
+      "gridX": 10,
+      "gridY": 17
     },
     {
       "id": "zivri",
       "name": "Zivri",
-      "gridX": 10,
-      "gridY": 18
+      "gridX": 8,
+      "gridY": 19
     }
   ],
   "zoom": 1,
