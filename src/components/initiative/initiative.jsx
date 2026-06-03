@@ -312,7 +312,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     }, [combatSummary, campaignNpcs]);
 
     const getSaveBonuses = React.useCallback((character) => {
-        const abilities = character.abilities || [];
+        const abilities = (character.computedStats?.abilities || character.abilities) || [];
         const getBonus = (name) => {
             const ab = abilities.find(a => a.name === name);
             return ab?.save ?? ab?.bonus ?? 0;
@@ -330,15 +330,16 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const setupCreatures = React.useCallback(() => {
         const creatureList = characters.map((character) => {
             const maxHp = character.computedStats?.hitPoints ?? character.hitPoints ?? 0;
+            const stats = character.computedStats || character;
             return {
                 name: utils.getName(character.name),
                 type: 'player',
                 imagePath: character.imagePath || '',
                 initiative: '',
                 targetName: null,
-                ac: computeAcEstimate(character),
-                resistances: character.resistances || [],
-                immunities: character.immunities || [],
+                ac: computeAcEstimate(stats),
+                resistances: stats.resistances || [],
+                immunities: stats.immunities || [],
                 conditions: [],
                 concentration: null,
                 maxHp: loadCreatureMaxHp(utils.getName(character.name), maxHp),
@@ -442,8 +443,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             const mergedCreatures = initialSummary.creatures.map(c => {
                 if (c.type === 'player' && characterNameSet.has(c.name)) {
                     const character = characters.find(ch => utils.getName(ch.name) === c.name);
-                    const maxHp = loadCreatureMaxHp(c.name, character?.hitPoints || c.maxHp || 0);
-                    return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(character), currentHp: loadCreatureHp(c.name, maxHp), maxHp, saveBonuses: c.saveBonuses || getSaveBonuses(character) };
+                    const stats = character?.computedStats || character;
+                    const maxHp = loadCreatureMaxHp(c.name, character ? stats.hitPoints || character.hitPoints : c.maxHp || 0);
+                    return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(stats), currentHp: loadCreatureHp(c.name, maxHp), maxHp, saveBonuses: c.saveBonuses || getSaveBonuses(character) };
                 }
                 return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, currentHp: c.currentHp ?? c.maxHp ?? 10, maxHp: c.maxHp ?? 10, saveBonuses: c.saveBonuses || {} };
             });
