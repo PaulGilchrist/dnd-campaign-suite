@@ -535,51 +535,48 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                       promptId: promptId,
                    }).catch(() => {});
 
-                  const handleSaveResult = async (event) => {
-                      const detail = event.detail;
-                      if (detail.promptId !== promptId) return;
+                   const handleSaveResult = async (event) => {
+                       const detail = event.detail;
+                       if (detail.promptId !== promptId) return;
 
-                      const targetCs = cs ? cs.creatures?.find(c => c.name === targetName) : null;
-                      if (!targetCs) return;
+                       const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                       const conditions = Array.isArray(storedConditions) ? storedConditions : [];
 
-                      const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
-                      const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+                       if (detail.success) {
+                             // Success: speed halved until start of next turn
+                           addEntry(campaignName, {
+                               type: 'save_result',
+                               characterName: playerStats.name,
+                               rollType: `save-${auto.type}`,
+                               targetName,
+                               saveDc,
+                               saveType: auto.saveType,
+                               success: true,
+                               description: `${targetName} succeeded on ${auto.saveType} save. Speed halved until start of next turn.`
+                             });
 
-                      if (detail.success) {
-                           // Success: speed halved until start of next turn
-                          addEntry(campaignName, {
-                              type: 'save_result',
-                              characterName: playerStats.name,
-                              rollType: `save-${auto.type}`,
-                              targetName,
-                              saveDc,
-                              saveType: auto.saveType,
-                              success: true,
-                              description: `${targetName} succeeded on ${auto.saveType} save. Speed halved until start of next turn.`
-                           });
+                           setRuntimeValue(targetName, `${auto.conditionInflicted}_speedHalved`, Date.now(), campaignName);
+                        } else {
+                             // Fail: apply the stunned condition
+                           addEntry(campaignName, {
+                               type: 'save_result',
+                               characterName: playerStats.name,
+                               rollType: `save-${auto.type}`,
+                               targetName,
+                               saveDc,
+                               saveType: auto.saveType,
+                               success: false,
+                               description: `${targetName} failed ${auto.saveType} save. Stunned until start of next turn.`
+                             });
 
-                          setRuntimeValue(targetName, `${auto.conditionInflicted}_speedHalved`, Date.now(), campaignName);
-                      } else {
-                           // Fail: apply the stunned condition
-                          addEntry(campaignName, {
-                              type: 'save_result',
-                              characterName: playerStats.name,
-                              rollType: `save-${auto.type}`,
-                              targetName,
-                              saveDc,
-                              saveType: auto.saveType,
-                              success: false,
-                              description: `${targetName} failed ${auto.saveType} save. Stunned until start of next turn.`
-                           });
+                           const newConditions = [...conditions, 'stunned'];
+                           setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
+                        }
 
-                          const newConditions = [...conditions, 'stunned'];
-                          setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
-                      }
+                       window.removeEventListener('save-result', handleSaveResult);
+                    };
 
-                      window.removeEventListener('save-result', handleSaveResult);
-                  };
-
-                  window.addEventListener('save-result', handleSaveResult, { once: true });
+                   window.addEventListener('save-result', handleSaveResult);
 
                   if (setPopupHtml) {
                       setPopupHtml({
