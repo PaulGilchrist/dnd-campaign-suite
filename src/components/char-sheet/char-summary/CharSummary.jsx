@@ -93,6 +93,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
      }
     speed = Math.max(0, speed - (5 * exhaustionLevel));
     if (conditionEffects?.speedZero) speed = 0;
+    if (conditionEffects?.speedHalved) speed = Math.floor(speed / 2);
     const auraSpeedBonus = auraComboEffects?.speedBonus || 0;
     const auraSpeedSource = auraComboEffects?.speedSource || null;
     const totalSpeed = speed + auraSpeedBonus;

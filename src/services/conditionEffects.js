@@ -3,7 +3,7 @@ const CONDITIONS_THAT_CANNOT_ACT = new Set([
 ])
 
 const CONDITIONS_THAT_SPEED_ZERO = new Set([
-   'grappled', 'paralyzed', 'petrified', 'restrained', 'unconscious',
+    'grappled', 'paralyzed', 'petrified', 'restrained', 'stunned', 'unconscious',
 ])
 
 function saveModifierApplies(modifier, saveType, abilityName) {
@@ -144,6 +144,7 @@ function computeConditionEffects(conditions = [], saveModifiers = []) {
 
        case 'stunned':
         effects.cannotAct = true
+        effects.speedZero = true
         effects.autoFailSaves.push('str', 'dex')
         effects.targetAdvantageCount++
         break

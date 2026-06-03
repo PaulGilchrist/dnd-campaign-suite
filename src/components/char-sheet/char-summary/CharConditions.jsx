@@ -37,7 +37,11 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
 
   React.useEffect(() => {
     setActiveConditions(loadConditions(playerStats.name, campaignName))
-  }, [playerStats.name, campaignName])
+   }, [playerStats.name, campaignName])
+
+   React.useEffect(() => {
+    saveConditions(playerStats.name, campaignName, activeConditions)
+   }, [activeConditions, playerStats.name, campaignName])
 
   function logEntry(entry) {
     fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
@@ -113,13 +117,9 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
     })
 
     if (success) {
-      setActiveConditions(prev => {
-        const next = prev.filter(c => c !== conditionKey)
-        saveConditions(playerStats.name, campaignName, next)
-        return next
-      })
-      onConditionsChange?.()
-    }
+    setActiveConditions(prev => prev.filter(c => c !== conditionKey))
+    onConditionsChange?.()
+   }
   }
 
   const toggle = (key) => {
@@ -128,13 +128,9 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
     if (activeConditions.includes(key) && saveAbility) {
       handleConditionSave(key, saveAbility, getAbilityLabel(saveAbility))
       return
-    }
+     }
 
-    setActiveConditions(prev => {
-      const next = prev.includes(key) ? prev.filter(c => c !== key) : [...prev, key]
-      saveConditions(playerStats.name, campaignName, next)
-      return next
-    })
+    setActiveConditions(prev => prev.includes(key) ? prev.filter(c => c !== key) : [...prev, key])
     onConditionsChange?.()
   }
 

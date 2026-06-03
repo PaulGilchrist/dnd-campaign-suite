@@ -85,7 +85,12 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
     const storedConditions = useRuntimeValue(playerSummary?.name, 'activeConditions', campaignName);
     const activeConditions = Array.isArray(storedConditions) ? storedConditions : [];
-    const conditionEffects = computeConditionEffects(activeConditions, playerStats?.saveModifiers)
+    const conditionEffects = computeConditionEffects(activeConditions, playerStats?.saveModifiers);
+    if (playerStats) {
+        const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
+        if (speedHalvedTime) conditionEffects.speedHalved = true;
+    }
+
     const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
     const conditionAttackMode = getNetAttackMode(conditionEffects.attackAdvantageCount, conditionEffects.attackDisadvantageCount)
 
