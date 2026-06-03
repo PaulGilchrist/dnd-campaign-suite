@@ -443,27 +443,32 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         if (target.type === 'player') {
           const isCarefulAlly = context?.metamagicCareful || false;
           if (isCarefulAlly) {
-            const applyResult = applyDamageToTarget(combatSummary, target.name, 0, [damageType], campaignName);
+            const carefulDamage = computeDamageAfterSave(total, true, dcSuccess);
+            const applyResult = applyDamageToTarget(combatSummary, target.name, carefulDamage, [damageType], campaignName);
             logEntry({
               type: 'roll',
               characterName,
-              rollType: 'save-auto-success',
+              rollType: 'save-damage',
               name,
               formula,
               rolls,
-              total: 0,
+              total,
               modifier,
               damageType,
               targetName: target.name,
               saveType,
               saveDc,
+              saveResult: 'success',
+              saveRoll: 20,
+              saveBonus: 0,
+              finalDamage: carefulDamage,
               note: 'Careful Spell: ally automatically succeeds save',
             });
             saveLastDamageEvent(characterName, {
               targetName: target.name,
               spellName: name,
               damageFormula: formula,
-              rawDamage: 0,
+              rawDamage: total,
               damageType,
               saveDc,
               saveType,
@@ -489,7 +494,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
               saveType,
               dcSuccess,
               saveResult: { success: true, roll: 20, total: saveDc, bonus: 0 },
-              finalDamage: 0,
+              finalDamage: carefulDamage,
               damageApplied: true,
               damageReduced: false,
               carefulSpell: true,
