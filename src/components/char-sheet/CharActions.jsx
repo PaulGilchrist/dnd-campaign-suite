@@ -707,7 +707,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     const monkLevel = playerStats.level;
 
                     // Roll the martial arts die
-                    const rollResult = rollExpression(`${martialArtsDie}d1`);
+                     const rollResult = rollExpression(`1d${martialArtsDie}`);
                     if (!rollResult) return;
 
                     const healAmount = monkLevel + rollResult.total;
@@ -760,15 +760,15 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
                     // Show popup with roll result and healing info
                     if (setPopupHtml) {
-                        setPopupHtml({
+                         setPopupHtml({
                             type: 'healing',
                             name: action.name,
-                            formula: `${martialArtsDie}d1 + ${monkLevel}`,
+                            formula: `1d${martialArtsDie} + ${monkLevel}`,
                             rolls: rollResult.rolls,
                             bonus: monkLevel,
                             modifier: 0,
                             healAmount: healAmount,
-                            description: `${action.name}: Rolled ${rollResult.total} (${martialArtsDie}d1) + ${monkLevel} (Monk level) = <strong>${healAmount}</strong> HP`,
+                            description: `${action.name}: Rolled ${rollResult.total} (1d${martialArtsDie}) + ${monkLevel} (Monk level) = <strong>${healAmount}</strong> HP`,
                             targetName: playerStats.name,
                             targetCurrentHp: newHp,
                             targetMaxHp: maxHp,
