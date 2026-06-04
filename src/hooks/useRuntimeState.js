@@ -54,7 +54,8 @@ export function getRuntimeValue(characterKey, propertyName) {
 
 export function setRuntimeValue(characterKey, propertyName, value, campaignName) {
   const store = getStore(characterKey);
-  if (store.get(propertyName) === value) return;
+  const existing = store.get(propertyName);
+  if (existing === value || (typeof existing === 'number' && typeof value === 'string' && existing === Number(value)) || (typeof existing === 'string' && typeof value === 'number' && Number(existing) === value)) return;
   store.set(propertyName, value);
 
   const obj = Object.fromEntries(store);

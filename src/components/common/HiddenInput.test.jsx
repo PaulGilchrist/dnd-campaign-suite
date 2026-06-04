@@ -52,37 +52,42 @@ describe('HiddenInput', () => {
     expect(input).toHaveValue(5);
   });
 
-  it('should call handleValueChange when input value changes', () => {
+  it('should call handleValueChange when input value changes on blur', () => {
     render(
-      <HiddenInput
+       <HiddenInput
         handleInputToggle={mockHandleInputToggle}
         handleValueChange={mockHandleValueChange}
         showInput={true}
         value={5}
-      />
-    );
+       />
+      );
 
     const input = screen.getByRole('spinbutton');
     fireEvent.change(input, { target: { value: '10' } });
 
-    expect(mockHandleValueChange).toHaveBeenCalledWith('10');
-  });
+    expect(mockHandleValueChange).not.toHaveBeenCalled();
 
-  it('should call handleInputToggle on blur', () => {
+    fireEvent.blur(input);
+
+    expect(mockHandleValueChange).toHaveBeenCalledWith('10');
+   });
+
+  it('should call handleInputToggle and handleValueChange on blur', () => {
     render(
-      <HiddenInput
+         <HiddenInput
         handleInputToggle={mockHandleInputToggle}
         handleValueChange={mockHandleValueChange}
         showInput={true}
         value={5}
-      />
-    );
+         />
+       );
 
     const input = screen.getByRole('spinbutton');
     fireEvent.blur(input);
 
     expect(mockHandleInputToggle).toHaveBeenCalled();
-  });
+    expect(mockHandleValueChange).toHaveBeenCalledWith(5);
+     });
 
   it('should call handleInputToggle and handleValueChange on Enter key', () => {
     render(

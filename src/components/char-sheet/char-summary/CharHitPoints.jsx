@@ -20,9 +20,11 @@ function CharHitPoints({ playerStats, campaignName }) {
          setShowInputCurrentHitPoints((showInputCurrentHitPoints) => !showInputCurrentHitPoints);
      };
       const handleValueChangeCurrentHitPoints = (value) => {
+          const numValue = Number(value);
+          if (Number.isNaN(numValue)) return;
           const oldHp = currentHitPoints;
-          const delta = value - oldHp;
-          setRuntimeValue(playerStats.name, 'currentHitPoints', value, campaignName);
+          const delta = numValue - oldHp;
+          setRuntimeValue(playerStats.name, 'currentHitPoints', numValue, campaignName);
 
           if (delta !== 0) {
               fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {

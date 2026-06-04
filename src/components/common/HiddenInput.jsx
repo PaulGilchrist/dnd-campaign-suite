@@ -1,49 +1,60 @@
- 
+
 import React from 'react'
 import './HiddenInput.css'
 
 function HiddenInput({ handleInputToggle, handleValueChange, showInput, value, displayValue = true }) {
     const inputRef = React.useRef(null);
+    const [localValue, setLocalValue] = React.useState(value);
+    const isEditingRef = React.useRef(false);
     React.useEffect(() => {
         if(showInput) {
+            isEditingRef.current = true;
             inputRef.current.focus();
-         }
-     }, [showInput]);
+            } else {
+            isEditingRef.current = false;
+           }
+       }, [showInput]);
+    React.useEffect(() => {
+        if (!isEditingRef.current) setLocalValue(value);
+      }, [value]);
 
+    const commit = () => {
+        handleValueChange(localValue);
+        handleInputToggle();
+     };
     const handleChange = (event) => {
-        handleValueChange(event.target.value);
-    };
+        setLocalValue(event.target.value);
+     };
     const handleKeyDown = (event) => {
         event.stopPropagation();
         if (event.key === "Enter") {
-            handleChange(event);
-            handleInputToggle();
-         }
-     };
+            commit();
+          }
+      };
     const handleStopPropagation = (event) => {
         event.stopPropagation();
-    };
+     };
 
     return (
-          <span className='hidden-input clickable'>
-             {
+           <span className='hidden-input clickable'>
+              {
                 showInput ? (
-                    <input
+                     <input
                         min="0"
-                        onBlur={handleInputToggle}
+                        onBlur={commit}
                         onChange={handleChange}
                         onClick={handleStopPropagation}
                         onKeyDown={handleKeyDown}
                         ref={inputRef}
                         type="number"
-                        value={value}
-                     />
-                 ) : (
+                        value={localValue}
+                      />
+                  ) : (
                                     displayValue ? value : null
-                                  )
-             }
-         </span>
-     )
-}
+                                   )
+              }
+          </span>
+      )
+  }
 
 export default HiddenInput
