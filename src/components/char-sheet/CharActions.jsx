@@ -640,7 +640,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     const actualHeal = newHp - targetCurrentHp;
 
                     if (combatTarget && combatSummary) {
-                        const result = applyHealingToTarget(combatSummary, combatTarget.name, healAmount, campaignName);
+                        applyHealingToTarget(combatSummary, combatTarget.name, healAmount, campaignName);
                     } else {
                         setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
                     }

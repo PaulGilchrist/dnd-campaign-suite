@@ -19,7 +19,8 @@ function getCreatureTargets(excludeName) {
     .map(c => c.name);
 }
 
-export default function MetamagicPopup({ spell, playerStats, campaignName, onConfirm, onSkip }) {
+export default function MetamagicPopup({ spell, playerStats, _campaignName, onConfirm, onSkip }) {
+  void _campaignName;
   const spellLevel = spell?.level || 0;
   const currentSP = Number(playerStats._metamagicCurrentSP) || 0;
   const options = getPreCastOptions(playerStats, currentSP, spellLevel);

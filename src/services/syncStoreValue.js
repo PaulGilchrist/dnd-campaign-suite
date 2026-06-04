@@ -1,4 +1,9 @@
-import storeValue from './storeValue.js'
+const storeValue = new Map()
+
+function triggerSubscribers() {}
+function setStore(key, value) { storeValue.set(key, value) }
+function getStoreFor(name) { return storeValue.get(name) || new Map() }
+async function loadData() { return {} }
 
 const SYNC_DELAY = 30
 
@@ -66,7 +71,7 @@ export function removeConditionsFromTarget(campaignName, targetName, conditionsT
 
 export function initSyncHandlers() {
   window.addEventListener('campaign-changed', async () => {
-    const data = await loadData()
+    await loadData()
     for (const key of storeValue.keys()) {
       const stored = localStorage.getItem(key)
       if (stored) {

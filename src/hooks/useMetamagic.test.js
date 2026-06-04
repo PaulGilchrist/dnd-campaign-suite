@@ -2,9 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useMetamagic from './useMetamagic.js';
 
-const mockCharacterName = 'TestSorcerer';
-const mockCampaign = 'test-campaign';
-
 vi.mock('./useRuntimeState.js', () => {
   const store = new Map();
   store.set('TestSorcerer', JSON.stringify({ sorceryPoints: 5 }));

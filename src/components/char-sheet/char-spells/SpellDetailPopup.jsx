@@ -1,5 +1,4 @@
 
-import React from 'react'
 import { sanitizeHtml } from '../../../services/sanitize.js';
 import { setRuntimeValue } from '../../../hooks/useRuntimeState.js'
 

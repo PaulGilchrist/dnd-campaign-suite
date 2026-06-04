@@ -429,9 +429,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             setActiveCreatureName(lastName);
           }
          expireStaleEffects(campaignName);
-      }, [activeCreatureName, campaignName]);
+        }, [activeCreatureName, campaignName, isPrevDisabled]);
 
-    React.useEffect(() => {
+     React.useEffect(() => {
         const stored = localStorage.getItem('combatSummary');
         let initialSummary = null;
         if (stored) {

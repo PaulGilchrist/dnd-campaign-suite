@@ -30,7 +30,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       castingTime: spell.casting_time,
       _currentSP: currentSP,
     });
-  }, [isSorcerer, playerStats.name, campaignName, onExecute]);
+    }, [isSorcerer, playerStats, campaignName, onExecute]);
 
   const handleConfirm = React.useCallback((result) => {
     const pending = pendingMetamagic;
