@@ -1,1 +1,52 @@
-[]
+[
+  {
+    "name": "Grimwen Hearth",
+    "size": "town",
+    "description": "A crossroads town built at the intersection of two major trade routes, with inns and stables on every corner. The old quarter, a preserved medieval warren of narrow alleys and timber-framed buildings. The town's famous bell tower, whose bells ring the hours, call worshippers to prayer, and warn of danger.",
+    "atmosphere": "Street preachers and political agitators compete for audiences on the town's many corners.",
+    "government": "A merchant oligarchy governs through a council of the ten wealthiest citizens.",
+    "population": "1,500-3,000 souls",
+    "services": [
+      {
+        "type": "blacksmith",
+        "name": "Crucible & Nail",
+        "description": "A dwarven blacksmith operates this forge. Their metalwork is renowned for its durability."
+      },
+      {
+        "type": "tailor",
+        "name": "Wren's Fabrics",
+        "description": "A small clothing shop with ready-made items in common sizes."
+      },
+      {
+        "type": "tavern",
+        "name": "The Frost Scroll",
+        "description": "A lively tavern with entertainment nightly. Minstrels, storytellers, and the occasional brawler."
+      }
+    ],
+    "notableNPCs": [
+      {
+        "name": "Greeba",
+        "role": "Forge-master",
+        "description": "The Forge-master of Crucible & Nail. Talkative and friendly, eager to share local gossip."
+      },
+      {
+        "name": "Rangrim",
+        "role": "Clothier",
+        "description": "The Clothier of Wren's Fabrics. Eccentric but knowledgeable, prone to rambling stories."
+      },
+      {
+        "name": "Aelara",
+        "role": "Publican",
+        "description": "The Publican of The Frost Scroll. Sharp-eyed and calculating, always looking for an angle."
+      }
+    ],
+    "rumors": [
+      "The town's oldest tree split down the middle during a windless night.",
+      "A sigil carved into the town square glows with imprisoned magic on certain nights.",
+      "Someone carved a warning into the door of the town hall overnight."
+    ],
+    "tags": "town, dwarven-culture, blacksmith",
+    "notes": "",
+    "threat": "The town's isolation has bred suspicion of outsiders, making trade and diplomacy nearly impossible."
+  }
+]

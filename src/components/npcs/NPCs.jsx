@@ -246,19 +246,22 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
       if (alreadyAdded) return;
       const roll = rollD20();
       const total = roll + initBonus;
-       combatSummary.creatures.push({
-         name: npc.name,
-         type: 'npc',
-         initiative: String(total),
-         targetName: null,
-        ac: npc.armorClass || 10,
-        resistances: npc.damageResistances || [],
-        immunities: npc.damageImmunities || [],
-        conditions: [],
-        concentration: null,
-        imagePath: npc.imagePath || npc.image || '',
-        initiativeBonus: initBonus,
-      });
+        combatSummary.creatures.push({
+          name: npc.name,
+          type: 'npc',
+          initiative: String(total),
+          targetName: null,
+         ac: npc.armorClass || 10,
+         resistances: npc.damageResistances || [],
+         immunities: npc.damageImmunities || [],
+         conditions: [],
+         concentration: null,
+         imagePath: npc.imagePath || npc.image || '',
+         initiativeBonus: initBonus,
+         maxHp: Number(npc.hitPoints) || 10,
+         currentHp: Number(npc.hitPoints) || 10,
+         saveBonuses: {},
+       });
       combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
       storage.set('combatSummary', combatSummary, campaignName);
       window.dispatchEvent(new CustomEvent('initiative-rolled'));
@@ -838,19 +841,22 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
                           }
                           const roll = rollD20();
                           const total = roll + initBonus;
-                           combatSummary.creatures.push({
-                             name: snapshot.name,
-                             type: 'npc',
-                             initiative: String(total),
-                             targetName: null,
-                            ac: snapshot.armorClass || 10,
-                            resistances: snapshot.damageResistances || [],
-                            immunities: snapshot.damageImmunities || [],
-                            conditions: [],
-                            concentration: null,
-                            imagePath,
-                            initiativeBonus: initBonus,
-                          });
+                            combatSummary.creatures.push({
+                              name: snapshot.name,
+                              type: 'npc',
+                              initiative: String(total),
+                              targetName: null,
+                             ac: snapshot.armorClass || 10,
+                             resistances: snapshot.damageResistances || [],
+                             immunities: snapshot.damageImmunities || [],
+                             conditions: [],
+                             concentration: null,
+                             imagePath,
+                             initiativeBonus: initBonus,
+                             maxHp: Number(snapshot.hitPoints) || 10,
+                             currentHp: Number(snapshot.hitPoints) || 10,
+                             saveBonuses: {},
+                           });
                           combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
                           storage.set('combatSummary', combatSummary, campaignName);
                           window.dispatchEvent(new CustomEvent('initiative-rolled'));

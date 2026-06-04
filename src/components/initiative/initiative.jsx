@@ -74,7 +74,9 @@ function HpBar({ current, max }) {
 }
 
 function CreatureHp({ creature, isLocalhost, onChange }) {
-    const { currentHp, maxHp, type } = creature;
+    const { currentHp: rawCurrentHp, maxHp: rawMaxHp, type } = creature;
+    const currentHp = rawCurrentHp ?? 0;
+    const maxHp = rawMaxHp ?? 1;
     const isDead = currentHp <= 0;
     const isBloodied = currentHp > 0 && currentHp <= Math.floor(maxHp / 2);
 
