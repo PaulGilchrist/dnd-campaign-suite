@@ -901,7 +901,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     return;
                 }
             } catch (err) {
-                console.log('Map data not found, initializing empty map');
             }
 
             const newData = { players: [], walls: new Set(), rooms: [] };

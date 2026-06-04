@@ -44,7 +44,6 @@ router.post('/api/campaigns/:campaign/:key', (req, res, next) => {
     characterChangeData.get(campaign)[key] = value;
     saveFile();
 
-    console.log('[changeData] POST', { campaign, key, hasOldValue: oldValue !== undefined, subscriberCount: subscribers.length });
     // Broadcast change
     publish(`change-${campaign}-${key}`, value);
 

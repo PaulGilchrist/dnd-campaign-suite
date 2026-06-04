@@ -56,9 +56,9 @@ app.listen(PORT, () => {
     const portStr = PORT === 80 ? '' : `:${PORT}`;
     const trailingSlash = PORT === 80 ? '' : '/';
 
-    console.log(`Server running at:`);
-    console.log(`  Local:   http://localhost${portStr}${trailingSlash}`);
-    console.log(`  Network: http://${lanIP}${portStr}${trailingSlash}`);
+    console.error(`Server running at:`);
+    console.error(`  Local:   http://localhost${portStr}${trailingSlash}`);
+    console.error(`  Network: http://${lanIP}${portStr}${trailingSlash}`);
 
     // Load character change data from disk at startup
     readFile();

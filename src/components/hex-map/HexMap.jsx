@@ -904,7 +904,6 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     return;
                 }
             } catch (err) {
-                console.log('Hex map data not found, initializing new map', err);
             }
 
             // Create new empty map

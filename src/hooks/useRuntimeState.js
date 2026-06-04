@@ -69,10 +69,8 @@ export function setRuntimeValue(characterKey, propertyName, value, campaignName)
   const store = getStore(characterKey);
   const existing = store.get(propertyName);
   if (valuesEqual(existing, value)) {
-    console.log('[setRuntimeValue] no-change skip', { characterKey, propertyName, value });
     return;
   }
-  console.log('[setRuntimeValue] writing', { characterKey, propertyName, oldValue: existing, newValue: value, campaignName });
   store.set(propertyName, value);
 
   const obj = Object.fromEntries(store);
@@ -105,7 +103,6 @@ export function setRuntimeObject(characterKey, fullObject, campaignName) {
     }
   }
   if (changed) {
-    console.log('[setRuntimeObject] changed', { characterKey, changedKeys, campaignName });
     try { localStorage.setItem(characterKey, JSON.stringify(Object.fromEntries(store))); } catch { /* ignore */ }
 
     if (campaignName) {
@@ -118,8 +115,6 @@ export function setRuntimeObject(characterKey, fullObject, campaignName) {
     }
 
     notify(characterKey);
-  } else {
-    console.log('[setRuntimeObject] no-change skip', { characterKey, campaignName });
   }
 }
 
@@ -131,7 +126,6 @@ export function useRuntimeValue(characterKey, propertyName, campaignName) {
     if (!listeners.has(characterKey)) listeners.set(characterKey, new Set());
     const listener = () => {
       const newVal = getRuntimeValue(characterKey, propertyName);
-      console.log('[useRuntimeValue] listener fired', { characterKey, propertyName, newVal });
       setValue(newVal);
     };
     listeners.get(characterKey).add(listener);

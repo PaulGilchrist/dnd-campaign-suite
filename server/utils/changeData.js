@@ -96,7 +96,6 @@ export const publish = (key, data) => {
             // client disconnected
         }
     });
-    console.log('[publish]', { key, targetCampaign, subscriberCount: subscribers.length, sent });
 }
 
 /**

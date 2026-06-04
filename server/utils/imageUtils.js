@@ -44,7 +44,7 @@ export const processImageUpload = (campaignName, characterName, character, origi
         delete character.image;
         delete character.imageName;
 
-        console.log(`Image saved: ${imageFilePath}`);
+        console.error(`Image saved: ${imageFilePath}`);
     }
 };
 
@@ -59,7 +59,7 @@ export const deleteCharacterImage = (imagePath) => {
             const fullPath = path.join(process.cwd(), 'public', imagePath);
             if (fs.existsSync(fullPath)) {
                 fs.unlinkSync(fullPath);
-                console.log(`Deleted image: ${fullPath}`);
+                console.error(`Deleted image: ${fullPath}`);
             }
         }
     } catch (error) {

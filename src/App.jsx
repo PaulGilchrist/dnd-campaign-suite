@@ -314,7 +314,6 @@ function App() {
     const prefix = `change-${campaignName}-`;
     if (!event.key.startsWith(prefix)) return;
     const characterKey = event.key.slice(prefix.length);
-    console.log('[App.handleRuntimeEvent] forwarding to setRuntimeObject', { characterKey, campaignName, dataKeys: Object.keys(event.data) });
     setRuntimeObject(characterKey, event.data, campaignName);
   }, [campaignName, setCharacters]);
 
