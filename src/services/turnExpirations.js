@@ -34,15 +34,6 @@ export function clearAllExpirationEffects(characterName, campaignName) {
 
     const charLower = characterName.toLowerCase();
 
-     // Get all current combat creatures for validation
-    let currentCreatures = [];
-    try {
-        const combatData = JSON.parse(localStorage.getItem('combatSummary') || '{}');
-        currentCreatures = combatData.creatures || [];
-      } catch (e) { /* no combat data */ }
-
-    const inCombat = currentCreatures.length ? new Set(currentCreatures.map(c => utils.getName(c.name).toLowerCase())) : null;
-
      // --- "From me": clear all effects I have on other targets ---
     const myList = getRuntimeValue(characterName, KEY) || [];
     for (const entry of myList) {
@@ -50,7 +41,7 @@ export function clearAllExpirationEffects(characterName, campaignName) {
       }
     setRuntimeValue(characterName, KEY, [], campaignName);
 
-     // --- Scan all runtime stores for "to me" and stale entries ---
+     // --- Scan all runtime stores for "to me" entries ---
     const allKeys = Object.keys(localStorage);
     for (const key of allKeys) {
         if (!key || key === 'combatSummary' || key === 'activeCreatureName') continue;
@@ -62,24 +53,11 @@ export function clearAllExpirationEffects(characterName, campaignName) {
         let kept = [];
       for (const entry of list) {
             const targetLower = utils.getName(entry.target).toLowerCase();
-            const keyLower = key.toLowerCase();
 
            // Clear if the effect targets me
             if (targetLower === charLower) {
                 clearExpirationEffects(entry.effects, entry.target, key, campaignName);
                  continue;
-              }
-
-           // If combat data exists, clear stale entries (attacker or target not in combat)
-            if (inCombat) {
-                if (!inCombat.has(keyLower)) {
-                    clearExpirationEffects(entry.effects, entry.target, key, campaignName);
-                     continue;
-                  }
-                if (!inCombat.has(targetLower)) {
-                    clearExpirationEffects(entry.effects, entry.target, key, campaignName);
-                     continue;
-                  }
               }
 
            kept.push(entry);

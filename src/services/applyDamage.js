@@ -1,4 +1,4 @@
-import { setRuntimeValue } from '../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
 import storage from './storage.js';
 import { rollD20 } from './diceRoller.js';
 import utils from './utils.js';
@@ -37,10 +37,21 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
   const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
 
-  const finalDamage = computeDamageAfterResistances(rawDamage, damageTypes || [], creature.resistances, creature.immunities);
-  const oldHp = creature.currentHp;
-  const newHp = Math.max(0, oldHp - finalDamage);
-  creature.currentHp = newHp;
+  const isPlayer = creature.type === 'player';
+  const resistances = isPlayer ? [] : (creature.resistances || []);
+  const immunities = isPlayer ? [] : (creature.immunities || []);
+  const finalDamage = computeDamageAfterResistances(rawDamage, damageTypes || [], resistances, immunities);
+
+  let oldHp, newHp;
+  if (isPlayer) {
+    oldHp = getRuntimeValue(creature.name, 'currentHitPoints') ?? 0;
+    newHp = Math.max(0, oldHp - finalDamage);
+    setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
+  } else {
+    oldHp = creature.currentHp;
+    newHp = Math.max(0, oldHp - finalDamage);
+    creature.currentHp = newHp;
+  }
 
   const wasAlive = oldHp > 0;
   const isNowUnconscious = newHp <= 0;
@@ -49,11 +60,10 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     creature.concentration.dc = Math.max(10, Math.floor(finalDamage / 2));
   }
 
-  storage.set('combatSummary', combatSummary, campaignName);
-
   logDamageApplication(creature, finalDamage, oldHp, newHp, campaignName);
 
   let npcConcentrationBroken = false;
+  let combatSummaryChanged = false;
   if (creature.type === 'player') {
     if (wasAlive && isNowUnconscious) {
       const promptId = utils.guid();
@@ -71,8 +81,10 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         spellName: creature.concentration.spell,
         dc: creature.concentration.dc,
       });
+      combatSummaryChanged = true;
     }
   } else {
+    combatSummaryChanged = true;
     if (creature.concentration && finalDamage > 0) {
       const saveBonus = creature?.saveBonuses?.['con'] ?? 0;
       const { success, roll, total } = rollConcentrationSave(saveBonus, creature.concentration.dc);
@@ -111,7 +123,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     }
   }
 
-  if (npcConcentrationBroken) {
+  if (combatSummaryChanged || npcConcentrationBroken) {
     storage.set('combatSummary', combatSummary, campaignName);
   }
 

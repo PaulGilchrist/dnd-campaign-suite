@@ -19,38 +19,39 @@ one-click die rolls, resource tracking, and automated effects during combat.
 
 | Type | Description | Examples |
 |------|-------------|----------|
-| `save_attack` | Roll damage + prompt for save | Breath Weapon, Warding Flare, Stunning Strike |
-| `healing` | Roll healing dice | Healing Hands (Aasimar), Second Wind |
-| `healing_pool` | Track and spend from pool | Lay on Hands |
-| `self_healing` | Self-heal with uses | Wholeness of Body, Second Wind |
-| `damage_reduction` | Reduce incoming damage | Deflect Missiles, Slow Fall |
-| `conditional_advantage` | Auto-advantage on specific saves | Fey Ancestry, Gnome Cunning, Brave |
+| `attack_rider` | Rider on weapon attacks | Brutal Strike (2024 Barbarian), Maneuvers |
+| `auto_effect` | Automatic effect on trigger | Relentless Endurance, Savage Attacks |
 | `auto_reroll` | Reroll specific results | Lucky (Halfling), Indomitable |
-| `temp_buff` | Temporary buff with duration | Heavenly Wings, Celestial Revelation |
-| `temp_hp_buff` | Grant temporary HP | Mantle of Inspiration (Bard) |
+| `bonus_action_attack` | Bonus action attack | Frenzy (Berserker) |
+| `bonus_attacks` | Extra attacks as bonus action | Flurry of Blows |
+| `buff_ally` | Buff an ally | Bardic Inspiration |
+| `combat_stance` | Toggle-able stance | Rage (Barbarian) |
+| `conditional_advantage` | Auto-advantage on specific saves | Fey Ancestry, Gnome Cunning, Brave |
 | `damage_aura` | Ongoing area damage | Inner Radiance (Aasimar) |
 | `damage_bonus` | Add damage to attacks | Divine Smite, Rage |
-| `combat_stance` | Toggle-able stance | Rage (Barbarian) |
-| `auto_effect` | Automatic effect on trigger | Relentless Endurance, Savage Attacks |
+| `damage_reduction` | Reduce incoming damage | Deflect Missiles, Slow Fall |
+| `extra_action` | Additional action use | Action Surge |
+| `flurry_effect` | Rider on Flurry of Blows | Open Hand Technique |
+| `free_spell` | Free spell cast | Paladin's Smite |
+| `healing` | Roll healing dice | Healing Hands (Aasimar), Second Wind |
+| `healing_bonus` | Bonus healing on rest | Song of Rest (Bard) |
+| `healing_pool` | Track and spend from pool | Lay on Hands |
+| `initiative_action` | Action on initiative roll | Uncanny Metabolism (2024 Monk) |
+| `meta` | Meta-mechanical effect | Resourceful (Human) |
 | `passive_buff` | Always-on bonus | Aura of Protection (Paladin) |
 | `passive_immunity` | Always-on immunity | Aura of Courage (Paladin) |
 | `passive_rule` | Passive rule change | Improved Critical (Champion) |
-| `extra_action` | Additional action use | Action Surge |
-| `buff_ally` | Buff an ally | Bardic Inspiration |
-| `bonus_attacks` | Extra attacks as bonus action | Flurry of Blows |
-| `flurry_effect` | Rider on Flurry of Blows | Open Hand Technique |
+| `reaction_bonus` | Bonus as reaction | Defensive Duelist |
 | `reaction_damage` | Damage as reaction | Retaliation (Berserker), Storm's Thunder |
 | `reaction_debuff` | Debuff as reaction | Cutting Words (Lore Bard) |
-| `free_spell` | Free spell cast | Paladin's Smite |
-| `resource_pool` | Track resource uses | Channel Divinity, Superiority Dice |
-| `attack_rider` | Rider on weapon attacks | Brutal Strike (2024 Barbarian), Maneuvers |
-| `initiative_action` | Action on initiative roll | Uncanny Metabolism (2024 Monk) |
-| `spell_modifier` | Modify spell casting | Metamagic (Sorcerer) |
-| `bonus_action_attack` | Bonus action attack | Frenzy (Berserker) |
 | `resistance` | Damage resistance | Celestial Resistance, racial resistances |
-| `meta` | Meta-mechanical effect | Resourceful (Human) |
-| `healing_bonus` | Bonus healing on rest | Song of Rest (Bard) |
-| `reaction_bonus` | Bonus as reaction | Defensive Duelist |
+| `resource_pool` | Track resource uses | Channel Divinity, Superiority Dice |
+| `save_attack` | Roll damage + prompt for save | Breath Weapon, Warding Flare, Stunning Strike |
+| `self_healing` | Self-heal with uses | Wholeness of Body, Second Wind |
+| `set_condition` | Add condition to target(s) | Abjure Foes (Paladin) |
+| `spell_modifier` | Modify spell casting | Metamagic (Sorcerer) |
+| `temp_buff` | Temporary buff with duration | Heavenly Wings, Celestial Revelation |
+| `temp_hp_buff` | Grant temporary HP | Mantle of Inspiration (Bard) |
 
 ---
 

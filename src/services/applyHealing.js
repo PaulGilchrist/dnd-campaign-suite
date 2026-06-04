@@ -1,5 +1,5 @@
 
-import { setRuntimeValue } from '../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
 import storage from './storage.js';
 
 export function applyHealingToTarget(combatSummary, targetName, healAmount, campaignName) {
@@ -7,30 +7,36 @@ export function applyHealingToTarget(combatSummary, targetName, healAmount, camp
     const creature = combatSummary.creatures.find(c => c.name === targetName);
     if (!creature) return null;
 
-    const oldHp = creature.currentHp;
-    const newHp = Math.min(creature.maxHp, oldHp + healAmount);
-    const actualHeal = newHp - oldHp;
-    creature.currentHp = newHp;
+    const isPlayer = creature.type === 'player';
+    const maxHp = creature.maxHp;
+    let oldHp, newHp, actualHeal;
 
-    storage.set('combatSummary', combatSummary, campaignName);
+    if (isPlayer) {
+        oldHp = getRuntimeValue(creature.name, 'currentHitPoints') ?? 0;
+        newHp = Math.min(maxHp, oldHp + healAmount);
+        actualHeal = newHp - oldHp;
+        setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
+        if (oldHp <= 0 && newHp > 0) {
+            setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
+            setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
+        }
+    } else {
+        oldHp = creature.currentHp;
+        newHp = Math.min(maxHp, oldHp + healAmount);
+        actualHeal = newHp - oldHp;
+        creature.currentHp = newHp;
+        storage.set('combatSummary', combatSummary, campaignName);
+    }
 
     const entry = {
         type: 'hp_change',
         targetName: creature.name,
         delta: actualHeal,
         currentHp: newHp,
-        maxHp: creature.maxHp,
+        maxHp: maxHp,
         isHealing: true,
         isUnconscious: false,
     };
-
-    if (creature.type === 'player') {
-        setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
-        if (oldHp <= 0 && newHp > 0) {
-            setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
-            setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
-        }
-    }
 
     fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
         method: 'POST',

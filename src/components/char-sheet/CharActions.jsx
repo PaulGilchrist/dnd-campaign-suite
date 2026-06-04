@@ -633,7 +633,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         if (combatTarget) {
                             const stored = getRuntimeValue(combatTarget.name, 'currentHitPoints', campaignName);
                             if (stored != null && stored !== '') return Number(stored);
-                            return combatTarget.currentHp;
+                            if (combatTarget.type === 'npc') return combatTarget.currentHp;
+                            return targetMaxHp;
                         }
                         const stored = getRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
                         return stored != null && stored !== '' ? Number(stored) : playerStats.hitPoints;
@@ -677,7 +678,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             targetCurrentHp: newHp,
                             targetMaxHp: targetMaxHp,
                             hasPhysiciansTouch: hasPhysiciansTouch,
-                            isInCombat: !!combatSummary,
                         });
 
                   } else {

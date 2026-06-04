@@ -179,8 +179,33 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const [mapData, setMapData] = React.useState(null);
     const [overlays, setOverlays] = React.useState([]);
 
+    const displayCreatures = React.useMemo(() => {
+        if (!combatSummary) return [];
+        return combatSummary.creatures.map(c => {
+            if (c.type !== 'player') return c;
+            const character = characters.find(ch => utils.getName(ch.name) === c.name);
+            const stats = character?.computedStats || character;
+            const maxHp = c.maxHp ?? stats?.hitPoints ?? 0;
+            const currentHp = getRuntimeValue(c.name, 'currentHitPoints') ?? maxHp;
+            const runtimeConditions = getRuntimeValue(c.name, 'activeConditions') || [];
+            const conditions = runtimeConditions.map((key, i) => ({
+                id: `runtime-${key}-${i}`,
+                key,
+                label: key.charAt(0).toUpperCase() + key.slice(1),
+                dc: 0,
+                ability: 'con',
+            }));
+            return {
+                ...c,
+                currentHp,
+                maxHp,
+                conditions,
+            };
+        });
+    }, [combatSummary, characters]);
+
     React.useEffect(() => {
-        if (!campaignName || !mapName) {
+        if (!combatSummary || !mapName) {
             setMapData(null);
             setOverlays([]);
             return;
@@ -192,12 +217,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             setMapData(null);
         });
     }, [campaignName, mapName]);
-
-    const loadCreatureHp = React.useCallback((characterName, fallbackMaxHp) => {
-        const stored = getRuntimeValue(characterName, 'currentHitPoints', campaignName);
-        if (stored != null) return stored;
-        return fallbackMaxHp;
-    }, [campaignName]);
 
     const loadCreatureMaxHp = React.useCallback((characterName, fallbackMaxHp) => {
         const stored = getRuntimeValue(characterName, 'hitPoints', campaignName);
@@ -275,24 +294,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         } else {
             const cs = combatSummaryRef.current;
             if (!cs) return;
-            const charData = event.data;
-            let changed = false;
-            for (const creature of cs.creatures) {
-                if (creature.type !== 'player') continue;
-                if (creature.name !== dataKey) continue;
-                if (charData.currentHitPoints != null && creature.currentHp !== charData.currentHitPoints) {
-                    creature.currentHp = charData.currentHitPoints;
-                    changed = true;
-                }
-                if (charData.hitPoints != null && creature.maxHp !== charData.hitPoints) {
-                    creature.maxHp = charData.hitPoints;
-                    changed = true;
-                }
-            }
-            if (changed) {
-                storage.set('combatSummary', cs, campaignName);
-                setCombatSummary(cloneDeep(cs));
-            }
+            setCombatSummary(cloneDeep(cs));
         }
     }, [campaignName, handleOverlayEvent]);
 
@@ -329,7 +331,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     const setupCreatures = React.useCallback(() => {
         const creatureList = characters.map((character) => {
-            const maxHp = character.computedStats?.hitPoints ?? character.hitPoints ?? 0;
             const stats = character.computedStats || character;
             return {
                 name: utils.getName(character.name),
@@ -340,10 +341,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 ac: computeAcEstimate(stats),
                 resistances: stats.resistances || [],
                 immunities: stats.immunities || [],
-                conditions: [],
                 concentration: null,
-                maxHp: loadCreatureMaxHp(utils.getName(character.name), maxHp),
-                currentHp: loadCreatureHp(utils.getName(character.name), maxHp),
+                maxHp: loadCreatureMaxHp(utils.getName(character.name), stats.hitPoints ?? 0),
                 saveBonuses: getSaveBonuses(character),
             };
         });
@@ -352,7 +351,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             creatureList.push({ name: `NPC ${i + 1}`, type: 'npc', initiative: '', targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null, maxHp: 10, currentHp: 10, saveBonuses: {} });
         }
         return creatureList;
-    }, [characters, numOfNpc, loadCreatureHp, loadCreatureMaxHp, getSaveBonuses]);
+    }, [characters, numOfNpc, loadCreatureMaxHp, getSaveBonuses]);
 
     const handleAddNpc = React.useCallback(() => {
         if (!combatSummary) return;
@@ -443,9 +442,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             const mergedCreatures = initialSummary.creatures.map(c => {
                 if (c.type === 'player' && characterNameSet.has(c.name)) {
                     const character = characters.find(ch => utils.getName(ch.name) === c.name);
+                    const maxHp = loadCreatureMaxHp(c.name, character?.computedStats?.hitPoints ?? character?.hitPoints ?? c.maxHp ?? 0);
                     const stats = character?.computedStats || character;
-                    const maxHp = loadCreatureMaxHp(c.name, character ? stats.hitPoints || character.hitPoints : c.maxHp || 0);
-                    return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(stats), currentHp: loadCreatureHp(c.name, maxHp), maxHp, saveBonuses: c.saveBonuses || getSaveBonuses(character) };
+                    return { ...c, imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(stats), resistances: c.resistances || stats.resistances || [], immunities: c.immunities || stats.immunities || [], saveBonuses: c.saveBonuses || getSaveBonuses(character), maxHp, concentration: c.concentration ?? null };
                 }
                 return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, currentHp: c.currentHp ?? c.maxHp ?? 10, maxHp: c.maxHp ?? 10, saveBonuses: c.saveBonuses || {} };
             });
@@ -473,7 +472,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             storage.set('activeCreatureName', firstName, campaignName);
             setActiveCreatureName(firstName);
         }
-    }, [characters, campaignName, setupCreatures, loadCreatureHp, loadCreatureMaxHp, getSaveBonuses]);
+    }, [characters, campaignName, setupCreatures, loadCreatureMaxHp, getSaveBonuses]);
 
     React.useEffect(() => {
         if (!combatSummary || !onNpcsChange) return;
@@ -571,8 +570,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 c.name === e.detail.targetName || c.name.startsWith(e.detail.targetName + ' ')
             );
             if (creature) {
-                creature.currentHp = e.detail.restoredToHp;
                 setRuntimeValue(creature.name, 'currentHitPoints', e.detail.restoredToHp, campaignName);
+                if (creature.type === 'npc') {
+                    creature.currentHp = e.detail.restoredToHp;
+                }
                 storage.set('combatSummary', combatSummary, campaignName);
                 setCombatSummary(cloneDeep(combatSummary));
             }
@@ -585,12 +586,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
          if (!combatSummary) return;
          const creature = combatSummary.creatures.find(c => c.name === creatureName);
          if (!creature) return;
-         const oldHp = creature.currentHp;
+
+         const isPlayer = creature.type === 'player';
+         const oldHp = isPlayer ? (getRuntimeValue(creature.name, 'currentHitPoints') ?? 0) : creature.currentHp;
          const delta = newValue - oldHp;
          if (delta === 0) return;
 
-         creature.currentHp = newValue;
-        if (creature.type === 'player') {
+         if (isPlayer) {
             setRuntimeValue(creature.name, 'currentHitPoints', newValue, campaignName);
             if (oldHp <= 0 && newValue > 0) {
                 setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
@@ -612,6 +614,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                  })
              }).catch(() => {});
          } else {
+             creature.currentHp = newValue;
              const wasBloodied = oldHp > 0 && oldHp <= Math.floor(creature.maxHp / 2);
              const isBloodied = newValue > 0 && newValue <= Math.floor(creature.maxHp / 2);
              const wasDead = oldHp <= 0;
@@ -771,14 +774,21 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         if (!conditionDef) return;
         const creature = combatSummary.creatures.find(c => c.name === conditionPickerTarget.name);
         if (!creature) return;
-        creature.conditions = creature.conditions.filter(c => c.key !== conditionDef.key);
-        creature.conditions.push({
-            id: utils.guid(),
-            key: conditionDef.key,
-            label: conditionDef.label,
-            dc: conditionPickerDc,
-            ability: conditionPickerAbility,
-        });
+
+        if (creature.type === 'player') {
+            const conditions = getRuntimeValue(creature.name, 'activeConditions') || [];
+            const filtered = conditions.filter(c => String(c).toLowerCase() !== conditionDef.key.toLowerCase());
+            setRuntimeValue(creature.name, 'activeConditions', [...filtered, conditionDef.key], campaignName);
+        } else {
+            creature.conditions = creature.conditions.filter(c => c.key !== conditionDef.key);
+            creature.conditions.push({
+                id: utils.guid(),
+                key: conditionDef.key,
+                label: conditionDef.label,
+                dc: conditionPickerDc,
+                ability: conditionPickerAbility,
+            });
+        }
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
         setConditionPickerTarget(null);
@@ -828,7 +838,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined;
 
         if (success) {
-            creature.conditions = creature.conditions.filter(c => c.id !== condition.id);
+            if (creature.type === 'player') {
+                const conditions = getRuntimeValue(creature.name, 'activeConditions') || [];
+                const filtered = conditions.filter(c => String(c).toLowerCase() !== (condition.key || condition).toLowerCase());
+                setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
+            } else {
+                creature.conditions = creature.conditions.filter(c => c.id !== condition.id);
+            }
         }
 
         storage.set('combatSummary', combatSummary, campaignName);
@@ -1008,7 +1024,13 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         if (!isLocalhost || !combatSummary) return;
         const creature = combatSummary.creatures.find(c => c.name === creatureName);
         if (!creature) return;
-        creature.conditions = creature.conditions.filter(c => c.id !== condition.id);
+        if (creature.type === 'player') {
+            const conditions = getRuntimeValue(creature.name, 'activeConditions') || [];
+            const filtered = conditions.filter(c => String(c).toLowerCase() !== (condition.key || condition).toLowerCase());
+            setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
+        } else {
+            creature.conditions = creature.conditions.filter(c => c.id !== condition.id);
+        }
         storage.set('combatSummary', combatSummary, campaignName);
         setCombatSummary(cloneDeep(combatSummary));
 
@@ -1032,7 +1054,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             <Subscriber campaignName={campaignName} handleEvent={handleEvent} />
             <h4>Initiative (round {combatSummary.round})</h4>
             <div className='carousel-container' ref={carouselRef}>
-                {combatSummary?.creatures?.map((creature) => {
+                {displayCreatures?.map((creature) => {
                     const isActive = creature.name === activeCreatureName;
                     const isUnconscious = creature.currentHp <= 0;
                     return (
@@ -1129,9 +1151,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                                                 onClick={() => canRoll && handleRollConditionSave(creature.name, cond)}
                                                 disabled={!canRoll}
                                                 type='button'
-                                                title={`${cond.label} (DC ${cond.dc} ${getAbilityLabel(cond.ability)})`}
+                                                title={cond.dc ? `${cond.label} (DC ${cond.dc} ${getAbilityLabel(cond.ability)})` : cond.label}
                                             >
-                                                {cond.label} DC {cond.dc}
+                                                {cond.dc ? `${cond.label} DC ${cond.dc}` : cond.label}
                                             </button>
                                             {isLocalhost && (
                                                 <button

@@ -5465,7 +5465,16 @@
                         "name": "Abjure Foes",
                         "description": "As a Magic action, expend one use of Channel Divinity. Target creatures equal to Charisma modifier (minimum 1) within 60 feet. Each makes Wisdom save or has Frightened condition for 1 minute or until taking damage. While Frightened, can only do one of: move, take action, or take Bonus Action.",
                         "level": 9,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "set_condition",
+                            "target": "targets_in_range",
+                            "range_expression": "60_ft",
+                            "condition": "frightened",
+                            "effect": "add_condition",
+                            "bonusExpression": "CHA modifier",
+                            "casting_time": "1 action"
+                        }
                     }
                 ],
                 "spellcasting": {

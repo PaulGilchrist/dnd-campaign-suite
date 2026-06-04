@@ -6,8 +6,15 @@ import HiddenInput from '../../common/HiddenInput.jsx'
 import DeathSavingThrows from './DeathSavingThrows.jsx'
 
 function CharHitPoints({ playerStats, campaignName }) {
-     const storedHp = useRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
-     const currentHitPoints = storedHp != null ? storedHp : playerStats.hitPoints;
+      const storedHp = useRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
+
+      React.useEffect(() => {
+          if (storedHp === null || storedHp === undefined) {
+              setRuntimeValue(playerStats.name, 'currentHitPoints', playerStats.hitPoints, campaignName);
+          }
+      }, []);
+
+      const currentHitPoints = storedHp != null ? storedHp : playerStats.hitPoints;
      const [showInputCurrentHitPoints, setShowInputCurrentHitPoints] = React.useState(false);
      const handleInputToggleCurrentHitPoints = () => {
          setShowInputCurrentHitPoints((showInputCurrentHitPoints) => !showInputCurrentHitPoints);

@@ -541,6 +541,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'initiative_action':
             case 'spell_modifier':
             case 'font_of_magic':
+            case 'set_condition':
                 result.actions.push(info)
                 break
             case 'damage_reduction':

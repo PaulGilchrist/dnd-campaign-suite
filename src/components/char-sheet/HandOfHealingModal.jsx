@@ -10,7 +10,7 @@ function conditionMatches(c, targetCondition) {
     return (typeof c === 'string' ? c.toLowerCase() : '').trim() === (typeof targetCondition === 'string' ? targetCondition.toLowerCase() : '').trim();
 }
 
-function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkName, targetName, targetCurrentHp, targetMaxHp, hasPhysiciansTouch, campaignName, isInCombat, onClose }) {
+function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkName, targetName, targetCurrentHp, targetMaxHp, hasPhysiciansTouch, campaignName, onClose }) {
     const [curedCondition, setCureCondition] = React.useState(null);
     const curedOnMount = React.useRef(false);
 
@@ -18,32 +18,30 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
          // Get conditions from runtime state (where Stunning Strike writes them)
         const runtimeConditions = getRuntimeValue(targetName, 'activeConditions') || [];
 
-         // Also check combat summary for conditions stored there
-        if (isInCombat) {
-            try {
-                const combatSummary = storage.get('combatSummary', campaignName);
-                if (combatSummary) {
-                    const creature = combatSummary.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
-                    if (creature && Array.isArray(creature.conditions)) {
-                        const csKeys = creature.conditions.map(c => c.key);
-                        // Merge both sources, deduplicate case-insensitively
-                        const seen = new Set(runtimeConditions.map(c => String(c).toLowerCase()));
-                        const merged = [...runtimeConditions];
-                        for (const key of csKeys) {
-                            if (!seen.has(key.toLowerCase())) {
-                                merged.push(key);
-                                seen.add(key.toLowerCase());
-                            }
+         // Also check combat summary for conditions stored on NPCs
+        try {
+            const combatSummary = storage.get('combatSummary', campaignName);
+            if (combatSummary) {
+                const creature = combatSummary.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
+                if (creature && Array.isArray(creature.conditions)) {
+                    const csKeys = creature.conditions.map(c => c.key);
+                    // Merge both sources, deduplicate case-insensitively
+                    const seen = new Set(runtimeConditions.map(c => String(c).toLowerCase()));
+                    const merged = [...runtimeConditions];
+                    for (const key of csKeys) {
+                        if (!seen.has(key.toLowerCase())) {
+                            merged.push(key);
+                            seen.add(key.toLowerCase());
                         }
-                        return merged;
-                      }
+                    }
+                    return merged;
                   }
-              } catch (e) {
               }
-        }
+          } catch (e) {
+          }
 
         return runtimeConditions;
-    }, [targetName, campaignName, isInCombat]);
+    }, [targetName, campaignName]);
 
     const getCureableForTarget = useCallback(() => {
         const conditions = getTargetConditions();
@@ -60,19 +58,17 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
         setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
 
          // Also remove from combat summary if present
-        if (isInCombat) {
-            try {
-                const combatSummary = storage.get('combatSummary', campaignName);
-                if (combatSummary) {
-                    const creature = combatSummary.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
-                    if (creature && Array.isArray(creature.conditions)) {
-                        creature.conditions = creature.conditions.filter(c => !conditionMatches(String(c.key).toLowerCase(), conditionName.toLowerCase()));
-                        storage.set('combatSummary', combatSummary, campaignName);
-                        window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-                     }
+        try {
+            const combatSummary = storage.get('combatSummary', campaignName);
+            if (combatSummary) {
+                const creature = combatSummary.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
+                if (creature && Array.isArray(creature.conditions)) {
+                    creature.conditions = creature.conditions.filter(c => !conditionMatches(String(c.key).toLowerCase(), conditionName.toLowerCase()));
+                    storage.set('combatSummary', combatSummary, campaignName);
+                    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
                  }
-             } catch { /* ignore */ }
-         }
+             }
+         } catch { /* ignore */ }
 
         fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
             method: 'POST',
@@ -88,7 +84,7 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
             }).catch(() => {});
 
         setCureCondition(conditionName);
-     }, [campaignName, getTargetConditions, targetName, healName, isInCombat]);
+     }, [campaignName, getTargetConditions, targetName, healName]);
 
     const cureableConditions = getCureableForTarget();
 
