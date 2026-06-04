@@ -23,9 +23,8 @@ export const SHORT_REST_RESOURCES = [
   'focusPoints',
   'superiorityDice',
   'kiPoints',
-  'actionsurgeUses',
-  'layonhandsPool',
-  'luckyPoints'
+    'actionsurgeUses',
+    'luckyPoints'
 ]
 
 export function getShortRestResources() {
@@ -33,22 +32,22 @@ export function getShortRestResources() {
 }
 
 export const LONG_REST_RESOURCES = [
-  'ragePoints',
-  'bardicInspirationUses',
-  'channelDivinityCharges',
-  'wildShapeUses',
-  'secondwindUses',
-  'psionicEnergy',
-  'focusPoints',
-  'uncannymetabolismUses',
-  'sorceryPoints',
-  'arcaneRecoveryLevels',
-  'superiorityDice',
-  'kiPoints',
-  'actionsurgeUses',
-  'layonhandsPool',
-  'warlockPactMagic',
-  'luckyPoints'
+   'ragePoints',
+   'bardicInspirationUses',
+   'channelDivinityCharges',
+   'wildShapeUses',
+   'secondwindUses',
+   'psionicEnergy',
+   'focusPoints',
+   'uncannymetabolismUses',
+   'sorceryPoints',
+   'arcaneRecoveryLevels',
+   'superiorityDice',
+   'kiPoints',
+   'actionsurgeUses',
+   'layOnHandsPool',
+   'warlockPactMagic',
+   'luckyPoints'
 ]
 
 export function getLongRestResources() {
