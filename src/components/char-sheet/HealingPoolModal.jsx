@@ -2,6 +2,7 @@
 import React from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
 import useTrackedResource from '../../hooks/useTrackedResource.js'
+import storage from '../../services/storage.js'
 import { getTargetFromAttacker, getCombatContext } from '../../services/damageUtils.js'
 import { applyHealingToTarget } from '../../services/applyHealing.js'
 import './CharSheet.css'
@@ -73,9 +74,39 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, onCl
         if (safePool < cureCost) return;
         const newPool = safePool - cureCost;
         setPoolRemaining(newPool);
+
+        // Remove from runtime state (primary source)
+        const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+        const filtered = conditions.filter(c => c.toLowerCase().trim() !== condition.toLowerCase().trim());
+        setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+
+        // Remove from combat summary if present
+        if (combatSummary && combatTarget) {
+            const creature = combatSummary.creatures?.find(c => c.name === targetName);
+            if (creature && Array.isArray(creature.conditions)) {
+                creature.conditions = creature.conditions.filter(c => c.key.toLowerCase().trim() !== condition.toLowerCase().trim());
+                storage.set('combatSummary', combatSummary, campaignName);
+                window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+            }
+        }
+
+        // Log the cure to the API
+        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'condition',
+                characterName: targetName,
+                condition: condition,
+                action: 'broken',
+                sourceName: playerStats.name,
+                timestamp: Date.now(),
+              })
+          }).catch(() => {});
+
         setLog(prev => [...prev, { action: `Cure ${condition}`, target: targetName, amount: cureCost, poolAfter: newPool }]);
         setHealAmount(Math.min(healAmount, newPool));
-    };
+     };
 
     React.useEffect(() => {
         const handleKey = (e) => {
