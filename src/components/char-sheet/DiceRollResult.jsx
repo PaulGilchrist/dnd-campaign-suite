@@ -45,12 +45,18 @@ function DiceRollResult({ name, type, rolls, bonus = 0, bonusDetail, formula = '
             <div className="dice-roll-total">{total}</div>
             <div className="dice-roll-breakdown">
                 {formula ? `${formula}: ` : type === 'd20' ? 'd20 ' : ''}
-                <span className="dice-rolled">
-                  {isD20
-                      ? (mode === 'normal' ? safeRolls[0] || 0 : finalRoll)
-                      : safeRolls.join(', ')
-                  }
-                </span>
+                {isD20 && mode !== 'normal' && safeRolls.length === 2 ? (
+                  <span className="dice-rolled">
+                    {safeRolls[0]}, {safeRolls[1]} → {finalRoll}
+                  </span>
+                ) : (
+                  <span className="dice-rolled">
+                    {isD20
+                        ? (mode === 'normal' ? safeRolls[0] || 0 : finalRoll)
+                        : safeRolls.join(', ')
+                    }
+                  </span>
+                )}
                 {(bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` :
                  (bonus + modifier) < 0 ? ` ${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` : ''}
             </div>

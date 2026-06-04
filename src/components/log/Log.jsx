@@ -25,7 +25,7 @@ function RollEntry({ entry }) {
   const isDamage = entry.rollType === 'damage';
   const isSaveDamage = entry.rollType === 'save-damage';
   const isAoeDamage = entry.rollType === 'aoe-damage';
-  const showBothDice = !isDamage && !isSaveDamage && !isAoeDamage && entry.rolls?.length === 2;
+  const showBothDice = !isDamage && !isSaveDamage && !isAoeDamage && entry.rolls?.length === 2 && entry.mode && entry.mode !== 'normal';
 
   return (
     <div className={`log-entry log-roll${entry.isNatural20 ? ' log-nat20' : ''}${entry.isNatural1 ? ' log-nat1' : ''}`}>
@@ -86,11 +86,15 @@ function RollEntry({ entry }) {
           <span className="log-target">vs {entry.targetName}</span>
         )}
         <div className="log-dice-values">
-          {!isDamage && !isSaveDamage && !isAoeDamage && (
-            <>
-              <span className={`log-die${entry.rolls[0] === entry.total ? ' log-die-selected' : ''}`}>({entry.rolls[0]})</span>
-              <span className={`log-die${entry.rolls[1] === entry.total ? ' log-die-selected' : ''}`}>({entry.rolls[1]})</span>
-            </>
+          {!isDamage && !isSaveDamage && !isAoeDamage && entry.rolls?.length === 2 && (
+            showBothDice ? (
+              <>
+                <span className={`log-die${entry.rolls[0] >= entry.rolls[1] ? ' log-die-selected' : ''}`}>({entry.rolls[0]} high)</span>
+                <span className={`log-die${entry.rolls[1] > entry.rolls[0] ? ' log-die-selected' : ''}`}>({entry.rolls[1]} low)</span>
+              </>
+            ) : (
+              <span className="log-die log-die-selected">({entry.total})</span>
+            )
           )}
           {(isDamage || isSaveDamage || isAoeDamage) && entry.formula && (
             <span className="log-dice-formula">{entry.formula}</span>
@@ -251,7 +255,7 @@ function EncounterEntry({ entry }) {
         {isStart && entry.monsters && entry.monsters.length > 0 && (
           <div className="log-encounter-monsters">
             {entry.monsters.map((m, i) => (
-              <span key={i} className="log-encounter-monster">{m}</span>
+              <span key={i} className="log-encounter-monster">{m}{i < entry.monsters.length-1 ? ',' : ''}&nbsp;</span>
             ))}
           </div>
         )}
