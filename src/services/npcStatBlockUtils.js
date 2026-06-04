@@ -77,6 +77,5 @@ export function npcToMonsterFormat(npc) {
     lair_actions: null,
     regional_effects: null,
     desc: null,
-    image: false,
-  };
+   };
 }

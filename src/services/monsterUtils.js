@@ -30,9 +30,9 @@ export async function getMonsterImageUrl(npcName, npcs) {
     }
     const baseName = stripTrailingNumber(npcName);
     const monster = monstersCache.find(m => m.name.toLowerCase() === baseName.toLowerCase());
-    if (monster && monster.image === true) {
+    if (monster) {
         return `https://paulgilchrist.github.io/dnd-tools/images/${monster.index}.jpg`;
-    }
+     }
     return null;
 }
 

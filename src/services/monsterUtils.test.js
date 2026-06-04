@@ -3,10 +3,10 @@ import { getMonsterImageUrl } from './monsterUtils.js';
 
 vi.mock('./dataLoader.js', () => ({
   loadMonsters: vi.fn(() => Promise.resolve([
-    { index: 'goblin', name: 'Goblin', image: true },
-    { index: 'orc', name: 'Orc', image: true },
-    { index: 'tarrasque', name: 'Tarrasque', image: false },
-    { index: 'dragon', name: 'Ancient Dragon', image: true },
+    { index: 'goblin', name: 'Goblin' },
+    { index: 'orc', name: 'Orc' },
+    { index: 'tarrasque', name: 'Tarrasque' },
+    { index: 'dragon', name: 'Ancient Dragon' },
   ])),
 }));
 
@@ -50,10 +50,10 @@ describe('monsterUtils', () => {
     expect(result).toBe('https://paulgilchrist.github.io/dnd-tools/images/orc.jpg');
   });
 
-  it('should return null when monster has image: false', async () => {
+  it('should return image URL for monster without image property', async () => {
     const result = await getMonsterImageUrl('Tarrasque');
-    expect(result).toBeNull();
-  });
+    expect(result).toBe('https://paulgilchrist.github.io/dnd-tools/images/tarrasque.jpg');
+   });
 
   it('should return null for non-existent monster', async () => {
     const result = await getMonsterImageUrl('Unicorn');
