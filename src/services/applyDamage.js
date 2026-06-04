@@ -32,14 +32,16 @@ export function rollSaveForCreature(creature, saveType, saveDc, disadvantage = f
   return { roll: finalRoll, total, bonus, success, rawRolls: [roll1, roll2] };
 }
 
-export function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName) {
+export function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName, characters) {
   if (!combatSummary) return null;
   const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
 
-  const isPlayer = creature.type === 'player';
-  const resistances = isPlayer ? [] : (creature.resistances || []);
-  const immunities = isPlayer ? [] : (creature.immunities || []);
+   const isPlayer = creature.type === 'player';
+   const playerStats = isPlayer ? (characters || []).find(c => c.name === targetName || c.name.startsWith(targetName + ' ')) : null;
+   const playerComputed = playerStats?.computedStats || playerStats;
+   const resistances = isPlayer ? (playerComputed?.resistances || []) : (creature.resistances || []);
+   const immunities = isPlayer ? (playerComputed?.immunities || []) : (creature.immunities || []);
   const finalDamage = computeDamageAfterResistances(rawDamage, damageTypes || [], resistances, immunities);
 
   let oldHp, newHp;
@@ -133,11 +135,14 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
 }
 
 function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
+  const maxHp = creature.type === 'player'
+    ? (getRuntimeValue(creature.name, 'hitPoints') ?? newHp)
+    : creature.maxHp;
   const delta = newHp - oldHp;
   const isDead = newHp <= 0;
   const wasDead = oldHp <= 0;
-  const wasBloodied = oldHp > 0 && oldHp <= Math.floor(creature.maxHp / 2);
-  const isBloodied = newHp > 0 && newHp <= Math.floor(creature.maxHp / 2);
+  const wasBloodied = oldHp > 0 && oldHp <= Math.floor(maxHp / 2);
+  const isBloodied = newHp > 0 && newHp <= Math.floor(maxHp / 2);
 
   let threshold;
   if (!wasDead && isDead) threshold = 'dead';

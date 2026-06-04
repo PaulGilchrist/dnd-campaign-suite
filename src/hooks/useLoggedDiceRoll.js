@@ -11,9 +11,10 @@ import {
 } from '../services/applyDamage.js';
 import { sendSavePrompt, sendSaveResult } from '../services/savePromptService.js';
 import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../services/aoeService.js';
-import { saveLastDamageEvent } from './useMetamagic.js';
+import { getRuntimeValue } from '../hooks/useRuntimeState.js';
 import { clearAllExpirationEffects } from '../services/turnExpirations.js';
 import { loadCombatSummary, getCombatSummary } from '../services/combatData.js';
+import { saveLastDamageEvent } from '../hooks/useMetamagic.js';
 
 function readAoeContext(campaignName) {
   try {
@@ -48,10 +49,10 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       let targetMaxHp = 0;
       if (combatSummary) {
         const t = combatSummary.creatures.find(c => c.name === pendingTargetName);
-        if (t) targetMaxHp = t.maxHp;
+        if (t) targetMaxHp = t.type === 'player' ? (getRuntimeValue(t.name, 'hitPoints') ?? 0) : t.maxHp;
        }
       const applyResult = applyDamageToTarget(
-        combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName
+        combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, null
          );
 
       logEntry({
@@ -294,7 +295,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           const npcResults = saveDc && saveType
              ? processAoeNpcs(combatSummary, affected, total, damageType, saveDc, saveType, dcSuccess, campaignName)
              : affected.map(({ creature }) => {
-                const applyResult = applyDamageToTarget(combatSummary, creature.name, total, [damageType], campaignName);
+                const applyResult = applyDamageToTarget(combatSummary, creature.name, total, [damageType], campaignName, null);
                 return { creatureName: creature.name, finalDamage: applyResult?.finalDamage, newHp: applyResult?.newHp, damageReduced: applyResult?.damageReduced, saveSuccess: null };
                });
           const playerAffected = affected.filter(a => a.creature.type === 'player');
@@ -337,13 +338,16 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
        }
 
       const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
+      const targetMaxHp = target?.type === 'player'
+        ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
+        : target?.maxHp ?? 0;
 
       if (saveDc && saveType && target) {
         if (target.type === 'npc') {
           const disadvantage = context?.metamagicHeighten || false;
           const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage);
           const finalDamage = computeDamageAfterSave(total, saveResult.success, dcSuccess);
-          const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName);
+          const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, null);
 
           logEntry({
             type: 'roll',
@@ -376,7 +380,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             damageType,
             targetName: target.name,
             targetCurrentHp: applyResult?.newHp,
-            targetMaxHp: target.maxHp,
+            targetMaxHp,
             saveDc,
             saveType,
             dcSuccess,
@@ -409,7 +413,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
               const twinDisadvantage = context?.metamagicHeighten || false;
               const twinSaveResult = rollSaveForCreature(twinTarget, saveType, saveDc, twinDisadvantage);
               const twinFinalDamage = computeDamageAfterSave(total, twinSaveResult.success, dcSuccess);
-              const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName);
+              const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName, null);
               logEntry({
                 type: 'roll',
                 characterName,
@@ -435,8 +439,10 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                 twinTargetName: twinTarget.name,
                 twinFinalDamage: twinApplyResult?.finalDamage,
                 twinTargetCurrentHp: twinApplyResult?.newHp,
-                twinTargetMaxHp: twinTarget.maxHp,
-              }));
+                 twinTargetMaxHp: twinTarget.type === 'npc'
+                   ? twinTarget.maxHp
+                   : (getRuntimeValue(twinTarget.name, 'hitPoints') ?? 0),
+               }));
             }
           }
           return;
@@ -446,7 +452,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           const isCarefulAlly = context?.metamagicCareful || false;
           if (isCarefulAlly) {
             const carefulDamage = computeDamageAfterSave(total, true, dcSuccess);
-            const applyResult = applyDamageToTarget(combatSummary, target.name, carefulDamage, [damageType], campaignName);
+            const applyResult = applyDamageToTarget(combatSummary, target.name, carefulDamage, [damageType], campaignName, null);
             logEntry({
               type: 'roll',
               characterName,
@@ -491,7 +497,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
               damageType,
               targetName: target.name,
               targetCurrentHp: applyResult?.newHp,
-              targetMaxHp: target.maxHp,
+              targetMaxHp,
               saveDc,
               saveType,
               dcSuccess,
@@ -565,7 +571,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
 
       let applyResult = null;
       if (target) {
-        applyResult = applyDamageToTarget(combatSummary, target.name, total, [damageType], campaignName);
+        applyResult = applyDamageToTarget(combatSummary, target.name, total, [damageType], campaignName, null);
        }
 
      logEntry({
@@ -597,9 +603,9 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
        };
 
        if (applyResult) {
-         popupData.targetCurrentHp = applyResult.newHp;
-         popupData.targetMaxHp = target.maxHp;
-         popupData.damageApplied = true;
+          popupData.targetCurrentHp = applyResult.newHp;
+          popupData.targetMaxHp = targetMaxHp;
+          popupData.damageApplied = true;
          popupData.finalDamage = applyResult.finalDamage;
          popupData.damageReduced = applyResult.damageReduced;
        }
@@ -609,7 +615,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       if (context?.metamagicTwinTarget && target) {
         const twinTarget = combatSummary?.creatures?.find(c => c.name === context.metamagicTwinTarget);
         if (twinTarget && twinTarget.name !== target.name) {
-          const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, total, [damageType], campaignName);
+          const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, total, [damageType], campaignName, null);
           logEntry({
             type: 'roll',
             characterName,
@@ -628,7 +634,9 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             twinTargetName: twinTarget.name,
             twinFinalDamage: twinApplyResult?.finalDamage,
             twinTargetCurrentHp: twinApplyResult?.newHp,
-            twinTargetMaxHp: twinTarget.maxHp,
+            twinTargetMaxHp: twinTarget.type === 'player'
+            ? (getRuntimeValue(twinTarget.name, 'hitPoints') ?? 0)
+            : twinTarget.maxHp,
           }));
         }
       }
@@ -658,7 +666,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
     const disadvantage = pending.metamagicHeighten || false;
     const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage);
     const finalDamage = computeDamageAfterSave(pending.rawDamage, saveResult.success, pending.dcSuccess);
-    const applyResult = applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName);
+    const applyResult = applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName, null);
 
     delete pendingSaves[promptId];
 
@@ -695,7 +703,9 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       damageType: pending.damageType,
       targetName: target.name,
       targetCurrentHp: applyResult?.newHp,
-      targetMaxHp: target.maxHp,
+      targetMaxHp: target.type === 'player'
+        ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
+        : target.maxHp,
       saveDc,
       saveType,
       dcSuccess: pending.dcSuccess,

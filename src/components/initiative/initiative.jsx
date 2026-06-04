@@ -15,7 +15,6 @@ import MonsterCardModal from '../encounter/MonsterCardModal.jsx';
 import AvatarImage from '../common/AvatarImage.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx';
-import { computePlayerAc, computeAcEstimate } from '../../services/damageUtils.js';
 import { loadNPCs } from '../../services/npcsService.js';
 import { npcToMonsterFormat, npcHasStatBlock } from '../../services/npcStatBlockUtils.js';
 import Popup from '../common/Popup.jsx';
@@ -186,7 +185,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             if (c.type !== 'player') return c;
             const character = characters.find(ch => utils.getName(ch.name) === c.name);
             const stats = character?.computedStats || character;
-            const maxHp = c.maxHp ?? stats?.hitPoints ?? 0;
+            const maxHp = getRuntimeValue(c.name, 'hitPoints') ?? stats?.hitPoints ?? 0;
             const currentHp = getRuntimeValue(c.name, 'currentHitPoints') ?? maxHp;
             const runtimeConditions = getRuntimeValue(c.name, 'activeConditions') || [];
             const conditions = runtimeConditions.map((key, i) => ({
@@ -198,6 +197,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             }));
             return {
                 ...c,
+                imagePath: character?.imagePath || '',
+                ac: stats?.armorClass ?? 10,
+                resistances: stats?.resistances || [],
+                immunities: stats?.immunities || [],
                 currentHp,
                 maxHp,
                 conditions,
@@ -218,12 +221,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             setMapData(null);
         });
     }, [campaignName, mapName]);
-
-    const loadCreatureMaxHp = React.useCallback((characterName, fallbackMaxHp) => {
-        const stored = getRuntimeValue(characterName, 'hitPoints', campaignName);
-        if (stored != null) return stored;
-        return fallbackMaxHp;
-    }, [campaignName]);
 
     // Load campaign NPCs for stat block matching
     React.useEffect(() => {
@@ -312,37 +309,14 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         });
     }, [combatSummary, campaignNpcs]);
 
-    const getSaveBonuses = React.useCallback((character) => {
-        const abilities = (character.computedStats?.abilities || character.abilities) || [];
-        const getBonus = (name) => {
-            const ab = abilities.find(a => a.name === name);
-            return ab?.save ?? ab?.bonus ?? 0;
-        };
-        return {
-            str: getBonus('Strength'),
-            dex: getBonus('Dexterity'),
-            con: getBonus('Constitution'),
-            int: getBonus('Intelligence'),
-            wis: getBonus('Wisdom'),
-            cha: getBonus('Charisma'),
-        };
-    }, []);
-
     const setupCreatures = React.useCallback(() => {
         const creatureList = characters.map((character) => {
-            const stats = character.computedStats || character;
             return {
                 name: utils.getName(character.name),
                 type: 'player',
-                imagePath: character.imagePath || '',
                 initiative: '',
                 targetName: null,
-                ac: computeAcEstimate(stats),
-                resistances: stats.resistances || [],
-                immunities: stats.immunities || [],
                 concentration: null,
-                maxHp: loadCreatureMaxHp(utils.getName(character.name), stats.hitPoints ?? 0),
-                saveBonuses: getSaveBonuses(character),
             };
         });
         creatureList.sort((a, b) => a.name.localeCompare(b.name));
@@ -350,7 +324,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             creatureList.push({ name: `NPC ${i + 1}`, type: 'npc', initiative: '', targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null, maxHp: 10, currentHp: 10, saveBonuses: {} });
         }
         return creatureList;
-    }, [characters, numOfNpc, loadCreatureMaxHp, getSaveBonuses]);
+    }, [characters, numOfNpc]);
 
     const handleAddNpc = React.useCallback(() => {
         if (!combatSummary) return;
@@ -440,10 +414,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 const characterNameSet = new Set(characters.map(c => utils.getName(c.name)));
                 const mergedCreatures = initialSummary.creatures.map(c => {
                     if (c.type === 'player' && characterNameSet.has(c.name)) {
-                        const character = characters.find(ch => utils.getName(ch.name) === c.name);
-                        const maxHp = loadCreatureMaxHp(c.name, character?.computedStats?.hitPoints ?? character?.hitPoints ?? c.maxHp ?? 0);
-                        const stats = character?.computedStats || character;
-                        return { ...c, imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(stats), resistances: c.resistances || stats.resistances || [], immunities: c.immunities || stats.immunities || [], saveBonuses: c.saveBonuses || getSaveBonuses(character), maxHp, concentration: c.concentration ?? null };
+                        return { ...c, initiative: c.initiative ?? '', targetName: c.targetName ?? null, concentration: c.concentration ?? null };
                     }
                     return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, currentHp: c.currentHp ?? c.maxHp ?? 10, maxHp: c.maxHp ?? 10, saveBonuses: c.saveBonuses || {} };
                 });
@@ -511,25 +482,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             activeCard.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
         }
     }, [activeCreatureName]);
-
-    React.useEffect(() => {
-        if (!combatSummary || characters.length === 0) return;
-        let cancelled = false;
-        (async () => {
-            for (const creature of combatSummary.creatures) {
-                if (creature.type !== 'player') continue;
-                const character = characters.find(c => utils.getName(c.name) === creature.name);
-                if (character) {
-                    const ac = await computePlayerAc(character);
-                    if (cancelled) return;
-                    creature.ac = ac;
-                }
-            }
-            storage.set('combatSummary', combatSummary, campaignName);
-            setCombatSummary(cloneDeep(combatSummary));
-        })();
-        return () => { cancelled = true; };
-    }, [combatSummary == null]); // eslint-disable-line react-hooks/exhaustive-deps
 
     React.useEffect(() => {
         const handler = () => {
@@ -600,6 +552,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 clearDeathSavePrompt(campaignName, creature.name);
             }
 
+             const playerMaxHp = getRuntimeValue(creature.name, 'hitPoints') ?? 0;
              fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
                  method: 'POST',
                  headers: { 'Content-Type': 'application/json' },
@@ -608,7 +561,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                      targetName: creature.name,
                      delta,
                      currentHp: newValue,
-                     maxHp: creature.maxHp,
+                     maxHp: playerMaxHp,
                      isHealing: delta > 0,
                      isUnconscious: newValue <= 0,
                  })

@@ -8,8 +8,10 @@ export function applyHealingToTarget(combatSummary, targetName, healAmount, camp
     if (!creature) return null;
 
     const isPlayer = creature.type === 'player';
-    const maxHp = creature.maxHp;
-    let oldHp, newHp, actualHeal;
+     const maxHp = isPlayer
+         ? (getRuntimeValue(creature.name, 'hitPoints') ?? creature.maxHp)
+         : creature.maxHp;
+     let oldHp, newHp, actualHeal;
 
     if (isPlayer) {
         oldHp = getRuntimeValue(creature.name, 'currentHitPoints') ?? 0;

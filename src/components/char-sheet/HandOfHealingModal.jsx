@@ -38,11 +38,10 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
                     return merged;
                   }
               }
-          } catch (e) {
-          }
+          } catch { /* ignore */ }
 
         return runtimeConditions;
-    }, [targetName, campaignName]);
+    }, [targetName]);
 
     const getCureableForTarget = useCallback(() => {
         const conditions = getTargetConditions();
@@ -85,7 +84,7 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
             }).catch(() => {});
 
         setCureCondition(conditionName);
-     }, [campaignName, getTargetConditions, targetName, healName]);
+     }, [campaignName, getTargetConditions, targetName, healName, monkName]);
 
     const cureableConditions = getCureableForTarget();
 

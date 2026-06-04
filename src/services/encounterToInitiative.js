@@ -1,25 +1,7 @@
 import utils from './utils.js'
-import { getRuntimeValue } from '../hooks/useRuntimeState.js';
 import storage from './storage.js';
 import { cloneDeep } from 'lodash';
 import { rollD20 } from './diceRoller.js';
-import { computePlayerAc } from './damageUtils.js';
-
-function getCharacterSaveBonuses(character) {
-  const abilities = character.abilities || [];
-  const getBonus = (name) => {
-    const ab = abilities.find(a => a.name === name);
-    return ab?.save ?? ab?.bonus ?? 0;
-  };
-  return {
-    str: getBonus('Strength'),
-    dex: getBonus('Dexterity'),
-    con: getBonus('Constitution'),
-    int: getBonus('Intelligence'),
-    wis: getBonus('Wisdom'),
-    cha: getBonus('Charisma'),
-  };
-}
 
 function getMonsterSaveBonuses(monster) {
   const map = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
@@ -75,22 +57,12 @@ export async function expandMonstersToCreatures(selectedMonsters, characters, _c
     const npcRollResults = [];
 
     const playerChars = await Promise.all(characters.map(async (character) => {
-      const maxHp = character.hitPoints || 0;
-      const currentHp = getRuntimeValue(character.name, 'currentHitPoints') ?? maxHp;
-      const storedMaxHp = getRuntimeValue(character.name, 'hitPoints');
       return {
         name: utils.getName(character.name),
         type: 'player',
-        imagePath: character.imagePath || '',
         initiative: '',
         targetName: null,
-        ac: await computePlayerAc(character),
-        resistances: character.resistances || [],
-        immunities: character.immunities || [],
         concentration: null,
-        maxHp: storedMaxHp ?? maxHp,
-        currentHp: currentHp,
-        saveBonuses: getCharacterSaveBonuses(character),
       };
       }));
     playerChars.sort((a, b) => a.name.localeCompare(b.name));

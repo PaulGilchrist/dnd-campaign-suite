@@ -78,8 +78,17 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
 
   const handleAttack = (name, bonus, action) => {
     const target = getTarget();
-    const damageTypes = action ? getDamageTypesForAction(action) : [];
-    const resistanceNotice = target ? getResistanceNotice(damageTypes, target.resistances, target.immunities, target.name) : null;
+    const actionDamageTypes = action ? getDamageTypesForAction(action) : [];
+    const targetStats = target?.type === 'player'
+      ? (creatures || []).find(c => c.name === target.name)
+      : null;
+    const targetComputed = targetStats?.computedStats || targetStats;
+    const resistanceNotice = target ? getResistanceNotice(
+      actionDamageTypes,
+      target.type === 'player' ? (targetComputed?.resistances || []) : (target.resistances || []),
+      target.type === 'player' ? (targetComputed?.immunities || []) : (target.immunities || []),
+      target.name
+    ) : null;
 
     const attacker = getAttackerCreature();
     const attackerConditions = (attacker?.conditions || []).map(c => c.key)
@@ -98,7 +107,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
     const isAutoCrit = isMelee && targetEffects.autoCritWithin5ft
 
     rollAttack(name, bonus, {
-      damageType: formatDamageTypes(damageTypes),
+      damageType: formatDamageTypes(actionDamageTypes),
       resistanceNotice,
       forcedMode: forcedMode !== 'normal' ? forcedMode : undefined,
       isAutoCrit,

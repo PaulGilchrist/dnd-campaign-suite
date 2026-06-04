@@ -59,7 +59,9 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, rest
     }, [campaignName]);
     const target = combatSummary ? getTargetFromAttacker(combatSummary, playerStats.name) : null;
     const targetName = target ? target.name : playerStats.name;
-    const targetMaxHp = target ? target.maxHp : playerStats.hitPoints;
+    const targetMaxHp = target
+      ? (target.type === 'player' ? (getRuntimeValue(target.name, 'hitPoints') ?? 0) : target.maxHp)
+      : playerStats.hitPoints;
     const targetCurrentHp = (() => {
           if (target) {
             const stored = getRuntimeValue(target.name, 'currentHitPoints');

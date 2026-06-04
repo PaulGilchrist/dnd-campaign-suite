@@ -12,7 +12,7 @@ function CharHitPoints({ playerStats, campaignName }) {
           if (storedHp === null || storedHp === undefined) {
               setRuntimeValue(playerStats.name, 'currentHitPoints', playerStats.hitPoints, campaignName);
           }
-      }, []);
+      }, [storedHp, playerStats.hitPoints, playerStats.name, campaignName]);
 
       const currentHitPoints = storedHp != null ? storedHp : playerStats.hitPoints;
      const [showInputCurrentHitPoints, setShowInputCurrentHitPoints] = React.useState(false);

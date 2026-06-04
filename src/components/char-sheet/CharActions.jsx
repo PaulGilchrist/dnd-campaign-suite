@@ -369,7 +369,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
         // Apply damage difference — positive means more damage, negative means less
         if (damageDifference !== 0) {
-            const applyResult = applyDamageToTarget(combatSummary, lastEvent.targetName, damageDifference, lastEvent.damageType ? [lastEvent.damageType] : [], campaignName);
+            const applyResult = applyDamageToTarget(combatSummary, lastEvent.targetName, damageDifference, lastEvent.damageType ? [lastEvent.damageType] : [], campaignName, null);
             addEntry(campaignName, {
                 type: 'metamagic',
                 characterName: name,
@@ -609,7 +609,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     const combatSummary = await getCombatContext(campaignName);
                     const target = combatSummary ? getTargetFromAttacker(combatSummary, playerStats.name) : null;
                     const targetName = target ? target.name : playerStats.name;
-                    const targetMaxHp = target ? target.maxHp : playerStats.hitPoints;
+                    const targetMaxHp = target
+                        ? (target.type === 'player'
+                            ? (getRuntimeValue(target.name, 'hitPoints') ?? playerStats.hitPoints)
+                            : target.maxHp)
+                        : playerStats.hitPoints;
                     const targetCurrentHp = (() => {
                         if (target) {
                             const stored = getRuntimeValue(target.name, 'currentHitPoints', campaignName);

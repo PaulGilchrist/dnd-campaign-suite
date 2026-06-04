@@ -4,7 +4,7 @@ import { rollD20 } from '../../services/diceRoller.js';
 import { sendConcentrationResult } from '../../services/savePromptService.js';
 import Subscriber from './Subscriber.jsx';
 import { computeAuraBonus } from '../../services/auraOfProtection.js';
-import { loadCombatSummary } from '../../services/combatData.js';
+import { getAbilitySaveBonus } from '../../services/conditionUtils.js';
 import './concentrationPromptModal.css';
 
 function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
@@ -43,14 +43,12 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
 
     let saveBonus = 0;
     try {
-      const cs = await loadCombatSummary(campaignName);
-      if (cs) {
-        const creature = cs.creatures.find(c =>
-          c.name === current.targetName || c.name.startsWith(current.targetName + ' ')
-        );
-        if (creature?.saveBonuses?.['con'] != null) {
-          saveBonus = creature.saveBonuses['con'];
-        }
+      const character = (characters || []).find(c => {
+        const name = typeof c === 'string' ? c : c.name;
+        return name && utils.getName(name) === utils.getName(current.targetName);
+      });
+      if (character && typeof character !== 'string') {
+        saveBonus = getAbilitySaveBonus(character.computedStats || character, 'con');
       }
     } catch { /* ignore */ }
 
