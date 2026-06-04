@@ -299,7 +299,7 @@ function HpChangeEntry({ entry }) {
         ) : (
           <>
             <span className="log-hp-delta">{entry.delta > 0 ? '+' : ''}{entry.delta} HP</span>
-            <span className="log-hp-current">{entry.currentHp}/{entry.maxHp}</span>
+            <span className="log-hp-current"> {entry.currentHp}/{entry.maxHp}</span>
           </>
         )}
       </div>
