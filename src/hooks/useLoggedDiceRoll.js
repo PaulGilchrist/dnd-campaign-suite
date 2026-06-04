@@ -15,6 +15,7 @@ import { getRuntimeValue } from '../hooks/useRuntimeState.js';
 import { clearAllExpirationEffects } from '../services/turnExpirations.js';
 import { loadCombatSummary, getCombatSummary } from '../services/combatData.js';
 import { saveLastDamageEvent } from '../hooks/useMetamagic.js';
+import { SHOW_DICE_ROLL_DELAY } from '../config/ui-config.js';
 
 function readAoeContext(campaignName) {
   try {
@@ -151,7 +152,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       const timer = setTimeout(() => {
         const { autoDamage } = popupHtml;
         autoDamageRollRef.current(autoDamage, popupHtml.isCrit);
-      }, 1000);
+      }, SHOW_DICE_ROLL_DELAY);
       return () => clearTimeout(timer);
     }
   }, [popupHtml]);
@@ -215,7 +216,8 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
            resistanceNotice: context?.resistanceNotice,
            coverLevel: context?.coverLevel,
            coverAcBonus: context?.coverAcBonus,
-             });
+           coverReason: context?.coverReason,
+              });
       setPopupHtml({
          type: 'd20',
          rollType,
@@ -230,6 +232,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
          resistanceNotice: context?.resistanceNotice,
          coverLevel: context?.coverLevel,
          coverAcBonus: context?.coverAcBonus,
+         coverReason: context?.coverReason,
         forcedMode: context?.forcedMode,
         isAutoCrit: context?.isAutoCrit,
         isCrit,
