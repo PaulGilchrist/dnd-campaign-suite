@@ -36,7 +36,7 @@ export async function getCombatContext(campaignName) {
     const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/combatSummary`);
     if (!response.ok) return null;
     const data = await response.json();
-    return data.value || null;
+    return data.combatSummary || null;
    } catch {
     return null;
    }

@@ -45,13 +45,16 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, rest
     const [log, setLog] = React.useState([]);
     const [selectedConditions, setSelectedConditions] = React.useState([]);
     const [combatSummary, setCombatSummary] = React.useState(null);
+    const [loading, setLoading] = React.useState(true);
 
     const safePool = Number(poolRemaining) || 0;
     const safeMax = Number(poolMaxFromHook) || 0;
 
     React.useEffect(() => {
+        setLoading(true);
         getCombatContext(campaignName).then(cs => {
             if (cs) setCombatSummary(cs);
+            setLoading(false);
         });
     }, [campaignName]);
     const target = combatSummary ? getTargetFromAttacker(combatSummary, playerStats.name) : null;
@@ -241,6 +244,13 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, rest
             <div className="short-rest-modal" onClick={(e) => e.stopPropagation()}>
                 <h3><i className="fas fa-hands-helping"></i> Lay On Hands</h3>
 
+                {loading && (
+                    <div className="short-rest-section" style={{ textAlign: 'center', padding: '1em' }}>
+                        <i className="fas fa-spinner fa-spin"></i> Loading...
+                    </div>
+                )}
+
+                {!loading && <>
                 <div className="short-rest-section">
                     <p>Pool: <b>{safePool}</b> / {safeMax} HP</p>
                 </div>
@@ -349,6 +359,7 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, rest
                         <i className="fa-solid fa-check"></i> Done
                     </button>
                 </div>
+                </>}
             </div>
         </div>
     );
