@@ -479,8 +479,8 @@
     {
       "id": "arjhan",
       "name": "Arjhan",
-      "gridX": 10,
-      "gridY": 19
+      "gridX": 3,
+      "gridY": 10
     },
     {
       "id": "selthara",
@@ -491,8 +491,8 @@
     {
       "id": "seris",
       "name": "Seris",
-      "gridX": 10,
-      "gridY": 17
+      "gridX": 3,
+      "gridY": 8
     },
     {
       "id": "zivri",

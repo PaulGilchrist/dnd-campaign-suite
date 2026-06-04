@@ -80,7 +80,7 @@ export async function expandMonstersToCreatures(selectedMonsters, characters, _c
             type: 'npc',
             initiative: String(rollResult.total),
             targetName: null,
-            ac: monster.armor_class || 10,
+            ac: typeof monster.armor_class === 'number' ? monster.armor_class : (console.error(`[AC] Monster "${name}" has no armor_class defined. Defaulting to 10.`), 10),
             resistances: monster.damage_resistances || [],
             immunities: monster.damage_immunities || [],
             concentration: null,

@@ -52,7 +52,7 @@ export function npcToMonsterFormat(npc) {
     type: npc.classRole || 'NPC',
     subtype: null,
     alignment: 'Unaligned',
-    armor_class: npc.armorClass ?? 10,
+    armor_class: typeof npc.armorClass === 'number' ? npc.armorClass : (console.error(`[AC] NPC "${npc.name}" has no armorClass defined. Defaulting to 10.`), 10),
     hit_points: npc.hitPoints || '',
     hit_dice: npc.hitDice || '',
     speed: npc.speed || { walk: '30 ft.' },

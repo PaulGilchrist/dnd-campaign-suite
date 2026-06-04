@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus }) {
+function DiceRollResult({ name, type, rolls, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
 
     const isD20 = type === 'd20';
@@ -85,9 +85,9 @@ function DiceRollResult({ name, type, rolls, bonus = 0, bonusDetail, formula = '
 
             {showCrit && <div className="dice-roll-crit">{isAutoCrit ? 'AUTO-CRIT (target condition)' : 'Critical Hit!'} — damage dice doubled</div>}
              {targetName && hit !== undefined && !isSaveDamageType && (
-               <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
-                 {isAutoMiss ? '✗ AUTO-MISS' : (hit ? '✓ HIT' : '✗ MISS')} {isAutoMiss ? `(${rangeReason || 'out of range'})` : `(${total} vs AC ${targetAc})`}
-               </div>
+                <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
+                  {isAutoMiss ? `✗ AUTO-MISS (${coverReason || rangeReason || 'out of range'})` : (hit ? `✓ HIT (${total} vs AC ${targetAc ?? '—'})` : `✗ MISS (${total} vs AC ${targetAc ?? '—'})`)}
+                </div>
               )}
 
             {coverAcBonus > 0 && (

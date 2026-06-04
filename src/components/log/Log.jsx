@@ -44,13 +44,16 @@ function RollEntry({ entry }) {
         )}
         {entry.hit !== undefined && (
           <span className={`log-hit-miss ${entry.hit ? 'log-hit' : 'log-miss'}`}>
-            {entry.hit ? 'HIT' : 'MISS'} (AC {entry.targetAc})
+            {entry.isAutoMiss ? 'AUTO-MISS' : (entry.hit ? 'HIT' : 'MISS')} {entry.targetAc != null ? `(AC ${entry.targetAc})` : ''}
           </span>
         )}
         {entry.coverAcBonus > 0 && (
           <span className="log-cover">
             {entry.coverLevel === 'threeQuarter' ? '3/4' : '1/2'} Cover (+{entry.coverAcBonus} AC)
           </span>
+        )}
+        {entry.coverReason && (
+          <span className="log-range-reason">{entry.coverReason}</span>
         )}
         {entry.rangeReason && (
           <span className="log-range-reason">{entry.rangeReason}</span>

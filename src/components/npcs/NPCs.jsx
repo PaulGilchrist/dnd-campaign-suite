@@ -75,7 +75,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     image: '',
     imageName: '',
     imagePath: '',
-    armorClass: null,
+    armorClass: 10,
     hitPoints: '',
     hitDice: '',
     initiativeBonus: '',
@@ -204,10 +204,11 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     try {
       const cleaned = { ...formData };
       if (cleaned.armorClass === null || cleaned.armorClass === undefined || cleaned.armorClass === '') {
-        delete cleaned.armorClass;
+        cleaned.armorClass = 10;
       }
-      if (cleaned.armorClass === undefined) {
-        cleaned.armorClass = null;
+      if (typeof cleaned.armorClass !== 'number') {
+        console.error(`[AC] NPC "${cleaned.name}" has invalid AC: ${cleaned.armorClass}. Defaulting to 10.`);
+        cleaned.armorClass = 10;
       }
       await saveNPCAction(cleaned, editingNPC?.name);
       handleCloseModal();
@@ -251,7 +252,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
           type: 'npc',
           initiative: String(total),
           targetName: null,
-         ac: npc.armorClass || 10,
+         ac: typeof npc.armorClass === 'number' ? npc.armorClass : (console.error(`[AC] NPC "${npc.name}" has no AC defined. Defaulting to 10.`), 10),
          resistances: npc.damageResistances || [],
          immunities: npc.damageImmunities || [],
          conditions: [],
@@ -846,7 +847,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
                               type: 'npc',
                               initiative: String(total),
                               targetName: null,
-                             ac: snapshot.armorClass || 10,
+                             ac: typeof snapshot.armorClass === 'number' ? snapshot.armorClass : (console.error(`[AC] NPC "${snapshot.name}" has no AC defined. Defaulting to 10.`), 10),
                              resistances: snapshot.damageResistances || [],
                              immunities: snapshot.damageImmunities || [],
                              conditions: [],

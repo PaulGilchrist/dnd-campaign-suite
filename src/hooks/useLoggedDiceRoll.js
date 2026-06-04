@@ -176,10 +176,11 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
      const isAutoMiss = context?.isAutoMiss === true;
 
       const coverAcBonus = context?.coverAcBonus || 0;
-      const effectiveAc = target ? target.ac + coverAcBonus : undefined;
+      const rawTargetAc = target?.ac;
+      const targetAc = typeof rawTargetAc === 'number' ? rawTargetAc : (console.error(`[AC] Target "${target?.name || characterName}" has no AC defined. Defaulting to 10.`), 10);
+      const effectiveAc = target ? targetAc + coverAcBonus : undefined;
       const hit = isAutoMiss ? false : (target ? (r1 + bonus >= effectiveAc) : undefined);
       const targetName = target?.name || context?.targetName;
-      const targetAc = effectiveAc || context?.targetAc;
 
       const isCrit = !isAutoMiss && (r1 === 20 || context?.isAutoCrit) && hit;
 

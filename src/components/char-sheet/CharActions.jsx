@@ -225,7 +225,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     )
                     if (coverResult.level === 'full') {
                         base.isAutoMiss = true
-                        base.rangeReason = 'Target has full cover'
+                        base.coverReason = 'Target has full cover'
                     } else if (coverResult.acBonus > 0) {
                         base.coverAcBonus = coverResult.acBonus
                         base.coverLevel = coverResult.level

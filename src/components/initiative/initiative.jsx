@@ -624,7 +624,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         combatSummary.creatures[idx].name = newName;
         getMonsterData(newName, campaignNpcs).then(monster => {
             if (monster) {
-                combatSummary.creatures[idx].ac = monster.armor_class || 10;
+                combatSummary.creatures[idx].ac = typeof monster.armor_class === 'number' ? monster.armor_class : (console.error(`[AC] Monster "${newName}" has no armor_class defined. Defaulting to 10.`), 10);
                 combatSummary.creatures[idx].resistances = monster.damage_resistances || [];
                 combatSummary.creatures[idx].immunities = monster.damage_immunities || [];
                 combatSummary.creatures[idx].initiativeBonus = monster.initiative_details ? parseInt(monster.initiative_details) || 0 : 0;
