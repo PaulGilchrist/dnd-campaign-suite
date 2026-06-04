@@ -55,6 +55,45 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     creature.currentHp = newHp;
   }
 
+  if (finalDamage > 0) {
+    if (isPlayer) {
+      const conditions = getRuntimeValue(creature.name, 'activeConditions') || [];
+      if (conditions.some(c => String(c).toLowerCase() === 'frightened')) {
+        const filtered = conditions.filter(c => String(c).toLowerCase() !== 'frightened');
+        setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
+        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'condition',
+            action: 'removed',
+            characterName: creature.name,
+            condition: 'Frightened',
+            reason: 'took damage',
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+      }
+    } else {
+      const hadFrightened = creature.conditions.some(c => c.key === 'frightened');
+      if (hadFrightened) {
+        creature.conditions = creature.conditions.filter(c => c.key !== 'frightened');
+        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'condition',
+            action: 'removed',
+            characterName: creature.name,
+            condition: 'Frightened',
+            reason: 'took damage',
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+      }
+    }
+  }
+
   const wasAlive = oldHp > 0;
   const isNowUnconscious = newHp <= 0;
 

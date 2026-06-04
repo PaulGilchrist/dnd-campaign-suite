@@ -1,5 +1,5 @@
 import express from 'express';
-import { publish, characterChangeData, saveFile, subscribers } from '../utils/changeData.js';
+import { publish, characterChangeData, saveFile } from '../utils/changeData.js';
 
 const router = express.Router();
 
@@ -38,9 +38,8 @@ router.post('/api/campaigns/:campaign/:key', (req, res, next) => {
 
     if (!characterChangeData.has(campaign)) {
         characterChangeData.set(campaign, {});
-    }
+     }
 
-    const oldValue = characterChangeData.get(campaign)[key];
     characterChangeData.get(campaign)[key] = value;
     saveFile();
 

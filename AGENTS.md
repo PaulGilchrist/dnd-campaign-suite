@@ -2,3 +2,5 @@
 - Fix all test failures even those that were pre-existing.
 - Don't swallow errors
 - Don't assume a variable is allowed to be null or undefined.  Ask the user.
+- This is a very large project so don't waste time, money, and memory doing excessive exploration.  Stick to the task and only the parts of the application directly related.
+- PlayerStats computed stats is the single source of truth for player character data.

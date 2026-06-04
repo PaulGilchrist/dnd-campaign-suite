@@ -134,7 +134,7 @@ const PaladinFeatures = function PaladinFeatures({ playerStats, campaignName }) 
          <div data-testid="char-class-paladin">
              {playerStats.class.fightingStyles && <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles.join(', ')}</div>}
              <div><b>Extra Attacks: </b>{paladinFeatures?.extraAttacks || 0}</div>
-             <div><b>Channel Divinity: </b>{paladinFeatures?.maxChannelDivinity || 0}</div>
+             <TrackedResourceInput label="Channel Divinity Charges" resourceKey="channelDivinityCharges" playerName={playerStats.name} getMax={() => paladinFeatures?.maxChannelDivinity || 0} deps={[playerStats]} campaignName={campaignName} />
              {paladinFeatures?.auraRange !== null && <div><b>Aura Range: </b>{paladinFeatures.auraRange}</div>}
              <TrackedResourceInput label="Lay On Hands Pool" resourceKey="layOnHandsPool" playerName={playerStats.name} getMax={() => layOnHandsPoolMax} deps={[playerStats]} campaignName={campaignName} />
              {cha && <div><b>Aura of Protection: </b>+{cha.bonus} to saves {playerStats.level >= 6 ? '(10 ft.)' : '(locked)'}</div>}

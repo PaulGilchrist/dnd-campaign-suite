@@ -900,8 +900,9 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
 
                     return;
                 }
-            } catch (err) {
-            }
+             } catch (err) {
+                 // ignore, fall through to empty map creation
+             }
 
             const newData = { players: [], walls: new Set(), rooms: [] };
 

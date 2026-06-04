@@ -904,6 +904,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                     return;
                 }
             } catch (err) {
+                // ignore, fall through to empty map creation
             }
 
             // Create new empty map
