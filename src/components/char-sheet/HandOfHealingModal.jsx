@@ -2,6 +2,7 @@ import React, { useCallback } from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
 import utils from '../../services/utils.js'
 import storage from '../../services/storage.js'
+import { getCombatSummary } from '../../services/combatData.js'
 import './CharSheet.css'
 
 const CUREABLE_CONDITIONS = ['Blinded', 'Deafened', 'Paralyzed', 'Poisoned', 'Stunned'];
@@ -20,7 +21,7 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
 
          // Also check combat summary for conditions stored on NPCs
         try {
-            const combatSummary = storage.get('combatSummary', campaignName);
+            const combatSummary = getCombatSummary();
             if (combatSummary) {
                 const creature = combatSummary.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
                 if (creature && Array.isArray(creature.conditions)) {
@@ -59,7 +60,7 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
 
          // Also remove from combat summary if present
         try {
-            const combatSummary = storage.get('combatSummary', campaignName);
+            const combatSummary = getCombatSummary();
             if (combatSummary) {
                 const creature = combatSummary.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
                 if (creature && Array.isArray(creature.conditions)) {

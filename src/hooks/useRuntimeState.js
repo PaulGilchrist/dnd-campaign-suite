@@ -15,6 +15,26 @@ function getStore(characterKey) {
   return stores.get(characterKey);
 }
 
+export async function seedStoreFromServer(characterKey, campaignName) {
+  if (!stores.has(characterKey)) {
+    getStore(characterKey);
+  }
+  if (!campaignName) return;
+  try {
+    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(characterKey)}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.value && typeof data.value === 'object') {
+        const store = stores.get(characterKey);
+        for (const [k, v] of Object.entries(data.value)) {
+          store.set(k, v);
+        }
+        notify(characterKey);
+      }
+    }
+  } catch { /* fall through — localStorage already loaded */ }
+}
+
 function notify(characterKey) {
   const set = listeners.get(characterKey);
   if (set) set.forEach(fn => fn());
@@ -54,7 +74,7 @@ export function setRuntimeValue(characterKey, propertyName, value, campaignName)
   notify(characterKey);
 }
 
-export function setRuntimeObject(characterKey, fullObject) {
+export function setRuntimeObject(characterKey, fullObject, campaignName) {
   if (!fullObject || typeof fullObject !== 'object') return;
   const store = getStore(characterKey);
   let changed = false;
@@ -66,6 +86,16 @@ export function setRuntimeObject(characterKey, fullObject) {
   }
   if (changed) {
     try { localStorage.setItem(characterKey, JSON.stringify(Object.fromEntries(store))); } catch { /* ignore */ }
+
+    if (campaignName) {
+      fetch(`/api/campaigns/${campaignName}/${characterKey}`, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: Object.fromEntries(store) })
+      }).catch(() => {});
+    }
+
     notify(characterKey);
   }
 }
@@ -86,6 +116,10 @@ export function useRuntimeValue(characterKey, propertyName, campaignName) {
       if (set) set.delete(listener);
     };
   }, [characterKey, propertyName, campaignName]);
+
+  useEffect(() => {
+    seedStoreFromServer(characterKey, campaignName);
+  }, [characterKey, campaignName]);
 
   return value;
 }

@@ -1,15 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getPreCastOptions, getMaxMetamagicPerSpell } from '../../services/metamagicRules.js';
+import { getCombatSummary } from '../../services/combatData.js';
 import './MetamagicPopup.css';
-
-function getCombatSummary() {
-  try {
-    const stored = localStorage.getItem('combatSummary');
-    return stored ? JSON.parse(stored) : null;
-  } catch {
-    return null;
-  }
-}
 
 function getCreatureTargets(excludeName) {
   const cs = getCombatSummary();

@@ -1,24 +1,8 @@
 import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
 import utils from './utils.js';
+import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary } from './combatData.js';
 
 const KEY = 'pendingTurnExpirations';
-
-export function getCurrentCombatRound() {
-    try {
-        const data = JSON.parse(localStorage.getItem('combatSummary') || '{}');
-        return data.round || 1;
-        } catch {
-        return 1;
-        }
-}
-
-function getActiveCreatureName() {
-    try {
-        return JSON.parse(localStorage.getItem('activeCreatureName'));
-       } catch {
-        return null;
-       }
-}
 
 export function addTurnExpiration(attackerName, targetName, effects, campaignName) {
     const list = getRuntimeValue(attackerName, KEY) || [];
@@ -73,7 +57,7 @@ export function expireStaleEffects(campaignName) {
     if (!activeName) return;
 
     try {
-        const combatData = JSON.parse(localStorage.getItem('combatSummary') || '{}');
+        const combatData = getCombatSummary() || {};
         const creatures = combatData.creatures || [];
 
         for (const attacker of creatures) {

@@ -77,6 +77,7 @@ function updateQty(selected, index, delta) {
 }
 
 // --- Load saved filter from localStorage ---
+// localStorage-only: UI preference, no server endpoint needed
 function loadSavedFilter() {
   try {
     const key = 'encounterFilter-2024';
@@ -91,6 +92,7 @@ function loadSavedFilter() {
   return null;
 }
 
+// localStorage-only: UI preference, no server endpoint needed
 function saveFilter(filter) {
   try {
     const key = 'encounterFilter-2024';
@@ -160,17 +162,19 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
   const [combatStarted, setCombatStarted] = useState(false);
 
       // GM-only working session persistence (survives unmount when navigating to initiative)
+   // localStorage-only: transient GM workspace state, no server endpoint exists for sessions
    function saveSession() {
-     try {
-       localStorage.setItem(`encounterSession-${campaignName}`, JSON.stringify({
-         currentEncounterName, description, lootData, combatStarted, encounterCompleted,
-         selectedMonsters: stripMonsters(selectedMonsters),
-        filter: { difficulty: filter.difficulty, playerLevels: filter.playerLevels },
-       encounterTitle,
-        }));
-       } catch { /* ignore */ }
-      }
+      try {
+        localStorage.setItem(`encounterSession-${campaignName}`, JSON.stringify({
+          currentEncounterName, description, lootData, combatStarted, encounterCompleted,
+          selectedMonsters: stripMonsters(selectedMonsters),
+         filter: { difficulty: filter.difficulty, playerLevels: filter.playerLevels },
+        encounterTitle,
+         }));
+        } catch { /* ignore */ }
+       }
 
+  // localStorage-only: transient GM workspace state, no server endpoint exists for sessions
   function loadSavedSession(existingsMonsters) {
     try {
        const sessionData = localStorage.getItem(`encounterSession-${campaignName}`);
@@ -185,9 +189,9 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
             }),
             };
          }
-       } catch { /* ignore */ }
+        } catch { /* ignore */ }
      return null;
-       }
+        }
 
 // Restore session on mount (resolves monster refs against current monsters data) - only runs when monsters load
    useEffect(() => {
@@ -411,6 +415,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
      if (!selectedMonsters.length) return;
 
      // Write combatStarted=true directly to localStorage before navigation unmounts the component
+     // localStorage-only: transient GM workspace state, no server endpoint for sessions
      try {
        localStorage.setItem(`encounterSession-${campaignName}`, JSON.stringify({
          currentEncounterName, description, lootData, encounterCompleted,

@@ -23,6 +23,7 @@ import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 import * as mapsService from '../../services/mapsService.js';
 import { OverlayShape } from '../../models/SpellOverlay.js';
 import { expireStaleEffects } from '../../services/turnExpirations.js';
+import { loadCombatSummary, getCombatSummary, loadActiveCreatureName, getActiveCreatureName } from '../../services/combatData.js';
 import './initiative.css'
 
 const SHAPE_LABELS = {
@@ -283,12 +284,12 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
          if (dataKey === 'combatSummary') {
             const prevRound = combatSummaryRef.current?.round ?? 1;
-             localStorage.setItem('combatSummary', JSON.stringify(event.data));
+             storage.set('combatSummary', event.data, campaignName);
              combatSummaryRef.current = event.data;
             setCombatSummary(event.data);
              if (event.data.round !== prevRound) expireStaleEffects(campaignName);
            } else if (dataKey === 'activeCreatureName') {
-            localStorage.setItem('activeCreatureName', JSON.stringify(event.data));
+            storage.set('activeCreatureName', event.data, campaignName);
             setActiveCreatureName(event.data);
             expireStaleEffects(campaignName);
         } else {
@@ -431,47 +432,51 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         }, [activeCreatureName, campaignName, isPrevDisabled]);
 
      React.useEffect(() => {
-        const stored = localStorage.getItem('combatSummary');
-        let initialSummary = null;
-        if (stored) {
-            try { initialSummary = JSON.parse(stored); } catch { /* ignore */ }
-        }
+        let cancelled = false;
+        (async () => {
+            const remote = await loadCombatSummary(campaignName);
+            const stored = remote || getCombatSummary();
+            let initialSummary = stored || null;
 
-        if (initialSummary) {
-            const characterNameSet = new Set(characters.map(c => utils.getName(c.name)));
-            const mergedCreatures = initialSummary.creatures.map(c => {
-                if (c.type === 'player' && characterNameSet.has(c.name)) {
-                    const character = characters.find(ch => utils.getName(ch.name) === c.name);
-                    const maxHp = loadCreatureMaxHp(c.name, character?.computedStats?.hitPoints ?? character?.hitPoints ?? c.maxHp ?? 0);
-                    const stats = character?.computedStats || character;
-                    return { ...c, imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(stats), resistances: c.resistances || stats.resistances || [], immunities: c.immunities || stats.immunities || [], saveBonuses: c.saveBonuses || getSaveBonuses(character), maxHp, concentration: c.concentration ?? null };
+            if (initialSummary) {
+                const characterNameSet = new Set(characters.map(c => utils.getName(c.name)));
+                const mergedCreatures = initialSummary.creatures.map(c => {
+                    if (c.type === 'player' && characterNameSet.has(c.name)) {
+                        const character = characters.find(ch => utils.getName(ch.name) === c.name);
+                        const maxHp = loadCreatureMaxHp(c.name, character?.computedStats?.hitPoints ?? character?.hitPoints ?? c.maxHp ?? 0);
+                        const stats = character?.computedStats || character;
+                        return { ...c, imagePath: character?.imagePath || c.imagePath || '', ac: computeAcEstimate(stats), resistances: c.resistances || stats.resistances || [], immunities: c.immunities || stats.immunities || [], saveBonuses: c.saveBonuses || getSaveBonuses(character), maxHp, concentration: c.concentration ?? null };
+                    }
+                    return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, currentHp: c.currentHp ?? c.maxHp ?? 10, maxHp: c.maxHp ?? 10, saveBonuses: c.saveBonuses || {} };
+                });
+
+                if (cancelled) return;
+                const npcCount = mergedCreatures.filter(c => c.type === 'npc').length;
+                setNumOfNpc(npcCount);
+
+                const summary = { round: initialSummary.round, creatures: mergedCreatures };
+                setCombatSummary(summary);
+                combatSummaryRef.current = summary;
+
+                const activeName = await loadActiveCreatureName(campaignName);
+                if (activeName) {
+                    setActiveCreatureName(activeName);
+                } else {
+                    setActiveCreatureName(mergedCreatures[0]?.name || null);
                 }
-                return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, currentHp: c.currentHp ?? c.maxHp ?? 10, maxHp: c.maxHp ?? 10, saveBonuses: c.saveBonuses || {} };
-            });
-
-            const npcCount = mergedCreatures.filter(c => c.type === 'npc').length;
-            setNumOfNpc(npcCount);
-
-            const summary = { round: initialSummary.round, creatures: mergedCreatures };
-            setCombatSummary(summary);
-            combatSummaryRef.current = summary;
-
-            const storedActive = localStorage.getItem('activeCreatureName');
-            if (storedActive) {
-                setActiveCreatureName(JSON.parse(storedActive));
             } else {
-                setActiveCreatureName(mergedCreatures[0]?.name || null);
+                if (cancelled) return;
+                const creatures = setupCreatures();
+                const newSummary = { round: 1, creatures };
+                storage.set('combatSummary', newSummary, campaignName);
+                setCombatSummary(newSummary);
+                combatSummaryRef.current = newSummary;
+                const firstName = creatures[0]?.name;
+                storage.set('activeCreatureName', firstName, campaignName);
+                setActiveCreatureName(firstName);
             }
-        } else {
-            const creatures = setupCreatures();
-            const newSummary = { round: 1, creatures };
-            storage.set('combatSummary', newSummary, campaignName);
-            setCombatSummary(newSummary);
-            combatSummaryRef.current = newSummary;
-            const firstName = creatures[0]?.name;
-            storage.set('activeCreatureName', firstName, campaignName);
-            setActiveCreatureName(firstName);
-        }
+        })();
+        return () => { cancelled = true; };
     }, [characters, campaignName, setupCreatures, loadCreatureMaxHp, getSaveBonuses]);
 
     React.useEffect(() => {
@@ -530,13 +535,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     React.useEffect(() => {
         const handler = () => {
-            const stored = localStorage.getItem('combatSummary');
-            if (stored) {
-                try {
-                    const summary = JSON.parse(stored);
-                    combatSummaryRef.current = summary;
-                    setCombatSummary(summary);
-                  } catch (e) { /* ignore parse errors */ }
+            const summary = getCombatSummary();
+            if (summary) {
+                combatSummaryRef.current = summary;
+                setCombatSummary(summary);
               }
           };
         window.addEventListener('initiative-rolled', handler);

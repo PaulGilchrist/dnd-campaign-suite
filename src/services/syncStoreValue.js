@@ -69,18 +69,37 @@ export function removeConditionsFromTarget(campaignName, targetName, conditionsT
   return updateStoreWithCondition(targetName, 'activeConditions', updated)
 }
 
-export function initSyncHandlers() {
-  window.addEventListener('campaign-changed', async () => {
-    await loadData()
-    for (const key of storeValue.keys()) {
-      const stored = localStorage.getItem(key)
-      if (stored) {
-        try { setStore(key, new Map(JSON.parse(stored).entries())) } catch { continue }
+async function fetchAndSeedStores(campaignName) {
+  for (const key of storeValue.keys()) {
+    try {
+      let data = null
+      if (campaignName) {
+        const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(key)}`)
+        if (response.ok) {
+          const json = await response.json()
+          if (json.value) data = json.value
+        }
+      }
+      if (!data) {
+        const stored = localStorage.getItem(key)
+        if (stored) data = JSON.parse(stored)
+      }
+      if (data) {
+        setStore(key, new Map(Object.entries(data)))
       } else {
         setStore(key, new Map())
       }
+    } catch {
+      setStore(key, new Map())
     }
-    triggerSubscribers()
+  }
+  triggerSubscribers()
+}
+
+export function initSyncHandlers(campaignName) {
+  window.addEventListener('campaign-changed', async () => {
+    await loadData()
+    await fetchAndSeedStores(campaignName)
   })
 
   window.addEventListener('condition-apply', (e) => {
@@ -100,19 +119,7 @@ export function initSyncHandlers() {
     store.put().catch(() => null)
   })
 
-  setTimeout(() => {
-    for (const key of storeValue.keys()) {
-      try {
-        const data = JSON.parse(localStorage.getItem(key))
-        if (data) {
-          setStore(key, new Map(Object.entries(data)))
-        } else {
-          setStore(key, new Map())
-        }
-      } catch {
-        setStore(key, new Map())
-      }
-    }
-    triggerSubscribers()
+  setTimeout(async () => {
+    await fetchAndSeedStores(campaignName)
   }, SYNC_DELAY)
 }

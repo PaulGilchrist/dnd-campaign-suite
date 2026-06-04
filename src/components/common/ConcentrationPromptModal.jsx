@@ -4,6 +4,7 @@ import { rollD20 } from '../../services/diceRoller.js';
 import { sendConcentrationResult } from '../../services/savePromptService.js';
 import Subscriber from './Subscriber.jsx';
 import { computeAuraBonus } from '../../services/auraOfProtection.js';
+import { loadCombatSummary } from '../../services/combatData.js';
 import './concentrationPromptModal.css';
 
 function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
@@ -42,9 +43,8 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
 
     let saveBonus = 0;
     try {
-      const stored = localStorage.getItem('combatSummary');
-      if (stored) {
-        const cs = JSON.parse(stored);
+      const cs = await loadCombatSummary(campaignName);
+      if (cs) {
         const creature = cs.creatures.find(c =>
           c.name === current.targetName || c.name.startsWith(current.targetName + ' ')
         );

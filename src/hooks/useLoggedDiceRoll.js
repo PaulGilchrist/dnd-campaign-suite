@@ -13,6 +13,7 @@ import { sendSavePrompt, sendSaveResult } from '../services/savePromptService.js
 import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../services/aoeService.js';
 import { saveLastDamageEvent } from './useMetamagic.js';
 import { clearAllExpirationEffects } from '../services/turnExpirations.js';
+import { loadCombatSummary, getCombatSummary } from '../services/combatData.js';
 
 function readAoeContext(campaignName) {
   try {
@@ -21,12 +22,6 @@ function readAoeContext(campaignName) {
   } catch {
     return null;
   }
-}
-
-function getCombatSummary() {
-  const stored = localStorage.getItem('combatSummary');
-  if (!stored) return null;
-  try { return JSON.parse(stored); } catch { return null; }
 }
 
 export default function useLoggedDiceRoll(characterName, campaignName, options = {}) {
@@ -168,11 +163,11 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       }).catch(() => {});
    }
 
-    function logAndShow(name, bonus, rollType, context) {
+    async function logAndShow(name, bonus, rollType, context) {
      const r1 = rollD20();
      const r2 = rollD20();
 
-     const combatSummary = getCombatSummary();
+     const combatSummary = await loadCombatSummary(campaignName);
 
      const target = combatSummary ? getTargetFromAttacker(combatSummary, utils.getName(characterName)) : null;
 
@@ -242,28 +237,25 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
 
     if (rollType === 'initiative') {
         const firstName = utils.getName(characterName);
-        const stored = localStorage.getItem('combatSummary');
-        if (stored) {
-            try {
-                const combatSummary = JSON.parse(stored);
-                const creature = combatSummary.creatures.find(
-                    c => c.type === 'player' && c.name === firstName
-                  );
-                if (creature) {
-                    creature.initiative = String(r1 + bonus);
-                    combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
-                    storage.set('combatSummary', combatSummary, campaignName);
-                  }
-              } catch (e) { /* ignore parse errors */ }
+        const combatSummary = await loadCombatSummary(campaignName);
+        if (combatSummary) {
+            const creature = combatSummary.creatures.find(
+                c => c.type === 'player' && c.name === firstName
+              );
+            if (creature) {
+                creature.initiative = String(r1 + bonus);
+                combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
+                storage.set('combatSummary', combatSummary, campaignName);
+              }
           }
          clearAllExpirationEffects(characterName, campaignName);
          window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + bonus } }));
         }
      }
 
-   function logDamageAndShow(name, formula, total, rolls, modifier, context) {
+   async function logDamageAndShow(name, formula, total, rolls, modifier, context) {
       const { saveDc, saveType, dcSuccess, damageType, attackerName, isAutoMiss, rangeReason } = context || {};
-      const combatSummary = getCombatSummary();
+      const combatSummary = await loadCombatSummary(campaignName);
 
       if (isAutoMiss) {
         logEntry({
@@ -655,11 +647,11 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         }, campaignName);
         }
 
-  function quickRollPlayerSave(promptId, targetName, saveType, saveDc) {
+  async function quickRollPlayerSave(promptId, targetName, saveType, saveDc) {
     const pending = pendingSaves[promptId];
     if (!pending) return;
 
-    const combatSummary = getCombatSummary();
+    const combatSummary = await loadCombatSummary(campaignName);
     const target = combatSummary?.creatures?.find(c => c.name === pending.targetName);
     if (!target) return;
 

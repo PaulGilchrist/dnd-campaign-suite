@@ -6,6 +6,8 @@ import AvatarModal from '../common/AvatarModal.jsx';
 import { npcHasStatBlock, calculateAbilityModifier } from '../../services/npcStatBlockUtils.js';
 import { rollD20 } from '../../services/diceRoller.js';
 import utils from '../../services/utils.js';
+import storage from '../../services/storage.js';
+import { loadCombatSummary } from '../../services/combatData.js';
 import { generateNPC } from '../../services/npcGenerator.js';
 import './NPCs.css';
 
@@ -234,8 +236,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     if (!npcHasStatBlock(npc)) return;
     try {
       const initBonus = parseInt(npc.initiativeBonus) || 0;
-      const stored = localStorage.getItem('combatSummary');
-      let combatSummary = stored ? JSON.parse(stored) : null;
+      let combatSummary = await loadCombatSummary(campaignName);
       if (!combatSummary) {
         combatSummary = { round: 1, creatures: [] };
       }
@@ -259,7 +260,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
         initiativeBonus: initBonus,
       });
       combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
-      localStorage.setItem('combatSummary', JSON.stringify(combatSummary));
+      storage.set('combatSummary', combatSummary, campaignName);
       window.dispatchEvent(new CustomEvent('initiative-rolled'));
 
       fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
@@ -824,8 +825,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
                           const imagePath = savedNpc.imagePath || snapshot.image || '';
                           handleCloseModal();
                           const initBonus = parseInt(snapshot.initiativeBonus) || 0;
-                          const stored = localStorage.getItem('combatSummary');
-                          let combatSummary = stored ? JSON.parse(stored) : null;
+                          let combatSummary = await loadCombatSummary(campaignName);
                           if (!combatSummary) {
                             combatSummary = { round: 1, creatures: [] };
                           }
@@ -852,7 +852,7 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
                             initiativeBonus: initBonus,
                           });
                           combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
-                          localStorage.setItem('combatSummary', JSON.stringify(combatSummary));
+                          storage.set('combatSummary', combatSummary, campaignName);
                           window.dispatchEvent(new CustomEvent('initiative-rolled'));
 
                           fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
