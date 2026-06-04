@@ -458,6 +458,15 @@
     font-weight: 600;
 }
 
+.log-condition-source {
+    font-size: 0.78rem;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(39, 174, 96, 0.2);
+    color: #27ae60;
+    font-weight: 600;
+}
+
 /* Condition save in roll entry */
 .log-condition-save {
     font-size: 0.78rem;

@@ -22,6 +22,7 @@ import { addTurnExpiration } from '../../services/turnExpirations.js';
 import storage from '../../services/storage.js'
 import utils from '../../services/utils.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
+import HandOfHealingModal from './HandOfHealingModal.jsx'
 import FontOfMagicModal from './FontOfMagicModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { getClassFeatures } from '../../services/classFeatures.js';
@@ -45,6 +46,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [pendingActionMetamagic, setPendingActionMetamagic] = useState(null);
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
     const [healingPoolModal, setHealingPoolModal] = useState(null);
+    const [handOfHealingModal, setHandOfHealingModal] = useState(null);
     const [fontOfMagicModal, setFontOfMagicModal] = useState(null);
 
     useEffect(() => {
@@ -662,23 +664,23 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
                     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
-                    if (setPopupHtml) {
-                        setPopupHtml({
-                            type: 'healing',
-                            name: action.name,
+                    const hasPhysiciansTouch = playerStats.characterAdvancement?.some(f => f.name === "Physician's Touch");
+
+                        setHandOfHealingModal({
+                            healName: action.name,
                             formula: `1d${martialArtsDie} + ${wisModifier}`,
                             rolls: rollResult.rolls,
                             bonus: wisModifier,
-                            modifier: 0,
                             healAmount: healAmount,
-                            description: `${action.name}: Rolled ${rollResult.total} (1d${martialArtsDie}) + ${wisModifier} (WIS) = <strong>${healAmount}</strong> HP`,
+                            monkName: playerStats.name,
                             targetName: targetName,
                             targetCurrentHp: newHp,
                             targetMaxHp: targetMaxHp,
-                            damageApplied: true,
+                            hasPhysiciansTouch: hasPhysiciansTouch,
+                            isInCombat: !!combatSummary,
                         });
-                    }
-                } else {
+
+                  } else {
                     const healAmount = auto.healAmount || auto.healExpression;
                     if (setPopupHtml) {
                         setPopupHtml({
@@ -1284,13 +1286,20 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 )}
                 {healingPoolModal && (
                     <HealingPoolModal
-                        playerStats={playerStats}
-                        campaignName={campaignName}
-                        poolMax={healingPoolModal.pool}
-                        poolExpression={healingPoolModal.poolExpression}
-                        alsoCures={healingPoolModal.alsoCures}
-                        cureCost={healingPoolModal.cureCost}
-                        onClose={() => setHealingPoolModal(null)}
+                       playerStats={playerStats}
+                       campaignName={campaignName}
+                       poolMax={healingPoolModal.pool}
+                       poolExpression={healingPoolModal.poolExpression}
+                       alsoCures={healingPoolModal.alsoCures}
+                       cureCost={healingPoolModal.cureCost}
+                       onClose={() => setHealingPoolModal(null)}
+                    />
+                )}
+                {handOfHealingModal && (
+                    <HandOfHealingModal
+                       {...handOfHealingModal}
+                       campaignName={campaignName}
+                       onClose={() => setHandOfHealingModal(null)}
                     />
                 )}
                 {fontOfMagicModal && (

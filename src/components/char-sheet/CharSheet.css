@@ -80,6 +80,34 @@
     margin-bottom: 2px;
 }
 
+/* Hand of Healing Modal */
+.healing-roll-details {
+    font-size: 0.95em;
+    line-height: 1.6;
+}
+.healing-formula {
+    color: var(--color-header-inner);
+}
+.healing-dice-rolled {
+    font-family: monospace;
+    color: #10b981;
+}
+.healing-bonus {
+    color: #fbbf24;
+}
+.healing-total {
+    color: #10b981;
+}
+.healing-cured-condition {
+    color: #10b981;
+}
+.healing-cure-options {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
 .stat--penalized {
     color: var(--color-error-light);
 }
