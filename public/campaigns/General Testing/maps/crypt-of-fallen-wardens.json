@@ -431,8 +431,8 @@
     },
     {
       "id": "npc-0",
-      "gridX": 8,
-      "gridY": 4,
+      "gridX": 4,
+      "gridY": 10,
       "type": "npc",
       "visible": false,
       "name": "Zombie 2",
@@ -440,8 +440,8 @@
     },
     {
       "id": "npc-1",
-      "gridX": 9,
-      "gridY": 8,
+      "gridX": 4,
+      "gridY": 11,
       "type": "npc",
       "visible": false,
       "name": "Skeleton 1",
@@ -449,8 +449,8 @@
     },
     {
       "id": "npc-2",
-      "gridX": 16,
-      "gridY": 7,
+      "gridX": 2,
+      "gridY": 10,
       "type": "npc",
       "visible": false,
       "name": "Skeleton 2",
@@ -467,8 +467,8 @@
     },
     {
       "id": "npc-4",
-      "gridX": 13,
-      "gridY": 9,
+      "gridX": 5,
+      "gridY": 7,
       "type": "npc",
       "visible": false,
       "name": "Zombie 1",
@@ -485,8 +485,8 @@
     {
       "id": "selthara",
       "name": "Selthara",
-      "gridX": 8,
-      "gridY": 17
+      "gridX": 3,
+      "gridY": 11
     },
     {
       "id": "seris",

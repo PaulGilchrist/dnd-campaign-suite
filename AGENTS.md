@@ -1,2 +1,4 @@
 - Fix all lint issues even those that were pre-existing.
 - Fix all test failures even those that were pre-existing.
+- Don't swallow errors
+- Don't assume a variable is allowed to be null or undefined.  Ask the user.

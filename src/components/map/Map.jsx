@@ -1558,6 +1558,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     monster={viewingMonster}
                     onClose={() => setViewingMonster(null)}
                     campaignName={campaignName}
+                    mapName={mapName}
                 />
             )}
         </div>

@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useEffect, useRef } from 'react';
+import { useMemo, useCallback, useEffect, useRef, useState } from 'react';
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { rollExpression, rollExpressionDoubled } from '../../services/diceRoller.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
@@ -8,6 +8,8 @@ import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResist
 import { getCombatContext } from '../../services/damageUtils.js';
 import { findCreatureByName } from '../../services/damageUtils.js';
 import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT } from '../../services/conditionEffects.js';
+import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rangeValidation.js';
+import * as mapsService from '../../services/mapsService.js';
 import './MonsterCardModal.css';
 
 const ABBR_MAP = { Strength: 'str', Dexterity: 'dex', Constitution: 'con', Intelligence: 'int', Wisdom: 'wis', Charisma: 'cha', str: 'str', dex: 'dex', con: 'con', int: 'int', wis: 'wis', cha: 'cha' };
@@ -16,9 +18,10 @@ function toAbbr(name) {
   return ABBR_MAP[name] || name?.substring(0, 3).toLowerCase();
 }
 
-function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
-  const monsterName = monster?.name || 'Monster';
+function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureName, mapName }) {
+  const monsterName = creatureName || monster?.name || 'Monster';
   const fallbackCsRef = useRef(null);
+  const [mapData, setMapData] = useState(null);
 
   useEffect(() => {
     if (creatures) return;
@@ -26,6 +29,18 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
       if (cs) fallbackCsRef.current = cs;
     });
   }, [creatures, campaignName]);
+
+  useEffect(() => {
+    if (!mapName) {
+      setMapData(null);
+      return;
+    }
+    mapsService.loadMapData(campaignName, mapName).then(data => {
+      setMapData(data);
+    }).catch(() => {
+      setMapData(null);
+    });
+  }, [campaignName, mapName]);
 
   const { popupHtml, setPopupHtml, rollAttack, rollDamage, rollAbilityCheck, rollSavingThrow, rollSkillCheck, rollInitiative, quickRollPlayerSave } = useLoggedDiceRoll(
     monsterName,
@@ -100,17 +115,50 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
 
     const targetEffects = computeConditionEffects(targetConditions)
 
-    const attackRange = action?.range?.type === 'reach' || action?.range?.type === 'melee' ? 5 : 30
+    const attackRange = action?.reach ? rangeToFeet(action.reach) : (action?.range ? rangeToFeet(action.range) : 30);
     const forcedMode = combineAttackModes(attackerEffects, targetEffects, attackRange)
 
     const isMelee = attackRange <= 5
     const isAutoCrit = isMelee && targetEffects.autoCritWithin5ft
 
+    let isAutoMiss = false;
+    let rangeReason = null;
+    let rangeForcedMode = null;
+    if (mapData && target) {
+      const attackerPlaced = (mapData?.placedItems || []).find(i => i.name === monsterName) || null;
+      let targetPos = null;
+      const targetPlayer = mapData?.players?.find(p => p.name === target.name);
+      const targetNpc = mapData?.placedItems?.length
+        ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlaced ? { gridX: attackerPlaced.gridX, gridY: attackerPlaced.gridY } : null)
+        : null;
+      if (targetPlayer) {
+        targetPos = { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
+      } else if (targetNpc) {
+        targetPos = { gridX: targetNpc.gridX, gridY: targetNpc.gridY };
+      }
+      if (attackerPlaced && targetPos) {
+        const distanceFt = getDistanceFeet(
+          { gridX: attackerPlaced.gridX, gridY: attackerPlaced.gridY },
+          targetPos
+        );
+        const rangeResult = computeRangeEffect(attackRange, distanceFt);
+        if (rangeResult.mode === 'disadvantage') {
+          rangeForcedMode = 'disadvantage';
+          rangeReason = rangeResult.reason;
+        } else if (rangeResult.mode === 'miss') {
+          isAutoMiss = true;
+          rangeReason = rangeResult.reason;
+        }
+      }
+    }
+
     rollAttack(name, bonus, {
       damageType: formatDamageTypes(actionDamageTypes),
       resistanceNotice,
-      forcedMode: forcedMode !== 'normal' ? forcedMode : undefined,
+      forcedMode: rangeForcedMode || (forcedMode !== 'normal' ? forcedMode : undefined),
       isAutoCrit,
+      isAutoMiss,
+      rangeReason,
       autoDamageFormula: action?.damage_dice || null,
       autoDamageName: name,
       targetName: target?.name,
@@ -215,7 +263,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
       <div className="mc-card" onClick={(e) => e.stopPropagation()}>
         <div className="mc-header" onClick={onClose}>
           <div className="mc-header-info">
-            <div className="mc-name">{monster.name}</div>
+            <div className="mc-name">{monsterName}</div>
             <div className="mc-type-line">
               {monster.size} {monster.type}
               {monster.subtype ? ` (${monster.subtype})` : ''}, {monster.alignment}

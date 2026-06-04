@@ -162,6 +162,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const [activeCreatureName, setActiveCreatureName] = React.useState(null);
     const [npcImages, setNpcImages] = React.useState({});
     const [viewingMonster, setViewingMonster] = React.useState(null);
+    const [viewingMonsterCreatureName, setViewingMonsterCreatureName] = React.useState(null);
     const carouselRef = React.useRef(null);
     const combatSummaryRef = React.useRef(null);
     combatSummaryRef.current = combatSummary;
@@ -706,12 +707,14 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             const formatted = npcToMonsterFormat(npc);
             if (formatted) {
                 setViewingMonster(formatted);
+                setViewingMonsterCreatureName(creature.name);
                 return;
             }
         }
         const monster = await getMonsterData(creature.name);
         if (monster) {
             setViewingMonster(monster);
+            setViewingMonsterCreatureName(creature.name);
         }
     };
 
@@ -1194,9 +1197,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             {viewingMonster && (
                 <MonsterCardModal
                     monster={viewingMonster}
-                    onClose={() => setViewingMonster(null)}
+                    onClose={() => { setViewingMonster(null); setViewingMonsterCreatureName(null); }}
                     campaignName={campaignName}
                     creatures={combatSummary.creatures}
+                    creatureName={viewingMonsterCreatureName}
+                    mapName={mapName}
                 />
             )}
             {conditionPickerTarget && (

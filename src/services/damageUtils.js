@@ -44,8 +44,10 @@ export async function getCombatContext(campaignName) {
 
 export function findCreatureByName(combatSummary, name) {
   if (!combatSummary?.creatures || !name) return null;
+  const exact = combatSummary.creatures.find(c => c.name === name);
+  if (exact) return exact;
   return combatSummary.creatures.find(c =>
-    c.name === name || c.name.startsWith(name + ' ')
+    c.name.startsWith(name + ' ')
   );
 }
 
