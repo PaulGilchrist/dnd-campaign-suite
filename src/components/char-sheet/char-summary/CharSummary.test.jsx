@@ -13,6 +13,10 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
   useRuntimeValue: vi.fn(() => null),
+  addStorageChangeListener: vi.fn(() => () => {}),
+  setRuntimeObject: vi.fn(),
+  setRuntimeBatch: vi.fn(),
+  clearRuntimeState: vi.fn(),
 }));
 
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';

@@ -19,6 +19,10 @@ vi.mock('../hooks/useRuntimeState.js', () => ({
   setRuntimeBatch: vi.fn(),
 }))
 
+vi.mock('./turnExpirations.js', () => ({
+  clearAllExpirationEffects: vi.fn(),
+}))
+
 import { getRuntimeValue, setRuntimeBatch } from '../hooks/useRuntimeState.js'
 
 beforeEach(() => {

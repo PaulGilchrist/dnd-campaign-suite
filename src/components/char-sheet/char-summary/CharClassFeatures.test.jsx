@@ -14,17 +14,21 @@ vi.mock('../../../hooks/useRuntimeState.js', () => {
   return {
     getRuntimeValue: vi.fn((_characterKey, _propertyName) => {
       return null;
-     }),
+      }),
     setRuntimeValue: vi.fn((characterKey, _propertyName, _value, _campaignName) => {
-       // Notify listeners
+        // Notify listeners
       const key = characterKey;
       if (listeners.has(key)) {
         listeners.get(key).forEach(fn => fn());
-       }
-     }),
+        }
+      }),
     useRuntimeValue: vi.fn((_characterKey, _propertyName) => {
       return null;
-     }),
+      }),
+    addStorageChangeListener: vi.fn(() => () => {}),
+    setRuntimeObject: vi.fn(),
+    setRuntimeBatch: vi.fn(),
+    clearRuntimeState: vi.fn(),
   };
 });
 
