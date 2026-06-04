@@ -5587,7 +5587,20 @@
                         "name": "Restoring Touch",
                         "description": "When you use Lay On Hands on a creature, you can also remove one or more conditions: Blinded, Charmed, Deafened, Frightened, Paralyzed, or Stunned. Must expend 5 Hit Points from the healing pool for each condition.",
                         "level": 14,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "cure_conditions_on_heal",
+                            "cureConditions": [
+                                "Blinded",
+                                "Charmed",
+                                "Deafened",
+                                "Frightened",
+                                "Paralyzed",
+                                "Stunned"
+                            ],
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spellcasting": {

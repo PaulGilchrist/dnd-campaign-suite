@@ -45,7 +45,6 @@ export const actions = [
     "Improved War Magic",
     "Precise Hunter",
     "Radiant Strikes",
-    "Restoring Touch",
     "Signature Spells",
     "Sneak Attack",
     "Spell Mastery",
