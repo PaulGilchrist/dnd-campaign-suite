@@ -86,14 +86,17 @@ export const publish = (key, data) => {
     const eventData = `data: ${JSON.stringify({ key, data: unwrapped })}\n\n`;
     const campaignPrefix = key.match(/^(?:change|spell-overlay|map-data|maps-list|map-activate|positioning|log)-(.+?)(?:-|$)/);
     const targetCampaign = campaignPrefix ? campaignPrefix[1] : null;
+    let sent = 0;
     subscribers.forEach(client => {
         if (targetCampaign && client.campaignName && client.campaignName !== targetCampaign) return;
         try {
             client.res.write(eventData);
+            sent++;
         } catch (e) {
             // client disconnected
         }
     });
+    console.log('[publish]', { key, targetCampaign, subscriberCount: subscribers.length, sent });
 }
 
 /**

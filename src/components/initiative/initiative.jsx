@@ -220,7 +220,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         }).catch(() => {
             setMapData(null);
         });
-    }, [campaignName, mapName]);
+    }, [combatSummary, campaignName, mapName]);
 
     // Load campaign NPCs for stat block matching
     React.useEffect(() => {

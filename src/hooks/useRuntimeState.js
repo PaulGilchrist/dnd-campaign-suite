@@ -3,6 +3,20 @@ import { useState, useEffect } from 'react';
 const stores = new Map();
 const listeners = new Map();
 
+function valuesEqual(a, b) {
+  if (a === b) return true;
+  if (a === null || b === null) return a === b;
+  if (typeof a === 'number' && typeof b === 'string') return a === Number(b);
+  if (typeof a === 'string' && typeof b === 'number') return Number(a) === b;
+  if (typeof a === 'object' && typeof b === 'object') {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    return keysA.every(k => valuesEqual(a[k], b[k]));
+  }
+  return false;
+}
+
 function getStore(characterKey) {
   if (!stores.has(characterKey)) {
     try {
@@ -54,7 +68,11 @@ export function getRuntimeValue(characterKey, propertyName) {
 export function setRuntimeValue(characterKey, propertyName, value, campaignName) {
   const store = getStore(characterKey);
   const existing = store.get(propertyName);
-  if (existing === value || (typeof existing === 'number' && typeof value === 'string' && existing === Number(value)) || (typeof existing === 'string' && typeof value === 'number' && Number(existing) === value)) return;
+  if (valuesEqual(existing, value)) {
+    console.log('[setRuntimeValue] no-change skip', { characterKey, propertyName, value });
+    return;
+  }
+  console.log('[setRuntimeValue] writing', { characterKey, propertyName, oldValue: existing, newValue: value, campaignName });
   store.set(propertyName, value);
 
   const obj = Object.fromEntries(store);
@@ -78,13 +96,16 @@ export function setRuntimeObject(characterKey, fullObject, campaignName) {
   if (!fullObject || typeof fullObject !== 'object') return;
   const store = getStore(characterKey);
   let changed = false;
+  const changedKeys = [];
   for (const [key, value] of Object.entries(fullObject)) {
-    if (store.get(key) !== value) {
+    if (!valuesEqual(store.get(key), value)) {
       store.set(key, value);
       changed = true;
+      changedKeys.push(key);
     }
   }
   if (changed) {
+    console.log('[setRuntimeObject] changed', { characterKey, changedKeys, campaignName });
     try { localStorage.setItem(characterKey, JSON.stringify(Object.fromEntries(store))); } catch { /* ignore */ }
 
     if (campaignName) {
@@ -97,6 +118,8 @@ export function setRuntimeObject(characterKey, fullObject, campaignName) {
     }
 
     notify(characterKey);
+  } else {
+    console.log('[setRuntimeObject] no-change skip', { characterKey, campaignName });
   }
 }
 
@@ -107,7 +130,9 @@ export function useRuntimeValue(characterKey, propertyName, campaignName) {
     if (!characterKey || !propertyName) return;
     if (!listeners.has(characterKey)) listeners.set(characterKey, new Set());
     const listener = () => {
-      setValue(getRuntimeValue(characterKey, propertyName));
+      const newVal = getRuntimeValue(characterKey, propertyName);
+      console.log('[useRuntimeValue] listener fired', { characterKey, propertyName, newVal });
+      setValue(newVal);
     };
     listeners.get(characterKey).add(listener);
     listener();
@@ -129,7 +154,7 @@ export function setRuntimeBatch(characterKey, properties, campaignName) {
   const store = getStore(characterKey);
   let changed = false;
   for (const [key, value] of Object.entries(properties)) {
-    if (store.get(key) !== value) {
+    if (!valuesEqual(store.get(key), value)) {
       store.set(key, value);
       changed = true;
     }

@@ -1,5 +1,5 @@
 import express from 'express';
-import { publish, characterChangeData, saveFile } from '../utils/changeData.js';
+import { publish, characterChangeData, saveFile, subscribers } from '../utils/changeData.js';
 
 const router = express.Router();
 
@@ -36,16 +36,18 @@ router.post('/api/campaigns/:campaign/:key', (req, res, next) => {
     }
     const value = req.body.value || req.body;
 
-if (!characterChangeData.has(campaign)) {
-    characterChangeData.set(campaign, {});
- }
+    if (!characterChangeData.has(campaign)) {
+        characterChangeData.set(campaign, {});
+    }
 
- characterChangeData.get(campaign)[key] = value;
- saveFile();
+    const oldValue = characterChangeData.get(campaign)[key];
+    characterChangeData.get(campaign)[key] = value;
+    saveFile();
 
-// Broadcast change
- publish(`change-${campaign}-${key}`, value);
-    
+    console.log('[changeData] POST', { campaign, key, hasOldValue: oldValue !== undefined, subscriberCount: subscribers.length });
+    // Broadcast change
+    publish(`change-${campaign}-${key}`, value);
+
     res.json({ message: 'Data saved successfully' });
 });
 
