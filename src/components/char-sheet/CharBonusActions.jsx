@@ -16,7 +16,7 @@ import './CharActions.css'
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 const bonusActionCastingTimes = ['1 bonus action', '1 Bonus Action', 'bonus action', 'Bonus Action'];
 
-function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, onAttackClick, onDamageClick, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getCombatTargetInfo }) {
+function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, onAttackClick, onDamageClick, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo }) {
     const [popupHtml, setPopupHtml] = useState(null);
     const [selectedBonusSpell, setSelectedBonusSpell] = useState(null);
 
@@ -32,9 +32,9 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const bonusCastAction = React.useCallback((spell, metaCtx) => {
       const pos = cachedBonusCastPosRef.current;
-      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getCombatTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos });
+      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos });
       cachedBonusCastPosRef.current = null;
-    }, [rollAttack, rollDamage, playerStats, getCombatTargetInfo]);
+    }, [rollAttack, rollDamage, playerStats, getTargetInfo]);
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, bonusCastAction);
     const handleBonusSpellCast = React.useCallback(async (spell) => {
       setSelectedBonusSpell(null);
@@ -45,7 +45,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
           ]);
           const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
           if (attackerPlayer) {
-            const cs = getCombatContext();
+            const cs = await getCombatContext(campaignName);
             const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
             if (target) {
               const targetPlayer = mapData?.players?.find(p => p.name === target.name);

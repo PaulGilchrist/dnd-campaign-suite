@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect, useRef } from 'react';
 import { sanitizeHtml } from '../../services/sanitize.js';
 import { rollExpression, rollExpressionDoubled } from '../../services/diceRoller.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
@@ -18,6 +18,15 @@ function toAbbr(name) {
 
 function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
   const monsterName = monster?.name || 'Monster';
+  const fallbackCsRef = useRef(null);
+
+  useEffect(() => {
+    if (creatures) return;
+    getCombatContext(campaignName).then(cs => {
+      if (cs) fallbackCsRef.current = cs;
+    });
+  }, [creatures, campaignName]);
+
   const { popupHtml, setPopupHtml, rollAttack, rollDamage, rollAbilityCheck, rollSavingThrow, rollSkillCheck, rollInitiative, quickRollPlayerSave } = useLoggedDiceRoll(
     monsterName,
     campaignName,
@@ -45,13 +54,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
     if (creatures) {
       return findCreatureByName({ creatures }, monsterName);
     }
-    const cs = getCombatContext();
+    const cs = fallbackCsRef.current;
     return cs ? findCreatureByName(cs, monsterName) : null;
   }, [creatures, monsterName]);
 
-  const getCombatTarget = useCallback(() => {
+  const getTarget = useCallback(() => {
     if (!creatures) {
-      const cs = getCombatContext();
+      const cs = fallbackCsRef.current;
       return cs ? getTargetFromAttacker(cs, monsterName) : null;
     }
     const attacker = findCreatureByName({ creatures }, monsterName);
@@ -68,7 +77,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
   }, []);
 
   const handleAttack = (name, bonus, action) => {
-    const target = getCombatTarget();
+    const target = getTarget();
     const damageTypes = action ? getDamageTypesForAction(action) : [];
     const resistanceNotice = target ? getResistanceNotice(damageTypes, target.resistances, target.immunities, target.name) : null;
 
@@ -104,7 +113,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures }) {
   };
 
   const handleDamage = (name, formula, damageType, action) => {
-    const target = getCombatTarget();
+    const target = getTarget();
     const wasCrit = popupHtml?.isCrit;
     if (wasCrit && setPopupHtml) setPopupHtml(null);
     const result = wasCrit ? rollExpressionDoubled(formula) : rollExpression(formula);

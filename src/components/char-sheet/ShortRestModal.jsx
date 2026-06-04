@@ -47,11 +47,11 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         setRollLog(prev => [...prev, ...newRolls]);
      };
 
-    const handleApplySongOfRest = () => {
+    const handleApplySongOfRest = async () => {
         if (!songOfRestDie || songOfRestApplied) return;
         const { total } = rollDice(1, songOfRestDie);
         const bonus = Math.max(1, total + conBonus);
-        const combatSummary = getCombatContext();
+        const combatSummary = await getCombatContext(campaignName);
         if (combatSummary) {
             const result = applyHealingToTarget(combatSummary, playerStats.name, bonus, campaignName);
             if (result) {

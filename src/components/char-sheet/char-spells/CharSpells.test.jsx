@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpells from './CharSpells.jsx';
 
@@ -739,7 +739,7 @@ it('should show spell detail popup when spell name is clicked', () => {
     expect(screen.getByText('8d6 Fire (DEX half)')).toBeInTheDocument();
   });
 
-  it('should call rollDamage with save context for save-based spells', () => {
+  it('should call rollDamage with save context for save-based spells', async () => {
     const mockRollDamage = vi.fn();
     useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: null,
@@ -787,7 +787,9 @@ it('should show spell detail popup when spell name is clicked', () => {
     const effectCell = screen.getByText('1d8 Radiant (DEX negates)');
     fireEvent.click(effectCell);
 
-    expect(mockRollDamage).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockRollDamage).toHaveBeenCalled();
+    });
     const args = mockRollDamage.mock.calls[0];
     expect(args[0]).toBe('Sacred Flame');
     expect(args[5]).toMatchObject({

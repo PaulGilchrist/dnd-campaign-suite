@@ -140,9 +140,11 @@ describe('CharActions', () => {
     const hitBonusElement = screen.getByText('+5');
     fireEvent.click(hitBonusElement);
 
-    expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5, expect.objectContaining({
-      damageType: 'Slashing',
-    }));
+    await waitFor(() => {
+      expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5, expect.objectContaining({
+        damageType: 'Slashing',
+      }));
+    });
   });
 
   it('should call rollDamage when damage is clicked', async () => {
@@ -159,8 +161,9 @@ describe('CharActions', () => {
     const damageElement = screen.getByText('1d8+3');
     fireEvent.click(damageElement);
 
-    // rollDamage is called with (name, formula, total, rolls, modifier)
-    expect(mockRollDamage).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockRollDamage).toHaveBeenCalled();
+    });
     const args = mockRollDamage.mock.calls[0];
     expect(args[0]).toBe('Longsword');
     expect(args[1]).toBe('1d8+3');

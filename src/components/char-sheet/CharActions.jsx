@@ -113,20 +113,18 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         },
     });
 
-    const getCombatTargetInfo = React.useCallback(() => {
-        const cs = getCombatContext();
+    const getTargetInfo = React.useCallback(async () => {
+        const cs = await getCombatContext(campaignName);
         if (!cs) return null;
         const target = getTargetFromAttacker(cs, playerStats.name);
         if (!target) return null;
         return target;
-    }, [playerStats.name]);
+    }, [playerStats.name, campaignName]);
 
-    const buildAttackContextSync = React.useCallback((attack) => {
-        const target = getCombatTargetInfo();
-        const targetName = target?.name || (() => {
-            const cs = getCombatContext();
-            return cs ? getAttackerTargetName(cs, playerStats.name) : undefined;
-         })();
+    const buildAttackContextSync = React.useCallback(async (attack) => {
+        const target = await getTargetInfo();
+        const cs = await getCombatContext(campaignName);
+        const targetName = target?.name || (cs ? getAttackerTargetName(cs, playerStats.name) : undefined);
         const resistanceNotice = target ? getResistanceNotice([attack.damageType], target.resistances, target.immunities, target.name) : null;
 
          // Check for Stunning Strike save advantage (consumed on use)
@@ -161,14 +159,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             autoDamageFormula: attack.damage,
             autoDamageName: attack.name,
            };
-          }, [getCombatTargetInfo, conditionAttackMode, playerStats.name, campaignName]);
+          }, [getTargetInfo, conditionAttackMode, playerStats.name, campaignName]);
 
     const buildAttackContext = React.useCallback(async (attack) => {
         if (!mapName) {
-            return buildAttackContextSync(attack);
+            return await buildAttackContextSync(attack);
         }
 
-        const base = buildAttackContextSync(attack);
+        const base = await buildAttackContextSync(attack);
 
         try {
             const [mapData, npcs] = await Promise.all([
@@ -179,7 +177,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
             if (attackerPlayer) {
                 let targetPos = null;
-                const cs = getCombatContext();
+                const cs = await getCombatContext(campaignName);
                 if (cs) {
                     const target = getTargetFromAttacker(cs, playerStats.name);
                     if (target) {
@@ -261,35 +259,20 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         if (wasCrit && setPopupHtml) setPopupHtml(null);
         const result = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
         if (result) {
-            if (!mapName) {
-                rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier, buildAttackContextSync(attack));
-            } else {
-                buildAttackContext(attack).then(ctx => {
-                    rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier, ctx);
-                }).catch(() => { });
-            }
+            (mapName ? buildAttackContext(attack) : buildAttackContextSync(attack)).then(ctx => {
+                rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier, ctx);
+            }).catch(() => { });
         }
     };
 
     const handleAttackClick = React.useCallback((attack) => {
         if (cannotAct) return;
-        if (!mapName) {
-            const ctx = buildAttackContextSync(attack);
+        buildAttackContext(attack).then(ctx => {
             rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, ctx);
-        } else {
-            buildAttackContext(attack).then(ctx => {
-                rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, ctx);
-            }).catch(() => { });
-        }
-    }, [cannotAct, mapName, buildAttackContextSync, buildAttackContext, rollAttack, exhaustionPenalty]);
+        }).catch(() => { });
+    }, [cannotAct, buildAttackContext, rollAttack, exhaustionPenalty]);
 
     const MONK_KI_FEATURES = ['Flurry of Blows', 'Patient Defense', 'Step of the Wind', 'Heightened Flurry of Blows', 'Heightened Patient Defense', 'Heightened Step of the Wind', 'Hand of Healing', 'Stunning Strike'];
-
-    function getCombatSummary() {
-        const stored = localStorage.getItem('combatSummary');
-        if (!stored) return null;
-        try { return JSON.parse(stored); } catch { return null; }
-    }
 
     const handleMetamagicAction = () => {
         const name = playerStats.name;
@@ -334,7 +317,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         }
     };
 
-    const handleEmpoweredReroll = (lastEvent, chaMod, campaignName) => {
+    const handleEmpoweredReroll = async (lastEvent, chaMod, campaignName) => {
         const parsed = parseExpression(lastEvent.damageFormula);
         if (!parsed) return;
 
@@ -367,7 +350,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         const newTotal = newRolls.reduce((sum, r) => sum + r, 0) + modifier;
         const damageDifference = newTotal - lastEvent.rawDamage;
 
-        const combatSummary = getCombatSummary();
+        const combatSummary = await getCombatContext(campaignName);
         if (!combatSummary || !lastEvent.targetName) {
             setPopupHtml({
                 type: 'empowered_spell',
@@ -496,7 +479,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     } else {
                         saveDc = auto.saveDc || 10;
                     }
-                    const ctx = buildAttackContextSync({
+                    const ctx = await buildAttackContextSync({
                         name: action.name,
                         damage: auto.damage,
                         damageType: auto.damageType || '',
@@ -509,7 +492,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 break;
              }
         case 'save_only': {
-             const cs = getCombatContext();
+             const cs = await getCombatContext(campaignName);
              const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
              const targetName = target?.name || playerStats.name;
 
@@ -623,17 +606,15 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
                     const healAmount = rollResult.total + wisModifier;
 
-                    const combatSummary = (() => {
-                        try { return getCombatContext(); } catch (e) { return null; }
-                    })();
-                    const combatTarget = combatSummary ? getTargetFromAttacker(combatSummary, playerStats.name) : null;
-                    const targetName = combatTarget ? combatTarget.name : playerStats.name;
-                    const targetMaxHp = combatTarget ? combatTarget.maxHp : playerStats.hitPoints;
+                    const combatSummary = await getCombatContext(campaignName);
+                    const target = combatSummary ? getTargetFromAttacker(combatSummary, playerStats.name) : null;
+                    const targetName = target ? target.name : playerStats.name;
+                    const targetMaxHp = target ? target.maxHp : playerStats.hitPoints;
                     const targetCurrentHp = (() => {
-                        if (combatTarget) {
-                            const stored = getRuntimeValue(combatTarget.name, 'currentHitPoints', campaignName);
+                        if (target) {
+                            const stored = getRuntimeValue(target.name, 'currentHitPoints', campaignName);
                             if (stored != null && stored !== '') return Number(stored);
-                            if (combatTarget.type === 'npc') return combatTarget.currentHp;
+                            if (target.type === 'npc') return target.currentHp;
                             return targetMaxHp;
                         }
                         const stored = getRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
@@ -642,8 +623,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     const newHp = Math.min(targetMaxHp, targetCurrentHp + healAmount);
                     const actualHeal = newHp - targetCurrentHp;
 
-                    if (combatTarget && combatSummary) {
-                        applyHealingToTarget(combatSummary, combatTarget.name, healAmount, campaignName);
+                    if (target && combatSummary) {
+                        applyHealingToTarget(combatSummary, target.name, healAmount, campaignName);
                     } else {
                         setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
                     }
@@ -726,7 +707,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     if (formula) {
                         const result = rollExpression(formula);
                         if (result) {
-                            const target = getCombatTargetInfo();
+                            const target = getTargetInfo();
                             rollDamage(spellName, formula, result.total, result.rolls, result.modifier, {
                                 damageType: spellData.damage.damage_type || 'Radiant',
                                 targetName: target?.name,
@@ -853,12 +834,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
 
                     // Also update combat summary if in combat
-                    const combatSummary = (() => {
-                        try {
-                            const cs = getCombatContext();
-                            return cs;
-                        } catch (e) { return null; }
-                    })();
+                    const combatSummary = await getCombatContext(campaignName);
                     if (combatSummary) {
                         const creature = combatSummary.creatures.find(c => c.name === playerStats.name || c.name.startsWith(playerStats.name + ' '));
                         if (creature) {
@@ -964,9 +940,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const actionCastAction = React.useCallback((spell, metaCtx) => {
         const pos = cachedActionCastPosRef.current;
-        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getCombatTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, featEffects: featRangeEffects });
+        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, featEffects: featRangeEffects });
         cachedActionCastPosRef.current = null;
-    }, [rollAttack, rollDamage, playerStats, getCombatTargetInfo, featRangeEffects]);
+    }, [rollAttack, rollDamage, playerStats, getTargetInfo, featRangeEffects]);
     const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction);
     const handleActionSpellCast = React.useCallback(async (spell) => {
         setSelectedActionSpell(null);
@@ -977,7 +953,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 ]);
                 const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
                 if (attackerPlayer) {
-                    const cs = getCombatContext();
+                    const cs = await getCombatContext(campaignName);
                     const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
                     if (target) {
                         const targetPlayer = mapData?.players?.find(p => p.name === target.name);
@@ -1377,7 +1353,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                   getWeaponMastery={getWeaponMastery}
                   rollAttack={rollAttack}
                   rollDamage={rollDamage}
-                  getCombatTargetInfo={getCombatTargetInfo}
+                  getTargetInfo={getTargetInfo}
               />
           </div>
       )

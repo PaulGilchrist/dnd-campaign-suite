@@ -44,19 +44,24 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, rest
     const [healAmount, setHealAmount] = React.useState(1);
     const [log, setLog] = React.useState([]);
     const [selectedConditions, setSelectedConditions] = React.useState([]);
+    const [combatSummary, setCombatSummary] = React.useState(null);
 
     const safePool = Number(poolRemaining) || 0;
     const safeMax = Number(poolMaxFromHook) || 0;
 
-    const combatSummary = getCombatContext();
-    const combatTarget = combatSummary ? getTargetFromAttacker(combatSummary, playerStats.name) : null;
-    const targetName = combatTarget ? combatTarget.name : playerStats.name;
-    const targetMaxHp = combatTarget ? combatTarget.maxHp : playerStats.hitPoints;
+    React.useEffect(() => {
+        getCombatContext(campaignName).then(cs => {
+            if (cs) setCombatSummary(cs);
+        });
+    }, [campaignName]);
+    const target = combatSummary ? getTargetFromAttacker(combatSummary, playerStats.name) : null;
+    const targetName = target ? target.name : playerStats.name;
+    const targetMaxHp = target ? target.maxHp : playerStats.hitPoints;
     const targetCurrentHp = (() => {
-          if (combatTarget) {
-            const stored = getRuntimeValue(combatTarget.name, 'currentHitPoints');
+          if (target) {
+            const stored = getRuntimeValue(target.name, 'currentHitPoints');
             if (stored != null && stored !== '') return Number(stored);
-            if (combatTarget.type === 'npc') return combatTarget.currentHp;
+            if (target.type === 'npc') return target.currentHp;
             return targetMaxHp;
           }
           const stored = getRuntimeValue(playerStats.name, 'currentHitPoints');
@@ -119,10 +124,10 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, rest
         const newPool = safePool - amount;
         setPoolRemaining(newPool);
 
-        if (combatTarget && combatSummary) {
-            const result = applyHealingToTarget(combatSummary, combatTarget.name, amount, campaignName);
+        if (target && combatSummary) {
+            const result = applyHealingToTarget(combatSummary, target.name, amount, campaignName);
             if (result) {
-                setLog(prev => [...prev, { action: 'Heal', target: combatTarget.name, amount: result.actualHeal, poolAfter: newPool }]);
+                setLog(prev => [...prev, { action: 'Heal', target: target.name, amount: result.actualHeal, poolAfter: newPool }]);
                 setHealAmount(Math.min(healAmount, newPool));
             }
         } else {
@@ -155,7 +160,7 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, rest
         const filtered = conditions.filter(c => !conditionMatches(c, condition));
         setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
 
-        if (combatSummary && combatTarget && combatTarget.type === 'npc') {
+        if (combatSummary && target && target.type === 'npc') {
             const creature = combatSummary.creatures?.find(c => c.name === targetName);
             if (creature && Array.isArray(creature.conditions)) {
                 creature.conditions = creature.conditions.filter(c => !conditionMatches(c.key, condition));
@@ -193,7 +198,7 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, rest
             const filtered = conditions.filter(c => !conditionMatches(c, condition));
             setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
 
-            if (combatSummary && combatTarget && combatTarget.type === 'npc') {
+            if (combatSummary && target && target.type === 'npc') {
                 const creature = combatSummary.creatures?.find(c => c.name === targetName);
                 if (creature && Array.isArray(creature.conditions)) {
                     creature.conditions = creature.conditions.filter(c => !conditionMatches(c.key, condition));

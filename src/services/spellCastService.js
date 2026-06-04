@@ -1,7 +1,7 @@
 import { rollExpression } from './diceRoller.js';
 import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet } from './rangeValidation.js';
 
-export function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getCombatTargetInfo, attackerPos, targetPos, featEffects }) {
+export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects }) {
   const slotDmg = spell.damage?.damage_at_slot_level;
   const charDmg = spell.damage?.damage_at_character_level;
   const dmgObj = slotDmg && Object.keys(slotDmg).length ? slotDmg : charDmg;
@@ -25,7 +25,7 @@ export function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playe
   }
 
   if (spell.dc) {
-    const target = getCombatTargetInfo();
+    const target = await getTargetInfo();
     const context = {
       targetName: target?.name,
       attackerName: playerStats.name,

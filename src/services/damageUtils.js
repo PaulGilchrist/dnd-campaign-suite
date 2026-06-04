@@ -30,14 +30,16 @@ export function getResistanceNotice(damageTypes, targetResistances, targetImmuni
   return null;
 }
 
-export function getCombatContext() {
-  const stored = localStorage.getItem('combatSummary');
-  if (!stored) return null;
+export async function getCombatContext(campaignName) {
+  if (!campaignName) return null;
   try {
-    return JSON.parse(stored);
-  } catch {
+    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/combatSummary`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.value || null;
+   } catch {
     return null;
-  }
+   }
 }
 
 export function findCreatureByName(combatSummary, name) {

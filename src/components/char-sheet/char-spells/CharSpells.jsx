@@ -75,19 +75,19 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         return match ? match[1] : null;
     };
 
-    const getCombatTargetInfo = React.useCallback(() => {
-        const cs = getCombatContext();
+    const getTargetInfo = React.useCallback(async () => {
+        const cs = await getCombatContext(campaignName);
         if (!cs) return null;
         return getTargetFromAttacker(cs, playerStats.name);
-    }, [playerStats.name]);
+    }, [playerStats.name, campaignName]);
 
     const cachedCastPosRef = React.useRef(null);
 
     const castAction = React.useCallback((spell, metaCtx) => {
       const pos = cachedCastPosRef.current;
-      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getCombatTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos });
+      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos });
       cachedCastPosRef.current = null;
-    }, [rollAttack, rollDamage, playerStats, getCombatTargetInfo]);
+    }, [rollAttack, rollDamage, playerStats, getTargetInfo]);
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
     const handleSpellCast = React.useCallback(async (spell) => {
       setSelectedSpell(null);
@@ -98,7 +98,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
           ]);
           const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
           if (attackerPlayer) {
-            const cs = getCombatContext();
+            const cs = await getCombatContext(campaignName);
             const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
             if (target) {
               const targetPlayer = mapData?.players?.find(p => p.name === target.name);
@@ -128,8 +128,8 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         if (wasCrit && setDicePopupHtml) setDicePopupHtml(null);
         const result = wasCrit ? rollExpressionDoubled(formula) : rollExpression(formula);
         if (result) {
-            const doDamage = (metaCtx) => {
-                const target = getCombatTargetInfo();
+            const doDamage = async (metaCtx) => {
+                const target = await getTargetInfo();
                 const context = {
                     targetName: target?.name,
                     attackerName: playerStats.name,
