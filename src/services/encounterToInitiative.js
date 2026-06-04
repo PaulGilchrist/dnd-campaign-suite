@@ -56,6 +56,9 @@ export async function expandMonstersToCreatures(selectedMonsters, characters, _c
     const creatureList = [];
     const npcRollResults = [];
 
+    // Player creatures in combatSummary are minimal by design.
+    // Single source of truth for player stats (AC, HP, resistances, etc.) is
+    // character.computedStats (playerStats), resolved at read time — NOT stored here.
     const playerChars = await Promise.all(characters.map(async (character) => {
       return {
         name: utils.getName(character.name),

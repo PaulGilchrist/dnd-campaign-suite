@@ -312,6 +312,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         });
     }, [combatSummary, campaignNpcs]);
 
+    // Player creatures in combatSummary are minimal by design.
+    // Single source of truth for player stats (AC, HP, resistances, etc.) is
+    // character.computedStats (playerStats), resolved at read time — NOT stored here.
     const setupCreatures = React.useCallback(() => {
         const creatureList = characters.map((character) => {
             return {
@@ -1202,6 +1205,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     creatures={combatSummary.creatures}
                     creatureName={viewingMonsterCreatureName}
                     mapName={mapName}
+                    characters={characters}
                 />
             )}
             {conditionPickerTarget && (

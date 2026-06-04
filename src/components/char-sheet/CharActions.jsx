@@ -19,7 +19,6 @@ import { hasAutomation } from '../../services/automationService.js'
 import { sendSavePrompt } from '../../services/savePromptService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { addTurnExpiration } from '../../services/turnExpirations.js';
-import storage from '../../services/storage.js'
 import utils from '../../services/utils.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
 import HandOfHealingModal from './HandOfHealingModal.jsx'
@@ -837,15 +836,10 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     // Update HP in storage (triggers SSE broadcast to other clients)
                     setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
 
-                    // Also update combat summary if in combat
-                    const combatSummary = await getCombatContext(campaignName);
-                    if (combatSummary) {
-                        const creature = combatSummary.creatures.find(c => c.name === playerStats.name || c.name.startsWith(playerStats.name + ' '));
-                        if (creature) {
-                            creature.currentHp = newHp;
-                            storage.set('combatSummary', combatSummary, campaignName);
-                        }
-                    }
+                    // NOTE: Do NOT write player HP into the combatSummary creature.
+                    // Single source of truth for player stats is playerStats (computedStats),
+                    // resolved at read time. The combatSummary only stores combat metadata
+                    // (name, type, initiative, targetName, concentration) for players.
 
                     // Increment use count
                     const newUsesUsed = usesUsed + 1;

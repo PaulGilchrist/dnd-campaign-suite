@@ -28,7 +28,7 @@ function readAoeContext(campaignName) {
 
 export default function useLoggedDiceRoll(characterName, campaignName, options = {}) {
   const { popupHtml, setPopupHtml } = useDiceRoll();
-  const { autoDamageRoll } = options;
+  const { autoDamageRoll, characters } = options;
   const autoDamageRollRef = useRef(null);
   autoDamageRollRef.current = autoDamageRoll || null;
 
@@ -176,8 +176,23 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
      const isAutoMiss = context?.isAutoMiss === true;
 
       const coverAcBonus = context?.coverAcBonus || 0;
-      const rawTargetAc = target?.ac;
-      const targetAc = typeof rawTargetAc === 'number' ? rawTargetAc : (console.error(`[AC] Target "${target?.name || characterName}" has no AC defined. Defaulting to 10.`), 10);
+
+      // Resolve AC: for NPCs, read from the combatSummary creature (stored at encounter setup).
+      // For players, the combatSummary creature does NOT store AC — single source of truth is
+      // character.computedStats.armorClass, resolved here at read time.
+      let targetAc;
+      if (target?.type === 'player') {
+        const playerChar = (characters || []).find(c => c.name === target.name);
+        const playerComputed = playerChar?.computedStats || playerChar;
+        targetAc = playerComputed?.armorClass;
+      } else {
+        targetAc = target?.ac;
+      }
+
+      if (target && typeof targetAc !== 'number') {
+        throw new Error(`[AC] Target "${target.name}" has no AC defined.`);
+      }
+
       const effectiveAc = target ? targetAc + coverAcBonus : undefined;
       const hit = isAutoMiss ? false : (target ? (r1 + bonus >= effectiveAc) : undefined);
       const targetName = target?.name || context?.targetName;

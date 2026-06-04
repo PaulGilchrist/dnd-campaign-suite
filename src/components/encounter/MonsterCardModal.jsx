@@ -18,7 +18,7 @@ function toAbbr(name) {
   return ABBR_MAP[name] || name?.substring(0, 3).toLowerCase();
 }
 
-function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureName, mapName }) {
+function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureName, mapName, characters }) {
   const monsterName = creatureName || monster?.name || 'Monster';
   const fallbackCsRef = useRef(null);
   const [mapData, setMapData] = useState(null);
@@ -62,6 +62,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
         }
       },
+      characters,
     }
   );
 

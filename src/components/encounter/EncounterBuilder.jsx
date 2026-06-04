@@ -767,6 +767,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
           monster={viewingMonster}
           onClose={() => setViewingMonster(null)}
           campaignName={campaignName}
+          characters={characters}
         />
       )}
     </div>

@@ -1559,6 +1559,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     onClose={() => setViewingMonster(null)}
                     campaignName={campaignName}
                     mapName={mapName}
+                    characters={characters}
                 />
             )}
         </div>
