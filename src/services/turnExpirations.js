@@ -22,11 +22,71 @@ function getActiveCreatureName() {
 
 export function addTurnExpiration(attackerName, targetName, effects, campaignName) {
     const list = getRuntimeValue(attackerName, KEY) || [];
-    const nowRound = getCurrentCombatRound();
+    const currentRound = getCurrentCombatRound();
     setRuntimeValue(attackerName, KEY, [
-            ...list,
-            { target: targetName, effects, appliedRound: nowRound }
-        ], campaignName);
+         ...list,
+         { target: targetName, effects, appliedRound: currentRound }
+     ], campaignName);
+}
+
+export function clearAllExpirationEffects(characterName, campaignName) {
+    if (!characterName || !campaignName) return;
+
+    const charLower = characterName.toLowerCase();
+
+     // Get all current combat creatures for validation
+    let currentCreatures = [];
+    try {
+        const combatData = JSON.parse(localStorage.getItem('combatSummary') || '{}');
+        currentCreatures = combatData.creatures || [];
+      } catch (e) { /* no combat data */ }
+
+    const inCombat = currentCreatures.length ? new Set(currentCreatures.map(c => utils.getName(c.name).toLowerCase())) : null;
+
+     // --- "From me": clear all effects I have on other targets ---
+    const myList = getRuntimeValue(characterName, KEY) || [];
+    for (const entry of myList) {
+        clearExpirationEffects(entry.effects, entry.target, characterName, campaignName);
+      }
+    setRuntimeValue(characterName, KEY, [], campaignName);
+
+     // --- Scan all runtime stores for "to me" and stale entries ---
+    const allKeys = Object.keys(localStorage);
+    for (const key of allKeys) {
+        if (!key || key === 'combatSummary' || key === 'activeCreatureName') continue;
+        if (key.toLowerCase() === charLower) continue;
+
+       const list = getRuntimeValue(key, KEY) || [];
+        if (!list.length) continue;
+
+        let kept = [];
+      for (const entry of list) {
+            const targetLower = utils.getName(entry.target).toLowerCase();
+            const keyLower = key.toLowerCase();
+
+           // Clear if the effect targets me
+            if (targetLower === charLower) {
+                clearExpirationEffects(entry.effects, entry.target, key, campaignName);
+                 continue;
+              }
+
+           // If combat data exists, clear stale entries (attacker or target not in combat)
+            if (inCombat) {
+                if (!inCombat.has(keyLower)) {
+                    clearExpirationEffects(entry.effects, entry.target, key, campaignName);
+                     continue;
+                  }
+                if (!inCombat.has(targetLower)) {
+                    clearExpirationEffects(entry.effects, entry.target, key, campaignName);
+                     continue;
+                  }
+              }
+
+           kept.push(entry);
+          }
+
+        setRuntimeValue(key, KEY, kept, campaignName);
+      }
 }
 
 export function expireStaleEffects(campaignName) {

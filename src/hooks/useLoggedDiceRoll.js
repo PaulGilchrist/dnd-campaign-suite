@@ -12,6 +12,7 @@ import {
 import { sendSavePrompt, sendSaveResult } from '../services/savePromptService.js';
 import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../services/aoeService.js';
 import { saveLastDamageEvent } from './useMetamagic.js';
+import { clearAllExpirationEffects } from '../services/turnExpirations.js';
 
 function readAoeContext(campaignName) {
   try {
@@ -255,8 +256,9 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                   }
               } catch (e) { /* ignore parse errors */ }
           }
-        window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + bonus } }));
-      }
+         clearAllExpirationEffects(characterName, campaignName);
+         window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + bonus } }));
+        }
      }
 
    function logDamageAndShow(name, formula, total, rolls, modifier, context) {

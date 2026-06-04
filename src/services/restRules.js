@@ -1,5 +1,6 @@
 import { getLevelAfterLongRest } from './exhaustionRules.js'
 import { getRuntimeValue, setRuntimeBatch } from '../hooks/useRuntimeState.js'
+import { clearAllExpirationEffects } from './turnExpirations.js'
 
 export function getHitDieSize(playerStats) {
   return playerStats.class?.class_levels?.[playerStats.level - 1]?.hit_die || 8
@@ -69,6 +70,8 @@ export async function applyShortRest(playerStats, campaignName) {
    }
 
   setRuntimeBatch(name, updates, campaignName)
+
+  clearAllExpirationEffects(name, campaignName)
 }
 
 export async function applyLongRest(playerStats, campaignName) {
@@ -84,27 +87,29 @@ export async function applyLongRest(playerStats, campaignName) {
       const max = playerStats.spellAbilities[key]
       if (max != null) {
         charData[key] = max
+         }
        }
      }
-    }
 
   charData.shortRestHitDice = playerStats.level
 
   getLongRestResources().forEach((key) => {
     charData[key] = null
-    })
+     })
 
   const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel')
   if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
     charData.exhaustionLevel = getLevelAfterLongRest(currentExhaustion)
-     }
+       }
 
-   // Grant Heroic Inspiration from Resourceful trait (Human 2024)
+    // Grant Heroic Inspiration from Resourceful trait (Human 2024)
   const hasResourceful = playerStats.characterAdvancement?.some(f => f.name === 'Resourceful')
   if (hasResourceful) {
     charData.hasInspiration = true
-     }
+       }
 
-   // Single atomic write fires ONE SSE event with the complete final state
+     // Single atomic write fires ONE SSE event with the complete final state
   setRuntimeBatch(name, charData, campaignName)
+
+  clearAllExpirationEffects(name, campaignName)
 }

@@ -3,6 +3,7 @@ import React from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
 import { rollDice } from '../../services/diceRoller.js'
 import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES } from '../../services/restRules.js'
+import { clearAllExpirationEffects } from '../../services/turnExpirations.js'
 import { getClassFeatures } from '../../services/classFeatures.js'
 import { getCombatContext } from '../../services/damageUtils.js'
 import { applyHealingToTarget } from '../../services/applyHealing.js'
@@ -77,7 +78,9 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
 
         SHORT_REST_RESOURCES.forEach((key) => {
             setRuntimeValue(playerStats.name, key, null, campaignName);
-        });
+          });
+
+        clearAllExpirationEffects(playerStats.name, campaignName);
 
         onComplete && onComplete();
      };
