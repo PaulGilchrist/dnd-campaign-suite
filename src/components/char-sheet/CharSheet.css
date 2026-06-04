@@ -107,6 +107,13 @@
     flex-wrap: wrap;
     margin-top: 8px;
 }
+.cure-btn-active {
+    background-color: var(--color-header) !important;
+    color: var(--background-color-header-inner) !important;
+}
+.short-rest-warning {
+    color: var(--color-error-light);
+}
 
 .stat--penalized {
     color: var(--color-error-light);

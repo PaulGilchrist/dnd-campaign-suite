@@ -5218,7 +5218,7 @@
                             "action": "bonus_action",
                             "recharge": "long_rest",
                             "alsoCures": [
-                                "poison"
+                                "poisoned"
                             ],
                             "cureCost": 5,
                             "casting_time": "1 bonus action"

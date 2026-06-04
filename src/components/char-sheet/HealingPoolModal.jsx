@@ -5,9 +5,33 @@ import useTrackedResource from '../../hooks/useTrackedResource.js'
 import storage from '../../services/storage.js'
 import { getTargetFromAttacker, getCombatContext } from '../../services/damageUtils.js'
 import { applyHealingToTarget } from '../../services/applyHealing.js'
+import { CONDITIONS } from '../../services/conditionUtils.js'
+import utils from '../../services/utils.js'
 import './CharSheet.css'
 
-function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, onClose }) {
+function conditionMatches(c, targetCondition) {
+    return (typeof c === 'string' ? c.toLowerCase() : '').trim() === (typeof targetCondition === 'string' ? targetCondition.toLowerCase() : '').trim();
+}
+
+function resolveConditionKey(name) {
+    const lower = typeof name === 'string' ? name.toLowerCase().trim() : '';
+    for (const c of CONDITIONS) {
+        if (c.key.toLowerCase() === lower || c.label.toLowerCase() === lower) {
+            return c.key;
+        }
+    }
+    return typeof name === 'string' ? lower : name;
+}
+
+function conditionLabel(name) {
+    const key = resolveConditionKey(name);
+    for (const c of CONDITIONS) {
+        if (c.key === key) return c.label;
+    }
+    return name;
+}
+
+function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, restoringTouchConditions, onClose }) {
     const layOnHandsPoolMax = 5 * (playerStats.level || 1);
 
     const { current: poolRemaining, max: poolMaxFromHook, update: setPoolRemaining } = useTrackedResource(
@@ -19,6 +43,7 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, onCl
        );
     const [healAmount, setHealAmount] = React.useState(1);
     const [log, setLog] = React.useState([]);
+    const [selectedConditions, setSelectedConditions] = React.useState([]);
 
     const safePool = Number(poolRemaining) || 0;
     const safeMax = Number(poolMaxFromHook) || 0;
@@ -36,6 +61,56 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, onCl
           const stored = getRuntimeValue(playerStats.name, 'currentHitPoints');
           return stored != null && stored !== '' ? Number(stored) : playerStats.hitPoints;
         })();
+
+    const getTargetConditions = React.useCallback(() => {
+        const runtimeConditions = getRuntimeValue(targetName, 'activeConditions') || [];
+
+        if (combatSummary) {
+            try {
+                if (combatSummary) {
+                    const creature = combatSummary.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
+                    if (creature && Array.isArray(creature.conditions)) {
+                        const csKeys = creature.conditions.map(c => c.key);
+                        const seen = new Set(runtimeConditions.map(c => String(c).toLowerCase()));
+                        const merged = [...runtimeConditions];
+                        for (const key of csKeys) {
+                            if (!seen.has(key.toLowerCase())) {
+                                merged.push(key);
+                                seen.add(key.toLowerCase());
+                            }
+                        }
+                        return merged;
+                    }
+                }
+            } catch { /* ignore */ }
+        }
+
+        return runtimeConditions;
+    }, [targetName, combatSummary]);
+
+    const targetConditions = getTargetConditions();
+    const allCurableEntries = [...(alsoCures || []), ...(restoringTouchConditions || [])];
+    const curableEntries = allCurableEntries
+        .map(name => ({ key: resolveConditionKey(name), label: conditionLabel(name) }))
+        .filter(entry => entry.key && targetConditions.some(c => conditionMatches(c, entry.key)));
+
+    const hasRestoringTouch = restoringTouchConditions && restoringTouchConditions.length > 0;
+
+    React.useEffect(() => {
+        const validKeys = new Set(curableEntries.map(e => e.key));
+        setSelectedConditions(prev => {
+            const valid = prev.filter(k => validKeys.has(k));
+            return valid.length === prev.length ? prev : valid;
+        });
+    }, [curableEntries]);
+
+    const toggleCondition = (conditionKey) => {
+        setSelectedConditions(prev =>
+            prev.includes(conditionKey)
+                ? prev.filter(c => c !== conditionKey)
+                : [...prev, conditionKey]
+        );
+    };
 
     const applyHeal = () => {
         const amount = Math.min(healAmount, safePool);
@@ -75,22 +150,19 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, onCl
         const newPool = safePool - cureCost;
         setPoolRemaining(newPool);
 
-        // Remove from runtime state (primary source)
         const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-        const filtered = conditions.filter(c => c.toLowerCase().trim() !== condition.toLowerCase().trim());
+        const filtered = conditions.filter(c => !conditionMatches(c, condition));
         setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
 
-        // Remove from combat summary if present
         if (combatSummary && combatTarget) {
             const creature = combatSummary.creatures?.find(c => c.name === targetName);
             if (creature && Array.isArray(creature.conditions)) {
-                creature.conditions = creature.conditions.filter(c => c.key.toLowerCase().trim() !== condition.toLowerCase().trim());
+                creature.conditions = creature.conditions.filter(c => !conditionMatches(c.key, condition));
                 storage.set('combatSummary', combatSummary, campaignName);
                 window.dispatchEvent(new CustomEvent('combat-summary-updated'));
             }
         }
 
-        // Log the cure to the API
         fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -108,6 +180,46 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, onCl
         setHealAmount(Math.min(healAmount, newPool));
      };
 
+    const applyBatchCure = () => {
+        if (selectedConditions.length === 0) return;
+        const totalCost = selectedConditions.length * cureCost;
+        if (safePool < totalCost) return;
+        const newPool = safePool - totalCost;
+        setPoolRemaining(newPool);
+
+        selectedConditions.forEach((condition) => {
+            const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+            const filtered = conditions.filter(c => !conditionMatches(c, condition));
+            setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+
+            if (combatSummary && combatTarget) {
+                const creature = combatSummary.creatures?.find(c => c.name === targetName);
+                if (creature && Array.isArray(creature.conditions)) {
+                    creature.conditions = creature.conditions.filter(c => !conditionMatches(c.key, condition));
+                    storage.set('combatSummary', combatSummary, campaignName);
+                    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+                }
+            }
+
+            fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'condition',
+                    characterName: targetName,
+                    condition: condition,
+                    action: 'broken',
+                    sourceName: playerStats.name,
+                    timestamp: Date.now(),
+                })
+            }).catch(() => {});
+
+            setLog(prev => [...prev, { action: `Cure ${condition}`, target: targetName, amount: cureCost, poolAfter: newPool }]);
+        });
+
+        setSelectedConditions([]);
+    };
+
     React.useEffect(() => {
         const handleKey = (e) => {
             if (e.key === 'Escape') onClose();
@@ -115,6 +227,8 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, onCl
         document.addEventListener('keydown', handleKey);
         return () => document.removeEventListener('keydown', handleKey);
     }, [onClose]);
+
+    const batchTotalCost = selectedConditions.length * cureCost;
 
     return (
         <div className="short-rest-overlay no-print" onClick={onClose}>
@@ -148,7 +262,47 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, onCl
                     </div>
                 </div>
 
-                {alsoCures && alsoCures.length > 0 && (
+                {hasRestoringTouch && curableEntries.length > 0 && (
+                    <div className="short-rest-section">
+                        <h4>Cure Conditions ({cureCost} HP each)</h4>
+                        <p>Select conditions affecting {targetName} to cure:</p>
+                        <div className="healing-cure-options">
+                            {curableEntries.map((entry) => {
+                                const isSelected = selectedConditions.includes(entry.key);
+                                return (
+                                    <button
+                                        key={entry.key}
+                                        className={`char-btn${isSelected ? ' cure-btn-active' : ''}`}
+                                        onClick={() => toggleCondition(entry.key)}
+                                    >
+                                        <i className={`fa-solid fa-${isSelected ? 'check-circle' : 'circle'}`}></i> {entry.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="short-rest-dice-row">
+                            <button
+                                className="char-btn"
+                                onClick={applyBatchCure}
+                                disabled={selectedConditions.length === 0 || safePool < batchTotalCost}
+                            >
+                                <i className="fas fa-shield-alt"></i> Cure Selected ({selectedConditions.length} for {batchTotalCost} HP)
+                            </button>
+                            {selectedConditions.length > 0 && safePool >= batchTotalCost && (
+                                <span className="short-rest-total">
+                                    Pool after: {safePool - batchTotalCost} HP
+                                </span>
+                            )}
+                            {selectedConditions.length > 0 && safePool < batchTotalCost && (
+                                <span className="short-rest-total short-rest-warning">
+                                    Not enough pool! Need {batchTotalCost - safePool} more HP
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {!hasRestoringTouch && alsoCures && alsoCures.length > 0 && (
                     <div className="short-rest-section">
                         <h4>Cure Conditions ({cureCost} HP each)</h4>
                         <div className="short-rest-dice-row">

@@ -694,12 +694,16 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 break;
             }
             case 'healing_pool': {
+                const restoringTouch = playerStats.characterAdvancement?.find(
+                    f => f.name === 'Restoring Touch'
+                );
                 setHealingPoolModal({
                     name: action.name,
                     pool: auto.pool,
                     resourceKey: auto.resourceKey,
                     alsoCures: auto.alsoCures || [],
                     cureCost: auto.cureCost || 5,
+                    restoringTouchConditions: restoringTouch?.automation?.cureConditions || [],
                 });
                 break;
             }
@@ -1292,6 +1296,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                        poolExpression={healingPoolModal.poolExpression}
                        alsoCures={healingPoolModal.alsoCures}
                        cureCost={healingPoolModal.cureCost}
+                       restoringTouchConditions={healingPoolModal.restoringTouchConditions}
                        onClose={() => setHealingPoolModal(null)}
                     />
                 )}
