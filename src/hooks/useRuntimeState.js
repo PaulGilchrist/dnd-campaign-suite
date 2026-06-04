@@ -22,15 +22,14 @@ export async function seedStoreFromServer(characterKey, campaignName) {
   if (!campaignName) return;
   try {
     const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(characterKey)}`);
-    if (response.ok) {
-      const data = await response.json();
-      if (data.value && typeof data.value === 'object') {
-        const store = stores.get(characterKey);
-        for (const [k, v] of Object.entries(data.value)) {
-          store.set(k, v);
-        }
-        notify(characterKey);
+    if (!response.ok) return;
+    const data = await response.json();
+    if (data.value && typeof data.value === 'object') {
+      const store = stores.get(characterKey);
+      for (const [k, v] of Object.entries(data.value)) {
+        store.set(k, v);
       }
+      notify(characterKey);
     }
   } catch { /* fall through — localStorage already loaded */ }
 }
@@ -65,7 +64,7 @@ export function setRuntimeValue(characterKey, propertyName, value, campaignName)
     console.error('setRuntimeValue called with undefined campaignName', { characterKey, propertyName, value, stack: new Error().stack });
   }
 
-  fetch(`/api/campaigns/${campaignName}/${characterKey}`, {
+  fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(characterKey)}`, {
     method: 'POST',
     mode: 'cors',
     headers: { 'Content-Type': 'application/json' },
@@ -89,7 +88,7 @@ export function setRuntimeObject(characterKey, fullObject, campaignName) {
     try { localStorage.setItem(characterKey, JSON.stringify(Object.fromEntries(store))); } catch { /* ignore */ }
 
     if (campaignName) {
-      fetch(`/api/campaigns/${campaignName}/${characterKey}`, {
+      fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(characterKey)}`, {
         method: 'POST',
         mode: 'cors',
         headers: { 'Content-Type': 'application/json' },
@@ -144,7 +143,7 @@ export function setRuntimeBatch(characterKey, properties, campaignName) {
     console.error('setRuntimeBatch called with undefined campaignName', { characterKey, properties, stack: new Error().stack });
   }
 
-  fetch(`/api/campaigns/${campaignName}/${characterKey}`, {
+  fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(characterKey)}`, {
     method: 'POST',
     mode: 'cors',
     headers: { 'Content-Type': 'application/json' },

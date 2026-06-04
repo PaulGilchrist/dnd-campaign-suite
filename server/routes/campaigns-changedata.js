@@ -20,7 +20,7 @@ router.get('/api/campaigns/:campaign/:key', (req, res, next) => {
     const data = characterChangeData.get(campaign);
 
     if (!data || !(key in data)) {
-        return res.status(404).json({ error: 'Key not found' });
+        return res.json({ value: null });
     }
 
     res.json({ [key]: data[key] });

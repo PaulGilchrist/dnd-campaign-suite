@@ -3,7 +3,7 @@ const storage = {
     get: async (key, campaignName) => {
         if (campaignName) {
             try {
-                const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`);
+                const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(key)}`);
                 if (response.ok) {
                     const data = await response.json();
                     if (data.value != null) {
@@ -23,7 +23,7 @@ const storage = {
     set: (key, value, campaignName) => {
         const json = JSON.stringify(value);
         localStorage.setItem(key, json);
-        const fullUrl = `/api/campaigns/${campaignName}/${key}`;
+        const fullUrl = `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(key)}`;
         return fetch(fullUrl, {
             method: 'POST',
             mode: 'cors',

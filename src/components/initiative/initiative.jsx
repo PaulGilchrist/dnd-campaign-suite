@@ -23,7 +23,7 @@ import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 import * as mapsService from '../../services/mapsService.js';
 import { OverlayShape } from '../../models/SpellOverlay.js';
 import { expireStaleEffects } from '../../services/turnExpirations.js';
-import { loadCombatSummary, getCombatSummary, loadActiveCreatureName, getActiveCreatureName } from '../../services/combatData.js';
+import { loadCombatSummary, getCombatSummary, getActiveCreatureName } from '../../services/combatData.js';
 import './initiative.css'
 
 const SHAPE_LABELS = {
@@ -284,12 +284,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
          if (dataKey === 'combatSummary') {
             const prevRound = combatSummaryRef.current?.round ?? 1;
-             storage.set('combatSummary', event.data, campaignName);
              combatSummaryRef.current = event.data;
             setCombatSummary(event.data);
              if (event.data.round !== prevRound) expireStaleEffects(campaignName);
-           } else if (dataKey === 'activeCreatureName') {
-            storage.set('activeCreatureName', event.data, campaignName);
+            } else if (dataKey === 'activeCreatureName') {
             setActiveCreatureName(event.data);
             expireStaleEffects(campaignName);
         } else {
@@ -458,7 +456,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 setCombatSummary(summary);
                 combatSummaryRef.current = summary;
 
-                const activeName = await loadActiveCreatureName(campaignName);
+                const activeName = getActiveCreatureName();
                 if (activeName) {
                     setActiveCreatureName(activeName);
                 } else {
@@ -477,7 +475,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             }
         })();
         return () => { cancelled = true; };
-    }, [characters, campaignName, setupCreatures, loadCreatureMaxHp, getSaveBonuses]);
+    }, [characters, campaignName]); // eslint-disable-line react-hooks/exhaustive-deps
 
     React.useEffect(() => {
         if (!combatSummary || !onNpcsChange) return;
