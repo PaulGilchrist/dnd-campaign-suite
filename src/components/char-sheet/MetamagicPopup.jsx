@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getPreCastOptions, getMaxMetamagicPerSpell } from '../../services/metamagicRules.js';
+import { getPreCastOptions, getMaxMetamagicPerSpell, computeMetamagicCost, hasArcaneApotheosis } from '../../services/metamagicRules.js';
 import { getCombatSummary } from '../../services/combatData.js';
 import './MetamagicPopup.css';
 
@@ -22,10 +22,8 @@ export default function MetamagicPopup({ spell, playerStats, _campaignName, onCo
   const [twinTarget, setTwinTarget] = useState('');
   const creatureTargets = getCreatureTargets(playerStats?.name);
 
-  const totalCost = selected.reduce((sum, name) => {
-    const opt = options.find(o => o.name === name);
-    return sum + (opt?.resolvedCost || 0);
-  }, 0);
+  const apotheosisActive = hasArcaneApotheosis(playerStats, playerStats?.name);
+  const { totalCost, waivedName } = computeMetamagicCost(selected, options, playerStats, playerStats?.name);
 
   const remainingAfter = currentSP - totalCost;
   const canAffordTotal = remainingAfter >= 0;
@@ -77,14 +75,18 @@ export default function MetamagicPopup({ spell, playerStats, _campaignName, onCo
   }
 
   const isAffordable = (opt) => {
+       if (apotheosisActive) {
+           const nextSelection = selected.includes(opt.name) ? [...selected] : [...selected, opt.name];
+           return computeMetamagicCost(nextSelection, options, playerStats, playerStats?.name).totalCost <= currentSP;
+         }
     const costSoFar = selected
-      .filter(n => n !== opt.name)
-      .reduce((sum, name) => {
+       .filter(n => n !== opt.name)
+       .reduce((sum, name) => {
         const o = options.find(x => x.name === name);
         return sum + (o?.resolvedCost || 0);
-      }, 0);
-    return (currentSP - costSoFar) >= opt.resolvedCost;
-  };
+       }, 0);
+     return (currentSP - costSoFar) >= opt.resolvedCost;
+   };
 
   return (
     <div className="popup-overlay" onClick={onSkip}>
@@ -119,7 +121,9 @@ export default function MetamagicPopup({ spell, playerStats, _campaignName, onCo
                     onChange={() => toggleOption(opt.name, !disabled)}
                   />
                   <span className="metamagic-option-name">{opt.name}</span>
-                  <span className="metamagic-option-cost">{opt.resolvedCost} SP</span>
+                  <span className="metamagic-option-cost">
+    {waivedName === opt.name ? '0 (waived)' : `${opt.resolvedCost} SP`}
+</span>
                   <span className="metamagic-option-desc">{opt.description}</span>
                 </label>
               );

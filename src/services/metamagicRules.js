@@ -1,3 +1,5 @@
+import { getRuntimeValue } from '../hooks/useRuntimeState.js';
+
 export const METAMAGIC_EFFECTS = {
   CAREFUL: 'ally_auto_succeed_save',
   DISTANT: 'double_range',
@@ -92,3 +94,35 @@ export function getMaxMetamagicPerSpell(stats) {
 export function isPreCastOption(option) {
   return option.effect !== METAMAGIC_EFFECTS.EMPOWERED;
 }
+
+export function hasArcaneApotheosis(stats, playerName) {
+    const passives = stats?.automation?.passives ?? [];
+    const hasFeature = passives.some(p => p.name === 'Arcane Apotheosis');
+    if (!hasFeature) return false;
+    const buffs = getRuntimeValue(playerName, 'activeBuffs') || [];
+    return Array.isArray(buffs) && buffs.some(b => b.name === 'Innate Sorcery');
+ }
+
+export function computeMetamagicCost(selectedOptionNames, optionsList, stats, playerName) {
+    if (selectedOptionNames.length === 0) return { totalCost: 0, waivedName: null };
+
+    const costs = selectedOptionNames.map(name => {
+        const opt = optionsList.find(o => o.name === name);
+        return { name, cost: opt?.resolvedCost || 0 };
+    });
+
+    if (hasArcaneApotheosis(stats, playerName)) {
+        const maxCost = Math.max(...costs.map(c => c.cost));
+        const waivedIdx = costs.findIndex(c => c.cost === maxCost);
+        const waivedName = costs[waivedIdx].name;
+        let totalCost = 0;
+        for (let i = 0; i < costs.length; i++) {
+            if (i !== waivedIdx) totalCost += costs[i].cost;
+        }
+        return { totalCost, waivedName };
+    }
+
+    const totalCost = costs.reduce((sum, c) => sum + c.cost, 0);
+    return { totalCost, waivedName: null };
+ }
+

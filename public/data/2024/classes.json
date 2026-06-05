@@ -8145,12 +8145,18 @@
                 "proficiency_bonus": 6,
                 "sorcery_points": 20,
                 "features": [
-                    {
-                        "name": "Arcane Apotheosis",
-                        "description": "While your Innate Sorcery feature is active, you can use one Metamagic option on each of your turns without spending Sorcery Points on it.",
-                        "level": 20,
-                        "type": "class_feature"
-                    }
+{
+                          "name": "Arcane Apotheosis",
+                          "description": "While your Innate Sorcery feature is active, you can use one Metamagic option on each of your turns without spending Sorcery Points on it.",
+                          "level": 20,
+                          "type": "class_feature",
+                          "automation": {
+                              "type": "passive_rule",
+                              "effect": "arcane_apotheosis",
+                              "condition": "innate_sorcery_active",
+                              "casting_time": "passive"
+                          }
+                      }
                 ],
                 "spellcasting": {
                     "cantrips_known": 6,
