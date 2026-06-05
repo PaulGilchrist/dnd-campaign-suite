@@ -9,6 +9,7 @@ import utils from '../../services/utils.js';
 import storage from '../../services/storage.js';
 
 function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, onClose, featureName = 'Abjure Foes', conditionName = 'frightened', saveType = 'WIS', rangeFeet = 60 }) {
+    const [selected, setSelected] = useState(new Set());
     const [processing, setProcessing] = useState(false);
     const [results, setResults] = useState([]);
     const [pendingPrompts, setPendingPrompts] = useState([]);
@@ -24,6 +25,18 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
             return dist != null && dist <= rangeFeet;
          });
      }, [combatSummary, attackerName, mapData, attackerPos, rangeFeet]);
+
+    const toggleTarget = useCallback((name) => {
+        setSelected(prev => {
+            const next = new Set(prev);
+            if (next.has(name)) {
+                next.delete(name);
+             } else {
+                next.add(name);
+             }
+            return next;
+         });
+     }, []);
 
     const addConditionToCreature = useCallback((targetName, saveDcValue) => {
         const creature = combatSummary.creatures.find(c => c.name === targetName);
@@ -70,15 +83,15 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
      }, [campaignName, attackerName, conditionName, saveType]);
 
     const handleApply = useCallback(() => {
-        if (eligibleTargets.length === 0) return;
+        if (selected.size === 0) return;
         setProcessing(true);
 
         const npcResults = [];
         const playerPrompts = [];
 
-        eligibleTargets.forEach(target => {
-            const targetName = target.name;
-            const isNpc = target.type === 'npc';
+        selected.forEach(targetName => {
+            const target = combatSummary.creatures.find(c => c.name === targetName);
+            const isNpc = !target || target.type === 'npc';
 
             if (isNpc) {
                 const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
@@ -157,7 +170,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
         setResults(npcResults);
         setPendingPrompts(playerPrompts);
 
-     }, [eligibleTargets, combatSummary, campaignName, saveDc, attackerName, addConditionToCreature, logCondition, featureName, saveType]);
+     }, [selected, combatSummary, campaignName, saveDc, attackerName, addConditionToCreature, logCondition, featureName, saveType]);
 
     const handleSaveResult = useCallback((event) => {
         const detail = event.detail;
@@ -206,7 +219,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
         return () => window.removeEventListener('save-result', handleSaveResult);
      }, [processing, handleSaveResult]);
 
-    const allResolved = processing && pendingPrompts.length === 0 && results.length >= eligibleTargets.length;
+    const allResolved = processing && pendingPrompts.length === 0 && results.length >= selected.size;
 
     const conditionLabel = conditionName.charAt(0).toUpperCase() + conditionName.slice(1);
 
@@ -219,13 +232,19 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
                  <div className="sp-body">
                      {!processing ? (
                          <>
-                             <p>All creatures within {rangeFeet} feet must make a <strong>{saveType}</strong> saving throw (DC {saveDc}) or become <strong>{conditionLabel}</strong> for 1 minute.</p>
+                             <p>Select creatures within {rangeFeet} feet. Each must make a <strong>{saveType}</strong> saving throw (DC {saveDc}) or become <strong>{conditionLabel}</strong> for 1 minute.</p>
+                             <p className="sp-note">Targets selected: {selected.size}/{eligibleTargets.length}</p>
                              <div className="abjure-targets-list">
                                  {eligibleTargets.map(c => (
-                                     <div key={c.name} className="abjure-target-row abjure-target-selected">
+                                     <label key={c.name} className={`abjure-target-row ${selected.has(c.name) ? 'abjure-target-selected' : ''}`}>
+                                         <input
+                                             type="checkbox"
+                                             checked={selected.has(c.name)}
+                                             onChange={() => toggleTarget(c.name)}
+                                         />
                                          <span className="abjure-target-name">{c.name}</span>
-                                         <span className="abjure-target-type">({c.type})</span>
-                                     </div>
+                                         <span className="abjure-target-type">({c.type})</span>&nbsp;&nbsp;
+                                     </label>
                                  ))}
                                  {eligibleTargets.length === 0 && (
                                      <p className="sp-note">No valid targets in range.</p>
@@ -256,8 +275,8 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
                  <div className="sp-actions">
                      {!processing ? (
                          <>
-                             <button className="sp-roll-btn" onClick={handleApply} disabled={eligibleTargets.length === 0} type="button">
-                                 <i className="fa-solid fa-dice-d20"></i> {featureName} ({eligibleTargets.length} target{eligibleTargets.length !== 1 ? 's' : ''})
+                             <button className="sp-roll-btn" onClick={handleApply} disabled={selected.size === 0} type="button">
+                                 <i className="fa-solid fa-dice-d20"></i> {featureName} ({selected.size} target{selected.size !== 1 ? 's' : ''})
                              </button>
                              <button className="sp-dismiss-btn" onClick={onClose} type="button">
                                  Cancel

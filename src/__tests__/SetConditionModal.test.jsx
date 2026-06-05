@@ -128,16 +128,18 @@ describe('SetConditionModal', () => {
     expect(screen.queryByText(/Goblin A/)).toBeInTheDocument();
     expect(screen.queryByText(/Goblin B/)).toBeInTheDocument();
     expect(screen.queryByText(/Player Ally/)).toBeInTheDocument();
+    expect(screen.queryByText(/Attacker/)).not.toBeInTheDocument();
   });
 
-  it('does not render checkboxes for targets', () => {
+  it('renders checkboxes for each eligible target', () => {
     render(<SetConditionModal {...makeProps()} />);
-    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    const checkboxes = screen.getAllByRole('checkbox');
+    expect(checkboxes).toHaveLength(3);
   });
 
-  it('shows the feature name button with target count', () => {
-    render(<SetConditionModal {...makeProps({ featureName: 'Nature\'s Wrath' })} />);
-    expect(screen.getByRole('button', { name: /Nature's Wrath \(3 targets\)/ })).toBeInTheDocument();
+  it('shows target selection counter starting at 0', () => {
+    render(<SetConditionModal {...makeProps()} />);
+    expect(screen.getByText(/Targets selected: 0\/3/)).toBeInTheDocument();
   });
 
   // ── Edge cases for eligible targets ──
@@ -161,25 +163,64 @@ describe('SetConditionModal', () => {
     expect(screen.getByText(/No valid targets in range/)).toBeInTheDocument();
   });
 
+  // ── Checkbox interactions ──
+
+  it('toggles target selection on checkbox click', () => {
+    render(<SetConditionModal {...makeProps()} />);
+    const checkbox = screen.getAllByRole('checkbox')[0];
+    expect(checkbox.checked).toBe(false);
+    fireEvent.click(checkbox);
+    expect(checkbox.checked).toBe(true);
+  });
+
+  it('deselects target on second click', () => {
+    render(<SetConditionModal {...makeProps()} />);
+    const checkbox = screen.getAllByRole('checkbox')[0];
+    fireEvent.click(checkbox);
+    fireEvent.click(checkbox);
+    expect(checkbox.checked).toBe(false);
+  });
+
+  it('allows selecting all targets (no max cap)', () => {
+    render(<SetConditionModal {...makeProps()} />);
+    const checkboxes = screen.getAllByRole('checkbox');
+    checkboxes.forEach(cb => fireEvent.click(cb));
+    checkboxes.forEach(cb => expect(cb.checked).toBe(true));
+  });
+
+  it('updates target counter when targets selected', () => {
+    render(<SetConditionModal {...makeProps()} />);
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    expect(screen.getByText(/Targets selected: 1\/3/)).toBeInTheDocument();
+  });
+
   // ── Apply button behavior ──
 
-  it('disables apply button when no valid targets', () => {
-    const emptyProps = makeProps({ combatSummary: { creatures: [{ name: 'Attacker', type: 'player' }] } });
-    render(<SetConditionModal {...emptyProps} />);
+  it('disables apply button when no targets selected', () => {
+    render(<SetConditionModal {...makeProps()} />);
     const btn = screen.getByRole('button', { name: /Abjure Foes \(0 targets\)/ });
     expect(btn.disabled).toBe(true);
   });
 
-  it('enables apply button when targets exist', () => {
+  it('enables apply button after selecting a target', () => {
     render(<SetConditionModal {...makeProps()} />);
-    const btn = screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ });
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    const btn = screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ });
     expect(btn.disabled).toBe(false);
   });
 
   it('shows singular "target" when count is 1', () => {
-    const singleTargetSummary = { creatures: [{ name: 'Attacker', type: 'player' }, { name: 'Goblin A', type: 'npc' }] };
-    render(<SetConditionModal {...makeProps({ combatSummary: singleTargetSummary })} />);
+    render(<SetConditionModal {...makeProps()} />);
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
     expect(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ })).toBeInTheDocument();
+  });
+
+  it('shows plural "targets" when count exceeds 1', () => {
+    render(<SetConditionModal {...makeProps()} />);
+    const boxes = screen.getAllByRole('checkbox');
+    fireEvent.click(boxes[0]);
+    fireEvent.click(boxes[1]);
+    expect(screen.getByRole('button', { name: /Abjure Foes \(2 targets\)/ })).toBeInTheDocument();
   });
 
   // ── Cancel and close ──
@@ -209,41 +250,45 @@ describe('SetConditionModal', () => {
 
   // ── Confirm flow — NPC saves (auto-roll) ──
 
-  it('rolls NPC saves and shows processing state on apply', () => {
+  it('rolls NPC save and shows processing state on confirm', () => {
     diceRoller.rollD20.mockReturnValue(15);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
     expect(savePromptService.sendSaveResult).toHaveBeenCalled();
-    expect(diceRoller.rollD20).toHaveBeenCalledTimes(2); // 2 NPCs
+    expect(diceRoller.rollD20).toHaveBeenCalledTimes(1);
     const bodyDiv = document.querySelector('.sp-body');
     expect(bodyDiv.textContent).toMatch(/Resolving WIS saving throws/);
   });
 
-  it('NPCs succeed when roll total >= saveDc', () => {
+  it('NPC succeeds when roll total >= saveDc', () => {
     diceRoller.rollD20.mockReturnValue(14);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
-    expect(screen.getAllByText(/Saved — unaffected/)).toHaveLength(2);
+    expect(screen.getByText(/Saved — unaffected/)).toBeInTheDocument();
   });
 
-  it('NPCs fail and show Frightened when roll < DC', () => {
+  it('NPC fails and shows Frightened when roll < DC', () => {
     diceRoller.rollD20.mockReturnValue(5);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
-    expect(screen.getAllByText(/Failed — Frightened!/)).toHaveLength(2);
+    expect(screen.getByText(/Failed — Frightened!/)).toBeInTheDocument();
   });
 
   it('NPC failure calls turn expiration tracking', () => {
     diceRoller.rollD20.mockReturnValue(5);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
     expect(turnExpirations.addTurnExpiration).toHaveBeenCalled();
   });
@@ -252,34 +297,38 @@ describe('SetConditionModal', () => {
     diceRoller.rollD20.mockReturnValue(20);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 
   it('NPC failure with bonus shows correct total in roll display', () => {
-    diceRoller.rollD20.mockReturnValue(10);
+    diceRoller.rollD20.mockReturnValue(10); // roll=10 saveBonus=2 → total=12 < 14 → fail
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[1]);
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
-    expect(screen.getAllByText(/\(Roll: 10 \+2 = 12\)/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/\(Roll: 10 \+2 = 12\)/)).toBeInTheDocument();
   });
 
   it('NPC success with bonus shows correct total in roll display', () => {
-    diceRoller.rollD20.mockReturnValue(14);
+    diceRoller.rollD20.mockReturnValue(14); // roll=14 + 2 = 16 >= 14 → success
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[1]);
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
-    expect(screen.getAllByText(/\(Roll: 14 \+2 = 16\)/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/\(Roll: 14 \+2 = 16\)/)).toBeInTheDocument();
   });
 
   it('uses saveBonus of 0 when creature has no saveBonuses', () => {
     diceRoller.rollD20.mockReturnValue(10);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
     expect(savePromptService.sendSaveResult).toHaveBeenCalledWith(
       'test-campaign',
@@ -300,6 +349,7 @@ describe('SetConditionModal', () => {
     diceRoller.rollD20.mockReturnValue(10);
 
     render(<SetConditionModal {...makeProps({ combatSummary: natureSummary, featureName: 'Nature\'s Wrath', conditionName: 'restrained', saveType: 'STR' })} />);
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
     fireEvent.click(screen.getByRole('button', { name: /Nature's Wrath \(1 target\)/ }));
 
     expect(savePromptService.sendSaveResult).toHaveBeenCalledWith(
@@ -319,6 +369,7 @@ describe('SetConditionModal', () => {
     diceRoller.rollD20.mockReturnValue(5);
 
     render(<SetConditionModal {...makeProps({ combatSummary: natureSummary, featureName: 'Nature\'s Wrath', conditionName: 'restrained', saveType: 'STR' })} />);
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
     fireEvent.click(screen.getByRole('button', { name: /Nature's Wrath \(1 target\)/ }));
 
     expect(screen.getByText(/Failed — Restrained!/)).toBeInTheDocument();
@@ -326,24 +377,27 @@ describe('SetConditionModal', () => {
 
   // ── Confirm flow — Player saves (prompt-based) ──
 
-  it('sends save prompt for player creatures on apply', () => {
+  it('sends save prompt for player creature on confirm', () => {
     diceRoller.rollD20.mockReturnValue(15);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[2]);
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
     expect(savePromptService.sendSavePrompt).toHaveBeenCalled();
   });
 
-  // ── Confirm flow — mixed NPC and Player ──
+  // ── Confirm flow — mixed NPC and Player selection ──
 
   it('shows both NPC results and pending player prompts', () => {
     diceRoller.rollD20.mockReturnValue(5);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A (NPC)
+    fireEvent.click(screen.getAllByRole('checkbox')[2]); // Player Ally
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(2 targets\)/ }));
 
-    expect(screen.getAllByText(/Failed — Frightened!/)).toHaveLength(2);
+    expect(screen.getByText(/Failed — Frightened!/)).toBeInTheDocument();
     expect(screen.getByText(/Waiting for save roll/)).toBeInTheDocument();
   });
 
@@ -353,7 +407,8 @@ describe('SetConditionModal', () => {
     diceRoller.rollD20.mockReturnValue(15);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[2]); // Player Ally
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
     const sentPrompt = savePromptService.sendSavePrompt.mock.calls[0][1];
     window.dispatchEvent(
@@ -371,7 +426,8 @@ describe('SetConditionModal', () => {
     diceRoller.rollD20.mockReturnValue(15);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[2]); // Player Ally
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
     const sentPrompt = savePromptService.sendSavePrompt.mock.calls[0][1];
     window.dispatchEvent(
@@ -389,7 +445,9 @@ describe('SetConditionModal', () => {
     diceRoller.rollD20.mockReturnValue(5);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // NPC
+    fireEvent.click(screen.getAllByRole('checkbox')[2]); // Player
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(2 targets\)/ }));
 
     const sentPrompt = savePromptService.sendSavePrompt.mock.calls[0][1];
     window.dispatchEvent(
@@ -407,7 +465,9 @@ describe('SetConditionModal', () => {
     diceRoller.rollD20.mockReturnValue(5);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // NPC
+    fireEvent.click(screen.getAllByRole('checkbox')[2]); // Player
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(2 targets\)/ }));
 
     const sentPrompt = savePromptService.sendSavePrompt.mock.calls[0][1];
     window.dispatchEvent(
@@ -424,7 +484,9 @@ describe('SetConditionModal', () => {
     const onClose = vi.fn();
 
     render(<SetConditionModal {...makeProps({ onClose })} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // NPC
+    fireEvent.click(screen.getAllByRole('checkbox')[2]); // Player
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(2 targets\)/ }));
 
     const sentPrompt = savePromptService.sendSavePrompt.mock.calls[0][1];
     window.dispatchEvent(
@@ -443,7 +505,8 @@ describe('SetConditionModal', () => {
     diceRoller.rollD20.mockReturnValue(15);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[2]); // Player only → pending
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
     expect(screen.queryByText('Done')).not.toBeInTheDocument();
   });
@@ -464,13 +527,14 @@ describe('SetConditionModal', () => {
     expect(bodyDiv.textContent).toMatch(/15 feet/);
   });
 
-  // ── Side-effects on apply ──
+  // ── Side-effects on confirm ──
 
-  it('persists combatSummary after apply via storage mock', () => {
+  it('persists combatSummary after confirm via storage mock', () => {
     diceRoller.rollD20.mockReturnValue(15);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // NPC
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
     expect(savePromptService.sendSaveResult).toHaveBeenCalled();
   });
@@ -479,16 +543,18 @@ describe('SetConditionModal', () => {
     diceRoller.rollD20.mockReturnValue(15);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
     expect(logService.addEntry).toHaveBeenCalled();
   });
 
   it('calls fetch for condition logging when NPC save fails', () => {
-    diceRoller.rollD20.mockReturnValue(5);
+    diceRoller.rollD20.mockReturnValue(5); // fail
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A no bonuses
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
     const logCalls = global.fetch.mock.calls.filter(
       (call) => call[0] === '/api/campaigns/test-campaign/log'
@@ -497,10 +563,11 @@ describe('SetConditionModal', () => {
   });
 
   it('does not log condition for NPC save success', () => {
-    diceRoller.rollD20.mockReturnValue(20);
+    diceRoller.rollD20.mockReturnValue(20); // auto-success
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
     const logCalls = global.fetch.mock.calls.filter(
       (call) => call[0] === '/api/campaigns/test-campaign/log'
@@ -508,16 +575,15 @@ describe('SetConditionModal', () => {
     expect(logCalls).toHaveLength(0);
   });
 
-  // ── Edge case: apply with no targets is a no-op ──
+  // ── Edge case: confirm with no targets selected is a no-op ──
 
-  it('is a no-op when clicking apply with no targets', () => {
-    const emptyProps = makeProps({ combatSummary: { creatures: [{ name: 'Attacker', type: 'player' }] } });
-    render(<SetConditionModal {...emptyProps} />);
+  it('is a no-op when clicking confirm with no targets selected', () => {
+    render(<SetConditionModal {...makeProps()} />);
     const btn = screen.getByRole('button', { name: /Abjure Foes \(0 targets\)/ });
     fireEvent.click(btn);
 
     expect(diceRoller.rollD20).not.toHaveBeenCalled();
-    expect(screen.queryByText(/Resolving Wisdom/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Resolving WIS/)).not.toBeInTheDocument();
   });
 
   // ── Cleanup of event listener on unmount ──
@@ -526,7 +592,8 @@ describe('SetConditionModal', () => {
     diceRoller.rollD20.mockReturnValue(15);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(3 targets\)/ }));
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
     expect(() => {
       window.dispatchEvent(
@@ -535,18 +602,13 @@ describe('SetConditionModal', () => {
     }).not.toThrow();
   });
 
-  // ── Only NPC targets → resolved immediately (no pending) ──
+  // ── Only NPC targets selected → resolved immediately (no pending) ──
 
   it('shows resolved state with only NPC targets and no pending prompts', () => {
-    const npcOnlySummary = {
-      creatures: [
-        { name: 'Attacker', type: 'player' },
-        { name: 'Goblin A', type: 'npc', conditions: [] },
-      ],
-    };
     diceRoller.rollD20.mockReturnValue(5);
 
-    render(<SetConditionModal {...makeProps({ combatSummary: npcOnlySummary })} />);
+    render(<SetConditionModal {...makeProps()} />);
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // NPC only
     fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
     expect(screen.queryByText(/Waiting for save roll/)).not.toBeInTheDocument();
