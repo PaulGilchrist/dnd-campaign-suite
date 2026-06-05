@@ -481,10 +481,21 @@ function buildAttackInfo(feature, playerStats) {
         }
 
 
+        case 'sorcery_aura': {
+            return {
+                type: 'sorcery_aura',
+                name: feature.name,
+                uses_max: 2,
+                recharge: auto.recharge || 'long_rest',
+                casting_time: auto.casting_time || '1 bonus action',
+                hasAutomation: true
+             }
+        }
+
         default:
             return null
-    }
-}
+     }
+ }
 
 function evaluateAutoExpression(expression, playerStats, prof, level) {
     if (!expression) return expression
@@ -545,6 +556,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'spell_modifier':
             case 'font_of_magic':
             case 'set_condition':
+            case 'sorcery_aura':
                 result.actions.push(info)
                 break
             case 'damage_reduction':

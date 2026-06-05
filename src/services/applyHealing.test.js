@@ -162,11 +162,10 @@ describe('applyHealingToTarget', () => {
     it('does not reset death saves when still at 0 HP after healing', () => {
       getRuntimeValue.mockReturnValueOnce(30);
       getRuntimeValue.mockReturnValueOnce(0);
-      const player = createPlayerCreature('Fighter');
-      player.maxHp = 30;
-      const cs = makeCombatSummary([player]);
-      // 0 HP + 0 healing = still 0. But healAmount is 0, so newHp stays 0
-      // Actually if healAmount > 0 but maxHp is same as current, no change.
+       const player = createPlayerCreature('Fighter');
+       player.maxHp = 30;
+          // 0 HP + 0 healing = still 0. But healAmount is 0, so newHp stays 0
+        // Actually if healAmount > 0 but maxHp is same as current, no change.
     });
 
     it('does not save combat summary for player healing', () => {

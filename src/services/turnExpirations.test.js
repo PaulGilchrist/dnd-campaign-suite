@@ -45,10 +45,6 @@ function resetMocks() {
   localStorage.clear();
 }
 
-function stubUtilsGetName(returnValue) {
-  utils.getName.mockReturnValue(returnValue);
-}
-
 // Make utils.getName default to identity (pass-through) for most tests
 function stubUtilsNameIdentity() {
   utils.getName.mockImplementation((v) => v);

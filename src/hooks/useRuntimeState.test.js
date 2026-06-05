@@ -1,5 +1,5 @@
-import { renderHook, act } from '@testing-library/react';
-import { seedStoreFromServer, addStorageChangeListener, getRuntimeValue, setRuntimeValue, setRuntimeObject, useRuntimeValue, setRuntimeBatch, clearRuntimeState } from './useRuntimeState.js';
+import { act } from '@testing-library/react';
+import { seedStoreFromServer, addStorageChangeListener, getRuntimeValue, setRuntimeValue, clearRuntimeState } from './useRuntimeState.js';
 
 const usedKeys = new Set();
 function trackKey(k) { if (k) usedKeys.add(k); }

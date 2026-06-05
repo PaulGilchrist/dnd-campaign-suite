@@ -44,13 +44,6 @@ function makePassive(name) {
   return { name };
 }
 
-function makeAbilities(chextra = {}) {
-  return [
-     { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-     ...chextra.others ?? [],
-   ];
-}
-
 function makeSourceEntry(name, computedStats) {
   return { name, computedStats };
 }

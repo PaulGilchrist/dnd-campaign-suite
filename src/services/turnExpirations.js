@@ -16,6 +16,9 @@ export function addTurnExpiration(attackerName, targetName, effects, campaignNam
 export function clearAllExpirationEffects(characterName, campaignName) {
     if (!characterName || !campaignName) return;
 
+    // Clear all active buffs (Innate Sorcery, Reckless Attack, etc.)
+    setRuntimeValue(characterName, 'activeBuffs', [], campaignName);
+
     const charLower = characterName.toLowerCase();
 
      // --- "From me": clear all effects I have on other targets ---

@@ -12,6 +12,7 @@ import { executeSpellCast } from '../../services/spellCastService.js'
 import * as mapsService from '../../services/mapsService.js';
 import { getNearestPlacedItem } from '../../services/rangeValidation.js';
 import { getCombatContext, getTargetFromAttacker } from '../../services/damageUtils.js';
+import { getInnateSorceryBonus } from './char-summary/buffService.js';
 import './CharActions.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
@@ -20,6 +21,8 @@ const bonusActionCastingTimes = ['1 bonus action', '1 Bonus Action', 'bonus acti
 function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, onAttackClick, onDamageClick, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo }) {
     const [popupHtml, setPopupHtml] = useState(null);
     const [selectedBonusSpell, setSelectedBonusSpell] = useState(null);
+
+    const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
 
     const is2024Rules = playerStats.rules === '2024';
 
@@ -33,9 +36,9 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const bonusCastAction = React.useCallback((spell, metaCtx) => {
       const pos = cachedBonusCastPosRef.current;
-      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos });
+      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, innateSorceryActive: !!displaySaveDcBonus });
       cachedBonusCastPosRef.current = null;
-    }, [rollAttack, rollDamage, playerStats, getTargetInfo]);
+      }, [rollAttack, rollDamage, playerStats, getTargetInfo, displaySaveDcBonus]);
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, bonusCastAction);
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
 
@@ -108,8 +111,8 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                         return <React.Fragment key={attack.name}>
                              <div className='left'>{attack.name}</div>
                              <div>{attack.range} ft.</div>
-                             {attack.saveDc
-                                 ? <div className="save-dc-display">DC {attack.saveDc} {attack.saveType}</div>
+                               {attack.saveDc
+                                   ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
                                  : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
                              <div className={attack.damage ? "clickable" : ""} onClick={() => !cannotAct && onDamageClick(attack)}>{attack.damage}</div>
                              <div className='left'>{attack.damageType}</div>

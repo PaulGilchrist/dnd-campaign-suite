@@ -18,9 +18,11 @@ import UpcastPopup from './UpcastPopup.jsx'
 import { executeSpellCast } from '../../../services/spellCastService.js'
 import * as mapsService from '../../../services/mapsService.js';
 import { getNearestPlacedItem } from '../../../services/rangeValidation.js';
+import { isInnateSorceryActive } from '../char-summary/buffService.js';
 import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName }) {
+    const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
     const { popupHtml, setPopupHtml } = useActionPopup('spell');
      const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
         autoDamageRoll: (autoDamage, isCrit) => {
@@ -87,9 +89,9 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
 
     const castAction = React.useCallback((spell, metaCtx) => {
       const pos = cachedCastPosRef.current;
-      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos });
+      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, innateSorceryActive });
       cachedCastPosRef.current = null;
-    }, [rollAttack, rollDamage, playerStats, getTargetInfo]);
+     }, [rollAttack, rollDamage, playerStats, getTargetInfo, innateSorceryActive]);
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
 
@@ -145,13 +147,13 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                     ...metaCtx,
                 };
                 if (spell.dc) {
-                    context.dc = playerStats.spellAbilities.saveDc;
+                    context.dc = playerStats.spellAbilities.saveDc + (innateSorceryActive ? 1 : 0);
                     context.dcType = spell.dc.dc_type;
                     context.dcSuccess = spell.dc.dc_success;
-                    context.saveDc = playerStats.spellAbilities.saveDc;
+                    context.saveDc = playerStats.spellAbilities.saveDc + (innateSorceryActive ? 1 : 0);
                     context.saveType = spell.dc.dc_type;
                     context.dcSuccess = spell.dc.dc_success;
-                }
+                 }
                 rollDamage(spellName, formula, result.total, result.rolls, result.modifier, context);
             };
             if (isSorcerer) {
@@ -288,9 +290,10 @@ return (
                 <div>
                     <b className={'clickable' + (cannotAct ? ' disabled-attack' : '') + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? ' stat--penalized' : '')} onClick={() => {
                       if (cannotAct) return;
-                      const doAttack = (metaCtx) => {
-                        rollAttack('Spell Attack', playerStats.spellAbilities.toHit - exhaustionPenalty, { forcedMode: conditionAttackMode !== 'normal' ? conditionAttackMode : undefined, ...metaCtx });
-                      };
+                       const doAttack = (metaCtx) => {
+                         const innateAdv = isSorcerer && innateSorceryActive && !conditionAttackMode ? 'advantage' : undefined;
+                         rollAttack('Spell Attack', playerStats.spellAbilities.toHit - exhaustionPenalty, { forcedMode: conditionAttackMode !== 'normal' ? conditionAttackMode : innateAdv, ...metaCtx });
+                        };
                       if (isSorcerer) {
                         const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
                         setPendingSimpleMetamagic({
@@ -303,7 +306,7 @@ return (
                       }
                     }}>Attack (to hit):</b> <span className={exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.toHit - exhaustionPenalty}</span><br/>
                     <b>Modifier:</b> <span className={exhaustionPenalty > 0 ? 'stat--penalized' : ''}>+{playerStats.spellAbilities.modifier - exhaustionPenalty}</span><br/>
-                    <b>Save DC:</b> {playerStats.spellAbilities.saveDc}
+                      <b>Save DC:</b> {playerStats.spellAbilities.saveDc + (innateSorceryActive ? 1 : 0)}
                 </div>
                 <div>
                     <b>Cantrips Known:</b> {playerStats.spellAbilities.cantrips_known ? playerStats.spellAbilities.cantrips_known : 0}<br/>

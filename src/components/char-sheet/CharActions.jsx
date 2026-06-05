@@ -34,6 +34,7 @@ import { executeSpellCast } from '../../services/spellCastService.js'
 import { getChaModifier } from '../../services/metamagicRules.js';
 import { applyDamageToTarget } from '../../services/applyDamage.js';
 import { applyHealingToTarget } from '../../services/applyHealing.js';
+import { setInnateSorceryActive, getInnateSorceryBonus } from './char-summary/buffService.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';
 
@@ -50,6 +51,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [handOfHealingModal, setHandOfHealingModal] = useState(null);
     const [fontOfMagicModal, setFontOfMagicModal] = useState(null);
     const [setConditionModal, setSetConditionModal] = useState(null);
+    const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
 
     useEffect(() => {
         computeFeatRangeEffects(playerStats.feats, playerStats.rules).then(setFeatRangeEffects).catch(() => { });
@@ -144,8 +146,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                }
            }
 
+        const innateSorceryBonus = getInnateSorceryBonus(playerStats.name, campaignName);
+
         let forcedMode = conditionAttackMode !== 'normal' ? conditionAttackMode : undefined;
         if (hasSaveAdvantage && forcedMode === undefined) {
+            forcedMode = 'advantage';
+           }
+        if (innateSorceryBonus.spellAdvantage && forcedMode === undefined) {
             forcedMode = 'advantage';
            }
 
@@ -153,7 +160,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             damageType: attack.damageType,
             resistanceNotice,
             targetName,
-            saveDc: attack.saveDc,
+            saveDc: attack.saveDc + innateSorceryBonus.saveDcBonus,
             saveType: attack.saveType,
             dcSuccess: attack.saveSuccess,
             attackerName: playerStats.name,
@@ -161,7 +168,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             autoDamageFormula: attack.damage,
             autoDamageName: attack.name,
            };
-          }, [getTargetInfo, conditionAttackMode, playerStats.name, campaignName]);
+        }, [getTargetInfo, conditionAttackMode, playerStats.name, campaignName]);
 
     const buildAttackContext = React.useCallback(async (attack) => {
         if (!mapName) {
@@ -785,6 +792,50 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 }
                 break;
             }
+            case 'sorcery_aura': {
+                const usesUsed = Number(getRuntimeValue(playerStats.name, 'innateSorceryUses', campaignName) ?? 0);
+                const usesMax = auto.uses_max || 2;
+                const remaining = usesMax - usesUsed;
+
+                if (remaining <= 0) {
+                    if (setPopupHtml) {
+                        setPopupHtml({
+                            type: 'automation_info',
+                            name: action.name,
+                            automationType: auto.type,
+                            description: `${action.name} has no remaining uses. Recharges on a long rest (${usesMax}/${usesMax} used).`,
+                            automation: auto,
+                          });
+                    }
+                    return;
+                  }
+
+                const newUses = usesUsed + 1;
+                setRuntimeValue(playerStats.name, 'innateSorceryUses', newUses, campaignName);
+
+                if (newUses === usesMax) {
+                    // Uses exhausted - deactivate effect automatically
+                    setInnateSorceryActive(playerStats.name, false, campaignName);
+                    if (onBuffsChange) onBuffsChange();
+                } else {
+                    setInnateSorceryActive(playerStats.name, true, campaignName);
+                    if (onBuffsChange) onBuffsChange();
+                  }
+
+                window.dispatchEvent(new CustomEvent('innate-sorcery-updated'));
+
+                if (setPopupHtml) {
+                    const isActive = newUses < usesMax;
+                    setPopupHtml({
+                        type: 'automation_info',
+                        name: action.name,
+                        automationType: auto.type,
+                        description: `${action.name} ${isActive ? 'activated' : 'deactivated'} (${usesMax - newUses}/${usesMax} uses remaining).`,
+                        automation: auto,
+                      });
+                }
+                 break;
+               }
             case 'extra_action':
             case 'bonus_attacks':
             case 'bonus_action_attack':
@@ -1265,8 +1316,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         return <React.Fragment key={attack.name}>
                             <div className='left clickable' onClick={() => handleActionSpellClick(attack.name)}>{attack.name}</div>
                             <div>{attack.range} ft.</div>
-                            {attack.saveDc
-                                ? <div className="save-dc-display">DC {attack.saveDc} {attack.saveType}</div>
+                              {attack.saveDc
+                                  ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
                                 : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleSpellAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
                             <div className={attack.damage ? "clickable" : ""} onClick={() => {
                                 if (cannotAct) return;

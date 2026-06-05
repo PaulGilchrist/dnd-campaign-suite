@@ -40,7 +40,6 @@ import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
 import storage from './storage.js';
 import { sendDeathSavePrompt, sendConcentrationPrompt } from './savePromptService.js';
 import { rollConcentrationSave } from './concentrationRules.js';
-import utils from './utils.js';
 
 // ── Globals ────────────────────────────────────────────────────
 
@@ -598,12 +597,9 @@ describe('applyDamageToTarget', () => {
     it('does not set threshold when already dead', () => {
       stubPlayerRuntime(0);
       const player = createPlayerCreature('Fighter');
-      const cs = makeCombatSummary([player]);
-      applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], 'TestCampaign', []);
-      const callBody = JSON.parse(
-        global.fetch.mock.calls.find(c => c[0].includes('/log'))?.[1]?.body || '{}'
-       );
-         // wasDead so no threshold set
+       const cs = makeCombatSummary([player]);
+       applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], 'TestCampaign', []);
+             // wasDead so no threshold set
      });
 
     it('resets death saves when player dies', () => {

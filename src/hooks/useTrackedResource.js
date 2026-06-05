@@ -32,13 +32,15 @@ function useTrackedResource(storageKey, playerName, maxGetter, deps, campaignNam
 
     window.addEventListener('focus-points-updated', reReadHandler);
     window.addEventListener('sorcery-points-updated', reReadHandler);
+    window.addEventListener('innate-sorcery-updated', reReadHandler);
     const removeListener = addStorageChangeListener(playerName, reReadHandler);
 
     return () => {
       window.removeEventListener('focus-points-updated', reReadHandler);
       window.removeEventListener('sorcery-points-updated', reReadHandler);
+      window.removeEventListener('innate-sorcery-updated', reReadHandler);
       removeListener();
-    };
+     };
   }, [playerName, storageKey, campaignName, maxGetter]);
 
   const update = async (val) => {

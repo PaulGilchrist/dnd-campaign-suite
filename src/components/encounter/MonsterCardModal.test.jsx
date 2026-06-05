@@ -74,9 +74,9 @@ vi.mock('../../hooks/useLoggedDiceRoll.js', () => {
 // Expose mutable state for conditionEffects so we can control per-test
 vi.mock('../../services/conditionEffects.js', () => {
   let _computeReturn = null;
-  const _computeConditionEffects = vi.fn((conditions) => {
+  const _computeConditionEffects = vi.fn((_conditions) => {
     return _computeReturn ?? { ...defaultConditionEffects };
-  });
+   });
 
   return {
     computeConditionEffects: _computeConditionEffects,
@@ -90,9 +90,9 @@ vi.mock('../../services/conditionEffects.js', () => {
 // Expose mutable state for findCreatureByName mock
 vi.mock('../../services/damageUtils.js', () => {
   let _findCreatureReturn = null;
-  const _findCreatureByName = vi.fn((ctx, name) => {
+  const _findCreatureByName = vi.fn((_ctx, _name) => {
     return _findCreatureReturn ?? { name: 'Goblin', conditions: [] };
-  });
+    });
 
   return {
     extractDamageTypes: vi.fn(() => []),

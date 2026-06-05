@@ -47,7 +47,7 @@ function makeCombatSummary(creatures) {
   return { round: 1, creatures };
 }
 
-function createNpcCreature(name, gridX, gridY) {
+function createNpcCreature(name) {
   return { name, type: 'npc', currentHp: 20, maxHp: 20, conditions: [] };
 }
 
@@ -450,17 +450,17 @@ describe('sendAoePlayerSaves', () => {
   });
 
   it('calls sendSavePrompt once per player', () => {
-    const results = sendAoePlayerSaves(
-        [
-          { creature: createPlayerCreature('Hero') },
-          { creature: createPlayerCreature('Ranger') },
-          { creature: createPlayerCreature('Cleric') },
-        ], 10, 'Thunder', 15, 'strength', 'none',
-        'MyCampaign', 'Thunderstorm', 'Druid', [], '8d6'
-    );
+    sendAoePlayerSaves(
+          [
+            { creature: createPlayerCreature('Hero') },
+            { creature: createPlayerCreature('Ranger') },
+            { creature: createPlayerCreature('Cleric') },
+          ], 10, 'Thunder', 15, 'strength', 'none',
+          'MyCampaign', 'Thunderstorm', 'Druid', [], '8d6'
+      );
 
     expect(sendSavePrompt).toHaveBeenCalledTimes(3);
-  });
+   });
 
   it('generates unique prompt ID for each player', () => {
     // Each call to utils.guid generates a new UUID (mocked but still unique calls)

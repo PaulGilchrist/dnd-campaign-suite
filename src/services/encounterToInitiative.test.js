@@ -427,18 +427,18 @@ describe('loadEncounterToInitiative', () => {
  });
 
   it('stores activeCreatureName even when no creatures exist', async () => {
-    const result = await loadEncounterToInitiative([], [], 'TestCampaign');
+    await loadEncounterToInitiative([], [], 'TestCampaign');
 
-       // firstName is undefined, so storage.set is called with undefined value
+        // firstName is undefined, so storage.set is called with undefined value
     expect(storage.set).toHaveBeenCalledWith('activeCreatureName', undefined, 'TestCampaign');
- });
+  });
 
   it('first player goes first when NPCs have low initiative', async () => {
     rollD20.mockReturnValueOnce(5).mockReturnValueOnce(10); // NPC rolls low
     const chars = [createCharacter('Alpha')];
-    const result = await loadEncounterToInitiative([createMonster('Goblin')], chars, 'TestCampaign');
+    await loadEncounterToInitiative([createMonster('Goblin')], chars, 'TestCampaign');
 
-       // Player has initiative='' which is not a number, so when sorted b.initiative - a.initiative,
+        // Player has initiative='' which is not a number, so when sorted b.initiative - a.initiative,
        // '' coerces to NaN, and any number - NaN = NaN. The sort is unstable but the NPC will
        // generally sort after players because their string initiative becomes numeric.
  });
