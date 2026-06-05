@@ -97,6 +97,10 @@ export async function applyShortRest(playerStats, campaignName) {
     updates[key] = null
    }
 
+      // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
+  updates.activeBuffs = [];
+  updates.activeConditions = [];
+
   setRuntimeBatch(name, updates, campaignName)
 
   clearAllExpirationEffects(name, campaignName)
@@ -125,18 +129,22 @@ export async function applyLongRest(playerStats, campaignName) {
     charData[key] = null
      })
 
+  // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
+  charData.activeBuffs = [];
+  charData.activeConditions = [];
+
   const currentExhaustion = getRuntimeValue(name, 'exhaustionLevel')
   if (typeof currentExhaustion === 'number' && currentExhaustion > 0) {
     charData.exhaustionLevel = getLevelAfterLongRest(currentExhaustion)
-       }
+        }
 
-    // Grant Heroic Inspiration from Resourceful trait (Human 2024)
+     // Grant Heroic Inspiration from Resourceful trait (Human 2024)
   const hasResourceful = playerStats.characterAdvancement?.some(f => f.name === 'Resourceful')
   if (hasResourceful) {
     charData.hasInspiration = true
-       }
+        }
 
-     // Single atomic write fires ONE SSE event with the complete final state
+      // Single atomic write fires ONE SSE event with the complete final state
   setRuntimeBatch(name, charData, campaignName)
 
   clearAllExpirationEffects(name, campaignName)

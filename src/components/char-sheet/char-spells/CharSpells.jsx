@@ -23,7 +23,7 @@ import { useRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName }) {
-    const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+    const _activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName); (void _activeBuffs); // subscribe to activeBuffs changes for re-render
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
     const { popupHtml, setPopupHtml } = useActionPopup('spell');
      const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
