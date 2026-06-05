@@ -30,8 +30,8 @@
 /* Automation UI elements */
 .automation-btn {
     background: none;
-    border: 1px solid #8b5cf6;
-    color: #8b5cf6;
+    border: 1px solid #8f64f4;
+    color: #8f64f4;
     border-radius: 4px;
     padding: 1px 6px;
     font-size: 0.7rem;
@@ -49,10 +49,10 @@
 
 .automation-badge {
     display: inline-block;
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    color: #8b5cf6;
-    background: rgba(139, 92, 246, 0.1);
+    color: #8f64f4;
+    background: rgba(148, 109, 238, 0.1);
     padding: 1px 5px;
     border-radius: 3px;
     margin-left: 6px;

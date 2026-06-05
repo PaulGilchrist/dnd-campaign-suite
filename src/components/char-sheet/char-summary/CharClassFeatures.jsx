@@ -42,19 +42,22 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
     );
 };
 
-/* ─── Bard ─── */
 const BardFeatures = function BardFeatures({ playerStats, campaignName }) {
     const bardFeatures = getClassFeatures(playerStats);
+    const multiMinuteBadges = useActiveBuffs(playerStats, campaignName);
     return (
-         <div data-testid="char-class-bard">
-             {playerStats.level > 5 && (bardFeatures?.magicalSecrets ?? false) && <div><b>Extra Attacks: </b>1</div>}
-             <div><b>Bardic Inspiration Die: </b>d{bardFeatures?.bardicDie ?? 0}</div>
-             <TrackedResourceInput label="Bardic Inspiration Uses" resourceKey="bardicInspirationUses" playerName={playerStats.name} getMax={() => { const charisma = playerStats.abilities?.find((a) => a.name === 'Charisma'); return charisma?.bonus || 0; }} deps={[playerStats]} campaignName={campaignName} />
-             {bardFeatures?.songOfRestDie && <div><b>Song of Rest Die: </b>d{bardFeatures.songOfRestDie}</div>}
-               {bardFeatures?.magicalSecrets !== null && <TrackedResourceInput label="Magical Secrets" resourceKey="magicalSecrets" playerName={playerStats.name} getMax={() => bardFeatures.magicalSecrets + bardFeatures.subclassMagicalSecrets} deps={[playerStats]} campaignName={campaignName} />}
-             {playerStats.level > 2 && playerStats.class.expertise && <div><b>Expertise: </b>{playerStats.class.expertise.join(', ')}</div>}
-         </div>
-    );
+           <div data-testid="char-class-bard">
+               {multiMinuteBadges.map((b, i) => <span key={i} className="automation-badge">{b.name}</span>)}
+               {playerStats.level > 5 && (bardFeatures?.magicalSecrets ?? false) && <div><b>Extra Attacks: </b>1</div>}
+               <div><b>Bardic Inspiration Die: </b>d{bardFeatures?.bardicDie ?? 0}</div>
+               <TrackedResourceInput label="Bardic Inspiration Uses" resourceKey="bardicInspirationUses" playerName={playerStats.name} getMax={() => { const charisma = playerStats.abilities?.find((a) => a.name === 'Charisma'); return charisma?.bonus || 0; }} deps={[playerStats]} campaignName={campaignName} />
+               {bardFeatures?.songOfRestDie && <div><b>Song of Rest Die: </b>d{bardFeatures.songOfRestDie}</div>}
+                {bardFeatures?.magicalSecrets !== null && <TrackedResourceInput label="Magical Secrets" resourceKey="magicalSecrets" playerName={playerStats.name} getMax={() => bardFeatures.magicalSecrets + bardFeatures.subclassMagicalSecrets} deps={[playerStats]} campaignName={campaignName} />}
+               {playerStats.level > 2 && playerStats.class.expertise && <div><b>Expertise: </b>{playerStats.class.expertise.join(', ')}</div>}
+           </div>
+        );
+
+
 };
 
 /* ─── Cleric ─── */
@@ -69,19 +72,38 @@ const ClericFeatures = function ClericFeatures({ playerStats, campaignName }) {
     );
 };
 
-/* ─── Druid ─── */
+/* ─── Helpers for showing active buffs with multi-minute duration ─── */
+ const MULTI_MINUTE_DURATIONS = new Set([
+      '1_minute', '10_minutes', 'hour', 'half_druid_level_hours',
+      'long_rest', 'while_illusion_active'
+ ]);
+
+ function getMultiMinuteBadges(activeBuffs) {
+     void activeBuffs;
+     return Array.isArray(activeBuffs) ? activeBuffs.filter(b => MULTI_MINUTE_DURATIONS.has(b.duration)) : [];
+ }
+
+/* ─── Generic Hook: subscribe to buffs for any class ─── */
+ function useActiveBuffs(playerStats, campaignName) {
+     const activeBuffs = useRuntimeValue(playerStats?.name, 'activeBuffs', campaignName);
+     return getMultiMinuteBadges(activeBuffs);
+ }
+
+ /* ─── Druid ─── */
 const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
     const druidFeatures = getClassFeatures(playerStats);
+    const multiMinuteBadges = useActiveBuffs(playerStats, campaignName);
     if (playerStats.level < 2) return null;
     return (
-         <div data-testid="char-class-druid">
-             <TrackedResourceInput label="Wild Shape Uses" resourceKey="wildShapeUses" playerName={playerStats.name} getMax={() => druidFeatures?.maxWildShapeUses || 0} deps={[playerStats]} campaignName={campaignName} />
-             <div><b>Wild Shape Max Challenge Rating: </b>{druidFeatures?.maxWildShapeChallengeRating}</div>
-             {druidFeatures?.beastKnownForms > 0 && <div><b>Beast Forms Known: </b>{druidFeatures.beastKnownForms}</div>}
-             <div><b>Wild Shape Limitations: </b>{druidFeatures.wildShapeLimitations}</div>
+           <div data-testid="char-class-druid">
+               <TrackedResourceInput label="Wild Shape Uses" resourceKey="wildShapeUses" playerName={playerStats.name} getMax={() => druidFeatures?.maxWildShapeUses || 0} deps={[playerStats]} campaignName={campaignName} />
+               {multiMinuteBadges.map((b, i) => <span key={i} className="automation-badge">{b.name}</span>)}
+               <div><b>Wild Shape Max Challenge Rating: </b>{druidFeatures?.maxWildShapeChallengeRating}</div>
+               {druidFeatures?.beastKnownForms > 0 && <div><b>Beast Forms Known: </b>{druidFeatures.beastKnownForms}</div>}
+               <div><b>Wild Shape Limitations: </b>{druidFeatures.wildShapeLimitations}</div>
 
-         </div>
-    );
+           </div>
+        );
 };
 
 /* ─── Fighter ─── */
