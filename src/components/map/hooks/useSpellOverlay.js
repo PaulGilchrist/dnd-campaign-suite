@@ -1,5 +1,11 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import useSSEEqualityGuard from '../../../hooks/useSSEEqualityGuard.js';
 
+/**
+ * WARNING: SSE re-render loop risk
+ * All setters in handleSSEEvent must use equality guards to prevent loops when
+ * an echoed-back event triggers the same handler.  See useSSEEqualityGuard.
+ */
 const SSE_EVENT_KEY_PREFIX = 'spell-overlay-';
 const UPDATE_DEBOUNCE_MS = 150;
 
@@ -24,6 +30,7 @@ function saveOverlays(campaignName, mapName, overlays) {
 
 function useSpellOverlay(campaignName, mapName) {
     const [overlays, setOverlays] = useState(() => loadOverlays(campaignName, mapName));
+    const setOverlaysG = useSSEEqualityGuard(setOverlays);
     const [pendingOverlay, setPendingOverlay] = useState(null);
     const debounceTimerRef = useRef(null);
     const pendingRef = useRef(null);
@@ -91,33 +98,33 @@ function useSpellOverlay(campaignName, mapName) {
         switch (action) {
             case 'add':
                 if (newOverlays?.length) {
-                    setOverlays(prev => {
+                    setOverlaysG(prev => {
                         const existingIds = new Set(prev.map(o => o.id));
                         const unique = newOverlays.filter(n => !existingIds.has(n.id));
                         return unique.length ? [...prev, ...unique] : prev;
-                    });
-                }
+                     });
+                  }
                 break;
             case 'update':
                 if (newOverlays?.length) {
-                    setOverlays(prev => prev.map(o => {
+                    setOverlaysG(prev => prev.map(o => {
                         const replacement = newOverlays.find(n => n.id === o.id);
                         return replacement || o;
-                    }));
-                }
+                     }));
+                  }
                 break;
             case 'remove':
                 if (overlayId) {
-                    setOverlays(prev => prev.filter(o => o.id !== overlayId));
-                }
+                    setOverlaysG(prev => prev.filter(o => o.id !== overlayId));
+                  }
                 break;
             case 'clear':
-                setOverlays([]);
+                setOverlaysG([]);
                 break;
             default:
                 break;
-        }
-    }, [campaignName]);
+           }
+        }, [campaignName, setOverlaysG]);
 
     return {
         overlays,

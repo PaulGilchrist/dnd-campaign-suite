@@ -292,6 +292,12 @@ function App() {
     }
   };
 
+  /**
+   * WARNING: SSE re-render loop risk
+   * This handler processes inbound SSE events.  Self-echoes are filtered by the
+   * Subscriber component (via selfId).  The setRuntimeObject call already does
+   * deep comparison, and character list updates return prev unchanged when no match.
+   */
   const handleRuntimeEvent = useCallback((event) => {
     if (event.key == null || event.data == null) return;
     if (event.key.startsWith('character-')) {

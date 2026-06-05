@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const stores = new Map();
 const listeners = new Map();
@@ -118,23 +118,34 @@ export function setRuntimeObject(characterKey, fullObject, campaignName) {
   }
 }
 
+/**
+ * WARNING: SSE re-render loop risk
+ * The listener below is invoked whenever any property in the same runtime store
+ * changes.  If we call `setValue` for every notification we trigger unnecessary
+ * re-renders which can cascade into infinite loops when effects also fire.
+ * Use a ref-based equality guard to only re-render when this specific property changed.
+ */
 export function useRuntimeValue(characterKey, propertyName, campaignName) {
   const [value, setValue] = useState(() => getRuntimeValue(characterKey, propertyName));
+  const currentValueRef = useRef(undefined);
 
   useEffect(() => {
     if (!characterKey || !propertyName) return;
+    currentValueRef.current = getRuntimeValue(characterKey, propertyName);
     if (!listeners.has(characterKey)) listeners.set(characterKey, new Set());
     const listener = () => {
       const newVal = getRuntimeValue(characterKey, propertyName);
+      if (valuesEqual(currentValueRef.current, newVal)) return;
+      currentValueRef.current = newVal;
       setValue(newVal);
-    };
+     };
     listeners.get(characterKey).add(listener);
     listener();
     return () => {
       const set = listeners.get(characterKey);
       if (set) set.delete(listener);
-    };
-  }, [characterKey, propertyName, campaignName]);
+     };
+   }, [characterKey, propertyName, campaignName]);
 
   useEffect(() => {
     seedStoreFromServer(characterKey, campaignName);

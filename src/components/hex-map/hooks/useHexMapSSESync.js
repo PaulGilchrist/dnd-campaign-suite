@@ -1,6 +1,26 @@
 import { useCallback } from 'react';
+import useSSEEqualityGuard from '../../../hooks/useSSEEqualityGuard';
 
+/**
+ * WARNING: SSE re-render loop risk
+ * All setters called in this handler are wrapped with useSSEEqualityGuard so
+ * that echoed-back updates identical to current state are ignored.  This prevents
+ * re-render loops when the local client's own changes come back through publish().
+ */
 function useHexMapSSESync({ campaignName, mapName, setGridSize, setTerrain, setRivers, setRoads, setPois, setZoom, setPanX, setPanY, setMarchingOrder, setPartyPosition, setMapData, setWeather, onTravelStateChange }) {
+    const setGridSizeG = useSSEEqualityGuard(setGridSize);
+    const setTerrainG = useSSEEqualityGuard(setTerrain);
+    const setRiversG = useSSEEqualityGuard(setRivers);
+    const setRoadsG = useSSEEqualityGuard(setRoads);
+    const setPoisG = useSSEEqualityGuard(setPois);
+    const setZoomG = useSSEEqualityGuard(setZoom);
+    const setPanXG = useSSEEqualityGuard(setPanX);
+    const setPanYG = useSSEEqualityGuard(setPanY);
+    const setMarchingOrderG = useSSEEqualityGuard(setMarchingOrder);
+    const setPartyPositionG = useSSEEqualityGuard(setPartyPosition);
+    const setMapDataG = useSSEEqualityGuard(setMapData);
+    const setWeatherG = useSSEEqualityGuard(setWeather);
+
     const handleSSEEvent = useCallback((event) => {
         if (!event || !event.data) return;
         const expectedKey = `map-data-${campaignName}-${mapName}`;
@@ -8,45 +28,45 @@ function useHexMapSSESync({ campaignName, mapName, setGridSize, setTerrain, setR
 
         const data = event.data;
         if (data.gridSize !== undefined) {
-            setGridSize(data.gridSize);
-        }
+            setGridSizeG(data.gridSize);
+           }
         if (data.terrain !== undefined) {
-            setTerrain(data.terrain);
-        }
+            setTerrainG(data.terrain);
+           }
         if (data.rivers !== undefined) {
-            setRivers(data.rivers);
-        }
+            setRiversG(data.rivers);
+           }
         if (data.pois !== undefined) {
-            setPois(data.pois);
-        }
+            setPoisG(data.pois);
+           }
         if (data.roads !== undefined) {
-            setRoads(data.roads);
-        }
+            setRoadsG(data.roads);
+           }
         if (data.zoom !== undefined) {
-            setZoom(data.zoom);
-        }
+            setZoomG(data.zoom);
+           }
         if (data.panX !== undefined) {
-            setPanX(data.panX);
-        }
+            setPanXG(data.panX);
+           }
         if (data.panY !== undefined) {
-            setPanY(data.panY);
-        }
+            setPanYG(data.panY);
+           }
         if (data.marchingOrder !== undefined) {
-            setMarchingOrder(data.marchingOrder);
-        }
+            setMarchingOrderG(data.marchingOrder);
+           }
         if (data.partyPosition !== undefined) {
-            setPartyPosition(data.partyPosition);
-        }
+            setPartyPositionG(data.partyPosition);
+           }
         if (data.weather !== undefined) {
-            setWeather(data.weather);
-        }
+            setWeatherG(data.weather);
+           }
         if (data.travelState !== undefined && onTravelStateChange) {
             onTravelStateChange(data.travelState);
-        }
+           }
         if (data.type) {
-            setMapData(prev => ({ ...prev, ...data }));
-        }
-    }, [campaignName, mapName, setGridSize, setTerrain, setRivers, setRoads, setPois, setZoom, setPanX, setPanY, setMarchingOrder, setPartyPosition, setMapData, setWeather, onTravelStateChange]);
+            setMapDataG(prev => ({ ...prev, ...data }));
+           }
+       }, [campaignName, mapName, setGridSizeG, setTerrainG, setRiversG, setRoadsG, setPoisG, setZoomG, setPanXG, setPanYG, setMarchingOrderG, setPartyPositionG, setMapDataG, setWeatherG, onTravelStateChange]);
 
     return { handleSSEEvent };
 }

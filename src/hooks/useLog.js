@@ -1,37 +1,49 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as logService from '../services/logService.js';
 
+/**
+ * WARNING: SSE re-render loop risk
+ * This hook creates its own EventSource (bypassing <Subscriber>).  It must filter
+ * self-echoes using clientId so it never processes its own published events.
+ */
+import sseClientId from '../utils/sseClientId';
+
 const MAX_LOG_ENTRIES = 200;
 
 export default function useLog(campaignName) {
    const [logEntries, setLogEntries] = useState([]);
     const [initialized, setInitialized] = useState(false);
 
-     // Load initial log on mount/campaign change
+      // Load initial log on mount/campaign change
     useEffect(() => {
         if (!campaignName) return;
-       (async () => {
+        (async () => {
           try {
               const entries = await logService.getLog(campaignName);
              setLogEntries(entries.slice(-MAX_LOG_ENTRIES));
             } catch (err) {
-               console.error('Failed to load log:', err);
-           } finally {
+                console.error('Failed to load log:', err);
+            } finally {
              setInitialized(true);
             }
          })();
-      }, [campaignName]);
+        }, [campaignName]);
 
-     // Subscribe to SSE events for new log entries
+      // Subscribe to SSE events for new log entries
     useEffect(() => {
          if (!campaignName) return;
         const host = window.location.hostname;
-        const url = `http://${host}/subscribe?campaign=${encodeURIComponent(campaignName)}`;
+        const urlParams = new URLSearchParams({
+            campaign: campaignName,
+            clientId: sseClientId,
+          });
+        const url = `http://${host}/subscribe?${urlParams.toString()}`;
          const eventSource = new EventSource(url);
 
       eventSource.onmessage = (e) => {
           try {
                const event = JSON.parse(e.data);
+              if (event.selfId === sseClientId) return;
               if (!event.key.startsWith('log-')) return;
              setLogEntries(prev => {
                   const updated = [...prev, event.data];
@@ -39,11 +51,11 @@ export default function useLog(campaignName) {
                 });
             } catch (err) {
              // Ignore parse errors for non-log events
-           }
-         };
+            }
+          };
 
         return () => eventSource.close();
-      }, [campaignName]);
+        }, [campaignName]);
 
     const addEntry = useCallback(async (entry) => {
         if (!campaignName) return;

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import useSSEEqualityGuard from '../../hooks/useSSEEqualityGuard.js';
 import * as mapsService from '../../services/mapsService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import Subscriber from '../common/Subscriber.jsx';
@@ -8,6 +9,7 @@ import './MapsManager.css';
 
 function MapsManager({ campaignName, onOpenMap, onBack }) {
     const [maps, setMaps] = useState([]);
+    const setMapsGuarded = useSSEEqualityGuard(setMaps);
     const [loading, setLoading] = useState(true);
     const [createName, setCreateName] = useState('');
     const [renamingMap, setRenamingMap] = useState(null);
@@ -42,21 +44,22 @@ function MapsManager({ campaignName, onOpenMap, onBack }) {
     }, [loadMapsList]);
 
     // SSE handler — re-fetch maps list on maps-list event, update active map directly on activate event
+    // WARNING: SSE re-render loop risk — guarded setters via useSSEEqualityGuard
     const handleSSEEvent = useCallback((event) => {
         if (!event || !event.key) return;
         const mapsListKey = `maps-list-${campaignName}`;
         const activateKey = `map-activate-${campaignName}`;
         if (event.key === mapsListKey) {
             loadMapsList();
-        } else if (event.key === activateKey) {
-            // Update active map directly without re-fetching the list
+          } else if (event.key === activateKey) {
+              // Update active map directly without re-fetching the list
             const { activeMap } = event.data;
-            setMaps(prev => prev.map(m => ({
-                ...m,
-                isActive: m.fileName.replace(/\.json$/, '') === activeMap
-            })));
-        }
-    }, [campaignName, loadMapsList]);
+            setMapsGuarded(prev => prev.map(m => ({
+                  ...m,
+                 isActive: m.fileName.replace(/\.json$/, '') === activeMap
+              })));
+          }
+      }, [campaignName, loadMapsList, setMapsGuarded]);
 
     const handleCreate = async () => {
         const name = createName.trim();

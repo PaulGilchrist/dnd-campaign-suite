@@ -944,8 +944,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         setGridSize,
         setMapData,
         setPlacedItems,
-        lastSavedWallsRef,
-    });
+      });
 
     // Combined SSE handler for both map data and spell overlays
     const handleSSEEvent = useCallback((event) => {

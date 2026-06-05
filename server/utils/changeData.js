@@ -77,23 +77,27 @@ export const debouncedSave = () => {
 }
 
 /**
- * Writes SSE event to all connected subscribers
+ * Writes SSE event to all connected subscribers.
+ *
+ * Each event payload includes `selfId` — the subscriber's own ID as known to this
+ * server connection.  The receiving client compares `selfId` against its local
+ * clientId and skips processing, preventing re-render loops from self-echoes.
+ *
  * @param {string} key - Event key
  * @param {object} data - Event data
  */
 export const publish = (key, data) => {
     const unwrapped = data && typeof data === 'object' && 'value' in data && Object.keys(data).length === 1 ? data.value : data;
-    const eventData = `data: ${JSON.stringify({ key, data: unwrapped })}\n\n`;
     const campaignPrefix = key.match(/^(?:change|spell-overlay|map-data|maps-list|map-activate|positioning|log)-(.+?)(?:-|$)/);
     const targetCampaign = campaignPrefix ? campaignPrefix[1] : null;
     subscribers.forEach(client => {
         if (targetCampaign && client.campaignName && client.campaignName !== targetCampaign) return;
         try {
-            client.res.write(eventData);
-          } catch (e) {
-              // client disconnected
-          }
-      });
+            client.res.write(`data: ${JSON.stringify({ key, data: unwrapped, selfId: client.clientProvidedId })}\n\n`);
+           } catch (e) {
+               // client disconnected
+           }
+       });
 }
 
 /**

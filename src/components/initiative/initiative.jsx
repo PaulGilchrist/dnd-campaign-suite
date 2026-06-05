@@ -1,6 +1,7 @@
 
 import React from 'react'
 import { cloneDeep } from 'lodash';
+import useSSEEqualityGuard from '../../hooks/useSSEEqualityGuard.js';
 import utils from '../../services/utils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import storage from '../../services/storage.js'
@@ -158,8 +159,10 @@ function CreatureHp({ creature, isLocalhost, onChange }) {
 
 function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName }) {
     const [combatSummary, setCombatSummary] = React.useState(null);
+    const setCombatSummaryG = useSSEEqualityGuard(setCombatSummary);
     const [numOfNpc, setNumOfNpc] = React.useState(4);
     const [activeCreatureName, setActiveCreatureName] = React.useState(null);
+    const setActiveCreatureNameG = useSSEEqualityGuard(setActiveCreatureName);
     const [npcImages, setNpcImages] = React.useState({});
     const [viewingMonster, setViewingMonster] = React.useState(null);
     const [viewingMonsterCreatureName, setViewingMonsterCreatureName] = React.useState(null);
@@ -269,6 +272,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         }
     }, [campaignName]);
 
+     /**
+      * WARNING: SSE re-render loop risk
+      * Self-echoes are filtered by the Subscriber component (via selfId).
+      * All setters in this handler use equality guards (useSSEEqualityGuard).
+      */
     const handleEvent = React.useCallback((event) => {
         if (event.key == null || event.data == null) return;
 
@@ -285,15 +293,16 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
          if (dataKey === 'combatSummary') {
             const prevRound = combatSummaryRef.current?.round ?? 1;
              combatSummaryRef.current = event.data;
-            setCombatSummary(event.data);
-             if (event.data.round !== prevRound) expireStaleEffects(campaignName);
-            } else if (dataKey === 'activeCreatureName') {
-            setActiveCreatureName(event.data);
+            setCombatSummaryG(event.data);
+            if (event.data.round !== prevRound) expireStaleEffects(campaignName);
+         } else if (dataKey === 'activeCreatureName') {
+            setActiveCreatureNameG(event.data);
             expireStaleEffects(campaignName);
         }
-    }, [campaignName, handleOverlayEvent]);
+      }, [campaignName, handleOverlayEvent, setCombatSummaryG, setActiveCreatureNameG]);
 
     React.useEffect(() => {
+
         if (!combatSummary) return;
         const npcs = combatSummary.creatures.filter(c => c.type === 'npc');
         const promises = npcs.map(async (creature) => {
