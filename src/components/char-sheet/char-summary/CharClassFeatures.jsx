@@ -2,6 +2,7 @@
 import React from 'react'
 import TrackedResourceInput from './TrackedResourceInput.jsx';
 import { getClassFeatures } from '../../../services/classFeatures.js';
+import { useRuntimeValue } from '../../../hooks/useRuntimeState.js';
 /* ─── Barbarian ─── */
 const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
@@ -202,15 +203,18 @@ const RogueFeatures = function RogueFeatures({ playerStats }) {
 /* ─── Sorcerer ─── */
 const SorcererFeatures = function SorcererFeatures({ playerStats, campaignName }) {
     const sorcererFeatures = getClassFeatures(playerStats);
+    const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+    const innateSorceryActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Innate Sorcery');
     return (
-          <div data-testid="char-class-sorcerer">
-                <TrackedResourceInput label="Sorcery Points" resourceKey="sorceryPoints" playerName={playerStats.name} getMax={() => sorcererFeatures?.maxSorceryPoints || 0} deps={[playerStats]} campaignName={campaignName} />
-                <TrackedResourceInput label="Metamagic Known" resourceKey="metamagicKnown" playerName={playerStats.name} getMax={() => sorcererFeatures?.metamagicKnown || 0} deps={[playerStats]} campaignName={campaignName} />
-                <TrackedResourceInput label="Innate Sorcery" resourceKey="innateSorceryUses" playerName={playerStats.name} getMax={() => 2} deps={[playerStats]} campaignName={campaignName} />
-               {sorcererFeatures?.creatingSpellSlotCosts?.length > 0 && <div><b>Spell Slot (level 1-5) Costs: </b>{sorcererFeatures.creatingSpellSlotCosts.join(', ')}</div>}
+           <div data-testid="char-class-sorcerer">
+                  <TrackedResourceInput label="Sorcery Points" resourceKey="sorceryPoints" playerName={playerStats.name} getMax={() => sorcererFeatures?.maxSorceryPoints || 0} deps={[playerStats]} campaignName={campaignName} />
+                  <TrackedResourceInput label="Metamagic Known" resourceKey="metamagicKnown" playerName={playerStats.name} getMax={() => sorcererFeatures?.metamagicKnown || 0} deps={[playerStats]} campaignName={campaignName} />
+                  <TrackedResourceInput label="Innate Sorcery" resourceKey="innateSorceryUses" playerName={playerStats.name} getMax={() => 2} deps={[playerStats]} campaignName={campaignName} />
+                 {innateSorceryActive && <span className="automation-badge">+1 Save DC, Spell Adv</span>}
+                 {sorcererFeatures?.creatingSpellSlotCosts?.length > 0 && <div><b>Spell Slot (level 1-5) Costs: </b>{sorcererFeatures.creatingSpellSlotCosts.join(', ')}</div>}
 
-          </div>
-    );
+           </div>
+      );
 };
 
 /* ─── Warlock ─── */

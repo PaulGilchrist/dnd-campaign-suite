@@ -33,7 +33,6 @@ export const featuresToIgnore = [
 ];
 
 export const actions = [
-    "Abjure Foes",
     "Arcane Charge",
     "Bestial Fury",
     "Cunning Strike",
@@ -44,7 +43,6 @@ export const actions = [
     "Hex",
     "Improved War Magic",
     "Precise Hunter",
-    "Radiant Strikes",
     "Signature Spells",
     "Sneak Attack",
     "Spell Mastery",
@@ -63,14 +61,10 @@ export const bonusActions = [
     "Exceptional Training",
     "Fast Hands",
     "Fighting Style Bonus",
-    "Font of Magic",
-    "Innate Sorcery",
     "Instinctive Pounce",
     "Large Form",
     "Nature's Veil",
-    "Patient Defense",
     "Steady Aim",
-    "Step of the Wind",
     "Tactical Shift"
 ];
 

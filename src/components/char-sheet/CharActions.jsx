@@ -1079,9 +1079,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const actionCastAction = React.useCallback((spell, metaCtx) => {
         const pos = cachedActionCastPosRef.current;
-        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, featEffects: featRangeEffects });
+        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, featEffects: featRangeEffects, campaignName });
         cachedActionCastPosRef.current = null;
-    }, [rollAttack, rollDamage, playerStats, getTargetInfo, featRangeEffects]);
+     }, [rollAttack, rollDamage, playerStats, getTargetInfo, featRangeEffects, campaignName]);
     const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction);
     const handleActionSpellCast = React.useCallback(async (spell) => {
         setSelectedActionSpell(null);

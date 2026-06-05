@@ -19,9 +19,11 @@ import { executeSpellCast } from '../../../services/spellCastService.js'
 import * as mapsService from '../../../services/mapsService.js';
 import { getNearestPlacedItem } from '../../../services/rangeValidation.js';
 import { isInnateSorceryActive } from '../char-summary/buffService.js';
+import { useRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName }) {
+    const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
     const { popupHtml, setPopupHtml } = useActionPopup('spell');
      const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
@@ -89,9 +91,9 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
 
     const castAction = React.useCallback((spell, metaCtx) => {
       const pos = cachedCastPosRef.current;
-      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, innateSorceryActive });
+      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName });
       cachedCastPosRef.current = null;
-     }, [rollAttack, rollDamage, playerStats, getTargetInfo, innateSorceryActive]);
+      }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName]);
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
 
