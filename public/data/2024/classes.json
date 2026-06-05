@@ -7773,12 +7773,21 @@
                 "proficiency_bonus": 3,
                 "sorcery_points": 5,
                 "features": [
-                    {
-                        "name": "Sorcerous Restoration",
-                        "description": "When you finish a Short Rest, you can regain expended Sorcery Points, but no more than a number equal to half your Sorcerer level (round down). Once you use this feature, you can't do so again until you finish a Long Rest.",
-                        "level": 5,
-                        "type": "class_feature"
-                    }
+                       {
+                           "name": "Sorcerous Restoration",
+                           "description": "When you finish a Short Rest, you can regain expended Sorcery Points, but no more than a number equal to half your Sorcerer level (round down). Once you use this feature, you can't do so again until you finish a Long Rest.",
+                           "level": 5,
+                           "type": "class_feature",
+                           "automation": {
+                               "type": "resource_restoration",
+                               "trigger": "short_rest",
+                               "casting_time": "passive",
+                                                               "restore_expression": "Math.floor(level / 2)",
+                               "resourceKey": "sorceryPoints",
+                               "uses_max": 1,
+                               "recharge": "long_rest"
+                           }
+                       }
                 ],
                 "spellcasting": {
                     "cantrips_known": 5,

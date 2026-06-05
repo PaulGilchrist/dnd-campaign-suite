@@ -60,24 +60,25 @@ export function getShortRestResources() {
 }
 
 export const LONG_REST_RESOURCES = [
-    'ragePoints',
-    'bardicInspirationUses',
-    'channelDivinityCharges',
-    'wildShapeUses',
-    'secondwindUses',
-    'psionicEnergy',
-    'focusPoints',
-    'uncannymetabolismUses',
-    'sorceryPoints',
-    'arcaneRecoveryLevels',
-    'superiorityDice',
-    'kiPoints',
-    'actionsurgeUses',
-    'layOnHandsPool',
-    'warlockPactMagic',
-    'luckyPoints',
-    'innateSorceryUses'
-]
+     'ragePoints',
+     'bardicInspirationUses',
+     'channelDivinityCharges',
+     'wildShapeUses',
+     'secondwindUses',
+     'psionicEnergy',
+     'focusPoints',
+     'uncannymetabolismUses',
+     'sorceryPoints',
+     'arcaneRecoveryLevels',
+     'superiorityDice',
+     'kiPoints',
+     'actionsurgeUses',
+     'layOnHandsPool',
+     'warlockPactMagic',
+     'luckyPoints',
+     'innateSorceryUses',
+     'sorcerousRestorationUses'
+ ]
 
 export function getLongRestResources() {
   return [...LONG_REST_RESOURCES]

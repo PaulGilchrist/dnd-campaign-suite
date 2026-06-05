@@ -10450,12 +10450,21 @@
                 "ability_score_bonuses": 5,
                 "prof_bonus": 6,
                 "features": [
-                    {
-                        "name": "Sorcerous Restoration",
-                        "level": 20,
-                        "prerequisites": [],
-                        "description": "You regain 4 expended sorcery points whenever you finish a short rest."
-                    }
+                      {
+                          "name": "Sorcerous Restoration",
+                          "level": 20,
+                          "prerequisites": [],
+                          "description": "You regain 4 expended sorcery points whenever you finish a short rest.",
+                          "automation": {
+                              "type": "resource_restoration",
+                              "trigger": "short_rest",
+                              "casting_time": "passive",
+                                                             "restore_expression": "Math.floor(level / 2)",
+                              "resourceKey": "sorceryPoints",
+                              "uses_max": 1,
+                              "recharge": "long_rest"
+                          }
+                      }
                 ],
                 "spellcasting": {
                     "cantrips_known": 6,

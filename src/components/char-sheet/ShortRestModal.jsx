@@ -5,6 +5,7 @@ import { rollDice } from '../../services/diceRoller.js'
 import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES, getShortRestResourceLabels } from '../../services/restRules.js'
 import { clearAllExpirationEffects } from '../../services/expirations.js'
 import { getClassFeatures } from '../../services/classFeatures.js'
+import { evaluateAutoExpression } from '../../services/automationService.js'
 import { getCombatContext } from '../../services/damageUtils.js'
 import { applyHealingToTarget } from '../../services/applyHealing.js'
 
@@ -12,10 +13,18 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [remainingHitDice, setRemainingHitDice] = React.useState(() => {
         const stored = getRuntimeValue(playerStats.name, 'shortRestHitDice');
         return stored != null ? stored : playerStats.level;
-     });
+       });
     const [recoveredHp, setRecoveredHp] = React.useState(0);
     const [rollLog, setRollLog] = React.useState([]);
     const [songOfRestApplied, setSongOfRestApplied] = React.useState(false);
+    const [restorationRequested, setRestorationRequested] = React.useState(false);
+
+    const isSorcerer = playerStats?.class?.name === 'Sorcerer';
+    const sorcRestoration = isSorcerer && (playerStats.automation?.passives ?? []).find(
+        a => a.type === 'resource_restoration'
+      );
+    const restorationCur = getRuntimeValue(playerStats.name, 'sorcerousRestorationUses');
+    const restorationAvailable = !!sorcRestoration && restorationCur !== 0;
 
     const maxHitDice = playerStats.level;
     const hitDie = getHitDieSize(playerStats);
@@ -64,7 +73,14 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             setRollLog(prev => [...prev, { roll: total, hp: bonus, isSongOfRest: true }]);
         }
         setSongOfRestApplied(true);
-     };
+       };
+
+    const restoreAmount = isSorcerer ? evaluateAutoExpression(sorcRestoration?.restore_expression ?? '', playerStats, playerStats.proficiency, playerStats.level) : 0;
+
+    const handleApplySorcerousRestoration = () => {
+        if (!sorcRestoration || !restorationAvailable || restorationRequested) return;
+        setRestorationRequested(true);
+       };
 
     const handleComplete = () => {
         setRuntimeValue(playerStats.name, 'shortRestHitDice', remainingHitDice, campaignName);
@@ -72,19 +88,26 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         let currentHp = getRuntimeValue(playerStats.name, 'currentHitPoints');
         if (currentHp == null || currentHp === '') {
             currentHp = playerStats.hitPoints;
-         } else {
+           } else {
             currentHp = Number(currentHp) + recoveredHp;
-         }
+           }
         setRuntimeValue(playerStats.name, 'currentHitPoints', Math.min(playerStats.hitPoints, currentHp), campaignName);
 
         SHORT_REST_RESOURCES.forEach((key) => {
             setRuntimeValue(playerStats.name, key, null, campaignName);
-          });
+           });
+
+        if (sorcRestoration && restorationAvailable && restorationRequested) {
+            let curSorcery = getRuntimeValue(playerStats.name, 'sorceryPoints');
+            const maxSp = getClassFeatures(playerStats)?.maxSorceryPoints || 0;
+            setRuntimeValue(playerStats.name, 'sorceryPoints', Math.min(maxSp, (curSorcery != null ? Number(curSorcery) : 0) + restoreAmount), campaignName);
+            setRuntimeValue(playerStats.name, 'sorcerousRestorationUses', 0, campaignName);
+            }
 
         clearAllExpirationEffects(playerStats.name, campaignName);
 
         onComplete && onComplete();
-     };
+       };
 
     React.useEffect(() => {
         const handleKey = (e) => {
@@ -140,9 +163,25 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                              </button>
                          </div>
                      </div>
-                 )}
+                   )}
 
-                  {resourceLabels.length > 0 && (
+                  {sorcRestoration && (restorationAvailable || restorationRequested) && (
+                       <div className="short-rest-section">
+                           <h4>Sorcerous Restoration</h4>
+                           <p>Regain {restoreAmount} expended sorcery points.</p>
+                           <div className="short-rest-dice-row">
+                               {restorationRequested ? (
+                                   <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Restoration requested</span>
+                                 ) : (
+                                   <button className="char-btn" onClick={handleApplySorcerousRestoration} disabled={!restorationAvailable}>
+                                       <i className="fas fa-wand-magic-sparkles"></i> Regain {restoreAmount} Sorcery Points
+                                   </button>
+                                 )}
+                           </div>
+                       </div>
+                   )}
+
+                    {resourceLabels.length > 0 && (
                       <div className="short-rest-section">
                           <h4>Resources Restored</h4>
                           <ul>

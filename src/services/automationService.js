@@ -492,28 +492,46 @@ function buildAttackInfo(feature, playerStats) {
              }
         }
 
+        case 'resource_restoration': {
+            const restoreAmount = auto.restore_expression
+                 ? evaluateAutoExpression(auto.restore_expression, playerStats)
+                 : 0
+            return {
+                type: 'resource_restoration',
+                name: feature.name,
+                trigger: auto.trigger || 'short_rest',
+                casting_time: auto.casting_time || 'passive',
+                restore_amount: restoreAmount,
+                restore_expression: auto.restore_expression || '',
+                resourceKey: auto.resourceKey || '',
+                uses_max: auto.uses_max ?? 1,
+                recharge: auto.recharge || 'long_rest',
+                hasAutomation: true
+             }
+         }
+
         default:
             return null
-     }
- }
+       }
+   }
 
-function evaluateAutoExpression(expression, playerStats, prof, level) {
+export function evaluateAutoExpression(expression, playerStats, prof, level) {
     if (!expression) return expression
     prof = prof || 0
     level = level || 1
     let expr = expression
-        .replace(/proficiency_bonus_d4/g, `${Math.max(1, prof)}d4`)
-        .replace(/proficiency_bonus/g, prof)
-        .replace(/monk level/gi, level)
-        .replace(/fighter level/gi, level)
-        .replace(/paladin level/gi, level)
-        .replace(/barbarian level/gi, level)
-        .replace(/bard level/gi, level)
-        .replace(/level/gi, level)
+           .replace(/proficiency_bonus_d4/g, `${Math.max(1, prof)}d4`)
+           .replace(/proficiency_bonus/g, prof)
+           .replace(/monk level/gi, level)
+           .replace(/fighter level/gi, level)
+           .replace(/paladin level/gi, level)
+           .replace(/barbarian level/gi, level)
+           .replace(/bard level/gi, level)
+           .replace(/level/gi, level)
     try {
         const result = new Function(`"use strict"; return (${expr})`)()
         if (typeof result === 'number' && !isNaN(result)) return result
-    } catch (e) { /* not a simple expression, return as string */ }
+      } catch (e) { /* not a simple expression, return as string */ }
     return expr
 }
 
@@ -576,6 +594,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'passive_rule':
             case 'resistance':
             case 'auto_effect':
+            case 'resource_restoration':
                 result.passives.push(info)
                 break
             default:
