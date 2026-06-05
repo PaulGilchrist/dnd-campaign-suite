@@ -2,7 +2,7 @@
 import React from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
 import { rollDice } from '../../services/diceRoller.js'
-import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES } from '../../services/restRules.js'
+import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES, getShortRestResourceLabels } from '../../services/restRules.js'
 import { clearAllExpirationEffects } from '../../services/turnExpirations.js'
 import { getClassFeatures } from '../../services/classFeatures.js'
 import { getCombatContext } from '../../services/damageUtils.js'
@@ -22,6 +22,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const conBonus = playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0;
     const classFeatures = getClassFeatures(playerStats);
     const songOfRestDie = classFeatures?.songOfRestDie || null;
+    const resourceLabels = React.useMemo(() => getShortRestResourceLabels(playerStats), [playerStats]);
 
     const handleRollOne = () => {
         if (remainingHitDice <= 0) return;
@@ -141,16 +142,16 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                      </div>
                  )}
 
-                <div className="short-rest-section">
-                    <h4>Resources Restored</h4>
-                    <ul>
-                        <li>Channel Divinity</li>
-                        <li>Wild Shape</li>
-                        <li>Second Wind</li>
-                        <li>Psionic Energy</li>
-                        <li>Focus Points</li>
-                    </ul>
-                </div>
+                  {resourceLabels.length > 0 && (
+                      <div className="short-rest-section">
+                          <h4>Resources Restored</h4>
+                          <ul>
+                              {resourceLabels.map(label => (
+                                  <li key={label}>{label}</li>
+                                 ))}
+                          </ul>
+                      </div>
+                  )}
 
                 <div className="short-rest-actions">
                     <button className="char-btn" onClick={handleComplete}>

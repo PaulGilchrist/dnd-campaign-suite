@@ -9,7 +9,8 @@ import {
   getLongRestResources,
   spellSlotLevels,
   applyShortRest,
-  applyLongRest
+  applyLongRest,
+  getShortRestResourceLabels
 } from './restRules.js'
 
 // Mock useRuntimeState before importing restRules
@@ -30,44 +31,73 @@ beforeEach(() => {
 })
 
 describe('getHitDieSize', () => {
-  it('returns class hit die when class_levels exists', () => {
+  it('returns hit_die as number from class root (5e)', () => {
     const playerStats = {
-      level: 3,
-      class: {
-        class_levels: [{ hit_die: 6 }, { hit_die: 6 }, { hit_die: 8 }]
-      }
-    }
+       level: 3,
+      class: { hit_die: 12 }
+     }
+    expect(getHitDieSize(playerStats)).toBe(12)
+   })
+
+  it('returns hit_point_die from class root (2024)', () => {
+    const playerStats = {
+       level: 3,
+      class: { hit_point_die: '10' }
+     }
+    expect(getHitDieSize(playerStats)).toBe(10)
+   })
+
+  it('handles hit_point_die with dN format', () => {
+    const playerStats = {
+       level: 3,
+      class: { hit_point_die: 'd8' }
+     }
     expect(getHitDieSize(playerStats)).toBe(8)
-  })
+   })
+
+  it('falls back to hit_die when hit_point_die is missing', () => {
+    const playerStats = {
+       level: 3,
+      class: { name: 'Fighter', hit_die: 10 }
+     }
+    expect(getHitDieSize(playerStats)).toBe(10)
+   })
 
   it('returns default 8 when no class data', () => {
     expect(getHitDieSize({ level: 1 })).toBe(8)
-  })
+   })
 
-  it('returns default 8 when class_levels is missing', () => {
+  it('returns default 8 when class is missing hit_die and hit_point_die', () => {
     const playerStats = { level: 1, class: {} }
     expect(getHitDieSize(playerStats)).toBe(8)
-  })
+   })
+
+  it('ignores hit_die in class_levels', () => {
+    const playerStats = {
+       level: 3,
+      class: {
+          hit_die: 6,
+         class_levels: [{ hit_die: 10 }, { hit_die: 10 }, { hit_die: 12 }]
+        }
+      }
+    expect(getHitDieSize(playerStats)).toBe(6)
+   })
 
   it('returns d4 for caster at level 1', () => {
     const playerStats = {
-      level: 1,
-      class: {
-        class_levels: [{ hit_die: 6 }]
-      }
-    }
-    expect(getHitDieSize(playerStats)).toBe(6)
-  })
+       level: 1,
+      class: { hit_die: 4 }
+     }
+    expect(getHitDieSize(playerStats)).toBe(4)
+   })
 
   it('returns d8 for martial class at level 1', () => {
     const playerStats = {
-      level: 1,
-      class: {
-        class_levels: [{ hit_die: 8 }]
-      }
-    }
+       level: 1,
+      class: { hit_die: 8 }
+     }
     expect(getHitDieSize(playerStats)).toBe(8)
-  })
+   })
 })
 
 describe('computeHitDieRecovery', () => {
@@ -340,5 +370,84 @@ describe('applyLongRest', () => {
 
     const data = setRuntimeBatch.mock.calls[0][1]
     expect(data.hasInspiration).toBeUndefined()
-  })
+    })
+})
+
+describe('getShortRestResourceLabels', () => {
+  it('returns Channel Divinity for Cleric', () => {
+    const labels = getShortRestResourceLabels({ class: { name: 'Cleric' } })
+    expect(labels).toContain('Channel Divinity')
+     expect(labels).not.toContain('Wild Shape')
+     expect(labels).not.toContain('Second Wind')
+    })
+
+  it('returns Channel Divinity for Paladin', () => {
+    const labels = getShortRestResourceLabels({ class: { name: 'Paladin' } })
+    expect(labels).toContain('Channel Divinity')
+    })
+
+  it('returns Wild Shape for Druid', () => {
+    const labels = getShortRestResourceLabels({ class: { name: 'Druid' } })
+    expect(labels).toContain('Wild Shape')
+     expect(labels).not.toContain('Second Wind')
+    })
+
+  it('returns Second Wind and Action Surge for Fighter', () => {
+    const labels = getShortRestResourceLabels({ class: { name: 'Fighter' } })
+    expect(labels).toContain('Second Wind')
+     expect(labels).toContain('Action Surge')
+     expect(labels).not.toContain('Superiority Dice')
+     expect(labels).not.toContain('Psionic Energy')
+    })
+
+  it('includes Psionic Energy for Fighter with Psi Warrior major', () => {
+    const labels = getShortRestResourceLabels({ class: { name: 'Fighter', major: { name: 'Psi Warrior' } } })
+    expect(labels).toContain('Psionic Energy')
+     expect(labels).toContain('Second Wind')
+     expect(labels).toContain('Action Surge')
+    })
+
+  it('includes Psionic Energy for Fighter with Psi Warrior subclass', () => {
+    const labels = getShortRestResourceLabels({ class: { name: 'Fighter', subclass: { name: 'Psi Warrior' } } })
+    expect(labels).toContain('Psionic Energy')
+    })
+
+  it('includes Superiority Dice and not Psionic for Fighter with Battle Master major', () => {
+    const labels = getShortRestResourceLabels({ class: { name: 'Fighter', major: { name: 'Battle Master' } } })
+    expect(labels).toContain('Superiority Dice')
+     expect(labels).toContain('Second Wind')
+     expect(labels).toContain('Action Surge')
+     expect(labels).not.toContain('Psionic Energy')
+    })
+
+  it('includes Superiority Dice for Fighter with Battle Master subclass', () => {
+    const labels = getShortRestResourceLabels({ class: { name: 'Fighter', subclass: { name: 'Battle Master' } } })
+    expect(labels).toContain('Superiority Dice')
+    })
+
+  it('returns Focus Points for Monk', () => {
+    const labels = getShortRestResourceLabels({ class: { name: 'Monk' } })
+    expect(labels).toContain('Focus Points')
+     expect(labels).not.toContain('Second Wind')
+    })
+
+  it('returns empty array for Barbarian', () => {
+    const labels = getShortRestResourceLabels({ class: { name: 'Barbarian' } })
+    expect(labels).toEqual([])
+    })
+
+  it('returns empty array for Wizard', () => {
+    const labels = getShortRestResourceLabels({ class: { name: 'Wizard' } })
+    expect(labels).toEqual([])
+    })
+
+  it('returns empty array when class is missing', () => {
+    const labels = getShortRestResourceLabels({ level: 1 })
+    expect(labels).toEqual([])
+    })
+
+  it('returns empty array for undefined playerStats', () => {
+    const labels = getShortRestResourceLabels(undefined)
+    expect(labels).toEqual([])
+    })
 })

@@ -3,7 +3,35 @@ import { getRuntimeValue, setRuntimeBatch } from '../hooks/useRuntimeState.js'
 import { clearAllExpirationEffects } from './turnExpirations.js'
 
 export function getHitDieSize(playerStats) {
-  return playerStats.class?.class_levels?.[playerStats.level - 1]?.hit_die || 8
+  const hitDieStr = playerStats?.class?.hit_point_die || playerStats?.class?.hit_die;
+
+  if (hitDieStr != null) {
+    const die = parseInt(String(hitDieStr).replace(/[^0-9]/g, ''), 10);
+    if (!isNaN(die)) return die;
+   }
+
+  return 8;
+}
+
+const SHORT_REST_RESOURCE_LABELS = [
+    { key: 'channelDivinityCharges', label: 'Channel Divinity', classes: ['Cleric', 'Paladin'] },
+    { key: 'wildShapeUses', label: 'Wild Shape', classes: ['Druid'] },
+    { key: 'secondWindUses', label: 'Second Wind', classes: ['Fighter'] },
+    { key: 'actionSurgeUses', label: 'Action Surge', classes: ['Fighter'] },
+    { key: 'focusPoints', label: 'Focus Points', classes: ['Monk'] },
+    { key: 'psionicEnergy', label: 'Psionic Energy', classes: ['Fighter'], subclasses: ['Psi Warrior'] },
+    { key: 'superiorityDice', label: 'Superiority Dice', classes: ['Fighter'], subclasses: ['Battle Master'] }
+];
+
+export function getShortRestResourceLabels(playerStats) {
+    const className = playerStats?.class?.name;
+    const subclassName = playerStats?.class?.subclass?.name || playerStats?.class?.major?.name;
+
+    return SHORT_REST_RESOURCE_LABELS.filter(entry => {
+        if (!entry.classes.includes(className)) return false;
+        if (entry.subclasses && !entry.subclasses.includes(subclassName)) return false;
+        return true;
+       }).map(entry => entry.label);
 }
 
 export function computeHitDieRecovery(rollValue, conBonus) {

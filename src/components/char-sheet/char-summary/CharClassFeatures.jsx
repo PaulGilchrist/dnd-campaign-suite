@@ -88,24 +88,35 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName }) 
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name;
     const hasEnergy = classLevel?.energy && classLevel.energy.required_major === majorName;
+    const isBattleMaster = majorName === 'Battle Master';
 
     if (!classLevel) return null;
 
+    const actionsurgeMax = playerStats.rules === '2024'
+          ? (playerStats.level >= 17 ? 2 : (playerStats.level >= 2 ? 1 : 0))
+          : (classLevel?.class_specific?.action_surges || 0);
+
+    const superiorityDiceMax = !isBattleMaster ? 0 : (playerStats.rules === '2024' ? 4 : (playerStats.level >= 15 ? 6 : (playerStats.level >= 7 ? 5 : 4)));
+
     return (
-         <div data-testid="char-class-fighter">
-             <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles?.join(', ') || 'N/A'}</div>
-             <div><b>Extra Attacks: </b>{classLevel.extra_attacks || 0}</div>
-             <div><b>Weapon Mastery: </b>{classLevel.weapon_mastery}</div>
-             <TrackedResourceInput label="Second Wind" resourceKey="secondWindUses" playerName={playerStats.name} getMax={() => classLevel?.second_wind || 0} deps={[playerStats]} campaignName={campaignName} />
-             {hasEnergy && (
-                 <div>
-                     <div><b>Psionic Energy (Psi Warrior):</b></div>
-                     <TrackedResourceInput label="Energy Dice" resourceKey="psionicEnergy" playerName={playerStats.name} getMax={() => hasEnergy ? classLevel?.energy?.energy_die_num || 0 : 0} deps={[playerStats]} campaignName={campaignName} />
-                     <div><b>Energy Die Type: </b>d{classLevel.energy.energy_die_type}</div>
-                 </div>
-             )}
-         </div>
-    );
+          <div data-testid="char-class-fighter">
+              <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles?.join(', ') || 'N/A'}</div>
+              <div><b>Extra Attacks: </b>{classLevel.extra_attacks || 0}</div>
+              <div><b>Weapon Mastery: </b>{classLevel.weapon_mastery}</div>
+              <TrackedResourceInput label="Second Wind" resourceKey="secondWindUses" playerName={playerStats.name} getMax={() => classLevel?.second_wind || 0} deps={[playerStats]} campaignName={campaignName} />
+              <TrackedResourceInput label="Action Surge Uses" resourceKey="actionsurgeUses" playerName={playerStats.name} getMax={() => actionsurgeMax} deps={[playerStats]} campaignName={campaignName} />
+              {hasEnergy && (
+                  <div>
+                      <div><b>Psionic Energy (Psi Warrior):</b></div>
+                      <TrackedResourceInput label="Energy Dice" resourceKey="psionicEnergy" playerName={playerStats.name} getMax={() => hasEnergy ? classLevel?.energy?.energy_die_num || 0 : 0} deps={[playerStats]} campaignName={campaignName} />
+                      <div><b>Energy Die Type: </b>d{classLevel.energy.energy_die_type}</div>
+                  </div>
+              )}
+              {isBattleMaster && (
+                  <TrackedResourceInput label="Superiority Dice" resourceKey="superiorityDice" playerName={playerStats.name} getMax={() => superiorityDiceMax} deps={[playerStats]} campaignName={campaignName} />
+               )}
+          </div>
+      );
 };
 
 /* ─── Monk ─── */
