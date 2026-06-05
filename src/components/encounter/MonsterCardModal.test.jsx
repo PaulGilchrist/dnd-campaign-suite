@@ -1,16 +1,16 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import MonsterCardModal from '../components/encounter/MonsterCardModal.jsx';
+import MonsterCardModal from './MonsterCardModal.jsx';
 
 // ── Mocks defined before component import ──
 
 // diceRoller - used by the hook internally (already mocked by useLoggedDiceRoll mock)
-vi.mock('../services/diceRoller.js', () => ({
+vi.mock('../../services/diceRoller.js', () => ({
   rollExpression: vi.fn((formula) => ({ total: parseInt(formula.split('d')[0]) * 5, rolls: [1, 2], modifier: 0 })),
   rollExpressionDoubled: vi.fn((formula) => ({ total: parseInt(formula.split('d')[0]) * 10, rolls: [1, 2], modifier: 0 })),
 }));
 
-vi.mock('../services/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
+vi.mock('../../services/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
 const defaultConditionEffects = {
   attackAdvantageCount: 0,
@@ -36,7 +36,7 @@ const defaultConditionEffects = {
 };
 
 // Expose mutable state for the useLoggedDiceRoll mock so we can control it per-test
-vi.mock('../hooks/useLoggedDiceRoll.js', () => {
+vi.mock('../../hooks/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _rollAttack = vi.fn();
   const _rollDamage = vi.fn();
@@ -72,7 +72,7 @@ vi.mock('../hooks/useLoggedDiceRoll.js', () => {
 });
 
 // Expose mutable state for conditionEffects so we can control per-test
-vi.mock('../services/conditionEffects.js', () => {
+vi.mock('../../services/conditionEffects.js', () => {
   let _computeReturn = null;
   const _computeConditionEffects = vi.fn((conditions) => {
     return _computeReturn ?? { ...defaultConditionEffects };
@@ -88,7 +88,7 @@ vi.mock('../services/conditionEffects.js', () => {
 });
 
 // Expose mutable state for findCreatureByName mock
-vi.mock('../services/damageUtils.js', () => {
+vi.mock('../../services/damageUtils.js', () => {
   let _findCreatureReturn = null;
   const _findCreatureByName = vi.fn((ctx, name) => {
     return _findCreatureReturn ?? { name: 'Goblin', conditions: [] };
@@ -106,7 +106,7 @@ vi.mock('../services/damageUtils.js', () => {
   };
 });
 
-vi.mock('../services/rangeValidation.js', () => ({
+vi.mock('../../services/rangeValidation.js', () => ({
   computeRangeEffect: vi.fn(() => ({ mode: 'normal' })),
   getDistanceFeet: vi.fn(() => null),
   getNearestPlacedItem: vi.fn(() => null),
@@ -119,14 +119,14 @@ vi.mock('../services/rangeValidation.js', () => ({
   }),
 }));
 
-vi.mock('../services/mapsService.js', () => ({
+vi.mock('../../services/mapsService.js', () => ({
   loadMapData: vi.fn().mockResolvedValue(null),
 }));
 
 // ── Re-import mocked modules ──
-import * as useLoggedDiceRoll from '../hooks/useLoggedDiceRoll.js';
-import * as conditionEffects from '../services/conditionEffects.js';
-import * as damageUtils from '../services/damageUtils.js';
+import * as useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
+import * as conditionEffects from '../../services/conditionEffects.js';
+import * as damageUtils from '../../services/damageUtils.js';
 
 // Short aliases for mock hooks exposed by the factory
 const rollAttack = useLoggedDiceRoll._rollAttack;

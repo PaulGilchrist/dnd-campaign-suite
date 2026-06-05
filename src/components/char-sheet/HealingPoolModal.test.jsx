@@ -1,42 +1,42 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import HealingPoolModal from '../components/char-sheet/HealingPoolModal.jsx';
+import HealingPoolModal from './HealingPoolModal.jsx';
 
 // ── Mocked modules (before the component import) ──
 
-vi.mock('../hooks/useRuntimeState.js', () => ({
+vi.mock('../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   addStorageChangeListener: vi.fn(() => () => {}),
 }));
 
-vi.mock('../hooks/useTrackedResource.js', () => ({
+vi.mock('../../hooks/useTrackedResource.js', () => ({
   default: vi.fn(),
 }));
 
-vi.mock('../services/storage.js', () => ({
+vi.mock('../../services/storage.js', () => ({
   default: { set: vi.fn() },
 }));
 
-vi.mock('../services/damageUtils.js', () => ({
+vi.mock('../../services/damageUtils.js', () => ({
   getTargetFromAttacker: vi.fn(() => null),
   getCombatContext: vi.fn(() => Promise.resolve(null)),
 }));
 
-vi.mock('../services/applyHealing.js', () => ({
+vi.mock('../../services/applyHealing.js', () => ({
   applyHealingToTarget: vi.fn(),
 }));
 
-vi.mock('../services/utils.js', () => ({
+vi.mock('../../services/utils.js', () => ({
   default: { getName: vi.fn((n) => n?.toLowerCase().trim()) },
 }));
 
 // ── Re-import mocked modules ──
-import * as useRuntimeState from '../hooks/useRuntimeState.js';
-import useTrackedResource from '../hooks/useTrackedResource.js';
-import storage from '../services/storage.js';
-import * as damageUtils from '../services/damageUtils.js';
-import * as applyHealingService from '../services/applyHealing.js';
+import * as useRuntimeState from '../../hooks/useRuntimeState.js';
+import useTrackedResource from '../../hooks/useTrackedResource.js';
+import storage from '../../services/storage.js';
+import * as damageUtils from '../../services/damageUtils.js';
+import * as applyHealingService from '../../services/applyHealing.js';
 
 // ── Test fixtures ──
 

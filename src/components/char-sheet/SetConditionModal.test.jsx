@@ -1,37 +1,37 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import SetConditionModal from '../components/char-sheet/SetConditionModal.jsx';
+import SetConditionModal from './SetConditionModal.jsx';
 
 // ── Mocked modules (before the component import) ──
 
-vi.mock('../services/rangeValidation.js', () => ({
+vi.mock('../../services/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
   rangeToFeet: vi.fn(() => 60),
 }));
 
-vi.mock('../services/savePromptService.js', () => ({
+vi.mock('../../services/savePromptService.js', () => ({
   sendSavePrompt: vi.fn(),
   sendSaveResult: vi.fn(),
 }));
 
-vi.mock('../hooks/useRuntimeState.js', () => ({
+vi.mock('../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../services/turnExpirations.js', () => ({
+vi.mock('../../services/turnExpirations.js', () => ({
   addTurnExpiration: vi.fn(),
 }));
 
-vi.mock('../services/logService.js', () => ({
+vi.mock('../../services/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../services/diceRoller.js', () => ({
+vi.mock('../../services/diceRoller.js', () => ({
   rollD20: vi.fn(),
 }));
 
-vi.mock('../services/utils.js', () => {
+vi.mock('../../services/utils.js', () => {
   let counter = 0;
   const utilsMock = {
     guid: vi.fn(() => `guid-${++counter}`),
@@ -40,16 +40,16 @@ vi.mock('../services/utils.js', () => {
   return { default: utilsMock };
 });
 
-vi.mock('../services/storage.js', () => ({
+vi.mock('../../services/storage.js', () => ({
   default: { set: vi.fn() },
 }));
 
 // ── Re-import mocked modules ──
-import * as savePromptService from '../services/savePromptService.js';
-import * as useRuntimeState from '../hooks/useRuntimeState.js';
-import * as turnExpirations from '../services/turnExpirations.js';
-import * as logService from '../services/logService.js';
-import * as diceRoller from '../services/diceRoller.js';
+import * as savePromptService from '../../services/savePromptService.js';
+import * as useRuntimeState from '../../hooks/useRuntimeState.js';
+import * as turnExpirations from '../../services/turnExpirations.js';
+import * as logService from '../../services/logService.js';
+import * as diceRoller from '../../services/diceRoller.js';
 
 // ── Test fixtures ──
 

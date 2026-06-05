@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockState = vi.hoisted(() => ({ logEntries: [], initialized: true }));
 const mockAddEntry = vi.hoisted(() => vi.fn(async () => {}));
 
-vi.mock('../hooks/useLog.js', () => ({
+vi.mock('../../hooks/useLog.js', () => ({
   default: vi.fn(() => ({
     logEntries: mockState.logEntries,
     initialized: mockState.initialized,
@@ -12,7 +12,7 @@ vi.mock('../hooks/useLog.js', () => ({
   })),
 }));
 
-import Log from '../components/log/Log.jsx';
+import Log from './Log.jsx';
 
 const CHARS = [{ name: 'Frodo' }, { name: 'Aragorn' }];
 
