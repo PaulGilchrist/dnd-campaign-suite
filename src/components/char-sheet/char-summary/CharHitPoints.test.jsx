@@ -103,10 +103,10 @@ describe('CharHitPoints', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'currentHitPoints', 20, undefined);
   });
 
-  it('should show max/cur label', () => {
+  it('should show cur/max label', () => {
     render(<CharHitPoints playerStats={mockPlayerStats} />);
-    expect(screen.getByText(/\(max\/cur\)/)).toBeInTheDocument();
-  });
+    expect(screen.getByText(/\(cur\/max\)/)).toBeInTheDocument();
+ });
 
   it('should have tabIndex for accessibility', () => {
     render(<CharHitPoints playerStats={mockPlayerStats} />);

@@ -374,9 +374,9 @@ describe('Barbarian', () => {
     expect(screen.getByText(/Extra Attacks:/).parentElement.textContent).toContain('0');
      });
 
-  it('shows rage count from class_specific.rage_count (5e)', () => {
+  it('shows cur/max label (5e)', () => {
     render(<CharClassFeatures playerStats={mockStats5e} />);
-    expect(screen.getByText(/\(max\/cur\)/)).toBeInTheDocument();
+    expect(screen.getByText(/\(cur\/max\)/)).toBeInTheDocument();
      });
 
   it('shows rage damage from class_specific.rage_damage_bonus (5e)', () => {
@@ -395,9 +395,9 @@ describe('Barbarian', () => {
     expect(screen.getByText(/Weapon Mastery:/).parentElement.textContent).toContain('N/A');
      });
 
-  it('shows max/cur label (2024)', () => {
+  it('shows cur/max label (2024)', () => {
     render(<CharClassFeatures playerStats={mockStats2024} />);
-    expect(screen.getByText(/\(max\/cur\)/)).toBeInTheDocument();
+    expect(screen.getByText(/\(cur\/max\)/)).toBeInTheDocument();
      });
 
   it('persists rage points to storage', () => {

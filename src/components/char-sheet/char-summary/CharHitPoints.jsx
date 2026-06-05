@@ -62,7 +62,7 @@ function CharHitPoints({ playerStats, campaignName }) {
     return (
         <div>
             <div className="clickable" onClick={handleInputToggleCurrentHitPoints} onKeyDown={handleInputToggleCurrentHitPoints} tabIndex={0}>
-                <b>Hit Points: </b>{playerStats.hitPoints}/<HiddenInput handleInputToggle={handleInputToggleCurrentHitPoints} handleValueChange={(value) => handleValueChangeCurrentHitPoints(value)} showInput={showInputCurrentHitPoints} value={currentHitPoints}></HiddenInput> <span className="text-muted">(max/cur)</span>
+                <b>Hit Points: </b><HiddenInput handleInputToggle={handleInputToggleCurrentHitPoints} handleValueChange={(value) => handleValueChangeCurrentHitPoints(value)} showInput={showInputCurrentHitPoints} value={currentHitPoints}></HiddenInput>/{playerStats.hitPoints} <span className="text-muted">(cur/max)</span>
             </div>
             {currentHitPoints <= 0 && (
                 <DeathSavingThrows playerStats={playerStats} campaignName={campaignName} />
