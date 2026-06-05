@@ -290,10 +290,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             } else if (dataKey === 'activeCreatureName') {
             setActiveCreatureName(event.data);
             expireStaleEffects(campaignName);
-        } else {
-            const cs = combatSummaryRef.current;
-            if (!cs) return;
-            setCombatSummary(cloneDeep(cs));
         }
     }, [campaignName, handleOverlayEvent]);
 
@@ -479,7 +475,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-         }, [combatSummary, activeCreatureName, isPrevDisabled, handleAddNpc, handleNextCreature, handlePreviousCreature]);
+          }, [combatSummary, activeCreatureName]); // eslint-disable-line react-hooks/exhaustive-deps
 
     React.useEffect(() => {
         if (!carouselRef.current || !activeCreatureName) return;
@@ -492,11 +488,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     React.useEffect(() => {
         const handler = () => {
             const summary = getCombatSummary();
-            if (summary) {
+            if (summary && JSON.stringify(summary) !== JSON.stringify(combatSummaryRef.current)) {
                 combatSummaryRef.current = summary;
                 setCombatSummary(summary);
-              }
-          };
+            }
+        };
         window.addEventListener('initiative-rolled', handler);
         window.addEventListener('combat-summary-updated', handler);
         return () => {
