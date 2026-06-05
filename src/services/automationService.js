@@ -439,7 +439,7 @@ function buildAttackInfo(feature, playerStats) {
                 target: auto.target,
                 condition: auto.condition,
                 cost: auto.cost || '',
-                range: auto.range || '60_ft',
+                range: auto.range || '60 ft',
                 saveType: auto.saveType || 'STR',
                 effect: auto.effect || '',
                 hasAutomation: true

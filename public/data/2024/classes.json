@@ -5469,7 +5469,7 @@
                         "automation": {
                             "type": "set_condition",
                             "target": "targets_in_range",
-                            "range_expression": "60_ft",
+                            "range": "60 ft",
                             "condition": "frightened",
                             "effect": "add_condition",
                             "bonusExpression": "CHA modifier",
@@ -5940,7 +5940,17 @@
                     {
                         "name": "Nature's Wrath",
                         "description": "Magic action, expend Channel Divinity. Creatures within 15 feet make Strength save or be Restrained for 1 minute (repeats save each turn).",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "set_condition",
+                            "target": "targets_in_range",
+                            "range": "15 ft",
+                            "condition": "restrained",
+                            "cost": "1 Channel Divinity",
+                            "effect": "add_condition",
+                            "saveType": "STR",
+                            "casting_time": "1 action"
+                        }
                     },
                     {
                         "name": "Aura of Warding",

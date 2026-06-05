@@ -24,7 +24,7 @@ import utils from '../../services/utils.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
 import HandOfHealingModal from './HandOfHealingModal.jsx'
 import FontOfMagicModal from './FontOfMagicModal.jsx'
-import AbjureFoesModal from './AbjureFoesModal.jsx'
+import SetConditionModal from './SetConditionModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { getClassFeatures } from '../../services/classFeatures.js';
 import { addEntry } from '../../services/logService.js';
@@ -49,7 +49,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [healingPoolModal, setHealingPoolModal] = useState(null);
     const [handOfHealingModal, setHandOfHealingModal] = useState(null);
     const [fontOfMagicModal, setFontOfMagicModal] = useState(null);
-    const [abjureFoesModal, setAbjureFoesModal] = useState(null);
+    const [setConditionModal, setSetConditionModal] = useState(null);
 
     useEffect(() => {
         computeFeatRangeEffects(playerStats.feats, playerStats.rules).then(setFeatRangeEffects).catch(() => { });
@@ -922,9 +922,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             case 'set_condition': {
                 const cha = playerStats.abilities?.find(a => a.name === 'Charisma');
                 const chaBonus = cha?.bonus || 0;
-                const maxTargets = Math.max(1, chaBonus);
                 const prof = playerStats.proficiency || 0;
                 const saveDc = 8 + prof + chaBonus;
+                const conditionName = auto.condition || 'frightened';
+                const saveType = auto.saveType || 'WIS';
+                const rangeFeet = rangeToFeet(auto.range || '60 ft') || 60;
 
                 const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
                 const paladinFeatures = getClassFeatures(playerStats);
@@ -959,23 +961,24 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     } catch { /* positions unavailable */ }
                 }
 
-                setAbjureFoesModal({
+                setSetConditionModal({
                     combatSummary: cs,
                     attackerName: playerStats.name,
                     attackerPos,
-                    maxTargets,
                     saveDc,
                     campaignName,
-                    characters: playerStats._characters,
-                    activeMapName: mapName,
                     mapData,
+                    featureName: action.name,
+                    conditionName,
+                    saveType,
+                    rangeFeet,
                 });
 
                 addEntry(campaignName, {
                     type: 'ability_use',
                     characterName: playerStats.name,
                     abilityName: action.name,
-                    description: `${action.name} activated — WIS save DC ${saveDc}, up to ${maxTargets} target${maxTargets > 1 ? 's' : ''} within 60 ft.`,
+                    description: `${action.name} activated — ${saveType} save DC ${saveDc}, all targets within ${rangeFeet} ft.`,
                 }).catch(() => {});
 
                 break;
@@ -1375,10 +1378,10 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         onClose={() => setFontOfMagicModal(null)}
                     />
                 )}
-                {abjureFoesModal && (
-                    <AbjureFoesModal
-                        {...abjureFoesModal}
-                        onClose={() => setAbjureFoesModal(null)}
+                {setConditionModal && (
+                    <SetConditionModal
+                        {...setConditionModal}
+                        onClose={() => setSetConditionModal(null)}
                     />
                 )}
                 {selectedActionSpell && (

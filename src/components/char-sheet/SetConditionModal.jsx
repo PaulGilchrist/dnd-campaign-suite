@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { getDistanceFeet, rangeToFeet } from '../../services/rangeValidation.js';
+import { getDistanceFeet } from '../../services/rangeValidation.js';
 import { sendSavePrompt, sendSaveResult } from '../../services/savePromptService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { addTurnExpiration } from '../../services/turnExpirations.js';
@@ -8,13 +8,10 @@ import { rollD20 } from '../../services/diceRoller.js';
 import utils from '../../services/utils.js';
 import storage from '../../services/storage.js';
 
-function AbjureFoesModal({ combatSummary, attackerName, attackerPos, maxTargets, saveDc, campaignName, mapData, onClose }) {
-    const [selected, setSelected] = useState(new Set());
+function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, onClose, featureName = 'Abjure Foes', conditionName = 'frightened', saveType = 'WIS', rangeFeet = 60 }) {
     const [processing, setProcessing] = useState(false);
     const [results, setResults] = useState([]);
     const [pendingPrompts, setPendingPrompts] = useState([]);
-
-    const rangeFeet = useMemo(() => rangeToFeet('60 ft') || 60, []);
 
     const eligibleTargets = useMemo(() => {
         if (!combatSummary?.creatures) return [];
@@ -28,42 +25,32 @@ function AbjureFoesModal({ combatSummary, attackerName, attackerPos, maxTargets,
          });
      }, [combatSummary, attackerName, mapData, attackerPos, rangeFeet]);
 
-    const toggleTarget = useCallback((name) => {
-        setSelected(prev => {
-            const next = new Set(prev);
-            if (next.has(name)) {
-                next.delete(name);
-             } else if (next.size < maxTargets) {
-                next.add(name);
-             }
-            return next;
-         });
-     }, [maxTargets]);
-
     const addConditionToCreature = useCallback((targetName, saveDcValue) => {
         const creature = combatSummary.creatures.find(c => c.name === targetName);
         if (!creature) return;
 
+        const conditionKey = conditionName.toLowerCase();
+
         if (creature.type === 'player') {
             const conditions = getRuntimeValue(creature.name, 'activeConditions') || [];
-            const filtered = conditions.filter(c => String(c).toLowerCase() !== 'frightened');
-            setRuntimeValue(creature.name, 'activeConditions', [...filtered, 'frightened'], campaignName);
+            const filtered = conditions.filter(c => String(c).toLowerCase() !== conditionKey);
+            setRuntimeValue(creature.name, 'activeConditions', [...filtered, conditionKey], campaignName);
          } else {
-            creature.conditions = (creature.conditions || []).filter(c => c.key !== 'frightened');
+            creature.conditions = (creature.conditions || []).filter(c => c.key !== conditionKey);
             creature.conditions.push({
                 id: utils.guid(),
-                key: 'frightened',
-                label: 'Frightened',
+                key: conditionKey,
+                label: conditionName.charAt(0).toUpperCase() + conditionName.slice(1),
                 dc: saveDcValue,
-                ability: 'wis',
+                ability: saveType.toLowerCase(),
              });
          }
 
         addTurnExpiration(attackerName, targetName, [
-          { type: 'frightened', condition: 'frightened' },
+          { type: conditionKey, condition: conditionKey },
          ], campaignName);
 
-     }, [combatSummary, attackerName, campaignName]);
+     }, [combatSummary, attackerName, campaignName, conditionName, saveType]);
 
     const logCondition = useCallback((targetName, saveDcValue) => {
         fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
@@ -73,28 +60,28 @@ function AbjureFoesModal({ combatSummary, attackerName, attackerPos, maxTargets,
                 type: 'condition',
                 action: 'applied',
                 characterName: targetName,
-                condition: 'Frightened',
+                condition: conditionName.charAt(0).toUpperCase() + conditionName.slice(1),
                 dc: saveDcValue,
-                ability: 'WIS',
+                ability: saveType,
                 sourceName: attackerName,
                 timestamp: Date.now(),
              }),
          }).catch(() => {});
-     }, [campaignName, attackerName]);
+     }, [campaignName, attackerName, conditionName, saveType]);
 
-    const handleConfirm = useCallback(() => {
-        if (selected.size === 0) return;
+    const handleApply = useCallback(() => {
+        if (eligibleTargets.length === 0) return;
         setProcessing(true);
 
         const npcResults = [];
         const playerPrompts = [];
 
-        selected.forEach(targetName => {
-            const target = combatSummary.creatures.find(c => c.name === targetName);
-            const isNpc = !target || target.type === 'npc';
+        eligibleTargets.forEach(target => {
+            const targetName = target.name;
+            const isNpc = target.type === 'npc';
 
             if (isNpc) {
-                const saveBonus = target?.saveBonuses?.['wis'] ?? 0;
+                const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
                 const roll1 = rollD20();
                 const total = roll1 + saveBonus;
                 const success = total >= saveDc;
@@ -116,12 +103,12 @@ function AbjureFoesModal({ combatSummary, attackerName, attackerPos, maxTargets,
 
                 addEntry(campaignName, {
                     type: 'roll',
-                    name: 'Abjure Foes',
+                    name: featureName,
                     characterName: attackerName,
                     rollType: 'save-damage',
                     targetName,
                     saveDc,
-                    saveType: 'WIS',
+                    saveType,
                     saveResult: success ? 'success' : 'failure',
                     total,
                     rolls: [roll1],
@@ -135,7 +122,7 @@ function AbjureFoesModal({ combatSummary, attackerName, attackerPos, maxTargets,
                 sendSavePrompt(campaignName, {
                     promptId,
                     targetName,
-                    saveType: 'WIS',
+                    saveType,
                     saveDc,
                     sourceName: attackerName,
                  });
@@ -143,12 +130,12 @@ function AbjureFoesModal({ combatSummary, attackerName, attackerPos, maxTargets,
 
                 addEntry(campaignName, {
                     type: 'roll',
-                    name: 'Abjure Foes',
+                    name: featureName,
                     characterName: attackerName,
                     rollType: 'save-damage',
                     targetName,
                     saveDc,
-                    saveType: 'WIS',
+                    saveType,
                     total: 0,
                     rolls: [],
                     bonus: 0,
@@ -170,7 +157,7 @@ function AbjureFoesModal({ combatSummary, attackerName, attackerPos, maxTargets,
         setResults(npcResults);
         setPendingPrompts(playerPrompts);
 
-     }, [selected, combatSummary, campaignName, saveDc, attackerName, addConditionToCreature, logCondition]);
+     }, [eligibleTargets, combatSummary, campaignName, saveDc, attackerName, addConditionToCreature, logCondition, featureName, saveType]);
 
     const handleSaveResult = useCallback((event) => {
         const detail = event.detail;
@@ -190,12 +177,12 @@ function AbjureFoesModal({ combatSummary, attackerName, attackerPos, maxTargets,
 
         addEntry(campaignName, {
             type: 'roll',
-            name: 'Abjure Foes',
+            name: featureName,
             characterName: attackerName,
             rollType: 'save-damage',
             targetName,
             saveDc,
-            saveType: 'WIS',
+            saveType,
             saveResult: success ? 'success' : 'failure',
             total: detail.total ?? 0,
             rolls: [detail.roll ?? 0],
@@ -211,7 +198,7 @@ function AbjureFoesModal({ combatSummary, attackerName, attackerPos, maxTargets,
         setResults(prev => [...prev, { targetName, success, roll: detail.roll ?? 0, total: detail.total ?? 0, saveBonus: detail.saveBonus ?? 0 }]);
         setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
 
-     }, [pendingPrompts, campaignName, attackerName, saveDc, combatSummary, addConditionToCreature, logCondition]);
+     }, [pendingPrompts, campaignName, attackerName, saveDc, combatSummary, addConditionToCreature, logCondition, featureName, saveType]);
 
     React.useEffect(() => {
         if (!processing) return;
@@ -219,31 +206,26 @@ function AbjureFoesModal({ combatSummary, attackerName, attackerPos, maxTargets,
         return () => window.removeEventListener('save-result', handleSaveResult);
      }, [processing, handleSaveResult]);
 
-    const allResolved = processing && pendingPrompts.length === 0 && results.length >= selected.size;
+    const allResolved = processing && pendingPrompts.length === 0 && results.length >= eligibleTargets.length;
+
+    const conditionLabel = conditionName.charAt(0).toUpperCase() + conditionName.slice(1);
 
     return (
          <div className="sp-overlay" onClick={onClose}>
              <div className="sp-modal" onClick={e => e.stopPropagation()}>
                  <div className="sp-header">
-                     <i className="fa-solid fa-shield-halved"></i> Abjure Foes
+                     <i className="fa-solid fa-dice-d20"></i> {featureName}
                  </div>
                  <div className="sp-body">
                      {!processing ? (
                          <>
-                             <p>Select up to <strong>{maxTargets}</strong> target{maxTargets > 1 ? 's' : ''} within 60 feet. Each must make a <strong>WIS</strong> saving throw (DC {saveDc}) or become <strong>Frightened</strong> for 1 minute.</p>
-                             <p className="sp-note">Targets selected: {selected.size}/{maxTargets}</p>
+                             <p>All creatures within {rangeFeet} feet must make a <strong>{saveType}</strong> saving throw (DC {saveDc}) or become <strong>{conditionLabel}</strong> for 1 minute.</p>
                              <div className="abjure-targets-list">
                                  {eligibleTargets.map(c => (
-                                     <label key={c.name} className={`abjure-target-row ${selected.has(c.name) ? 'abjure-target-selected' : ''}`}>
-                                         <input
-                                            type="checkbox"
-                                            checked={selected.has(c.name)}
-                                            onChange={() => toggleTarget(c.name)}
-                                            disabled={!selected.has(c.name) && selected.size >= maxTargets}
-                                         />
+                                     <div key={c.name} className="abjure-target-row abjure-target-selected">
                                          <span className="abjure-target-name">{c.name}</span>
                                          <span className="abjure-target-type">({c.type})</span>
-                                     </label>
+                                     </div>
                                  ))}
                                  {eligibleTargets.length === 0 && (
                                      <p className="sp-note">No valid targets in range.</p>
@@ -252,11 +234,11 @@ function AbjureFoesModal({ combatSummary, attackerName, attackerPos, maxTargets,
                          </>
                      ) : (
                          <>
-                             <p>Resolving Wisdom saving throws (DC {saveDc})...</p>
+                             <p>Resolving {saveType} saving throws (DC {saveDc})...</p>
                              <div className="abjure-results-list">
                                  {results.map(r => (
                                      <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                                         <strong>{r.targetName}</strong>: {r.success ? 'Saved — unaffected' : 'Failed — Frightened!'}{typeof r.roll === 'number' && <> (Roll: {r.roll}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = {r.total})</>}
+                                         <strong>{r.targetName}</strong>: {r.success ? 'Saved — unaffected' : `Failed — ${conditionLabel}!`}{typeof r.roll === 'number' && <> (Roll: {r.roll}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = {r.total})</>}
                                      </div>
                                  ))}
                                  {pendingPrompts.map(p => (
@@ -266,7 +248,7 @@ function AbjureFoesModal({ combatSummary, attackerName, attackerPos, maxTargets,
                                  ))}
                              </div>
                              {allResolved && (
-                                 <p className="sp-note" style={{ marginTop: '8px' }}>All targets resolved. Click to dismiss.</p>
+                                 <p className="sp-note" style={{ marginTop: '8px' }}>All targets resolved.</p>
                              )}
                          </>
                      )}
@@ -274,16 +256,16 @@ function AbjureFoesModal({ combatSummary, attackerName, attackerPos, maxTargets,
                  <div className="sp-actions">
                      {!processing ? (
                          <>
-                             <button className="sp-roll-btn" onClick={handleConfirm} disabled={selected.size === 0} type="button">
-                                 <i className="fa-solid fa-dice-d20"></i> Abjure ({selected.size} target{selected.size !== 1 ? 's' : ''})
+                             <button className="sp-roll-btn" onClick={handleApply} disabled={eligibleTargets.length === 0} type="button">
+                                 <i className="fa-solid fa-dice-d20"></i> {featureName} ({eligibleTargets.length} target{eligibleTargets.length !== 1 ? 's' : ''})
                              </button>
                              <button className="sp-dismiss-btn" onClick={onClose} type="button">
-                                Cancel
+                                 Cancel
                              </button>
                          </>
                      ) : allResolved ? (
                          <button className="sp-roll-btn" onClick={onClose} type="button">
-                            Done
+                             Done
                          </button>
                      ) : null}
                  </div>
@@ -292,4 +274,4 @@ function AbjureFoesModal({ combatSummary, attackerName, attackerPos, maxTargets,
      );
 }
 
-export default AbjureFoesModal;
+export default SetConditionModal;

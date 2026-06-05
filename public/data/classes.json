@@ -7662,7 +7662,7 @@
                                 "automation": {
                                     "type": "set_condition",
                                     "target": "targets_in_range",
-                                    "range_expression": "15_ft",
+                                    "range": "15 ft",
                                     "condition": "restrained",
                                     "cost": "1 Channel Divinity",
                                     "effect": "add_condition",

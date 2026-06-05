@@ -31,7 +31,6 @@ export const actions = [
     "Channel Divinity: Charm Animals and Plants",
     "Channel Divinity: Invoke Duplicity",
     "Channel Divinity: Knowledge of the Ages",
-    "Channel Divinity: Nature's Wrath",
     "Channel Divinity: Preserve Life",
     "Channel Divinity: Radiance of the Dawn",
     "Channel Divinity: Read Thoughts",
