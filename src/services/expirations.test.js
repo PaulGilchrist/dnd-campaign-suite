@@ -22,10 +22,10 @@ vi.mock('./combatData.js', () => ({
 // ── Imports (Vite returns mocked versions) ─────────────────────
 
 import {
-  addTurnExpiration,
+  addExpiration,
   clearAllExpirationEffects,
   expireStaleEffects,
-} from './turnExpirations.js';
+} from './expirations.js';
 
 import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
 import utils from './utils.js';
@@ -37,7 +37,7 @@ import {
 
 // ── Helpers ────────────────────────────────────────────────────
 
-const KEY = 'pendingTurnExpirations';
+const KEY = 'pendingExpirations';
 
 function resetMocks() {
   vi.clearAllMocks();
@@ -52,9 +52,9 @@ function stubUtilsNameIdentity() {
 
 /**
  * Stub getRuntimeValue for clearAllExpirationEffects localStorage scan.
- * @param {Object} keysMap - Map of creature name → pendingTurnExpirations list
- *                           The key in localStorage will be the object's own key (lowercased from char name).
- * @param {Array} myPendingList - What to return for the characterName call to pendingTurnExpirations
+  * @param {Object} keysMap - Map of creature name → pendingExpirations list
+  *                           The key in localStorage will be the object's own key (lowercased from char name).
+  * @param {Array} myPendingList - What to return for the characterName call to pendingExpirations
  */
 function setupLocalStorageScan(keysMap, myPendingList) {
   // Set up localStorage keys
@@ -78,7 +78,7 @@ function setupLocalStorageScan(keysMap, myPendingList) {
 
 // ── Tests ───────────────────────────────────────────────────────
 
-describe('addTurnExpiration', () => {
+describe('addExpiration', () => {
   beforeEach(() => {
     resetMocks();
     stubUtilsNameIdentity();
@@ -88,7 +88,7 @@ describe('addTurnExpiration', () => {
   it('adds a new expiration entry when no existing list', () => {
     getRuntimeValue.mockReturnValueOnce(null);
 
-    addTurnExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign');
+    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign');
 
     expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', KEY);
     expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -105,7 +105,7 @@ describe('addTurnExpiration', () => {
     ];
     getRuntimeValue.mockReturnValueOnce(existingList);
 
-    addTurnExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign');
+    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign');
 
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'Goblin',
@@ -124,7 +124,7 @@ describe('addTurnExpiration', () => {
     ];
     getRuntimeValue.mockReturnValueOnce(existingList);
 
-    addTurnExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign');
+    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign');
 
     // Original list should __not__ have the new entry (we used spread)
     expect(existingList.length).toBe(1);
@@ -134,7 +134,7 @@ describe('addTurnExpiration', () => {
     getCurrentCombatRound.mockReturnValue(5);
     getRuntimeValue.mockReturnValueOnce(null);
 
-    addTurnExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign');
+    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign');
 
     const call = setRuntimeValue.mock.calls[0];
     expect(call[2][0].appliedRound).toBe(5);
@@ -147,7 +147,7 @@ describe('addTurnExpiration', () => {
     ];
     getRuntimeValue.mockReturnValueOnce(null);
 
-    addTurnExpiration('Goblin', 'Human', effects, 'MyCampaign');
+    addExpiration('Goblin', 'Human', effects, 'MyCampaign');
 
     const call = setRuntimeValue.mock.calls[0];
     expect(call[2][0].effects).toBe(effects);
@@ -198,7 +198,7 @@ describe('clearAllExpirationEffects', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', KEY, [], 'MyCampaign');
   });
 
-  it('clears "from me" — uses getRuntimeValue for my pendingTurnExpirations list', () => {
+  it('clears "from me" — uses getRuntimeValue for my pendingExpirations list', () => {
     const myList = [
       { target: 'Human', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 1 },
     ];
@@ -552,8 +552,8 @@ describe('expireStaleEffects', () => {
 
 // ────────────────────────────────────────────────────────────────
 // Indirect tests: clearExpirationEffects and removeActiveCondition
-// Through addTurnExpiration → doesn't call it, so through the other two exports
-// Actually addTurnExpiration does NOT call clearExpirationEffects.
+// Through addExpiration → doesn't call it, so through the other two exports
+// Actually addExpiration does NOT call clearExpirationEffects.
 // It's only called by clearAllExpirationEffects and expireStaleEffects.
 // These are already covered above.  Add a few edge-case tests.
 // ────────────────────────────────────────────────────────────────
@@ -950,7 +950,7 @@ describe('expireStaleEffects — additional edge cases', () => {
     );
   });
 
-  it('handles when getRuntimeValue returns non-array pendingTurnExpirations for an attacker', () => {
+  it('handles when getRuntimeValue returns non-array pendingExpirations for an attacker', () => {
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     // || [] on line 66 makes this treated as empty list → skipped
     getRuntimeValue.mockReturnValueOnce('not-an-array');

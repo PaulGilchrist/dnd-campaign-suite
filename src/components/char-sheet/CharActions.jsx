@@ -19,7 +19,7 @@ import { loadNPCs } from '../../services/npcsService.js';
 import { hasAutomation } from '../../services/automationService.js'
 import { sendSavePrompt } from '../../services/savePromptService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import { addTurnExpiration } from '../../services/turnExpirations.js';
+import { addExpiration } from '../../services/expirations.js';
 import utils from '../../services/utils.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
 import HandOfHealingModal from './HandOfHealingModal.jsx'
@@ -578,10 +578,10 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                              const attackerStoredAdv = getRuntimeValue(playerStats.name, advKey) || [];
                              setRuntimeValue(playerStats.name, advKey, [...attackerStoredAdv, targetName], campaignName);
 
-                             addTurnExpiration(playerStats.name, targetName, [
-                               { type: 'stunned', condition: 'speed_halved' },
-                               { type: 'advantage_on_target' }
-                              ], campaignName);
+addExpiration(playerStats.name, targetName, [
+                                 { type: 'stunned', condition: 'speed_halved' },
+                                 { type: 'advantage_on_target' }
+                                ], campaignName);
                             } else {
                     // Fail: apply the stunned condition
                    addEntry(campaignName, {
@@ -598,9 +598,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 const newConditions = [...conditions, 'stunned'];
                    setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
 
-                   addTurnExpiration(playerStats.name, targetName, [
-                        { type: 'stunned', condition: 'stunned' }
-                      ], campaignName);
+addExpiration(playerStats.name, targetName, [
+                              { type: 'stunned', condition: 'stunned' }
+                            ], campaignName);
                            }
 
                        window.removeEventListener('save-result', handleSaveResult);

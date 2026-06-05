@@ -12,7 +12,7 @@ import {
 import { sendSavePrompt, sendSaveResult } from '../services/savePromptService.js';
 import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../services/aoeService.js';
 import { getRuntimeValue } from '../hooks/useRuntimeState.js';
-import { clearAllExpirationEffects } from '../services/turnExpirations.js';
+import { clearAllExpirationEffects } from '../services/expirations.js';
 import { loadCombatSummary, getCombatSummary } from '../services/combatData.js';
 import { saveLastDamageEvent } from '../hooks/useMetamagic.js';
 import { SHOW_DICE_ROLL_DELAY } from '../config/ui-config.js';

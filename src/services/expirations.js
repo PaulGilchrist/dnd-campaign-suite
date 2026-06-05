@@ -2,9 +2,9 @@ import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
 import utils from './utils.js';
 import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary } from './combatData.js';
 
-const KEY = 'pendingTurnExpirations';
+const KEY = 'pendingExpirations';
 
-export function addTurnExpiration(attackerName, targetName, effects, campaignName) {
+export function addExpiration(attackerName, targetName, effects, campaignName) {
     const list = getRuntimeValue(attackerName, KEY) || [];
     const currentRound = getCurrentCombatRound();
     setRuntimeValue(attackerName, KEY, [
@@ -16,7 +16,7 @@ export function addTurnExpiration(attackerName, targetName, effects, campaignNam
 export function clearAllExpirationEffects(characterName, campaignName) {
     if (!characterName || !campaignName) return;
 
-    // Clear all active buffs (Innate Sorcery, Reckless Attack, etc.)
+     // Clear all active buffs (Innate Sorcery, Reckless Attack, etc.)
     setRuntimeValue(characterName, 'activeBuffs', [], campaignName);
 
     const charLower = characterName.toLowerCase();

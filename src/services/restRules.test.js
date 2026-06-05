@@ -20,7 +20,7 @@ vi.mock('../hooks/useRuntimeState.js', () => ({
   setRuntimeBatch: vi.fn(),
 }))
 
-vi.mock('./turnExpirations.js', () => ({
+vi.mock('./expirations.js', () => ({
   clearAllExpirationEffects: vi.fn(),
 }))
 

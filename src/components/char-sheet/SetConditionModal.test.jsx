@@ -19,8 +19,8 @@ vi.mock('../../hooks/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../services/turnExpirations.js', () => ({
-  addTurnExpiration: vi.fn(),
+vi.mock('../../services/expirations.js', () => ({
+  addExpiration: vi.fn(),
 }));
 
 vi.mock('../../services/logService.js', () => ({
@@ -36,7 +36,7 @@ vi.mock('../../services/utils.js', () => {
   const utilsMock = {
     guid: vi.fn(() => `guid-${++counter}`),
     getAbilityLongName: vi.fn((s) => s),
-  };
+   };
   return { default: utilsMock };
 });
 
@@ -47,7 +47,7 @@ vi.mock('../../services/storage.js', () => ({
 // ── Re-import mocked modules ──
 import * as savePromptService from '../../services/savePromptService.js';
 import * as useRuntimeState from '../../hooks/useRuntimeState.js';
-import * as turnExpirations from '../../services/turnExpirations.js';
+import * as expirations from '../../services/expirations.js';
 import * as logService from '../../services/logService.js';
 import * as diceRoller from '../../services/diceRoller.js';
 
@@ -290,7 +290,7 @@ describe('SetConditionModal', () => {
     fireEvent.click(screen.getAllByRole('checkbox')[0]);
     fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
-    expect(turnExpirations.addTurnExpiration).toHaveBeenCalled();
+    expect(expirations.addExpiration).toHaveBeenCalled();
   });
 
   it('NPC success does not call setRuntimeValue for conditions', () => {

@@ -21,7 +21,7 @@ import Popup from '../common/Popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 import * as mapsService from '../../services/mapsService.js';
 import { OverlayShape } from '../../models/SpellOverlay.js';
-import { expireStaleEffects } from '../../services/turnExpirations.js';
+import { expireStaleEffects } from '../../services/expirations.js';
 import { loadCombatSummary, getCombatSummary, getActiveCreatureName } from '../../services/combatData.js';
 import './initiative.css'
 

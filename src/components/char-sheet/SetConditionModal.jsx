@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { getDistanceFeet } from '../../services/rangeValidation.js';
 import { sendSavePrompt, sendSaveResult } from '../../services/savePromptService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import { addTurnExpiration } from '../../services/turnExpirations.js';
+import { addExpiration } from '../../services/expirations.js';
 import { addEntry } from '../../services/logService.js';
 import { rollD20 } from '../../services/diceRoller.js';
 import utils from '../../services/utils.js';
@@ -59,9 +59,9 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
              });
          }
 
-        addTurnExpiration(attackerName, targetName, [
-          { type: conditionKey, condition: conditionKey },
-         ], campaignName);
+        addExpiration(attackerName, targetName, [
+            { type: conditionKey, condition: conditionKey },
+           ], campaignName);
 
      }, [combatSummary, attackerName, campaignName, conditionName, saveType]);
 
