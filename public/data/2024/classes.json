@@ -5965,7 +5965,7 @@
                     },
                     {
                         "name": "Elder Champion",
-                        "description": "Bonus Action for 1 minute. Diminish Defiance: enemies in aura have Disadvantage on saves against your spells/Channel Divinity. Regeneration: regain 10 HP at start of each turn. Swift Spells: cast action spells as Bonus Action.",
+                        "description": "As a Bonus Action you can imbue your Aura of Protection with primal power, granting the benefits below for 1 minute or until you end them (no action required). Once you use this feature, you can't use it again until you finish a Long Rest. You can also restore your use of it by expoending a level 5 spell slot (no action required). <b>Diminish Defiance</b>: Enemies in aura have Disadvantage on saving throws against your spells and Channel Divinity options. <b>Regeneration</b>: At the start of each of your turns, you regain 10 HP. <b>Swift Spells</b>: Whenever you cast a spell that has a casting time of an action, you can cast it using a Bonus Action instead.",
                         "level": 20
                     }
                 ],

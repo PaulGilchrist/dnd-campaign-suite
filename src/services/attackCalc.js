@@ -51,6 +51,8 @@ export function buildWeaponAttack(opts) {
         extraHitBonusLabel = '',
         // When false, skip adding ability bonus to damage string (used for off-hand)
         includeAbilityBonusInDamage = true,
+        // Weapon category for automation matching ('melee', 'ranged', 'unarmed', or '')
+        weaponType = '',
     } = opts;
 
     const { magicBonus } = parseMagicItemName(weaponName);
@@ -95,6 +97,7 @@ export function buildWeaponAttack(opts) {
         hitBonusFormula,
         range: weapon.range.normal,
         type: actionType,
+        weaponType,
     };
 }
 
@@ -116,6 +119,7 @@ export function buildMonkAttacks(opts) {
             hitBonusFormula: `To Hit Bonus Formula = Dexterity Bonus (${dexterityBonus}) + Proficiency (${proficiency})`,
             range: 5,
             type: 'Action',
+            weaponType: 'unarmed',
         },
         {
             name: 'Unarmed Strike',
@@ -126,6 +130,7 @@ export function buildMonkAttacks(opts) {
             hitBonusFormula: `To Hit Bonus Formula = Dexterity Bonus (${dexterityBonus}) + Proficiency (${proficiency})`,
             range: 5,
             type: 'Bonus Action',
+            weaponType: 'unarmed',
         },
     ];
 }
@@ -242,6 +247,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                 abilityName,
                 proficiency,
                 actionType: 'Action',
+                weaponType: 'melee',
                 extraDamage: isDueling ? '+2' : '',
                 extraDamageLabel: isDueling ? 'Dueling Fighting Style (2)' : '',
              }));
@@ -261,6 +267,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                     abilityName,
                     proficiency,
                     actionType: 'Bonus Action',
+                    weaponType: 'melee',
                     includeAbilityBonusInDamage: false,
                     extraDamage: isTwoWeapon ? `+${bonus}` : '',
                     extraDamageLabel: isTwoWeapon ? `Two-Weapon Fighting Style (${bonus})` : '',

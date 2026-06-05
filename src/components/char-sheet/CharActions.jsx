@@ -260,11 +260,32 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         const wasCrit = popupHtml?.isCrit;
         if (wasCrit && setPopupHtml) setPopupHtml(null);
         const result = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
-        if (result) {
-            (mapName ? buildAttackContext(attack) : buildAttackContextSync(attack)).then(ctx => {
-                rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier, ctx);
-            }).catch(() => { });
+        if (!result) return;
+
+        let formula = attack.damage;
+        let total = result.total;
+        let rolls = result.rolls;
+        const modifier = result.modifier;
+
+        // Apply any melee_weapon_hit damage bonus automations (e.g. Radiant Strikes)
+        const isMeleeOrUnarmed = attack.weaponType === 'melee' || attack.weaponType === 'unarmed';
+        if (isMeleeOrUnarmed && playerStats.automation?.actions) {
+            const hitBonuses = playerStats.automation.actions.filter(
+                a => a.type === 'damage_bonus' && a.trigger === 'melee_weapon_hit'
+            );
+            for (const bonus of hitBonuses) {
+                const bonusResult = rollExpression(bonus.damageExpression);
+                if (bonusResult) {
+                    formula += ` + ${bonus.damageExpression}[${bonus.damageType}]`;
+                    total += bonusResult.total;
+                    rolls = [...rolls, ...bonusResult.rolls];
+                }
+            }
         }
+
+        (mapName ? buildAttackContext(attack) : buildAttackContextSync(attack)).then(ctx => {
+            rollDamage(attack.name, formula, total, rolls, modifier, ctx);
+        }).catch(() => { });
     };
 
     const handleAttackClick = React.useCallback((attack) => {

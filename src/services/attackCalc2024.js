@@ -48,6 +48,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                 abilityName,
                 proficiency,
                 actionType: 'Action',
+                weaponType: 'melee',
             }));
         }
 
@@ -64,6 +65,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                     abilityName,
                     proficiency,
                     actionType: 'Bonus Action',
+                    weaponType: 'melee',
                     includeAbilityBonusInDamage: false,
                 }));
             }

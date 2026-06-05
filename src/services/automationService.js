@@ -438,7 +438,9 @@ function buildAttackInfo(feature, playerStats) {
                 name: feature.name,
                 target: auto.target,
                 condition: auto.condition,
+                cost: auto.cost || '',
                 range: auto.range || '60_ft',
+                saveType: auto.saveType || 'STR',
                 effect: auto.effect || '',
                 hasAutomation: true
             }
