@@ -81,7 +81,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
 
     // Spell attacks
     if (playerStats.spellAbilities) {
-        attacks.push(...buildSpellAttacks(playerStats.spellAbilities.spells, allSpells, playerStats.spellAbilities));
+        attacks.push(...buildSpellAttacks(playerStats.spellAbilities.spells, allSpells, playerStats.spellAbilities, playerStats.level));
     }
 
     return attacks;

@@ -8,6 +8,7 @@ import { sanitizeHtml } from '../../services/sanitize.js';
 import { parseMagicItemName } from '../../services/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
+import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
 import { rollExpression, rollExpressionDoubled, parseExpression } from '../../services/diceRoller.js';
 import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetName } from '../../services/damageUtils.js';
 import * as mapsService from '../../services/mapsService.js';
@@ -978,6 +979,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         return null;
     };
 
+    const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
+
     const actionCastingTimes = ['1 action', '1 Action', 'action', 'Action'];
     const actionAttackNames = new Set(playerStats.attacks?.filter(a => a.type === 'Action').map(a => a.name) || []);
     const actionSpells = playerStats.spellAbilities?.spells?.filter(spell =>
@@ -1363,6 +1366,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             spell={selectedActionSpell}
                             playerStats={playerStats}
                             campaignName={campaignName}
+                            playerLevel={playerStats.level}
+                            upcastLevels={buildUpcastLevels(selectedActionSpell)}
                             onClose={() => setSelectedActionSpell(null)}
                             onCast={handleActionSpellCast}
                         />

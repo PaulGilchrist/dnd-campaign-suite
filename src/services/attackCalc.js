@@ -137,7 +137,7 @@ export function buildMonkAttacks(opts) {
  * @param {Object} spellAbilities - { modifier }
  * @returns {Object[]}
  */
-export function buildSpellAttacks(playerSpells, allSpells, spellAbilities) {
+export function buildSpellAttacks(playerSpells, allSpells, spellAbilities, playerLevel = 1) {
     const attacks = [];
 
     const spells = (playerSpells || []).map(spell => {
@@ -154,7 +154,13 @@ export function buildSpellAttacks(playerSpells, allSpells, spellAbilities) {
         const charDmg = spell.damage.damage_at_character_level;
         const dmgObj = slotDmg && Object.keys(slotDmg).length ? slotDmg : charDmg;
         if (dmgObj) {
-            damage = dmgObj[Object.keys(dmgObj)[0]];
+            if (spell.level === 0) {
+                const lvls = Object.keys(dmgObj).map(Number).filter(l => l <= playerLevel);
+                const bestLevel = lvls.length > 0 ? Math.max(...lvls) : Object.keys(dmgObj)[0];
+                damage = dmgObj[bestLevel];
+            } else {
+                damage = dmgObj[Object.keys(dmgObj)[0]];
+            }
         }
 
         const attackEntry = {
@@ -275,7 +281,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
 
      // Spell attacks
     if (playerStats.spellAbilities) {
-        attacks.push(...buildSpellAttacks(playerStats.spellAbilities.spells, allSpells, playerStats.spellAbilities));
+        attacks.push(...buildSpellAttacks(playerStats.spellAbilities.spells, allSpells, playerStats.spellAbilities, playerStats.level));
      }
 
     return attacks;

@@ -4,8 +4,12 @@ import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet } from 
 export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects }) {
   const slotDmg = spell.damage?.damage_at_slot_level;
   const charDmg = spell.damage?.damage_at_character_level;
-  const dmgObj = slotDmg && Object.keys(slotDmg).length ? slotDmg : charDmg;
-  const formula = dmgObj ? dmgObj[Object.keys(dmgObj)[0]] : null;
+  const formula =
+    (slotDmg && slotDmg[spell.level]) ||
+    (charDmg && charDmg[spell.level]) ||
+    (slotDmg && Object.keys(slotDmg).length ? slotDmg[Object.keys(slotDmg)[0]] : null) ||
+    (charDmg && Object.keys(charDmg).length ? charDmg[Object.keys(charDmg)[0]] : null) ||
+    null;
   const damageType = spell.damage?.damage_type || '';
 
   if (!formula) return;

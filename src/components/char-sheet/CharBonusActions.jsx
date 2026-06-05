@@ -7,6 +7,7 @@ import { sanitizeHtml } from '../../services/sanitize.js';
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import { hasAutomation } from '../../services/automationService.js'
 import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
+import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
 import { executeSpellCast } from '../../services/spellCastService.js'
 import * as mapsService from '../../services/mapsService.js';
 import { getNearestPlacedItem } from '../../services/rangeValidation.js';
@@ -36,39 +37,45 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
       cachedBonusCastPosRef.current = null;
     }, [rollAttack, rollDamage, playerStats, getTargetInfo]);
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, bonusCastAction);
-    const handleBonusSpellCast = React.useCallback(async (spell) => {
-      setSelectedBonusSpell(null);
-      if (mapName) {
-        try {
-          const [mapData] = await Promise.all([
-            mapsService.loadMapData(campaignName, mapName),
-          ]);
-          const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
-          if (attackerPlayer) {
-            const cs = await getCombatContext(campaignName);
-            const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-            if (target) {
-              const targetPlayer = mapData?.players?.find(p => p.name === target.name);
-              const targetNpc = mapData?.placedItems?.length
-                ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlayer)
+    const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
+
+    const resolveBonusSpellPositions = React.useCallback(async () => {
+      if (!mapName) return;
+      try {
+        const [mapData] = await Promise.all([
+          mapsService.loadMapData(campaignName, mapName),
+        ]);
+        const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
+        if (attackerPlayer) {
+          const cs = await getCombatContext(campaignName);
+          const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+          if (target) {
+            const targetPlayer = mapData?.players?.find(p => p.name === target.name);
+            const targetNpc = mapData?.placedItems?.length
+              ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlayer)
+              : null;
+            const targetPos = targetPlayer
+              ? { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY }
+              : targetNpc
+                ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY }
                 : null;
-              const targetPos = targetPlayer
-                ? { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY }
-                : targetNpc
-                  ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY }
-                  : null;
-              if (targetPos) {
-                cachedBonusCastPosRef.current = {
-                  attackerPos: { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-                  targetPos,
-                };
-              }
+            if (targetPos) {
+              cachedBonusCastPosRef.current = {
+                attackerPos: { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
+                targetPos,
+              };
             }
           }
-        } catch { /* positions unavailable */ }
-      }
+        }
+      } catch { /* positions unavailable */ }
+    }, [mapName, campaignName, playerStats.name]);
+
+    const handleBonusSpellCast = React.useCallback(async (spell) => {
+      setSelectedBonusSpell(null);
+
+      await resolveBonusSpellPositions();
       gateMetamagic(spell);
-    }, [gateMetamagic, mapName, campaignName, playerStats.name]);
+    }, [gateMetamagic, resolveBonusSpellPositions]);
 
     const bonusActionAttacks = playerStats.attacks.filter((attack) => attack.type === 'Bonus Action');
     const attackNames = new Set((playerStats.attacks || []).map(a => a.name));
@@ -163,14 +170,16 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                         spell={selectedBonusSpell}
                         playerStats={playerStats}
                         campaignName={campaignName}
+                        playerLevel={playerStats.level}
+                        upcastLevels={buildUpcastLevels(selectedBonusSpell)}
                         onClose={() => setSelectedBonusSpell(null)}
                          onCast={handleBonusSpellCast}
                      />
                  </Popup>
              )}
-              {pendingMetamagic && (
-                  <div>
-                      <MetamagicPopup
+                {pendingMetamagic && (
+                   <div>
+                       <MetamagicPopup
                          spell={{ name: pendingMetamagic.spellName, level: pendingMetamagic.spellLevel || 0 }}
                          playerStats={{ ...playerStats, _metamagicCurrentSP: pendingMetamagic._currentSP }}
                          campaignName={campaignName}

@@ -1,0 +1,93 @@
+.upcast-popup {
+  max-width: 440px;
+  width: 90%;
+}
+
+.upcast-popup-inner {
+  padding: 20px;
+}
+
+.upcast-popup-inner h3 {
+  margin: 0 0 6px 0;
+  color: var(--color-header);
+  font-size: 1.3em;
+}
+
+.upcast-popup-inner h3 i {
+  margin-right: 8px;
+}
+
+.upcast-popup-inner p {
+  margin: 0 0 14px 0;
+  font-size: 0.95em;
+  color: var(--color-text-secondary, var(--color-text));
+}
+
+.upcast-levels {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.upcast-level {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 2px 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color-input, #ccc);
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--background-color-surface, #fafafa);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.upcast-level:hover {
+  background: var(--background-color-card-hover, #f0f0f0);
+}
+
+.upcast-level-selected {
+  border-color: var(--color-primary, #1976d2);
+  background: var(--background-color-surface, #e3f2fd);
+}
+
+.upcast-level-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.upcast-level input[type="radio"] {
+  grid-column: 1 / 2;
+  margin: 0;
+}
+
+.upcast-level-number {
+  grid-column: 2 / 3;
+  font-weight: 600;
+  font-size: 0.95em;
+  color: var(--color-text);
+}
+
+.upcast-level-formula {
+  grid-column: 3 / 4;
+  font-size: 1em;
+  font-weight: 700;
+  color: var(--color-primary, #1976d2);
+  font-family: 'Courier New', monospace;
+}
+
+.upcast-level-slots {
+  grid-column: 2 / 4;
+  font-size: 0.85em;
+  color: var(--color-text-secondary, #777);
+}
+
+.upcast-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+  border-top: 1px solid var(--border-color-light);
+  padding-top: 12px;
+}

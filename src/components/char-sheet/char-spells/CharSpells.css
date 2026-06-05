@@ -48,6 +48,60 @@
     margin-top: 8px;
     font-style: italic;
 }
+.spell-detail-upcast {
+    margin: 12px 0;
+    padding: 10px;
+    background: var(--background-color-body, #f5f5f5);
+    border-radius: 4px;
+}
+.spell-detail-upcast-label {
+    margin: 0 0 8px 0;
+    font-size: 0.95em;
+    font-weight: 600;
+    color: var(--color-text-secondary, var(--color-text));
+}
+.spell-detail-upcast-label i {
+    margin-right: 4px;
+}
+.spell-detail-upcast-level {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 2px 8px;
+    align-items: center;
+    padding: 6px 8px;
+    border: 1px solid var(--border-color-input, #ccc);
+    border-radius: 3px;
+    cursor: pointer;
+    background: var(--background-color-surface, #fafafa);
+    transition: background 0.15s, border-color 0.15s;
+    margin-bottom: 4px;
+}
+.spell-detail-upcast-level:hover {
+    background: var(--background-color-card-hover, #f0f0f0);
+}
+.spell-detail-upcast-selected {
+    border-color: var(--color-primary, #1976d2);
+    background: var(--background-color-surface, #e3f2fd);
+}
+.spell-detail-upcast-level input[type="radio"] {
+    margin: 0;
+}
+.spell-detail-upcast-level-number {
+    font-weight: 600;
+    font-size: 0.9em;
+    color: var(--color-text);
+}
+.spell-detail-upcast-formula {
+    font-weight: 700;
+    font-size: 0.95em;
+    color: var(--color-primary, #1976d2);
+    font-family: 'Courier New', monospace;
+}
+.spell-detail-upcast-slots {
+    grid-column: 2 / 4;
+    font-size: 0.8em;
+    color: var(--color-text-secondary, #777);
+}
 @media print {
     .char-spells .table-spells {
         font-size: 10px;

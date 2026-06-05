@@ -13,6 +13,8 @@ import { sanitizeHtml } from '../../../services/sanitize.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../services/damageUtils.js';
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../../hooks/useMetamagic.js'
 import { useSpellMetamagicFlow } from '../../../hooks/useSpellMetamagicFlow.js'
+import { useSpellUpcastFlow } from '../../../hooks/useSpellUpcastFlow.js'
+import UpcastPopup from './UpcastPopup.jsx'
 import { executeSpellCast } from '../../../services/spellCastService.js'
 import * as mapsService from '../../../services/mapsService.js';
 import { getNearestPlacedItem } from '../../../services/rangeValidation.js';
@@ -89,41 +91,47 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
       cachedCastPosRef.current = null;
     }, [rollAttack, rollDamage, playerStats, getTargetInfo]);
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
-    const handleSpellCast = React.useCallback(async (spell) => {
-      setSelectedSpell(null);
-      if (mapName) {
-        try {
-          const [mapData] = await Promise.all([
-            mapsService.loadMapData(campaignName, mapName),
-          ]);
-          const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
-          if (attackerPlayer) {
-            const cs = await getCombatContext(campaignName);
-            const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-            if (target) {
-              const targetPlayer = mapData?.players?.find(p => p.name === target.name);
-              const targetNpc = mapData?.placedItems?.length
-                ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlayer)
+    const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
+
+    const resolveSpellPositions = React.useCallback(async () => {
+      if (!mapName) return;
+      try {
+        const [mapData] = await Promise.all([
+          mapsService.loadMapData(campaignName, mapName),
+        ]);
+        const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
+        if (attackerPlayer) {
+          const cs = await getCombatContext(campaignName);
+          const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+          if (target) {
+            const targetPlayer = mapData?.players?.find(p => p.name === target.name);
+            const targetNpc = mapData?.placedItems?.length
+              ? getNearestPlacedItem(mapData.placedItems, target.name, attackerPlayer)
+              : null;
+            const targetPos = targetPlayer
+              ? { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY }
+              : targetNpc
+                ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY }
                 : null;
-              const targetPos = targetPlayer
-                ? { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY }
-                : targetNpc
-                  ? { gridX: targetNpc.gridX, gridY: targetNpc.gridY }
-                  : null;
-              if (targetPos) {
-                cachedCastPosRef.current = {
-                  attackerPos: { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-                  targetPos,
-                };
-              }
+            if (targetPos) {
+              cachedCastPosRef.current = {
+                attackerPos: { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
+                targetPos,
+              };
             }
           }
-        } catch { /* positions unavailable */ }
-      }
-      gateMetamagic(spell);
-    }, [gateMetamagic, mapName, campaignName, playerStats.name]);
+        }
+      } catch { /* positions unavailable */ }
+    }, [mapName, campaignName, playerStats.name]);
 
-    const handleDamageRoll = (formula, spellName, spell) => {
+    const handleSpellCast = React.useCallback(async (spell) => {
+      setSelectedSpell(null);
+
+      await resolveSpellPositions();
+      gateMetamagic(spell);
+    }, [gateMetamagic, resolveSpellPositions]);
+
+    const executeDamageRoll = (formula, spellName, spell) => {
         const wasCrit = dicePopupHtml?.isCrit;
         if (wasCrit && setDicePopupHtml) setDicePopupHtml(null);
         const result = wasCrit ? rollExpressionDoubled(formula) : rollExpression(formula);
@@ -157,6 +165,33 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                 doDamage({});
             }
         }
+    };
+
+    const handleDamageRoll = (formula, spellName, spell) => {
+      const afterUpcast = (modifiedSpell) => {
+        const upcastFormula = modifiedSpell.damage?.damage_at_slot_level?.[modifiedSpell.level]
+          || modifiedSpell.damage?.damage_at_character_level?.[modifiedSpell.level]
+          || formula;
+        executeDamageRoll(upcastFormula, modifiedSpell.name || spellName, modifiedSpell);
+      };
+
+      if (gateUpcast(spell, afterUpcast, false)) {
+        return;
+      }
+
+      if (spell.level === 0) {
+        const autoLevel = getCantripAutoLevel(spell, playerStats.level);
+        if (autoLevel) {
+          const modifiedSpell = { ...spell, level: autoLevel };
+          const upcastFormula = modifiedSpell.damage?.damage_at_slot_level?.[modifiedSpell.level]
+            || modifiedSpell.damage?.damage_at_character_level?.[modifiedSpell.level]
+            || formula;
+          executeDamageRoll(upcastFormula, modifiedSpell.name || spellName, modifiedSpell);
+          return;
+        }
+      }
+
+      executeDamageRoll(formula, spellName, spell);
     };
     const [filterPrepared, setFilterPrepared] = React.useState(false);
     const [spells, setSpells] = React.useState([]);
@@ -208,6 +243,8 @@ return (
                                 spell={selectedSpell}
                                 playerStats={playerStats}
                                 campaignName={campaignName}
+                                playerLevel={playerStats.level}
+                                upcastLevels={buildUpcastLevels(selectedSpell)}
                                 onClose={() => setSelectedSpell(null)}
                                 onCast={handleSpellCast}
                             />
@@ -218,6 +255,14 @@ return (
                             {typeof dicePopupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(dicePopupHtml) }}></div> : 
                              <DiceRollResult {...dicePopupHtml} onQuickRoll={dicePopupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(dicePopupHtml.promptId, dicePopupHtml.targetName, dicePopupHtml.saveType, dicePopupHtml.saveDc) : undefined} />}
                         </Popup>
+                    )}
+                    {pendingUpcast && (
+                      <UpcastPopup
+                        spell={pendingUpcast.spell}
+                        levels={buildUpcastLevels(pendingUpcast.spell)}
+                        onConfirm={handleUpcastConfirm}
+                        onCancel={handleUpcastCancel}
+                      />
                     )}
                     {pendingMetamagic && (
                       <MetamagicPopup
@@ -294,7 +339,14 @@ return (
                             const charDmg = spell.damage.damage_at_character_level;
                             const dmgObj = slotDmg && Object.keys(slotDmg).length ? slotDmg : charDmg;
                             if (dmgObj) {
-                                effect = `${dmgObj[Object.keys(dmgObj)[0]]} ${spell.damage.damage_type}`;
+                                const isCantrip = spell.level === 0;
+                                if (isCantrip) {
+                                    const lvls = Object.keys(dmgObj).map(Number).filter(l => l <= playerStats.level);
+                                    const bestLevel = lvls.length > 0 ? Math.max(...lvls) : Object.keys(dmgObj)[0];
+                                    effect = `${dmgObj[bestLevel]} ${spell.damage.damage_type}`;
+                                } else {
+                                    effect = `${dmgObj[Object.keys(dmgObj)[0]]} ${spell.damage.damage_type}`;
+                                }
                                 if (spell.dc) {
                                     const saveLabel = spell.dc.dc_success === 'half' ? 'half' : 'negates';
                                     effect += ` (${spell.dc.dc_type} ${saveLabel})`;

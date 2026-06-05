@@ -164,6 +164,7 @@ function buildAttackInfo(feature, playerStats) {
                 name: feature.name,
                 trigger: auto.trigger || '',
                 damageExpression: auto.damageExpression || '',
+                damageType: auto.damageType || '',
                 maxDamage: auto.maxDamage || '',
                 extraVs: auto.extraVs || null,
                 extraDamage: auto.extraDamage || '',
