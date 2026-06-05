@@ -100,7 +100,7 @@ describe('CharHitPoints', () => {
     fireEvent.click(clickable);
     const input = screen.getByTestId('hidden-input');
     fireEvent.change(input, { target: { value: '20' } });
-    expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'currentHitPoints', '20', undefined);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'currentHitPoints', 20, undefined);
   });
 
   it('should show max/cur label', () => {
@@ -135,7 +135,7 @@ describe('CharHitPoints', () => {
     const input = screen.getByTestId('hidden-input');
     fireEvent.change(input, { target: { value: '10' } });
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'currentHitPoints', '10', undefined);
+    expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'currentHitPoints', 10, undefined);
     expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'deathSaves', [false, false, false], undefined);
     expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'deathFailures', [false, false, false], undefined);
   });

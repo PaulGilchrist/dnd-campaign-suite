@@ -650,7 +650,7 @@ describe('Paladin', () => {
   it('renders paladin features', () => {
     render(<CharClassFeatures playerStats={mockStats} />);
     expect(screen.getByText(/Fighting Styles:/)).toBeInTheDocument();
-    expect(screen.getByText(/Channel Divinity:/)).toBeInTheDocument();
+    expect(screen.getByText(/Channel Divinity Charges/)).toBeInTheDocument();
      });
 
   it('shows aura range for 5e', () => {
