@@ -46,7 +46,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const currentUses = getRuntimeValue(playerStats.name, 'innateSorceryUses', campaignName);
     const usesMax = getClassFeatures(playerStats)?.maxInnateSorcery || 0;
     const remaining = currentUses != null ? Number(currentUses) : usesMax;
-    const currentSP = getCurrentSorceryPoints(playerStats.name);
+    const maxSP = getClassFeatures(playerStats)?.maxSorceryPoints || 0;
+    const currentSP = getCurrentSorceryPoints(playerStats.name, maxSP);
 
     if (remaining > 0) {
         return {
