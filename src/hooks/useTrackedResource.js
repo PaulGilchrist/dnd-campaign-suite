@@ -1,33 +1,29 @@
 import React from 'react';
 import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from './useRuntimeState.js';
 
-function useTrackedResource(storageKey, playerName, maxGetter, deps, campaignName) {
-  const [current, setCurrent] = React.useState(() => {
-    const storedValue = getRuntimeValue(playerName, storageKey);
-    return storedValue != null ? storedValue : maxGetter();
-  });
+function resolveCurrent(storageKey, playerName, playerStats) {
+  const storedValue = getRuntimeValue(playerName, storageKey);
+  if (storedValue != null) return storedValue;
+  if (playerStats?._trackedResources?.[storageKey]) {
+    return playerStats._trackedResources[storageKey].current;
+  }
+  return null;
+}
 
-  // Re-sync when any dependency changes (e.g., player level changed)
+function useTrackedResource(storageKey, playerName, maxGetter, deps, campaignName, playerStats) {
+  const [current, setCurrent] = React.useState(() =>
+    resolveCurrent(storageKey, playerName, playerStats)
+  );
+
   React.useEffect(() => {
-    const storedValue = getRuntimeValue(playerName, storageKey);
-    if (storedValue != null) {
-      setCurrent(storedValue);
-    } else {
-      setCurrent(maxGetter());
-    }
-  }, [deps, maxGetter, playerName, storageKey, campaignName]);
+    const resolved = resolveCurrent(storageKey, playerName, playerStats);
+    setCurrent(resolved);
+  }, [deps, maxGetter, playerName, storageKey, campaignName, playerStats]);
 
-  // Listen for external updates to this resource from any source:
-  // - Long Rest / Short Rest (setRuntimeBatch resets resources to null)
-  // - Point spending via DOM custom events (focus-points-updated, sorcery-points-updated)
   React.useEffect(() => {
     const reReadHandler = () => {
-      const storedValue = getRuntimeValue(playerName, storageKey);
-      if (storedValue != null) {
-        setCurrent(storedValue);
-      } else {
-        setCurrent(maxGetter());
-      }
+      const resolved = resolveCurrent(storageKey, playerName, playerStats);
+      setCurrent(resolved);
     };
 
     window.addEventListener('focus-points-updated', reReadHandler);
@@ -41,7 +37,7 @@ function useTrackedResource(storageKey, playerName, maxGetter, deps, campaignNam
       window.removeEventListener('innate-sorcery-updated', reReadHandler);
       removeListener();
      };
-  }, [playerName, storageKey, campaignName, maxGetter]);
+  }, [playerName, storageKey, campaignName, maxGetter, playerStats]);
 
   const update = async (val) => {
     await setRuntimeValue(playerName, storageKey, val, campaignName);

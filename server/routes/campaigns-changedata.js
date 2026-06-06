@@ -13,6 +13,13 @@ router.use('/api/campaigns/:campaign', (req, res, next) => {
     next();
 });
 
+// GET /api/campaigns/:campaign/change-data - Get full change data object for campaign
+router.get('/api/campaigns/:campaign/change-data', (req, res) => {
+    const { campaign } = req.params;
+    const data = characterChangeData.get(campaign);
+    res.json(data || {});
+});
+
 // GET /api/campaigns/:campaign/:key - Generic GET from in-memory change data store
 router.get('/api/campaigns/:campaign/:key', (req, res, next) => {
     const { campaign, key } = req.params;

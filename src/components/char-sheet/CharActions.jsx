@@ -73,13 +73,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             const hasInitAction = playerStats.actions?.some(a => a.automation?.type === 'initiative_action');
             if (!hasInitAction) return;
 
-            // Get max focus points from class data and set current to max
             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
             const maxFP = classLevel?.focus_points || getRuntimeValue(playerStats.name, 'focusPoints', campaignName) || 0;
             if (!maxFP) return;
 
-            // Only recover if current is less than max (avoid unnecessary writes when already full)
-            const currentFP = Number(getRuntimeValue(playerStats.name, 'focusPoints', campaignName)) || 0;
+            const currentFP = Number(getRuntimeValue(playerStats.name, 'focusPoints', campaignName) ?? 0);
             if (currentFP >= maxFP) return;
 
             setRuntimeValue(playerStats.name, 'focusPoints', maxFP, campaignName);
@@ -186,7 +184,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
             const maxFP = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
             const storedFP = getRuntimeValue(playerStats.name, 'focusPoints', campaignName);
-            const currentFP = storedFP != null ? Number(storedFP) : maxFP;
+            const currentFP = storedFP != null ? Number(storedFP) : (playerStats._trackedResources?.focusPoints?.current ?? maxFP);
             if (currentFP <= 0) {
                 setPopupHtml(`<b>${action.name}</b><br/>No ${playerStats.rules === '2024' ? "Focus Points" : 'ki points'} remaining.`);
                 return;
@@ -508,7 +506,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         }
 
         pending.action(metaCtx);
-    }, [pendingActionMetamagic, playerStats.name, campaignName]);
+    }, [pendingActionMetamagic, playerStats, campaignName]);
 
     const handleActionMetamagicSkip = React.useCallback(() => {
         const pending = pendingActionMetamagic;

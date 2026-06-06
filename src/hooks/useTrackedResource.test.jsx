@@ -48,20 +48,18 @@ describe('useTrackedResource', () => {
     expect(getRuntimeValue).toHaveBeenCalledWith('Alice', 'hp');
   });
 
-  it('initializes with maxGetter() result when getProperty returns null', () => {
+  it('renders empty when getProperty returns null and no fallback', () => {
     getRuntimeValue.mockReturnValue(null);
     render(<TestComponent storageKey="hp" playerName="Alice" maxGetter={mockMaxGetter} deps={[]} />);
 
-    expect(screen.getByTestId('current').textContent).toBe('20');
-    expect(mockMaxGetter).toHaveBeenCalled();
+    expect(screen.getByTestId('current').textContent).toBe('');
   });
 
-  it('initializes with maxGetter() result when getProperty returns undefined', () => {
+  it('renders empty when getProperty returns undefined and no fallback', () => {
     getRuntimeValue.mockReturnValue(undefined);
     render(<TestComponent storageKey="hp" playerName="Alice" maxGetter={mockMaxGetter} deps={[]} />);
 
-    expect(screen.getByTestId('current').textContent).toBe('20');
-    expect(mockMaxGetter).toHaveBeenCalled();
+    expect(screen.getByTestId('current').textContent).toBe('');
   });
 
   it('update() calls storage.setProperty and updates current value', () => {

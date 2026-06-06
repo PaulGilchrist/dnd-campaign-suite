@@ -61,7 +61,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     }
 
     onExecute(pending.spell, metaCtx);
-  }, [pendingMetamagic, playerStats.name, campaignName, onExecute]);
+  }, [pendingMetamagic, playerStats, campaignName, onExecute]);
 
   const handleSkip = React.useCallback(() => {
     const pending = pendingMetamagic;

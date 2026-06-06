@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { getClassFeatures } from '../../classFeatures.js';
-import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../../hooks/useMetamagic.js';
+import { getCurrentSorceryPoints, spendSorceryPoints } from '../../../hooks/useMetamagic.js';
 import { setInnateSorceryActive } from '../../../components/char-sheet/char-summary/buffService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -8,7 +8,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     if (auto.type === 'sorcery_aura') {
         const currentUses = getRuntimeValue(playerStats.name, 'innateSorceryUses', campaignName);
-        const usesMax = getClassFeatures(playerStats)?.maxInnateSorcery || 2;
+        const usesMax = getClassFeatures(playerStats)?.maxInnateSorcery || 0;
         const remaining = currentUses != null ? Number(currentUses) : usesMax;
 
         if (remaining <= 0) {
@@ -44,9 +44,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const cost = auto.cost || 2;
     const currentUses = getRuntimeValue(playerStats.name, 'innateSorceryUses', campaignName);
-    const usesMax = getClassFeatures(playerStats)?.maxInnateSorcery || 2;
+    const usesMax = getClassFeatures(playerStats)?.maxInnateSorcery || 0;
     const remaining = currentUses != null ? Number(currentUses) : usesMax;
-    const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
+    const currentSP = getCurrentSorceryPoints(playerStats.name);
 
     if (remaining > 0) {
         return {
@@ -74,7 +74,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    spendSorceryPoints(playerStats.name, cost, campaignName, getMaxSorceryPoints(playerStats));
+    spendSorceryPoints(playerStats.name, cost, campaignName);
     setRuntimeValue(playerStats.name, 'innateSorceryUses', 0, campaignName);
     setInnateSorceryActive(playerStats.name, true, campaignName);
     window.dispatchEvent(new CustomEvent('innate-sorcery-updated'));

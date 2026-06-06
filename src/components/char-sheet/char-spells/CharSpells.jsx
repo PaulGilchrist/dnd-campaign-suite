@@ -67,7 +67,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         if (result.options.includes('Distant Spell')) metaCtx.metamagicDistant = true;
       }
       pending.action(metaCtx);
-    }, [pendingSimpleMetamagic, playerStats.name, campaignName]);
+    }, [pendingSimpleMetamagic, playerStats, campaignName]);
 
     const handleSimpleSkip = React.useCallback(() => {
       const pending = pendingSimpleMetamagic;

@@ -36,7 +36,7 @@ describe('useTrackedResource', () => {
     expect(getRuntimeValue).toHaveBeenCalledWith('Gandalf', 'hp');
   });
 
-  it('should fall back to maxGetter when storage returns null', () => {
+  it('should return null when no stored value and no fallback', () => {
     getRuntimeValue.mockReturnValue(null);
 
     const maxGetter = vi.fn(() => 20);
@@ -44,11 +44,11 @@ describe('useTrackedResource', () => {
       useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
     );
 
-    expect(result.current.current).toBe(20);
+    expect(result.current.current).toBeNull();
     expect(result.current.max).toBe(20);
   });
 
-  it('should fall back to maxGetter when storage returns undefined', () => {
+  it('should return null when storage returns undefined and no fallback', () => {
     getRuntimeValue.mockReturnValue(undefined);
 
     const maxGetter = vi.fn(() => 15);
@@ -56,7 +56,7 @@ describe('useTrackedResource', () => {
       useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
     );
 
-    expect(result.current.current).toBe(15);
+    expect(result.current.current).toBeNull();
   });
 
   it('should update current and call storage.setProperty on update', () => {

@@ -3,6 +3,7 @@ import { rules5e } from './race-rules/index.js';
 import { rules2024 } from './race-rules/index.js';
 import classRules from './classRules.js';
 import classRules2024 from './classRules2024.js';
+import { computeTrackedResources } from './trackedResources.js';
 
 const rulesFactory = {
       /**
@@ -130,6 +131,8 @@ const rulesFactory = {
         playerStats.race = rr.getRace(allRaces, playerStats);
         playerStats.immunities = rr.getImmunities(playerStats);
         playerStats.resistances = rr.getResistances(playerStats);
+
+        playerStats._trackedResources = computeTrackedResources(playerStats);
 
         return playerStats;
       }

@@ -3,17 +3,17 @@ import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from './us
 import { getClassFeatures } from '../services/classFeatures.js';
 import utils from '../services/utils.js';
 
-export function spendSorceryPoints(characterName, amount, campaignName, fallback = 0) {
-  const current = getCurrentSorceryPoints(characterName, fallback);
+export function spendSorceryPoints(characterName, amount, campaignName) {
+  const current = Number(getRuntimeValue(characterName, 'sorceryPoints') ?? 0);
   const newValue = Math.max(0, current - amount);
   setRuntimeValue(characterName, 'sorceryPoints', newValue, campaignName);
   window.dispatchEvent(new CustomEvent('sorcery-points-updated'));
   return newValue;
 }
 
-export function getCurrentSorceryPoints(characterName, fallback = 0) {
+export function getCurrentSorceryPoints(characterName) {
   const val = getRuntimeValue(characterName, 'sorceryPoints');
-  return val != null ? Number(val) : fallback;
+  return val != null ? Number(val) : null;
 }
 
 export function getMaxSorceryPoints(playerStats) {

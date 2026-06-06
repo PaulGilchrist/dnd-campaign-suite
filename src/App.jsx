@@ -16,7 +16,8 @@ import useCampaignManagement from './hooks/useCampaignManagement.js';
 import { useCharacterWizard } from './hooks/useCharacterWizard.js';
 import rulesFactory from './services/rulesFactory.js';
 import Subscriber from './components/common/Subscriber.jsx';
-import { setRuntimeObject } from './hooks/useRuntimeState.js';
+import { setRuntimeObject, seedTrackedResources } from './hooks/useRuntimeState.js';
+import { applyServerOverride, trackedResourcesToStoreEntries } from './services/trackedResources.js';
 import Notes from './components/notes/Notes.jsx';
 import Quests from './components/quests/Quests.jsx';
 import NPCs from './components/npcs/NPCs.jsx';
@@ -102,6 +103,32 @@ function App() {
       return () => { cancelled = true; };
     }, [characters, classes, classes2024, equipment, magicItems, magicItems2024, races, races2024, spells, spells2024]); // eslint-disable-line react-hooks/exhaustive-deps
 
+   // Seed runtime store with computed tracked resources, then apply server overrides
+    const seededCampaignRef = useRef('');
+    useEffect(() => {
+      if (!computedCharacters.length || !campaignName) return;
+      const campaign = campaignName;
+      if (seededCampaignRef.current === campaign && computedCharacters.length > 0) return;
+      seededCampaignRef.current = campaign;
+      (async () => {
+        let serverData = {};
+        try {
+          const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/change-data`);
+          if (response.ok) {
+            serverData = await response.json();
+          }
+        } catch { /* no server — use computed defaults */ }
+
+        for (const char of computedCharacters) {
+          const stats = char.computedStats;
+          if (!stats || !stats._trackedResources) continue;
+          const charServerData = serverData ? serverData[stats.name] : null;
+          const merged = applyServerOverride(stats._trackedResources, charServerData);
+          const entries = trackedResourcesToStoreEntries(merged);
+          seedTrackedResources(stats.name, entries);
+        }
+      })();
+    }, [computedCharacters, campaignName]);
 
   const [mapsView, setMapsView] = useState({ type: 'none' });
   const [activeMapName, setActiveMapName] = useState(null);

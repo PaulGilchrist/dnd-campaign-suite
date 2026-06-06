@@ -29,23 +29,20 @@ function getStore(characterKey) {
   return stores.get(characterKey);
 }
 
-export async function seedStoreFromServer(characterKey, campaignName) {
-  if (!stores.has(characterKey)) {
-    getStore(characterKey);
-  }
-  if (!campaignName) return;
-  try {
-    const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(characterKey)}`);
-    if (!response.ok) return;
-    const data = await response.json();
-    if (data.value && typeof data.value === 'object') {
-      const store = stores.get(characterKey);
-      for (const [k, v] of Object.entries(data.value)) {
-        store.set(k, v);
-      }
-      notify(characterKey);
+export function seedTrackedResources(characterKey, trackedEntries) {
+  if (!trackedEntries || typeof trackedEntries !== 'object') return;
+  const store = getStore(characterKey);
+  let changed = false;
+  for (const [key, value] of Object.entries(trackedEntries)) {
+    if (store.get(key) !== value) {
+      store.set(key, value);
+      changed = true;
     }
-  } catch { /* fall through — localStorage already loaded */ }
+  }
+  if (changed) {
+    try { localStorage.setItem(characterKey, JSON.stringify(Object.fromEntries(store))); } catch { /* ignore */ }
+    notify(characterKey);
+  }
 }
 
 function notify(characterKey) {
@@ -147,10 +144,6 @@ export function useRuntimeValue(characterKey, propertyName, campaignName) {
       if (set) set.delete(listener);
      };
    }, [characterKey, propertyName, campaignName]);
-
-  useEffect(() => {
-    seedStoreFromServer(characterKey, campaignName);
-  }, [characterKey, campaignName]);
 
   return value;
 }

@@ -3,8 +3,9 @@ import './CharSpellSlotLevel.css'
 import { setRuntimeValue, useRuntimeValue } from '../../../hooks/useRuntimeState.js'
 
 function CharSpellSlotLevel({ level, totalSlots, playerStats, campaignName }) {
+    const computedCurrent = playerStats?._trackedResources?.[`spell_slots_level_${level}`]?.current ?? totalSlots;
     const storedValue = useRuntimeValue(playerStats.name, `spell_slots_level_${level}`, campaignName);
-    const availableSlots = storedValue != null ? storedValue : totalSlots;
+    const availableSlots = storedValue != null ? storedValue : computedCurrent;
 
     const handleClick = (event) => {
         if (event.key !== "Tab") {

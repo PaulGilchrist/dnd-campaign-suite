@@ -1,5 +1,4 @@
-import { act } from '@testing-library/react';
-import { seedStoreFromServer, addStorageChangeListener, getRuntimeValue, setRuntimeValue, clearRuntimeState } from './useRuntimeState.js';
+import { seedTrackedResources, addStorageChangeListener, getRuntimeValue, setRuntimeValue, clearRuntimeState } from './useRuntimeState.js';
 
 const usedKeys = new Set();
 function trackKey(k) { if (k) usedKeys.add(k); }
@@ -84,17 +83,36 @@ describe('getRuntimeValue exported', () => {
   it('returns null for missing prop line65', () => { trackKey('r2'); localStorage.setItem('r2',JSON.stringify({str:8})); expect(getRuntimeValue('r2','missing')).toBeNull(); });
   it('uses cached store after load', () => { trackKey('r3'); localStorage.setItem('r3',JSON.stringify({con:14})); const v=getRuntimeValue('r3','con'); expect(v).toBe(14); v.toString(); });
 });
-describe('seedStoreFromServer', () => {
-  it('returns early falsy campaignName line36', async () => { trackKey('s1'); const m=vi.spyOn(globalThis,'fetch'); await act(async()=>{await seedStoreFromServer('s1',undefined);await seedStoreFromServer('s1',null);await seedStoreFromServer('s1','');}); expect(m).not.toHaveBeenCalled(); });
-  it('initialises store when key not cached line34', async () => { trackKey('s2'); vi.spyOn(globalThis,'fetch').mockResolvedValue({ok:true,json:()=>Promise.resolve({value:{hp:10}})}); await act(async()=>{await seedStoreFromServer('s2','cam');}); expect(getRuntimeValue('s2','hp')).toBe(10); });
-  it('encodes URL line38', async () => { trackKey('c/1'); vi.spyOn(globalThis,'fetch').mockResolvedValue({ok:true,json:()=>Promise.resolve({value:{}})}); await act(async()=>{await seedStoreFromServer('c/1','a&b');}); });
-  it('returns early !response.ok line39', async () => { trackKey('s4'); vi.spyOn(globalThis,'fetch').mockResolvedValue({ok:false}); await act(async()=>{await seedStoreFromServer('s4','cam');}); expect(getRuntimeValue('s4','hp')).toBeNull(); });
-  it('no-op no value key line41', async () => { trackKey('s5'); vi.spyOn(globalThis,'fetch').mockResolvedValue({ok:true,json:()=>Promise.resolve({other:42})}); await act(async()=>{await seedStoreFromServer('s5','cam');}); expect(getRuntimeValue('s5','other')).toBeNull(); });
-  it('no-op value not object line41', async () => { trackKey('s6'); vi.spyOn(globalThis,'fetch').mockResolvedValue({ok:true,json:()=>Promise.resolve({value:'str'})}); await act(async()=>{await seedStoreFromServer('s6','cam');}); });
-  it('merges server data lines42-47', async () => { trackKey('s7'); vi.spyOn(globalThis,'fetch').mockResolvedValue({ok:true,json:()=>Promise.resolve({value:{hp:99}})}); await act(async()=>{await seedStoreFromServer('s7','cam');}); expect(getRuntimeValue('s7','hp')).toBe(99); });
-  it('notifies listeners line46', async () => { trackKey('s8'); const l=vi.fn(); addStorageChangeListener('s8',l); vi.spyOn(globalThis,'fetch').mockResolvedValue({ok:true,json:()=>Promise.resolve({value:{hp:1}})}); await act(async()=>{await seedStoreFromServer('s8','cam');}); expect(l).toHaveBeenCalled(); });
-  it('catches fetch errors line48', async () => { trackKey('s9'); vi.spyOn(globalThis,'fetch').mockRejectedValue(new Error('err')); await act(async()=>{await seedStoreFromServer('s9','cam');}); });
-  it('catches json parse errors line48', async () => { trackKey('s10'); vi.spyOn(globalThis,'fetch').mockResolvedValue({ok:true,json:()=>Promise.reject(new Error('bad json'))}); await act(async()=>{await seedStoreFromServer('s10','cam');}); });
+describe('seedTrackedResources', () => {
+  it('sets runtime values from tracked entries', () => {
+    trackKey('t1');
+    seedTrackedResources('t1', { hp: 42, sorceryPoints: 5 });
+    expect(getRuntimeValue('t1', 'hp')).toBe(42);
+    expect(getRuntimeValue('t1', 'sorceryPoints')).toBe(5);
+  });
+
+  it('notifies listeners', () => {
+    trackKey('t2');
+    const fn = vi.fn();
+    addStorageChangeListener('t2', fn);
+    seedTrackedResources('t2', { hp: 10 });
+    expect(fn).toHaveBeenCalled();
+  });
+
+  it('is no-op for empty entries', () => {
+    trackKey('t3');
+    seedTrackedResources('t3', {});
+    expect(getRuntimeValue('t3', 'nada')).toBeNull();
+  });
+
+  it('handles multiple characters independently', () => {
+    trackKey('m1');
+    trackKey('m2');
+    seedTrackedResources('m1', { hp: 1 });
+    seedTrackedResources('m2', { hp: 2 });
+    expect(getRuntimeValue('m1', 'hp')).toBe(1);
+    expect(getRuntimeValue('m2', 'hp')).toBe(2);
+  });
 });
 describe('addStorageChangeListener', () => {
   it('creates listener set line57', () => { trackKey('a1'); const u=addStorageChangeListener('a1',vi.fn()); expect(typeof u).toBe('function'); });

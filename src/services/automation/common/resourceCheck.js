@@ -7,7 +7,8 @@ export function getResourceAmount(playerStats, resourceName) {
         return classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
      }
     const key = `${resourceName.toLowerCase().replace(/\s+/g, '')}Uses`;
-    return Number(getRuntimeValue(playerStats.name, key) ?? 0);
+    const stored = getRuntimeValue(playerStats.name, key);
+    return stored != null ? Number(stored) : (playerStats?._trackedResources?.[key]?.current ?? 0);
 }
 
 export function spendResource(playerName, resourceNameOrKey, amount, campaignName) {
