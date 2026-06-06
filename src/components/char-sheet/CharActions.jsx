@@ -10,31 +10,28 @@ import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
 import { rollExpression, rollExpressionDoubled, parseExpression } from '../../services/diceRoller.js';
-import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetName } from '../../services/damageUtils.js';
 import * as mapsService from '../../services/mapsService.js';
-import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem, rangeToFeet } from '../../services/rangeValidation.js';
-import { computeCover } from '../../services/coverService.js';
 import { computeFeatRangeEffects } from '../../services/featRangeService.js';
-import { loadNPCs } from '../../services/npcsService.js';
 import { hasAutomation } from '../../services/automationService.js'
-import { sendSavePrompt } from '../../services/savePromptService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import { addExpiration } from '../../services/expirations.js';
 import utils from '../../services/utils.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
 import HandOfHealingModal from './HandOfHealingModal.jsx'
 import FontOfMagicModal from './FontOfMagicModal.jsx'
 import SetConditionModal from './SetConditionModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
+import { executeHandler } from '../../services/automation/index.js';
 import { getClassFeatures } from '../../services/classFeatures.js';
 import { addEntry } from '../../services/logService.js';
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints, getLastDamageEvent, saveLastDamageEvent } from '../../hooks/useMetamagic.js';
 import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
 import { executeSpellCast } from '../../services/spellCastService.js'
 import { getChaModifier } from '../../services/metamagicRules.js';
+import { getTargetFromAttacker, getCombatContext } from '../../services/damageUtils.js';
 import { applyDamageToTarget } from '../../services/applyDamage.js';
-import { applyHealingToTarget } from '../../services/applyHealing.js';
-import { setInnateSorceryActive, getInnateSorceryBonus } from './char-summary/buffService.js';
+import { getNearestPlacedItem } from '../../services/rangeValidation.js';
+import { getInnateSorceryBonus } from './char-summary/buffService.js';
+import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';
 
@@ -125,143 +122,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         return target;
     }, [playerStats.name, campaignName]);
 
-    const buildAttackContextSync = React.useCallback(async (attack) => {
-        const target = await getTargetInfo();
-        const cs = await getCombatContext(campaignName);
-        const targetName = target?.name || (cs ? getAttackerTargetName(cs, playerStats.name) : undefined);
-        const resistanceNotice = target ? getResistanceNotice([attack.damageType], target.resistances, target.immunities, target.name) : null;
+    const buildCtxSync = React.useCallback(async (attack) => {
+        return await buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, featRangeEffects || null);
+     }, [playerStats, campaignName, conditionAttackMode, featRangeEffects]);
 
-        // Check for Stunning Strike save advantage (consumed on use)
-        let hasSaveAdvantage = false;
-        if (targetName) {
-            const advKey = `_advantageOn_${targetName}`;
-            const storedAdvantage = getRuntimeValue(playerStats.name, advKey);
-            if (Array.isArray(storedAdvantage)) {
-                const idx = storedAdvantage.indexOf(targetName);
-                if (idx !== -1) {
-                    hasSaveAdvantage = true;
-                    storedAdvantage.splice(idx, 1);
-                    setRuntimeValue(playerStats.name, advKey, storedAdvantage, campaignName);
-                }
-            }
-        }
-
-        const innateSorceryBonus = getInnateSorceryBonus(playerStats.name, campaignName);
-
-        let forcedMode = conditionAttackMode !== 'normal' ? conditionAttackMode : undefined;
-        if (hasSaveAdvantage && forcedMode === undefined) {
-            forcedMode = 'advantage';
-        }
-        if (innateSorceryBonus.spellAdvantage && forcedMode === undefined) {
-            forcedMode = 'advantage';
-        }
-
-        return {
-            damageType: attack.damageType,
-            resistanceNotice,
-            targetName,
-            saveDc: attack.saveDc + innateSorceryBonus.saveDcBonus,
-            saveType: attack.saveType,
-            dcSuccess: attack.saveSuccess,
-            attackerName: playerStats.name,
-            forcedMode,
-            autoDamageFormula: attack.damage,
-            autoDamageName: attack.name,
-        };
-    }, [getTargetInfo, conditionAttackMode, playerStats.name, campaignName]);
-
-    const buildAttackContext = React.useCallback(async (attack) => {
-        if (!mapName) {
-            return await buildAttackContextSync(attack);
-        }
-
-        const base = await buildAttackContextSync(attack);
-
-        try {
-            const [mapData, npcs] = await Promise.all([
-                mapsService.loadMapData(campaignName, mapName),
-                loadNPCs(campaignName),
-            ]);
-
-            const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
-            if (attackerPlayer) {
-                let targetPos = null;
-                const cs = await getCombatContext(campaignName);
-                if (cs) {
-                    const target = getTargetFromAttacker(cs, playerStats.name);
-                    if (target) {
-                        const targetPlayer = mapData?.players?.find(p => p.name === target.name);
-                        const targetNpc = mapData?.placedItems?.length
-                            ? getNearestPlacedItem(mapData.placedItems, target.name, { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY })
-                            : null;
-                        if (targetPlayer) {
-                            targetPos = { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
-                        } else if (targetNpc) {
-                            targetPos = { gridX: targetNpc.gridX, gridY: targetNpc.gridY };
-                        }
-                    }
-                }
-
-                const numericRange = rangeToFeet(attack.range) || 0;
-                const isRanged = numericRange > 8;
-                const feats = featRangeEffects || { ignoresMeleeDisadvantage: false, ignoresLongRangeDisadvantage: false, rangeMultiplier: 1, spellRangeBonus: 0 };
-
-                if (targetPos) {
-                    const effectiveRange = isRanged ? numericRange + (feats.spellRangeBonus || 0) : attack.range;
-                    const distanceFt = getDistanceFeet(
-                        { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-                        targetPos
-                    );
-                    const rangeResult = computeRangeEffect(effectiveRange, distanceFt, feats);
-                    if (rangeResult.mode === 'disadvantage') {
-                        base.forcedMode = 'disadvantage';
-                        base.rangeReason = rangeResult.reason;
-                    } else if (rangeResult.mode === 'miss') {
-                        base.isAutoMiss = true;
-                        base.rangeReason = rangeResult.reason;
-                        base.forcedMode = undefined;
-                    }
-                }
-
-                // Cover determination (ranged only - melee always has no cover)
-                if (isRanged && !base.isAutoMiss && targetPos) {
-                    const walls = mapData?.walls || new Set()
-                    const coverResult = computeCover(
-                        { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-                        { gridX: targetPos.gridX, gridY: targetPos.gridY },
-                        walls,
-                        mapData?.placedItems || [],
-                    )
-                    if (coverResult.level === 'full') {
-                        base.isAutoMiss = true
-                        base.coverReason = 'Target has full cover'
-                    } else if (coverResult.acBonus > 0) {
-                        base.coverAcBonus = coverResult.acBonus
-                        base.coverLevel = coverResult.level
-                    }
-                }
-
-                if (isRanged && !base.isAutoMiss) {
-                    const nearbyThreats = (mapData?.placedItems || [])
-                        .filter(i => i.type === 'npc')
-                        .map(i => {
-                            const npcData = npcs?.find(n => n.name === i.name || n.name === i.name?.replace(/\s+\d+$/, ''));
-                            return { ...i, attitude: npcData?.attitude };
-                        })
-                        .filter(i => isHostileNPC(i))
-                        .map(i => ({ gridX: i.gridX, gridY: i.gridY, name: i.name }));
-
-                    const meleeResult = computeMeleeProximityEffect(true, attackerPlayer, nearbyThreats, feats);
-                    if (meleeResult.mode === 'disadvantage' && base.forcedMode !== 'disadvantage') {
-                        base.forcedMode = 'disadvantage';
-                        base.rangeReason = meleeResult.reason;
-                    }
-                }
-            }
-        } catch (e) { /* fallback, no range validation */ }
-
-        return base;
-    }, [buildAttackContextSync, campaignName, mapName, playerStats.name, featRangeEffects]);
+    const buildCtx = React.useCallback(async (attack) => {
+        return await buildAttackContext(attack, playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects || null);
+    }, [playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects]);
 
     const handleDamageClick = (attack) => {
         const wasCrit = popupHtml?.isCrit;
@@ -290,19 +157,84 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }
         }
 
-        (mapName ? buildAttackContext(attack) : buildAttackContextSync(attack)).then(ctx => {
+        (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
             rollDamage(attack.name, formula, total, rolls, modifier, ctx);
         }).catch(() => { });
     };
 
     const handleAttackClick = React.useCallback((attack) => {
         if (cannotAct) return;
-        buildAttackContext(attack).then(ctx => {
-            rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, ctx);
-        }).catch(() => { });
-    }, [cannotAct, buildAttackContext, rollAttack, exhaustionPenalty]);
+         buildCtx(attack).then(ctx => {
+             rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, ctx);
+          }).catch(() => { });
+      }, [cannotAct, buildCtx, rollAttack, exhaustionPenalty]);
 
     const MONK_KI_FEATURES = ['Flurry of Blows', 'Patient Defense', 'Step of the Wind', 'Heightened Flurry of Blows', 'Heightened Patient Defense', 'Heightened Step of the Wind', 'Hand of Healing', 'Stunning Strike'];
+
+    async function handleAutomationAction(action) {
+        if (cannotAct) return;
+
+         // Metamagic is handled locally, not by the dispatcher
+        const auto = action.automation;
+        if (auto?.type === 'spell_modifier' && action.name === 'Metamagic') {
+            handleMetamagicAction();
+            return;
+         }
+
+         // Spend 1 focus point for monk Ki features before dispatching
+        if (MONK_KI_FEATURES.includes(action.name)) {
+            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+            const maxFP = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
+            const storedFP = getRuntimeValue(playerStats.name, 'focusPoints', campaignName);
+            const currentFP = storedFP != null ? Number(storedFP) : maxFP;
+            if (currentFP <= 0) {
+                setPopupHtml(`<b>${action.name}</b><br/>No ${playerStats.rules === '2024' ? "Focus Points" : 'ki points'} remaining.`);
+                return;
+             }
+            await setRuntimeValue(playerStats.name, 'focusPoints', currentFP - 1, campaignName);
+            window.dispatchEvent(new CustomEvent('focus-points-updated'));
+         }
+
+        const result = await executeHandler(action, playerStats, campaignName, mapName);
+        if (!result) return;
+
+        switch (result.type) {
+            case 'popup':
+                setPopupHtml(result.payload);
+                break;
+            case 'modal':
+                switch (result.modalName) {
+                    case 'healingPool': setHealingPoolModal(result.payload); break;
+                    case 'handOfHealing': setHandOfHealingModal(result.payload); break;
+                    case 'fontOfMagic': setFontOfMagicModal(true); break;
+                    case 'setCondition': setSetConditionModal(result.payload); break;
+                 }
+                break;
+            case 'roll':
+                if (result.payload.rollType === 'damage') {
+                    rollDamage(
+                        result.payload.name,
+                        result.payload.formula,
+                        result.payload.total,
+                        result.payload.rolls,
+                        result.payload.modifier,
+                        result.payload.contextConfig || {}
+                     );
+                 }
+                break;
+            case 'notify_buffs_changed':
+                if (onBuffsChange) onBuffsChange();
+                break;
+             }
+
+        if (result.logEntries) {
+            result.logEntries.forEach(entry => addEntry(campaignName, entry).catch(() => {}));
+         }
+
+        if (result.type === 'popup' && auto?.type === 'temp_buff') {
+            if (onBuffsChange) onBuffsChange();
+         }
+      }
 
     const handleMetamagicAction = () => {
         const name = playerStats.name;
@@ -322,9 +254,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     lastEvent: null,
                     chaMod,
                     error: 'Could not parse damage formula',
-                });
+                   });
                 return;
-            }
+               }
             setPopupHtml({
                 type: 'empowered_spell',
                 name: 'Metamagic - Empowered Spell',
@@ -333,21 +265,21 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 lastEvent,
                 chaMod: Math.min(chaMod, parsed.count),
                 formulaParsed: parsed,
-            });
-        } else {
-            setPopupHtml({
-                type: 'empowered_spell',
-                name: 'Metamagic - Empowered Spell',
-                currentSP,
-                maxSP,
-                lastEvent: null,
-                chaMod,
-                error: lastEvent ? 'No dice roll data available' : 'No recent damage event found. Cast a spell that deals damage first.',
-            });
-        }
-    };
+               });
+            } else {
+               setPopupHtml({
+                   type: 'empowered_spell',
+                   name: 'Metamagic - Empowered Spell',
+                   currentSP,
+                   maxSP,
+                   lastEvent: null,
+                   chaMod,
+                   error: lastEvent ? 'No dice roll data available' : 'No recent damage event found. Cast a spell that deals damage first.',
+               });
+           }
+       };
 
-    const handleEmpoweredReroll = async (lastEvent, chaMod, campaignName) => {
+    const handleEmpoweredReroll = async (lastEvent, chaMod) => {
         const parsed = parseExpression(lastEvent.damageFormula);
         if (!parsed) return;
 
@@ -363,17 +295,16 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 lastEvent,
                 chaMod,
                 error: 'Not enough sorcery points. Empowered Spell costs 1 SP.',
-            });
+             });
             return;
-        }
+           }
 
         const { sides, modifier } = parsed;
         const originalRolls = lastEvent.rolls || [];
 
-        // Reroll the lowest N dice where N = chaMod
         const rerollCount = Math.min(chaMod, originalRolls.length);
         const sortedWithIndex = originalRolls.map((r, i) => ({ value: r, index: i }))
-            .sort((a, b) => a.value - b.value);
+              .sort((a, b) => a.value - b.value);
         const rerollIndices = new Set(sortedWithIndex.slice(0, rerollCount).map(x => x.index));
 
         const newRolls = originalRolls.map((r, i) => rerollIndices.has(i) ? Math.floor(Math.random() * sides) + 1 : r);
@@ -390,14 +321,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 lastEvent,
                 chaMod,
                 error: 'No combat summary found. Cannot reapply damage.',
-            });
+             });
             return;
         }
 
-        // Deduct SP
         spendSorceryPoints(name, 1, campaignName);
 
-        // Apply damage difference — positive means more damage, negative means less
         if (damageDifference !== 0) {
             const applyResult = applyDamageToTarget(combatSummary, lastEvent.targetName, damageDifference, lastEvent.damageType ? [lastEvent.damageType] : [], campaignName, null);
             addEntry(campaignName, {
@@ -412,17 +341,17 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 rerolledDiceCount: rerollCount,
                 originalDice: originalRolls,
                 newDice: newRolls,
-            });
+             });
             setPopupHtml({
                 type: 'empowered_spell',
                 name: 'Metamagic - Empowered Spell',
                 currentSP: currentSP - 1,
                 maxSP,
                 lastEvent: {
-                    ...lastEvent,
+                     ...lastEvent,
                     rawDamage: newTotal,
                     rolls: newRolls,
-                },
+                 },
                 chaMod,
                 result: {
                     oldTotal: lastEvent.rawDamage,
@@ -433,656 +362,39 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     originalDice: originalRolls,
                     newDice: newRolls,
                     targetCurrentHp: applyResult?.newHp,
-                },
+                 },
                 completed: true,
-            });
-        } else {
-            // No change in damage, SP still spent
-            setPopupHtml({
-                type: 'empowered_spell',
-                name: 'Metamagic - Empowered Spell',
-                currentSP: currentSP - 1,
-                maxSP,
-                lastEvent: {
-                    ...lastEvent,
-                    rolls: newRolls,
-                },
-                chaMod,
-                result: {
-                    oldTotal: lastEvent.rawDamage,
-                    newTotal,
-                    damageDifference: 0,
-                    rerollCount,
-                    message: 'Reroll did not change the damage total.',
-                },
-                completed: true,
-            });
-        }
+             });
+           } else {
+               setPopupHtml({
+                   type: 'empowered_spell',
+                   name: 'Metamagic - Empowered Spell',
+                   currentSP: currentSP - 1,
+                   maxSP,
+                   lastEvent: {
+                        ...lastEvent,
+                       rolls: newRolls,
+                    },
+                 chaMod,
+                 result: {
+                     oldTotal: lastEvent.rawDamage,
+                     newTotal,
+                     damageDifference: 0,
+                     rerollCount,
+                     message: 'Reroll did not change the damage total.',
+                  },
+                 completed: true,
+              });
+          }
 
-        // Update saved event for potential subsequent rerolls
         saveLastDamageEvent(name, {
-            ...lastEvent,
+             ...lastEvent,
             rawDamage: newTotal,
             rolls: newRolls,
             timestamp: Date.now(),
-        }, campaignName);
-    };
+         }, campaignName);
+       };
 
-    const handleAutomationAction = async (action) => {
-        if (cannotAct) return;
-        const auto = action.automation;
-        if (!auto) return;
-
-        // Spend 1 focus point for monk Ki features
-        if (MONK_KI_FEATURES.includes(action.name)) {
-            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-            const maxFP = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
-            const storedFP = getRuntimeValue(playerStats.name, 'focusPoints', campaignName);
-            const currentFP = storedFP != null ? Number(storedFP) : maxFP;
-            if (currentFP <= 0) {
-                setPopupHtml(`<b>${action.name}</b><br/>No ${playerStats.rules === '2024' ? "Focus Points" : 'ki points'} remaining.`);
-                return;
-            }
-            await setRuntimeValue(playerStats.name, 'focusPoints', currentFP - 1, campaignName);
-            window.dispatchEvent(new CustomEvent('focus-points-updated'));
-            addEntry(campaignName, {
-                type: 'ability_use',
-                characterName: playerStats.name,
-                abilityName: action.name,
-                description: `${action.name} activated`,
-                focusPointsSpent: 1,
-                remainingFocusPoints: currentFP - 1
-            }).catch(() => { });
-        }
-
-        switch (auto.type) {
-            case 'save_attack': {
-                const damageResult = rollExpression(auto.damage);
-                if (damageResult) {
-                    const dcSuccess = auto.shape === 'cone' ? 0.5 : 0;
-                    // Resolve save DC: "ability" means 8 + CON mod + proficiency
-                    let saveDc;
-                    if (auto.saveDc === 'ability') {
-                        const conBonus = playerStats.abilities?.find(a => a.name === 'CON')?.bonus || 0;
-                        const prof = playerStats.proficiency || 0;
-                        saveDc = 8 + conBonus + prof;
-                    } else {
-                        saveDc = auto.saveDc || 10;
-                    }
-                    const ctx = await buildAttackContextSync({
-                        name: action.name,
-                        damage: auto.damage,
-                        damageType: auto.damageType || '',
-                        saveDc,
-                        saveType: auto.saveType || 'DEX',
-                        saveSuccess: dcSuccess,
-                    });
-                    rollDamage(action.name, auto.damage, damageResult.total, damageResult.rolls, damageResult.modifier, ctx);
-                }
-                break;
-            }
-            case 'save_only': {
-                const cs = await getCombatContext(campaignName);
-                const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-                const targetName = target?.name || playerStats.name;
-
-                const promptId = utils.guid();
-                let saveDc;
-                if (auto.saveDc === 'ability') {
-                    const conBonus = playerStats.abilities?.find(a => a.name === 'CON')?.bonus || 0;
-                    const prof = playerStats.proficiency || 0;
-                    saveDc = 8 + conBonus + prof;
-                } else {
-                    saveDc = auto.saveDc || 10;
-                }
-
-                sendSavePrompt(campaignName, {
-                    promptId: promptId,
-                    targetName: targetName,
-                    saveType: auto.saveType || 'CON',
-                    saveDc: saveDc,
-                    dcSuccess: undefined,
-                });
-
-                addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName: playerStats.name,
-                    abilityName: action.name,
-                    description: `Stunning Strike triggered — target ${targetName} must make ${auto.saveType || 'CON'} save (DC ${saveDc})`,
-                    promptId: promptId,
-                }).catch(() => { });
-
-                const handleSaveResult = async (event) => {
-                    const detail = event.detail;
-                    if (detail.promptId !== promptId) return;
-
-                    const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
-                    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-
-                    if (detail.success) {
-                        // Success: speed halved until start of attacker's next turn
-                        addEntry(campaignName, {
-                            type: 'save_result',
-                            characterName: playerStats.name,
-                            rollType: `save-${auto.type}`,
-                            targetName,
-                            saveDc,
-                            saveType: auto.saveType,
-                            success: true,
-                            description: `${targetName} succeeded on ${auto.saveType} save. Speed halved until start of next turn.`
-                        });
-
-                        setRuntimeValue(targetName, `${auto.conditionInflicted}_speedHalved`, Date.now(), campaignName);
-                        // Next attack roll against target has advantage (consumed on use)
-                        const advKey = `_advantageOn_${targetName}`;
-                        const attackerStoredAdv = getRuntimeValue(playerStats.name, advKey) || [];
-                        setRuntimeValue(playerStats.name, advKey, [...attackerStoredAdv, targetName], campaignName);
-
-                        addExpiration(playerStats.name, targetName, [
-                            { type: 'stunned', condition: 'speed_halved' },
-                            { type: 'advantage_on_target' }
-                        ], campaignName);
-                    } else {
-                        // Fail: apply the stunned condition
-                        addEntry(campaignName, {
-                            type: 'save_result',
-                            characterName: playerStats.name,
-                            rollType: `save-${auto.type}`,
-                            targetName,
-                            saveDc,
-                            saveType: auto.saveType,
-                            success: false,
-                            description: `${targetName} failed ${auto.saveType} save. Stunned until start of next turn.`
-                        });
-
-                        const newConditions = [...conditions, 'stunned'];
-                        setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
-
-                        addExpiration(playerStats.name, targetName, [
-                            { type: 'stunned', condition: 'stunned' }
-                        ], campaignName);
-                    }
-
-                    window.removeEventListener('save-result', handleSaveResult);
-                };
-
-                window.addEventListener('save-result', handleSaveResult);
-
-                if (setPopupHtml) {
-                    setPopupHtml({
-                        type: 'automation_info',
-                        name: action.name,
-                        targetName: targetName,
-                        description: `Target ${targetName} must make a ${auto.saveType || 'CON'} saving throw (DC ${saveDc}).`,
-                        automation: auto,
-                    });
-                }
-
-                break;
-            }
-            case 'healing':
-            case 'self_healing': {
-                const expression = auto.healExpression || '';
-                const isMonkHealing = expression.includes('martial_arts_die') && expression.includes('WIS');
-
-                if (isMonkHealing) {
-                    const monkFeatures = getClassFeatures(playerStats);
-                    const martialArtsDie = monkFeatures?.martialArtsDie || 4;
-                    const wisdom = playerStats.abilities?.find(a => a.name === 'Wisdom');
-                    const wisModifier = wisdom?.bonus || 0;
-
-                    const rollResult = rollExpression(`1d${martialArtsDie}`);
-                    if (!rollResult) break;
-
-                    const healAmount = rollResult.total + wisModifier;
-
-                    const combatSummary = await getCombatContext(campaignName);
-                    const target = combatSummary ? getTargetFromAttacker(combatSummary, playerStats.name) : null;
-                    const targetName = target ? target.name : playerStats.name;
-                    const targetMaxHp = target
-                        ? (target.type === 'player'
-                            ? (getRuntimeValue(target.name, 'hitPoints') ?? playerStats.hitPoints)
-                            : target.maxHp)
-                        : playerStats.hitPoints;
-                    const targetCurrentHp = (() => {
-                        if (target) {
-                            const stored = getRuntimeValue(target.name, 'currentHitPoints', campaignName);
-                            if (stored != null && stored !== '') return Number(stored);
-                            if (target.type === 'npc') return target.currentHp;
-                            return targetMaxHp;
-                        }
-                        const stored = getRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
-                        return stored != null && stored !== '' ? Number(stored) : playerStats.hitPoints;
-                    })();
-                    const newHp = Math.min(targetMaxHp, targetCurrentHp + healAmount);
-                    const actualHeal = newHp - targetCurrentHp;
-
-                    if (target && combatSummary) {
-                        applyHealingToTarget(combatSummary, target.name, healAmount, campaignName);
-                    } else {
-                        setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
-                    }
-
-                    fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            type: 'hp_change',
-                            targetName: targetName,
-                            sourceName: action.name,
-                            delta: actualHeal,
-                            currentHp: newHp,
-                            maxHp: targetMaxHp,
-                            isHealing: true,
-                            isUnconscious: false,
-                        }),
-                    }).catch(() => { });
-
-                    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-
-                    const hasPhysiciansTouch = playerStats.characterAdvancement?.some(f => f.name === "Physician's Touch");
-
-                    setHandOfHealingModal({
-                        healName: action.name,
-                        formula: `1d${martialArtsDie} + ${wisModifier}`,
-                        rolls: rollResult.rolls,
-                        bonus: wisModifier,
-                        healAmount: healAmount,
-                        monkName: playerStats.name,
-                        targetName: targetName,
-                        targetCurrentHp: newHp,
-                        targetMaxHp: targetMaxHp,
-                        hasPhysiciansTouch: hasPhysiciansTouch,
-                    });
-
-                } else {
-                    const healAmount = auto.healAmount || auto.healExpression;
-                    if (setPopupHtml) {
-                        setPopupHtml({
-                            type: 'healing',
-                            name: action.name,
-                            healAmount: typeof healAmount === 'number' ? healAmount : auto.healExpression,
-                            description: `${action.name}: Restores ${auto.healExpression} HP`,
-                        });
-                    }
-                }
-                break;
-            }
-            case 'healing_pool': {
-                const restoringTouch = playerStats.characterAdvancement?.find(
-                    f => f.name === 'Restoring Touch'
-                );
-                setHealingPoolModal({
-                    name: action.name,
-                    pool: auto.pool,
-                    resourceKey: auto.resourceKey,
-                    alsoCures: auto.alsoCures || [],
-                    cureCost: auto.cureCost || 5,
-                    restoringTouchConditions: restoringTouch?.automation?.cureConditions || [],
-                });
-                break;
-            }
-            case 'free_spell': {
-                const spellName = auto.spell || action.name;
-                let spellData = (playerStats.spellAbilities?.spells || []).find(s => s.name === spellName);
-                if (!spellData) {
-                    try {
-                        const spellsUrl = playerStats.rules === '2024' ? '/data/2024/spells.json' : '/data/spells.json';
-                        const response = await fetch(spellsUrl);
-                        const allSpells = await response.json();
-                        spellData = allSpells.find(s => s.name === spellName);
-                    } catch (e) {
-                        // Fetch failed, fall through to description popup
-                    }
-                }
-                if (spellData?.damage) {
-                    const slotDmg = spellData.damage.damage_at_slot_level;
-                    const formula = slotDmg?.[Object.keys(slotDmg)[0]];
-                    if (formula) {
-                        const result = rollExpression(formula);
-                        if (result) {
-                            const target = getTargetInfo();
-                            rollDamage(spellName, formula, result.total, result.rolls, result.modifier, {
-                                damageType: spellData.damage.damage_type || 'Radiant',
-                                targetName: target?.name,
-                                attackerName: playerStats.name,
-                            });
-                            break;
-                        }
-                    }
-                }
-                if (setPopupHtml) {
-                    const usesInfo = auto.uses ? ` (${auto.uses}/long rest)` : '';
-                    setPopupHtml(`<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Free cast of:</b> ${spellName}${usesInfo}`);
-                }
-                break;
-            }
-            case 'temp_buff': {
-                const activeBuffsKey = 'activeBuffs';
-                const stored = getRuntimeValue(playerStats.name, activeBuffsKey, campaignName);
-                const activeBuffs = Array.isArray(stored) ? stored : [];
-                const isActive = activeBuffs.some(b => b.name === action.name);
-                const newBuffs = isActive ? activeBuffs.filter(b => b.name !== action.name) : [...activeBuffs, { name: action.name, effect: auto.effect, duration: auto.duration }];
-                setRuntimeValue(playerStats.name, activeBuffsKey, newBuffs, campaignName);
-                if (onBuffsChange) onBuffsChange();
-                if (setPopupHtml) {
-                    setPopupHtml({
-                        type: 'automation_info',
-                        name: action.name,
-                        automationType: auto.type,
-                        description: isActive ? `${action.name} toggled OFF` : `${action.name} activated (${auto.duration || '10 min'})`,
-                        automation: auto,
-                    });
-                }
-                break;
-            }
-            case 'temp_hp_buff': {
-                // Temp HP doesn't modify speed display, just show info popup
-                if (setPopupHtml) {
-                    const result = rollExpression(auto.buffExpression || '');
-                    let desc = `${action.name}: ${auto.buffExpression} temp HP`;
-                    if (result) desc += ` (${result.total})`;
-                    setPopupHtml({
-                        type: 'automation_info',
-                        name: action.name,
-                        automationType: auto.type,
-                        description: desc,
-                        automation: auto,
-                    });
-                }
-                break;
-            }
-            case 'sorcery_aura': {
-                const currentUses = getRuntimeValue(playerStats.name, 'innateSorceryUses', campaignName);
-                const usesMax = getClassFeatures(playerStats)?.maxInnateSorcery || 2;
-                const remaining = currentUses != null ? Number(currentUses) : usesMax;
-
-                if (remaining <= 0) {
-                    if (setPopupHtml) {
-                        setPopupHtml({
-                            type: 'automation_info',
-                            name: action.name,
-                            automationType: auto.type,
-                            description: `${action.name} has no remaining uses. Recharges on a long rest.`,
-                            automation: auto,
-                        });
-                    }
-                    return;
-                }
-
-                const newRemaining = remaining - 1;
-                setRuntimeValue(playerStats.name, 'innateSorceryUses', newRemaining, campaignName);
-
-                setInnateSorceryActive(playerStats.name, true, campaignName);
-                if (onBuffsChange) onBuffsChange();
-
-                window.dispatchEvent(new CustomEvent('innate-sorcery-updated'));
-
-                if (setPopupHtml) {
-                    setPopupHtml({
-                        type: 'automation_info',
-                        name: action.name,
-                        automationType: auto.type,
-                        description: `${action.name} activated (${newRemaining}/${usesMax} uses remaining).`,
-                        automation: auto,
-                    });
-                }
-                break;
-            }
-            case 'sorcery_incarnate': {
-                const cost = auto.cost || 2;
-                const currentUses = getRuntimeValue(playerStats.name, 'innateSorceryUses', campaignName);
-                const usesMax = getClassFeatures(playerStats)?.maxInnateSorcery || 2;
-                const remaining = currentUses != null ? Number(currentUses) : usesMax;
-                const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
-
-                if (remaining > 0) {
-                    if (setPopupHtml) {
-                        setPopupHtml({
-                            type: 'automation_info',
-                            name: action.name,
-                            automationType: auto.type,
-                            description: `Cannot use ${action.name} while Innate Sorcery still has uses remaining (${remaining} uses left).`,
-                            automation: auto,
-                        });
-                    }
-                    return;
-                }
-
-                if (currentSP < cost) {
-                    if (setPopupHtml) {
-                        setPopupHtml({
-                            type: 'automation_info',
-                            name: action.name,
-                            automationType: auto.type,
-                            description: `Not enough Sorcery Points to use ${action.name}. Cost: ${cost} SP, Have: ${currentSP} SP.`,
-                            automation: auto,
-                        });
-                    }
-                    return;
-                }
-
-                console.log(`[sorcery_incarnate] Before spend — currentSP: ${currentSP}, cost: ${cost}`);
-                const spAfterSpend = spendSorceryPoints(playerStats.name, cost, campaignName);
-                console.log(`[sorcery_incarnate] After spend — remaining SP: ${spAfterSpend}`);
-                setRuntimeValue(playerStats.name, 'innateSorceryUses', 0, campaignName);
-                setInnateSorceryActive(playerStats.name, true, campaignName);
-                if (onBuffsChange) onBuffsChange();
-                window.dispatchEvent(new CustomEvent('innate-sorcery-updated'));
-
-                if (setPopupHtml) {
-                    setPopupHtml({
-                        type: 'automation_info',
-                        name: action.name,
-                        automationType: auto.type,
-                        description: `${action.name} activated (${cost} SP spent). Innate Sorcery is now active (0/${usesMax} uses remaining).`,
-                        automation: auto,
-                    });
-                }
-                break;
-            }
-            case 'extra_action':
-            case 'bonus_attacks':
-            case 'bonus_action_attack':
-            case 'damage_aura':
-            case 'combat_stance':
-            case 'resource_pool':
-            case 'attack_rider':
-            case 'damage_bonus': {
-                if (setPopupHtml) {
-                    setPopupHtml({
-                        type: 'automation_info',
-                        name: action.name,
-                        automationType: auto.type,
-                        description: action.description || '',
-                        automation: auto,
-                    });
-                }
-                break;
-            }
-            case 'spell_modifier': {
-                if (action.name === 'Metamagic') {
-                    handleMetamagicAction();
-                } else if (setPopupHtml) {
-                    setPopupHtml({
-                        type: 'automation_info',
-                        name: action.name,
-                        automationType: auto.type,
-                        description: action.description || '',
-                        automation: auto,
-                    });
-                }
-                break;
-            }
-            case 'font_of_magic': {
-                setFontOfMagicModal(true);
-                break;
-            }
-            case 'initiative_action': {
-                if (auto.effect === 'regain_focus_points_and_heal') {
-
-                    // Check use tracking against long-rest limit
-                    const resourceKey = auto.resourceKey || action.name.toLowerCase().replace(/\s+/g, '') + 'Uses';
-                    const usesUsed = Number(getRuntimeValue(playerStats.name, resourceKey, campaignName) ?? 0);
-                    if (usesUsed >= (auto.usesMax || auto.uses || 1)) {
-                        if (setPopupHtml) {
-                            setPopupHtml({
-                                type: 'automation_info',
-                                name: action.name,
-                                automationType: auto.type,
-                                description: `${action.name} has been used and cannot be used again until a long rest.` +
-                                    (auto.recharge === 'long_rest' ? '' : ` Recharges on ${auto.recharge || 'short rest'}.`),
-                            });
-                        }
-                        return;
-                    }
-
-                    // Get martial arts die from class data
-                    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-                    const martialArtsDie = classLevel?.martial_arts_die || 4;
-                    const monkLevel = playerStats.level;
-
-                    // Roll the martial arts die
-                    const rollResult = rollExpression(`1d${martialArtsDie}`);
-                    if (!rollResult) return;
-
-                    const healAmount = monkLevel + rollResult.total;
-
-                    // Get current HP from storage
-                    const currentHp = Number(getRuntimeValue(playerStats.name, 'currentHitPoints', campaignName)) || 0;
-                    const maxHp = playerStats.hitPoints;
-                    const newHp = Math.min(maxHp, currentHp + healAmount);
-
-                    // Update HP in storage (triggers SSE broadcast to other clients)
-                    setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
-
-                    // NOTE: Do NOT write player HP into the combatSummary creature.
-                    // Single source of truth for player stats is playerStats (computedStats),
-                    // resolved at read time. The combatSummary only stores combat metadata
-                    // (name, type, initiative, targetName, concentration) for players.
-
-                    // Increment use count
-                    const newUsesUsed = usesUsed + 1;
-                    setRuntimeValue(playerStats.name, resourceKey, newUsesUsed, campaignName);
-
-                    // Log to campaign log as a healing entry with source name
-                    fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            type: 'hp_change',
-                            targetName: playerStats.name,
-                            sourceName: action.name,
-                            delta: newHp - currentHp,
-                            currentHp: newHp,
-                            maxHp,
-                            isHealing: true,
-                            isUnconscious: false,
-                        }),
-                    }).catch(() => { });
-
-                    // Also dispatch combat-summary-updated for local sync
-                    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-
-                    // Show popup with roll result and healing info
-                    if (setPopupHtml) {
-                        setPopupHtml({
-                            type: 'healing',
-                            name: action.name,
-                            formula: `1d${martialArtsDie} + ${monkLevel}`,
-                            rolls: rollResult.rolls,
-                            bonus: monkLevel,
-                            modifier: 0,
-                            healAmount: healAmount,
-                            description: `${action.name}: Rolled ${rollResult.total} (1d${martialArtsDie}) + ${monkLevel} (Monk level) = <strong>${healAmount}</strong> HP`,
-                            targetName: playerStats.name,
-                            targetCurrentHp: newHp,
-                            targetMaxHp: maxHp,
-                            damageApplied: true,
-                        });
-                    }
-                } else {
-                    if (setPopupHtml) {
-                        setPopupHtml({
-                            type: 'automation_info',
-                            name: action.name,
-                            automationType: auto.type,
-                            description: action.description || '',
-                            automation: auto,
-                        });
-                    }
-                    break;
-                }
-                break;
-            }
-            case 'set_condition': {
-                const cha = playerStats.abilities?.find(a => a.name === 'Charisma');
-                const chaBonus = cha?.bonus || 0;
-                const prof = playerStats.proficiency || 0;
-                const saveDc = 8 + prof + chaBonus;
-                const conditionName = auto.condition || 'frightened';
-                const saveType = auto.saveType || 'WIS';
-                const rangeFeet = rangeToFeet(auto.range || '60 ft') || 60;
-
-                const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
-                const paladinFeatures = getClassFeatures(playerStats);
-                const maxCharges = paladinFeatures?.maxChannelDivinity || 0;
-                const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
-                if (currentCharges <= 0) {
-                    if (setPopupHtml) {
-                        setPopupHtml({
-                            type: 'automation_info',
-                            name: action.name,
-                            automationType: auto.type,
-                            description: 'No Channel Divinity charges remaining.',
-                            automation: auto,
-                        });
-                    }
-                    break;
-                }
-
-                const newCharges = currentCharges - 1;
-                setRuntimeValue(playerStats.name, 'channelDivinityCharges', newCharges, campaignName);
-
-                const cs = await getCombatContext(campaignName);
-                let attackerPos = null;
-                let mapData = null;
-                if (mapName) {
-                    try {
-                        mapData = await mapsService.loadMapData(campaignName, mapName);
-                        const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
-                        if (attackerPlayer) {
-                            attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
-                        }
-                    } catch { /* positions unavailable */ }
-                }
-
-                setSetConditionModal({
-                    combatSummary: cs,
-                    attackerName: playerStats.name,
-                    attackerPos,
-                    saveDc,
-                    campaignName,
-                    mapData,
-                    featureName: action.name,
-                    conditionName,
-                    saveType,
-                    rangeFeet,
-                });
-
-                addEntry(campaignName, {
-                    type: 'ability_use',
-                    characterName: playerStats.name,
-                    abilityName: action.name,
-                    description: `${action.name} activated — ${saveType} save DC ${saveDc}, all targets within ${rangeFeet} ft.`,
-                }).catch(() => { });
-
-                break;
-            }
-            default:
-                break;
-        }
-    };
     const getWeaponMastery = (weaponName) => {
         if (playerStats.rules !== '2024') {
             return null;
@@ -1236,11 +548,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             if (!result) return;
 
             if (!mapName) {
-                rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier, buildAttackContextSync(attack));
+                rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier, buildCtxSync(attack));
             } else {
-                buildAttackContext(attack).then(ctx => {
+                buildCtx(attack).then(ctx => {
                     rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier, ctx);
-                }).catch(() => { });
+                  }).catch(() => {});
             }
             return;
         }
@@ -1258,17 +570,17 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 const r = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
                 if (!r) return;
                 if (!mapName) {
-                    rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, { ...buildAttackContextSync(attack), ...metaCtx });
+                    rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, { ...buildCtxSync(attack), ...metaCtx });
                 } else {
-                    buildAttackContext(attack).then(ctx => {
-                        rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, { ...ctx, ...metaCtx });
-                    }).catch(() => { });
-                }
-            },
-        });
-    };
+                     buildCtx(attack).then(ctx => {
+                         rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, { ...ctx, ...metaCtx });
+                       }).catch(() => {});
+                   }
+               },
+           });
+       };
 
-    // Hit column click on spell attacks - gate through metamagic for sorcerers
+      // Hit column click on spell attacks - gate through metamagic for sorcerers
     const handleSpellAttackClick = (attack) => {
         if (cannotAct) return;
         const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attack.name);
@@ -1290,18 +602,18 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             _currentSP: currentSP,
             action: (metaCtx) => {
                 if (!mapName) {
-                    const ctx = buildAttackContextSync(attack);
+                    const ctx = buildCtxSync(attack);
                     rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, { ...ctx, ...metaCtx });
                 } else {
-                    buildAttackContext(attack).then(ctx => {
-                        rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, { ...ctx, ...metaCtx });
-                    }).catch(() => { });
-                }
-            },
-        });
-    };
+                     buildCtx(attack).then(ctx => {
+                         rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, { ...ctx, ...metaCtx });
+                        }).catch(() => {});
+                    }
+                },
+            });
+        };
 
-    // Damage column click on attack-roll spells - gate through metamagic for sorcerers
+       // Damage column click on attack-roll spells - gate through metamagic for sorcerers
     const handleSpellDamageClick = (attack) => {
         const spell = playerStats.spellAbilities?.spells?.find(s => s.name === attack.name);
         if (!spell) {
@@ -1326,13 +638,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 const r = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
                 if (!r) return;
                 if (!mapName) {
-                    rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, { ...buildAttackContextSync(attack), ...metaCtx });
+                    rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, { ...buildCtxSync(attack), ...metaCtx });
                 } else {
-                    buildAttackContext(attack).then(ctx => {
+                    buildCtx(attack).then(ctx => {
                         rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, { ...ctx, ...metaCtx });
-                    }).catch(() => { });
-                }
-            },
+                        }).catch(() => {});
+                  }
+              },
         });
     };
 

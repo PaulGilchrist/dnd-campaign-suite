@@ -4,12 +4,12 @@
     import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
     import MetamagicPopup from './MetamagicPopup.jsx'
      import { sanitizeHtml } from '../../services/sanitize.js';
-     import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
-     import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
-     import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/baseCombatActions.js'
-     import { hasAutomation } from '../../services/automationService.js'
-     import { rollExpression } from '../../services/diceRoller.js'
-     import { getCombatContext, getTargetFromAttacker } from '../../services/damageUtils.js'
+      import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
+      import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
+      import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/baseCombatActions.js'
+      import { hasAutomation } from '../../services/automationService.js'
+      import { getCombatContext, getTargetFromAttacker } from '../../services/damageUtils.js'
+      import { executeHandler } from '../../services/automation/index.js'
      import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
      import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
      import { executeSpellCast } from '../../services/spellCastService.js'
@@ -52,47 +52,20 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName }) {
         }
     };
 
-    const handleAutomationReaction = (reaction) => {
+    const handleAutomationReaction = async (reaction) => {
         if (cannotAct) return;
         const auto = reaction.automation;
         if (!auto) return;
-        switch (auto.type) {
-            case 'damage_reduction': {
-                if (auto.redirect && setPopupHtml) {
-                    const reductionExpr = auto.reductionExpression || '0';
-                    const damageResult = rollExpression(reductionExpr);
-                    if (damageResult) {
-                        setPopupHtml({
-                            type: 'damage_reduction_redirect',
-                            name: reaction.name,
-                            description: reaction.description || '',
-                            reductionExpression: reductionExpr,
-                            reductionRolls: damageResult.rolls,
-                            reductionModifier: damageResult.modifier,
-                            reductionTotal: damageResult.total,
-                            redirectCost: auto.redirectCost || null,
-                            redirectDamage: auto.redirectDamage || '',
-                            redirectSave: auto.redirectSave || 'DEX',
-                        });
-                    }
-                } else if (setPopupHtml) {
-                    setPopupHtml({
-                        type: 'damage_reduction',
-                        name: reaction.name,
-                        description: reaction.description || '',
-                        reductionExpression: auto.reductionExpression || '',
-                        trigger: auto.trigger || '',
-                    });
-                }
-                break;
-            }
-            default: {
-                const html = buildFeatureDetailHtml(reaction);
-                if (html) setPopupHtml(html);
-                break;
-            }
-          }
-      };
+
+        const result = await executeHandler(reaction, playerStats, campaignName, mapName);
+        if (result?.type === 'popup') {
+            setPopupHtml(result.payload);
+            return;
+        }
+
+        const html = buildFeatureDetailHtml(reaction);
+        if (html) setPopupHtml(html);
+    };
 
      const getTargetInfo = React.useCallback(async () => {
         const cs = await getCombatContext(campaignName);

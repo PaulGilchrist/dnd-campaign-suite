@@ -294,9 +294,8 @@ function App() {
 
   /**
    * WARNING: SSE re-render loop risk
-   * This handler processes inbound SSE events.  Self-echoes are filtered by the
-   * Subscriber component (via selfId).  The setRuntimeObject call already does
-   * deep comparison, and character list updates return prev unchanged when no match.
+   * setRuntimeObject is called with skipSync=true to prevent re-POSTing the full
+   * store back to the server on SSE echoes (the server already has this data).
    */
   const handleRuntimeEvent = useCallback((event) => {
     if (event.key == null || event.data == null) return;
@@ -320,7 +319,8 @@ function App() {
     const prefix = `change-${campaignName}-`;
     if (!event.key.startsWith(prefix)) return;
     const characterKey = event.key.slice(prefix.length);
-    setRuntimeObject(characterKey, event.data, campaignName);
+    console.log(`[SSE] inbound change-${characterKey} from server:`, event.data);
+    setRuntimeObject(characterKey, event.data, campaignName, true);
   }, [campaignName, setCharacters]);
 
   const handleDeleteCharacter = async (characterName) => {

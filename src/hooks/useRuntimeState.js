@@ -72,6 +72,7 @@ export function setRuntimeValue(characterKey, propertyName, value, campaignName)
     return;
   }
   store.set(propertyName, value);
+  console.log(`[SSE] setRuntimeValue ${characterKey}.${propertyName}:`, existing, '->', value);
 
   const obj = Object.fromEntries(store);
   try { localStorage.setItem(characterKey, JSON.stringify(obj)); } catch { /* ignore */ }
@@ -90,7 +91,7 @@ export function setRuntimeValue(characterKey, propertyName, value, campaignName)
   notify(characterKey);
 }
 
-export function setRuntimeObject(characterKey, fullObject, campaignName) {
+export function setRuntimeObject(characterKey, fullObject, campaignName, skipSync = false) {
   if (!fullObject || typeof fullObject !== 'object') return;
   const store = getStore(characterKey);
   let changed = false;
@@ -103,9 +104,10 @@ export function setRuntimeObject(characterKey, fullObject, campaignName) {
     }
   }
   if (changed) {
+    console.log(`[SSE] setRuntimeObject ${characterKey}: keys [${changedKeys.join(', ')}] changed`);
     try { localStorage.setItem(characterKey, JSON.stringify(Object.fromEntries(store))); } catch { /* ignore */ }
 
-    if (campaignName) {
+    if (campaignName && !skipSync) {
       fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(characterKey)}`, {
         method: 'POST',
         mode: 'cors',
