@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getRuntimeValue, setRuntimeValue } from './useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from './useRuntimeState.js';
 import { getClassFeatures } from '../services/classFeatures.js';
 import utils from '../services/utils.js';
 
-export function spendSorceryPoints(characterName, amount, campaignName) {
-  const current = Number(getRuntimeValue(characterName, 'sorceryPoints')) || 0;
+export function spendSorceryPoints(characterName, amount, campaignName, fallback = 0) {
+  const current = getCurrentSorceryPoints(characterName, fallback);
   const newValue = Math.max(0, current - amount);
   setRuntimeValue(characterName, 'sorceryPoints', newValue, campaignName);
   window.dispatchEvent(new CustomEvent('sorcery-points-updated'));
@@ -62,12 +62,23 @@ export default function useMetamagic(playerStats, campaignName) {
   });
 
   useEffect(() => {
-    const handler = () => {
+    const customEventHandler = () => {
       const stored = getRuntimeValue(characterName, 'sorceryPoints');
       setCurrentSP(stored != null ? Number(stored) : maxSP);
     };
-    window.addEventListener('sorcery-points-updated', handler);
-    return () => window.removeEventListener('sorcery-points-updated', handler);
+
+    const storeChangeHandler = () => {
+      const stored = getRuntimeValue(characterName, 'sorceryPoints');
+      setCurrentSP(stored != null ? Number(stored) : maxSP);
+    };
+
+    window.addEventListener('sorcery-points-updated', customEventHandler);
+    const removeListener = addStorageChangeListener(characterName, storeChangeHandler);
+
+    return () => {
+      window.removeEventListener('sorcery-points-updated', customEventHandler);
+      removeListener();
+    };
   }, [characterName, maxSP]);
 
   useEffect(() => {
@@ -80,11 +91,11 @@ export default function useMetamagic(playerStats, campaignName) {
   }, [characterName, maxSP, playerStats]);
 
   const spend = useCallback((amount) => {
-    const remaining = spendSorceryPoints(characterName, amount, campaignName);
+    const remaining = spendSorceryPoints(characterName, amount, campaignName, maxSP);
     setCurrentSP(remaining);
     window.dispatchEvent(new CustomEvent('sorcery-points-updated'));
     return remaining;
-  }, [characterName, campaignName]);
+  }, [characterName, campaignName, maxSP]);
 
   const logUse = useCallback((spellName, options, spCost) => {
     logMetamagicUse(campaignName, characterName, spellName, options, spCost);

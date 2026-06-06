@@ -22,6 +22,7 @@ vi.mock('./useRuntimeState.js', () => {
       } catch { /* ignore */ }
     }),
     useRuntimeValue: vi.fn(() => null),
+    addStorageChangeListener: vi.fn(() => () => {}),
   };
 });
 

@@ -38,7 +38,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     if (!pending) return;
 
     if (result?.totalCost > 0) {
-      spendSorceryPoints(playerStats.name, result.totalCost, campaignName);
+      spendSorceryPoints(playerStats.name, result.totalCost, campaignName, getMaxSorceryPoints(playerStats));
     }
 
     addEntry(campaignName, {

@@ -58,7 +58,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
       const pending = pendingSimpleMetamagic;
       setPendingSimpleMetamagic(null);
       if (!pending) return;
-      if (result?.totalCost > 0) spendSorceryPoints(playerStats.name, result.totalCost, campaignName);
+      if (result?.totalCost > 0) spendSorceryPoints(playerStats.name, result.totalCost, campaignName, getMaxSorceryPoints(playerStats));
       const metaCtx = {};
       if (result?.options) {
         if (result.options.includes('Heightened Spell')) metaCtx.metamagicHeighten = true;

@@ -74,7 +74,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    spendSorceryPoints(playerStats.name, cost, campaignName);
+    spendSorceryPoints(playerStats.name, cost, campaignName, getMaxSorceryPoints(playerStats));
     setRuntimeValue(playerStats.name, 'innateSorceryUses', 0, campaignName);
     setInnateSorceryActive(playerStats.name, true, campaignName);
     window.dispatchEvent(new CustomEvent('innate-sorcery-updated'));

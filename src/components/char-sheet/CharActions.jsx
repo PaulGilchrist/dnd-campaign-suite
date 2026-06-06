@@ -325,7 +325,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             return;
         }
 
-        spendSorceryPoints(name, 1, campaignName);
+        spendSorceryPoints(name, 1, campaignName, maxSP);
 
         if (damageDifference !== 0) {
             const applyResult = applyDamageToTarget(combatSummary, lastEvent.targetName, damageDifference, lastEvent.damageType ? [lastEvent.damageType] : [], campaignName, null);
@@ -485,7 +485,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         if (!pending) return;
 
         if (result?.totalCost > 0) {
-            spendSorceryPoints(playerStats.name, result.totalCost, campaignName);
+            spendSorceryPoints(playerStats.name, result.totalCost, campaignName, getMaxSorceryPoints(playerStats));
         }
 
         addEntry(campaignName, {
