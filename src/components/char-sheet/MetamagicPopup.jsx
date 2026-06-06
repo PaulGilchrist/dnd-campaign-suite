@@ -16,7 +16,7 @@ export default function MetamagicPopup({ spell, playerStats, _campaignName, onCo
   const spellLevel = spell?.level || 0;
   const currentSP = Number(playerStats._metamagicCurrentSP) || 0;
   const options = getPreCastOptions(playerStats, currentSP, spellLevel);
-  const maxPerSpell = getMaxMetamagicPerSpell(playerStats);
+  const maxPerSpell = getMaxMetamagicPerSpell(playerStats, playerStats?.name);
 
   const [selected, setSelected] = useState([]);
   const [twinTarget, setTwinTarget] = useState('');

@@ -494,8 +494,8 @@ function buildAttackInfo(feature, playerStats) {
 
         case 'resource_restoration': {
             const restoreAmount = auto.restore_expression
-                 ? evaluateAutoExpression(auto.restore_expression, playerStats)
-                 : 0
+                  ? evaluateAutoExpression(auto.restore_expression, playerStats)
+                  : 0
             return {
                 type: 'resource_restoration',
                 name: feature.name,
@@ -507,8 +507,18 @@ function buildAttackInfo(feature, playerStats) {
                 uses_max: auto.uses_max ?? 1,
                 recharge: auto.recharge || 'long_rest',
                 hasAutomation: true
-             }
-         }
+              }
+          }
+
+        case 'sorcery_incarnate': {
+            return {
+                type: 'sorcery_incarnate',
+                name: feature.name,
+                casting_time: auto.casting_time || '1 bonus action',
+                cost: auto.cost || 2,
+                hasAutomation: true
+              }
+          }
 
         default:
             return null
@@ -575,6 +585,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'font_of_magic':
             case 'set_condition':
             case 'sorcery_aura':
+            case 'sorcery_incarnate':
                 result.actions.push(info)
                 break
             case 'damage_reduction':

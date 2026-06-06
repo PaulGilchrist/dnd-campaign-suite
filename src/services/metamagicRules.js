@@ -86,8 +86,11 @@ export function getChaModifier(stats) {
   return Math.max(0, bonus);
 }
 
-export function getMaxMetamagicPerSpell(stats) {
-  if (stats?.rules === '2024' && (stats.level || 0) >= 6) return 2;
+export function getMaxMetamagicPerSpell(stats, playerName) {
+  if (stats?.rules === '2024' && (stats.level || 0) >= 6) {
+     const buffs = getRuntimeValue(playerName, 'activeBuffs') || [];
+     return Array.isArray(buffs) && buffs.some(b => b.name === 'Innate Sorcery') ? 2 : 1;
+   }
   return 1;
 }
 

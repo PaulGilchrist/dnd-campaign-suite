@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   METAMAGIC_OPTIONS,
   METAMAGIC_EFFECTS,
@@ -8,6 +8,13 @@ import {
   getMaxMetamagicPerSpell,
   isPreCastOption,
 } from './metamagicRules.js';
+import { clearRuntimeState } from '../hooks/useRuntimeState.js';
+
+beforeEach(() => {
+  localStorage.clear();
+  Object.keys(localStorage); // no-op to ensure clean state
+  clearRuntimeState('Test');
+});
 
 describe('METAMAGIC_OPTIONS', () => {
   it('has 8 options', () => {
@@ -98,21 +105,27 @@ describe('getChaModifier', () => {
 
 describe('getMaxMetamagicPerSpell', () => {
   it('returns 1 for 5e rules', () => {
-    expect(getMaxMetamagicPerSpell({ rules: '5e', level: 10 })).toBe(1);
-  });
+    expect(getMaxMetamagicPerSpell({ rules: '5e', level: 10 }, 'Test')).toBe(1);
+   });
 
   it('returns 1 for 2024 rules below level 6', () => {
-    expect(getMaxMetamagicPerSpell({ rules: '2024', level: 5 })).toBe(1);
-  });
+    expect(getMaxMetamagicPerSpell({ rules: '2024', level: 5 }, 'Test')).toBe(1);
+   });
 
-  it('returns 2 for 2024 rules level 6+', () => {
-    expect(getMaxMetamagicPerSpell({ rules: '2024', level: 6 })).toBe(2);
-    expect(getMaxMetamagicPerSpell({ rules: '2024', level: 10 })).toBe(2);
-  });
+  it('returns 2 for 2024 rules level 6+ with Innate Sorcery active', () => {
+    localStorage.setItem('Test', JSON.stringify({ activeBuffs: [{ name: 'Innate Sorcery' }] }));
+    expect(getMaxMetamagicPerSpell({ rules: '2024', level: 6 }, 'Test')).toBe(2);
+    expect(getMaxMetamagicPerSpell({ rules: '2024', level: 10 }, 'Test')).toBe(2);
+   });
+
+  it('returns 1 for 2024 rules level 6+ without Innate Sorcery active', () => {
+    localStorage.setItem('Test', JSON.stringify({ activeBuffs: [] }));
+    expect(getMaxMetamagicPerSpell({ rules: '2024', level: 6 }, 'Test')).toBe(1);
+   });
 
   it('handles missing level', () => {
-    expect(getMaxMetamagicPerSpell({ rules: '2024' })).toBe(1);
-  });
+    expect(getMaxMetamagicPerSpell({ rules: '2024' }, 'Test')).toBe(1);
+   });
 });
 
 describe('isPreCastOption', () => {

@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MetamagicPopup from './MetamagicPopup.jsx';
+import { clearRuntimeState } from '../../hooks/useRuntimeState.js';
 
 const mockSpell = {
   name: 'Fireball',
@@ -20,15 +21,16 @@ describe('MetamagicPopup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    // Set up combat summary with creatures for twinned target selector
+    clearRuntimeState('Sorcerer');
+     // Set up combat summary with creatures for twinned target selector
     localStorage.setItem('combatSummary', JSON.stringify({
       creatures: [
-        { name: 'Sorcerer', type: 'player' },
-        { name: 'Goblin', type: 'npc' },
-        { name: 'Orc', type: 'npc' },
-      ],
-    }));
-  });
+         { name: 'Sorcerer', type: 'player' },
+         { name: 'Goblin', type: 'npc' },
+         { name: 'Orc', type: 'npc' },
+       ],
+     }));
+    });
 
   it('renders spell name and level', () => {
     render(
@@ -161,22 +163,43 @@ describe('MetamagicPopup', () => {
     expect(screen.getByText(/Apply & Cast/)).toBeInTheDocument();
   });
 
-  it('shows Sorcery Incarnate note for 2024 level 6+', () => {
+  it('shows Sorcery Incarnate note for 2024 level 6+ with Innate Sorcery active', () => {
+    localStorage.setItem('Sorcerer', JSON.stringify({ activeBuffs: [{ name: 'Innate Sorcery' }] }));
     const stats2024 = {
-      ...mockPlayerStats,
+       ...mockPlayerStats,
       rules: '2024',
       level: 6,
-      _metamagicCurrentSP: 10,
-    };
+       _metamagicCurrentSP: 10,
+     };
     render(
-      <MetamagicPopup
+       <MetamagicPopup
         spell={mockSpell}
         playerStats={stats2024}
         campaignName="test"
         onConfirm={vi.fn()}
         onSkip={vi.fn()}
-      />
-    );
+       />
+     );
     expect(screen.getByText(/Sorcery Incarnate/)).toBeInTheDocument();
+  });
+
+  it('does not show Sorcery Incarnate note when Innate Sorcery is not active', () => {
+    localStorage.setItem('Sorcerer', JSON.stringify({ activeBuffs: [] }));
+    const stats2024 = {
+       ...mockPlayerStats,
+      rules: '2024',
+      level: 6,
+       _metamagicCurrentSP: 10,
+     };
+    render(
+       <MetamagicPopup
+        spell={mockSpell}
+        playerStats={stats2024}
+        campaignName="test"
+        onConfirm={vi.fn()}
+        onSkip={vi.fn()}
+       />
+     );
+    expect(screen.queryByText(/Sorcery Incarnate/)).not.toBeInTheDocument();
   });
 });
