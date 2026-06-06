@@ -1,14 +1,12 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import * as mapsService from '../../services/mapsService.js';
+import { generateWeather } from '../../services/weatherService.js';
 import {
-    HEX_SIZE, DEFAULT_GRID_SIZE, GRID_COLS_MULTIPLIER, DEFAULT_TERRAIN, MIN_ZOOM, MAX_ZOOM,
+    HEX_SIZE, GRID_COLS_MULTIPLIER,
     TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_PAN, TOOL_TRAVEL, TOOL_ROAD,
     TERRAIN_TYPES, POI_TYPES
 } from '../../config/outdoorConfig.js';
-import { generateWeather } from '../../services/weatherService.js';
-import { getDailyHexBudget } from '../../services/travelService.js';
-import { hexKey, hexToPixel, pixelToHexSnapped, hexToSVGPath, isRoadConnectable, findHexPath } from '../../services/hexMapUtils.js';
-import { generateOutdoorEncounter } from '../../services/outdoorEncounterGenerator.js';
+import { hexKey, hexToPixel, hexToSVGPath } from '../../services/hexMapUtils.js';
 import TerrainLayer from './TerrainLayer.jsx';
 import HexGridLayer from './HexGridLayer.jsx';
 import HexMapToolbar from './HexMapToolbar.jsx';
@@ -37,54 +35,69 @@ import TravelPathLayer from './TravelPathLayer.jsx';
 import useLog from '../../hooks/useLog.js';
 import WeatherOverlay from './WeatherOverlay.jsx';
 import EventDialog from './EventDialog.jsx';
+import useZoomPan from './hooks/useZoomPan.js';
+import useHexHover from './hooks/useHexHover.js';
+import useTerrainPainting from './hooks/useTerrainPainting.js';
+import usePoiManagement from './hooks/usePoiManagement.js';
+import useMapLoader from './hooks/useMapLoader.js';
+import useTravelToolSync from './hooks/useTravelToolSync.js';
+import useEncounterGeneration from './hooks/useEncounterGeneration.js';
 import './HexMap.css';
 
 function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCreated, isLocalhost = false, onPoiEntered }) {
-    const [loading, setLoading] = useState(true);
-    const [, setMapData] = useState(null);       // full map data object from server
-    const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE);
+    const svgRef = useRef(null);
+
+    // ── Core map data (load/init/save) ──
+    const mapLoader = useMapLoader(campaignName, mapName, characters);
+    const {
+        loading, setMapData,
+        gridSize, setGridSize,
+        terrain, setTerrain,
+        rivers, setRivers,
+        roads, setRoads,
+        pois, setPois,
+        marchingOrder, setMarchingOrder,
+        partyPosition, setPartyPosition,
+        weather, setWeather,
+        travelInit, setTravelInit,
+        setTravelStateRef,
+        zoom, setZoom,
+        panX, setPanX,
+        panY, setPanY,
+        needsResetViewRef,
+    } = mapLoader;
+
     const hexCols = gridSize * GRID_COLS_MULTIPLIER;
     const hexRows = gridSize;
-    const [terrain, setTerrain] = useState({});          // Record<hexKey, terrainType>
-    const [rivers, setRivers] = useState([]);            // array of "q,r" strings
-    const [pois, setPois] = useState([]);                // array of POI objects
-    const [roads, setRoads] = useState([]);              // array of road objects { id, fromPoiId, toPoiId, hexes }
-    const [roadStartPoiId, setRoadStartPoiId] = useState(null); // POI id selected as road start
 
-    // Marching order state
-    const [marchingOrder, setMarchingOrder] = useState([]);  // ordered character names
-    const [partyPosition, setPartyPosition] = useState(null); // {hexQ, hexR} | null
-    const [marchingOpen, setMarchingOpen] = useState(false);  // panel toggle
+    // ── Zoom/pan interaction ──
+    const zoomPan = useZoomPan(svgRef, hexCols, hexRows, zoom, setZoom, panX, setPanX, panY, setPanY);
+    const { svgWidth, svgHeight, zoomIn, zoomOut, resetView, clampPan, centerView,
+        panning, handlePanStart, handlePanMove, handlePanEnd, handleWheel } = zoomPan;
 
-    const [weather, setWeather] = useState(null);
-    const [travelInit, setTravelInit] = useState(null);
-    const [travelSaveVersion, setTravelSaveVersion] = useState(0);
+    // ── Hex hover & coordinate conversion ──
+    const hexHover = useHexHover(svgRef, hexCols, hexRows);
+    const { hoveredHex, setHoveredHex, getHexFromEvent, handleHexHover } = hexHover;
+
+    // ── Tool state ──
+    const [tool, setTool] = useState(TOOL_NONE);
+    const [selectedTerrain, setSelectedTerrain] = useState(TERRAIN_TYPES[0].id);
+    const [poiPanelOpen, setPoiPanelOpen] = useState(false);
+    const [marchingOpen, setMarchingOpen] = useState(false);
+    const [partyContextMenu, setPartyContextMenu] = useState(null);
+
+    // ── Terrain painting ──
+    const terrainPainting = useTerrainPainting(hexCols, hexRows, getHexFromEvent, selectedTerrain, setTerrain, setRivers);
+    const { handleTerrainPointerDown, handleTerrainPointerMove, handleTerrainPointerUp } = terrainPainting;
+
+    // ── Travel management ──
     const { monsters } = useMonstersData();
-    const playerLevels = React.useMemo(
-        () => characters.map(c => c.level || 1),
-        [characters]
-    );
-
-    const { addEntry } = useLog(campaignName);
-
-    const travelStateRef = useRef(null);
-    const setTravelStateRef = useCallback((ts) => {
-        travelStateRef.current = ts;
-        setTravelSaveVersion(prev => prev + 1);
-    }, []);
+    const playerLevels = useMemo(() => characters.map(c => c.level || 1), [characters]);
 
     const travelMgmt = useTravelManagement({
-        hexCols,
-        hexRows,
-        terrain,
-        partyPosition,
+        hexCols, hexRows, terrain, partyPosition,
         onPartyMove: setPartyPosition,
-        weather,
-        monsters,
-        playerLevels,
-        roads,
-        characters,
-        campaignName,
+        weather, monsters, playerLevels, roads, characters, campaignName,
         initialTravelState: travelInit,
         onTravelStateChange: setTravelStateRef,
     });
@@ -93,12 +106,34 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         const terrainKey = partyPosition ? hexKey(partyPosition.q, partyPosition.r) : null;
         const currentTerrain = terrainKey ? terrain[terrainKey] || 'plains' : 'plains';
         setWeather(generateWeather(currentTerrain));
-    }, [partyPosition, terrain]);
+    }, [partyPosition, terrain, setWeather]);
+
+    // ── Travel tool sync ──
+    useTravelToolSync(tool, travelMgmt, handleGenerateWeather, setTool);
+
+    // ── POI management ──
+    const poiMgmt = usePoiManagement(pois, setPois, roads, setRoads, terrain, hexCols, hexRows, getHexFromEvent, tool);
+    const {
+        selectedPoiMenu, setSelectedPoiMenu,
+        showRename, setShowRename,
+        poiDragging,
+        roadStartPoiId, setRoadStartPoiId,
+        handlePoiPointerDown, handlePoiPointerMove, handlePoiPointerUp,
+        handlePoiContextMenu, handleTogglePoiVisibility, handleDeletePoi,
+        handleRenamePoi, handleLinkMap, handleUnlinkMap, handleRemoveRoads,
+    } = poiMgmt;
+
+    // ── Encounter generation ──
+    const { generateMonsterPlacements, handleStartEncounter } = useEncounterGeneration(
+        campaignName, mapName, terrain, marchingOrder, onEncounterCreated
+    );
+
+    // ── Logging ──
+    const { addEntry } = useLog(campaignName);
 
     const logTravel = useCallback((action, hex, tileTerrain, w, evt) => {
         addEntry({
-            type: 'travel',
-            action,
+            type: 'travel', action,
             hex: hex || null,
             terrain: tileTerrain || null,
             weather: w?.label || null,
@@ -141,79 +176,22 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         return result;
     }, [travelMgmt, weather, terrain, logTravel]);
 
-    // Tool state
-    const [tool, setTool] = useState(TOOL_NONE);         // current tool mode
-    const [selectedTerrain, setSelectedTerrain] = useState(TERRAIN_TYPES[0].id);
-    // POI interaction state
-    const [poiPanelOpen, setPoiPanelOpen] = useState(false);
-    const [selectedPoiMenu, setSelectedPoiMenu] = useState(null); // { id, q, r }
-    const [showRename, setShowRename] = useState(null);
-    const [poiDragging, setPoiDragging] = useState(null); // { poiId, startQ, startR } | null
-    const [indoorMaps, setIndoorMaps] = useState([]); // available indoor maps for linking
-    const validLinkedMapsRef = useRef(new Set()); // Set of linked map names that exist on server
-    const [validLinkedMaps, setValidLinkedMaps] = useState(new Set()); // triggers re-render
+    // ── Indoor map linking ──
+    const [indoorMaps, setIndoorMaps] = useState([]);
+    const validLinkedMapsRef = useRef(new Set());
+    const [validLinkedMaps, setValidLinkedMaps] = useState(new Set());
 
-    // Painting state
-    const paintingRef = useRef(false); // whether we're in the middle of a paint/erase stroke
-
-    const [zoom, setZoom] = useState(MIN_ZOOM);
-    const [panX, setPanX] = useState(0);
-    const [panY, setPanY] = useState(0);
-    const [panning, setPanning] = useState(null);        // { startX, startY, startPanX, startPanY } | null
-    const [hoveredHex, setHoveredHex] = useState(null);  // { q, r } | null
-    const [partyContextMenu, setPartyContextMenu] = useState(null); // { q, r } | null
-
-    const svgRef = useRef(null);
-    const zoomValueRef = useRef(MIN_ZOOM);
-    const panXValueRef = useRef(0);
-    const panYValueRef = useRef(0);
-    const accumulatedDeltaRef = useRef(0);
-    const isInitialized = useRef(false);
-    const hasLoaded = useRef(false);
-    const needsResetViewRef = useRef(false);
-    const toolInitRef = useRef(true);
-
-    // Sync tool ↔ travel management state
-    const prevToolRef = useRef(TOOL_NONE);
-    useEffect(() => {
-        if (toolInitRef.current) {
-            toolInitRef.current = false;
-            prevToolRef.current = tool;
-            return;
-        }
-        const toolJustActivated = tool === TOOL_TRAVEL && prevToolRef.current !== TOOL_TRAVEL;
-        prevToolRef.current = tool;
-
-        if (toolJustActivated && travelMgmt.travelMode === 'inactive') {
-            travelMgmt.startPlanning();
-            if (!weather) {
-                handleGenerateWeather();
-            }
-        } else if (travelMgmt.travelMode === 'inactive' && tool === TOOL_TRAVEL) {
-            setTool(TOOL_NONE);
-        } else if (tool !== TOOL_TRAVEL && travelMgmt.isTravelActive) {
-            travelMgmt.cancelTravel();
-        }
-    }, [tool, weather, handleGenerateWeather, travelMgmt]);
-
-    // Fetch available indoor maps for POI linking
     useEffect(() => {
         let cancelled = false;
         mapsService.loadMaps(campaignName).then(result => {
             if (cancelled) return;
-            const indoor = result.maps
-                .filter(m => m.type === 'indoor')
-                .map(m => m.name);
-            setIndoorMaps(indoor);
+            setIndoorMaps(result.maps.filter(m => m.type === 'indoor').map(m => m.name));
         }).catch(err => console.error('[HexMap] Failed to load indoor maps:', err));
         return () => { cancelled = true; };
     }, [campaignName]);
 
-    // Verify that linked POI maps exist on the server
     useEffect(() => {
-        const linkedMaps = pois
-            .filter(p => p.linkedMap)
-            .map(p => p.linkedMap);
+        const linkedMaps = pois.filter(p => p.linkedMap).map(p => p.linkedMap);
         const unique = [...new Set(linkedMaps)];
         if (unique.length === 0) {
             validLinkedMapsRef.current = new Set();
@@ -223,23 +201,18 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         let cancelled = false;
         Promise.allSettled(
             unique.map(name =>
-                mapsService.loadMapData(campaignName, name)
-                    .then(() => name)
-                    .catch(() => null)
+                mapsService.loadMapData(campaignName, name).then(() => name).catch(() => null)
             )
         ).then(results => {
             if (cancelled) return;
-            const valid = new Set(
-                results
-                    .filter(r => r.status === 'fulfilled' && r.value)
-                    .map(r => r.value)
-            );
+            const valid = new Set(results.filter(r => r.status === 'fulfilled' && r.value).map(r => r.value));
             validLinkedMapsRef.current = valid;
             setValidLinkedMaps(valid);
         });
         return () => { cancelled = true; };
     }, [campaignName, pois]);
 
+    // ── SSE sync ──
     const { handleSSEEvent } = useHexMapSSESync({
         campaignName, mapName, setGridSize, setTerrain, setRivers, setRoads, setPois,
         setZoom, setPanX, setPanY, setMarchingOrder, setPartyPosition, setMapData,
@@ -247,478 +220,45 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         onTravelStateChange: (ts) => {
             if (ts) {
                 setTravelInit(ts);
-                setTravelSaveVersion(prev => prev + 1);
             }
         },
     });
 
-    // Computed SVG dimensions — corrected to account for full axial extent + hex shape
-    const gridPixelBounds = useMemo(() => {
-        const xMin = -HEX_SIZE * Math.sqrt(3) / 2;
-        const xMax = HEX_SIZE * Math.sqrt(3) * ((hexCols - 1) + (hexRows - 1) / 2 + 0.5);
-        const yMin = -HEX_SIZE;
-        const yMax = HEX_SIZE * (1.5 * (hexRows - 1) + 1);
-        return {
-            width: xMax - xMin,
-            height: yMax - yMin,
-            offsetX: xMin,
-            offsetY: yMin,
-            centerX: (xMin + xMax) / 2,
-            centerY: (yMin + yMax) / 2,
-        };
-    }, [hexCols, hexRows]);
-
-    const svgWidth = gridPixelBounds.width;
-    const svgHeight = gridPixelBounds.height;
-
-    // ── TUNING: MARGIN_X / MARGIN_Y — hex-widths to inset from each grid edge ──
-    // These formulas exactly hide empty diagonal corners for any grid size.
-    // For 60×30: MARGIN_X=14.5, MARGIN_Y=6.5 (dialed in manually).
-    const MARGIN_X = (hexRows - 1) / 2 || 0.5;
-    const MARGIN_Y = hexRows / 4 - 1 || 0.5;
-
-    // Uncomment to override with manual values:
-    // const MARGIN_X = 14.5;
-    // const MARGIN_Y = 6.5;
-
-    const clampPan = useCallback((pz, px, py) => {
-        const viewW = gridPixelBounds.width / pz;
-        const viewH = gridPixelBounds.height / pz;
-        const sqrt3 = Math.sqrt(3);
-        const hexW = sqrt3 * HEX_SIZE; // one hex width in pixels
-        const hexH = 1.5 * HEX_SIZE;   // one hex height in pixels
-        const marginX = MARGIN_X * hexW;
-        const marginY = MARGIN_Y * hexH;
-
-        // Grid pixel bounds (outer edges of outermost hexes)
-        const gridLeft = gridPixelBounds.offsetX + marginX;
-        const gridRight = gridPixelBounds.offsetX + gridPixelBounds.width - marginX;
-        const gridTop = gridPixelBounds.offsetY + marginY;
-        const gridBottom = gridPixelBounds.offsetY + gridPixelBounds.height - marginY;
-
-        const minPanX = gridLeft;
-        const maxPanX = gridRight - viewW;
-        const minPanY = gridTop;
-        const maxPanY = gridBottom - viewH;
-
-        return {
-            x: Math.min(maxPanX, Math.max(minPanX, px)),
-            y: Math.min(maxPanY, Math.max(minPanY, py)),
-        };
-    }, [gridPixelBounds, MARGIN_X, MARGIN_Y]);
-
+    // ── View reset on grid size change ──
     useLayoutEffect(() => {
         if (needsResetViewRef.current) {
             needsResetViewRef.current = false;
-            const vw = gridPixelBounds.width / 2;
-            const vh = gridPixelBounds.height / 2;
-            const cx = gridPixelBounds.centerX - vw / 2;
-            const cy = gridPixelBounds.centerY - vh / 2;
-            const clamped = clampPan(2, cx, cy);
+            const clamped = centerView(2);
             setZoom(2);
             setPanX(clamped.x);
             setPanY(clamped.y);
             return;
         }
-        const clamped = clampPan(zoom, panXValueRef.current, panYValueRef.current);
-        if (clamped.x !== panXValueRef.current) {
-            panXValueRef.current = clamped.x;
-            setPanX(clamped.x);
+        const clamped = clampPan(zoom, panX, panY);
+        if (clamped.x !== panX) setPanX(clamped.x);
+        if (clamped.y !== panY) setPanY(clamped.y);
+    }, [zoom, gridSize, clampPan, centerView, setZoom, setPanX, setPanY, panX, panY, needsResetViewRef]);
+
+    const viewPortBounds = useMemo(() => ({
+        left: panX, top: panY,
+        right: panX + svgWidth / zoom,
+        bottom: panY + svgHeight / zoom,
+    }), [panX, panY, svgWidth, svgHeight, zoom]);
+
+    // ── POI enter handler ──
+    const handlePoiEnter = useCallback((poi) => {
+        if (poi.linkedMap && validLinkedMapsRef.current.has(poi.linkedMap) && onPoiEntered) {
+            onPoiEntered(poi.linkedMap);
         }
-        if (clamped.y !== panYValueRef.current) {
-            panYValueRef.current = clamped.y;
-            setPanY(clamped.y);
-        }
-    }, [zoom, gridSize, clampPan, gridPixelBounds]);
+    }, [onPoiEntered]);
 
-    // ─── Zoom/Pan helpers ────────────────────────────────────────────────
-
-    const zoomIn = useCallback(() => {
-        setZoom(prev => {
-            const next = Math.min(MAX_ZOOM, prev * 1.25);
-            const vw = gridPixelBounds.width / next;
-            const vh = gridPixelBounds.height / next;
-            const cx = gridPixelBounds.centerX - vw / 2;
-            const cy = gridPixelBounds.centerY - vh / 2;
-            const clamped = clampPan(next, cx, cy);
-            setPanX(clamped.x);
-            setPanY(clamped.y);
-            return next;
-        });
-    }, [gridPixelBounds, clampPan]);
-
-    const zoomOut = useCallback(() => {
-        setZoom(prev => {
-            const next = Math.max(MIN_ZOOM, prev * 0.8);
-            const vw = gridPixelBounds.width / next;
-            const vh = gridPixelBounds.height / next;
-            const cx = gridPixelBounds.centerX - vw / 2;
-            const cy = gridPixelBounds.centerY - vh / 2;
-            const clamped = clampPan(next, cx, cy);
-            setPanX(clamped.x);
-            setPanY(clamped.y);
-            return next;
-        });
-    }, [gridPixelBounds, clampPan]);
-
-    const resetView = useCallback(() => {
-        const vw = gridPixelBounds.width / 2;
-        const vh = gridPixelBounds.height / 2;
-        const cx = gridPixelBounds.centerX - vw / 2;
-        const cy = gridPixelBounds.centerY - vh / 2;
-        const clamped = clampPan(2, cx, cy);
-        setZoom(2);
-        setPanX(clamped.x);
-        setPanY(clamped.y);
-    }, [gridPixelBounds, clampPan]);
-
-    const handlePanStart = useCallback((e) => {
-        if (e.button !== 0) return;
-        e.preventDefault();
-        const svg = svgRef.current;
-        if (!svg) return;
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
-        setPanning({
-            startX: svgX,
-            startY: svgY,
-            startPanX: panX,
-            startPanY: panY
-        });
-    }, [panX, panY]);
-
-    const handlePanMove = useCallback((e) => {
-        if (!panning) return;
-        e.preventDefault();
-        const svg = svgRef.current;
-        if (!svg) return;
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
-        const dx = svgX - panning.startX;
-        const dy = svgY - panning.startY;
-        const clamped = clampPan(zoomValueRef.current, panning.startPanX - dx, panning.startPanY - dy);
-        setPanX(clamped.x);
-        setPanY(clamped.y);
-    }, [panning, clampPan]);
-
-    const handlePanEnd = useCallback(() => {
-        setPanning(null);
-    }, []);
-
-    const handleWheel = useCallback((e) => {
-        if (!e.metaKey) return;
-        e.preventDefault();
-        const svg = svgRef.current;
-        if (!svg) return;
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height;
-        const currentZoom = zoomValueRef.current;
-        const currentPanX = panXValueRef.current;
-        const currentPanY = panYValueRef.current;
-        accumulatedDeltaRef.current += e.deltaY;
-        const accumulated = accumulatedDeltaRef.current;
-        const ZOOM_THRESHOLD = 20;
-        let factor = 1;
-        if (accumulated < -ZOOM_THRESHOLD) {
-            factor = 1.05;
-            accumulatedDeltaRef.current = 0;
-        } else if (accumulated > ZOOM_THRESHOLD) {
-            factor = 0.95;
-            accumulatedDeltaRef.current = 0;
-        }
-        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, currentZoom * factor));
-        const newPanX = svgX - (svgX - currentPanX) * (currentZoom / newZoom);
-        const newPanY = svgY - (svgY - currentPanY) * (currentZoom / newZoom);
-        const clamped = clampPan(newZoom, newPanX, newPanY);
-        setZoom(newZoom);
-        setPanX(clamped.x);
-        setPanY(clamped.y);
-    }, [clampPan]);
-
-    // ─── Hex coordinate helpers ─────────────────────────────────────────
-
-    const getHexFromEvent = useCallback((e) => {
-        const svg = svgRef.current;
-        if (!svg) return null;
-        const pt = svg.createSVGPoint();
-        pt.x = e.clientX;
-        pt.y = e.clientY;
-        const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
-        return pixelToHexSnapped(svgP.x, svgP.y, HEX_SIZE);
-    }, []);
-
-    // ─── Terrain painting handlers ──────────────────────────────────────
-
-    const handleTerrainPointerDown = useCallback((e) => {
-        const hex = getHexFromEvent(e);
-        if (!hex) return;
-        if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
-        const key = hexKey(hex.q, hex.r);
-        if (tool === TOOL_RIVER) {
-            setRivers(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
-            paintingRef.current = true;
-            return;
-        }
-        setTerrain(prev => {
-            const next = { ...prev };
-            if (tool === TOOL_PAINT) {
-                next[key] = selectedTerrain;
-            } else if (tool === TOOL_ERASE) {
-                delete next[key];
-            }
-            return next;
-        });
-        paintingRef.current = true;
-    }, [tool, selectedTerrain, getHexFromEvent, hexCols, hexRows]);
-
-    const handleTerrainPointerMove = useCallback((e) => {
-        if (!paintingRef.current) return;
-        const hex = getHexFromEvent(e);
-        if (!hex) return;
-        if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
-        const key = hexKey(hex.q, hex.r);
-        if (tool === TOOL_RIVER) {
-            setRivers(prev => prev.includes(key) ? prev : [...prev, key]);
-            return;
-        }
-        setTerrain(prev => {
-            const next = { ...prev };
-            if (tool === TOOL_PAINT) {
-                next[key] = selectedTerrain;
-            } else if (tool === TOOL_ERASE) {
-                delete next[key];
-            }
-            return next;
-        });
-    }, [tool, selectedTerrain, getHexFromEvent, hexCols, hexRows]);
-
-    const handleTerrainPointerUp = useCallback(() => {
-        paintingRef.current = false;
-    }, []);
-
-    // ─── POI drop from panel ────────────────────────────────────────────
-
-    const handleDrop = useCallback((e) => {
-        e.preventDefault();
-        const dragData = e.dataTransfer.getData('text/plain');
-        if (!dragData) return;
-
-        const hex = getHexFromEvent(e);
-        if (!hex) return;
-        if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
-
-        // Handle character drops from POI panel
-        if (dragData.startsWith('character:')) {
-            const charName = dragData.slice('character:'.length);
-            // Add character to marching order if not already present
-            setMarchingOrder(prev => {
-                if (prev.includes(charName)) return prev;
-                return [...prev, charName];
-            });
-            // Place party marker at drop position if none exists
-            setPartyPosition(prev => prev || { q: hex.q, r: hex.r });
-            return;
-        }
-
-        // Check if it's a POI type
-        const poiType = POI_TYPES.find(t => t.id === dragData);
-        if (!poiType) return;
-
-        // Check if a POI already exists at this hex
-        const exists = pois.some(p => p.q === hex.q && p.r === hex.r);
-        if (exists) return;
-
-        const newPoi = {
-            id: `poi-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-            type: poiType.id,
-            q: hex.q,
-            r: hex.r,
-            visible: true,
-            label: poiType.name,
-        };
-        setPois(prev => [...prev, newPoi]);
-    }, [pois, getHexFromEvent, hexCols, hexRows]);
-
-    // ─── POI interaction handlers ──────────────────────────────────────
-
-    const handlePoiPointerDown = useCallback((poiId, e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (tool === TOOL_ROAD) {
-            const poi = pois.find(p => p.id === poiId);
-            if (!poi) return;
-            if (!isRoadConnectable(poi.type, poi.type)) {
-                setRoadStartPoiId(null);
-                return;
-            }
-
-                if (roadStartPoiId === null) {
-                setRoadStartPoiId(poiId);
-            } else if (roadStartPoiId === poiId) {
-                setRoadStartPoiId(null);
-            } else {
-                const fromPoi = pois.find(p => p.id === roadStartPoiId);
-                const toPoi = poi;
-                if (!fromPoi || !toPoi) { setRoadStartPoiId(null); return; }
-
-                const exists = roads.some(r =>
-                    (r.fromPoiId === roadStartPoiId && r.toPoiId === poiId) ||
-                    (r.toPoiId === roadStartPoiId && r.fromPoiId === poiId)
-                );
-                if (exists) {
-                    setRoads(prev => prev.filter(r =>
-                        !((r.fromPoiId === roadStartPoiId && r.toPoiId === poiId) ||
-                          (r.toPoiId === roadStartPoiId && r.fromPoiId === poiId))
-                    ));
-                    setRoadStartPoiId(null);
-                    return;
-                }
-
-                const path = findHexPath(fromPoi, toPoi, hexCols, hexRows, terrain);
-                if (path) {
-                    const newRoad = {
-                        id: `road-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-                        fromPoiId: roadStartPoiId,
-                        toPoiId: poiId,
-                        hexes: path.map(h => `${h.q},${h.r}`),
-                    };
-                    setRoads(prev => [...prev, newRoad]);
-                }
-                setRoadStartPoiId(null);
-            }
-            return;
-        }
-
-        const poi = pois.find(p => p.id === poiId);
-        if (!poi) return;
-        setPoiDragging({ poiId, startQ: poi.q, startR: poi.r });
-    }, [pois, tool, roadStartPoiId, roads, terrain, hexCols, hexRows]);
-
-    const handlePoiPointerMove = useCallback((e) => {
-        if (!poiDragging) return;
-        const hex = getHexFromEvent(e);
-        if (!hex) return;
-        if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
-
-        // Check no other POI at target hex
-        const exists = pois.some(p => p.id !== poiDragging.poiId && p.q === hex.q && p.r === hex.r);
-        if (exists) return;
-
-        setPois(prev => prev.map(p =>
-            p.id === poiDragging.poiId ? { ...p, q: hex.q, r: hex.r } : p
-        ));
-    }, [poiDragging, pois, getHexFromEvent, hexCols, hexRows]);
-
-    const handlePoiPointerUp = useCallback(() => {
-        if (poiDragging) {
-            const draggedId = poiDragging.poiId;
-            // Recalculate roads connected to the moved POI
-            setRoads(prev => prev.map(road => {
-                if (road.fromPoiId === draggedId || road.toPoiId === draggedId) {
-                    const otherPoiId = road.fromPoiId === draggedId ? road.toPoiId : road.fromPoiId;
-                    const movedPoi = pois.find(p => p.id === draggedId);
-                    const otherPoi = pois.find(p => p.id === otherPoiId);
-                    if (movedPoi && otherPoi) {
-                        const path = findHexPath(movedPoi, otherPoi, hexCols, hexRows, terrain);
-                        if (path) {
-                            return { ...road, hexes: path.map(h => `${h.q},${h.r}`) };
-                        }
-                    }
-                }
-                return road;
-            }));
-        }
-        setPoiDragging(null);
-    }, [poiDragging, pois, terrain, hexCols, hexRows]);
-
-    const handleStartEncounter = useCallback(async (q, r, extraPlacedItems = []) => {
-        const terrainType = terrain[hexKey(q, r)] || 'plains';
-        const grid = 30;
-        const encounterData = generateOutdoorEncounter(terrainType, grid, marchingOrder, q, r);
-        const baseMapName = mapName.replace(/\.json$/, '');
-        const encounterName = `${baseMapName} - Encounter at ${q},${r}`;
-
-        // Merge extra items (monsters) into placed items
-        if (extraPlacedItems.length > 0) {
-            encounterData.placedItems = [...encounterData.placedItems, ...extraPlacedItems];
-        }
-
-        try {
-            const result = await mapsService.createMap(campaignName, encounterName, {
-                type: 'indoor',
-                gridSize: grid,
-                placedItems: encounterData.placedItems,
-                players: encounterData.players,
-                fog: [],
-                walls: [],
-                parentTerrain: terrainType,
-                parentHex: { q, r },
-                bgFill: encounterData.bgFill,
-            });
-
-            // Only save if the map was freshly created (not already existing)
-            if (!result?.alreadyExists) {
-                await mapsService.saveMapData(campaignName, encounterName, encounterData);
-            }
-
-            if (onEncounterCreated) {
-                onEncounterCreated(encounterName);
-            }
-        } catch (err) {
-            console.error('[handleStartEncounter] FAILED:', err);
-        }
-    }, [campaignName, mapName, terrain, marchingOrder, onEncounterCreated]);
-
-    function generateMonsterPlacements(monsters, gridSize) {
-        const center = Math.floor(gridSize / 2);
-        const items = [];
-        let idCounter = 0;
-        const occupied = new Set();
-
-        for (const group of monsters) {
-            for (let i = 0; i < group.qty; i++) {
-                let attempts = 0;
-                let gx, gy, key;
-                do {
-                    const angle = Math.random() * Math.PI * 2;
-                    const distance = 6 + Math.random() * 6;
-                    gx = Math.round(center + Math.cos(angle) * distance);
-                    gy = Math.round(center + Math.sin(angle) * distance);
-                    gx = Math.max(1, Math.min(gridSize - 2, gx));
-                    gy = Math.max(1, Math.min(gridSize - 2, gy));
-                    key = `${gx},${gy}`;
-                    attempts++;
-                } while (occupied.has(key) && attempts < 20);
-
-                occupied.add(key);
-                items.push({
-                    id: `enc-monster-${idCounter++}`,
-                    type: 'npc',
-                    name: group.name,
-                    gridX: gx,
-                    gridY: gy,
-                    visible: true,
-                });
-            }
-        }
-
-        return items;
-    }
-
+    // ── Event handlers ──
     const handleEventAccept = useCallback(() => {
         const evt = travelMgmt.acceptEvent();
         const pos = travelMgmt.currentPosition || partyPosition;
         if (evt?.type === 'combat') {
             if (pos && evt.encounter?.monsters) {
-                const grid = 30;
-                const monsterItems = generateMonsterPlacements(evt.encounter.monsters, grid);
+                const monsterItems = generateMonsterPlacements(evt.encounter.monsters, 30);
                 handleStartEncounter(pos.q, pos.r, monsterItems);
             } else if (pos) {
                 handleStartEncounter(pos.q, pos.r);
@@ -733,7 +273,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         const terrainKey = pos ? hexKey(pos.q, pos.r) : null;
         const tileTerrain = terrainKey ? terrain[terrainKey] || 'plains' : null;
         logTravel('event_accept', pos, tileTerrain, weather, evt);
-    }, [travelMgmt, partyPosition, handleStartEncounter, handleGenerateWeather, terrain, weather, logTravel]);
+    }, [travelMgmt, partyPosition, handleStartEncounter, generateMonsterPlacements, handleGenerateWeather, terrain, weather, logTravel]);
 
     const handleEventSkip = useCallback(() => {
         const evt = travelMgmt.pendingEvent;
@@ -755,256 +295,34 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
         logTravel('forced_march', pos, null, weather);
     }, [travelMgmt, partyPosition, weather, logTravel]);
 
-    const handlePoiContextMenu = useCallback((poiId) => {
-        const poi = pois.find(p => p.id === poiId);
-        if (!poi) return;
-        setSelectedPoiMenu({ id: poi.id, q: poi.q, r: poi.r });
-    }, [pois]);
+    // ── POI drop from panel ──
+    const handleDrop = useCallback((e) => {
+        e.preventDefault();
+        const dragData = e.dataTransfer.getData('text/plain');
+        if (!dragData) return;
 
-    const handleTogglePoiVisibility = useCallback((poiId) => {
-        setPois(prev => prev.map(p =>
-            p.id === poiId ? { ...p, visible: !p.visible } : p
-        ));
-        setSelectedPoiMenu(null);
-    }, []);
+        const hex = getHexFromEvent(e);
+        if (!hex) return;
+        if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
 
-    const handleDeletePoi = useCallback((poiId) => {
-        setPois(prev => prev.filter(p => p.id !== poiId));
-        setRoads(prev => prev.filter(r => r.fromPoiId !== poiId && r.toPoiId !== poiId));
-        setSelectedPoiMenu(null);
-    }, []);
-
-    const handleRenamePoi = useCallback((poiId, newLabel) => {
-        setPois(prev => prev.map(p =>
-            p.id === poiId ? { ...p, label: newLabel } : p
-        ));
-        setShowRename(null);
-        setSelectedPoiMenu(null);
-    }, []);
-
-    const handleLinkMap = useCallback((poiId, mapName) => {
-        setPois(prev => prev.map(p =>
-            p.id === poiId ? { ...p, linkedMap: mapName } : p
-        ));
-        setSelectedPoiMenu(null);
-    }, []);
-
-    const handleUnlinkMap = useCallback((poiId) => {
-        setPois(prev => prev.map(p =>
-            p.id === poiId ? { ...p, linkedMap: undefined } : p
-        ));
-        setSelectedPoiMenu(null);
-    }, []);
-
-    const handleRemoveRoads = useCallback((poiId) => {
-        setRoads(prev => prev.filter(r => r.fromPoiId !== poiId && r.toPoiId !== poiId));
-    }, []);
-
-    const handlePoiEnter = useCallback((poi) => {
-        if (poi.linkedMap && validLinkedMapsRef.current.has(poi.linkedMap) && onPoiEntered) {
-            onPoiEntered(poi.linkedMap);
+        if (dragData.startsWith('character:')) {
+            const charName = dragData.slice('character:'.length);
+            setMarchingOrder(prev => prev.includes(charName) ? prev : [...prev, charName]);
+            setPartyPosition(prev => prev || { q: hex.q, r: hex.r });
+            return;
         }
-    }, [onPoiEntered]);
 
-    // ─── Hex hover tracking ─────────────────────────────────────────────
+        const poiType = POI_TYPES.find(t => t.id === dragData);
+        if (!poiType) return;
 
-    const handleHexHover = useCallback((e) => {
-        const svg = svgRef.current;
-        if (!svg) return;
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
-        const snapped = pixelToHexSnapped(svgX, svgY, HEX_SIZE);
-        // Clamp to grid bounds
-        if (snapped.q >= 0 && snapped.q < hexCols && snapped.r >= 0 && snapped.r < hexRows) {
-            setHoveredHex(snapped);
-        } else {
-            setHoveredHex(null);
-        }
-    }, [hexCols, hexRows]);
+        if (pois.some(p => p.q === hex.q && p.r === hex.r)) return;
 
-    // ─── Load / initialize map data on mount ────────────────────────────
-
-    useEffect(() => {
-        if (isInitialized.current) return;
-        isInitialized.current = true;
-
-        const loadMap = async () => {
-            try {
-                const existing = await mapsService.loadMapData(campaignName, mapName);
-                if (existing) {
-                    // Load path — existing map data found
-                    const loadedTerrain = existing.terrain || {};
-                    const loadedRivers = existing.rivers || [];
-                    const loadedRoads = existing.roads || [];
-                    const loadedPois = existing.pois || [];
-                    const loadedGridSize = existing.gridSize || DEFAULT_GRID_SIZE;
-                    const loadedZoom = existing.zoom != null ? Math.max(MIN_ZOOM, existing.zoom) : MIN_ZOOM;
-                    // Migrate old broken default (panX=0, panY=0) to centering values
-                    const isOldDefault = existing.panX === 0 && existing.panY === 0;
-                    const loadedPanX = (!isOldDefault && existing.panX != null) ? existing.panX : 0;
-                    const loadedPanY = (!isOldDefault && existing.panY != null) ? existing.panY : 0;
-
-                    // Set default type for backward compat
-                    if (!existing.type) {
-                        existing.type = 'outdoor';
-                    }
-
-                    setMapData(existing);
-                    setGridSize(loadedGridSize);
-                    setTerrain(loadedTerrain);
-                    setRivers(loadedRivers);
-                    setRoads(loadedRoads);
-                    setPois(loadedPois);
-                    setZoom(loadedZoom);
-                    setPanX(loadedPanX);
-                    setPanY(loadedPanY);
-                    panXValueRef.current = loadedPanX;
-                    panYValueRef.current = loadedPanY;
-                    hexMapDisplayNameRef.current = existing.displayName || mapName;
-                    if (existing.weather) setWeather(existing.weather);
-
-                    const loadedTravel = existing.travelState || {};
-                    const travelInitData = {
-                        forcedMarchHours: typeof loadedTravel.forcedMarchHours === 'number' ? loadedTravel.forcedMarchHours : 0,
-                        accruedCost: typeof loadedTravel.accruedCost === 'number' ? loadedTravel.accruedCost : 0,
-                        dailyBudget: typeof loadedTravel.dailyBudget === 'number' ? loadedTravel.dailyBudget : getDailyHexBudget(loadedTravel.travelPace || 'normal'),
-                        travelMode: loadedTravel.travelMode || 'inactive',
-                        travelPace: loadedTravel.travelPace || 'normal',
-                        destination: loadedTravel.destination || null,
-                        path: Array.isArray(loadedTravel.path) ? loadedTravel.path : [],
-                        pathIndex: typeof loadedTravel.pathIndex === 'number' ? loadedTravel.pathIndex : 0,
-                    };
-                    // Only re-init travel state if there's something meaningful to restore
-                    const hasActiveTravel = travelInitData.travelMode !== 'inactive' || travelInitData.destination !== null;
-                    if (hasActiveTravel) {
-                        setTravelInit(travelInitData);
-                    }
-
-                    if (isOldDefault) {
-                        needsResetViewRef.current = true;
-                    }
-
-                    // Initialize marching order from characters if empty
-                    const loadOrder = existing.marchingOrder ||
-                        (characters.length > 0 ? characters.map(c => c.name) : []);
-                    setMarchingOrder(loadOrder);
-
-                    // Auto-place party at map center if no saved position
-                    if (existing.partyPosition) {
-                        setPartyPosition(existing.partyPosition);
-                    } else {
-                        const centerCols = loadedGridSize * GRID_COLS_MULTIPLIER;
-                        setPartyPosition({ q: Math.floor(centerCols / 2), r: Math.floor(loadedGridSize / 2) });
-                    }
-
-                    hasLoaded.current = true;
-                    setLoading(false);
-                    return;
-                }
-            } catch (err) {
-                // ignore, fall through to empty map creation
-            }
-
-            // Create new empty map
-            const initialTerrain = {};
-            const newCols = DEFAULT_GRID_SIZE * GRID_COLS_MULTIPLIER;
-            const newRows = DEFAULT_GRID_SIZE;
-            for (let r = 0; r < newRows; r++) {
-                for (let q = 0; q < newCols; q++) {
-                    initialTerrain[hexKey(q, r)] = DEFAULT_TERRAIN;
-                }
-            }
-
-            const initialOrder = characters.length > 0 ? characters.map(c => c.name) : [];
-            const initialPartyPos = initialOrder.length > 0
-                ? { q: Math.floor(newCols / 2), r: Math.floor(newRows / 2) }
-                : null;
-
-            const newData = {
-                type: 'outdoor',
-                gridSize: DEFAULT_GRID_SIZE,
-                terrain: initialTerrain,
-                pois: [],
-                roads: [],
-                zoom: MIN_ZOOM,
-                marchingOrder: initialOrder,
-                partyPosition: initialPartyPos
-            };
-
-            setMapData(newData);
-            setTerrain(initialTerrain);
-            setGridSize(DEFAULT_GRID_SIZE);
-            setMarchingOrder(initialOrder);
-            setPartyPosition(initialPartyPos);
-            setZoom(MIN_ZOOM);
-            setPanX(0);
-            setPanY(0);
-            panXValueRef.current = 0;
-            panYValueRef.current = 0;
-            needsResetViewRef.current = true;
-
-            // Save the new map data
-            try {
-                await mapsService.saveMapData(campaignName, mapName, newData);
-            } catch (err) {
-                console.error('Failed to save initial hex map data:', err);
-            }
-
-            hasLoaded.current = true;
-            setLoading(false);
-        };
-
-        loadMap();
-    }, [campaignName, mapName, characters]);
-
-    // ─── Auto-save when data changes ────────────────────────────────────
-    // Guard: only save for the mapName this HexMap was initialized with.
-    // Prevents overwriting encounter map files during the brief window
-    // when mapName changes (via onEncounterCreated) before Map.jsx switches.
-
-    const hexMapNameRef = useRef(mapName);
-    const hexMapDisplayNameRef = useRef(mapName);
-
-    useEffect(() => {
-        if (!hasLoaded.current) return;
-        if (mapName !== hexMapNameRef.current) return;
-
-        const dataToSave = {
-            type: 'outdoor',
-            displayName: hexMapDisplayNameRef.current,
-            gridSize,
-            terrain,
-            rivers,
-            roads,
-            pois,
-            zoom,
-            panX,
-            panY,
-            marchingOrder,
-            partyPosition,
-            weather,
-            travelState: travelStateRef.current,
-        };
-        mapsService.saveMapData(campaignName, mapName, dataToSave)
-            .catch(err => console.error('Failed to save hex map data:', err));
-    }, [campaignName, mapName, terrain, rivers, roads, pois, gridSize, zoom, panX, panY, marchingOrder, partyPosition, weather, travelSaveVersion]);
-
-    const viewPortBounds = useMemo(() => ({
-        left: panX,
-        top: panY,
-        right: panX + svgWidth / zoom,
-        bottom: panY + svgHeight / zoom,
-    }), [panX, panY, svgWidth, svgHeight, zoom]);
-
-    // ─── Sync state to refs for use in event handlers ──────────────────
-
-    useEffect(() => { zoomValueRef.current = zoom; }, [zoom]);
-    useEffect(() => { panXValueRef.current = panX; }, [panX]);
-    useEffect(() => { panYValueRef.current = panY; }, [panY]);
-
-    // ─── Render ─────────────────────────────────────────────────────────
+        setPois(prev => [...prev, {
+            id: `poi-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+            type: poiType.id, q: hex.q, r: hex.r,
+            visible: true, label: poiType.name,
+        }]);
+    }, [pois, getHexFromEvent, hexCols, hexRows, setMarchingOrder, setPartyPosition, setPois]);
 
     return (
         <div className="hex-map">
@@ -1012,21 +330,14 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
             <HexMapToolbar
                 onBack={onBack}
                 mapName={mapsService.formatMapName(mapName)}
-                tool={tool}
-                setTool={setTool}
-                selectedTerrain={selectedTerrain}
-                setSelectedTerrain={setSelectedTerrain}
+                tool={tool} setTool={setTool}
+                selectedTerrain={selectedTerrain} setSelectedTerrain={setSelectedTerrain}
                 terrainTypes={TERRAIN_TYPES}
-                zoomIn={zoomIn}
-                zoomOut={zoomOut}
-                resetView={resetView}
+                zoomIn={zoomIn} zoomOut={zoomOut} resetView={resetView}
                 zoom={zoom}
-                poiPanelOpen={poiPanelOpen}
-                setPoiPanelOpen={setPoiPanelOpen}
-                gridSize={gridSize}
-                setGridSize={setGridSize}
-                marchingOrderOpen={marchingOpen}
-                setMarchingOrderOpen={setMarchingOpen}
+                poiPanelOpen={poiPanelOpen} setPoiPanelOpen={setPoiPanelOpen}
+                gridSize={gridSize} setGridSize={setGridSize}
+                marchingOrderOpen={marchingOpen} setMarchingOrderOpen={setMarchingOpen}
                 marchingOrder={marchingOrder}
             />
 
@@ -1042,21 +353,21 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                         onDragStart={(e) => e.preventDefault()}
                         onPointerDown={(e) => {
                             if (tool === TOOL_PAINT || tool === TOOL_ERASE || tool === TOOL_RIVER) {
-                                handleTerrainPointerDown(e);
+                                handleTerrainPointerDown(e, tool);
                             } else {
                                 handlePanStart(e);
                             }
                         }}
                         onPointerMove={(e) => {
                             handlePanMove(e);
-                            handleTerrainPointerMove(e);
+                            handleTerrainPointerMove(e, tool);
                             handlePoiPointerMove(e);
                             handleHexHover(e);
                         }}
-                        onPointerUp={(e) => {
-                            handlePanEnd(e);
-                            handleTerrainPointerUp(e);
-                            handlePoiPointerUp(e);
+                        onPointerUp={() => {
+                            handlePanEnd();
+                            handleTerrainPointerUp();
+                            handlePoiPointerUp();
                         }}
                         onPointerLeave={() => {
                             handlePanEnd();
@@ -1086,8 +397,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             }
                         }}
                         style={{
-                            cursor: panning
-                                ? 'grabbing'
+                            cursor: panning ? 'grabbing'
                                 : (tool === TOOL_PAN || tool === TOOL_NONE ? 'grab' : 'crosshair')
                         }}
                     >
@@ -1103,23 +413,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             <TowerSVG id="poi-tower" />
                         </defs>
 
-                        <TerrainLayer
-                            hexCols={hexCols}
-                            hexRows={hexRows}
-                            terrain={terrain}
-                        />
-                        <RiverLayer
-                            rivers={rivers}
-                            hexCols={hexCols}
-                            hexRows={hexRows}
-                        />
-                        <HexGridLayer
-                            hexCols={hexCols}
-                            hexRows={hexRows}
-                        />
-                        <RoadLayer
-                            roads={roads}
-                        />
+                        <TerrainLayer hexCols={hexCols} hexRows={hexRows} terrain={terrain} />
+                        <RiverLayer rivers={rivers} hexCols={hexCols} hexRows={hexRows} />
+                        <HexGridLayer hexCols={hexCols} hexRows={hexRows} />
+                        <RoadLayer roads={roads} />
                         <POILayer
                             pois={pois}
                             onPoiPointerDown={handlePoiPointerDown}
@@ -1135,8 +432,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                         <PartyMarkerLayer
                             position={partyPosition}
                             HEX_SIZE={HEX_SIZE}
-                            hexCols={hexCols}
-                            hexRows={hexRows}
+                            hexCols={hexCols} hexRows={hexRows}
                             onPositionChange={setPartyPosition}
                             svgRef={svgRef}
                             onEncounter={handleStartEncounter}
@@ -1146,46 +442,30 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             onAdvance={handleAdvance}
                             onCancelTravel={travelMgmt.cancelTravel}
                         />
-
                         <TravelPathLayer
                             path={travelMgmt.path}
                             pathIndex={travelMgmt.pathIndex}
                             partyPosition={partyPosition}
                         />
 
-                    {/* Hovered hex highlight (only when paint/erase active) */}
-                    {hoveredHex && (tool === TOOL_PAINT || tool === TOOL_ERASE) && (() => {
-                        const center = hexToPixel(hoveredHex.q, hoveredHex.r, HEX_SIZE);
-                        const pathD = hexToSVGPath(center.x, center.y, HEX_SIZE);
-                        return (
-                            <path
-                                d={pathD}
-                                fill="rgba(255,255,255,0.15)"
-                                stroke="#FFD700"
-                                strokeWidth={1.5}
-                                pointerEvents="none"
-                            />
-                        );
-                    })()}
+                        {hoveredHex && (tool === TOOL_PAINT || tool === TOOL_ERASE) && (() => {
+                            const center = hexToPixel(hoveredHex.q, hoveredHex.r, HEX_SIZE);
+                            const pathD = hexToSVGPath(center.x, center.y, HEX_SIZE);
+                            return (
+                                <path d={pathD} fill="rgba(255,255,255,0.15)" stroke="#FFD700" strokeWidth={1.5} pointerEvents="none" />
+                            );
+                        })()}
 
-                    {/* River hover highlight */}
-                    {hoveredHex && tool === TOOL_RIVER && (() => {
-                        const center = hexToPixel(hoveredHex.q, hoveredHex.r, HEX_SIZE);
-                        const pathD = hexToSVGPath(center.x, center.y, HEX_SIZE);
-                        const key = hexKey(hoveredHex.q, hoveredHex.r);
-                        const hasRiver = rivers.includes(key);
-                        return (
-                            <path
-                                d={pathD}
-                                fill={hasRiver ? 'rgba(200,50,50,0.15)' : 'rgba(60,130,210,0.2)'}
-                                stroke={hasRiver ? '#c44' : '#4A90D9'}
-                                strokeWidth={1.5}
-                                pointerEvents="none"
-                            />
-                        );
-                    })()}
+                        {hoveredHex && tool === TOOL_RIVER && (() => {
+                            const center = hexToPixel(hoveredHex.q, hoveredHex.r, HEX_SIZE);
+                            const pathD = hexToSVGPath(center.x, center.y, HEX_SIZE);
+                            const key = hexKey(hoveredHex.q, hoveredHex.r);
+                            const hasRiver = rivers.includes(key);
+                            return (
+                                <path d={pathD} fill={hasRiver ? 'rgba(200,50,50,0.15)' : 'rgba(60,130,210,0.2)'} stroke={hasRiver ? '#c44' : '#4A90D9'} strokeWidth={1.5} pointerEvents="none" />
+                            );
+                        })()}
 
-                        {/* Context menu for POIs */}
                         <POIContextMenu
                             selectedPoi={selectedPoiMenu}
                             pois={pois}
@@ -1227,7 +507,6 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 </div>
             )}
 
-            {/* Marching Order Panel overlay */}
             {marchingOpen && (
                 <div className="no-print">
                     <MarchingOrderPanel
@@ -1239,17 +518,12 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                 </div>
             )}
 
-            {/* POI Panel overlay */}
             {poiPanelOpen && (
                 <div className="no-print">
-                    <POIPanel
-                        poiPanelOpen={poiPanelOpen}
-                        onClose={() => setPoiPanelOpen(false)}
-                    />
+                    <POIPanel poiPanelOpen={poiPanelOpen} onClose={() => setPoiPanelOpen(false)} />
                 </div>
             )}
 
-            {/* Travel Panel overlay */}
             <div className="no-print">
                 <TravelPanel
                     travelMode={travelMgmt.travelMode}
