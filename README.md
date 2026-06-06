@@ -7,11 +7,12 @@
   <strong>📖 Dual ruleset support (5e &amp; 2024)</strong> &nbsp;·&nbsp;
   <strong>🗺️ Indoor &amp; outdoor maps with fog of war</strong> &nbsp;·&nbsp;
   <strong>🎲 Encounter, dungeon &amp; loot generators</strong> &nbsp;·&nbsp;
-  <strong>📜 Quest, faction &amp; NPC management</strong> &nbsp;·&nbsp;
+  <strong>📜 Quest, faction, NPC &amp; settlement management</strong> &nbsp;·&nbsp;
   <strong>🖨️ Print-ready character sheets</strong> &nbsp;·&nbsp;
   <strong>📋 Full campaign activity log</strong> &nbsp;·&nbsp;
-  <strong>⚔️ Condition &amp; exhaustion tracking</strong> &nbsp;·&nbsp;
-  <strong>🌦️ Overland travel with weather</strong>
+  <strong>⚔️ Condition, exhaustion &amp; cover tracking</strong> &nbsp;·&nbsp;
+  <strong>🌦️ Overland travel with weather</strong> &nbsp;·&nbsp;
+  <strong>🧙 Metamagic, auras &amp; automation</strong>
 </p>
 
 ---
@@ -61,8 +62,10 @@ No more "Wait, how many hit points do you have?" mid-combat! No more passing aro
 | 🏔️ **Outdoor Hex Maps** | Procedural terrain, rivers, roads, POIs, weather, overland travel with paces, indoor map linking |
 | 🏚️ **Dungeon Generator** | BSP algorithm, configurable rooms, corridors, doors, triggered from outdoor encounters |
 | 🗺️ **Terrain Generator** | Procedural hex terrain using fractal noise with configurable seed, grid size, and biome weights |
+| 🏘️ **Settlement Generator** | Procedural settlements with culture-based naming, services, named NPCs, rumors, government, and threats |
 | 📝 **Campaign Notes** | Markdown-supported story notes with location tracking, private notes, timestamps, party level |
 | 🧙 **NPC Management** | Full stat blocks (abilities, saves, skills, AC, HP, actions, traits, reactions), attitudes, tags, avatars, one-click to initiative |
+| ⚡ **NPC Generator** | Instant procedural NPC generation — race-based names, traits, stat blocks, and personality at the click of a button |
 | 📜 **Quest Tracking** | Active/completed/failed statuses, color-coded badges, markdown descriptions, rewards, notes, search |
 | 🤝 **Faction Management** | Influence scale (1-10) with 4 color-coded tiers, goals, markdown notes, search |
 | 📋 **Campaign Activity Log** | Dice rolls with full details, manual notes, travel events, loot awards, condition tracking — all with timestamps |
@@ -73,6 +76,11 @@ No more "Wait, how many hit points do you have?" mid-combat! No more passing aro
 | 🌦️ **Weather System** | Biome-based weather with animated overlays (rain, snow, fog, wind, lightning), travel modifiers |
 | 🗡️ **Loot Generator** | CR-tiered treasure tables — currency, gems, jewelry, equipment, and magic items by rarity |
 | 🗺️ **Map Manager** | Create, rename, activate, delete maps, indoor/outdoor type selection, markdown descriptions, dungeon/terrain generation |
+| 🛡️ **Cover System** | 4-level cover (none, half, three-quarter, full) computed from walls, doors, and furniture using line-of-sight ray casting |
+| ✨ **Metamagic Engine** | 8 metamagic options with SP costs, Arcane Apotheosis, Font of Magic slot conversion, pre/post-cast filtering |
+| 💫 **Aura Systems** | Paladin Aura of Protection, plus Auras of Alacrity, Courage, Devotion, and Warding — range-aware with map positions |
+| 🤖 **Automation Engine** | Automated save prompts, auto-damage with saves, concentration checks, condition effects, critical hit dice doubling, and more |
+| 🎯 **Range Validation** | Melee/ranged checks with disadvantage, long-range penalties, and feat-based range effects (e.g., Crossbow Expert) |
 
 ---
 
@@ -537,6 +545,21 @@ A full-featured NPC creator with both **roleplay** and **combat** data:
 - **Notes** with markdown preview
 - **Search** by faction name
 
+### 🏘️ Settlement Management & Generator
+
+Create and manage the towns, cities, and villages your party visits — or generate them on the fly:
+
+- **Full CRUD** — Create, rename, edit, and delete settlements persisted per campaign
+- **Procedural generation** — One-click to generate a complete settlement with:
+  - **Culture-based naming** — Human, Dwarven, Elven, Mixed, or Nomadic naming conventions
+  - **Size-scaled details** — From village to metropolis, with appropriate population ranges
+  - **Services** — Inns, taverns, blacksmiths, general stores, magic shops, temples, guilds, alchemists, bakeries, butchers, tailors, stables, and banks — scaled to settlement size
+  - **Named NPCs** — Each service gets a named NPC with race, gender, and personality descriptors
+  - **Rumors** — General gossip, quest hooks, faction intrigue, supernatural whispers, and trade/economy news
+  - **Atmosphere, government, features, and threats** — Everything you need to bring a settlement to life
+- **Search** by settlement name
+- **Markdown descriptions** with preview for custom details
+
 ### 📋 Campaign Activity Log
 
 A comprehensive running record of everything that happens during play — synced in real-time across all clients:
@@ -551,6 +574,78 @@ A comprehensive running record of everything that happens during play — synced
 All entries are timestamped and displayed in reverse chronological order with color-coded left borders by type.
 
 <img src="public/logging.png" alt="Party Log Example" width="800" />
+
+---
+
+---
+
+## 🛡️ Cover System
+
+The app automatically determines cover for ranged attacks using line-of-sight ray casting:
+
+- **4 cover levels** — None, Half (+2 AC), Three-Quarters (+5 AC), Full (can't be targeted)
+- **Line tracing** — Bresenham's algorithm traces the attacker-to-target line checking for obstructions
+- **Wall and door blocking** — Walls and closed doors provide full cover
+- **Furniture cover** — Barrels, chairs, crates, fountains, pillars, and statues give half cover; altars, tables, beds, and bookshelves give three-quarter cover
+- **Two-cell items** — Larger furniture (tables, beds, altars, bookshelves) properly accounts for rotation and both occupied cells
+- **Logged in campaign log** — Cover determinations are recorded for transparency
+
+---
+
+## ✨ Metamagic & Spell Automation
+
+A comprehensive Sorcerer metamagic system and automated spell resolution:
+
+### Metamagic Engine
+- **8 metamagic options** — Careful (1 SP), Distant (1 SP), Empowered (1 SP), Extended (1 SP), Heightened (3 SP), Quickened (2 SP), Subtle (1 SP), Twinned (variable = spell level)
+- **Pre/post-cast filtering** — Only valid options shown based on spell properties (e.g., Empowered only for damage spells)
+- **Arcane Apotheosis** — At Sorcerer 20, if Innate Sorcery is active, the highest-cost metamagic option is free
+- **Max metamagic per spell** — 1 normally, 2 if level 6+ with Innate Sorcery active (2024 rules)
+- **Font of Magic** — Sorcery Point to spell slot conversion modal with 5e and 2024 cost tables
+- **Sorcerous Restoration** — Long rest restores 4 Sorcery Points (2024 feature)
+
+### Sorcerer Buffs
+- **Innate Sorcery** — Toggleable buff granting +1 to spell save DC and advantage on spell attacks for 1 minute
+- **AoE damage detection** — Tokens within spell overlay areas are automatically detected; NPCs auto-roll saves, players receive save prompts
+
+### Spell Resolution
+- **Auto-transition to damage** — After a successful hit roll, the damage roll begins automatically
+- **Saving throw integration** — Save-based spells show success/failure and full/half/no damage
+- **Concentration saves** — Taking damage while concentrating auto-triggers a Constitution save prompt (DC = max(10, floor(damage/2)))
+- **Range validation** — Melee/ranged checks with disadvantage, long-range penalties, and feat-based range effects (e.g., Crossbow Expert ignores melee disadvantage)
+- **Auto-damage application** — Damage rolls automatically apply with saving throw prompts and die roller popups
+- **Critical hit automation** — Natural 20 auto-doubles damage dice
+
+---
+
+## 💫 Aura Systems
+
+Paladin and party auras that compute bonuses based on actual map positions:
+
+- **Aura of Protection** — Adds Charisma modifier (minimum 1) to all saving throws for allies within range (default 10 ft, 30 ft with Aura Expansion)
+- **Aura of Alacrity** — Speed bonus for nearby allies
+- **Aura of Courage** — Frightened immunity for nearby allies
+- **Aura of Devotion** — Charmed immunity for nearby allies
+- **Aura of Warding** — Damage resistances for nearby allies
+- **Range-aware** — All auras use actual map positions to determine who's in range
+- **Condition-aware** — Auras from incapacitated, paralyzed, petrified, stunned, or unconscious characters are disabled
+
+---
+
+## 🤖 Combat Automation Engine
+
+A comprehensive automation system handles the mechanical heavy lifting during combat:
+
+- **Automated save prompts** — When a spell or effect requires a save, the target receives an SSE-pushed prompt with DC, damage, and type
+- **Auto-damage with saves** — Dealing damage to a target automatically prompts saving throws when applicable
+- **Concentration tracking** — Auto-triggers concentration saves on damage, with SSE-pushed prompts to affected players
+- **Condition propagation** — 15 conditions with full mechanical effects: auto-fail saves, auto-crit flags, speed zero, "cannot act" state, attack advantage/disadvantage, concentration breaking, and more
+- **Death save automation** — Dropping to 0 HP triggers a death save prompt; natural 20 restores to 1 HP; natural 1 counts as 2 failures
+- **Expirations system** — Time-limited combat effects (stunned, speed halved, advantage-on-target, etc.) auto-expire when the affected creature's turn comes up
+- **Turn expiration cleanup** — Effects from previous rounds are automatically cleared at the start of the affected creature's turn
+- **Critical/fumble automation** — Natural 20 doubles damage dice; natural 1 triggers fumble
+- **Resistance notices** — Cross-references target resistances with damage type and logs warnings
+- **Auto-award XP** — Post-encounter XP summary with per-character split
 
 ---
 
@@ -642,6 +737,12 @@ Want to level up, buy gear, or prepare spells between sessions?
 
 **No More Boring Maps** — Interactive indoor maps with fog of war and spell overlays, outdoor hex maps with overland travel, a BSP dungeon generator, and encounter-map transitions make your table feel alive.
 
+**No More Manual Combat Math** — The automation engine handles save prompts, concentration checks, cover calculation, range validation, auto-damage with saves, critical hit dice doubling, and condition propagation — so you can focus on tactics, not arithmetic.
+
+**No More Blank NPC Pages** — The procedural NPC generator creates fully fleshed-out NPCs with names, personalities, stat blocks, and traits in seconds. The settlement generator builds entire towns with services, NPCs, and rumors.
+
+**No More "Who Has Cover?" Arguments** — The cover system automatically determines cover levels from walls, doors, and furniture using line-of-sight ray casting. It's fair, consistent, and logged.
+
 **No More Dice Hunt** — Roll ability checks, saving throws, attacks, damage, and resting hit dice right from your character sheet. Built-in dice roller supports advantage, disadvantage, and custom expressions with auto-crit/fumble detection.
 
 **No More Late-Night Eye Strain** — Toggle between dark and light themes to match your gaming environment.
@@ -701,7 +802,7 @@ The app validates your character against the rules and shows warnings if somethi
 Yes! Download your character as a JSON file, work on it at home, then upload it before the next session.
 
 **What campaign tools are available?**
-The app includes an initiative tracker, encounter builder with auto-generation and loot tables, interactive indoor maps with fog of war and spell overlays, outdoor hex maps with overland travel and weather, a BSP dungeon generator and fractal terrain generator, quest tracking, faction management, NPC management with full stat blocks, campaign notes with private notes and location tracking, and a comprehensive campaign activity log — everything a DM needs to run a great session.
+The app includes an initiative tracker, encounter builder with auto-generation and loot tables, interactive indoor maps with fog of war and spell overlays, outdoor hex maps with overland travel and weather, a BSP dungeon generator and fractal terrain generator, a procedural settlement generator, quest tracking, faction management, NPC management with full stat blocks and a procedural NPC generator, settlement management, campaign notes with private notes and location tracking, a comprehensive campaign activity log, a 4-level cover system, a full metamagic engine for Sorcerers, range validation, Paladin aura systems, and a combat automation engine that handles save prompts, concentration checks, auto-damage, and condition propagation — everything a DM needs to run a great session.
 
 **How does real-time sync work?**
 The app uses Server-Sent Events (SSE) — a lightweight, one-way push protocol. When the DM or a player changes something (HP, spell slots, position on a map, fog of war updates), the server broadcasts the update to every connected browser instantly. No polling, no refresh lag.
