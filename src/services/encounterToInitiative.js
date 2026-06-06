@@ -4,7 +4,7 @@ import { cloneDeep } from 'lodash';
 import { rollD20 } from './diceRoller.js';
 import { postLogEntry } from './shared/logPoster.js';
 
-function getMonsterSaveBonuses(monster) {
+export function getMonsterSaveBonuses(monster) {
   const map = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
   const bonuses = {};
   for (const [abbr] of Object.entries(map)) {
