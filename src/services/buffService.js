@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
 
 export function getActiveBuffs(playerName, campaignName) {
   void campaignName;
