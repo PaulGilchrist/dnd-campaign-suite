@@ -133,7 +133,6 @@ export function useRuntimeValue(characterKey, propertyName, campaignName) {
 
   useEffect(() => {
     if (!characterKey || !propertyName) return;
-    currentValueRef.current = getRuntimeValue(characterKey, propertyName);
     if (!listeners.has(characterKey)) listeners.set(characterKey, new Set());
     const listener = () => {
       const newVal = getRuntimeValue(characterKey, propertyName);
