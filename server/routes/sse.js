@@ -7,7 +7,6 @@ const router = express.Router();
 
 router.get('/subscribe', (req, res) => {
     const campaignName = req.query.campaign || '';
-    const clientProvidedId = req.query.clientId;
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('Cache-Control', 'no-cache');
@@ -16,7 +15,6 @@ router.get('/subscribe', (req, res) => {
     const clientId = guid.create().value;
     const newClient = {
         id: clientId,
-        clientProvidedId,
         res,
         campaignName,
      };

@@ -6,9 +6,6 @@ vi.mock('../services/logService.js', () => ({
   addEntry: vi.fn(async () => {}),
 }));
 
-vi.mock('../utils/sseClientId.js', () => ({ default: 'test-client-id-123' }));
-const CLIENT_ID = 'test-client-id-123';
-
 let mockEventSource;
 
 beforeEach(() => {
@@ -18,7 +15,7 @@ beforeEach(() => {
 });
 
 function buildUrl(campaignName) {
-    const params = new URLSearchParams({ campaign: campaignName, clientId: CLIENT_ID });
+    const params = new URLSearchParams({ campaign: campaignName });
     return `http://localhost/subscribe?${params.toString()}`;
     }
 
@@ -62,7 +59,7 @@ describe('useLog', () => {
     expect(logServiceMock.addEntry).toHaveBeenCalledWith('test-campaign', { text: 'Hello' });
        });
 
-   it('should create EventSource with correct URL including clientId', () => {
+   it('should create EventSource with correct URL', () => {
      renderHook(() => useLog('test-campaign'));
      expect(global.EventSource).toHaveBeenCalledWith(buildUrl('test-campaign'));
         });
@@ -80,11 +77,10 @@ describe('useLog', () => {
         expect(result.current.initialized).toBe(true);
          });
 
-           // Simulate an SSE message from another client (different selfId)
        const logEntry = { text: 'A dragon appears!' };
          act(() => {
            mockEventSource.onmessage({
-              data: JSON.stringify({ key: 'log-1234567890', data: logEntry, selfId: 'different-client' }),
+              data: JSON.stringify({ key: 'log-1234567890', data: logEntry }),
              });
         });
 
@@ -94,20 +90,7 @@ describe('useLog', () => {
           });
       });
 
-   it('should ignore self-echo SSE messages (matching clientId)', async () => {
-     const logEntry = { text: 'self-echo' };
-      const { result } = renderHook(() => useLog('test-campaign'));
-
-         act(() => {
-           mockEventSource.onmessage({
-              data: JSON.stringify({ key: 'log-self', data: logEntry, selfId: CLIENT_ID }),
-             });
-        });
-
-         expect(result.current.logEntries).toHaveLength(0);
-      });
-
-    it('should ignore non-log events', async () => {
+   it('should ignore non-log events', async () => {
        const { result } = renderHook(() => useLog('test-campaign'));
 
       await waitFor(() => {
@@ -116,7 +99,7 @@ describe('useLog', () => {
 
          act(() => {
            mockEventSource.onmessage({
-              data: JSON.stringify({ key: 'other-event', data: { text: 'ignored' }, selfId: 'different-client' }),
+              data: JSON.stringify({ key: 'other-event', data: { text: 'ignored' } }),
              });
           });
 
@@ -134,9 +117,9 @@ describe('useLog', () => {
            // Add 205 entries to exceed MAX_LOG_ENTRIES (200)
          act(() => {
            for (let i = 0; i < 205; i++) {
-             mockEventSource.onmessage({
-                data: JSON.stringify({ key: `log-${i}`, data: { text: `entry ${i}` }, selfId: 'different-client' }),
-                 });
+              mockEventSource.onmessage({
+                 data: JSON.stringify({ key: `log-${i}`, data: { text: `entry ${i}` } }),
+                  });
             }
           });
 

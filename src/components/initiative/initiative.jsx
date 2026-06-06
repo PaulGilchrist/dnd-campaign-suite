@@ -272,11 +272,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         }
     }, [campaignName]);
 
-     /**
-      * WARNING: SSE re-render loop risk
-      * Self-echoes are filtered by the Subscriber component (via selfId).
-      * All setters in this handler use equality guards (useSSEEqualityGuard).
-      */
+      /**
+       * WARNING: SSE re-render loop risk
+       * All setters in this handler use equality guards (useSSEEqualityGuard).
+       */
     const handleEvent = React.useCallback((event) => {
         if (event.key == null || event.data == null) return;
 

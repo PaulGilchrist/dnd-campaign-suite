@@ -1,13 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as logService from '../services/logService.js';
 
-/**
- * WARNING: SSE re-render loop risk
- * This hook creates its own EventSource (bypassing <Subscriber>).  It must filter
- * self-echoes using clientId so it never processes its own published events.
- */
-import sseClientId from '../utils/sseClientId';
-
 const MAX_LOG_ENTRIES = 200;
 
 export default function useLog(campaignName) {
@@ -35,16 +28,14 @@ export default function useLog(campaignName) {
         const host = window.location.hostname;
         const urlParams = new URLSearchParams({
             campaign: campaignName,
-            clientId: sseClientId,
           });
         const url = `http://${host}/subscribe?${urlParams.toString()}`;
          const eventSource = new EventSource(url);
 
       eventSource.onmessage = (e) => {
           try {
-               const event = JSON.parse(e.data);
-              if (event.selfId === sseClientId) return;
-              if (!event.key.startsWith('log-')) return;
+                const event = JSON.parse(e.data);
+               if (!event.key.startsWith('log-')) return;
              setLogEntries(prev => {
                   const updated = [...prev, event.data];
                  return updated.slice(-MAX_LOG_ENTRIES);

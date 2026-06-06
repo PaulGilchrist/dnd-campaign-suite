@@ -77,15 +77,6 @@ describe('Subscriber', () => {
         expect(handleEventMock).toHaveBeenCalledWith({ type: 'test', payload: 'data' });
          });
 
-    it('should process all messages including self-sent (no self-echo filter)', async () => {
-        render(<Subscriber handleEvent={handleEventMock} campaignName="Test Campaign" />);
-
-        const instance = MockEventSource.getInstance(urlWithCampaign('Test Campaign'));
-        instance.onmessage({ data: JSON.stringify({ type: 'test', selfId: 'any-id' }) });
-
-        expect(handleEventMock).toHaveBeenCalledWith({ type: 'test', selfId: 'any-id' });
-         });
-
     it('should close the EventSource on unmount', async () => {
         const { unmount } = render(<Subscriber handleEvent={handleEventMock} campaignName="Test Campaign" />);
 
