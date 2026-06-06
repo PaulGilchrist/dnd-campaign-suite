@@ -110,6 +110,19 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                break;
                 }
 
+            case 'fly_speed_equals_walk_speed': {
+                const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                if (Array.isArray(buffs)) {
+                    setRuntimeValue(
+                        targetName,
+                        'activeBuffs',
+                        buffs.filter(b => b.effect !== 'fly_speed_equals_walk_speed'),
+                        campaignName
+                    );
+                }
+                break;
+            }
+
             default:
                 break;
              }

@@ -3,12 +3,12 @@ import { toggleBuff } from '../common/buffToggle.js';
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
-    const wasActive = toggleBuff(
-         playerStats.name,
+    const { wasActive } = toggleBuff(
+        playerStats.name,
         action.name,
         auto,
         campaignName
-         );
+    );
 
     return {
         type: 'popup',
@@ -17,9 +17,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             name: action.name,
             automationType: auto.type,
             description: wasActive
-                   ? `${action.name} toggled OFF`
-                   : `${action.name} activated (${auto.duration || '10 min'})`,
+                ? `${action.name} toggled OFF`
+                : `${action.name} activated (${auto.duration || '10 min'})`,
             automation: auto,
-              },
-          };
+        },
+    };
  }

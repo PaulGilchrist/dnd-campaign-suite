@@ -18,7 +18,7 @@ import { sanitizeHtml } from '../../../services/sanitize.js';
 import LongRestButton from '../LongRestButton.jsx'
 import ShortRestButton from '../ShortRestButton.jsx'
 import ShortRestModal from '../ShortRestModal.jsx'
-import { setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { setRuntimeValue, useRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { getActiveBuffs } from './buffService.js';
 import CharConditions from './CharConditions.jsx'
 
@@ -78,7 +78,11 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         setShowXpModal(false);
     };
 
-    const activeBuffs = getActiveBuffs(playerStats.name, campaignName);
+    const storedBuffs = getActiveBuffs(playerStats.name, campaignName);
+    const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName) ?? storedBuffs;
+    const flyBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.effect === 'fly_speed_equals_walk_speed') : null;
+    const flyBuffActive = !!flyBuff;
+    const flyBuffName = flyBuff?.name || '';
     let speed = playerStats.race.subrace && playerStats.race.subrace.speed ? playerStats.race.subrace.speed : playerStats.race.speed;
     if (playerStats.class.name === 'Monk') {
         const { classRules: cr } = rulesFactory.getRules(playerStats);
@@ -179,6 +183,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     <b>Proficiency: </b>+{playerStats.proficiency}<br />
                     <span className={'clickable' + (exhaustionLevel > 0 ? ' stat--penalized' : '')} onClick={() => rollInitiative(effectiveInitiative)}><b>Initiative: </b>{signFormatter.format(effectiveInitiative)}</span><br />
                     <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiration} /><br />
+                    {flyBuffActive && <span className="automation-badge">{flyBuffName} Active</span>}
                 </div>
                 <div>
                     <CharFeats playerStats={playerStats} showPopup={(feat) => {
