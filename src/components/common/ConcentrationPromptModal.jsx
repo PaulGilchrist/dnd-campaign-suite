@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 import utils from '../../services/utils.js';
 import { rollD20 } from '../../services/diceRoller.js';
 import { sendConcentrationResult } from '../../services/savePromptService.js';
@@ -9,11 +9,6 @@ import './concentrationPromptModal.css';
 
 function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
   const [prompts, setPrompts] = useState([]);
-
-  const characterNames = useMemo(() => new Set((characters || []).map(c => {
-    const name = typeof c === 'string' ? c : c.name;
-    return name ? utils.getName(name).toLowerCase() : '';
-  })), [characters]);
 
   const current = prompts.length > 0 ? prompts[0] : null;
 
@@ -26,13 +21,13 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
     const prefix = `change-${campaignName}-concentrationPrompt-`;
     if (!event.key.startsWith(prefix)) return;
     const targetName = event.key.slice(prefix.length);
-    if (!targetName || !characterNames.has(targetName.toLowerCase())) return;
+    if (!targetName) return;
 
     setPrompts(prev => {
       if (prev.some(p => p.promptId === event.data.promptId)) return prev;
       return [...prev, { targetName, ...event.data }];
-    });
-  }, [campaignName, characterNames]);
+      });
+     }, [campaignName]);
 
   const handleDismiss = useCallback(() => {
     advance();

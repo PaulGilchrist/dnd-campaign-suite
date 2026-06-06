@@ -1,5 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
-import utils from '../../services/utils.js';
+import { useState, useCallback } from 'react';
 
 import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/savePromptService.js';
 import * as deathSaveRules from '../../services/deathSaveRules.js';
@@ -7,13 +6,8 @@ import Subscriber from './Subscriber.jsx';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import './deathSavePromptModal.css';
 
-function DeathSavePromptModal({ campaignName, characters }) {
+function DeathSavePromptModal({ campaignName }) {
   const [prompts, setPrompts] = useState([]);
-
-  const characterNames = useMemo(() => new Set((characters || []).map(c => {
-    const name = typeof c === 'string' ? c : c.name;
-    return name ? utils.getName(name).toLowerCase() : '';
-  })), [characters]);
 
   const current = prompts.length > 0 ? prompts[0] : null;
 
@@ -26,13 +20,13 @@ function DeathSavePromptModal({ campaignName, characters }) {
     const prefix = `change-${campaignName}-deathSavePrompt-`;
     if (!event.key.startsWith(prefix)) return;
     const targetName = event.key.slice(prefix.length);
-    if (!targetName || !characterNames.has(targetName.toLowerCase())) return;
+    if (!targetName) return;
 
     setPrompts(prev => {
       if (prev.some(p => p.promptId === event.data.promptId)) return prev;
       return [...prev, { targetName, ...event.data }];
-    });
-  }, [campaignName, characterNames]);
+     });
+    }, [campaignName]);
 
   const handleRoll = useCallback(() => {
     if (!current) return;
