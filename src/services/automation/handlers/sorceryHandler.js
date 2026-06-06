@@ -1,7 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { getClassFeatures } from '../../classFeatures.js';
 import { getCurrentSorceryPoints, spendSorceryPoints } from '../../../hooks/useMetamagic.js';
-import { setInnateSorceryActive } from '../../../components/char-sheet/char-summary/buffService.js';
+import { setInnateSorceryActive } from '../../buffService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;

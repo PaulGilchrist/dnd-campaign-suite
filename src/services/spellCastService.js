@@ -1,6 +1,6 @@
 import { rollExpression } from './diceRoller.js';
 import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet } from './rangeValidation.js';
-import { isInnateSorceryActive } from '../components/char-sheet/char-summary/buffService.js';
+import { isInnateSorceryActive } from './buffService.js';
 
 export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName }) {
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);

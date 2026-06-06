@@ -35,12 +35,13 @@ function HealingPoolModal({ playerStats, campaignName, alsoCures, cureCost, rest
     const layOnHandsPoolMax = 5 * (playerStats.level || 1);
 
     const { current: poolRemaining, max: poolMaxFromHook, update: setPoolRemaining } = useTrackedResource(
-         'layOnHandsPool',
+        'layOnHandsPool',
         playerStats.name,
-          () => layOnHandsPoolMax,
-          [playerStats],
-        campaignName
-       );
+        () => layOnHandsPoolMax,
+        [playerStats],
+        campaignName,
+        playerStats
+    );
     const [healAmount, setHealAmount] = React.useState(1);
     const [log, setLog] = React.useState([]);
     const [selectedConditions, setSelectedConditions] = React.useState([]);

@@ -16,8 +16,8 @@
      import * as mapsService from '../../services/mapsService.js';
      import { getNearestPlacedItem } from '../../services/rangeValidation.js';
 
-function CharReactions({ playerStats, campaignName, cannotAct, mapName }) {
-    const { popupHtml, setPopupHtml, rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName);
+function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
+    const { popupHtml, setPopupHtml, rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
     const [selectedSpell, setSelectedSpell] = React.useState(null);
 
      // Build reactions list immutably

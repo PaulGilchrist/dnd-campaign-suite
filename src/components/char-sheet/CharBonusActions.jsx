@@ -12,7 +12,7 @@ import { executeSpellCast } from '../../services/spellCastService.js'
 import * as mapsService from '../../services/mapsService.js';
 import { getNearestPlacedItem } from '../../services/rangeValidation.js';
 import { getCombatContext, getTargetFromAttacker } from '../../services/damageUtils.js';
-import { getInnateSorceryBonus } from './char-summary/buffService.js';
+import { getInnateSorceryBonus } from '../../services/buffService.js';
 import './CharActions.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });

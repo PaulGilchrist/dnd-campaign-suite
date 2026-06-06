@@ -30,7 +30,7 @@ import { getChaModifier } from '../../services/metamagicRules.js';
 import { getTargetFromAttacker, getCombatContext } from '../../services/damageUtils.js';
 import { applyDamageToTarget } from '../../services/applyDamage.js';
 import { getNearestPlacedItem } from '../../services/rangeValidation.js';
-import { getInnateSorceryBonus } from './char-summary/buffService.js';
+import { getInnateSorceryBonus } from '../../services/buffService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';
@@ -39,7 +39,7 @@ const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats) && prevProps.conditionAttackMode === nextProps.conditionAttackMode && prevProps.exhaustionPenalty === nextProps.exhaustionPenalty && prevProps.cannotAct === nextProps.cannotAct;
 
-const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, onBuffsChange }) {
+const CharActions = React.memo(function CharActions({ playerStats, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, onBuffsChange, characters }) {
     const [actions, setActions] = useState([]);
     const [selectedActionSpell, setSelectedActionSpell] = useState(null);
     const [pendingActionMetamagic, setPendingActionMetamagic] = useState(null);
@@ -90,6 +90,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         };
     }, [playerStats, campaignName]);
     const { popupHtml, setPopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
+        characters,
         autoDamageRoll: (autoDamage, isCrit) => {
             const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
             if (result) {

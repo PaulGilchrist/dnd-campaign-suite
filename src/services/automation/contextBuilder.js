@@ -4,7 +4,7 @@ import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHos
 import { computeCover } from '../coverService.js';
 import { loadNPCs } from '../npcsService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import { getInnateSorceryBonus } from '../../components/char-sheet/char-summary/buffService.js';
+import { getInnateSorceryBonus } from '../buffService.js';
 
 export function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects) {
     const playerName = playerStats.name;

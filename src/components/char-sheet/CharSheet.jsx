@@ -131,23 +131,26 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
               ></CharAbilities><hr />
 
                <CharActions
-                 playerStats={playerStats}
-                 campaignName={campaignName}
-                 exhaustionPenalty={exhaustionPenalty}
-                 conditionAttackMode={conditionAttackMode}
-                 cannotAct={cannotAct}
-                 mapName={activeMapName}
-                 onBuffsChange={handleBuffsChange}
-                ></CharActions><hr />
-              <CharReactions
-                playerStats={playerStats}
-                campaignName={campaignName}
-                cannotAct={cannotAct}
-                mapName={activeMapName}
-              ></CharReactions>
-            {playerSummary.rules === '2024'
-  ? <CharSpells playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName}></CharSpells>
-  : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName}></CharSpells>
+                  playerStats={playerStats}
+                  campaignName={campaignName}
+                  exhaustionPenalty={exhaustionPenalty}
+                  conditionAttackMode={conditionAttackMode}
+                  cannotAct={cannotAct}
+                  mapName={activeMapName}
+                  onBuffsChange={handleBuffsChange}
+                  characters={characters}
+                 ></CharActions><hr />
+               <CharReactions
+                  playerStats={playerStats}
+                  campaignName={campaignName}
+                  cannotAct={cannotAct}
+                  mapName={activeMapName}
+                  characters={characters}
+                ></CharReactions>
+             {playerSummary.rules === '2024'
+  ? <CharSpells playerStats={playerStats} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters}></CharSpells>
+  : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters}></CharSpells>
+
 }<hr />
             <CharSpecialActions playerStats={playerStats}></CharSpecialActions><hr />
             <CharInventory playerStats={playerStats}></CharInventory><hr />

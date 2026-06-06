@@ -18,15 +18,16 @@ import UpcastPopup from './UpcastPopup.jsx'
 import { executeSpellCast } from '../../../services/spellCastService.js'
 import * as mapsService from '../../../services/mapsService.js';
 import { getNearestPlacedItem } from '../../../services/rangeValidation.js';
-import { isInnateSorceryActive } from '../char-summary/buffService.js';
+import { isInnateSorceryActive } from '../../../services/buffService.js';
 import { useRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import './CharSpells.css'
 
-const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName }) {
+const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, characters }) {
     const _activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName); (void _activeBuffs); // subscribe to activeBuffs changes for re-render
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
     const { popupHtml, setPopupHtml } = useActionPopup('spell');
      const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
+        characters,
         autoDamageRoll: (autoDamage, isCrit) => {
           const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
           if (result) {
