@@ -862,8 +862,10 @@ addExpiration(playerStats.name, targetName, [
                     return;
                   }
 
-                spendSorceryPoints(playerStats.name, cost, campaignName);
-                 setRuntimeValue(playerStats.name, 'innateSorceryUses', 1, campaignName);
+                console.log(`[sorcery_incarnate] Before spend — currentSP: ${currentSP}, cost: ${cost}`);
+                const spAfterSpend = spendSorceryPoints(playerStats.name, cost, campaignName);
+                console.log(`[sorcery_incarnate] After spend — remaining SP: ${spAfterSpend}`);
+                 setRuntimeValue(playerStats.name, 'innateSorceryUses', 0, campaignName);
                  setInnateSorceryActive(playerStats.name, true, campaignName);
                  if (onBuffsChange) onBuffsChange();
                  window.dispatchEvent(new CustomEvent('innate-sorcery-updated'));
@@ -873,7 +875,7 @@ addExpiration(playerStats.name, targetName, [
                         type: 'automation_info',
                         name: action.name,
                         automationType: auto.type,
-                        description: `${action.name} activated (${cost} SP spent). Innate Sorcery is now active (1/${usesMax} use remaining).`,
+                        description: `${action.name} activated (${cost} SP spent). Innate Sorcery is now active (0/${usesMax} uses remaining).`,
                         automation: auto,
                         });
                    }
