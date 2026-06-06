@@ -1,5 +1,5 @@
 
-const CELL_SIZE = 40;
+import { CELL_SIZE } from '../../config/mapConfig';
 
 const GridAndWalls = ({ gridSize, walls, isLocalhost, fog, bgFill }) => {
     const SVG_SIZE = gridSize * CELL_SIZE;

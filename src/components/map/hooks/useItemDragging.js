@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
-
-const CELL_SIZE = 40;
+import { CELL_SIZE } from '../../../config/mapConfig';
 
 export default function useItemDragging({
     svgRef,

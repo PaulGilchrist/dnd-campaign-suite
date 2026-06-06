@@ -1,5 +1,5 @@
 
-const CELL_SIZE = 40;
+import { CELL_SIZE } from '../../config/mapConfig';
 const RADIUS = 20;
 
 function PlacedItems({

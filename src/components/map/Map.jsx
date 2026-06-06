@@ -1,6 +1,4 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import utils from '../../services/utils.js';
-import * as mapsService from '../../services/mapsService.js';
 import Subscriber from '../common/Subscriber.jsx';
 import MapToolbar from './MapToolbar.jsx';
 import { loadMonsters } from '../../services/dataLoader.js';
@@ -45,67 +43,78 @@ import useFogOfWar from './hooks/useFogOfWar';
 import useSpellOverlay from './hooks/useSpellOverlay';
 import SpellOverlayRenderer from './SpellOverlayRenderer.jsx';
 import RulerOverlay from './RulerOverlay.jsx';
-import { OverlayShape, DEFAULTS, createOverlay, hitTestOverlay, svgOrigin } from '../../models/SpellOverlay.js';
+import { OverlayShape, DEFAULTS } from '../../models/SpellOverlay.js';
 import HexMap from '../hex-map/HexMap';
 import '../hex-map/HexMap.css';
-
-const CELL_SIZE = 40;
+import RoomContextMenu from './RoomContextMenu.jsx';
+import PlayerContextMenu from './PlayerContextMenu.jsx';
+import useMapLoader from './hooks/useMapLoader';
+import useZoomPan from './hooks/useZoomPan';
+import useWallDrawing from './hooks/useWallDrawing';
+import useRoomDrawing from './hooks/useRoomDrawing';
+import useSelectMove from './hooks/useSelectMove';
+import useRuler from './hooks/useRuler';
+import useSpellHandlers from './hooks/useSpellHandlers';
+import useMapDrops from './hooks/useMapDrops';
+import { CELL_SIZE, TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_SELECT, TOOL_ROOM } from '../../config/mapConfig';
 
 function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncounterCreated, onPoiEntered }) {
     const [gridSize, setGridSize] = useState(30);
     const SVG_SIZE = gridSize * CELL_SIZE;
-    const [mapData, setMapData] = useState(null);
     const svgRef = useRef(null);
-    const loadInProgressRef = useRef(false);
-    const loadedMapNameRef = useRef(null);
 
-    // Zoom/Pan state
-    const [zoom, setZoom] = useState(1);
-    const [panX, setPanX] = useState(0);
-    const [panY, setPanY] = useState(0);
-
-    // Refs for zoom/pan state used by handleWheel (avoids stale closure)
-    const zoomValueRef = useRef(1);
-    const panXValueRef = useRef(0);
-    const panYValueRef = useRef(0);
-    // Accumulate deltaY for smooth zoom thresholding
-    const accumulatedDeltaRef = useRef(0);
-    // Selection/move refs for stale-closure-free access
-    const selectedWallsRef = useRef(new Set());
-    const selectedItemsRef = useRef(new Set());
-    const placedItemsRef = useRef([]);
-    const selectStart = useRef(null);
-    const moveStartGrid = useRef(null);
-    const moveOffsetRef = useRef(null);
-    const selectionRectRef = useRef(null);
-    const mapDataRef = useRef(null);
-    const selectionBoundsRef = useRef(null);
-    const lastSavedWallsRef = useRef(null);
-    // Tool state: 'none' | 'paint' | 'erase' | 'select' | 'room'
-    const [tool, setTool] = useState('none');
-    // Paint state: tracks grid coords during active paint/erase
-    const [painting, setPainting] = useState(null);
-    // Room draw state
-    const [roomDrawStart, setRoomDrawStart] = useState(null);
-    const [roomDrawRect, setRoomDrawRect] = useState(null);
-    const [selectedRoom, setSelectedRoom] = useState(null);
-    const [panning, setPanning] = useState(null); // { startX, startY, startPanX, startPanY }
-
-    // Ruler state
-    const [rulerMode, setRulerMode] = useState(false);
-    const [rulerStart, setRulerStart] = useState(null); // { gridX, gridY } | null
-    const [rulerEnd, setRulerEnd] = useState(null); // { gridX, gridY } | null
-    const [rulerPreview, setRulerPreview] = useState(null); // { gridX, gridY } | null (live preview)
-
-    // Spell overlay state
-    const [spellMode, setSpellMode] = useState(null); // null | 'sphere' | 'cylinder' | 'cube' | 'cone' | 'line'
+    const [tool, setTool] = useState(TOOL_NONE);
+    const [itemsPanelOpen, setItemsPanelOpen] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [renamePopover, setRenamePopover] = useState(null);
+    const [viewingMonster, setViewingMonster] = useState(null);
+    const [monstersLoaded, setMonstersLoaded] = useState([]);
+    const [selectedPlayer, setSelectedPlayer] = useState(null);
+    const [spellMode, setSpellMode] = useState(null);
     const [selectedShape, setSelectedShape] = useState(OverlayShape.SPHERE);
     const [shapeParams, setShapeParams] = useState(DEFAULTS.sphere);
-    const [spellDraft, setSpellDraft] = useState(null); // { startGridX, startGridY, startScreenX, startScreenY, angle? }
-    // Overlay drag/rotate state
-    const [dragOverlay, setDragOverlay] = useState(null); // { overlayId, startGridX, startGridY, offsetGridX, offsetGridY } | null
-    const [rotateOverlay, setRotateOverlay] = useState(null); // { overlayId, originX, originY, startAngle, startScreenAngle } | null
-    const spellDragActiveRef = useRef(false);
+
+    const { mapData, setMapData, placedItems, setPlacedItems } = useMapLoader({
+        campaignName, characters, mapName, gridSize, setGridSize,
+    });
+
+    const {
+        zoom, panX, panY,
+        zoomIn, zoomOut, resetView,
+        gridCenterX, gridCenterY,
+        getGridFromEvent,
+        panning, handlePanStart, handlePanMove, handlePanEnd,
+        handleWheel,
+        clientToSVG,
+    } = useZoomPan(svgRef);
+
+    const {
+        painting,
+        handleGridPointerDown,
+        handleGridPointerMove,
+        handleGridPointerUp,
+        handleGridPointerLeave,
+    } = useWallDrawing({ isLocalhost, tool, getGridFromEvent, svgRef });
+
+    const {
+        roomDrawRect, selectedRoom, setSelectedRoom,
+        handleRoomPointerDown, handleRoomPointerMove, handleRoomPointerUp, handleRoomClick,
+    } = useRoomDrawing({ isLocalhost, tool, getGridFromEvent, svgRef });
+
+    const {
+        selectionRect, selectedWalls, selectedItems, moveOffset,
+        selectedWallsRef, selectedItemsRef, selectStart, moveStartGrid,
+        placedItemsRef, mapDataRef,
+        handleSelectPointerDown, handleSelectPointerMove, handleSelectPointerUp,
+    } = useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef });
+
+    const {
+        rulerMode, setRulerMode,
+        rulerStart, rulerEnd, rulerPreview,
+        resetRuler,
+        handleRulerPointerDown, handleRulerPointerMove, handleRulerPointerUp,
+    } = useRuler();
+
     const {
         overlays,
         addOverlay,
@@ -116,31 +125,23 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         handleSSEEvent: handleSpellOverlayEvent,
     } = useSpellOverlay(campaignName, mapName);
 
-    // Selection state
-    const [selectionRect, setSelectionRect] = useState(null);
-    const [selectedWalls, setSelectedWalls] = useState(new Set());
-    const [selectedItems, setSelectedItems] = useState(new Set());
-    // Move state
-    const [moveOffset, setMoveOffset] = useState(null);
+    const {
+        spellDraft,
+        dragOverlay, rotateOverlay,
+        spellDragActiveRef,
+        handleSpellPointerDown, handleSpellPointerMove, handleSpellPointerUp,
+        handleSpellDragMove, handleSpellDragEnd,
+    } = useSpellHandlers({
+        rulerMode, getGridFromEvent, clientToSVG,
+        addOverlay, shapeParams, updateOverlay, updateOverlayImmediate, svgRef,
+    });
 
-    // Items panel state
-    const [itemsPanelOpen, setItemsPanelOpen] = useState(false);
-    const [placedItems, setPlacedItems] = useState([]);
+    const { handleDrop } = useMapDrops({ isLocalhost, getGridFromEvent, setMapData, setPlacedItems });
 
-    // Item context menu state
-    const [selectedItem, setSelectedItem] = useState(null); // { id, gridX, gridY }
-    const [renamePopover, setRenamePopover] = useState(null); // { itemName, name } | null
-
-    // Monster card modal state
-    const [viewingMonster, setViewingMonster] = useState(null);
-    const [monstersLoaded, setMonstersLoaded] = useState([]);
-
-    // Load monster data for NPC context menu
     useEffect(() => {
         loadMonsters().then(setMonstersLoaded).catch(() => {});
     }, []);
 
-    // Handle "View Stats" for NPC context menu
     const handleViewStats = useCallback((itemId) => {
         const item = placedItems.find(i => i.id === itemId);
         if (!item || item.type !== 'npc') return;
@@ -163,873 +164,24 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         );
     }, [selectedItem, placedItems, monstersLoaded]);
 
-    // Player context menu state
-    const [selectedPlayer, setSelectedPlayer] = useState(null); // { id, name, gridX, gridY } | null
-
-    // Zoom/Pan helpers
-    const gridCenterX = useCallback((gridX) => gridX * CELL_SIZE + CELL_SIZE / 2, []);
-    const gridCenterY = useCallback((gridY) => gridY * CELL_SIZE + CELL_SIZE / 2, []);
-
-    const svgPointRef = useRef(null);
-
-    const clientToSVG = useCallback((clientX, clientY) => {
-        const svg = svgRef.current;
-        if (!svg) return null;
-        if (!svgPointRef.current) svgPointRef.current = svg.createSVGPoint();
-        const pt = svgPointRef.current;
-        pt.x = clientX;
-        pt.y = clientY;
-        const ctm = svg.getScreenCTM();
-        if (!ctm) return null;
-        const svgPt = pt.matrixTransform(ctm.inverse());
-        return { x: svgPt.x, y: svgPt.y };
-    }, []);
-
-    const getGridFromEvent = useCallback((e) => {
-        const svgPt = clientToSVG(e.clientX, e.clientY);
-        if (!svgPt) return null;
-        const gridX = Math.max(0, Math.min(gridSize - 1, Math.floor(svgPt.x / CELL_SIZE)));
-        const gridY = Math.max(0, Math.min(gridSize - 1, Math.floor(svgPt.y / CELL_SIZE)));
-        return { gridX, gridY };
-    }, [gridSize, clientToSVG]);
-
-    const MIN_ZOOM = 0.25;
-    const MAX_ZOOM = 4;
-
-    const zoomIn = useCallback(() => {
-        setZoom((prev) => Math.min(MAX_ZOOM, prev * 1.25));
-    }, []);
-
-    const zoomOut = useCallback(() => {
-        setZoom((prev) => Math.max(MIN_ZOOM, prev * 0.8));
-    }, []);
-
-    const resetView = useCallback(() => {
-        setZoom(1);
-        setPanX(0);
-        setPanY(0);
-    }, []);
-
-    // Handle grid pointer down (paint/erase mode)
-    const handleGridPointerDown = useCallback((e) => {
-        if (spellDragActiveRef.current) return;
-        if (!isLocalhost) return;
-        if (tool === 'none') return;
-        e.preventDefault();
-        const svg = svgRef.current;
-        if (svg) svg.setPointerCapture(e.pointerId);
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-
-        const key = `${grid.gridX},${grid.gridY}`;
-        setMapData((prev) => {
-            const newWalls = new Set(prev.walls);
-            if (tool === 'paint') {
-                newWalls.add(key);
-            } else if (tool === 'erase') {
-                newWalls.delete(key);
-            }
-            return { ...prev, walls: newWalls };
-        });
-        setPainting(grid);
-    }, [isLocalhost, tool, getGridFromEvent]);
-
-    // Handle grid pointer move (paint/erase drag)
-    const handleGridPointerMove = useCallback((e) => {
-        if (!isLocalhost) return;
-        if (!painting || (tool !== 'paint' && tool !== 'erase')) return;
-        e.preventDefault();
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-
-        const key = `${grid.gridX},${grid.gridY}`;
-        setMapData((prev) => {
-            const newWalls = new Set(prev.walls);
-            if (tool === 'paint') {
-                newWalls.add(key);
-            } else if (tool === 'erase') {
-                newWalls.delete(key);
-            }
-            return { ...prev, walls: newWalls };
-        });
-    }, [painting, tool, isLocalhost, getGridFromEvent]);
-
-    // Handle grid pointer up (end paint/erase)
-    const handleGridPointerUp = useCallback((e) => {
-        const svg = svgRef.current;
-        if (svg) svg.releasePointerCapture(e.pointerId);
-        setPainting(null);
-    }, []);
-
-    // Handle pointer leaving SVG during paint/erase
-    const handleGridPointerLeave = useCallback((e) => {
-        const svg = svgRef.current;
-        if (svg) svg.releasePointerCapture(e.pointerId);
-        setPainting(null);
-    }, []);
-
-    // ---- Room drawing tool ----
-    const handleRoomPointerDown = useCallback((e) => {
-        if (!isLocalhost || tool !== 'room') return;
-        e.preventDefault();
-        const svg = svgRef.current;
-        if (svg) svg.setPointerCapture(e.pointerId);
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-        setRoomDrawStart(grid);
-        setRoomDrawRect({ minX: grid.gridX, maxX: grid.gridX, minY: grid.gridY, maxY: grid.gridY });
-        setSelectedRoom(null);
-    }, [isLocalhost, tool, getGridFromEvent]);
-
-    const handleRoomPointerMove = useCallback((e) => {
-        if (!isLocalhost || tool !== 'room' || !roomDrawStart) return;
-        e.preventDefault();
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-        const minX = Math.min(roomDrawStart.gridX, grid.gridX);
-        const maxX = Math.max(roomDrawStart.gridX, grid.gridX);
-        const minY = Math.min(roomDrawStart.gridY, grid.gridY);
-        const maxY = Math.max(roomDrawStart.gridY, grid.gridY);
-        setRoomDrawRect({ minX, maxX, minY, maxY });
-    }, [isLocalhost, tool, roomDrawStart, getGridFromEvent]);
-
-    const handleRoomPointerUp = useCallback((e) => {
-        if (!isLocalhost || tool !== 'room' || !roomDrawStart || !roomDrawRect) {
-            setRoomDrawStart(null);
-            setRoomDrawRect(null);
-            return;
-        }
-        const svg = svgRef.current;
-        if (svg) svg.releasePointerCapture(e.pointerId);
-
-        const { minX, maxX, minY, maxY } = roomDrawRect;
-        const w = maxX - minX + 1;
-        const h = maxY - minY + 1;
-        if (w < 3 || h < 3) {
-            // Too small — ignore
-            setRoomDrawStart(null);
-            setRoomDrawRect(null);
-            return;
-        }
-
-        setMapData((prev) => {
-            const newWalls = new Set(prev.walls);
-            const gridSize = prev.gridSize || 30;
-
-            // Step 1: Carve floor cells inside the rect
-            for (let y = minY; y <= maxY; y++) {
-                for (let x = minX; x <= maxX; x++) {
-                    const key = x + ',' + y;
-                    newWalls.delete(key);
-                }
-            }
-
-            // Step 2: Add wall cells around the perimeter
-            // But skip cells that border existing open space (creates door openings)
-            function hasOpenNeighbor(gx, gy) {
-                const neighbors = [
-                    [gx - 1, gy], [gx + 1, gy],
-                    [gx, gy - 1], [gx, gy + 1],
-                ];
-                for (const [nx, ny] of neighbors) {
-                    if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize) {
-                        if (!newWalls.has(nx + ',' + ny)) return true;
-                    }
-                }
-                return false;
-            }
-
-            // Check if a cell is adjacent to open space OUTSIDE the room rect
-            function hasOutsideOpenNeighbor(gx, gy) {
-                const neighbors = [
-                    [gx - 1, gy], [gx + 1, gy],
-                    [gx, gy - 1], [gx, gy + 1],
-                ];
-                for (const [nx, ny] of neighbors) {
-                    // Only check neighbors outside the room rect
-                    if (nx < minX || nx > maxX || ny < minY || ny > maxY) {
-                        if (nx >= 0 && nx < gridSize && ny >= 0 && ny < gridSize) {
-                            if (!newWalls.has(nx + ',' + ny)) return true;
-                        }
-                    }
-                }
-                return false;
-            }
-
-            // Top wall
-            for (let x = minX; x <= maxX; x++) {
-                const key = x + ',' + minY;
-                if (!newWalls.has(key) && !hasOpenNeighbor(x, minY)) {
-                    // This is an interior edge — only add wall if no outside open neighbor
-                }
-                if (!hasOutsideOpenNeighbor(x, minY)) {
-                    newWalls.add(key);
-                }
-                // If hasOutsideOpenNeighbor, leave it open (doorway)
-            }
-            // Bottom wall
-            for (let x = minX; x <= maxX; x++) {
-                const key = x + ',' + maxY;
-                if (!hasOutsideOpenNeighbor(x, maxY)) {
-                    newWalls.add(key);
-                }
-            }
-            // Left wall
-            for (let y = minY + 1; y < maxY; y++) {
-                const key = minX + ',' + y;
-                if (!hasOutsideOpenNeighbor(minX, y)) {
-                    newWalls.add(key);
-                }
-            }
-            // Right wall
-            for (let y = minY + 1; y < maxY; y++) {
-                const key = maxX + ',' + y;
-                if (!hasOutsideOpenNeighbor(maxX, y)) {
-                    newWalls.add(key);
-                }
-            }
-
-            // Step 3: Add room to rooms array
-            const newRoom = {
-                id: Date.now(),
-                rect: { x: minX, y: minY, w, h },
-                type: 'common',
-                label: '',
-                connectedTo: [],
-            };
-            const existingRooms = prev.rooms || [];
-
-            return {
-                ...prev,
-                walls: newWalls,
-                rooms: [...existingRooms, newRoom],
-            };
-        });
-
-        setRoomDrawStart(null);
-        setRoomDrawRect(null);
-    }, [isLocalhost, tool, roomDrawStart, roomDrawRect]);
-
-    // Room click detection (select a room by clicking inside its rect)
-    const handleRoomClick = useCallback((e) => {
-        if (!isLocalhost) return;
-        if (tool !== 'none' && tool !== 'select') return;
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-        const rooms = mapDataRef.current?.rooms || [];
-        if (rooms.length === 0) return;
-
-        // Find the smallest room containing the click point
-        let bestRoom = null;
-        let bestArea = Infinity;
-        for (const room of rooms) {
-            const r = room.rect;
-            if (grid.gridX >= r.x && grid.gridX < r.x + r.w &&
-                grid.gridY >= r.y && grid.gridY < r.y + r.h) {
-                const area = r.w * r.h;
-                if (area < bestArea) {
-                    bestArea = area;
-                    bestRoom = room;
-                }
-            }
-        }
-        setSelectedRoom(bestRoom);
-    }, [isLocalhost, tool, getGridFromEvent]);
-
-    // Spell overlay handlers
-    const computeAngle = useCallback((originX, originY, cursorX, cursorY) => {
-        const dx = cursorX - originX;
-        const dy = cursorY - originY;
-        const radians = Math.atan2(dy, dx);
-        let degrees = radians * (180 / Math.PI);
-        if (degrees < 0) degrees += 360;
-        return degrees;
-    }, []);
-
-    const handleRulerPointerDown = useCallback((e) => {
-        if (!rulerMode) return;
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-        e.preventDefault();
-        const svg = svgRef.current;
-        if (svg) svg.setPointerCapture(e.pointerId);
-
-        if (!rulerStart) {
-            setRulerStart(grid);
-            setRulerEnd(null);
-            setRulerPreview(null);
-        } else if (!rulerEnd) {
-            setRulerEnd(grid);
-            setRulerPreview(null);
-        } else {
-            setRulerStart(grid);
-            setRulerEnd(null);
-            setRulerPreview(null);
-        }
-    }, [rulerMode, rulerStart, rulerEnd, getGridFromEvent]);
-
-    const handleRulerPointerMove = useCallback((e) => {
-        if (!rulerMode || !rulerStart || rulerEnd) return;
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-        setRulerPreview(grid);
-    }, [rulerMode, rulerStart, rulerEnd, getGridFromEvent]);
-
-    const handleRulerPointerUp = useCallback((e) => {
-        if (!rulerMode) return;
-        const svg = svgRef.current;
-        if (svg) svg.releasePointerCapture(e.pointerId);
-    }, [rulerMode]);
-
-    const resetRuler = useCallback(() => {
-        setRulerStart(null);
-        setRulerEnd(null);
-        setRulerPreview(null);
-    }, []);
-
-    // When ruler mode toggled off, clear measurement
-    useEffect(() => {
-        if (!rulerMode) {
-            resetRuler();
-        }
-    }, [rulerMode, resetRuler]);
-
-    const handleSpellPointerDown = useCallback((e) => {
-        if (rulerMode) return;
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-
-        if (spellMode) {
-            e.preventDefault();
-            if (spellMode === OverlayShape.SPHERE || spellMode === OverlayShape.CYLINDER) {
-                const overlay = createOverlay(spellMode, grid.gridX, grid.gridY, 0, shapeParams);
-                addOverlay(overlay);
-                setSpellMode(null);
-            } else {
-                setSpellDraft({
-                    startGridX: grid.gridX,
-                    startGridY: grid.gridY,
-                    startScreenX: e.clientX,
-                    startScreenY: e.clientY,
-                    angle: 0,
-                });
-            }
-            return;
-        }
-
-        for (let i = overlays.length - 1; i >= 0; i--) {
-            const overlay = overlays[i];
-            if (hitTestOverlay(overlay, grid.gridX, grid.gridY)) {
-                if (e.button !== 0) return;
-                e.preventDefault();
-                e.stopPropagation();
-                const origin = svgOrigin(overlay);
-                const screenPt = clientToSVG(e.clientX, e.clientY);
-                if (!screenPt) return;
-                const dx = screenPt.x - origin.x;
-                const dy = screenPt.y - origin.y;
-                const distFromOrigin = Math.sqrt(dx * dx + dy * dy);
-                const isAtOrigin = grid.gridX === overlay.startGridX && grid.gridY === overlay.startGridY;
-                const EDGE_FRACTION = 0.25;
-                const overlayDist = ((overlay.distanceFt || overlay.sizeFt || 0) / 5) * 40;
-                const isNearEdge = !isAtOrigin && overlay.shape !== OverlayShape.SPHERE && overlay.shape !== OverlayShape.CYLINDER && distFromOrigin > overlayDist * EDGE_FRACTION;
-                if (isNearEdge && (overlay.shape === OverlayShape.CONE || overlay.shape === OverlayShape.LINE || overlay.shape === OverlayShape.CUBE)) {
-                    const initialAngle = computeAngle(origin.x, origin.y, screenPt.x, screenPt.y);
-                    spellDragActiveRef.current = true;
-                    const svg = svgRef.current;
-                    if (svg) svg.setPointerCapture(e.pointerId);
-                    setRotateOverlay({
-                        overlayId: overlay.id,
-                        originX: origin.x,
-                        originY: origin.y,
-                        startAngle: overlay.angle,
-                        offsetAngle: initialAngle - overlay.angle,
-                    });
-                } else {
-                    spellDragActiveRef.current = true;
-                    const svg = svgRef.current;
-                    if (svg) svg.setPointerCapture(e.pointerId);
-                    setDragOverlay({
-                        overlayId: overlay.id,
-                        offsetX: grid.gridX - overlay.startGridX,
-                        offsetY: grid.gridY - overlay.startGridY,
-                    });
-                }
-                return;
-            }
-        }
-    }, [rulerMode, spellMode, overlays, getGridFromEvent, clientToSVG, computeAngle, addOverlay, shapeParams]);
-
-    const handleSpellPointerMove = useCallback((e) => {
-        if (!spellDraft) return;
-        e.preventDefault();
-        const angle = computeAngle(spellDraft.startScreenX, spellDraft.startScreenY, e.clientX, e.clientY);
-        setSpellDraft(prev => prev ? { ...prev, angle } : null);
-    }, [spellDraft, computeAngle]);
-
-    const handleSpellPointerUp = useCallback((e) => {
-        if (!spellDraft) return;
-        const angle = computeAngle(spellDraft.startScreenX, spellDraft.startScreenY, e.clientX, e.clientY);
-        const shape = spellMode;
-        const overlay = createOverlay(shape, spellDraft.startGridX, spellDraft.startGridY, angle, shapeParams);
-        addOverlay(overlay);
-        setSpellDraft(null);
-        setSpellMode(null);
-    }, [spellDraft, spellMode, computeAngle, addOverlay, shapeParams]);
-
-    const handleSpellDragMove = useCallback((e) => {
-        if (dragOverlay) {
-            e.preventDefault();
-            const grid = getGridFromEvent(e);
-            if (!grid) return;
-            const overlay = overlays.find(o => o.id === dragOverlay.overlayId);
-            if (!overlay) return;
-            const newPos = {
-                ...overlay,
-                startGridX: grid.gridX - dragOverlay.offsetX,
-                startGridY: grid.gridY - dragOverlay.offsetY,
-            };
-            updateOverlay(newPos);
-        } else if (rotateOverlay) {
-            e.preventDefault();
-            const overlay = overlays.find(o => o.id === rotateOverlay.overlayId);
-            if (!overlay) return;
-            const origin = svgOrigin(overlay);
-            const screenPt = clientToSVG(e.clientX, e.clientY);
-            if (!screenPt) return;
-            let newAngle = computeAngle(origin.x, origin.y, screenPt.x, screenPt.y) - rotateOverlay.offsetAngle;
-            if (newAngle < 0) newAngle += 360;
-            updateOverlay({ ...overlay, angle: newAngle });
-        }
-    }, [dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, computeAngle, updateOverlay]);
-
-    const handleSpellDragEnd = useCallback((e) => {
-        if (dragOverlay) {
-            const grid = getGridFromEvent(e);
-            if (grid) {
-                const overlay = overlays.find(o => o.id === dragOverlay.overlayId);
-                if (overlay) {
-                    const finalPos = {
-                        ...overlay,
-                        startGridX: grid.gridX - dragOverlay.offsetX,
-                        startGridY: grid.gridY - dragOverlay.offsetY,
-                    };
-                    updateOverlayImmediate(finalPos);
-                }
-            }
-            setDragOverlay(null);
-        } else if (rotateOverlay) {
-            const overlay = overlays.find(o => o.id === rotateOverlay.overlayId);
-            if (overlay) {
-                const origin = svgOrigin(overlay);
-                const screenPt = clientToSVG(e.clientX, e.clientY);
-                if (screenPt) {
-                    let newAngle = computeAngle(origin.x, origin.y, screenPt.x, screenPt.y) - rotateOverlay.offsetAngle;
-                    if (newAngle < 0) newAngle += 360;
-                    updateOverlayImmediate({ ...overlay, angle: newAngle });
-                }
-            }
-            setRotateOverlay(null);
-        }
-        spellDragActiveRef.current = false;
-        const svg = svgRef.current;
-        if (svg) svg.releasePointerCapture(e.pointerId);
-    }, [dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, computeAngle, updateOverlayImmediate]);
-
-    // Select/move handlers
-    const handleSelectPointerDown = useCallback((e) => {
-        if (spellDragActiveRef.current) return;
-        if (!isLocalhost || tool !== 'select') return;
-        e.preventDefault();
-        const svg = svgRef.current;
-        if (svg) svg.setPointerCapture(e.pointerId);
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-
-        const key = `${grid.gridX},${grid.gridY}`;
-        const curSelWalls = selectedWallsRef.current;
-        const curSelItems = selectedItemsRef.current;
-        const curPlaced = placedItemsRef.current;
-
-        const onSelectedWall = curSelWalls.has(key);
-        const onSelectedItem = curSelItems.size > 0 && curPlaced.some(
-            it => curSelItems.has(it.id) && it.gridX === grid.gridX && it.gridY === grid.gridY
-        );
-        const selBounds = selectionBoundsRef.current;
-        const withinBounds = selBounds &&
-            grid.gridX >= selBounds.minX && grid.gridX <= selBounds.maxX &&
-            grid.gridY >= selBounds.minY && grid.gridY <= selBounds.maxY;
-
-        if ((onSelectedWall || onSelectedItem || withinBounds) && (curSelWalls.size > 0 || curSelItems.size > 0)) {
-            moveStartGrid.current = grid;
-            moveOffsetRef.current = { dx: 0, dy: 0 };
-            setMoveOffset({ dx: 0, dy: 0 });
-            selectStart.current = null;
-        } else {
-            selectStart.current = grid;
-            setSelectionRect({ minX: grid.gridX, maxX: grid.gridX, minY: grid.gridY, maxY: grid.gridY });
-            setSelectedWalls(new Set());
-            setSelectedItems(new Set());
-            setMoveOffset(null);
-            moveStartGrid.current = null;
-            moveOffsetRef.current = null;
-            selectionBoundsRef.current = null;
-        }
-    }, [isLocalhost, tool, getGridFromEvent]);
-
-    const handleSelectPointerMove = useCallback((e) => {
-        if (!isLocalhost || tool !== 'select') return;
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-
-        if (selectStart.current) {
-            e.preventDefault();
-            const minX = Math.min(selectStart.current.gridX, grid.gridX);
-            const maxX = Math.max(selectStart.current.gridX, grid.gridX);
-            const minY = Math.min(selectStart.current.gridY, grid.gridY);
-            const maxY = Math.max(selectStart.current.gridY, grid.gridY);
-            const rect = { minX, maxX, minY, maxY };
-            selectionRectRef.current = rect;
-            setSelectionRect(rect);
-        } else if (moveStartGrid.current) {
-            e.preventDefault();
-            const dx = grid.gridX - moveStartGrid.current.gridX;
-            const dy = grid.gridY - moveStartGrid.current.gridY;
-            moveOffsetRef.current = { dx, dy };
-            setMoveOffset({ dx, dy });
-        }
-    }, [isLocalhost, tool, getGridFromEvent]);
-
-    const handleSelectPointerUp = useCallback((e) => {
-        if (!isLocalhost) return;
-        const svg = svgRef.current;
-        if (svg) svg.releasePointerCapture(e.pointerId);
-
-        if (selectStart.current) {
-            const rect = selectionRectRef.current;
-            if (rect) {
-                const { minX, maxX, minY, maxY } = rect;
-                const walls = mapDataRef.current?.walls || new Set();
-                const items = placedItemsRef.current || [];
-
-                const newSelWalls = new Set();
-                for (let y = minY; y <= maxY; y++) {
-                    for (let x = minX; x <= maxX; x++) {
-                        const key = `${x},${y}`;
-                        if (walls.has(key)) newSelWalls.add(key);
-                    }
-                }
-                const newSelItems = new Set();
-                for (const item of items) {
-                    if (item.gridX >= minX && item.gridX <= maxX &&
-                        item.gridY >= minY && item.gridY <= maxY) {
-                        newSelItems.add(item.id);
-                    }
-                }
-                setSelectedWalls(newSelWalls);
-                setSelectedItems(newSelItems);
-                selectionBoundsRef.current = { minX, maxX, minY, maxY };
-            }
-            selectStart.current = null;
-            selectionRectRef.current = null;
-            setSelectionRect(null);
-        } else if (moveStartGrid.current) {
-            const offset = moveOffsetRef.current;
-            if (offset && (offset.dx !== 0 || offset.dy !== 0)) {
-                const curSelWalls = selectedWallsRef.current;
-                const curSelItems = selectedItemsRef.current;
-                const bounds = selectionBoundsRef.current;
-                const dstBounds = bounds && {
-                    minX: bounds.minX + offset.dx,
-                    maxX: bounds.maxX + offset.dx,
-                    minY: bounds.minY + offset.dy,
-                    maxY: bounds.maxY + offset.dy,
-                };
-
-                setMapData((prev) => {
-                    const newWalls = new Set(prev.walls);
-                    // Step 1: clear the entire destination rect
-                    if (dstBounds) {
-                        for (let y = dstBounds.minY; y <= dstBounds.maxY; y++) {
-                            for (let x = dstBounds.minX; x <= dstBounds.maxX; x++) {
-                                newWalls.delete(`${x},${y}`);
-                            }
-                        }
-                    }
-                    // Step 2: remove all source positions first, then add all destinations
-                    // (Two phases prevent later deletes from undoing earlier adds)
-                    for (const key of curSelWalls) {
-                        newWalls.delete(key);
-                    }
-                    for (const key of curSelWalls) {
-                        const [x, y] = key.split(',').map(Number);
-                        newWalls.add(`${x + offset.dx},${y + offset.dy}`);
-                    }
-                    return { ...prev, walls: newWalls };
-                });
-
-                setSelectedWalls((prev) => {
-                    const next = new Set();
-                    for (const key of prev) {
-                        const [x, y] = key.split(',').map(Number);
-                        next.add(`${x + offset.dx},${y + offset.dy}`);
-                    }
-                    return next;
-                });
-
-                if (bounds) {
-                    selectionBoundsRef.current = {
-                        minX: bounds.minX + offset.dx,
-                        maxX: bounds.maxX + offset.dx,
-                        minY: bounds.minY + offset.dy,
-                        maxY: bounds.maxY + offset.dy,
-                    };
-                }
-
-                setPlacedItems((prev) =>
-                    prev.map(item =>
-                        curSelItems.has(item.id)
-                            ? { ...item, gridX: item.gridX + offset.dx, gridY: item.gridY + offset.dy }
-                            : item
-                    )
-                );
-            }
-            moveStartGrid.current = null;
-            moveOffsetRef.current = null;
-            setMoveOffset(null);
-        }
-    }, [isLocalhost]);
-
-    const handlePanStart = useCallback((e) => {
-        if (spellDragActiveRef.current) return;
-        if (tool === 'paint' || tool === 'erase') {
-            handleGridPointerDown(e);
-            return;
-        }
-        if (tool === 'select') {
-            handleSelectPointerDown(e);
-            return;
-        }
-        if (tool === 'room') {
-            handleRoomPointerDown(e);
-            return;
-        }
-        if (e.button !== 0) return;
-        e.preventDefault();
-        const svg = svgRef.current;
-        if (!svg) return;
-        const svgPt = clientToSVG(e.clientX, e.clientY);
-        if (!svgPt) return;
-        setPanning({
-            startX: svgPt.x,
-            startY: svgPt.y,
-            startPanX: panX,
-            startPanY: panY
-        });
-    }, [tool, panX, panY, handleGridPointerDown, handleSelectPointerDown, handleRoomPointerDown, clientToSVG]);
-
-    const handlePanMove = useCallback((e) => {
-        if (!panning) return;
-        e.preventDefault();
-        const svgPt = clientToSVG(e.clientX, e.clientY);
-        if (!svgPt) return;
-        const dx = svgPt.x - panning.startX;
-        const dy = svgPt.y - panning.startY;
-        setPanX(panning.startPanX - dx);
-        setPanY(panning.startPanY - dy);
-    }, [panning, clientToSVG]);
-
-    const handlePanEnd = useCallback((e) => {
-        const svg = svgRef.current;
-        if (svg) svg.releasePointerCapture(e.pointerId);
-        setPanning(null);
-    }, []);
-
-    const handleWheel = useCallback((e) => {
-        if (!e.metaKey) return;
-        e.preventDefault();
-        const svgPt = clientToSVG(e.clientX, e.clientY);
-        if (!svgPt) return;
-        const currentZoom = zoomValueRef.current;
-        const currentPanX = panXValueRef.current;
-        const currentPanY = panYValueRef.current;
-        accumulatedDeltaRef.current += e.deltaY;
-        const accumulated = accumulatedDeltaRef.current;
-        const ZOOM_THRESHOLD = 20;
-        let factor = 1;
-        if (accumulated < -ZOOM_THRESHOLD) {
-            factor = 1.05;
-            accumulatedDeltaRef.current = 0;
-        } else if (accumulated > ZOOM_THRESHOLD) {
-            factor = 0.95;
-            accumulatedDeltaRef.current = 0;
-        }
-        const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, currentZoom * factor));
-        const newPanX = svgPt.x - (svgPt.x - currentPanX) * (currentZoom / newZoom);
-        const newPanY = svgPt.y - (svgPt.y - currentPanY) * (currentZoom / newZoom);
-        setZoom(newZoom);
-        setPanX(newPanX);
-        setPanY(newPanY);
-   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-    useEffect(() => {
-        if (loadedMapNameRef.current === mapName) return;
-        loadedMapNameRef.current = mapName;
-        loadInProgressRef.current = true;
-
-        const loadMap = async () => {
-            try {
-                const existing = await mapsService.loadMapData(campaignName, mapName);
-                if (existing) {
-                    // LOAD PATH — entered for any existing map data (generated or hand-made)
-                    const walls = existing.walls
-                        ? new Set(existing.walls)
-                        : new Set();
-                    setMapData({ ...existing, walls });
-                    setGridSize(existing.gridSize || 30);
-                    setPlacedItems(existing.placedItems || []);
-
-                    // Remove players whose characters no longer exist in the campaign
-                    if (characters && characters.length > 0) {
-                        const charNames = new Set(characters.map(c => c.name));
-                        const existingPlayers = existing.players || [];
-                        const reconciled = existingPlayers.filter(p => charNames.has(p.name));
-                        if (reconciled.length !== existingPlayers.length) {
-                            setMapData(prev => ({ ...prev, players: reconciled }));
-                        }
-                    }
-
-                    return;
-                }
-             } catch (err) {
-                 // ignore, fall through to empty map creation
-             }
-
-            const newData = { players: [], walls: new Set(), rooms: [] };
-
-            setMapData(newData);
-            // Save initial data
-            const dataToSave = {
-                ...newData,
-                gridSize,
-                walls: [],
-                placedItems: [],
-            };
-            mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save initial map data:', err));
-        };
-
-        loadMap().finally(() => { loadInProgressRef.current = false; });
-    }, [campaignName, characters, mapName, gridSize]);
-
-    // Save map data whenever it changes
-    useEffect(() => {
-        if (!mapData) return;
-        // Don't save stale mapData while a new map is loading
-        if (loadInProgressRef.current) return;
-        // Convert walls Set to array for storage
-        const dataToSave = {
-            ...mapData,
-            gridSize,
-            walls: Array.from(mapData.walls || []),
-            placedItems: placedItems,
-            rooms: mapData.rooms || [],
-        };
-        lastSavedWallsRef.current = dataToSave.walls;
-        mapsService.saveMapData(campaignName, mapName, dataToSave).catch(err => console.error('Failed to save map data:', err));
-    }, [mapData, campaignName, gridSize, placedItems, mapName]);
-
-    // SSE handler for real-time updates from other clients
     const { handleSSEEvent: handleMapSSEEvent } = useSSESync({
-        campaignName,
-        mapName,
-        setGridSize,
-        setMapData,
-        setPlacedItems,
-      });
+        campaignName, mapName, setGridSize, setMapData, setPlacedItems,
+    });
 
-    // Combined SSE handler for both map data and spell overlays
     const handleSSEEvent = useCallback((event) => {
         handleMapSSEEvent(event);
         handleSpellOverlayEvent(event);
     }, [handleMapSSEEvent, handleSpellOverlayEvent]);
 
     const { dragging, handlePointerDown, handlePointerMove, handlePointerUp } = usePlayerDragging({
-        svgRef,
-        mapData,
-        gridSize,
-        panX,
-        panY,
-        setMapData,
-        gridCenterX,
-        gridCenterY,
-        rulerMode,
-        spellMode,
+        svgRef, mapData, gridSize, panX, panY, setMapData, gridCenterX, gridCenterY, rulerMode, spellMode,
     });
 
     const { itemDragging, handleItemPointerDown, handleItemPointerMove, handleItemPointerUp: handleItemPointerUpHook, handleItemPointerLeave } = useItemDragging({
-        svgRef,
-        placedItems,
-        setPlacedItems,
-        gridSize,
-        gridCenterX,
-        gridCenterY,
-        rulerMode,
-        spellMode,
+        svgRef, placedItems, setPlacedItems, gridSize, gridCenterX, gridCenterY, rulerMode, spellMode,
     });
 
     const fog = useFogOfWar(mapData?.players, mapData?.walls, placedItems, gridSize);
-
-
-    // Handle drop from items panel onto grid
-    const handleDrop = useCallback((e) => {
-        e.preventDefault();
-        const grid = getGridFromEvent(e);
-        if (!grid) return;
-        const dragData = e.dataTransfer.getData('text/plain');
-        if (!dragData) return;
-
-        // Character drop from ItemsPanel — add player to map
-        if (dragData.startsWith('character:')) {
-            const charName = dragData.slice('character:'.length);
-            setMapData(prev => {
-                const existing = prev.players || [];
-                if (existing.some(p => p.name === charName)) return prev;
-                return {
-                    ...prev,
-                    players: [...existing, {
-                        id: charName.toLowerCase().replace(/\s+/g, '-'),
-                        name: charName,
-                        gridX: grid.gridX,
-                        gridY: grid.gridY
-                    }]
-                };
-            });
-            return;
-        }
-
-        // Generic NPC drop
-        if (dragData === 'npc') {
-            const newItem = {
-                id: utils.guid(),
-                type: 'npc',
-                gridX: grid.gridX,
-                gridY: grid.gridY,
-                visible: isLocalhost,
-                name: 'NPC',
-            };
-            setPlacedItems(prev => [...prev, newItem]);
-            return;
-        }
-
-        const newItem = {
-            id: utils.guid(),
-            type: dragData,
-            gridX: grid.gridX,
-            gridY: grid.gridY,
-            visible: isLocalhost,
-            rotation: (dragData === 'table' || dragData === 'bed' || dragData === 'stairs' || dragData === 'altar' || dragData === 'bookshelf' || dragData === 'torch' || dragData === 'chair' || dragData === 'arrowSlitWall') ? 0 : undefined
-        };
-        setPlacedItems(prev => [...prev, newItem]);
-    }, [isLocalhost, getGridFromEvent]);
 
     const { npcImages, setNpcImages } = useNpcImageCache(placedItems);
 
@@ -1042,9 +194,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         );
         setRenamePopover(null);
         setSelectedItem(null);
-        // Clear the cached image so it gets recomputed
         setNpcImages(prev => ({ ...prev, [newName.trim()]: null }));
-    }, [setNpcImages]);
+    }, [setNpcImages, setPlacedItems, setRenamePopover, setSelectedItem]);
 
     const {
         handleToggleItemVisibility,
@@ -1056,58 +207,96 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const handleRemovePlayer = useCallback((playerId) => {
         setMapData(prev => ({
             ...prev,
-            players: (prev.players || []).filter(p => p.id !== playerId)
+            players: (prev.players || []).filter(p => p.id !== playerId),
         }));
         setSelectedPlayer(null);
-    }, []);
+    }, [setMapData]);
 
-// Close context menu
     const handleCloseMenu = useCallback(() => {
         setSelectedItem(null);
         setSelectedPlayer(null);
         setSelectedRoom(null);
         setRenamePopover(null);
-       }, []);
+    }, [setSelectedItem, setSelectedPlayer, setSelectedRoom, setRenamePopover]);
 
-    // Open rename autocomplete as HTML overlay positioned near the context menu
-        const handleRenameClicked = (event, item, defaultName) => {
-            if (!svgRef.current) return;
-            const svgRect = svgRef.current.getBoundingClientRect();
+    const handleRenameClicked = (event, item, defaultName) => {
+        if (!svgRef.current) return;
+        const svgRect = svgRef.current.getBoundingClientRect();
+        const placedItem = placedItems.find(i => i.id === item.id);
+        const vbX = panX;
+        const vbY = panY;
+        const scaleX = svgRect.width / (SVG_SIZE / zoom);
+        const scaleY = svgRect.height / (SVG_SIZE / zoom);
+        const menuSvgX = gridCenterX(item.gridX) + 10;
+        const menuSvgY = gridCenterY(item.gridY) + 10;
+        const domX = svgRect.left + (menuSvgX - vbX) * scaleX;
+        const domY = svgRect.top + (menuSvgY - vbY) * scaleY + 80;
+        setSelectedItem(null);
+        setRenamePopover({ itemName: placedItem?.name || defaultName || 'NPC', name: defaultName || placedItem?.name || 'NPC', position: { left: `${domX}px`, top: `${domY}px` } });
+    };
 
-            const placedItem = placedItems.find(i => i.id === item.id);
+    useEffect(() => { placedItemsRef.current = placedItems; }, [placedItems, placedItemsRef]);
+    useEffect(() => { selectedWallsRef.current = selectedWalls; }, [selectedWalls, selectedWallsRef]);
+    useEffect(() => { selectedItemsRef.current = selectedItems; }, [selectedItems, selectedItemsRef]);
+    useEffect(() => { mapDataRef.current = mapData; }, [mapData, mapDataRef]);
 
-             // Convert SVG coords to DOM position
-            const vbX = panX;
-            const vbY = panY;
-            const scaleX = svgRect.width / (SVG_SIZE / zoom);
-            const scaleY = svgRect.height / (SVG_SIZE / zoom);
+    const handleToolPanStart = useCallback((e) => {
+        if (spellDragActiveRef.current) return;
+        if (tool === TOOL_PAINT || tool === TOOL_ERASE) {
+            handleGridPointerDown(e, setMapData);
+            return;
+        }
+        if (tool === TOOL_SELECT) {
+            handleSelectPointerDown(e, placedItems, mapData);
+            return;
+        }
+        if (tool === TOOL_ROOM) {
+            handleRoomPointerDown(e);
+            return;
+        }
+        handlePanStart(e, panX, panY);
+    }, [tool, panX, panY, handleGridPointerDown, handleSelectPointerDown, handleRoomPointerDown, handlePanStart, placedItems, mapData, setMapData, spellDragActiveRef]);
 
-            const menuSvgX = gridCenterX(item.gridX) + 10;
-            const menuSvgY = gridCenterY(item.gridY) + 10;
+    const handleToolPointerMove = useCallback((e) => {
+        handlePointerMove(e);
+        handleItemPointerMove(e);
+        handleGridPointerMove(e, setMapData, painting, tool);
+        handleSelectPointerMove(e);
+        handleRoomPointerMove(e);
+        handlePanMove(e);
+        handleSpellPointerMove(e, spellDraft);
+        handleSpellDragMove(e, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlay);
+        handleRulerPointerMove(e, rulerMode, rulerStart, rulerEnd, getGridFromEvent);
+    }, [handlePointerMove, handleItemPointerMove, handleGridPointerMove, handleSelectPointerMove, handleRoomPointerMove, handlePanMove, handleSpellPointerMove, handleSpellDragMove, handleRulerPointerMove, setMapData, painting, tool, spellDraft, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlay, rulerMode, rulerStart, rulerEnd]);
 
-            const domX = svgRect.left + (menuSvgX - vbX) * scaleX;
-            const domY = svgRect.top + (menuSvgY - vbY) * scaleY + 80;
+    const handleToolPointerUp = useCallback((e) => {
+        handlePointerUp(e);
+        handleItemPointerUpHook(e);
+        handleGridPointerUp(e);
+        handleSelectPointerUp(e, placedItems, mapData, setMapData, setPlacedItems);
+        handleRoomPointerUp(e, gridSize, setMapData);
+        handlePanEnd(e);
+        handleSpellPointerUp(e, spellDraft, spellMode, addOverlay, shapeParams);
+        handleSpellDragEnd(e, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlayImmediate, svgRef);
+        handleRulerPointerUp(e, rulerMode, svgRef);
+    }, [handlePointerUp, handleItemPointerUpHook, handleGridPointerUp, handleSelectPointerUp, handleRoomPointerUp, handlePanEnd, handleSpellPointerUp, handleSpellDragEnd, handleRulerPointerUp, placedItems, mapData, setMapData, setPlacedItems, gridSize, spellDraft, spellMode, addOverlay, shapeParams, dragOverlay, rotateOverlay, overlays, getGridFromEvent, clientToSVG, updateOverlayImmediate, rulerMode, svgRef]);
 
-            setSelectedItem(null);
-            setRenamePopover({ itemName: placedItem?.name || defaultName || 'NPC', name: defaultName || placedItem?.name || 'NPC', position: { left: `${domX}px`, top: `${domY}px` } });
-             };
+    const handleToolPointerLeave = useCallback((e) => {
+        handleItemPointerLeave();
+        handleGridPointerLeave(e);
+        handleSelectPointerUp(e, placedItems, mapData, setMapData, setPlacedItems);
+    }, [handleItemPointerLeave, handleGridPointerLeave, handleSelectPointerUp, placedItems, mapData, setMapData, setPlacedItems]);
 
-    // Sync state to refs so handleWheel always reads latest values
-    useEffect(() => { zoomValueRef.current = zoom; }, [zoom]);
-    useEffect(() => { panXValueRef.current = panX; }, [panX]);
-    useEffect(() => { panYValueRef.current = panY; }, [panY]);
-
-    // Sync refs for selection/move handlers
-    useEffect(() => { placedItemsRef.current = placedItems; }, [placedItems]);
-    useEffect(() => { selectedWallsRef.current = selectedWalls; }, [selectedWalls]);
-    useEffect(() => { selectedItemsRef.current = selectedItems; }, [selectedItems]);
-    useEffect(() => { mapDataRef.current = mapData; }, [mapData]);
-
-
+    const handleSetRulerMode = useCallback((value) => {
+        setRulerMode(value);
+        if (value) {
+            setSpellMode(null);
+            resetRuler();
+        }
+    }, [setRulerMode, setSpellMode, resetRuler]);
 
     if (!mapData) return null;
 
-    // Outdoor map dispatcher — render HexMap for outdoor terrain maps
     if (mapData?.type === 'outdoor') {
         return <HexMap campaignName={campaignName} mapName={mapName} onBack={onBack} characters={characters} onEncounterCreated={onEncounterCreated} isLocalhost={isLocalhost} onPoiEntered={onPoiEntered} />;
     }
@@ -1130,13 +319,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 resetView={resetView}
                 onBack={onBack}
                 rulerMode={rulerMode}
-                setRulerMode={(value) => {
-                    setRulerMode(value);
-                    if (value) {
-                        setSpellMode(null);
-                        resetRuler();
-                    }
-                }}
+                setRulerMode={handleSetRulerMode}
                 spellOverlayState={{
                     spellMode,
                     setSpellMode,
@@ -1154,16 +337,16 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 ref={svgRef}
                 viewBox={`${panX} ${panY} ${SVG_SIZE / zoom} ${SVG_SIZE / zoom}`}
                 className="grid-svg"
-                onPointerDown={(e) => { handleSpellPointerDown(e); handleRulerPointerDown(e); handlePanStart(e); }}
-                onPointerMove={(e) => { handlePointerMove(e); handleItemPointerMove(e); handleGridPointerMove(e); handleSelectPointerMove(e); handleRoomPointerMove(e); handlePanMove(e); handleSpellPointerMove(e); handleSpellDragMove(e); handleRulerPointerMove(e); }}
-                onPointerUp={(e) => { handlePointerUp(e); handleItemPointerUpHook(e); handleGridPointerUp(e); handleSelectPointerUp(e); handleRoomPointerUp(e); handlePanEnd(e); handleSpellPointerUp(e); handleSpellDragEnd(e); handleRulerPointerUp(e); }}
-                onPointerLeave={(e) => { handleItemPointerLeave(); handleGridPointerLeave(e); handleSelectPointerUp(e); }}
+                onPointerDown={(e) => { handleSpellPointerDown(e, spellMode, overlays); handleRulerPointerDown(e, rulerMode, rulerStart, rulerEnd, getGridFromEvent, svgRef); handleToolPanStart(e); }}
+                onPointerMove={handleToolPointerMove}
+                onPointerUp={handleToolPointerUp}
+                onPointerLeave={handleToolPointerLeave}
                 onWheel={handleWheel}
                 onContextMenu={(e) => e.preventDefault()}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDrop}
-                onClick={(e) => { if (e.button === 0) handleCloseMenu(); handleRoomClick(e); }}
-                style={{ cursor: panning ? 'grabbing' : rulerMode ? 'crosshair' : (tool === 'none' ? 'grab' : tool === 'select' ? (moveOffset ? 'grabbing' : 'crosshair') : tool === 'room' ? 'crosshair' : 'default') }}
+                onClick={(e) => { if (e.button === 0) handleCloseMenu(); handleRoomClick(e, mapData, tool); }}
+                style={{ cursor: panning ? 'grabbing' : rulerMode ? 'crosshair' : (tool === TOOL_NONE ? 'grab' : tool === TOOL_SELECT ? (moveOffset ? 'grabbing' : 'crosshair') : tool === TOOL_ROOM ? 'crosshair' : 'default') }}
             >
                 <defs>
                     <BarrelSVG id="barrel" />
@@ -1199,7 +382,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     bgFill={mapData.bgFill}
                 />
 
-                {/* Characters */}
                 <Players
                     players={players}
                     characters={characters}
@@ -1213,7 +395,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     setSelectedPlayer={setSelectedPlayer}
                 />
 
-                {/* Placed items */}
                 <PlacedItems
                     placedItems={placedItems}
                     isLocalhost={isLocalhost}
@@ -1231,8 +412,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     isLocalhost={isLocalhost}
                 />
 
-                {/* Selection overlay */}
-                {/* Live selection drag preview (dashed rect) */}
                 {selectStart.current && selectionRect && (() => {
                     const { minX, maxX, minY, maxY } = selectionRect;
                     return (
@@ -1246,7 +425,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     );
                 })()}
 
-                {/* Room draw preview */}
                 {roomDrawRect && (() => {
                     const { minX, maxX, minY, maxY } = roomDrawRect;
                     return (
@@ -1260,7 +438,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     );
                 })()}
 
-                {/* Room highlights and labels */}
                 {(mapData?.rooms || []).map(room => {
                     const r = room.rect;
                     const isSelected = selectedRoom && selectedRoom.id === room.id;
@@ -1274,8 +451,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                                 height={r.h * CELL_SIZE}
                                 className={`room-highlight ${typeClass} ${isSelected ? 'room-selected' : ''}`}
                             />
-                            {/* Invisible hit area for click/hover */}
-                            {(tool === 'none' || tool === 'select') && (
+                            {(tool === TOOL_NONE || tool === TOOL_SELECT) && (
                                 <rect
                                     x={r.x * CELL_SIZE}
                                     y={r.y * CELL_SIZE}
@@ -1298,7 +474,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     );
                 })}
 
-                {/* Committed selection outline (solid rect) */}
                 {!selectStart.current && !moveStartGrid.current && (selectedWalls.size > 0 || selectedItems.size > 0) && (() => {
                     let mnX = Infinity, mxX = -Infinity, mnY = Infinity, mxY = -Infinity;
                     for (const key of selectedWalls) {
@@ -1325,7 +500,6 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     );
                 })()}
 
-                {/* Selected wall highlights */}
                 {selectedWalls.size > 0 && Array.from(selectedWalls).map(key => {
                     const [gx, gy] = key.split(',').map(Number);
                     return (
@@ -1338,9 +512,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                             className="selection-wall"
                         />
                     );
-                })}
+                })()}
 
-                {/* Selected item highlights */}
                 {selectedItems.size > 0 && placedItems.filter(item => selectedItems.has(item.id)).map(item => {
                     const w = (item.type === 'table' || item.type === 'bed' || item.type === 'altar' || item.type === 'bookshelf')
                         && item.rotation !== 90 && item.rotation !== 270 ? CELL_SIZE * 2 : CELL_SIZE;
@@ -1356,9 +529,8 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                             className="selection-item-highlight"
                         />
                     );
-                })}
+                })()}
 
-                {/* Move drag preview (dashed rect at offset) */}
                 {moveOffset && (moveOffset.dx !== 0 || moveOffset.dy !== 0) && (selectedWalls.size > 0 || selectedItems.size > 0) && (() => {
                     let mnX = Infinity, mxX = -Infinity, mnY = Infinity, mxY = -Infinity;
                     for (const key of selectedWalls) {
@@ -1385,142 +557,44 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                     );
                 })()}
 
-                  {/* Item context menu */}
-                   <ItemContextMenu
-                      selectedItem={selectedItem}
-                      placedItems={placedItems}
-                      gridCenterX={gridCenterX}
-                      gridCenterY={gridCenterY}
-                      handleToggleItemVisibility={handleToggleItemVisibility}
-                      handleDeleteItem={handleDeleteItem}
-                      handleToggleDoor={handleToggleDoor}
-                      handleRotate={handleRotate}
-                      handleViewStats={handleViewStats}
-                      monsterFound={monsterFound}
-                      onRenameClicked={handleRenameClicked}
-                     onClose={handleCloseMenu}
-                    />
+                <ItemContextMenu
+                    selectedItem={selectedItem}
+                    placedItems={placedItems}
+                    gridCenterX={gridCenterX}
+                    gridCenterY={gridCenterY}
+                    handleToggleItemVisibility={handleToggleItemVisibility}
+                    handleDeleteItem={handleDeleteItem}
+                    handleToggleDoor={handleToggleDoor}
+                    handleRotate={handleRotate}
+                    handleViewStats={handleViewStats}
+                    monsterFound={monsterFound}
+                    onRenameClicked={handleRenameClicked}
+                    onClose={handleCloseMenu}
+                />
 
-                {/* Room context menu */}
-                {selectedRoom && isLocalhost && (() => {
-                    const r = selectedRoom.rect;
-                    const menuX = Math.min((r.x + r.w) * CELL_SIZE + 10, gridSize * CELL_SIZE - 140);
-                    const menuY = r.y * CELL_SIZE;
-                    const roomTypes = ['entrance', 'common', 'utility', 'private', 'grand', 'hall'];
-                    return (
-                        <g className="item-context-menu" onClick={(e) => e.stopPropagation()}>
-                            <g>
-                                <rect x={menuX} y={menuY} width="130" height={72 + roomTypes.length * 20} rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
-                                <text x={menuX + 8} y={menuY + 16} fill="#e0e0e0" fontSize="11" fontWeight="bold">Room</text>
-                                <text
-                                    x={menuX + 8}
-                                    y={menuY + 34}
-                                    fill="#ccc"
-                                    fontSize="11"
-                                    className="menu-option"
-                                    onClick={() => {
-                                        const label = prompt('Room label:', selectedRoom.label || '');
-                                        if (label !== null) {
-                                            setMapData(prev => ({
-                                                ...prev,
-                                                rooms: (prev.rooms || []).map(rr =>
-                                                    rr.id === selectedRoom.id ? { ...rr, label } : rr
-                                                ),
-                                            }));
-                                        }
-                                        setSelectedRoom(null);
-                                    }}
-                                >
-                                    Set Label...
-                                </text>
-                                {roomTypes.map((type, i) => {
-                                    const colorMap = { entrance: '#4caf50', common: '#4a90d9', utility: '#ff9800', private: '#ce93d8', grand: '#ffd700', hall: '#4dd0e1' };
-                                    return (
-                                        <g key={type} style={{ cursor: 'pointer' }} onClick={() => {
-                                            setMapData(prev => ({
-                                                ...prev,
-                                                rooms: (prev.rooms || []).map(rr =>
-                                                    rr.id === selectedRoom.id ? { ...rr, type } : rr
-                                                ),
-                                            }));
-                                            setSelectedRoom(null);
-                                        }}>
-                                            <rect x={menuX + 8} y={menuY + 52 + i * 20 - 6} width={8} height={8} rx={2} fill={colorMap[type] || '#888'} />
-                                            <text
-                                                x={menuX + 20}
-                                                y={menuY + 52 + i * 20}
-                                                fill={selectedRoom.type === type ? '#fff' : '#ccc'}
-                                                fontSize="11"
-                                                fontWeight={selectedRoom.type === type ? 'bold' : 'normal'}
-                                                className="menu-option"
-                                            >
-                                                {type.charAt(0).toUpperCase() + type.slice(1)}
-                                            </text>
-                                        </g>
-                                    );
-                                })}
-                                <text
-                                    x={menuX + 8}
-                                    y={menuY + 52 + roomTypes.length * 20}
-                                    fill="#e74c3c"
-                                    fontSize="11"
-                                    className="menu-option"
-                                    onClick={() => {
-                                        setMapData(prev => ({
-                                            ...prev,
-                                            rooms: (prev.rooms || []).filter(rr => rr.id !== selectedRoom.id),
-                                        }));
-                                        setSelectedRoom(null);
-                                    }}
-                                >
-                                    Delete Room
-                                </text>
-                                <text x={menuX + 118} y={menuY + 14} fill="#999" fontSize="10" className="menu-close" onClick={() => setSelectedRoom(null)}>✕</text>
-                            </g>
-                        </g>
-                    );
-                })()}
+                <RoomContextMenu
+                    selectedRoom={selectedRoom}
+                    isLocalhost={isLocalhost}
+                    gridSize={gridSize}
+                    gridCenterX={gridCenterX}
+                    gridCenterY={gridCenterY}
+                    setMapData={setMapData}
+                    setSelectedRoom={setSelectedRoom}
+                />
 
-                {/* Player context menu */}
-                {selectedPlayer && (() => {
-                    const menuX = gridCenterX(selectedPlayer.gridX) + 10;
-                    const menuY = gridCenterY(selectedPlayer.gridY) + 10;
-                    return (
-                        <g className="item-context-menu" onClick={(e) => e.stopPropagation()}>
-                            <g>
-                                <rect x={menuX} y={menuY} width="120" height="36" rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
-                                <text
-                                    x={menuX + 8}
-                                    y={menuY + 24}
-                                    fill="#ccc"
-                                    fontSize="11"
-                                    className="menu-option"
-                                    onClick={() => handleRemovePlayer(selectedPlayer.id)}
-                                >
-                                    Remove from Map
-                                </text>
-                                <text
-                                    x={menuX + 108}
-                                    y={menuY + 12}
-                                    fill="#999"
-                                    fontSize="10"
-                                    className="menu-close"
-                                    onClick={() => setSelectedPlayer(null)}
-                                >
-                                    ✕
-                                </text>
-                            </g>
-                        </g>
-                    );
-                })()}
+                <PlayerContextMenu
+                    selectedPlayer={selectedPlayer}
+                    gridCenterX={gridCenterX}
+                    gridCenterY={gridCenterY}
+                    handleRemovePlayer={handleRemovePlayer}
+                    setSelectedPlayer={setSelectedPlayer}
+                />
 
-                {/* Spell overlays */}
                 <SpellOverlayRenderer
                     overlays={overlays}
                     pendingOverlay={spellDraft ? { ...spellDraft, shape: spellMode, ...shapeParams, id: 'pending' } : null}
                 />
 
-                {/* Ruler measurement overlay */}
                 <RulerOverlay
                     start={rulerStart}
                     end={rulerEnd || rulerPreview}
@@ -1528,30 +602,27 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
                 />
             </svg>
 
-              {/* NPC Rename Autocomplete Overlay */}
-                  {renamePopover && (
-                      <MonsterNameAutocomplete
-                        key={renamePopover.name}
-                        value={renamePopover.name}
-                        position={renamePopover.position}
-                        onCommit={(newName) => handleRenameItem(renamePopover.itemName, newName)}
-                    />
-                 )}
+            {renamePopover && (
+                <MonsterNameAutocomplete
+                    key={renamePopover.name}
+                    value={renamePopover.name}
+                    position={renamePopover.position}
+                    onCommit={(newName) => handleRenameItem(renamePopover.itemName, newName)}
+                />
+            )}
 
-                 {/* Items panel sidebar */}
-                  {isLocalhost && itemsPanelOpen && (
-                      <ItemsPanel
-                         itemsPanelOpen={itemsPanelOpen}
-                         placedItems={placedItems}
-                         onToggleItemVisibility={handleToggleItemVisibility}
-                         onClose={() => setItemsPanelOpen(false)}
-                         characters={characters}
-                         players={players}
-                         mapVariant={mapData.parentHex ? 'outdoor' : 'indoor'}
-                      />
-                  )}
+            {isLocalhost && itemsPanelOpen && (
+                <ItemsPanel
+                    itemsPanelOpen={itemsPanelOpen}
+                    placedItems={placedItems}
+                    onToggleItemVisibility={handleToggleItemVisibility}
+                    onClose={() => setItemsPanelOpen(false)}
+                    characters={characters}
+                    players={players}
+                    mapVariant={mapData.parentHex ? 'outdoor' : 'indoor'}
+                />
+            )}
 
-            {/* Monster Card Modal for NPC context menu */}
             {viewingMonster && (
                 <MonsterCardModal
                     monster={viewingMonster}

@@ -1,6 +1,5 @@
 import { OverlayShape, toGrid, svgOrigin } from '../../models/SpellOverlay.js';
-
-const CELL_SIZE = 40;
+import { CELL_SIZE } from '../../config/mapConfig';
 
 const HANDLE_RADIUS = 6;
 
