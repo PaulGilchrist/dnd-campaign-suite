@@ -295,17 +295,18 @@ const classRules = {
             let metamagicKnown = 0;
             if (playerStats.level >= 17) {
                 metamagicKnown = 6;
-            } else if (playerStats.level >= 10) {
+             } else if (playerStats.level >= 10) {
                 metamagicKnown = 4;
-            } else if (playerStats.level >= 3) {
+             } else if (playerStats.level >= 3) {
                 metamagicKnown = 2;
-            }
+             }
             return {
                 maxSorceryPoints,
                 metamagicKnown,
+                maxInnateSorcery: 2,
                 creatingSpellSlotCosts: []
-            };
-        },
+             };
+         },
         getWarlockFeatures(playerStats) {
             const invocationsKnown = this.getEldritchInvocations(playerStats);
             return {

@@ -233,7 +233,7 @@ const SorcererFeatures = function SorcererFeatures({ playerStats, campaignName }
                    <TrackedResourceInput label="Sorcery Points" resourceKey="sorceryPoints" playerName={playerStats.name} getMax={() => sorcererFeatures?.maxSorceryPoints || 0} deps={[playerStats]} campaignName={campaignName} />
                    <TrackedResourceInput label="Metamagic Known" resourceKey="metamagicKnown" playerName={playerStats.name} getMax={() => sorcererFeatures?.metamagicKnown || 0} deps={[playerStats]} campaignName={campaignName} />
                    {hasRestoration && <TrackedResourceInput label="Sorcerous Restoration" resourceKey="sorcerousRestorationUses" playerName={playerStats.name} getMax={() => 1} deps={[playerStats]} campaignName={campaignName} />}
-                   <TrackedResourceInput label="Innate Sorcery" resourceKey="innateSorceryUses" playerName={playerStats.name} getMax={() => 2} deps={[playerStats]} campaignName={campaignName} />
+                    <TrackedResourceInput label="Innate Sorcery" resourceKey="innateSorceryUses" playerName={playerStats.name} getMax={() => sorcererFeatures?.maxInnateSorcery || 0} deps={[playerStats]} campaignName={campaignName} />
                   {innateSorceryActive && <span className="automation-badge">+1 Save DC, Spell Adv</span>}
                   {sorcererFeatures?.creatingSpellSlotCosts?.length > 0 && <div><b>Spell Slot (level 1-5) Costs: </b>{sorcererFeatures.creatingSpellSlotCosts.join(', ')}</div>}
 

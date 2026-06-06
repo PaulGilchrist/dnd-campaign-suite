@@ -793,9 +793,9 @@ addExpiration(playerStats.name, targetName, [
                 break;
             }
             case 'sorcery_aura': {
-                const usesUsed = Number(getRuntimeValue(playerStats.name, 'innateSorceryUses', campaignName) ?? 0);
-                const usesMax = auto.uses_max || 2;
-                const remaining = usesMax - usesUsed;
+                const currentUses = getRuntimeValue(playerStats.name, 'innateSorceryUses', campaignName);
+                const usesMax = getClassFeatures(playerStats)?.maxInnateSorcery || 2;
+                const remaining = currentUses != null ? Number(currentUses) : usesMax;
 
                 if (remaining <= 0) {
                     if (setPopupHtml) {
@@ -803,15 +803,15 @@ addExpiration(playerStats.name, targetName, [
                             type: 'automation_info',
                             name: action.name,
                             automationType: auto.type,
-                            description: `${action.name} has no remaining uses. Recharges on a long rest (${usesMax}/${usesMax} used).`,
+                            description: `${action.name} has no remaining uses. Recharges on a long rest.`,
                             automation: auto,
-                           });
-                      }
+                              });
+                         }
                     return;
-                   }
+                  }
 
-            const newUses = usesUsed + 1;
-                    setRuntimeValue(playerStats.name, 'innateSorceryUses', newUses, campaignName);
+                const newRemaining = remaining - 1;
+                    setRuntimeValue(playerStats.name, 'innateSorceryUses', newRemaining, campaignName);
 
                     setInnateSorceryActive(playerStats.name, true, campaignName);
                     if (onBuffsChange) onBuffsChange();
@@ -823,30 +823,31 @@ addExpiration(playerStats.name, targetName, [
                         type: 'automation_info',
                         name: action.name,
                         automationType: auto.type,
-                        description: `${action.name} activated (${usesMax - newUses}/${usesMax} uses remaining).`,
+                        description: `${action.name} activated (${newRemaining}/${usesMax} uses remaining).`,
                         automation: auto,
-                        });
-                    }
-                 break;
-                }
+                          });
+                      }
+                  break;
+                   }
             case 'sorcery_incarnate': {
                 const cost = auto.cost || 2;
-                const innateSorceryUses = Number(getRuntimeValue(playerStats.name, 'innateSorceryUses', campaignName) ?? 0);
-                const usesMax = auto.uses_max || 2;
+                const currentUses = getRuntimeValue(playerStats.name, 'innateSorceryUses', campaignName);
+                const usesMax = getClassFeatures(playerStats)?.maxInnateSorcery || 2;
+                const remaining = currentUses != null ? Number(currentUses) : usesMax;
                 const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
 
-                if (innateSorceryUses < usesMax) {
+                if (remaining > 0) {
                     if (setPopupHtml) {
                         setPopupHtml({
                             type: 'automation_info',
                             name: action.name,
                             automationType: auto.type,
-                            description: `Cannot use ${action.name} while Innate Sorcery still has uses remaining (${usesMax - innateSorceryUses} uses left).`,
+                            description: `Cannot use ${action.name} while Innate Sorcery still has uses remaining (${remaining} uses left).`,
                             automation: auto,
-                           });
-                      }
+                              });
+                         }
                     return;
-                   }
+                  }
 
                 if (currentSP < cost) {
                     if (setPopupHtml) {
@@ -856,13 +857,13 @@ addExpiration(playerStats.name, targetName, [
                             automationType: auto.type,
                             description: `Not enough Sorcery Points to use ${action.name}. Cost: ${cost} SP, Have: ${currentSP} SP.`,
                             automation: auto,
-                           });
-                      }
+                              });
+                         }
                     return;
-                   }
+                  }
 
                 spendSorceryPoints(playerStats.name, cost, campaignName);
-                 setRuntimeValue(playerStats.name, 'innateSorceryUses', 0, campaignName);
+                 setRuntimeValue(playerStats.name, 'innateSorceryUses', 1, campaignName);
                  setInnateSorceryActive(playerStats.name, true, campaignName);
                  if (onBuffsChange) onBuffsChange();
                  window.dispatchEvent(new CustomEvent('innate-sorcery-updated'));
@@ -872,12 +873,12 @@ addExpiration(playerStats.name, targetName, [
                         type: 'automation_info',
                         name: action.name,
                         automationType: auto.type,
-                        description: `${action.name} activated (${cost} SP spent). Innate Sorcery is now active.`,
+                        description: `${action.name} activated (${cost} SP spent). Innate Sorcery is now active (1/${usesMax} use remaining).`,
                         automation: auto,
-                       });
-                  }
+                        });
+                   }
                 break;
-             }
+              }
             case 'extra_action':
             case 'bonus_attacks':
             case 'bonus_action_attack':

@@ -132,20 +132,21 @@ const classRules = {
                  extraAttacks
              };
          },
-          getSorcererFeatures: (playerStats) => {
-               const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
-              const classSpecific = classLevel?.class_specific;
-              const maxSorceryPoints = classSpecific?.sorcery_points || 0;
-              const metamagicKnown = classSpecific?.metamagic_known || 0;
-              const creatingSpellSlotCosts = classSpecific?.creating_spell_slots
-                  ? classSpecific.creating_spell_slots.map(slot => slot.sorcery_point_cost)
-                  : [];
-              return {
-                  maxSorceryPoints,
-                  metamagicKnown,
-                  creatingSpellSlotCosts
-              };
-          },
+           getSorcererFeatures: (playerStats) => {
+                const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+               const classSpecific = classLevel?.class_specific;
+               const maxSorceryPoints = classSpecific?.sorcery_points || 0;
+               const metamagicKnown = classSpecific?.metamagic_known || 0;
+               const creatingSpellSlotCosts = classSpecific?.creating_spell_slots
+                    ? classSpecific.creating_spell_slots.map(slot => slot.sorcery_point_cost)
+                    : [];
+               return {
+                   maxSorceryPoints,
+                   metamagicKnown,
+                   maxInnateSorcery: 0,
+                   creatingSpellSlotCosts
+                };
+            },
            getWarlockFeatures: (playerStats) => {
                const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
               const classSpecific = classLevel?.class_specific;
