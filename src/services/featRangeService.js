@@ -1,14 +1,5 @@
 import { loadFeatData } from './dataLoader.js'
-
-function findFeat(featName, allFeats) {
-  const exact = allFeats.find(f => f.name === featName)
-  if (exact) return exact
-  const stripped = featName.replace(/\s*\([^)]*\)\s*$/, '').trim()
-  if (stripped !== featName) {
-    return allFeats.find(f => f.name === stripped)
-  }
-  return null
-}
+import { findFeat } from './shared/featFinder.js';
 
 export async function computeFeatRangeEffects(featNames = [], ruleset = '5e') {
   const result = {

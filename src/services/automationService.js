@@ -1,7 +1,4 @@
-function getAbilityBonus(abilities, abilityName) {
-    const ability = abilities?.find(a => a.name === abilityName)
-    return ability?.bonus || 0
-}
+import { getAbilityModifier } from './shared/abilityLookup.js'
 
 function resolveUses(playerStats, usesSpec) {
     if (typeof usesSpec === 'number') return usesSpec
@@ -26,7 +23,7 @@ function resolveScaling(playerStats, scaling) {
 }
 
 function getSaveDc(playerStats, ability, proficiency) {
-    return 8 + getAbilityBonus(playerStats.abilities, ability) + (proficiency || 0)
+    return 8 + getAbilityModifier(playerStats.abilities, ability) + (proficiency || 0)
 }
 
 function buildAttackInfo(feature, playerStats) {

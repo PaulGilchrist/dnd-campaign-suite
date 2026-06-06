@@ -6,17 +6,11 @@ import { handle as handleCondition } from './handlers/conditionHandler.js';
 import { handle as handleSorcery } from './handlers/sorceryHandler.js';
 import { handle as handleSpellCast } from './handlers/spellCastHandler.js';
 import { handle as handleInitiative } from './handlers/initiativeHandler.js';
-import { handle as handleBonusAttack } from './handlers/bonusAttackHandler.js';
+import { handle as handleGenericPopup } from './handlers/genericPopupHandler.js';
 import { handle as handleResourcePool } from './handlers/resourcePoolHandler.js';
 import { handle as handleFontOfMagic } from './handlers/fontOfMagicHandler.js';
 import { handle as handleHealingPool } from './handlers/healingPoolHandler.js';
-import { handle as handleExtraAction } from './handlers/extraActionHandler.js';
-import { handle as handleCombatStance } from './handlers/combatStanceHandler.js';
-import { handle as handleDamageAura } from './handlers/damageAuraHandler.js';
-import { handle as handleAttackRider } from './handlers/attackRiderHandler.js';
-import { handle as handleDamageBonus } from './handlers/damageBonusHandler.js';
 import { handle as handleSpellModifier } from './handlers/spellModifierHandler.js';
-import { handle as handleTempHpBuff } from './handlers/tempHpBuffHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -29,18 +23,18 @@ const HANDLER_MAP = {
     sorcery_incarnate: handleSorcery,
     free_spell: handleSpellCast,
     initiative_action: handleInitiative,
-    bonus_attacks: handleBonusAttack,
-    bonus_action_attack: handleBonusAttack,
+    bonus_attacks: handleGenericPopup,
+    bonus_action_attack: handleGenericPopup,
     resource_pool: handleResourcePool,
     font_of_magic: handleFontOfMagic,
     healing_pool: handleHealingPool,
-    extra_action: handleExtraAction,
-    combat_stance: handleCombatStance,
-    damage_aura: handleDamageAura,
-    attack_rider: handleAttackRider,
-    damage_bonus: handleDamageBonus,
+    extra_action: handleGenericPopup,
+    combat_stance: handleGenericPopup,
+    damage_aura: handleGenericPopup,
+    attack_rider: handleGenericPopup,
+    damage_bonus: handleGenericPopup,
     spell_modifier: handleSpellModifier,
-    temp_hp_buff: handleTempHpBuff,
+    temp_hp_buff: handleGenericPopup,
 };
 
 export async function executeHandler(action, playerStats, campaignName, mapName) {

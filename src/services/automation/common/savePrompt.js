@@ -1,9 +1,10 @@
 import { sendSavePrompt } from '../../savePromptService.js';
 import utils from '../../utils.js';
+import { getAbilityModifier } from '../../shared/abilityLookup.js';
 
 export function buildSaveDc(auto, playerStats) {
     if (auto.saveDc === 'ability') {
-        const conBonus = playerStats.abilities?.find(a => a.name === 'CON')?.bonus || 0;
+        const conBonus = getAbilityModifier(playerStats.abilities, 'CON');
         const prof = playerStats.proficiency || 0;
         return 8 + conBonus + prof;
      }

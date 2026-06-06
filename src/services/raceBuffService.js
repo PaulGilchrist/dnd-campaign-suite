@@ -1,3 +1,5 @@
+import { applyAbilityScoreIncreases, mergeDeduplicated } from './shared/buffApplier.js';
+
 /**
  * Race Buff Service
  * Computes race-granted stat buffs for both 5e and 2024 rulesets.
@@ -154,25 +156,6 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
  * @param {object} buffs - Buff result from computeRaceBuffs
  */
 export function applyRaceBuffsToPlayerData(playerData, buffs) {
-  if (playerData.abilities) {
-    buffs.abilityScoreIncreases.forEach(inc => {
-      const ability = playerData.abilities.find(
-        a => a.name.toLowerCase() === inc.name.toLowerCase()
-      );
-      if (ability) {
-        ability.miscBonus = (ability.miscBonus || 0) + inc.amount;
-      }
-    });
-  }
-
-  if (buffs.languages.length > 0) {
-    const existing = new Set((playerData.languages || []).map(l => l.toLowerCase()));
-    buffs.languages.forEach(lang => {
-      if (!existing.has(lang.toLowerCase())) {
-        playerData.languages = playerData.languages || [];
-        playerData.languages.push(lang);
-        existing.add(lang.toLowerCase());
-      }
-    });
-  }
+  applyAbilityScoreIncreases(playerData.abilities, buffs.abilityScoreIncreases);
+  mergeDeduplicated(playerData, 'languages', buffs.languages);
 }

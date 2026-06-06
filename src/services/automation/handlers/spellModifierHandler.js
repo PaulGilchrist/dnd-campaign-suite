@@ -1,18 +1,6 @@
-export async function handle(action, _playerStats, _campaignName, _mapName) {
-    if (action.name === 'Metamagic') {
-        return null;
-      }
+import { automationInfoPopup } from '../../shared/popupResponse.js';
 
-    const auto = action.automation;
-
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: action.name,
-            automationType: auto.type,
-            description: action.description || '',
-            automation: auto,
-          },
-      };
- }
+export async function handle(action) {
+    if (action.name === 'Metamagic') return null;
+    return automationInfoPopup(action);
+}

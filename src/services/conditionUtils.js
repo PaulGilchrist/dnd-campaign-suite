@@ -34,6 +34,8 @@ const CONDITION_SAVE_MAP = {
   unconscious: null,
 }
 
+import { getAbilitySaveModifier } from './shared/abilityLookup.js'
+
 const ABILITY_LABELS = {
   str: 'Strength',
   dex: 'Dexterity',
@@ -53,9 +55,7 @@ function getAbilityLabel(abbr) {
 
 function getAbilitySaveBonus(character, abilityAbbr) {
   if (!character?.abilities || !abilityAbbr) return 0
-  const fullName = getAbilityLabel(abilityAbbr)
-  const ability = character.abilities.find(a => a.name === fullName)
-  return ability?.save ?? ability?.bonus ?? 0
+  return getAbilitySaveModifier(character.abilities, abilityAbbr)
 }
 
 export {

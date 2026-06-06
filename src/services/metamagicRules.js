@@ -1,4 +1,5 @@
 import { getRuntimeValue } from '../hooks/useRuntimeState.js';
+import { getAbilityModifier } from './shared/abilityLookup.js';
 
 export const METAMAGIC_EFFECTS = {
   CAREFUL: 'ally_auto_succeed_save',
@@ -81,9 +82,7 @@ export function getPreCastOptions(stats, currentSP, spellLevel) {
 
 export function getChaModifier(stats) {
   if (!stats?.abilities) return 0;
-  const cha = stats.abilities.find(a => a.name === 'Charisma');
-  const bonus = cha?.bonus || 0;
-  return Math.max(0, bonus);
+  return Math.max(0, getAbilityModifier(stats.abilities, 'Charisma'));
 }
 
 export function getMaxMetamagicPerSpell(stats, playerName) {

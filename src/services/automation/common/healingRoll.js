@@ -2,6 +2,7 @@ import { rollExpression } from '../../diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../damageUtils.js';
 import { applyHealingToTarget } from '../../applyHealing.js';
+import { postLogEntry } from '../../shared/logPoster.js';
 
 export function rollHealingForAction(auto, playerStats, campaignName, isSelf = false) {
     const formula = auto.healExpression || '';
@@ -49,20 +50,16 @@ export function applyHealingDirectly(playerStats, targetName, amount, campaignNa
 
 export function logHealingToSSE(campaignName, info) {
     const { targetName, sourceName, actualHeal, newHp, maxHp } = info;
-    fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            type: 'hp_change',
-            targetName,
-            sourceName,
-            delta: actualHeal,
-            currentHp: newHp,
-            maxHp,
-            isHealing: true,
-            isUnconscious: false,
-          })
-      }).catch(() => {});
+    postLogEntry(campaignName, {
+        type: 'hp_change',
+        targetName,
+        sourceName,
+        delta: actualHeal,
+        currentHp: newHp,
+        maxHp,
+        isHealing: true,
+        isUnconscious: false,
+      });
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }

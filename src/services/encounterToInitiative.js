@@ -2,6 +2,7 @@ import utils from './utils.js'
 import storage from './storage.js';
 import { cloneDeep } from 'lodash';
 import { rollD20 } from './diceRoller.js';
+import { postLogEntry } from './shared/logPoster.js';
 
 function getMonsterSaveBonuses(monster) {
   const map = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
@@ -34,22 +35,18 @@ function rollNpcInitiative(monster) {
 }
 
 function logRoll(campaignName, name, rollResult) {
-    fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            type: 'roll',
-            characterName: name,
-            rollType: 'initiative',
-            name: 'Initiative',
-            rolls: rollResult.rolls,
-            total: rollResult.roll,
-            bonus: rollResult.bonus,
-            mode: 'normal',
-            isNatural20: rollResult.roll === 20,
-            isNatural1: rollResult.roll === 1
-         })
-     }).catch(() => {});
+    postLogEntry(campaignName, {
+        type: 'roll',
+        characterName: name,
+        rollType: 'initiative',
+        name: 'Initiative',
+        rolls: rollResult.rolls,
+        total: rollResult.roll,
+        bonus: rollResult.bonus,
+        mode: 'normal',
+        isNatural20: rollResult.roll === 20,
+        isNatural1: rollResult.roll === 1
+     });
 }
 
 export async function expandMonstersToCreatures(selectedMonsters, characters, _campaignName) {

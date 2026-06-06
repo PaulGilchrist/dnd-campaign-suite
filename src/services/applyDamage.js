@@ -4,6 +4,7 @@ import { rollD20 } from './diceRoller.js';
 import utils from './utils.js';
 import { sendDeathSavePrompt, sendConcentrationPrompt } from './savePromptService.js';
 import { rollConcentrationSave } from './concentrationRules.js';
+import { postLogEntry } from './shared/logPoster.js';
 
 export function computeDamageAfterResistances(rawDamage, damageTypes, resistances, immunities) {
   if (!damageTypes || damageTypes.length === 0) throw new Error('computeDamageAfterResistances: damageTypes is required');
@@ -61,35 +62,27 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
       if (conditions.some(c => String(c).toLowerCase() === 'frightened')) {
         const filtered = conditions.filter(c => String(c).toLowerCase() !== 'frightened');
         setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
-        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'condition',
-            action: 'removed',
-            characterName: creature.name,
-            condition: 'Frightened',
-            reason: 'took damage',
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
+        postLogEntry(campaignName, {
+          type: 'condition',
+          action: 'removed',
+          characterName: creature.name,
+          condition: 'Frightened',
+          reason: 'took damage',
+          timestamp: Date.now(),
+        });
       }
     } else {
       const hadFrightened = creature.conditions.some(c => c.key === 'frightened');
       if (hadFrightened) {
         creature.conditions = creature.conditions.filter(c => c.key !== 'frightened');
-        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'condition',
-            action: 'removed',
-            characterName: creature.name,
-            condition: 'Frightened',
-            reason: 'took damage',
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
+        postLogEntry(campaignName, {
+          type: 'condition',
+          action: 'removed',
+          characterName: creature.name,
+          condition: 'Frightened',
+          reason: 'took damage',
+          timestamp: Date.now(),
+        });
       }
     }
   }
@@ -134,32 +127,24 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         const dc = creature.concentration.dc;
         creature.concentration = null;
         npcConcentrationBroken = true;
-        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'concentration-broken',
-            characterName: creature.name,
-            spellName,
-            roll,
-            total,
-            dc,
-          }),
-        }).catch(() => {});
+        postLogEntry(campaignName, {
+          type: 'concentration-broken',
+          characterName: creature.name,
+          spellName,
+          roll,
+          total,
+          dc,
+        });
       } else {
-        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'concentration-save',
-            characterName: creature.name,
-            spellName: creature.concentration.spell,
-            roll,
-            total,
-            dc: creature.concentration.dc,
-            success: true,
-          }),
-        }).catch(() => {});
+        postLogEntry(campaignName, {
+          type: 'concentration-save',
+          characterName: creature.name,
+          spellName: creature.concentration.spell,
+          roll,
+          total,
+          dc: creature.concentration.dc,
+          success: true,
+        });
       }
     }
   }
@@ -207,9 +192,5 @@ function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
        }
      }
 
-  fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(entry),
-  }).catch(() => {});
+  postLogEntry(campaignName, entry);
 }

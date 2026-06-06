@@ -1,3 +1,6 @@
+import { findFeat } from './shared/featFinder.js';
+import { resetMiscBonuses, applyAbilityScoreIncreases, mergeDeduplicated } from './shared/buffApplier.js';
+
 /**
  * Feat Buff Service
  * Computes and applies stat buffs from feats for both 5e and 2024 rulesets.
@@ -241,16 +244,6 @@ export function computeFeatBuffs(feat, ruleset = '2024') {
   return result;
 }
 
-function findFeat(featName, allFeats) {
-  const exact = allFeats.find(f => f.name === featName);
-  if (exact) return exact;
-  const stripped = featName.replace(/\s*\([^)]*\)\s*$/, '').trim();
-  if (stripped !== featName) {
-    return allFeats.find(f => f.name === stripped);
-  }
-  return null;
-}
-
 export function computeAllFeatBuffs(formData, allFeats) {
   const ruleset = formData.rules || '5e';
   const selectedFeats = formData.feats || [];
@@ -279,33 +272,10 @@ export function computeAllFeatBuffs(formData, allFeats) {
 export function applyFeatBuffsToFormData(formData, allFeats) {
   const buffs = computeAllFeatBuffs(formData, allFeats);
   const ruleset = formData.rules || '5e';
-  if (formData.abilities) {
-    formData.abilities.forEach(ability => {
-      ability.miscBonus = 0;
-    });
 
-    buffs.abilityScoreIncreases.forEach(inc => {
-      if (inc.name && inc.name !== 'any') {
-        const ability = formData.abilities.find(
-          a => a.name.toLowerCase() === inc.name.toLowerCase()
-        );
-        if (ability) {
-          ability.miscBonus = (ability.miscBonus || 0) + inc.amount;
-        }
-      }
-    });
-  }
-
-  if (buffs.resistances.length > 0) {
-    const existing = new Set((formData.resistances || []).map(r => r.toLowerCase()));
-    buffs.resistances.forEach(r => {
-      if (!existing.has(r.toLowerCase())) {
-        formData.resistances = formData.resistances || [];
-        formData.resistances.push(r);
-        existing.add(r.toLowerCase());
-      }
-    });
-  }
+  resetMiscBonuses(formData.abilities);
+  applyAbilityScoreIncreases(formData.abilities, buffs.abilityScoreIncreases);
+  mergeDeduplicated(formData, 'resistances', buffs.resistances);
 
   const existingActions = new Set(
     (formData.specialActions || []).map(a => (typeof a === 'string' ? a : a.name))
@@ -332,9 +302,5 @@ export function applyFeatBuffsToFormData(formData, allFeats) {
 }
 
 export function clearAppliedFeatBuffs(formData) {
-  if (formData.abilities) {
-    formData.abilities.forEach(ability => {
-      ability.miscBonus = 0;
-    });
-  }
+  resetMiscBonuses(formData.abilities);
 }
