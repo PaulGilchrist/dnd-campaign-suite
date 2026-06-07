@@ -1,10 +1,9 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
+import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
 
-// ── Mocks defined before component import ──
-
-// diceRoller - used by the hook internally (already mocked by useLoggedDiceRoll mock)
+// ── Mocks ----
 vi.mock('../../services/dice/diceRoller.js', () => ({
   rollExpression: vi.fn((formula) => ({ total: parseInt(formula.split('d')[0]) * 5, rolls: [1, 2], modifier: 0 })),
   rollExpressionDoubled: vi.fn((formula) => ({ total: parseInt(formula.split('d')[0]) * 10, rolls: [1, 2], modifier: 0 })),
@@ -12,30 +11,6 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
-const defaultConditionEffects = {
-  attackAdvantageCount: 0,
-  attackDisadvantageCount: 0,
-  abilityCheckDisadvantage: false,
-  autoFailSaves: [],
-  saveDisadvantage: [],
-  cannotAct: false,
-  speedZero: false,
-  concentrationBroken: false,
-  targetAdvantageCount: 0,
-  targetDisadvantageCount: 0,
-  targetAdvantageIfWithin5ft: false,
-  targetDisadvantageIfBeyond5ft: false,
-  autoCritWithin5ft: false,
-  resistantToAll: false,
-  poisonImmune: false,
-  saveAdvantage: [],
-  saveAdvantageCount: 0,
-  saveDisadvantageCount: 0,
-  autoReroll: false,
-  autoRerollCondition: null,
-};
-
-// Expose mutable state for the useLoggedDiceRoll mock so we can control it per-test
 vi.mock('../../hooks/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _rollAttack = vi.fn();
@@ -59,7 +34,6 @@ vi.mock('../../hooks/useLoggedDiceRoll.js', () => {
       rollInitiative: _rollInitiative,
       quickRollPlayerSave: _quickRollPlayerSave,
     })),
-    // Exposed for test assertions
     _rollAttack,
     _rollDamage,
     _rollAbilityCheck,
@@ -71,7 +45,6 @@ vi.mock('../../hooks/useLoggedDiceRoll.js', () => {
   };
 });
 
-// Expose mutable state for conditionEffects so we can control per-test
 vi.mock('../../services/combat/conditionEffects.js', () => {
   let _computeReturn = null;
   const _computeConditionEffects = vi.fn((_conditions) => {
@@ -82,12 +55,10 @@ vi.mock('../../services/combat/conditionEffects.js', () => {
     computeConditionEffects: _computeConditionEffects,
     combineAttackModes: vi.fn(() => 'normal'),
     CONDITIONS_THAT_CANNOT_ACT: new Set(['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious']),
-    // Test helpers
     __setComputeReturn(val) { _computeReturn = val; },
   };
 });
 
-// Expose mutable state for findCreatureByName mock
 vi.mock('../../services/rules/damageUtils.js', () => {
   let _findCreatureReturn = null;
   const _findCreatureByName = vi.fn((_ctx, _name) => {
@@ -101,7 +72,6 @@ vi.mock('../../services/rules/damageUtils.js', () => {
     getResistanceNotice: vi.fn(() => null),
     findCreatureByName: _findCreatureByName,
     getCombatContext: vi.fn().mockResolvedValue(null),
-    // Test helpers
     __setFindCreatureReturn(val) { _findCreatureReturn = val; },
   };
 });
@@ -123,75 +93,13 @@ vi.mock('../../services/maps/mapsService.js', () => ({
   loadMapData: vi.fn().mockResolvedValue(null),
 }));
 
-// ── Re-import mocked modules ──
-import * as useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
+// ── Re-import mocked modules for test setup helpers ----
 import * as conditionEffects from '../../services/combat/conditionEffects.js';
 import * as damageUtils from '../../services/rules/damageUtils.js';
 
-// Short aliases for mock hooks exposed by the factory
-const rollAttack = useLoggedDiceRoll._rollAttack;
-const rollDamage = useLoggedDiceRoll._rollDamage;
-const rollAbilityCheck = useLoggedDiceRoll._rollAbilityCheck;
-const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
-const rollSkillCheck = useLoggedDiceRoll._rollSkillCheck;
-const rollInitiative = useLoggedDiceRoll._rollInitiative;
-const quickRollPlayerSave = useLoggedDiceRoll._quickRollPlayerSave;
-const setPopupHtml = useLoggedDiceRoll._setPopupHtml;
+// ── Tests ----
 
-// ── Fixtures ──
-
-function makeMonster(overrides = {}) {
-  return {
-    name: 'Goblin',
-    size: 'Small',
-    type: 'humanoid',
-    subtype: '',
-    alignment: 'neutral evil',
-    armor_class: 15,
-    hit_points: 7,
-    hit_dice: '2d6',
-    speed: { walk: '30 ft.' },
-    ability_scores: { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 10 },
-    ability_score_modifiers: { str: -1, dex: 2, con: 0, int: 0, wis: -1, cha: 0 },
-    saving_throws: {},
-    skills: {},
-    senses: null,
-    languages: 'Common',
-    damage_vulnerabilities: [],
-    damage_resistances: [],
-    damage_immunities: [],
-    condition_immunities: [],
-    challenge_rating: '1/4',
-    xp: 25,
-    actions: [],
-    traits: [],
-    reactions: [],
-    legendary_actions: [],
-    lair_actions: [],
-    regional_effects: [],
-    desc: null,
-    book: null,
-    page: null,
-    ...overrides,
-  };
-}
-
-function makeProps(monster, overrides = {}) {
-  return {
-    monster,
-    onClose: vi.fn(),
-    campaignName: 'test-campaign',
-    creatures: [],
-    creatureName: '',
-    mapName: null,
-    characters: [],
-    ...overrides,
-  };
-}
-
-// ── Tests ──
-
-describe('MonsterCardModal', () => {
+describe('MonsterCardModal rendering', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     conditionEffects.__setComputeReturn(null);
@@ -265,7 +173,6 @@ describe('MonsterCardModal', () => {
   // ════════════════════════════════════════════
 
   it('calls onClose when close button clicked', () => {
-     // Close button clicks bubble to parent .mc-header which also calls onClose
     const onClose = vi.fn();
     render(<MonsterCardModal {...makeProps(makeMonster(), { onClose })} />);
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
@@ -345,11 +252,8 @@ describe('MonsterCardModal', () => {
   // ════════════════════════════════════════════
 
   it('renders initiative dice link with parseable bonus', () => {
-      // Use +3 for initiative to avoid collision with dex modifier +2
     const m = makeMonster({ initiative_details: '+3' });
     render(<MonsterCardModal {...makeProps(m)} />);
-     // The only element containing +5 (or the initiative value in this case) should be unique
-     // Since we set initiative +3, look for it in initiative context
     expect(screen.getByText('+3')).toBeInTheDocument();
    });
 
@@ -385,7 +289,6 @@ describe('MonsterCardModal', () => {
   it('shows dash for all modifiers when empty', () => {
     const m = makeMonster({ ability_score_modifiers: {} });
     render(<MonsterCardModal {...makeProps(m)} />);
-    // All six mod slots show '-' since no modifiers defined
     expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(6);
   });
 
@@ -402,10 +305,8 @@ describe('MonsterCardModal', () => {
   });
 
    it('shows zero modifier without sign', () => {
-        // Use a unique value to avoid matching other elements
      const m = makeMonster({ ability_score_modifiers: { str: 0, dex: 2, con: 5, int: -3, wis: -1, cha: 4 } });
      render(<MonsterCardModal {...makeProps(m)} />);
-        // Look for the span with exactly '+0' text in an mc-ability-mod container
      const mods = document.querySelectorAll('.mc-ability-mod');
      expect(Array.from(mods).some(el => el.textContent === '+0')).toBe(true);
       });
@@ -590,7 +491,6 @@ describe('MonsterCardModal', () => {
   it('renders traits section when present', () => {
     const m = makeMonster({ actions: [], traits: [{ name: 'Keen Smell', description: '' }] });
     render(<MonsterCardModal {...makeProps(m)} />);
-      // The action name renders with a trailing period from renderAction: <strong>Keen Smell.</strong>
     expect(screen.getByText(/Keen Smell/)).toBeInTheDocument();
     });
 
@@ -606,7 +506,6 @@ describe('MonsterCardModal', () => {
       traits: [{ name: 'Keen Smell', description: '' }, { name: 'Darkvision', description: '' }],
      });
     render(<MonsterCardModal {...makeProps(m)} />);
-       // Names render with trailing periods
     expect(screen.getByText(/Darkvision/)).toBeInTheDocument();
      });
 
@@ -657,14 +556,12 @@ describe('MonsterCardModal', () => {
   });
 
   it('renders action description via sanitizeHtml', () => {
-       // Name renders as "Slash." with trailing dot from <strong>{name}.</strong>
     const m = makeMonster({ actions: [{ name: 'Slash', description: '<p>The creature slashes.</p>' }] });
     render(<MonsterCardModal {...makeProps(m)} />);
      expect(screen.getByText(/Slash/)).toBeInTheDocument();
       });
 
   it('renders multiple action names', () => {
-       // Names render with trailing periods
     const m = makeMonster({ traits: [], actions: [{ name: 'Bite', description: '' }, { name: 'Sting', description: '' }] });
     render(<MonsterCardModal {...makeProps(m)} />);
     expect(screen.getByText(/Sting/)).toBeInTheDocument();
@@ -775,232 +672,6 @@ describe('MonsterCardModal', () => {
   });
 
   // ════════════════════════════════════════════
-  // Conditions section and effect badges
-  // ════════════════════════════════════════════
-
-  it('renders condition labels for creature with conditions', () => {
-    damageUtils.__setFindCreatureReturn({
-      name: 'Goblin',
-      conditions: [{ key: 'prone', label: 'Prone', id: 'cond-1' }, { key: 'poisoned', label: 'Poisoned', id: 'cond-2' }],
-    });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(screen.getByText('Prone')).toBeInTheDocument();
-  });
-
-  it('does not render condition effects when creature has no conditions', () => {
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [] });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(screen.queryByText("Can't Act")).not.toBeInTheDocument();
-  });
-
-  it('renders speed zero effect badge when condition causes speed zero', () => {
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, speedZero: true });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'grappled', label: 'Grappled' }] });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(document.querySelector('.effect-speed-zero')).not.toBeNull();
-  });
-
-  it('shows "0 ft." speed when condition sets speedZero to true', () => {
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, speedZero: true });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'grappled', label: 'Grappled' }] });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(screen.getByText('0 ft.')).toBeInTheDocument();
-  });
-
-  it('renders cannot act badge when applicable', () => {
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, cannotAct: true });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'incapacitated', label: "Incapacitated" }] });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(document.querySelector('.effect-cannot-act')).not.toBeNull();
-  });
-
-  it('renders auto-fail saves badge', () => {
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, autoFailSaves: ['str', 'dex'] });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'stunned', label: 'Stunned' }] });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(document.querySelector('.effect-auto-fail')).not.toBeNull();
-  });
-
-  it('renders auto-crit badge when condition applies', () => {
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, autoCritWithin5ft: true });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'paralyzed', label: 'Paralyzed' }] });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(document.querySelector('.effect-auto-crit')).not.toBeNull();
-  });
-
-  it('renders concentration broken badge', () => {
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, concentrationBroken: true });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'incapacitated', label: 'Incapacitated' }] });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(document.querySelector('.effect-no-conc')).not.toBeNull();
-  });
-
-  it('renders resist all badge', () => {
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, resistantToAll: true });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'petrified', label: 'Petrified' }] });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(document.querySelector('.effect-resist')).not.toBeNull();
-  });
-
-  it('renders disadvantage effect badge', () => {
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, attackDisadvantageCount: 1 });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'blinded', label: 'Blinded' }] });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(document.querySelector('.effect-disadvantage')).not.toBeNull();
-  });
-
-  it('renders target advantage effect badge', () => {
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, targetAdvantageCount: 1 });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'blinded', label: 'Blinded' }] });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(document.querySelector('.effect-target-adv')).not.toBeNull();
-  });
-
-  // ════════════════════════════════════════════
-  // Incapacitated / Cannot Act - renderAction behavior
-  // ════════════════════════════════════════════
-
-  it('disables action and shows incapacitated label when attacker cannot act', () => {
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, cannotAct: true });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'paralyzed', label: 'Paralyzed' }] });
-
-    const m = makeMonster({ actions: [{ name: 'Club', description: '', attack_bonus: 4 }] });
-    render(<MonsterCardModal {...makeProps(m)} />);
-     expect(screen.getByText(/Incapacitated/)).toBeInTheDocument();
-    });
-
-   it('adds mc-action-disabled class when attacker incapacitated', () => {
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, cannotAct: true });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'petrified', label: 'Petrified' }] });
-
-    const m = makeMonster({ actions: [{ name: 'Club', description: '', attack_bonus: 4 }] });
-    render(<MonsterCardModal {...makeProps(m)} />);
-    expect(document.querySelector('.mc-action.mc-action-disabled')).not.toBeNull();
-  });
-
-  it('does not render incapacitated label when attacker can act normally', () => {
-    conditionEffects.__setComputeReturn({ ...defaultConditionEffects, cannotAct: false });
-    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [] });
-
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(screen.queryByText('Incapacitated')).not.toBeInTheDocument();
-  });
-
-  // ════════════════════════════════════════════
-  // Dice link click handlers (rollAttack, rollDamage, etc.)
-  // ════════════════════════════════════════════
-
-  it('clicking ability modifier calls rollAbilityCheck', () => {
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    const mods = document.querySelectorAll('.mc-ability-mod');
-    expect(mods.length).toBe(6);
-    fireEvent.click(mods[0]); // Click STR modifier
-    expect(rollAbilityCheck).toHaveBeenCalled();
-  });
-
-  it('clicking saving throw dice link calls rollSavingThrow', () => {
-    const m = makeMonster({ saving_throws: { str: { modifier: 2 } } });
-    render(<MonsterCardModal {...makeProps(m)} />);
-
-    // Find the dice link inside Saving Throws row
-    const rows = document.querySelectorAll('.mc-defense-row');
-    let saveRow = null;
-    for (const row of rows) {
-      if (row.querySelector('.mc-defense-label')?.textContent === 'Saving Throws') {
-        saveRow = row;
-        break;
-      }
-    }
-    expect(saveRow).toBeTruthy();
-    const link = saveRow.querySelector('.mc-dice-link');
-    expect(link).toBeTruthy();
-    fireEvent.click(link);
-    expect(rollSavingThrow).toHaveBeenCalled();
-  });
-
-  it('clicking skill dice link calls rollSkillCheck', () => {
-    const m = makeMonster({ skills: { stealth: { modifier: 3 } } });
-    render(<MonsterCardModal {...makeProps(m)} />);
-
-    const rows = document.querySelectorAll('.mc-defense-row');
-    let skillRow = null;
-    for (const row of rows) {
-      if (row.querySelector('.mc-defense-label')?.textContent === 'Skills') {
-        skillRow = row;
-        break;
-      }
-    }
-    expect(skillRow).toBeTruthy();
-    const link = skillRow.querySelector('.mc-dice-link');
-    fireEvent.click(link);
-    expect(rollSkillCheck).toHaveBeenCalled();
-  });
-
-  it('clicking initiative dice link calls rollInitiative', () => {
-    const m = makeMonster({ initiative_details: '+5' });
-    render(<MonsterCardModal {...makeProps(m)} />);
-    expect(screen.getByText('+5')).toBeTruthy();
-    // The initiative display should be an mc-dice-link with role=button
-    const initLinks = document.querySelectorAll('.mc-dice-link');
-    let initLink = null;
-    for (const el of initLinks) {
-      if (el.textContent.includes('+5') && !el.textContent.includes('d')) {
-        initLink = el;
-        break;
-      }
-    }
-    expect(initLink).toBeTruthy();
-    fireEvent.click(initLink);
-    expect(rollInitiative).toHaveBeenCalled();
-  });
-
-  it('clicking attack bonus calls rollAttack', () => {
-    const m = makeMonster({ actions: [{ name: 'Club', description: '', attack_bonus: 4 }] });
-    render(<MonsterCardModal {...makeProps(m)} />);
-    expect(screen.getByText('+4')).toBeTruthy();
-
-    // The attack bonus link is an mc-dice-link. When clicked, handleAttack fires → rollAttack
-    const links = document.querySelectorAll('.mc-dice-link');
-    let attackLink = null;
-    for (const el of links) {
-      if (el.textContent.includes('+4') && !el.textContent.includes('d') && !el.textContent.includes('Init')) {
-        attackLink = el;
-        break;
-      }
-    }
-    // Might be in the traits/actions area. Find it by context
-    expect(attackLink).toBeTruthy();
-    fireEvent.click(attackLink);
-    expect(rollAttack).toHaveBeenCalled();
-  });
-
-  it('clicking damage dice link calls rollDamage', () => {
-    const m = makeMonster({ actions: [{ name: 'Bite', description: '', attack_bonus: null, damage_dice: '1d4 + 2' }] });
-    render(<MonsterCardModal {...makeProps(m)} />);
-
-    const links = document.querySelectorAll('.mc-dice-link');
-    let dmgLink = null;
-    for (const el of links) {
-      if (el.textContent.includes('1d4')) {
-        dmgLink = el;
-        break;
-      }
-    }
-    expect(dmgLink).toBeTruthy();
-    fireEvent.click(dmgLink);
-    expect(rollDamage).toHaveBeenCalled();
-  });
-
-  it('clicking extra damage dice link calls rollDamage', () => {
-    const m = makeMonster({ actions: [{ name: 'Sword', description: '', attack_bonus: null, damage_dice: '1d8', damage: 'plus 2d6 slashing' }] });
-    render(<MonsterCardModal {...makeProps(m)} />);
-
-    // Should find multiple dice links
-    const diceLinks = document.querySelectorAll('.mc-dice-link');
-    expect(diceLinks.length).toBeGreaterThan(0);
-  });
-
-  // ════════════════════════════════════════════
   // Action with reach/range properties
   // ════════════════════════════════════════════
 
@@ -1060,20 +731,6 @@ describe('MonsterCardModal', () => {
   });
 
   // ════════════════════════════════════════════
-  // Creature conditions section only shown with conditions
-  // ════════════════════════════════════════════
-
-  it('shows condition labels when creature has conditions', () => {
-    damageUtils.__setFindCreatureReturn({
-      name: 'Goblin',
-      conditions: [{ key: 'prone', label: 'Prone', id: 'c1' }, { key: 'poisoned', label: 'Poisoned', id: 'c2' }],
-    });
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(screen.getByText('Prone')).toBeInTheDocument();
-    expect(screen.getByText('Poisoned')).toBeInTheDocument();
-  });
-
-  // ════════════════════════════════════════════
   // Creatures prop integration (fallback combat context)
   // ════════════════════════════════════════════
 
@@ -1091,75 +748,6 @@ describe('MonsterCardModal', () => {
     const m = makeMonster();
     render(<MonsterCardModal {...makeProps(m, { mapName: 'map1' })} />);
     expect(screen.getByText('Goblin')).toBeInTheDocument();
-  });
-
-  // ════════════════════════════════════════════
-  // Popup rendering (string and object popupHtml)
-  // ════════════════════════════════════════════
-
-  it('renders Popup when popupHtml is a string', () => {
-    // Configure the mocked hook to return a string popupHtml
-    useLoggedDiceRoll.default.mockReturnValue({
-      popupHtml: 'Some HTML popup content',
-      setPopupHtml,
-      rollAttack,
-      rollDamage,
-      rollAbilityCheck,
-      rollSavingThrow,
-      rollSkillCheck,
-      rollInitiative,
-      quickRollPlayerSave,
-    });
-
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-  });
-
-  it('renders DiceRollResult when popupHtml is an object', () => {
-    useLoggedDiceRoll.default.mockReturnValue({
-      popupHtml: { type: 'damage', name: 'Slash', formula: '1d8', rolls: [3], total: 3, bonus: 0, modifier: 0 },
-      setPopupHtml,
-      rollAttack,
-      rollDamage,
-      rollAbilityCheck,
-      rollSavingThrow,
-      rollSkillCheck,
-      rollInitiative,
-      quickRollPlayerSave,
-    });
-
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(document.querySelector('.dice-roll-result')).not.toBeNull();
-  });
-
-  it('shows Quick Roll button when popupHtml is waiting for save', () => {
-    useLoggedDiceRoll.default.mockReturnValue({
-      popupHtml: {
-        type: 'save-damage',
-        name: 'Fireball',
-        formula: '8d6',
-        rolls: [40],
-        total: 40,
-        bonus: 0,
-        modifier: 0,
-        waitingForPlayerSave: true,
-        promptId: 'test-prompt-1',
-        targetName: 'Player A',
-        saveType: 'CON',
-        saveDc: 15,
-      },
-      setPopupHtml,
-      rollAttack,
-      rollDamage,
-      rollAbilityCheck,
-      rollSavingThrow,
-      rollSkillCheck,
-      rollInitiative,
-      quickRollPlayerSave,
-    });
-
-    render(<MonsterCardModal {...makeProps(makeMonster())} />);
-    expect(screen.getByText(/Quick Roll/)).toBeInTheDocument();
   });
 
   // ════════════════════════════════════════════
@@ -1270,6 +858,6 @@ describe('MonsterCardModal', () => {
     render(<MonsterCardModal {...makeProps(fullMonster)} />);
 
     expect(screen.getByText('Goblin')).toBeInTheDocument();
-     expect(screen.getByText(/Small humanoid \(goblinoid\)/)).toBeInTheDocument(); // Subtype renders correctly
+     expect(screen.getByText(/Small humanoid \(goblinoid\)/)).toBeInTheDocument();
     });
 });
