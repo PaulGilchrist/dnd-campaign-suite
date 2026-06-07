@@ -49,6 +49,7 @@ export async function handle(action, playerStats, campaignName) {
         resistanceTypes: auto.resistanceTypes || [],
         advantages: auto.advantages || [],
         damageBonusExpression: auto.damageBonusExpression || '',
+        blocksSpellcasting: auto.blocksSpellcasting || false,
     }];
     setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
 

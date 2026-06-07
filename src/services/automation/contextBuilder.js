@@ -51,6 +51,17 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
 
+        // Grant attack advantage if Reckless Attack (or similar buff) is active
+        let targetsHaveAdvantage = false;
+        for (const buff of activeBuffs) {
+            if (buff.effect === 'advantage_attacks_disadvantage_against') {
+                if (forcedMode === undefined) {
+                    forcedMode = 'advantage';
+                }
+                targetsHaveAdvantage = true;
+            }
+        }
+
         const autoDamageFormula = stanceDamageBonus > 0
             ? `${attack.damage}+${stanceDamageBonus}`
             : attack.damage;
@@ -66,6 +77,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             forcedMode,
             autoDamageFormula,
             autoDamageName: attack.name,
+            targetsHaveAdvantage,
            };
        });
 }

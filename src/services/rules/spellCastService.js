@@ -1,8 +1,12 @@
 import { rollExpression } from '../dice/diceRoller.js';
 import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet } from './rangeValidation.js';
-import { isInnateSorceryActive } from '../combat/buffService.js';
+import { isInnateSorceryActive, getActiveBuffs } from '../combat/buffService.js';
 
 export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName }) {
+    if (getActiveBuffs(playerStats.name, campaignName).some(b => b.blocksSpellcasting)) {
+        console.warn(`[spellCast] ${playerStats.name} cannot cast spells (blocked by active buff)`);
+        return;
+    }
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
   const slotDmg = spell.damage?.damage_at_slot_level;
   const charDmg = spell.damage?.damage_at_character_level;

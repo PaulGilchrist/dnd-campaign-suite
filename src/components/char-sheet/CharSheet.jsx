@@ -106,6 +106,10 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
         if (speedHalvedTime) conditionEffects.speedHalved = true;
     }
+    // Reckless Attack: enemies have Advantage on attack rolls against you
+    if (Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_attacks_disadvantage_against')) {
+        conditionEffects.targetAdvantageCount = (conditionEffects.targetAdvantageCount || 0) + 1;
+    }
 
     const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
     const conditionAttackMode = getNetAttackMode(conditionEffects.attackAdvantageCount, conditionEffects.attackDisadvantageCount)

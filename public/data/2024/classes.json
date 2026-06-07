@@ -44,6 +44,7 @@
                             "maxRages": "class_level_scaling",
                             "recharge_short_rest": "1_use",
                             "recharge_long_rest": "all",
+                            "blocksSpellcasting": true,
                             "casting_time": "1 bonus action"
                         }
                     },
@@ -93,7 +94,7 @@
                             "effect": "advantage_attacks_disadvantage_against",
                             "duration": "until_start_of_next_turn",
                             "trigger": "first_attack_of_turn",
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     }
                 ]

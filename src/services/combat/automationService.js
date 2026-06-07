@@ -115,6 +115,7 @@ function buildAttackInfo(feature, playerStats) {
                 advantages: auto.advantages || [],
                 duration: auto.duration || '',
                 resourceKey: 'ragePoints',
+                blocksSpellcasting: auto.blocksSpellcasting || false,
                 hasAutomation: true
             }
         }
