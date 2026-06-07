@@ -508,7 +508,7 @@
                             "damageExpression": "rage_damage_d6",
                             "damageType": "same_as_weapon",
                             "oncePerTurn": true,
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     },
                     {
@@ -756,7 +756,7 @@
                             "trigger": "failed_save_while_raging",
                             "bonusExpression": "rage_damage",
                             "oncePerRage": true,
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     },
                     {

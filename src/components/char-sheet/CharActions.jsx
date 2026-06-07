@@ -31,6 +31,7 @@ import { getTargetFromAttacker, getCombatContext } from '../../services/rules/da
 import { getNearestPlacedItem } from '../../services/rules/rangeValidation.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
+import { getCurrentCombatRound } from '../../services/encounters/combatData.js';
 import { buildEmpoweredSpellState, executeEmpoweredReroll, getEmpoweredSpellDescription } from '../../services/rules/empoweredSpellService.js';
 import { useActionSpellMetamagic } from '../../hooks/useActionSpellMetamagic.js';
 import './CharActions.css'
@@ -153,6 +154,36 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     formula += ` + ${bonus.damageExpression}[${bonus.damageType}]`;
                     total += bonusResult.total;
                     rolls = [...rolls, ...bonusResult.rolls];
+                }
+            }
+
+            // Apply Frenzy damage bonus (reckless_attack_hit_while_raging)
+            const frenzyBonuses = isMeleeOrUnarmed ? playerStats.automation.actions.filter(
+                a => a.type === 'damage_bonus' && a.trigger === 'reckless_attack_hit_while_raging'
+            ) : [];
+            if (frenzyBonuses.length > 0) {
+                const playerName = playerStats.name;
+                const usedRound = getRuntimeValue(playerName, '_frenzyUsedRound', campaignName);
+                const currentRound = getCurrentCombatRound();
+                if (usedRound !== currentRound) {
+                    const activeBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
+                    const isReckless = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_attacks_disadvantage_against');
+                    const isRaging = Array.isArray(activeBuffs) && activeBuffs.some(b => b.damageBonusExpression);
+                    const isStrengthBased = (attack.abilityName || '').toLowerCase() === 'strength';
+                    if (isReckless && isRaging && isStrengthBased) {
+                        for (const bonus of frenzyBonuses) {
+                            let expr = bonus.damageExpression || '';
+                            const rageDamage = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1]?.rage_damage ?? 2;
+                            expr = expr.replace(/rage_damage/g, rageDamage);
+                            const bonusResult = rollExpression(expr);
+                            if (bonusResult) {
+                                formula += ` + ${expr}[${bonus.damageType}]`;
+                                total += bonusResult.total;
+                                rolls = [...rolls, ...bonusResult.rolls];
+                            }
+                        }
+                        setRuntimeValue(playerName, '_frenzyUsedRound', currentRound, campaignName);
+                    }
                 }
             }
 

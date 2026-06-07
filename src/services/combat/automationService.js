@@ -70,6 +70,8 @@ function buildAttackInfo(feature, playerStats) {
                 target: auto.target || 'd20',
                 condition: auto.condition || '',
                 effect: auto.effect || 'reroll',
+                bonusExpression: auto.bonusExpression || '',
+                oncePerRage: !!auto.oncePerRage,
                 hasAutomation: true
             }
         }
@@ -173,6 +175,7 @@ function buildAttackInfo(feature, playerStats) {
                 extraVs: auto.extraVs || null,
                 extraDamage: auto.extraDamage || '',
                 resourceType: auto.resourceType || 'spell_slot',
+                oncePerTurn: !!auto.oncePerTurn,
                 hasAutomation: true
             }
         }
@@ -683,7 +686,9 @@ export function collectSaveModifiers(features) {
                 source: feature.name,
                 target: auto.target,
                 condition: auto.condition,
-                effect: 'reroll'
+                effect: 'reroll',
+                bonusExpression: auto.bonusExpression || '',
+                oncePerRage: !!auto.oncePerRage,
             })
         }
     })

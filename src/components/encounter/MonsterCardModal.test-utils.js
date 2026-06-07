@@ -19,6 +19,7 @@ export const defaultConditionEffects = {
   saveDisadvantageCount: 0,
   autoReroll: false,
   autoRerollCondition: null,
+  autoRerollBonus: null,
 };
 
 export function makeMonster(overrides = {}) {

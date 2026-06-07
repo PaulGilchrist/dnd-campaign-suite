@@ -41,10 +41,13 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName) {
       }
      } else if (mod.effect === 'disadvantage') {
       effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
-     } else if (mod.effect === 'reroll') {
-      effects.autoReroll = true;
-      effects.autoRerollCondition = mod.condition;
-     }
+      } else if (mod.effect === 'reroll') {
+       effects.autoReroll = true;
+       effects.autoRerollCondition = mod.condition;
+       if (mod.bonusExpression) {
+         effects.autoRerollBonus = mod.bonusExpression;
+       }
+      }
     }
 }
 
@@ -70,6 +73,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     saveDisadvantageCount: 0,
     autoReroll: false,
     autoRerollCondition: null,
+    autoRerollBonus: null,
     riderSaveDisadvantage: false,
     riderAttackBonus: 0,
     riderCannotOpportunityAttack: false,

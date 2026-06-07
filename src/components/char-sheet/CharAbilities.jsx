@@ -30,9 +30,9 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
         if (!autoFail && !forcedMode && conditionEffects?.saveAdvantageAbilities?.includes(abilityName.substring(0, 3).toUpperCase())) {
           forcedMode = 'advantage'
          }
-        if (conditionEffects?.autoReroll) {
-          return { forcedMode, autoFail: autoFail || undefined, autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition }
-        }
+         if (conditionEffects?.autoReroll) {
+           return { forcedMode, autoFail: autoFail || undefined, autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition, autoRerollBonus: conditionEffects.autoRerollBonus || null }
+         }
         return { forcedMode, autoFail: autoFail || undefined }
       }
 

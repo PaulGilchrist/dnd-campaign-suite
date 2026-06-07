@@ -40,6 +40,7 @@ const HANDLER_MAP = {
     conditional_disadvantage: handleGenericPopup,
     conditional_advantage: handleGenericPopup,
     passive_rule: handleGenericPopup,
+    auto_reroll: handleGenericPopup,
 };
 
 export async function executeHandler(action, playerStats, campaignName, mapName) {
