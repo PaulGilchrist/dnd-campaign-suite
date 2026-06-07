@@ -101,7 +101,9 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
           )
         : [];
     const allSaveModifiers = [...(playerStats?.saveModifiers || []), ...stanceSaveModifiers];
-    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers);
+    const allTargetEffects = useRuntimeValue(campaignName, 'targetEffects') ?? [];
+    const myTargetEffects = allTargetEffects.filter(te => te.target === (playerSummary?.name));
+    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects);
     if (playerStats) {
         const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
         if (speedHalvedTime) conditionEffects.speedHalved = true;

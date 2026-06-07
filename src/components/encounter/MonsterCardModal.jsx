@@ -10,6 +10,7 @@ import { findCreatureByName } from '../../services/rules/damageUtils.js';
 import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditionEffects.js';
 import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rules/rangeValidation.js';
 import * as mapsService from '../../services/maps/mapsService.js';
+import { useRuntimeValue } from '../../hooks/useRuntimeState.js';
 import './MonsterCardModal.css';
 
 const ABBR_MAP = { Strength: 'str', Dexterity: 'dex', Constitution: 'con', Intelligence: 'int', Wisdom: 'wis', Charisma: 'cha', str: 'str', dex: 'dex', con: 'con', int: 'int', wis: 'wis', cha: 'cha' };
@@ -41,6 +42,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       setMapData(null);
     });
   }, [campaignName, mapName]);
+
+  const allTargetEffects = useRuntimeValue(campaignName, 'targetEffects') ?? [];
+  const monsterTargetEffects = allTargetEffects.filter(te => te.target === (creatureName || monster?.name));
 
   const { popupHtml, setPopupHtml, rollAttack, rollDamage, rollAbilityCheck, rollSavingThrow, rollSkillCheck, rollInitiative, quickRollPlayerSave } = useLoggedDiceRoll(
     monsterName,
@@ -114,13 +118,14 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const attackerCannotAct = attackerConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
     if (attackerCannotAct) return
 
-    const targetEffects = computeConditionEffects(targetConditions)
+    const targetRiderForTarget = allTargetEffects.filter(te => te.target === target?.name)
+    const targetEffectData = computeConditionEffects(targetConditions, [], targetRiderForTarget)
 
     const attackRange = action?.reach ? rangeToFeet(action.reach) : (action?.range ? rangeToFeet(action.range) : 30);
-    const forcedMode = combineAttackModes(attackerEffects, targetEffects, attackRange)
+    const forcedMode = combineAttackModes(attackerEffects, targetEffectData, attackRange)
 
     const isMelee = attackRange <= 5
-    const isAutoCrit = isMelee && targetEffects.autoCritWithin5ft
+    const isAutoCrit = isMelee && targetEffectData.autoCritWithin5ft
 
     let isAutoMiss = false;
     let rangeReason = null;
@@ -247,7 +252,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const creature = getAttackerCreature();
     const monsterConditions = creature?.conditions || [];
     const condKeys = monsterConditions.map(c => c.key);
-    const condEffects = condKeys.length > 0 ? computeConditionEffects(condKeys) : null;
+    const condEffects = computeConditionEffects(condKeys, [], monsterTargetEffects);
     const condEffectBadges = [];
     if (condEffects) {
       if (condEffects.cannotAct) condEffectBadges.push({ label: "Can't Act", cls: 'effect-cannot-act', icon: 'fa-hand' });
@@ -258,6 +263,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       if (condEffects.resistantToAll) condEffectBadges.push({ label: 'Resist All', cls: 'effect-resist', icon: 'fa-shield-halved' });
       if (condEffects.attackDisadvantageCount > 0 || condEffects.abilityCheckDisadvantage) condEffectBadges.push({ label: 'Disadv', cls: 'effect-disadvantage', icon: 'fa-arrow-down' });
       if (condEffects.targetAdvantageCount > 0) condEffectBadges.push({ label: 'Adv vs', cls: 'effect-target-adv', icon: 'fa-arrow-up' });
+      if (condEffects.riderSaveDisadvantage) condEffectBadges.push({ label: 'Save Disadv', cls: 'effect-disadvantage', icon: 'fa-shield' });
+      if (condEffects.riderAttackBonus > 0) condEffectBadges.push({ label: `+${condEffects.riderAttackBonus} to hit`, cls: 'effect-target-adv', icon: 'fa-bullseye' });
+      if (condEffects.riderCannotOpportunityAttack) condEffectBadges.push({ label: 'No OA', cls: 'effect-cannot-act', icon: 'fa-ban' });
     }
 
     return (
@@ -530,7 +538,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         </div>
       </div>
     );
-      }, [monster, onClose, handleAttack, handleDamage, handleAbilityCheck, handleSaveThrow, handleSkillCheck, handleInitiative, attackerCannotAct]); // eslint-disable-line react-hooks/exhaustive-deps
+      }, [monster, onClose, handleAttack, handleDamage, handleAbilityCheck, handleSaveThrow, handleSkillCheck, handleInitiative, attackerCannotAct, monsterTargetEffects]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!monster) return null;
 

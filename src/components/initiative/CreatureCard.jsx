@@ -5,6 +5,7 @@ import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx'
 import NpcAvatar from './NpcAvatar.jsx'
 import CreatureHp from './CreatureHp.jsx'
 import { getAbilityLabel } from '../../services/combat/conditionUtils.js'
+import { useRuntimeValue } from '../../hooks/useRuntimeState.js';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx'
 
 const SHAPE_LABELS = {
@@ -36,8 +37,11 @@ function CreatureCard({
     onBreakConcentration,
     onOpenConcentrationPicker,
     allCreatures,
+    campaignName,
 }) {
     const isUnconscious = creature.currentHp <= 0
+    const allTargetEffects = useRuntimeValue(campaignName, 'targetEffects') ?? [];
+    const myTargetEffects = allTargetEffects.filter(te => te.target === creature.name);
     const showRollLink = creature.type === 'npc'
         && creature.initiativeBonus != null
         && creature.initiativeBonus !== ''
@@ -159,7 +163,7 @@ function CreatureCard({
                         </div>
                     )
                 })}
-                <ConditionEffectBadges conditions={creature.conditions} />
+                <ConditionEffectBadges conditions={creature.conditions} targetEffects={myTargetEffects} />
                 {isLocalhost && (
                     <button
                         className='condition-add-btn'

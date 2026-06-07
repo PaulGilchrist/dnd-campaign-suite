@@ -664,6 +664,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                             onBreakConcentration={handleBreakConcentration}
                             onOpenConcentrationPicker={openConcentrationPicker}
                             allCreatures={combatSummary.creatures}
+                            campaignName={campaignName}
                         />
                     )
                 })}

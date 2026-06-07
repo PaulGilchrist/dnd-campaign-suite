@@ -20,6 +20,7 @@ import HealingPoolModal from './HealingPoolModal.jsx'
 import HandOfHealingModal from './HandOfHealingModal.jsx'
 import FontOfMagicModal from './FontOfMagicModal.jsx'
 import SetConditionModal from './SetConditionModal.jsx'
+import AttackRiderModal from './AttackRiderModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { getClassFeatures } from '../../services/character/classFeatures.js';
@@ -47,6 +48,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [handOfHealingModal, setHandOfHealingModal] = useState(null);
     const [fontOfMagicModal, setFontOfMagicModal] = useState(null);
     const [setConditionModal, setSetConditionModal] = useState(null);
+    const [attackRiderModal, setAttackRiderModal] = useState(null);
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
 
     useEffect(() => {
@@ -153,6 +155,19 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     rolls = [...rolls, ...bonusResult.rolls];
                 }
             }
+
+            // Apply attack_rider automations (e.g. Brutal Strike)
+            const hitRiders = playerStats.automation.actions.filter(
+                a => a.type === 'attack_rider' && a.damageExpression && a.trigger === 'strength_attack_hit_after_reckless'
+            );
+            for (const rider of hitRiders) {
+                const riderResult = rollExpression(rider.damageExpression);
+                if (riderResult) {
+                    formula += ` + ${rider.damageExpression}[${rider.damageType || 'same_as_weapon'}]`;
+                    total += riderResult.total;
+                    rolls = [...rolls, ...riderResult.rolls];
+                }
+            }
         }
 
         (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
@@ -228,6 +243,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'handOfHealing': setHandOfHealingModal(result.payload); break;
                     case 'fontOfMagic': setFontOfMagicModal(true); break;
                     case 'setCondition': setSetConditionModal(result.payload); break;
+                    case 'attackRider': setAttackRiderModal(result.payload); break;
                  }
                 break;
             case 'roll':
@@ -431,6 +447,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <SetConditionModal
                         {...setConditionModal}
                         onClose={() => setSetConditionModal(null)}
+                    />
+                )}
+                {attackRiderModal && (
+                    <AttackRiderModal
+                        {...attackRiderModal}
+                        onClose={() => { setAttackRiderModal(null); window.dispatchEvent(new CustomEvent('target-effects-updated')); }}
                     />
                 )}
                 {selectedActionSpell && (

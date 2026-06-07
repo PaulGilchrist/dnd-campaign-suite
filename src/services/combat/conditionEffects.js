@@ -48,7 +48,7 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName) {
     }
 }
 
-function computeConditionEffects(conditions = [], saveModifiers = []) {
+function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = []) {
   const effects = {
     attackAdvantageCount: 0,
     attackDisadvantageCount: 0,
@@ -70,6 +70,9 @@ function computeConditionEffects(conditions = [], saveModifiers = []) {
     saveDisadvantageCount: 0,
     autoReroll: false,
     autoRerollCondition: null,
+    riderSaveDisadvantage: false,
+    riderAttackBonus: 0,
+    riderCannotOpportunityAttack: false,
    }
 
   const conditionSet = new Set(conditions)
@@ -178,6 +181,22 @@ function computeConditionEffects(conditions = [], saveModifiers = []) {
         break
       }
     }
+
+  for (const te of targetEffects) {
+    if (te.effect === 'disadvantage_on_next_save') {
+      effects.riderSaveDisadvantage = true;
+      effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
+    }
+    if (te.effect === 'next_attack_advantage') {
+      const bonus = parseInt(te.value) || 5;
+      if (bonus > effects.riderAttackBonus) {
+        effects.riderAttackBonus = bonus;
+      }
+    }
+    if (te.noOpportunityAttacks) {
+      effects.riderCannotOpportunityAttack = true;
+    }
+  }
 
   return effects
 }

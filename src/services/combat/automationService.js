@@ -40,6 +40,12 @@ function buildAttackInfo(feature, playerStats) {
                 name: feature.name,
                 options: auto.options || [],
                 cost: auto.cost || null,
+                damageExpression: auto.damageExpression || '',
+                damageType: auto.damageType || '',
+                trigger: auto.trigger || '',
+                oncePerTurn: !!auto.oncePerTurn,
+                chooseOne: !!auto.chooseOne,
+                maxEffects: auto.maxEffects || 1,
                 hasAutomation: true
             }
         }

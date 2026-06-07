@@ -233,6 +233,11 @@
                         "type": "class_feature",
                         "automation": {
                             "type": "attack_rider",
+                            "damageExpression": "1d10",
+                            "damageType": "same_as_weapon",
+                            "trigger": "strength_attack_hit_after_reckless",
+                            "oncePerTurn": true,
+                            "chooseOne": true,
                             "options": [
                                 {
                                     "name": "Forceful Blow",
@@ -244,7 +249,7 @@
                                     "value": "15_ft_until_start_of_next_turn"
                                 }
                             ],
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     }
                 ]
@@ -312,10 +317,16 @@
                         "type": "class_feature",
                         "automation": {
                             "type": "attack_rider",
+                            "damageExpression": "1d10",
+                            "damageType": "same_as_weapon",
+                            "trigger": "strength_attack_hit_after_reckless",
+                            "oncePerTurn": true,
+                            "chooseOne": true,
                             "options": [
                                 {
                                     "name": "Staggering Blow",
-                                    "effect": "disadvantage_on_next_save"
+                                    "effect": "disadvantage_on_next_save",
+                                    "noOpportunityAttacks": true
                                 },
                                 {
                                     "name": "Sundering Blow",
@@ -323,7 +334,7 @@
                                     "value": "+5_to_next_attack_vs_target"
                                 }
                             ],
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     }
                 ]
@@ -391,10 +402,17 @@
                         "type": "class_feature",
                         "automation": {
                             "type": "attack_rider",
+                            "damageExpression": "2d10",
+                            "damageType": "same_as_weapon",
+                            "trigger": "strength_attack_hit_after_reckless",
+                            "oncePerTurn": true,
+                            "chooseOne": true,
+                            "maxEffects": 2,
                             "options": [
                                 {
                                     "name": "Staggering Blow",
-                                    "effect": "disadvantage_on_next_save"
+                                    "effect": "disadvantage_on_next_save",
+                                    "noOpportunityAttacks": true
                                 },
                                 {
                                     "name": "Sundering Blow",
@@ -402,7 +420,7 @@
                                     "value": "+5_to_next_attack_vs_target"
                                 }
                             ],
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     }
                 ]
