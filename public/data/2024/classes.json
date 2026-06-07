@@ -324,6 +324,15 @@
                             "chooseOne": true,
                             "options": [
                                 {
+                                    "name": "Forceful Blow",
+                                    "effect": "push_15ft"
+                                },
+                                {
+                                    "name": "Hamstring Blow",
+                                    "effect": "speed_reduction",
+                                    "value": "15_ft_until_start_of_next_turn"
+                                },
+                                {
                                     "name": "Staggering Blow",
                                     "effect": "disadvantage_on_next_save",
                                     "noOpportunityAttacks": true
@@ -406,9 +415,18 @@
                             "damageType": "same_as_weapon",
                             "trigger": "strength_attack_hit_after_reckless",
                             "oncePerTurn": true,
-                            "chooseOne": true,
+                            "chooseOne": false,
                             "maxEffects": 2,
                             "options": [
+                                {
+                                    "name": "Forceful Blow",
+                                    "effect": "push_15ft"
+                                },
+                                {
+                                    "name": "Hamstring Blow",
+                                    "effect": "speed_reduction",
+                                    "value": "15_ft_until_start_of_next_turn"
+                                },
                                 {
                                     "name": "Staggering Blow",
                                     "effect": "disadvantage_on_next_save",
