@@ -181,7 +181,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 </div>
                 <div>
                     <b>Proficiency: </b>+{playerStats.proficiency}<br />
-                    <span className={'clickable' + (exhaustionLevel > 0 ? ' stat--penalized' : '')} onClick={() => rollInitiative(effectiveInitiative)}><b>Initiative: </b>{signFormatter.format(effectiveInitiative)}</span><br />
+                    <span className={'clickable' + (exhaustionLevel > 0 ? ' stat--penalized' : '')} onClick={() => rollInitiative(effectiveInitiative, playerStats.initiativeAdvantage ? { forcedMode: 'advantage' } : undefined)}><b>Initiative: </b>{signFormatter.format(effectiveInitiative)}</span><br />
                     <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiration} /><br />
                     {flyBuffActive && <span className="automation-badge">{flyBuffName} Active</span>}
                 </div>

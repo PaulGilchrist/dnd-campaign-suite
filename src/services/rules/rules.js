@@ -442,6 +442,9 @@ const rules = {
         playerStats.abilities = await rules.getAbilities(playerStats, playerSummary);
         playerStats.hitPoints = rules.getHitPoints(playerStats, playerSummary);
         playerStats.initiative = playerStats.abilities.find((ability) => ability.name === 'Dexterity').bonus;
+        playerStats.initiativeAdvantage = (playerStats.automation?.passives ?? []).some(
+            p => p.type === 'passive_rule' && p.effect === 'initiative_advantage'
+        );
          [playerStats.armorClass, playerStats.armorClassFormula] = rules.getArmorClass(allEquipment, playerStats, playerSummary);
         playerStats.spellAbilities = rules.getSpellAbilities(allSpells, playerStats, playerSummary);
         playerStats.attacks = rules.getAttacks(allEquipment, allSpells, playerStats, playerSummary);

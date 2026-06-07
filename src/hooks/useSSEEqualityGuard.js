@@ -47,16 +47,23 @@ function useSSEEqualityGuard(setter) {
     const currentValueRef = useRef(undefined);
 
     return useCallback((newVal) => {
-        let resolvedNewVal = newVal;
         if (typeof newVal === 'function') {
-            resolvedNewVal = newVal(currentValueRef.current);
-           }
-        if (valuesEqual(currentValueRef.current, resolvedNewVal)) {
-            return;
-          }
-        currentValueRef.current = resolvedNewVal;
-        setter(newVal);
-       }, [setter]);
+            setter((prev) => {
+                const result = newVal(prev);
+                if (valuesEqual(currentValueRef.current, result)) {
+                    return prev;
+                }
+                currentValueRef.current = result;
+                return result;
+            });
+        } else {
+            if (valuesEqual(currentValueRef.current, newVal)) {
+                return;
+            }
+            currentValueRef.current = newVal;
+            setter(newVal);
+        }
+    }, [setter]);
 }
 
 export default useSSEEqualityGuard;

@@ -186,7 +186,11 @@
                         "name": "Feral Instinct",
                         "description": "Your instincts are so honed that you have Advantage on Initiative rolls.",
                         "level": 7,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "initiative_advantage"
+                        }
                     },
                     {
                         "name": "Instinctive Pounce",

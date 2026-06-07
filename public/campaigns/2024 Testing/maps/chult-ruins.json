@@ -896,5 +896,6 @@
   "zoom": 1,
   "panX": 0,
   "panY": 0,
-  "displayName": "Chult Ruins"
+  "displayName": "Chult Ruins",
+  "rooms": []
 }

@@ -1,0 +1,91 @@
+[
+  {
+    "name": "Sovereign's Rime",
+    "size": "city",
+    "description": "A city of theaters, where three great playhouses compete for audiences. The city's famous bridge, a stone arch so perfectly engineered that it has stood for five centuries. A great bridge with shops built along both sides.",
+    "atmosphere": "The city's many church doors open and close in a constant rhythm of prayer and devotion.",
+    "government": "A guild council, with seats based on guild membership size, governs all economic policy.",
+    "population": "12,000-25,000 souls",
+    "services": [
+      {
+        "type": "tailor",
+        "name": "The Silken Tunic",
+        "description": "A skilled tailor who can create or repair garments in any style."
+      },
+      {
+        "type": "stable",
+        "name": "The Country Stallion",
+        "description": "A modest stable with a few reliable mounts available for reasonable rates."
+      },
+      {
+        "type": "inn",
+        "name": "The Floating Butterfly",
+        "description": "A converted manor house now serving as an inn. The interior is surprisingly elegant."
+      },
+      {
+        "type": "general_store",
+        "name": "Hilltop Provisions & Supplies",
+        "description": "A family-run general store that has served the community for three generations."
+      },
+      {
+        "type": "blacksmith",
+        "name": "The Burning Forge",
+        "description": "An amateur blacksmith still learning the trade. Prices are low but the work is rough."
+      },
+      {
+        "type": "tavern",
+        "name": "The Tipsy Chimera",
+        "description": "A lively tavern with entertainment nightly. Minstrels, storytellers, and the occasional brawler."
+      },
+      {
+        "type": "magic_shop",
+        "name": "Nerissa's Antiquities",
+        "description": "A shop specializing in divination services and warded items. Prices are steep but quality is guaranteed."
+      }
+    ],
+    "notableNPCs": [
+      {
+        "name": "Aldren",
+        "role": "Clothier",
+        "description": "The Clothier of The Silken Tunic. Sharp-eyed and calculating, always looking for an angle."
+      },
+      {
+        "name": "Ambrose",
+        "role": "Groom",
+        "description": "The Groom of The Country Stallion. Friendly but forgetful, writing everything down in a ledger."
+      },
+      {
+        "name": "Gralden",
+        "role": "Host",
+        "description": "The Host of The Floating Butterfly. Friendly but forgetful, writing everything down in a ledger."
+      },
+      {
+        "name": "Francesca",
+        "role": "Shopkeeper",
+        "description": "The Shopkeeper of Hilltop Provisions & Supplies. Talkative and friendly, eager to share local gossip."
+      },
+      {
+        "name": "Camilla",
+        "role": "Blacksmith",
+        "description": "The Blacksmith of The Burning Forge. Cheerful and optimistic, regardless of circumstances."
+      },
+      {
+        "name": "Caerthynna",
+        "role": "Barkeep",
+        "description": "The Barkeep of The Tipsy Chimera. Secretive and private, reluctant to share information."
+      },
+      {
+        "name": "Rurik",
+        "role": "Hedge Wizard",
+        "description": "The Hedge Wizard of Nerissa's Antiquities. Secretive and private, reluctant to share information."
+      }
+    ],
+    "rumors": [
+      "A book found on a dead traveler contains a page that updates itself each day.",
+      "A dying courier clutched a bloodstained letter warning of an ambush on the king's road."
+    ],
+    "tags": "city, human-culture, tailor, many-services",
+    "notes": "",
+    "threat": "A serial arsonist has been targeting warehouses, and the merchant guild is offering a reward."
+  }
+]
