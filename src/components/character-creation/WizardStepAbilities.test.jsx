@@ -31,7 +31,7 @@ global.fetch = vi.fn(() =>
 );
 
 // Mock the utils module
-vi.mock('./utils.js', () => ({
+vi.mock('../../services/ui/utils.js', () => ({
   getPointBuyCosts: vi.fn(() => Promise.resolve(mockPointBuyCosts)),
 }));
 

@@ -206,15 +206,15 @@ const { MockFactions } = vi.hoisted(() => ({
 // ──────────────────────────────────────────────
 // Mock service modules and node_modules
 // ──────────────────────────────────────────────
-vi.mock('./services/dataLoader.js', () => dataLoaderMocks);
+vi.mock('./services/ui/dataLoader.js', () => dataLoaderMocks);
 
-vi.mock('./services/utils.js', () => ({
+vi.mock('./services/ui/utils.js', () => ({
   default: { getName: vi.fn((name) => name || '') },
 }));
 
 vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
 
-vi.mock('./services/mapsService.js', () => ({
+vi.mock('./services/maps/mapsService.js', () => ({
   loadMaps: vi.fn(),
 }));
 
@@ -548,7 +548,7 @@ describe('App', () => {
         writable: true,
         configurable: true,
       });
-      const { loadMaps } = await import('./services/mapsService.js');
+      const { loadMaps } = await import('./services/maps/mapsService.js');
       loadMaps.mockResolvedValue({ maps: [{ fileName: 'dungeon-1.json', isActive: true }] });
 
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
@@ -567,7 +567,7 @@ describe('App', () => {
         writable: true,
         configurable: true,
       });
-      const { loadMaps } = await import('./services/mapsService.js');
+      const { loadMaps } = await import('./services/maps/mapsService.js');
       loadMaps.mockResolvedValue({ maps: [{ fileName: 'dungeon-1.json', isActive: false }] });
 
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
@@ -585,7 +585,7 @@ describe('App', () => {
         writable: true,
         configurable: true,
       });
-      const { loadMaps } = await import('./services/mapsService.js');
+      const { loadMaps } = await import('./services/maps/mapsService.js');
       loadMaps.mockRejectedValue(new Error('Network error'));
 
       mockState.characters = [{ name: 'Aragorn', level: 1 }];
@@ -692,7 +692,7 @@ describe('App', () => {
         writable: true,
         configurable: true,
       });
-      const { loadMaps } = await import('./services/mapsService.js');
+      const { loadMaps } = await import('./services/maps/mapsService.js');
       loadMaps.mockResolvedValue({ maps: [{ fileName: 'dungeon-1.json', isActive: true }] });
 
       mockState.characters = [{ name: 'Aragorn', level: 1 }];

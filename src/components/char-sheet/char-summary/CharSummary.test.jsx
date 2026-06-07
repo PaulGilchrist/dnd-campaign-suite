@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
 
-vi.mock('../../../services/storage.js', () => ({
+vi.mock('../../../services/ui/storage.js', () => ({
   default: {
     getProperty: vi.fn(),
     setProperty: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
 }));
 
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import storage from '../../../services/storage.js';
+import storage from '../../../services/ui/storage.js';
 import CharFeats from '../char-feats/CharFeats.jsx';
 
 vi.mock('../../common/HiddenInput.jsx', () => ({
@@ -80,7 +80,7 @@ vi.mock('./char-class-sorcerer', () => ({ default: vi.fn(({ playerStats }) => <d
 vi.mock('./char-class-warlock', () => ({ default: vi.fn(({ playerStats }) => <div data-testid="char-class-warlock">{playerStats.class.name}</div>) }));
 vi.mock('./char-class-wizard', () => ({ default: vi.fn(({ playerStats }) => <div data-testid="char-class-wizard">{playerStats.class.name}</div>) }));
 
-vi.mock('../../../services/classRules2024.js', () => ({
+vi.mock('../../../services/character/classRules2024.js', () => ({
   default: {
     getUnarmoredMovementIncrease: vi.fn(() => 0),
     getMartialArtsDie: vi.fn(() => 1),

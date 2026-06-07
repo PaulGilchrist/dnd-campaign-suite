@@ -1,15 +1,15 @@
 import { useMemo, useCallback, useEffect, useRef, useState } from 'react';
-import { sanitizeHtml } from '../../services/sanitize.js';
-import { rollExpression, rollExpressionDoubled } from '../../services/diceRoller.js';
+import { sanitizeHtml } from '../../services/ui/sanitize.js';
+import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
 import Popup from '../common/Popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
-import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResistanceNotice } from '../../services/damageUtils.js';
-import { getCombatContext } from '../../services/damageUtils.js';
-import { findCreatureByName } from '../../services/damageUtils.js';
-import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT } from '../../services/conditionEffects.js';
-import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rangeValidation.js';
-import * as mapsService from '../../services/mapsService.js';
+import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResistanceNotice } from '../../services/rules/damageUtils.js';
+import { getCombatContext } from '../../services/rules/damageUtils.js';
+import { findCreatureByName } from '../../services/rules/damageUtils.js';
+import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditionEffects.js';
+import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rules/rangeValidation.js';
+import * as mapsService from '../../services/maps/mapsService.js';
 import './MonsterCardModal.css';
 
 const ABBR_MAP = { Strength: 'str', Dexterity: 'dex', Constitution: 'con', Intelligence: 'int', Wisdom: 'wis', Charisma: 'cha', str: 'str', dex: 'dex', con: 'con', int: 'int', wis: 'wis', cha: 'cha' };

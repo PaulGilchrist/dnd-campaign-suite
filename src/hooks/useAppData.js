@@ -6,7 +6,7 @@ import {
   loadMagicItems,
   loadRaceData,
   loadSpells
-} from '../services/dataLoader.js';
+} from '../services/ui/dataLoader.js';
 
 function useAppData() {
   const [abilityScores, setAbilityScores] = useState(null);

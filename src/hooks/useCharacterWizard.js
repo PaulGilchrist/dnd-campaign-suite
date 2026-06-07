@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import cloneDeep from 'lodash/cloneDeep';
-import * as campaignService from '../services/campaignService.js';
+import * as campaignService from '../services/campaign/campaignService.js';
 
 export function useCharacterWizard(campaignName) {
   const [showCharacterWizard, setShowCharacterWizard] = useState(false);

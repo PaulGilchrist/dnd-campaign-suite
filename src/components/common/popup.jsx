@@ -1,6 +1,6 @@
  
 import { useEffect, useCallback } from 'react';
-import { sanitizeHtml } from '../../services/sanitize.js';
+import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import './popup.css'
 
 function Popup({ html, children, onClickOrKeyDown }) {

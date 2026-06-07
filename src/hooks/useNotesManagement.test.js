@@ -5,7 +5,7 @@ const mockLoadNotes = vi.fn();
 const mockSaveNotes = vi.fn();
 const mockDeleteNote = vi.fn();
 
-vi.mock('../services/notesService.js', () => ({
+vi.mock('../services/campaign/notesService.js', () => ({
   loadNotes: (...args) => mockLoadNotes(...args),
   saveNotes: (...args) => mockSaveNotes(...args),
   deleteNote: (...args) => mockDeleteNote(...args),

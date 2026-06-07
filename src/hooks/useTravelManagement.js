@@ -8,12 +8,12 @@ import {
   EXHAUSTION_LEVELS,
   applyExhaustionSpeedPenaltyToBudget,
   getExhaustionMultiplierPercent,
-} from '../services/travelService.js';
+} from '../services/campaign/travelService.js';
 import {
   shouldTriggerEvent,
   generateRandomEvent,
-} from '../services/randomEventService.js';
-import { generateEncounterSuggestions } from '../services/encounterGenerator.js';
+} from '../services/campaign/randomEventService.js';
+import { generateEncounterSuggestions } from '../services/encounters/encounterGenerator.js';
 import { getRuntimeValue, setRuntimeValue } from './useRuntimeState.js';
 
 const MODES = {

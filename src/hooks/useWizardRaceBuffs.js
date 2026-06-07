@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { computeRaceBuffs, applyRaceBuffsToPlayerData } from '../services/raceBuffService.js';
+import { computeRaceBuffs, applyRaceBuffsToPlayerData } from '../services/character/raceBuffService.js';
 
 function useWizardRaceBuffs(formData, allRaces, setFormData) {
   const prevRaceRef = useRef(null);

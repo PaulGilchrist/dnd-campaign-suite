@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getMonsterImageUrl } from '../../../services/monsterUtils.js';
+import { getMonsterImageUrl } from '../../../services/npcs/monsterUtils.js';
 
 function useNpcImageCache(placedItems) {
     const [npcImages, setNpcImages] = useState({});

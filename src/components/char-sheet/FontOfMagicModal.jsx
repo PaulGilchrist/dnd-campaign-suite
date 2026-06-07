@@ -1,7 +1,7 @@
 
 import React from 'react'
 import { getRuntimeValue, setRuntimeBatch } from '../../hooks/useRuntimeState.js'
-import { getClassFeatures } from '../../services/classFeatures.js'
+import { getClassFeatures } from '../../services/character/classFeatures.js'
 import './FontOfMagicModal.css'
 
 const COSTS_2024 = [0, 2, 3, 4, 5, 6];

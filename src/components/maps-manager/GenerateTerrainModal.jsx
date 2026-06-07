@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { generateHexTerrain } from '../../services/hexTerrainGenerator.js';
-import * as mapsService from '../../services/mapsService.js';
+import { generateHexTerrain } from '../../services/maps/hexTerrainGenerator.js';
+import * as mapsService from '../../services/maps/mapsService.js';
 import './GenerateTerrainModal.css';
 
 function GenerateTerrainModal({ campaignName, initialMapName, onClose, onMapCreated }) {

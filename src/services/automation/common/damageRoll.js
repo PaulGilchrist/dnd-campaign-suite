@@ -1,9 +1,9 @@
-import { rollExpression, rollExpressionDoubled } from '../../diceRoller.js';
-import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetName } from '../../damageUtils.js';
-import * as mapsService from '../../mapsService.js';
-import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem, rangeToFeet } from '../../rangeValidation.js';
-import { computeCover } from '../../coverService.js';
-import { loadNPCs } from '../../npcsService.js';
+import { rollExpression, rollExpressionDoubled } from '../../dice/diceRoller.js';
+import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetName } from '../../rules/damageUtils.js';
+import * as mapsService from '../../maps/mapsService.js';
+import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem, rangeToFeet } from '../../rules/rangeValidation.js';
+import { computeCover } from '../../rules/coverService.js';
+import { loadNPCs } from '../../npcs/npcsService.js';
 
 export function rollDamageForAction(auto, options = {}) {
     const damage = auto.damage;

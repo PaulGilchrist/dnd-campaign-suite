@@ -220,7 +220,7 @@ vi.mock('../../config/steps-config.js', () => {
 });
 
 // Mock utils
-vi.mock('./utils.js', () => ({
+vi.mock('../../services/ui/utils.js', () => ({
   validateStep: vi.fn(() => Promise.resolve({})),
   validateFinalFormData: vi.fn(() => ({})),
   getPointBuyCosts: vi.fn(() => Promise.resolve({ 8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 9 })),

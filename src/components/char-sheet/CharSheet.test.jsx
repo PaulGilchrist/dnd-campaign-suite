@@ -62,7 +62,7 @@ vi.mock('./CharCharacterAdvancement.jsx', () => ({
 }));
 
 // Mock rulesFactory
-vi.mock('../../services/rulesFactory.js', () => ({
+vi.mock('../../services/rules/rulesFactory.js', () => ({
   default: {
     getPlayerStats: vi.fn(),
   },
@@ -76,7 +76,7 @@ vi.mock('../../hooks/useRuntimeState.js', () => ({
 }));
 
 // Mock utils
-vi.mock('../../services/utils.js', () => ({
+vi.mock('../../services/ui/utils.js', () => ({
   default: {
     getName: vi.fn((name) => name),
     getFirstName: vi.fn((name) => name),
@@ -85,12 +85,12 @@ vi.mock('../../services/utils.js', () => ({
 }));
 
 // Mock auraComboEffects
-vi.mock('../../services/auraComboEffects.js', () => ({
+vi.mock('../../services/combat/auraComboEffects.js', () => ({
   computeAuraComboEffects: vi.fn(() => Promise.resolve(null)),
 }));
 
 // Mock conditionEffects
-vi.mock('../../services/conditionEffects.js', () => ({
+vi.mock('../../services/combat/conditionEffects.js', () => ({
   computeConditionEffects: vi.fn(() => ({})),
   getNetAttackMode: vi.fn(() => 'normal'),
   CONDITIONS_THAT_CANNOT_ACT: new Set(),
@@ -107,9 +107,9 @@ Object.defineProperty(window, 'localStorage', {
   writable: true,
 });
 
-import rulesFactory from '../../services/rulesFactory.js';
+import rulesFactory from '../../services/rules/rulesFactory.js';
 import { getRuntimeValue, useRuntimeValue } from '../../hooks/useRuntimeState.js';
-import utils from '../../services/utils.js';
+import utils from '../../services/ui/utils.js';
 
 const mockPlayerSummary = {
   name: 'Test Character',

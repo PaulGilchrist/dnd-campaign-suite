@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
-import * as mapsService from '../../../services/mapsService.js';
-import { hexKey } from '../../../services/hexMapUtils.js';
-import { generateOutdoorEncounter } from '../../../services/outdoorEncounterGenerator.js';
+import * as mapsService from '../../../services/maps/mapsService.js';
+import { hexKey } from '../../../services/maps/hexMapUtils.js';
+import { generateOutdoorEncounter } from '../../../services/encounters/outdoorEncounterGenerator.js';
 
 function useEncounterGeneration(campaignName, mapName, terrain, marchingOrder, onEncounterCreated) {
     const generateMonsterPlacements = useCallback((monsters, gridSize) => {

@@ -14,29 +14,29 @@ vi.mock('../../hooks/useTrackedResource.js', () => ({
   default: vi.fn(),
 }));
 
-vi.mock('../../services/storage.js', () => ({
+vi.mock('../../services/ui/storage.js', () => ({
   default: { set: vi.fn() },
 }));
 
-vi.mock('../../services/damageUtils.js', () => ({
+vi.mock('../../services/rules/damageUtils.js', () => ({
   getTargetFromAttacker: vi.fn(() => null),
   getCombatContext: vi.fn(() => Promise.resolve(null)),
 }));
 
-vi.mock('../../services/applyHealing.js', () => ({
+vi.mock('../../services/rules/applyHealing.js', () => ({
   applyHealingToTarget: vi.fn(),
 }));
 
-vi.mock('../../services/utils.js', () => ({
+vi.mock('../../services/ui/utils.js', () => ({
   default: { getName: vi.fn((n) => n?.toLowerCase().trim()) },
 }));
 
 // ── Re-import mocked modules ──
 import * as useRuntimeState from '../../hooks/useRuntimeState.js';
 import useTrackedResource from '../../hooks/useTrackedResource.js';
-import storage from '../../services/storage.js';
-import * as damageUtils from '../../services/damageUtils.js';
-import * as applyHealingService from '../../services/applyHealing.js';
+import storage from '../../services/ui/storage.js';
+import * as damageUtils from '../../services/rules/damageUtils.js';
+import * as applyHealingService from '../../services/rules/applyHealing.js';
 
 // ── Test fixtures ──
 

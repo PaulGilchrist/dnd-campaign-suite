@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EncounterModal from './EncounterModal.jsx';
 
-vi.mock('../../services/encountersService.js', () => ({
+vi.mock('../../services/encounters/encountersService.js', () => ({
   formatEncounterName: (name) => name.replace(/-/g, ' '),
 }));
 

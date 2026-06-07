@@ -50,7 +50,7 @@ vi.mock('../MetamagicPopup.jsx', () => ({
 }));
 
 // Mock sanitizeHtml
-vi.mock('../../../services/sanitize.js', () => ({
+vi.mock('../../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 

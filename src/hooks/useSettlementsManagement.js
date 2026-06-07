@@ -4,7 +4,7 @@ import {
   saveSettlements,
   saveSettlement,
   deleteSettlement,
-} from '../services/settlementsService.js';
+} from '../services/campaign/settlementsService.js';
 
 function useSettlementsManagement(campaignName) {
   const [settlements, setSettlements] = useState([]);

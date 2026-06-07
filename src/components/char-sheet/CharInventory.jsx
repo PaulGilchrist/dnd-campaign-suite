@@ -2,8 +2,8 @@
 
 import usePopup from '../../hooks/usePopup.js'
 import Popup from '../common/Popup.jsx'
-import { sanitizeHtml } from '../../services/sanitize.js';
-import { loadEquipment } from '../../services/dataLoader.js';
+import { sanitizeHtml } from '../../services/ui/sanitize.js';
+import { loadEquipment } from '../../services/ui/dataLoader.js';
 import './CharInventory.css'
 
 function CharInventory({ playerStats }) {

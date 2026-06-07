@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CharInventory from './CharInventory.jsx';
 
 // Mock the dataLoader service
-vi.mock('../../services/dataLoader.js', () => ({
+vi.mock('../../services/ui/dataLoader.js', () => ({
   loadEquipment: vi.fn(),
   clearDataCache: vi.fn(),
 }));
@@ -14,12 +14,12 @@ vi.mock('../../hooks/usePopup.js', () => ({
 }));
 
 // Mock the sanitize service
-vi.mock('../../services/sanitize.js', () => ({
+vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
 import usePopup from '../../hooks/usePopup.js';
-import { loadEquipment } from '../../services/dataLoader.js';
+import { loadEquipment } from '../../services/ui/dataLoader.js';
 
 const mockPlayerStats = {
   inventory: {

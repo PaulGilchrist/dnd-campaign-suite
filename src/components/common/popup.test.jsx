@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Popup from './Popup.jsx';
 
-vi.mock('../../services/sanitize.js', () => ({
+vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
@@ -45,7 +45,7 @@ describe('Popup', () => {
   });
 
   it('should call sanitizeHtml with provided HTML', async () => {
-    const { sanitizeHtml } = await import('../../services/sanitize.js');
+    const { sanitizeHtml } = await import('../../services/ui/sanitize.js');
     const handleClose = vi.fn();
     render(<Popup html="<b>Safe HTML</b>" onClickOrKeyDown={handleClose} />);
 

@@ -1,4 +1,4 @@
-import * as mapsService from '../../services/mapsService.js';
+import * as mapsService from '../../services/maps/mapsService.js';
 import SpellOverlayControls from './SpellOverlayControls.jsx';
 import { OverlayShape } from '../../models/SpellOverlay.js';
 

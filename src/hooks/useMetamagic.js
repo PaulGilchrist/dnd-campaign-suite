@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from './useRuntimeState.js';
-import { getClassFeatures } from '../services/classFeatures.js';
-import utils from '../services/utils.js';
+import { getClassFeatures } from '../services/character/classFeatures.js';
+import utils from '../services/ui/utils.js';
 
 export function spendSorceryPoints(characterName, amount, campaignName) {
   const current = Number(getRuntimeValue(characterName, 'sorceryPoints') ?? 0);

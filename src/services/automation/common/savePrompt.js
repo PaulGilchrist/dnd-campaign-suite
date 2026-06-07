@@ -1,5 +1,5 @@
-import { sendSavePrompt } from '../../savePromptService.js';
-import utils from '../../utils.js';
+import { sendSavePrompt } from '../../combat/savePromptService.js';
+import utils from '../../ui/utils.js';
 import { getAbilityModifier } from '../../shared/abilityLookup.js';
 
 export function buildSaveDc(auto, playerStats) {

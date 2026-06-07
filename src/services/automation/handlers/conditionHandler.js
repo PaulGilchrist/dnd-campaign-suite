@@ -1,8 +1,8 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../logService.js';
-import * as mapsService from '../../mapsService.js';
-import { getCombatContext } from '../../damageUtils.js';
-import { rangeToFeet } from '../../rangeValidation.js';
+import { addEntry } from '../../ui/logService.js';
+import * as mapsService from '../../maps/mapsService.js';
+import { getCombatContext } from '../../rules/damageUtils.js';
+import { rangeToFeet } from '../../rules/rangeValidation.js';
 
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;

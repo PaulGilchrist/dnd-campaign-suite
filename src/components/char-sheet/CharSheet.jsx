@@ -1,7 +1,7 @@
 import React from 'react'
 import { cloneDeep } from 'lodash';
 import { setRuntimeValue, getRuntimeValue, useRuntimeValue } from '../../hooks/useRuntimeState.js'
-import rulesFactory from '../../services/rulesFactory.js'
+import rulesFactory from '../../services/rules/rulesFactory.js'
 import CharAbilities from './CharAbilities.jsx'
 import CharActions from './CharActions.jsx'
 import CharInventory from './CharInventory.jsx'
@@ -10,9 +10,9 @@ import CharSpecialActions from './CharSpecialActions.jsx'
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx'
 import CharSpells from './char-spells/CharSpells.jsx'
 import CharSummary from './char-summary/CharSummary.jsx'
-import { computeAuraComboEffects } from '../../services/auraComboEffects.js';
-import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/conditionEffects.js'
-import { EXHAUSTION_LEVELS } from '../../services/exhaustionRules.js'
+import { computeAuraComboEffects } from '../../services/combat/auraComboEffects.js';
+import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditionEffects.js'
+import { EXHAUSTION_LEVELS } from '../../services/combat/exhaustionRules.js'
 import './CharSheet.css'
 
 function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters }) {

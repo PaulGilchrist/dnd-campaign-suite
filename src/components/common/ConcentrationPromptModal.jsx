@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react';
-import utils from '../../services/utils.js';
-import { rollD20 } from '../../services/diceRoller.js';
-import { sendConcentrationResult } from '../../services/savePromptService.js';
+import utils from '../../services/ui/utils.js';
+import { rollD20 } from '../../services/dice/diceRoller.js';
+import { sendConcentrationResult } from '../../services/combat/savePromptService.js';
 import Subscriber from './Subscriber.jsx';
-import { computeAuraBonus } from '../../services/auraOfProtection.js';
-import { getAbilitySaveBonus } from '../../services/conditionUtils.js';
+import { computeAuraBonus } from '../../services/combat/auraOfProtection.js';
+import { getAbilitySaveBonus } from '../../services/combat/conditionUtils.js';
 import './concentrationPromptModal.css';
 
 function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {

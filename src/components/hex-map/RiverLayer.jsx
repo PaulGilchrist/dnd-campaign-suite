@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig.js';
-import { hexToPixel, hexNeighbors, orderHexPath, buildWindingPathDescriptor } from '../../services/hexMapUtils.js';
+import { hexToPixel, hexNeighbors, orderHexPath, buildWindingPathDescriptor } from '../../services/maps/hexMapUtils.js';
 
 function parseHexKey(key) {
     const [q, r] = key.split(',');

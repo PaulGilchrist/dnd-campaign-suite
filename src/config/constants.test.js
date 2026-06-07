@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as constants from './constants.js';
-import { loadAbilityScores } from '../services/dataLoader.js';
+import { loadAbilityScores } from '../services/ui/dataLoader.js';
 
 // Mock dataLoader
-vi.mock('../services/dataLoader.js', () => ({
+vi.mock('../services/ui/dataLoader.js', () => ({
   loadAbilityScores: vi.fn(),
   loadSkills: vi.fn(),
   loadPassiveSkills: vi.fn()

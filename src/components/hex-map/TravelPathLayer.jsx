@@ -1,5 +1,5 @@
 import { HEX_SIZE } from '../../config/outdoorConfig';
-import { hexToPixel } from '../../services/hexMapUtils';
+import { hexToPixel } from '../../services/maps/hexMapUtils';
 
 function TravelPathLayer({ path, pathIndex }) {
   if (!path || path.length === 0) return null;

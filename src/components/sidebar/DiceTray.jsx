@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { rollDie } from '../../services/diceRoller.js';
+import { rollDie } from '../../services/dice/diceRoller.js';
 import './DiceTray.css';
 
 function D4Icon() {

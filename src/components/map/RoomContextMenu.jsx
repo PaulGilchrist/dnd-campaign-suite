@@ -1,4 +1,4 @@
-import { ROOM_TYPES, ROOM_TYPE_COLORS, CELL_SIZE } from '../../../config/mapConfig';
+import { ROOM_TYPES, ROOM_TYPE_COLORS, CELL_SIZE } from '../../config/mapConfig';
 
 function RoomContextMenu({ selectedRoom, isLocalhost, gridSize, gridCenterX, gridCenterY, setMapData, setSelectedRoom }) {
     if (!selectedRoom || !isLocalhost) return null;

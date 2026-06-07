@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EncounterGeneratorModal from './EncounterGeneratorModal.jsx';
 
-vi.mock('../../services/encounterGenerator.js', () => ({
+vi.mock('../../services/encounters/encounterGenerator.js', () => ({
   generateEncounterSuggestions: vi.fn(() => []),
 }));
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { generateDungeon, generateAdjacentDungeon } from '../../services/dungeonGenerator.js';
-import * as mapsService from '../../services/mapsService.js';
+import { generateDungeon, generateAdjacentDungeon } from '../../services/maps/dungeonGenerator.js';
+import * as mapsService from '../../services/maps/mapsService.js';
 import './GenerateDungeonModal.css';
 
 const MODE_OPTIONS = [

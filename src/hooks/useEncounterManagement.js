@@ -6,7 +6,7 @@ import {
   updateEncounter,
   deleteEncounter,
   renameEncounter,
-} from '../services/encountersService.js';
+} from '../services/encounters/encountersService.js';
 
 function useEncounterManagement(campaignName) {
   const [encounters, setEncounters] = useState([]);

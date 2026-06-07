@@ -5,7 +5,7 @@ const mockLoadFactions = vi.fn();
 const mockSaveFactions = vi.fn();
 const mockDeleteFaction = vi.fn();
 
-vi.mock('../services/factionsService.js', () => ({
+vi.mock('../services/campaign/factionsService.js', () => ({
   loadFactions: (...args) => mockLoadFactions(...args),
   saveFactions: (...args) => mockSaveFactions(...args),
   deleteFaction: (...args) => mockDeleteFaction(...args),

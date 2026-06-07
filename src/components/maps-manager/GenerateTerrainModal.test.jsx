@@ -1,16 +1,16 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import GenerateTerrainModal from './GenerateTerrainModal.jsx';
-import { generateHexTerrain } from '../../services/hexTerrainGenerator.js';
-import * as mapsService from '../../services/mapsService.js';
+import { generateHexTerrain } from '../../services/maps/hexTerrainGenerator.js';
+import * as mapsService from '../../services/maps/mapsService.js';
 
-vi.mock('../../services/hexTerrainGenerator.js', () => ({
+vi.mock('../../services/maps/hexTerrainGenerator.js', () => ({
   generateHexTerrain: vi.fn(() => ({
     terrain: [],
   })),
 }));
 
-vi.mock('../../services/mapsService.js', () => ({
+vi.mock('../../services/maps/mapsService.js', () => ({
   createMap: vi.fn(() => Promise.resolve()),
 }));
 

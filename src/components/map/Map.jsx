@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Subscriber from '../common/Subscriber.jsx';
 import MapToolbar from './MapToolbar.jsx';
-import { loadMonsters } from '../../services/dataLoader.js';
+import { loadMonsters } from '../../services/ui/dataLoader.js';
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx';
 import './Map.css';
 import ItemsPanel from './ItemsPanel.jsx';

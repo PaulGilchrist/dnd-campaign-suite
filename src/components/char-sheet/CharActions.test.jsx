@@ -24,7 +24,7 @@ vi.mock('../../hooks/useMetamagic.js', () => ({
   })),
 }));
 
-vi.mock('../../services/sanitize.js', () => ({
+vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 

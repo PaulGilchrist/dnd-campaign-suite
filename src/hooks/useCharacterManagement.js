@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import cloneDeep from 'lodash/cloneDeep';
 import { saveAs } from 'file-saver';
-import * as campaignService from '../services/campaignService.js';
-import utils from '../services/utils.js';
+import * as campaignService from '../services/campaign/campaignService.js';
+import utils from '../services/ui/utils.js';
 
 function useCharacterManagement(campaignName) {
   const [characters, setCharacters] = useState([]);

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MapsManager from './MapsManager.jsx';
 
 // Mock the mapsService
-vi.mock('../../services/mapsService.js', () => ({
+vi.mock('../../services/maps/mapsService.js', () => ({
   loadMaps: vi.fn().mockResolvedValue({ maps: [] }),
   createMap: vi.fn().mockResolvedValue({}),
   deleteMap: vi.fn().mockResolvedValue({}),
@@ -31,7 +31,7 @@ vi.mock('./GenerateTerrainModal.jsx', () => ({
   default: () => <div data-testid="generate-terrain-modal" />,
 }));
 
-import * as mapsService from '../../services/mapsService.js';
+import * as mapsService from '../../services/maps/mapsService.js';
 
 const defaultProps = {
   campaignName: 'test-campaign',

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
-vi.mock('../services/storage.js', () => ({
+vi.mock('../services/ui/storage.js', () => ({
   default: {
     getProperty: vi.fn(),
     setProperty: vi.fn(),

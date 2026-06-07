@@ -1,19 +1,19 @@
 import { useRef, useEffect } from 'react';
 import useDiceRoll from './useDiceRoll.js';
-import { rollD20 } from '../services/diceRoller.js';
-import utils from '../services/utils.js';
-import storage from '../services/storage.js';
-import { getTargetFromAttacker } from '../services/damageUtils.js';
+import { rollD20 } from '../services/dice/diceRoller.js';
+import utils from '../services/ui/utils.js';
+import storage from '../services/ui/storage.js';
+import { getTargetFromAttacker } from '../services/rules/damageUtils.js';
 import {
   computeDamageAfterSave,
   rollSaveForCreature,
   applyDamageToTarget,
-} from '../services/applyDamage.js';
-import { sendSavePrompt, sendSaveResult } from '../services/savePromptService.js';
-import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../services/aoeService.js';
+} from '../services/rules/applyDamage.js';
+import { sendSavePrompt, sendSaveResult } from '../services/combat/savePromptService.js';
+import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../services/rules/aoeService.js';
 import { getRuntimeValue } from '../hooks/useRuntimeState.js';
-import { clearAllExpirationEffects } from '../services/expirations.js';
-import { loadCombatSummary, getCombatSummary } from '../services/combatData.js';
+import { clearAllExpirationEffects } from '../services/rules/expirations.js';
+import { loadCombatSummary, getCombatSummary } from '../services/encounters/combatData.js';
 import { saveLastDamageEvent } from '../hooks/useMetamagic.js';
 import { SHOW_DICE_ROLL_DELAY } from '../config/ui-config.js';
 

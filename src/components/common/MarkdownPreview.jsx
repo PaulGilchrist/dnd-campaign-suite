@@ -1,4 +1,4 @@
-import { renderMarkdown } from '../../services/sanitize.js';
+import { renderMarkdown } from '../../services/ui/sanitize.js';
 
 /**
  * Renders markdown text as sanitized HTML.

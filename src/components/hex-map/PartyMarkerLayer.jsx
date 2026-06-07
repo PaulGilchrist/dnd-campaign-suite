@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { hexToPixel, pixelToHexSnapped, hexToSVGPath } from '../../services/hexMapUtils.js';
+import { hexToPixel, pixelToHexSnapped, hexToSVGPath } from '../../services/maps/hexMapUtils.js';
 
 function PartyMarkerLayer({ position, HEX_SIZE, hexCols, hexRows, onPositionChange, svgRef, onEncounter, contextMenuOpen, onContextMenu, travelMode, onAdvance, onCancelTravel }) {
     const draggingRef = useRef(false);

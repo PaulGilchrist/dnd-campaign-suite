@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { loadEquipment } from '../services/dataLoader.js';
+import { loadEquipment } from '../services/ui/dataLoader.js';
 
 export function useEquipmentSearch(tempInventory, onTempInventoryChange, onInventoryChange) {
   const [equipmentData, setEquipmentData] = useState([]);

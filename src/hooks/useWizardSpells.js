@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getPreSelectedSpells } from '../services/getPreSelectedSpells.js';
+import { getPreSelectedSpells } from '../services/character/getPreSelectedSpells.js';
 
 function useWizardSpells(formData) {
   const [preSelectedSpells, setPreSelectedSpells] = useState([]);

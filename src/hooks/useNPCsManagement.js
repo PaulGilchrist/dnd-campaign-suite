@@ -4,7 +4,7 @@ import {
   saveNPCs,
   saveNPC,
   deleteNPC,
-} from '../services/npcsService.js';
+} from '../services/npcs/npcsService.js';
 
 function useNPCsManagement(campaignName) {
   const [npcs, setNpcs] = useState([]);

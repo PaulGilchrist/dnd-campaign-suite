@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { HEX_SIZE, TERRAIN_TYPES, DEFAULT_TERRAIN } from '../../config/outdoorConfig.js';
-import { getAllHexes, hexKey, hexToPixel, hexToSVGPath } from '../../services/hexMapUtils.js';
+import { getAllHexes, hexKey, hexToPixel, hexToSVGPath } from '../../services/maps/hexMapUtils.js';
 
 const terrainLookup = {};
 TERRAIN_TYPES.forEach(t => {

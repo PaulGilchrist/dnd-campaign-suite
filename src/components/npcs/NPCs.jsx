@@ -3,12 +3,12 @@ import useNPCsManagement from '../../hooks/useNPCsManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import AvatarImage from '../common/AvatarImage.jsx';
 import AvatarModal from '../common/AvatarModal.jsx';
-import { npcHasStatBlock, calculateAbilityModifier } from '../../services/npcStatBlockUtils.js';
-import { rollD20 } from '../../services/diceRoller.js';
-import utils from '../../services/utils.js';
-import storage from '../../services/storage.js';
-import { loadCombatSummary } from '../../services/combatData.js';
-import { generateNPC } from '../../services/npcGenerator.js';
+import { npcHasStatBlock, calculateAbilityModifier } from '../../services/encounters/npcStatBlockUtils.js';
+import { rollD20 } from '../../services/dice/diceRoller.js';
+import utils from '../../services/ui/utils.js';
+import storage from '../../services/ui/storage.js';
+import { loadCombatSummary } from '../../services/encounters/combatData.js';
+import { generateNPC } from '../../services/npcs/npcGenerator.js';
 import './NPCs.css';
 
 const ABILITY_ABBR = ['str', 'dex', 'con', 'int', 'wis', 'cha'];

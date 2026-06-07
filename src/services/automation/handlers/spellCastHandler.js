@@ -1,4 +1,4 @@
-import { rollExpression } from '../../diceRoller.js';
+import { rollExpression } from '../../dice/diceRoller.js';
 
 export async function handle(action, playerStats, _campaignName, _mapName) {
     const auto = action.automation;

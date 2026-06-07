@@ -1,7 +1,7 @@
 
 import React from 'react'
 import TrackedResourceInput from './TrackedResourceInput.jsx';
-import { getClassFeatures } from '../../../services/classFeatures.js';
+import { getClassFeatures } from '../../../services/character/classFeatures.js';
 import { useRuntimeValue } from '../../../hooks/useRuntimeState.js';
 /* ─── Barbarian ─── */
 const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName }) {

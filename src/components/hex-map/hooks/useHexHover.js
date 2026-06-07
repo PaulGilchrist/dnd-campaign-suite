@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { pixelToHexSnapped } from '../../../services/hexMapUtils.js';
+import { pixelToHexSnapped } from '../../../services/maps/hexMapUtils.js';
 import { HEX_SIZE } from '../../../config/outdoorConfig.js';
 
 function useHexHover(svgRef, hexCols, hexRows) {

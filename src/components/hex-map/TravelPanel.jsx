@@ -1,6 +1,6 @@
 import { useRef } from 'react';
-import { TRAVEL_PACES, formatTravelTime, getHexTravelTime } from '../../services/travelService.js';
-import { EVENT_FREQUENCIES } from '../../services/randomEventService.js';
+import { TRAVEL_PACES, formatTravelTime, getHexTravelTime } from '../../services/campaign/travelService.js';
+import { EVENT_FREQUENCIES } from '../../services/campaign/randomEventService.js';
 
 function TravelPanel({
   travelPace,

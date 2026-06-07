@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { computeAllFeatBuffs } from '../services/featBuffService.js';
+import { computeAllFeatBuffs } from '../services/character/featBuffService.js';
 
 function buildFormDataWithBuffs(prev, buffs) {
   const next = { ...prev };

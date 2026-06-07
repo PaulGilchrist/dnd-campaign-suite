@@ -4,12 +4,12 @@ import SetConditionModal from './SetConditionModal.jsx';
 
 // ── Mocked modules (before the component import) ──
 
-vi.mock('../../services/rangeValidation.js', () => ({
+vi.mock('../../services/rules/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
   rangeToFeet: vi.fn(() => 60),
 }));
 
-vi.mock('../../services/savePromptService.js', () => ({
+vi.mock('../../services/combat/savePromptService.js', () => ({
   sendSavePrompt: vi.fn(),
   sendSaveResult: vi.fn(),
 }));
@@ -19,19 +19,19 @@ vi.mock('../../hooks/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../services/expirations.js', () => ({
+vi.mock('../../services/rules/expirations.js', () => ({
   addExpiration: vi.fn(),
 }));
 
-vi.mock('../../services/logService.js', () => ({
+vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../services/diceRoller.js', () => ({
+vi.mock('../../services/dice/diceRoller.js', () => ({
   rollD20: vi.fn(),
 }));
 
-vi.mock('../../services/utils.js', () => {
+vi.mock('../../services/ui/utils.js', () => {
   let counter = 0;
   const utilsMock = {
     guid: vi.fn(() => `guid-${++counter}`),
@@ -40,16 +40,16 @@ vi.mock('../../services/utils.js', () => {
   return { default: utilsMock };
 });
 
-vi.mock('../../services/storage.js', () => ({
+vi.mock('../../services/ui/storage.js', () => ({
   default: { set: vi.fn() },
 }));
 
 // ── Re-import mocked modules ──
-import * as savePromptService from '../../services/savePromptService.js';
+import * as savePromptService from '../../services/combat/savePromptService.js';
 import * as useRuntimeState from '../../hooks/useRuntimeState.js';
-import * as expirations from '../../services/expirations.js';
-import * as logService from '../../services/logService.js';
-import * as diceRoller from '../../services/diceRoller.js';
+import * as expirations from '../../services/rules/expirations.js';
+import * as logService from '../../services/ui/logService.js';
+import * as diceRoller from '../../services/dice/diceRoller.js';
 
 // ── Test fixtures ──
 

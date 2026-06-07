@@ -1,12 +1,12 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
-import * as mapsService from '../../services/mapsService.js';
-import { generateWeather } from '../../services/weatherService.js';
+import * as mapsService from '../../services/maps/mapsService.js';
+import { generateWeather } from '../../services/campaign/weatherService.js';
 import {
     HEX_SIZE, GRID_COLS_MULTIPLIER,
     TOOL_NONE, TOOL_PAINT, TOOL_ERASE, TOOL_RIVER, TOOL_PAN, TOOL_TRAVEL, TOOL_ROAD,
     TERRAIN_TYPES, POI_TYPES
 } from '../../config/outdoorConfig.js';
-import { hexKey, hexToPixel, hexToSVGPath } from '../../services/hexMapUtils.js';
+import { hexKey, hexToPixel, hexToSVGPath } from '../../services/maps/hexMapUtils.js';
 import TerrainLayer from './TerrainLayer.jsx';
 import HexGridLayer from './HexGridLayer.jsx';
 import HexMapToolbar from './HexMapToolbar.jsx';

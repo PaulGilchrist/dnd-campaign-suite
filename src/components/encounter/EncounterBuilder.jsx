@@ -9,13 +9,13 @@ import EncounterModal from './EncounterModal.jsx';
 import EncounterGeneratorModal from './EncounterGeneratorModal.jsx';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import PreviewToggle from '../common/PreviewToggle.jsx';
-import { formatEncounterName } from '../../services/encountersService.js';
-import { loadEncounterToInitiative } from '../../services/encounterToInitiative.js';
-import { generateLootSuggestions } from '../../services/lootGenerator.js';
-import { calculateXPThreshold, calculateDifficultyMultiplier } from '../../services/encounterGenerator.js';
+import { formatEncounterName } from '../../services/encounters/encountersService.js';
+import { loadEncounterToInitiative } from '../../services/encounters/encounterToInitiative.js';
+import { generateLootSuggestions } from '../../services/items/lootGenerator.js';
+import { calculateXPThreshold, calculateDifficultyMultiplier } from '../../services/encounters/encounterGenerator.js';
 import { ENCOUNTER_CONFIG } from '../../config/encounterConfig.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import * as logService from '../../services/logService.js';
+import * as logService from '../../services/ui/logService.js';
 import './EncounterBuilder.css';
 
 const difficultyLabels = ['Easy', 'Medium', 'Hard', 'Deadly'];

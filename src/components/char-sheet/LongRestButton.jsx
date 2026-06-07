@@ -1,5 +1,5 @@
 
-import { applyLongRest } from '../../services/restRules.js'
+import { applyLongRest } from '../../services/rules/restRules.js'
 
 function LongRestButton({ playerStats, campaignName, onLongRest }) {
   const handleLongRest = () => {

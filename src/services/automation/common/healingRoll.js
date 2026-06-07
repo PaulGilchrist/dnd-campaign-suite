@@ -1,7 +1,7 @@
-import { rollExpression } from '../../diceRoller.js';
+import { rollExpression } from '../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getCombatContext, getTargetFromAttacker } from '../../damageUtils.js';
-import { applyHealingToTarget } from '../../applyHealing.js';
+import { getCombatContext, getTargetFromAttacker } from '../../rules/damageUtils.js';
+import { applyHealingToTarget } from '../../rules/applyHealing.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 
 export function rollHealingForAction(auto, playerStats, campaignName, isSelf = false) {

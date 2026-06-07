@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import * as mapsService from '../../services/mapsService';
-import { DEFAULT_GRID_SIZE } from '../../config/mapConfig';
+import * as mapsService from '../../../services/maps/mapsService';
+import { DEFAULT_GRID_SIZE } from '../../../config/mapConfig';
 
 function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize }) {
     const [mapData, setMapData] = useState(null);

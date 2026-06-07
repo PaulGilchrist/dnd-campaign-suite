@@ -1,17 +1,17 @@
 import React from 'react'
 import { cloneDeep } from 'lodash'
 import useSSEEqualityGuard from '../../hooks/useSSEEqualityGuard.js'
-import utils from '../../services/utils.js'
+import utils from '../../services/ui/utils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
-import storage from '../../services/storage.js'
-import { clearDeathSavePrompt } from '../../services/savePromptService.js'
-import { getMonsterImageUrl, getMonsterData } from '../../services/monsterUtils.js'
-import { getAbilityLabel, CONDITIONS } from '../../services/conditionUtils.js'
-import { loadNPCs } from '../../services/npcsService.js'
-import { npcToMonsterFormat, npcHasStatBlock } from '../../services/npcStatBlockUtils.js'
-import * as mapsService from '../../services/mapsService.js'
-import { expireStaleEffects } from '../../services/expirations.js'
-import { loadCombatSummary, getCombatSummary, getActiveCreatureName } from '../../services/combatData.js'
+import storage from '../../services/ui/storage.js'
+import { clearDeathSavePrompt } from '../../services/combat/savePromptService.js'
+import { getMonsterImageUrl, getMonsterData } from '../../services/npcs/monsterUtils.js'
+import { getAbilityLabel, CONDITIONS } from '../../services/combat/conditionUtils.js'
+import { loadNPCs } from '../../services/npcs/npcsService.js'
+import { npcToMonsterFormat, npcHasStatBlock } from '../../services/encounters/npcStatBlockUtils.js'
+import * as mapsService from '../../services/maps/mapsService.js'
+import { expireStaleEffects } from '../../services/rules/expirations.js'
+import { loadCombatSummary, getCombatSummary, getActiveCreatureName } from '../../services/encounters/combatData.js'
 import {
     setupCreatures,
     addNpc,
@@ -25,19 +25,19 @@ import {
     setTarget,
     clearCombat,
     mergeCombatSummaryWithCharacters,
-} from '../../services/initiativeService.js'
+} from '../../services/encounters/initiativeService.js'
 import {
     rollConditionSave,
     removeCondition,
     addCondition,
     buildConditionPopup,
-} from '../../services/conditionSaveService.js'
+} from '../../services/combat/conditionSaveService.js'
 import {
     rollConcentrationSave,
     breakConcentration,
     addConcentration,
     buildConcentrationPopup,
-} from '../../services/concentrationService.js'
+} from '../../services/combat/concentrationService.js'
 import {
     logInitiativeRoll,
     logConditionEvent,
@@ -45,7 +45,7 @@ import {
     logConditionSave,
     logHpChange,
     logNpcThreshold,
-} from '../../services/combatLoggingService.js'
+} from '../../services/encounters/combatLoggingService.js'
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx'
 import Subscriber from '../common/Subscriber.jsx'
 import Popup from '../common/Popup.jsx'

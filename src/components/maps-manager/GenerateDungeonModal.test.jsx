@@ -1,10 +1,10 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import GenerateDungeonModal from './GenerateDungeonModal.jsx';
-import { generateDungeon } from '../../services/dungeonGenerator.js';
-import * as mapsService from '../../services/mapsService.js';
+import { generateDungeon } from '../../services/maps/dungeonGenerator.js';
+import * as mapsService from '../../services/maps/mapsService.js';
 
-vi.mock('../../services/dungeonGenerator.js', () => ({
+vi.mock('../../services/maps/dungeonGenerator.js', () => ({
   generateDungeon: vi.fn(() => ({
     name: 'test-dungeon',
     gridSize: 30,
@@ -13,7 +13,7 @@ vi.mock('../../services/dungeonGenerator.js', () => ({
   })),
 }));
 
-vi.mock('../../services/mapsService.js', () => ({
+vi.mock('../../services/maps/mapsService.js', () => ({
   createMap: vi.fn(() => Promise.resolve()),
 }));
 

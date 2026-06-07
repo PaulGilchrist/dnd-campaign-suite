@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { isRoadConnectable, findHexPath } from '../../../services/hexMapUtils.js';
+import { isRoadConnectable, findHexPath } from '../../../services/maps/hexMapUtils.js';
 import { TOOL_ROAD } from '../../../config/outdoorConfig.js';
 
 function usePoiManagement(pois, setPois, roads, setRoads, terrain, hexCols, hexRows, getHexFromEvent, tool) {

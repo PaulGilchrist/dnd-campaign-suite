@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CharFeats from './CharFeats.jsx';
 
 // Mock the dataLoader module
-vi.mock('../../../services/dataLoader.js', () => ({
+vi.mock('../../../services/ui/dataLoader.js', () => ({
   loadFeatData: vi.fn(),
 }));
 
@@ -13,7 +13,7 @@ vi.mock('../../../hooks/usePopup.js', () => ({
 }));
 
 import usePopup from '../../../hooks/usePopup.js';
-import { loadFeatData } from '../../../services/dataLoader.js';
+import { loadFeatData } from '../../../services/ui/dataLoader.js';
 
 const mockPlayerStats = {
   feats: ['Actor', 'Athlete'],

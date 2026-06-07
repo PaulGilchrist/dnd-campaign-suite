@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharGold from './CharGold.jsx';
 
-vi.mock('../../../services/storage.js', () => ({
+vi.mock('../../../services/ui/storage.js', () => ({
   default: {
     getProperty: vi.fn(),
     setProperty: vi.fn(),

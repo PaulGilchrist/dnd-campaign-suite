@@ -1,15 +1,15 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepFeats from './WizardStepFeats.jsx';
-import * as featValidation from '../../services/featValidation.js';
+import * as featValidation from '../../services/character/featValidation.js';
 
-vi.mock('../../services/featValidation.js', () => ({
+vi.mock('../../services/character/featValidation.js', () => ({
   validateFeats: vi.fn(() => Promise.resolve([])),
   getFeatLimits: vi.fn(() => Promise.resolve({ allowed: 2, originRequired: false, details: 'Test rules' })),
   normalizeFeatDescription: vi.fn((feat) => ({ text: feat.description || (feat.desc && feat.desc[0]) || '', isHtml: !!feat.description }))
 }));
 
-vi.mock('../../services/sanitize.js', () => ({
+vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html)
 }));
 

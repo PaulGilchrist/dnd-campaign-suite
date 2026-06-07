@@ -23,6 +23,6 @@ function ConditionEffectBadges({ conditions }) {
     )
 }
 
-import { computeConditionEffects } from '../../services/conditionEffects.js'
+import { computeConditionEffects } from '../../services/combat/conditionEffects.js'
 
 export default ConditionEffectBadges

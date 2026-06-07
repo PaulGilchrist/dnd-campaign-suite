@@ -54,6 +54,6 @@ function ConditionPicker({ targetName, selected, dc, ability, onSelect, onDcChan
     )
 }
 
-import { CONDITIONS, getDefaultAbility } from '../../services/conditionUtils.js'
+import { CONDITIONS, getDefaultAbility } from '../../services/combat/conditionUtils.js'
 
 export default ConditionPicker

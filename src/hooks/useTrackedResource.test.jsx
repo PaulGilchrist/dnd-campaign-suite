@@ -3,7 +3,7 @@ import { render, screen, act } from '@testing-library/react';
 import React from 'react';
 import useTrackedResource from './useTrackedResource.js';
 
-vi.mock('../services/storage.js', () => ({
+vi.mock('../services/ui/storage.js', () => ({
   default: {
     getProperty: vi.fn(),
     setProperty: vi.fn(),

@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharClassFeatures from './CharClassFeatures.jsx';
 
-vi.mock('../../../services/storage.js', () => ({
+vi.mock('../../../services/ui/storage.js', () => ({
   default: {
     getProperty: vi.fn(),
     setProperty: vi.fn(),
@@ -49,7 +49,7 @@ vi.mock('../../common/HiddenInput.jsx', () => ({
       }),
 }));
 
-vi.mock('../../../services/classRules.js', () => ({
+vi.mock('../../../services/character/classRules.js', () => ({
   default: {
     getDruidMaxWildShapeChallengeRating: vi.fn(),
     getDruidWildShapeUses: vi.fn(),
@@ -156,7 +156,7 @@ vi.mock('../../../services/classRules.js', () => ({
      },
 }));
 
-vi.mock('../../../services/classRules2024.js', () => ({
+vi.mock('../../../services/character/classRules2024.js', () => ({
   default: {
     getDruidMaxWildShapeChallengeRating: vi.fn((playerStats) => {
       const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
@@ -312,9 +312,9 @@ vi.mock('../../../services/classRules2024.js', () => ({
 }));
 
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import storage from '../../../services/storage.js';
-import classRules from '../../../services/classRules.js';
-import classRules2024 from '../../../services/classRules2024.js';
+import storage from '../../../services/ui/storage.js';
+import classRules from '../../../services/character/classRules.js';
+import classRules2024 from '../../../services/character/classRules2024.js';
 
 function toggleFirstClickChangeAndSet(value) {
   fireEvent.click(document.querySelector('.clickable'));

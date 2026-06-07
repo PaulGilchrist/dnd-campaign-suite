@@ -2,7 +2,7 @@
 
 import useActionPopup from '../../hooks/useActionPopup.js'
 import Popup from '../common/Popup.jsx'
-import { sanitizeHtml } from '../../services/sanitize.js';
+import { sanitizeHtml } from '../../services/ui/sanitize.js';
 
 function CharCharacterAdvancement({ playerStats }) {
     const { showPopup, popupHtml, setPopupHtml } = useActionPopup('feature');

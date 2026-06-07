@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import useSettlementsManagement from '../../hooks/useSettlementsManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
-import { generateSettlement } from '../../services/settlementGenerator.js';
+import { generateSettlement } from '../../services/campaign/settlementGenerator.js';
 import './Settlements.css';
 
 const SIZE_OPTIONS = [

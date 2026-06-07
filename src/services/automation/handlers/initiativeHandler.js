@@ -1,5 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { rollExpression } from '../../diceRoller.js';
+import { rollExpression } from '../../dice/diceRoller.js';
 import { logHealingToSSE } from '../common/healingRoll.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {

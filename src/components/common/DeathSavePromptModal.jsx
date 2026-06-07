@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 
-import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/savePromptService.js';
-import * as deathSaveRules from '../../services/deathSaveRules.js';
+import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/combat/savePromptService.js';
+import * as deathSaveRules from '../../services/combat/deathSaveRules.js';
 import Subscriber from './Subscriber.jsx';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import './deathSavePromptModal.css';

@@ -3,13 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepSkills from './WizardStepSkills.jsx';
 
 // Mock dataLoader to avoid actual fetch calls and allow precise control
-vi.mock('../../services/dataLoader.js', () => ({
+vi.mock('../../services/ui/dataLoader.js', () => ({
   loadSkills: vi.fn(),
 }));
 
-import { loadSkills } from '../../services/dataLoader.js';
+import { loadSkills } from '../../services/ui/dataLoader.js';
 
-vi.mock('../../services/skillValidation.js', () => ({
+vi.mock('../../services/character/skillValidation.js', () => ({
   validateSkills: vi.fn(() => Promise.resolve([])),
   getSkillLimits: vi.fn(() => Promise.resolve({ allowed: 3, details: 'Your class and level grant 3 skills.' })),
   getExpertiseLimits: vi.fn(() => Promise.resolve({ allowed: true, count: 2, details: 'Rogues get expertise in 2 skills.' })),

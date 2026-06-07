@@ -5,7 +5,7 @@ const mockLoadQuests = vi.fn();
 const mockSaveQuests = vi.fn();
 const mockDeleteQuest = vi.fn();
 
-vi.mock('../services/questsService.js', () => ({
+vi.mock('../services/campaign/questsService.js', () => ({
   loadQuests: (...args) => mockLoadQuests(...args),
   saveQuests: (...args) => mockSaveQuests(...args),
   deleteQuest: (...args) => mockDeleteQuest(...args),

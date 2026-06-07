@@ -1,7 +1,7 @@
  
 import React from 'react'
 import './CharSpellSlots.css'
-import rules from '../../../services/rules.js'
+import rules from '../../../services/rules/rules.js'
 import CharSpellSlotLevel from './CharSpellSlotLevel.jsx'
 
 function CharSpellSlots({ playerStats, campaignName }) {

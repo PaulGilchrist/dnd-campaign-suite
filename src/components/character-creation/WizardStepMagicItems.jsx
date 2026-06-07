@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import SelectableList from './SelectableList.jsx';
 import WarningList from '../common/WarningList.jsx';
-import { sanitizeHtml } from '../../services/sanitize.js';
+import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import './WizardStepMagicItems.css';
 function WizardStepMagicItems({ formData, allMagicItems, onArrayFieldChange }) {
   const [warnings, setWarnings] = useState([]);

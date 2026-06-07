@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpellSlots from './CharSpellSlots.jsx';
 
 // Mock the rules service
-vi.mock('../../../services/rules.js', () => ({
+vi.mock('../../../services/rules/rules.js', () => ({
   default: {
     getSpellMaxLevel: vi.fn(),
    },
@@ -21,7 +21,7 @@ vi.mock('./CharSpellSlotLevel.jsx', () => ({
       },
 }));
 
-import rules from '../../../services/rules.js';
+import rules from '../../../services/rules/rules.js';
 
 const mockPlayerStats = {
   name: 'Test Character',

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { computeVisibility } from '../../../services/lineOfSight.js';
+import { computeVisibility } from '../../../services/maps/lineOfSight.js';
 
 function useFogOfWar(players, walls, placedItems, gridSize) {
     return useMemo(() => {

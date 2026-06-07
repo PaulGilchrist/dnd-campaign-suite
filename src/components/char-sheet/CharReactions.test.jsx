@@ -6,7 +6,7 @@ vi.mock('../../hooks/useLoggedDiceRoll.js', () => ({
   default: vi.fn(),
 }));
 
-vi.mock('../../services/sanitize.js', () => ({
+vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 

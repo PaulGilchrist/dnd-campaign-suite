@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import * as mapsService from '../../../services/mapsService.js';
-import { hexKey } from '../../../services/hexMapUtils.js';
-import { getDailyHexBudget } from '../../../services/travelService.js';
+import * as mapsService from '../../../services/maps/mapsService.js';
+import { hexKey } from '../../../services/maps/hexMapUtils.js';
+import { getDailyHexBudget } from '../../../services/campaign/travelService.js';
 import { DEFAULT_GRID_SIZE, GRID_COLS_MULTIPLIER, MIN_ZOOM, DEFAULT_TERRAIN } from '../../../config/outdoorConfig.js';
 
 function useMapLoader(campaignName, mapName, characters) {

@@ -1,13 +1,13 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
-import { rollD20 } from '../../../services/diceRoller.js'
-import { CONDITIONS, CONDITION_SAVE_DC, CONDITION_SAVE_MAP, getAbilityLabel, getAbilitySaveBonus } from '../../../services/conditionUtils.js'
-import { EXHAUSTION_LEVELS, isDeadFromExhaustion, getExhaustionSaveDC } from '../../../services/exhaustionRules.js'
+import { rollD20 } from '../../../services/dice/diceRoller.js'
+import { CONDITIONS, CONDITION_SAVE_DC, CONDITION_SAVE_MAP, getAbilityLabel, getAbilitySaveBonus } from '../../../services/combat/conditionUtils.js'
+import { EXHAUSTION_LEVELS, isDeadFromExhaustion, getExhaustionSaveDC } from '../../../services/combat/exhaustionRules.js'
 import usePopup from '../../../hooks/usePopup.js'
 import Popup from '../../common/Popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
-import { computeAuraBonus } from '../../../services/auraOfProtection.js'
+import { computeAuraBonus } from '../../../services/combat/auraOfProtection.js'
 import './CharConditions.css'
 
 const STORAGE_KEY = 'activeConditions'

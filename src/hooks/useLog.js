@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import * as logService from '../services/logService.js';
+import * as logService from '../services/ui/logService.js';
 
 const MAX_LOG_ENTRIES = 200;
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig';
-import { hexToPixel } from '../../services/hexMapUtils';
-import * as mapsService from '../../services/mapsService.js';
+import { hexToPixel } from '../../services/maps/hexMapUtils';
+import * as mapsService from '../../services/maps/mapsService.js';
 
 function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onDelete, onRename, onLinkMap, onUnlinkMap, onRemoveRoads, setShowRename, onClose, indoorMaps = [], viewPortBounds, roads = [] }) {
     const [showLinkPicker, setShowLinkPicker] = useState(false);

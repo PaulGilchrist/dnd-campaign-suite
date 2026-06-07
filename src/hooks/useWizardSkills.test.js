@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardSkills from './useWizardSkills.js';
 
 // Mock the skill validation services
-vi.mock('../services/skillValidation.js', () => ({
+vi.mock('../services/character/skillValidation.js', () => ({
   validateSkills: vi.fn(),
   getSkillLimits: vi.fn(),
   getExpertiseLimits: vi.fn(),
@@ -15,7 +15,7 @@ import {
   getSkillLimits,
   getExpertiseLimits,
   getPreSelectedSkills
-} from '../services/skillValidation.js';
+} from '../services/character/skillValidation.js';
 
 describe('useWizardSkills', () => {
   const mockFormData = {

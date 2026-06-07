@@ -26,7 +26,7 @@ vi.mock('./useRuntimeState.js', () => {
   };
 });
 
-vi.mock('../services/classFeatures.js', () => ({
+vi.mock('../services/character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(() => ({
     maxSorceryPoints: 10,
     metamagicKnown: 2,

@@ -4,7 +4,7 @@ import AvatarImage from '../common/AvatarImage.jsx'
 import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx'
 import NpcAvatar from './NpcAvatar.jsx'
 import CreatureHp from './CreatureHp.jsx'
-import { getAbilityLabel } from '../../services/conditionUtils.js'
+import { getAbilityLabel } from '../../services/combat/conditionUtils.js'
 import ConditionEffectBadges from './ConditionEffectBadges.jsx'
 
 const SHAPE_LABELS = {

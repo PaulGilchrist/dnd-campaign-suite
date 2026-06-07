@@ -8,17 +8,17 @@ import DiceRollResult from '../DiceRollResult.jsx'
 import MetamagicPopup from '../MetamagicPopup.jsx'
 import SpellDetailPopup from './SpellDetailPopup.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
-import { rollExpression, rollExpressionDoubled } from '../../../services/diceRoller.js';
-import { sanitizeHtml } from '../../../services/sanitize.js';
-import { getCombatContext, getTargetFromAttacker } from '../../../services/damageUtils.js';
+import { rollExpression, rollExpressionDoubled } from '../../../services/dice/diceRoller.js';
+import { sanitizeHtml } from '../../../services/ui/sanitize.js';
+import { getCombatContext, getTargetFromAttacker } from '../../../services/rules/damageUtils.js';
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../../hooks/useMetamagic.js'
 import { useSpellMetamagicFlow } from '../../../hooks/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../../hooks/useSpellUpcastFlow.js'
 import UpcastPopup from './UpcastPopup.jsx'
-import { executeSpellCast } from '../../../services/spellCastService.js'
-import * as mapsService from '../../../services/mapsService.js';
-import { getNearestPlacedItem } from '../../../services/rangeValidation.js';
-import { isInnateSorceryActive } from '../../../services/buffService.js';
+import { executeSpellCast } from '../../../services/rules/spellCastService.js'
+import * as mapsService from '../../../services/maps/mapsService.js';
+import { getNearestPlacedItem } from '../../../services/rules/rangeValidation.js';
+import { isInnateSorceryActive } from '../../../services/combat/buffService.js';
 import { useRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import './CharSpells.css'
 

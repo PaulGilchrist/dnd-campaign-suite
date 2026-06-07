@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharHitPoints from './CharHitPoints.jsx';
 
-vi.mock('../../../services/storage.js', () => ({
+vi.mock('../../../services/ui/storage.js', () => ({
   default: {
     getProperty: vi.fn(),
     setProperty: vi.fn(),
@@ -39,7 +39,7 @@ vi.mock('./DeathSavingThrows.jsx', () => ({
 }));
 
 // Mock savePromptService
-vi.mock('../../../services/savePromptService.js', () => ({
+vi.mock('../../../services/combat/savePromptService.js', () => ({
   clearDeathSavePrompt: vi.fn(),
 }));
 

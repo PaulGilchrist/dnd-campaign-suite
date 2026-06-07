@@ -1,5 +1,5 @@
 import usePopup from './usePopup.js'
-import { rollD20 } from '../services/diceRoller.js'
+import { rollD20 } from '../services/dice/diceRoller.js'
 import './useDiceRoll.css'
 
 export default function useDiceRoll() {

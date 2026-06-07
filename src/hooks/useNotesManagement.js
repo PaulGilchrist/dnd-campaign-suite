@@ -3,7 +3,7 @@ import {
   loadNotes,
   saveNotes,
   deleteNote,
-} from '../services/notesService.js';
+} from '../services/campaign/notesService.js';
 
 function useNotesManagement(campaignName) {
   const [notes, setNotes] = useState([]);

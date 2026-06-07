@@ -3,7 +3,7 @@ import {
   loadFactions,
   saveFactions,
   deleteFaction,
-} from '../services/factionsService.js';
+} from '../services/campaign/factionsService.js';
 
 function useFactionsManagement(campaignName) {
   const [factions, setFactions] = useState([]);

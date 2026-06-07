@@ -1,5 +1,5 @@
 import { HEX_SIZE } from '../../config/outdoorConfig';
-import { hexToPixel, hexDistance } from '../../services/hexMapUtils';
+import { hexToPixel, hexDistance } from '../../services/maps/hexMapUtils';
 
 function POILayer({ pois, onPoiPointerDown, onPoiContextMenu, poiDragging, poiHover, isLocalhost = false, partyPosition, onPoiEnter, validLinkedMaps, roadStartPoiId }) {
     const isAdjacentToParty = (poi) => {

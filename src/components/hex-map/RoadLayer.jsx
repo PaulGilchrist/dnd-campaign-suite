@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig.js';
-import { parseHexKey, buildWindingPathDescriptor } from '../../services/hexMapUtils.js';
+import { parseHexKey, buildWindingPathDescriptor } from '../../services/maps/hexMapUtils.js';
 
 function RoadLayer({ roads }) {
     const elements = useMemo(() => {

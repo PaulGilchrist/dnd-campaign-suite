@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import useSSEEqualityGuard from '../../hooks/useSSEEqualityGuard.js';
-import * as mapsService from '../../services/mapsService.js';
+import * as mapsService from '../../services/maps/mapsService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import GenerateDungeonModal from './GenerateDungeonModal.jsx';

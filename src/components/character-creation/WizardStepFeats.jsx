@@ -1,9 +1,9 @@
 import React from 'react';
 import SelectableList from './SelectableList.jsx';
 import WarningList from '../common/WarningList.jsx';
-import { validateFeats, getFeatLimits, normalizeFeatDescription } from '../../services/featValidation.js';
-import { computeFeatBuffs } from '../../services/featBuffService.js';
-import { sanitizeHtml } from '../../services/sanitize.js';
+import { validateFeats, getFeatLimits, normalizeFeatDescription } from '../../services/character/featValidation.js';
+import { computeFeatBuffs } from '../../services/character/featBuffService.js';
+import { sanitizeHtml } from '../../services/ui/sanitize.js';
 
 function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFeats, computedBuffs }) {
   const [warnings, setWarnings] = React.useState([]);

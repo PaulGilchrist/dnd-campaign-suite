@@ -14,7 +14,7 @@ vi.mock('../../hooks/useActionPopup.js', () => ({
 }));
 
 // Mock sanitizeHtml
-vi.mock('../../services/sanitize.js', () => ({
+vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
   renderMarkdown: vi.fn((md) => md),
   renderMarkdownInline: vi.fn((md) => md),

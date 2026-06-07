@@ -1,13 +1,13 @@
 
 import React from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
-import { rollDice } from '../../services/diceRoller.js'
-import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES, getShortRestResourceLabels } from '../../services/restRules.js'
-import { clearAllExpirationEffects } from '../../services/expirations.js'
-import { getClassFeatures } from '../../services/classFeatures.js'
-import { evaluateAutoExpression } from '../../services/automationService.js'
-import { getCombatContext } from '../../services/damageUtils.js'
-import { applyHealingToTarget } from '../../services/applyHealing.js'
+import { rollDice } from '../../services/dice/diceRoller.js'
+import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES, getShortRestResourceLabels } from '../../services/rules/restRules.js'
+import { clearAllExpirationEffects } from '../../services/rules/expirations.js'
+import { getClassFeatures } from '../../services/character/classFeatures.js'
+import { evaluateAutoExpression } from '../../services/combat/automationService.js'
+import { getCombatContext } from '../../services/rules/damageUtils.js'
+import { applyHealingToTarget } from '../../services/rules/applyHealing.js'
 
 function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [remainingHitDice, setRemainingHitDice] = React.useState(() => {

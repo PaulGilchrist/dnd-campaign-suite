@@ -1,12 +1,12 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { getDistanceFeet } from '../../services/rangeValidation.js';
-import { sendSavePrompt, sendSaveResult } from '../../services/savePromptService.js';
+import { getDistanceFeet } from '../../services/rules/rangeValidation.js';
+import { sendSavePrompt, sendSaveResult } from '../../services/combat/savePromptService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import { addExpiration } from '../../services/expirations.js';
-import { addEntry } from '../../services/logService.js';
-import { rollD20 } from '../../services/diceRoller.js';
-import utils from '../../services/utils.js';
-import storage from '../../services/storage.js';
+import { addExpiration } from '../../services/rules/expirations.js';
+import { addEntry } from '../../services/ui/logService.js';
+import { rollD20 } from '../../services/dice/diceRoller.js';
+import utils from '../../services/ui/utils.js';
+import storage from '../../services/ui/storage.js';
 
 function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, onClose, featureName = 'Abjure Foes', conditionName = 'frightened', saveType = 'WIS', rangeFeet = 60 }) {
     const [selected, setSelected] = useState(new Set());

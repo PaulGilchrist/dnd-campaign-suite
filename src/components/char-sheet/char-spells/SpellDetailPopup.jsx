@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { sanitizeHtml } from '../../../services/sanitize.js';
+import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
 
 function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, upcastLevels = [], playerLevel = 1 }) {

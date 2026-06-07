@@ -3,18 +3,18 @@
     import DiceRollResult from './DiceRollResult.jsx'
     import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
     import MetamagicPopup from './MetamagicPopup.jsx'
-     import { sanitizeHtml } from '../../services/sanitize.js';
+     import { sanitizeHtml } from '../../services/ui/sanitize.js';
       import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
       import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
-      import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/baseCombatActions.js'
-      import { hasAutomation } from '../../services/automationService.js'
-      import { getCombatContext, getTargetFromAttacker } from '../../services/damageUtils.js'
+      import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js'
+      import { hasAutomation } from '../../services/combat/automationService.js'
+      import { getCombatContext, getTargetFromAttacker } from '../../services/rules/damageUtils.js'
       import { executeHandler } from '../../services/automation/index.js'
      import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
      import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
-     import { executeSpellCast } from '../../services/spellCastService.js'
-     import * as mapsService from '../../services/mapsService.js';
-     import { getNearestPlacedItem } from '../../services/rangeValidation.js';
+     import { executeSpellCast } from '../../services/rules/spellCastService.js'
+     import * as mapsService from '../../services/maps/mapsService.js';
+     import { getNearestPlacedItem } from '../../services/rules/rangeValidation.js';
 
 function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
     const { popupHtml, setPopupHtml, rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });

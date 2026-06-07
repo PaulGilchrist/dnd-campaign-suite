@@ -2,8 +2,8 @@
 
 import useActionPopup from '../../hooks/useActionPopup.js'
 import Popup from '../common/Popup.jsx'
-import { renderMarkdownInline } from '../../services/sanitize.js';
-import { getFightingStyle } from '../../services/fightingStyles.js'
+import { renderMarkdownInline } from '../../services/ui/sanitize.js';
+import { getFightingStyle } from '../../services/character/fightingStyles.js'
 
 function CharSpecialActions({ playerStats }) {
     const { showPopup, popupHtml, setPopupHtml } = useActionPopup('feature')

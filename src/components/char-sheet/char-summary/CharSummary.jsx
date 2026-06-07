@@ -3,7 +3,7 @@ import React from 'react'
 import './CharSummary.css'
 import DiceRollResult from '../DiceRollResult.jsx'
 
-import rulesFactory from '../../../services/rulesFactory.js'
+import rulesFactory from '../../../services/rules/rulesFactory.js'
 import CharGold from './CharGold.jsx'
 import CharHitPoints from './CharHitPoints.jsx'
 import CharClassFeatures from './CharClassFeatures.jsx'
@@ -14,12 +14,12 @@ import AvatarModal from '../../common/AvatarModal.jsx';
 import useTrackedResource from '../../../hooks/useTrackedResource.js'
 import { showBackgroundPopup } from '../../../hooks/useActionPopup.js';
 import useLoggedDiceRoll from '../../../hooks/useLoggedDiceRoll.js';
-import { sanitizeHtml } from '../../../services/sanitize.js';
+import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import LongRestButton from '../LongRestButton.jsx'
 import ShortRestButton from '../ShortRestButton.jsx'
 import ShortRestModal from '../ShortRestModal.jsx'
 import { setRuntimeValue, useRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getActiveBuffs } from '../../../services/buffService.js';
+import { getActiveBuffs } from '../../../services/combat/buffService.js';
 import CharConditions from './CharConditions.jsx'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });

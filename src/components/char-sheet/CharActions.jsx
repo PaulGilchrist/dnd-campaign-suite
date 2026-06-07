@@ -4,33 +4,33 @@ import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import MetamagicPopup from './MetamagicPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
-import { sanitizeHtml } from '../../services/sanitize.js';
-import { parseMagicItemName } from '../../services/attackCalc.js';
+import { sanitizeHtml } from '../../services/ui/sanitize.js';
+import { parseMagicItemName } from '../../services/rules/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
-import { rollExpression, rollExpressionDoubled, parseExpression } from '../../services/diceRoller.js';
-import * as mapsService from '../../services/mapsService.js';
-import { computeFeatRangeEffects } from '../../services/featRangeService.js';
-import { hasAutomation } from '../../services/automationService.js'
+import { rollExpression, rollExpressionDoubled, parseExpression } from '../../services/dice/diceRoller.js';
+import * as mapsService from '../../services/maps/mapsService.js';
+import { computeFeatRangeEffects } from '../../services/character/featRangeService.js';
+import { hasAutomation } from '../../services/combat/automationService.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import utils from '../../services/utils.js'
+import utils from '../../services/ui/utils.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
 import HandOfHealingModal from './HandOfHealingModal.jsx'
 import FontOfMagicModal from './FontOfMagicModal.jsx'
 import SetConditionModal from './SetConditionModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
-import { getClassFeatures } from '../../services/classFeatures.js';
-import { addEntry } from '../../services/logService.js';
+import { getClassFeatures } from '../../services/character/classFeatures.js';
+import { addEntry } from '../../services/ui/logService.js';
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints, getLastDamageEvent, saveLastDamageEvent } from '../../hooks/useMetamagic.js';
 import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
-import { executeSpellCast } from '../../services/spellCastService.js'
-import { getChaModifier } from '../../services/metamagicRules.js';
-import { getTargetFromAttacker, getCombatContext } from '../../services/damageUtils.js';
-import { applyDamageToTarget } from '../../services/applyDamage.js';
-import { getNearestPlacedItem } from '../../services/rangeValidation.js';
-import { getInnateSorceryBonus } from '../../services/buffService.js';
+import { executeSpellCast } from '../../services/rules/spellCastService.js'
+import { getChaModifier } from '../../services/rules/metamagicRules.js';
+import { getTargetFromAttacker, getCombatContext } from '../../services/rules/damageUtils.js';
+import { applyDamageToTarget } from '../../services/rules/applyDamage.js';
+import { getNearestPlacedItem } from '../../services/rules/rangeValidation.js';
+import { getInnateSorceryBonus } from '../../services/combat/buffService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';

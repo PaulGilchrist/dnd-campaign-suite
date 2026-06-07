@@ -1,10 +1,10 @@
-import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetName } from '../damageUtils.js';
-import * as mapsService from '../mapsService.js';
-import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem, rangeToFeet } from '../rangeValidation.js';
-import { computeCover } from '../coverService.js';
-import { loadNPCs } from '../npcsService.js';
+import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetName } from '../rules/damageUtils.js';
+import * as mapsService from '../maps/mapsService.js';
+import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem, rangeToFeet } from '../rules/rangeValidation.js';
+import { computeCover } from '../rules/coverService.js';
+import { loadNPCs } from '../npcs/npcsService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import { getInnateSorceryBonus } from '../buffService.js';
+import { getInnateSorceryBonus } from '../combat/buffService.js';
 
 export function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects) {
     const playerName = playerStats.name;

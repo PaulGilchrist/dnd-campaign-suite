@@ -1,6 +1,6 @@
 import React from 'react'
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from './useMetamagic.js'
-import { addEntry } from '../services/logService.js'
+import { addEntry } from '../services/ui/logService.js'
 
 export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
   const isSorcerer = playerStats?.class?.name === 'Sorcerer';

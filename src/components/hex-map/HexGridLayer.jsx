@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { HEX_SIZE } from '../../config/outdoorConfig.js';
-import { getAllHexes, hexToPixel, hexToSVGPath } from '../../services/hexMapUtils.js';
+import { getAllHexes, hexToPixel, hexToSVGPath } from '../../services/maps/hexMapUtils.js';
 
 function HexGridLayer({ hexCols, hexRows }) {
     const paths = useMemo(() => {

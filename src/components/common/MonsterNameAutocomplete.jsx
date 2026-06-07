@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { loadMonsters } from '../../services/dataLoader.js';
+import { loadMonsters } from '../../services/ui/dataLoader.js';
 import './MonsterNameAutocomplete.css';
 
 function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, position, initialFocus = true, npcs }) {

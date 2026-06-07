@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import * as questsService from '../services/questsService.js';
+import * as questsService from '../services/campaign/questsService.js';
 
 function useQuestsManagement(campaignName) {
   const [quests, setQuests] = useState([]);

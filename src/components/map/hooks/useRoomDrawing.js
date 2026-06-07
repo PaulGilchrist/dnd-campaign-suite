@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { TOOL_ROOM } from '../../../config/mapConfig';
-import { buildRoomWalls, createRoom } from '../../../services/mapRoomUtils';
+import { buildRoomWalls, createRoom } from '../../../services/maps/mapRoomUtils';
 
 function useRoomDrawing({ isLocalhost, tool, getGridFromEvent, svgRef }) {
     const [roomDrawStart, setRoomDrawStart] = useState(null);

@@ -1,5 +1,5 @@
-import { rollExpression } from '../../diceRoller.js';
-import { getClassFeatures } from '../../classFeatures.js';
+import { rollExpression } from '../../dice/diceRoller.js';
+import { getClassFeatures } from '../../character/classFeatures.js';
 import { resolveTarget } from '../common/targetResolver.js';
 import { applyHealingDirectly, logHealingToSSE } from '../common/healingRoll.js';
 

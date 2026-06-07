@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import utils from '../../../services/utils';
+import utils from '../../../services/ui/utils';
 
 function useMapDrops({ isLocalhost, getGridFromEvent, setMapData, setPlacedItems }) {
     const handleDrop = useCallback((e) => {

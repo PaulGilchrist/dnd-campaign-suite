@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { generateEncounterSuggestions } from '../../services/encounterGenerator.js';
+import { generateEncounterSuggestions } from '../../services/encounters/encounterGenerator.js';
 import './EncounterGeneratorModal.css';
 
 const ENVIRONMENT_GROUPS = [

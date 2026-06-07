@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getPreCastOptions, getMaxMetamagicPerSpell, computeMetamagicCost, hasArcaneApotheosis } from '../../services/metamagicRules.js';
-import { getCombatSummary } from '../../services/combatData.js';
+import { getPreCastOptions, getMaxMetamagicPerSpell, computeMetamagicCost, hasArcaneApotheosis } from '../../services/rules/metamagicRules.js';
+import { getCombatSummary } from '../../services/encounters/combatData.js';
 import './MetamagicPopup.css';
 
 function getCreatureTargets(excludeName) {

@@ -2,11 +2,11 @@
 import React from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
 import useTrackedResource from '../../hooks/useTrackedResource.js'
-import storage from '../../services/storage.js'
-import { getTargetFromAttacker, getCombatContext } from '../../services/damageUtils.js'
-import { applyHealingToTarget } from '../../services/applyHealing.js'
-import { CONDITIONS } from '../../services/conditionUtils.js'
-import utils from '../../services/utils.js'
+import storage from '../../services/ui/storage.js'
+import { getTargetFromAttacker, getCombatContext } from '../../services/rules/damageUtils.js'
+import { applyHealingToTarget } from '../../services/rules/applyHealing.js'
+import { CONDITIONS } from '../../services/combat/conditionUtils.js'
+import utils from '../../services/ui/utils.js'
 import './CharSheet.css'
 
 function conditionMatches(c, targetCondition) {

@@ -3,16 +3,16 @@ import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import MetamagicPopup from './MetamagicPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
-import { sanitizeHtml } from '../../services/sanitize.js';
+import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
-import { hasAutomation } from '../../services/automationService.js'
+import { hasAutomation } from '../../services/combat/automationService.js'
 import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
-import { executeSpellCast } from '../../services/spellCastService.js'
-import * as mapsService from '../../services/mapsService.js';
-import { getNearestPlacedItem } from '../../services/rangeValidation.js';
-import { getCombatContext, getTargetFromAttacker } from '../../services/damageUtils.js';
-import { getInnateSorceryBonus } from '../../services/buffService.js';
+import { executeSpellCast } from '../../services/rules/spellCastService.js'
+import * as mapsService from '../../services/maps/mapsService.js';
+import { getNearestPlacedItem } from '../../services/rules/rangeValidation.js';
+import { getCombatContext, getTargetFromAttacker } from '../../services/rules/damageUtils.js';
+import { getInnateSorceryBonus } from '../../services/combat/buffService.js';
 import './CharActions.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });

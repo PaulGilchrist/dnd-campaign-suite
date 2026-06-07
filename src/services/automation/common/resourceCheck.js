@@ -1,5 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import { getClassFeatures } from '../../classFeatures.js';
+import { getClassFeatures } from '../../character/classFeatures.js';
 
 export function getResourceAmount(playerStats, resourceName) {
     if (resourceName === 'focusPoints') {
