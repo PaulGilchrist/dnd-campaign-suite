@@ -36,6 +36,8 @@ const HANDLER_MAP = {
     damage_bonus: handleGenericPopup,
     spell_modifier: handleSpellModifier,
     temp_hp_buff: handleGenericPopup,
+    conditional_advantage: handleGenericPopup,
+    conditional_disadvantage: handleGenericPopup,
 };
 
 export async function executeHandler(action, playerStats, campaignName, mapName) {

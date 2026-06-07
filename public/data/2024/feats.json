@@ -63,7 +63,7 @@
                     "condition": "disguised",
                     "effect": "advantage",
                     "ability": "Charisma",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             },
             {
@@ -984,7 +984,7 @@
                     "target": "all_attackers_vs_target",
                     "effect": "advantage",
                     "duration": "until_start_of_next_turn",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             }
         ],
@@ -1218,7 +1218,7 @@
                     "type": "conditional_advantage",
                     "target": "death_saving_throws",
                     "effect": "advantage",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             },
             {
@@ -1374,7 +1374,7 @@
                     "target": "attack_rolls",
                     "condition": "creature_grappled_by_you",
                     "effect": "advantage",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             },
             {
@@ -2090,7 +2090,7 @@
                     "target": "attack_rolls_vs_unmounted_near_mount",
                     "condition": "mounted_and_target_one_size_smaller",
                     "effect": "advantage",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             },
             {
@@ -2886,7 +2886,7 @@
                     "target": "stealth_checks",
                     "condition": "combat_hide_action",
                     "effect": "advantage",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             },
             {
@@ -2959,7 +2959,7 @@
                     "target": "target_attack_rolls",
                     "effect": "disadvantage",
                     "duration": "until_start_of_next_turn",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             }
         ],
@@ -3369,7 +3369,7 @@
                     "abilities": [
                         "CON"
                     ],
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             },
             {

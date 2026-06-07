@@ -5,6 +5,7 @@ import { sendConcentrationResult } from '../../services/combat/savePromptService
 import Subscriber from './Subscriber.jsx';
 import { computeAuraBonus } from '../../services/combat/auraOfProtection.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditionUtils.js';
+import { hasSaveModifier } from '../../services/combat/conditionEffects.js';
 import './concentrationPromptModal.css';
 
 function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
@@ -37,6 +38,7 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
     if (!current) return;
 
     let saveBonus = 0;
+    let saveModifiers = null;
     try {
       const character = (characters || []).find(c => {
         const name = typeof c === 'string' ? c : c.name;
@@ -44,12 +46,15 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
       });
       if (character && typeof character !== 'string') {
         saveBonus = getAbilitySaveBonus(character.computedStats || character, 'con');
+        saveModifiers = character.saveModifiers || character.computedStats?.saveModifiers;
       }
     } catch { /* ignore */ }
 
     const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName });
     const auraBonus = aura.bonus;
-    const roll = rollD20();
+
+    const hasAdvantage = hasSaveModifier(saveModifiers, 'concentration_saving_throws', 'CON');
+    const roll = hasAdvantage ? Math.max(rollD20(), rollD20()) : rollD20();
     const total = roll + saveBonus + auraBonus;
     const success = total >= current.dc;
     const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined;

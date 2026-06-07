@@ -586,8 +586,6 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 result.actions.push(info)
                 break
             case 'damage_reduction':
-            case 'conditional_advantage':
-            case 'conditional_disadvantage':
             case 'auto_reroll':
                 result.reactions.push(info)
                 break
@@ -595,6 +593,8 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'temp_hp_buff':
             case 'damage_aura':
             case 'combat_stance':
+            case 'conditional_advantage':
+            case 'conditional_disadvantage':
                 result.specialActions.push(info)
                 break
             case 'passive_buff':
@@ -646,12 +646,13 @@ export function collectSaveModifiers(features) {
         if (!feature?.automation) return
         const auto = feature.automation
         if (auto.type === 'conditional_advantage') {
+            const abilities = auto.abilities || (auto.saveType ? [auto.saveType.toUpperCase()] : []);
             modifiers.push({
                 source: feature.name,
                 target: auto.target,
                 condition: auto.condition,
                 effect: auto.effect,
-                abilities: auto.abilities || []
+                abilities
             })
         }
         if (auto.type === 'auto_reroll') {

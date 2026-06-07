@@ -67,4 +67,68 @@ function rollDeathSave(currentSaves, currentFailures) {
   }
 }
 
-export { rollDeathSave, isStable, isDead }
+function rollDeathSaveWithAdvantage(currentSaves, currentFailures) {
+  const roll1 = rollD20()
+  const roll2 = rollD20()
+  const bestRoll = Math.max(roll1, roll2)
+
+  const isNat20 = bestRoll === 20
+  const isNat1 = bestRoll === 1
+
+  if (isNat20) {
+    return {
+      newSaves: [false, false, false],
+      newFailures: [false, false, false],
+      result: 'nat20',
+      roll: bestRoll,
+      isNat20,
+      isNat1,
+      restoredToHp: 1,
+    }
+  }
+
+  const isSuccess = bestRoll >= 10
+
+  if (isSuccess) {
+    const newSaves = [...currentSaves]
+    const firstEmpty = newSaves.indexOf(false)
+    if (firstEmpty !== -1) newSaves[firstEmpty] = true
+
+    const stable = isStable(newSaves)
+
+    return {
+      newSaves: stable ? [false, false, false] : newSaves,
+      newFailures: stable ? [false, false, false] : [...currentFailures],
+      result: stable ? 'stable' : 'success',
+      roll: bestRoll,
+      rolls: [roll1, roll2],
+      isNat20,
+      isNat1,
+      restoredToHp: null,
+    }
+  } else {
+    const newFailures = [...currentFailures]
+    const failMultiplier = isNat1 ? 2 : 1
+    for (let i = 0; i < failMultiplier; i++) {
+      const firstEmpty = newFailures.indexOf(false)
+      if (firstEmpty !== -1) {
+        newFailures[firstEmpty] = true
+      }
+    }
+
+    const dead = isDead(newFailures)
+
+    return {
+      newSaves: dead ? [false, false, false] : [...currentSaves],
+      newFailures: dead ? [false, false, false] : newFailures,
+      result: dead ? 'dead' : 'failure',
+      roll: bestRoll,
+      rolls: [roll1, roll2],
+      isNat20,
+      isNat1,
+      restoredToHp: null,
+    }
+  }
+}
+
+export { rollDeathSave, rollDeathSaveWithAdvantage, isStable, isDead }

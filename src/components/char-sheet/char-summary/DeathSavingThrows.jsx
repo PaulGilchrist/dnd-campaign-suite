@@ -2,6 +2,7 @@ import React from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
 import { clearDeathSavePrompt } from '../../../services/combat/savePromptService.js'
 import * as deathSaveRules from '../../../services/combat/deathSaveRules.js'
+import { hasSaveModifier } from '../../../services/combat/conditionEffects.js'
 import './CharSummary.css'
 
 function DeathSavingThrows({ playerStats, campaignName }) {
@@ -47,7 +48,10 @@ function DeathSavingThrows({ playerStats, campaignName }) {
     const rollDeathSave = () => {
         if (isStable || isDead) return;
 
-        const result = deathSaveRules.rollDeathSave(saves, failures);
+        const hasAdvantage = hasSaveModifier(playerStats?.saveModifiers, 'death_saving_throws');
+        const result = hasAdvantage
+            ? deathSaveRules.rollDeathSaveWithAdvantage(saves, failures)
+            : deathSaveRules.rollDeathSave(saves, failures);
 
         setLastRoll({ roll: result.roll, success: result.result === 'success' || result.result === 'nat20' || result.result === 'stable', isNat20: result.isNat20, isNat1: result.isNat1 });
         setTimeout(() => setLastRoll(null), 2000);

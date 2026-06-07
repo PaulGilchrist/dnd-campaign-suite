@@ -6,6 +6,7 @@ import {
   CONDITIONS_THAT_CANNOT_ACT,
   CONDITIONS_THAT_SPEED_ZERO,
   hasSaveAdvantage,
+  hasSaveModifier,
 } from './conditionEffects.js'
 
 describe('computeConditionEffects', () => {
@@ -307,9 +308,82 @@ describe('hasSaveAdvantage', () => {
           target: 'saving_throw',
        condition: 'poison',
         effect: 'advantage'
-       }]);
+        }]);
       effects2.saveAdvantageCount = 1;
       expect(hasSaveAdvantage(effects2, 'con')).toBe(true);
       expect(hasSaveAdvantage(effects2, 'poisoned')).toBe(true);
        })
     })
+
+describe('hasSaveModifier', () => {
+  it('returns false for null modifiers', () => {
+    expect(hasSaveModifier(null, 'death_saving_throws')).toBe(false)
+  })
+
+  it('returns false for empty modifiers', () => {
+    expect(hasSaveModifier([], 'death_saving_throws')).toBe(false)
+  })
+
+  it('returns true when modifier matches target with no ability restriction', () => {
+    const modifiers = [{ target: 'death_saving_throws', effect: 'advantage', abilities: [] }]
+    expect(hasSaveModifier(modifiers, 'death_saving_throws')).toBe(true)
+  })
+
+  it('returns true when modifier matches target with matching ability', () => {
+    const modifiers = [{ target: 'concentration_saving_throws', effect: 'advantage', abilities: ['CON'] }]
+    expect(hasSaveModifier(modifiers, 'concentration_saving_throws', 'CON')).toBe(true)
+  })
+
+  it('returns false when modifier matches target but wrong ability', () => {
+    const modifiers = [{ target: 'concentration_saving_throws', effect: 'advantage', abilities: ['CON'] }]
+    expect(hasSaveModifier(modifiers, 'concentration_saving_throws', 'DEX')).toBe(false)
+  })
+
+  it('returns false when effect is not advantage', () => {
+    const modifiers = [{ target: 'death_saving_throws', effect: 'disadvantage' }]
+    expect(hasSaveModifier(modifiers, 'death_saving_throws')).toBe(false)
+  })
+
+  it('requires abilityName when modifier has abilities', () => {
+    const modifiers = [{ target: 'death_saving_throws', effect: 'advantage', abilities: ['CON'] }]
+    expect(hasSaveModifier(modifiers, 'death_saving_throws')).toBe(false)
+  })
+})
+
+describe('saveModifierApplies with unknown conditions', () => {
+  it('treats unknown condition as always-on for correct target', () => {
+    const saveModifiers = [{
+      target: 'saving_throw',
+      condition: 'visible_effect',
+      effect: 'advantage',
+      source: 'Danger Sense'
+    }]
+    const effects = computeConditionEffects([], saveModifiers)
+    expect(effects.saveAdvantageCount).toBe(1)
+  })
+
+  it('tracks ability-specific advantage in saveAdvantageAbilities', () => {
+    const saveModifiers = [{
+      target: 'saving_throw',
+      condition: 'visible_effect',
+      effect: 'advantage',
+      abilities: ['DEX'],
+      source: 'Danger Sense'
+    }]
+    const effects = computeConditionEffects([], saveModifiers)
+    expect(effects.saveAdvantageCount).toBe(0)
+    expect(effects.saveAdvantageAbilities).toContain('DEX')
+  })
+
+  it('still applies condition-specific modifiers correctly', () => {
+    const saveModifiers = [{
+      target: 'saving_throw',
+      condition: 'poison',
+      effect: 'advantage',
+      source: 'Dwarven Resilience'
+    }]
+    const effects = computeConditionEffects(['poisoned'], saveModifiers)
+    expect(effects.saveAdvantageCount).toBe(0)
+    expect(effects.saveAdvantage).toContain('poisoned')
+  })
+})

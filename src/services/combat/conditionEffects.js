@@ -6,6 +6,8 @@ const CONDITIONS_THAT_SPEED_ZERO = new Set([
     'grappled', 'paralyzed', 'petrified', 'restrained', 'stunned', 'unconscious',
 ])
 
+const CONDITION_KEYWORDS = new Set(['charmed', 'frightened', 'poison', 'magic'])
+
 function saveModifierApplies(modifier, saveType, abilityName) {
   if (modifier.target !== 'saving_throw' && modifier.target !== 'save') return false;
   if (modifier.condition === 'charmed' && saveType === 'charmed') return true;
@@ -16,7 +18,12 @@ function saveModifierApplies(modifier, saveType, abilityName) {
     if (abilityName && modifier.abilities.includes(abilityName)) return true;
     return false;
     }
-  return false;
+  if (CONDITION_KEYWORDS.has(modifier.condition)) return false;
+  if (modifier.abilities && modifier.abilities.length > 0) {
+    if (!abilityName) return true;
+    return modifier.abilities.includes(abilityName);
+  }
+  return true;
 }
 
 function applySaveModifiers(effects, modifiers, saveType, abilityName) {
@@ -24,7 +31,14 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName) {
   for (const mod of modifiers) {
     if (!saveModifierApplies(mod, saveType, abilityName)) continue;
     if (mod.effect === 'advantage') {
-      effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
+      if (mod.abilities && mod.abilities.length > 0 && !abilityName) {
+        effects.saveAdvantageAbilities = [...new Set([
+          ...(effects.saveAdvantageAbilities || []),
+          ...mod.abilities
+        ])];
+      } else {
+        effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
+      }
      } else if (mod.effect === 'disadvantage') {
       effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
      } else if (mod.effect === 'reroll') {
@@ -187,6 +201,19 @@ function hasSaveAdvantage(effects, saveType) {
     if (effects.saveAdvantageAbilities.includes(abbr)) return true;
   }
   return false;
+}
+
+export function hasSaveModifier(modifiers, target, abilityName) {
+  if (!modifiers || modifiers.length === 0) return false;
+  return modifiers.some(mod => {
+    if (mod.target !== target) return false;
+    if (mod.effect !== 'advantage') return false;
+    if (mod.abilities && mod.abilities.length > 0) {
+      if (!abilityName) return false;
+      return mod.abilities.includes(abilityName);
+    }
+    return true;
+  });
 }
 
 export {
