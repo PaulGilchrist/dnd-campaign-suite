@@ -41,8 +41,17 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
    const isPlayer = creature.type === 'player';
    const playerStats = isPlayer ? (characters || []).find(c => c.name === targetName || c.name.startsWith(targetName + ' ')) : null;
    const playerComputed = playerStats?.computedStats || playerStats;
-   const resistances = isPlayer ? (playerComputed?.resistances || []) : (creature.resistances || []);
+   let resistances = isPlayer ? (playerComputed?.resistances || []) : (creature.resistances || []);
    const immunities = isPlayer ? (playerComputed?.immunities || []) : (creature.immunities || []);
+   if (isPlayer) {
+       const rawBuffs = getRuntimeValue(creature.name, 'activeBuffs', campaignName);
+       const activeBuffs = Array.isArray(rawBuffs) ? rawBuffs : [];
+       for (const buff of activeBuffs) {
+           if (buff.resistanceTypes?.length) {
+               resistances = [...new Set([...resistances, ...buff.resistanceTypes])];
+           }
+       }
+   }
   const finalDamage = computeDamageAfterResistances(rawDamage, damageTypes || [], resistances, immunities);
 
   let oldHp, newHp;

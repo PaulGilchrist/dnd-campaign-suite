@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
+import { getActiveBuffs } from '../../../services/combat/buffService.js'
 
 function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, upcastLevels = [], playerLevel = 1 }) {
   const isCantrip = spell.level === 0;
@@ -54,12 +55,13 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     onCast(spell);
   };
 
-  const canCast = isCantrip || (isUpcastable ? hasAnySlots : (() => {
+  const isRaging = getActiveBuffs(playerStats.name, campaignName).some(b => b.name === 'Rage');
+  const canCast = !isRaging && (isCantrip || (isUpcastable ? hasAnySlots : (() => {
     const baseKey = `spell_slots_level_${spell.level}`;
     const stored = getRuntimeValue(playerStats.name, baseKey);
     const max = (playerStats.spellAbilities && playerStats.spellAbilities[baseKey]) || 0;
     return (stored != null ? stored : max) > 0;
-  })());
+  })()));
 
   const showUpcastSelector = isUpcastable && upcastLevels.length > 1;
 

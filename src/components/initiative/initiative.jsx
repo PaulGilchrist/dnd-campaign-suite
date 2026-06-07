@@ -581,6 +581,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     const handleApplyConcentration = () => {
         if (!concentrationPickerTarget || !concentrationSpellName.trim() || !combatSummary) return
+        // Can't concentrate while raging
+        const targetBuffs = getRuntimeValue(concentrationPickerTarget.name, 'activeBuffs', campaignName);
+        if (Array.isArray(targetBuffs) && targetBuffs.some(b => b.name === 'Rage')) return;
         addConcentration(combatSummary, concentrationPickerTarget.name, concentrationSpellName, concentrationDc)
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))

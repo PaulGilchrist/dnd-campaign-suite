@@ -89,10 +89,16 @@ function computeConditionEffects(conditions = [], saveModifiers = []) {
         // Track per-ability advantage for traits like Gnomish Cunning
         if (mod.effect === 'advantage') effects.saveAdvantageAbilities = [...(effects.saveAdvantageAbilities || []), ...mod.abilities];
         if (mod.effect === 'disadvantage') effects.saveDisadvantageAbilities = [...(effects.saveDisadvantageAbilities || []), ...mod.abilities];
+       } else if (mod.condition === 'visible_effect' && [...CONDITIONS_THAT_CANNOT_ACT].some(c => conditionSet.has(c))) {
+        continue; // Danger Sense disabled while incapacitated
        }
      }
 
-  applySaveModifiers(effects, saveModifiers, null, null);
+  const isIncapacitated = [...CONDITIONS_THAT_CANNOT_ACT].some(c => conditionSet.has(c));
+  const activeSaveModifiers = isIncapacitated
+    ? saveModifiers.filter(mod => mod.condition !== 'visible_effect')
+    : saveModifiers;
+  applySaveModifiers(effects, activeSaveModifiers, null, null);
 
   for (const key of conditionSet) {
     switch (key) {

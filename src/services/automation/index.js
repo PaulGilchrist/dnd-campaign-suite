@@ -36,8 +36,8 @@ const HANDLER_MAP = {
     damage_bonus: handleGenericPopup,
     spell_modifier: handleSpellModifier,
     temp_hp_buff: handleGenericPopup,
-    conditional_advantage: handleGenericPopup,
     conditional_disadvantage: handleGenericPopup,
+    conditional_advantage: handleGenericPopup,
     passive_rule: handleGenericPopup,
 };
 

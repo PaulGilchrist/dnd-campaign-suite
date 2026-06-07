@@ -85,7 +85,23 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
     const storedConditions = useRuntimeValue(playerSummary?.name, 'activeConditions', campaignName);
     const activeConditions = Array.isArray(storedConditions) ? storedConditions : [];
-    const conditionEffects = computeConditionEffects(activeConditions, playerStats?.saveModifiers);
+    // Merge save modifiers from active combat stances (e.g. Rage STR save advantage)
+    const activeBuffs = useRuntimeValue(playerSummary?.name, 'activeBuffs', campaignName) ?? [];
+    const stanceSaveModifiers = Array.isArray(activeBuffs)
+        ? activeBuffs.filter(b => b.advantages?.length).flatMap(b =>
+            b.advantages
+                .filter(a => a.toLowerCase().includes('saves'))
+                .map(a => {
+                    const abilityMatch = a.match(/^(\w{3})\s+saves/);
+                    return abilityMatch
+                        ? { source: b.name, target: 'saving_throw', condition: 'stance_active', effect: 'advantage', abilities: [abilityMatch[1].toUpperCase()] }
+                        : null;
+                })
+                .filter(Boolean)
+          )
+        : [];
+    const allSaveModifiers = [...(playerStats?.saveModifiers || []), ...stanceSaveModifiers];
+    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers);
     if (playerStats) {
         const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
         if (speedHalvedTime) conditionEffects.speedHalved = true;

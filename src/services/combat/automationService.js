@@ -534,6 +534,7 @@ export function evaluateAutoExpression(expression, playerStats, prof, level) {
            .replace(/paladin level/gi, level)
            .replace(/barbarian level/gi, level)
            .replace(/bard level/gi, level)
+           .replace(/rage_damage/g, playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.rage_damage ?? 2)
            .replace(/level/gi, level)
     try {
         const result = new Function(`"use strict"; return (${expr})`)()
@@ -654,6 +655,21 @@ export function collectSaveModifiers(features) {
                 effect: auto.effect,
                 abilities
             })
+        }
+        if (auto.type === 'combat_stance' && auto.advantages) {
+            for (const adv of auto.advantages) {
+                const isSave = adv.toLowerCase().includes('saves');
+                const abilityMatch = adv.match(/^(\w{3})\s+(?:checks|saves)/);
+                if (isSave && abilityMatch) {
+                    modifiers.push({
+                        source: feature.name,
+                        target: 'saving_throw',
+                        condition: 'stance_active',
+                        effect: 'advantage',
+                        abilities: [abilityMatch[1].toUpperCase()]
+                    })
+                }
+            }
         }
         if (auto.type === 'auto_reroll') {
             modifiers.push({

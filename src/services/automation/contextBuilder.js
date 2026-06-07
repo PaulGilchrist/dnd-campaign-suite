@@ -39,6 +39,22 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             forcedMode = 'advantage';
           }
 
+        // Add stance damage bonus (e.g. Rage) if an active combat buff provides one
+        let stanceDamageBonus = 0;
+        const activeBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
+        for (const buff of activeBuffs) {
+            if (buff.damageBonusExpression) {
+                const resolved = buff.damageBonusExpression === 'rage_damage'
+                    ? (playerStats.class?.class_levels?.[(playerStats.level || 1) - 1]?.rage_damage ?? 2)
+                    : 0;
+                stanceDamageBonus += resolved;
+            }
+        }
+
+        const autoDamageFormula = stanceDamageBonus > 0
+            ? `${attack.damage}+${stanceDamageBonus}`
+            : attack.damage;
+
         return {
             damageType: attack.damageType,
             resistanceNotice,
@@ -48,7 +64,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             dcSuccess: attack.saveSuccess,
             attackerName: playerName,
             forcedMode,
-            autoDamageFormula: attack.damage,
+            autoDamageFormula,
             autoDamageName: attack.name,
            };
        });

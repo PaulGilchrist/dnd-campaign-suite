@@ -95,12 +95,14 @@ function createPlayerCharacter(name, extra = {}) {
 
 /**
  * Helper: stub getRuntimeValue for player tests.
- * applyDamageToTarget calls getRuntimeValue twice for players:
- *   1) currentHitPoints → hp (number or null)
- *   2) activeConditions → array (use [] when no condition test needed)
+ * applyDamageToTarget calls getRuntimeValue for players:
+ *   1) activeBuffs → array (no active stance buffs by default)
+ *   2) currentHitPoints → hp (number or null)
+ *   3) activeConditions → array (use [] when no condition test needed)
  */
 function stubPlayerRuntime(currentHp, conditions = []) {
   getRuntimeValue
+    .mockReturnValueOnce([])                  // activeBuffs
     .mockReturnValueOnce(currentHp)           // currentHitPoints
     .mockReturnValueOnce(conditions);         // activeConditions
 }

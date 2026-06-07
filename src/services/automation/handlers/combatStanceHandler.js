@@ -46,6 +46,9 @@ export async function handle(action, playerStats, campaignName) {
         name: action.name,
         effect: auto.effect || 'stance',
         duration: auto.duration || '1_minute',
+        resistanceTypes: auto.resistanceTypes || [],
+        advantages: auto.advantages || [],
+        damageBonusExpression: auto.damageBonusExpression || '',
     }];
     setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
 
