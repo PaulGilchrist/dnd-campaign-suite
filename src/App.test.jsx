@@ -2,211 +2,15 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from './App.jsx';
 
-// ──────────────────────────────────────────────
-// Hoisted shared state for cross-module use
-// ──────────────────────────────────────────────
-const mockState = vi.hoisted(() => ({
-  campaignName: 'test-campaign',
-  characters: [],
-}));
-
-const dataLoaderMocks = vi.hoisted(() => ({
-  loadAbilityScores: vi.fn(),
-  loadClassData: vi.fn(),
-  loadEquipment: vi.fn(),
-  loadMagicItems: vi.fn(),
-  loadRaceData: vi.fn(),
-  loadSpells: vi.fn(),
-}));
-
-// ──────────────────────────────────────────────
-// Mock child components (hoisted so vi.mock sees them)
-// ──────────────────────────────────────────────
-const { MockCharSheet } = vi.hoisted(() => ({
-  MockCharSheet: vi.fn((props) => (
-    <div data-testid="char-sheet">
-      <span data-testid="character-name">{props.playerSummary?.name || 'no character'}</span>
-      <button title="Delete Character" onClick={() => props.onDeleteCharacter?.(props.playerSummary?.name)}>Delete Char</button>
-      <button onClick={props.onUploadClick}>Upload</button>
-      <button onClick={props.onSaveClick}>Download</button>
-      <button onClick={props.onEditCharacter}>Edit</button>
-    </div>
-  )),
-}));
-
-const { MockInitiative } = vi.hoisted(() => ({
-  MockInitiative: vi.fn(({ characters, campaignName }) => (
-    <div data-testid="initiative">
-      <span data-testid="init-char-count">{characters?.length || 0}</span>
-      <span data-testid="init-campaign">{campaignName}</span>
-    </div>
-  )),
-}));
-
-const { MockCampaignSelection } = vi.hoisted(() => ({
-  MockCampaignSelection: vi.fn(({ onCampaignSelect }) => (
-    <div data-testid="campaign-selection">
-      <button
-        data-testid="select-campaign-btn"
-        onClick={() => onCampaignSelect(mockState.campaignName, mockState.characters)}
-      >
-        Select Campaign
-      </button>
-    </div>
-  )),
-}));
-
-const { MockWizard } = vi.hoisted(() => ({
-  MockWizard: vi.fn(({ onComplete, onCancel, characterData, isEditing }) => (
-    <div data-testid="character-wizard">
-      <button data-testid="wizard-complete-btn" onClick={() => onComplete({ name: 'New Character', level: 1 })}>
-        Complete
-      </button>
-      <button data-testid="wizard-cancel-btn" onClick={onCancel}>Cancel</button>
-      {characterData && <div data-testid="editing-character">{characterData.name}</div>}
-      {isEditing && <div data-testid="editing-mode">Editing Mode</div>}
-    </div>
-  )),
-}));
-
-const { MockSidebar } = vi.hoisted(() => ({
-  MockSidebar: vi.fn(({
-    campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick,
-    onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick,
-    onNPCsClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost,
-  }) => (
-    <div data-testid="sidebar">
-      <div data-testid="sidebar-campaign">{campaignName}</div>
-      <button data-testid="back-to-campaigns-btn" onClick={onBackToCampaigns}>
-        <i className="fa-solid fa-arrow-left"></i> Campaigns
-      </button>
-      <button data-testid="add-character-btn" onClick={onAddCharacter}>
-        <i className="fa-solid fa-plus"></i> Add Character
-      </button>
-      <div data-testid="sidebar-characters">
-        {characters?.map((char, i) => (
-          <button
-            key={`${char.name}-${i}`}
-            data-testid={`char-btn-${char.name}`}
-            className={activeCharacter?.name === char.name ? 'active' : ''}
-            onClick={() => onCharacterClick(char)}
-          >
-            {char.name}
-          </button>
-        ))}
-      </div>
-      <button data-testid="initiative-btn" onClick={onInitiativeClick}>
-        Initiative
-      </button>
-      <button data-testid="maps-btn" onClick={onMapsClick}>
-        {isLocalhost ? 'Maps' : 'Map'}
-      </button>
-      <button data-testid="notes-btn" onClick={onNotesClick}>
-        Notes
-      </button>
-      <button data-testid="encounter-btn" onClick={onEncounterClick}>
-        Encounters
-      </button>
-      <button data-testid="factions-btn" onClick={onFactionsClick}>
-        Factions
-      </button>
-      <button data-testid="npcs-btn" onClick={onNPCsClick}>
-        NPCs
-      </button>
-      <button data-testid="quests-btn" onClick={onQuestsClick}>
-        Quests
-      </button>
-      <button data-testid="rename-campaign-btn" onClick={onRenameCampaign} disabled={!isLocalhost}>
-        Rename
-      </button>
-      <button data-testid="delete-campaign-btn" onClick={onDeleteCampaign} disabled={characters?.length > 0}>
-        Delete Campaign
-      </button>
-      <button data-testid="theme-toggle-btn" onClick={toggleTheme}>
-        {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-      </button>
-      <span data-testid="sidebar-theme">{theme}</span>
-      <span data-testid="sidebar-localhost">{String(isLocalhost)}</span>
-    </div>
-  )),
-}));
-
-const { MockMapsManager } = vi.hoisted(() => ({
-  MockMapsManager: vi.fn(({ campaignName, onOpenMap, onBack }) => (
-    <div data-testid="maps-manager">
-      <span data-testid="mm-campaign">{campaignName}</span>
-      <button data-testid="open-map-btn" onClick={() => onOpenMap('dungeon-1')}>Open Map</button>
-      <button data-testid="mm-back-btn" onClick={onBack}>Back</button>
-    </div>
-  )),
-}));
-
-const { MockMap } = vi.hoisted(() => ({
-  MockMap: vi.fn(({ mapName, campaignName, characters, npcs, isLocalhost, onBack }) => (
-    <div data-testid="map-view">
-      <span data-testid="map-name">{mapName}</span>
-      <span data-testid="map-campaign">{campaignName}</span>
-      <span data-testid="map-char-count">{characters?.length || 0}</span>
-      <span data-testid="map-npc-count">{npcs?.length || 0}</span>
-      <span data-testid="map-localhost">{String(isLocalhost)}</span>
-      <button data-testid="map-back-btn" onClick={onBack}>Back from Map</button>
-    </div>
-  )),
-}));
-
-const { MockEncounterBuilder } = vi.hoisted(() => ({
-  MockEncounterBuilder: vi.fn(({ characters, campaignName }) => (
-    <div data-testid="encounter-builder">
-      <span data-testid="eb-char-count">{characters?.length || 0}</span>
-      <span data-testid="eb-campaign">{campaignName}</span>
-    </div>
-  )),
-}));
-
-const { MockNotes } = vi.hoisted(() => ({
-  MockNotes: vi.fn(({ campaignName, isLocalhost, onBack }) => (
-    <div data-testid="notes-view">
-      <span data-testid="notes-campaign">{campaignName}</span>
-      <span data-testid="notes-localhost">{String(isLocalhost)}</span>
-      <button data-testid="notes-back-btn" onClick={onBack}>Back from Notes</button>
-    </div>
-  )),
-}));
-
-const { MockQuests } = vi.hoisted(() => ({
-  MockQuests: vi.fn(({ campaignName, isLocalhost, onBack }) => (
-    <div data-testid="quests-view">
-      <span data-testid="quests-campaign">{campaignName}</span>
-      <span data-testid="quests-localhost">{String(isLocalhost)}</span>
-      <button data-testid="quests-back-btn" onClick={onBack}>Back from Quests</button>
-    </div>
-  )),
-}));
-
-const { MockNPCs } = vi.hoisted(() => ({
-  MockNPCs: vi.fn(({ campaignName, characters, onBack }) => (
-    <div data-testid="npcs-view">
-      <span data-testid="npcs-campaign">{campaignName}</span>
-      <span data-testid="npcs-char-count">{characters?.length || 0}</span>
-      <button data-testid="npcs-back-btn" onClick={onBack}>Back from NPCs</button>
-    </div>
-  )),
-}));
-
-const { MockFactions } = vi.hoisted(() => ({
-  MockFactions: vi.fn(({ campaignName, isLocalhost, onBack }) => (
-    <div data-testid="factions-view">
-      <span data-testid="factions-campaign">{campaignName}</span>
-      <span data-testid="factions-localhost">{String(isLocalhost)}</span>
-      <button data-testid="factions-back-btn" onClick={onBack}>Back from Factions</button>
-    </div>
-  )),
-}));
+import { mockState, dataLoaderMocks } from './test/appTestState.js';
 
 // ──────────────────────────────────────────────
 // Mock service modules and node_modules
 // ──────────────────────────────────────────────
-vi.mock('./services/ui/dataLoader.js', () => dataLoaderMocks);
+vi.mock('./services/ui/dataLoader.js', async () => {
+  const { dataLoaderMocks } = await import('./test/appTestState.js');
+  return dataLoaderMocks;
+});
 
 vi.mock('./services/ui/utils.js', () => ({
   default: { getName: vi.fn((name) => name || '') },
@@ -221,18 +25,54 @@ vi.mock('./services/maps/mapsService.js', () => ({
 // ──────────────────────────────────────────────
 // Mock all child view components
 // ──────────────────────────────────────────────
-vi.mock('./components/char-sheet/CharSheet.jsx', () => ({ default: MockCharSheet }));
-vi.mock('./components/initiative/initiative.jsx', () => ({ default: MockInitiative }));
-vi.mock('./components/campaign-selection/CampaignSelection.jsx', () => ({ default: MockCampaignSelection }));
-vi.mock('./components/character-creation/CharacterCreationWizard.jsx', () => ({ default: MockWizard }));
-vi.mock('./components/sidebar/Sidebar.jsx', () => ({ default: MockSidebar }));
-vi.mock('./components/maps-manager/MapsManager.jsx', () => ({ default: MockMapsManager }));
-vi.mock('./components/map/Map.jsx', () => ({ default: MockMap }));
-vi.mock('./components/encounter/EncounterBuilder.jsx', () => ({ default: MockEncounterBuilder }));
-vi.mock('./components/notes/Notes.jsx', () => ({ default: MockNotes }));
-vi.mock('./components/quests/Quests.jsx', () => ({ default: MockQuests }));
-vi.mock('./components/npcs/NPCs.jsx', () => ({ default: MockNPCs }));
-vi.mock('./components/factions/Factions.jsx', () => ({ default: MockFactions }));
+vi.mock('./components/char-sheet/CharSheet.jsx', async () => {
+  const { MockCharSheet } = await import('./test/mockComponents.jsx');
+  return { default: MockCharSheet };
+});
+vi.mock('./components/initiative/initiative.jsx', async () => {
+  const { MockInitiative } = await import('./test/mockComponents.jsx');
+  return { default: MockInitiative };
+});
+vi.mock('./components/campaign-selection/CampaignSelection.jsx', async () => {
+  const { MockCampaignSelection } = await import('./test/mockComponents.jsx');
+  return { default: MockCampaignSelection };
+});
+vi.mock('./components/character-creation/CharacterCreationWizard.jsx', async () => {
+  const { MockWizard } = await import('./test/mockComponents.jsx');
+  return { default: MockWizard };
+});
+vi.mock('./components/sidebar/Sidebar.jsx', async () => {
+  const { MockSidebar } = await import('./test/mockComponents.jsx');
+  return { default: MockSidebar };
+});
+vi.mock('./components/maps-manager/MapsManager.jsx', async () => {
+  const { MockMapsManager } = await import('./test/mockComponents.jsx');
+  return { default: MockMapsManager };
+});
+vi.mock('./components/map/Map.jsx', async () => {
+  const { MockMap } = await import('./test/mockComponents.jsx');
+  return { default: MockMap };
+});
+vi.mock('./components/encounter/EncounterBuilder.jsx', async () => {
+  const { MockEncounterBuilder } = await import('./test/mockComponents.jsx');
+  return { default: MockEncounterBuilder };
+});
+vi.mock('./components/notes/Notes.jsx', async () => {
+  const { MockNotes } = await import('./test/mockComponents.jsx');
+  return { default: MockNotes };
+});
+vi.mock('./components/quests/Quests.jsx', async () => {
+  const { MockQuests } = await import('./test/mockComponents.jsx');
+  return { default: MockQuests };
+});
+vi.mock('./components/npcs/NPCs.jsx', async () => {
+  const { MockNPCs } = await import('./test/mockComponents.jsx');
+  return { default: MockNPCs };
+});
+vi.mock('./components/factions/Factions.jsx', async () => {
+  const { MockFactions } = await import('./test/mockComponents.jsx');
+  return { default: MockFactions };
+});
 
 // Mock Subscriber to avoid EventSource in tests
 vi.mock('./components/common/Subscriber.jsx', () => ({
