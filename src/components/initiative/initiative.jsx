@@ -292,9 +292,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     React.useEffect(() => {
         let cancelled = false
         ;(async () => {
-            const remote = await loadCombatSummary(campaignName)
-            const stored = remote || getCombatSummary()
-            let initialSummary = stored || null
+            const initialSummary = await loadCombatSummary(campaignName)
 
             if (initialSummary) {
                 const merged = mergeCombatSummaryWithCharacters(initialSummary, characters, utils.getName)

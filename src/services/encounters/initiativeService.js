@@ -151,13 +151,27 @@ function clearCombat(characters, npcCount, getName) {
 }
 
 function mergeCombatSummaryWithCharacters(initialSummary, characters, getName) {
-    const characterNameSet = new Set(characters.map(c => getName(c.name)))
+    const creatureNameSet = new Set(initialSummary.creatures.map(c => c.name))
     const mergedCreatures = initialSummary.creatures.map(c => {
-        if (c.type === 'player' && characterNameSet.has(c.name)) {
-            return { ...c, initiative: c.initiative ?? '', targetName: c.targetName ?? null, concentration: c.concentration ?? null }
+        if (c.type === 'player') {
+            const character = characters.find(ch => getName(ch.name) === c.name)
+            if (character) {
+                return { ...c, initiative: c.initiative ?? '', targetName: c.targetName ?? null, concentration: c.concentration ?? null }
+            }
         }
         return { ...c, conditions: c.conditions || [], concentration: c.concentration ?? null, currentHp: c.currentHp ?? c.maxHp ?? 10, maxHp: c.maxHp ?? 10, saveBonuses: c.saveBonuses || {} }
     })
+    const newPlayerCreatures = characters
+        .filter(ch => !creatureNameSet.has(getName(ch.name)))
+        .map(ch => ({
+            name: getName(ch.name),
+            type: 'player',
+            initiative: '',
+            targetName: null,
+            concentration: null,
+        }))
+    mergedCreatures.push(...newPlayerCreatures)
+    mergedCreatures.sort((a, b) => a.name.localeCompare(b.name))
     return { round: initialSummary.round, creatures: mergedCreatures }
 }
 

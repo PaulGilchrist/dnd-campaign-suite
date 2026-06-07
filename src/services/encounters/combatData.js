@@ -27,6 +27,7 @@ export async function loadCombatSummary(campaignName) {
         return fromApi
       }
     } catch { /* fall through */ }
+    return null
   }
   return readLocal(CS_KEY)
 }
