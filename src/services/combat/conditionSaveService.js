@@ -2,6 +2,7 @@ import { rollD20 } from '../dice/diceRoller.js'
 import { getMonsterData } from '../npcs/monsterUtils.js'
 import { getAbilitySaveBonus } from './conditionUtils.js'
 import { computeAuraBonus } from './auraOfProtection.js'
+import { playerIsImmuneToCondition } from './automationService.js'
 
 async function getCreatureSaveBonus(creature, abilityAbbr, characters, campaignNpcs, getName) {
     if (creature.type === 'player') {
@@ -42,9 +43,21 @@ function removeCondition(combatSummary, creatureName, condition, getRuntimeValue
     }
 }
 
-function addCondition(combatSummary, creatureName, conditionDef, dc, ability, getRuntimeValue, setRuntimeValue, campaignName) {
+function addCondition(combatSummary, creatureName, conditionDef, dc, ability, getRuntimeValue, setRuntimeValue, campaignName, playerStats) {
     const creature = combatSummary.creatures.find(c => c.name === creatureName)
     if (!creature) return
+
+    if (playerStats && getRuntimeValue && campaignName) {
+        if (playerIsImmuneToCondition({
+            conditionKey: conditionDef.key,
+            playerStats,
+            getRuntimeValue,
+            campaignName,
+        })) {
+            return
+        }
+    }
+
     if (creature.type === 'player') {
         const conditions = getRuntimeValue(creature.name, 'activeConditions') || []
         const filtered = conditions.filter(c => String(c).toLowerCase() !== conditionDef.key.toLowerCase())

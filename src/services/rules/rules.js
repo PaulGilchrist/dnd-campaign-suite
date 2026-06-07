@@ -20,6 +20,7 @@ import {
     collectAutomationFromFeatures,
     collectSaveModifiers,
     getConditionImmunities,
+    getConditionalImmunities,
 } from '../combat/automationService.js';
 
 /**
@@ -421,6 +422,7 @@ const rules = {
         playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
         playerStats.saveModifiers = collectSaveModifiers(allFeatures);
         playerStats.automationConditionImmunities = getConditionImmunities(allFeatures);
+        playerStats.automationConditionalImmunities = getConditionalImmunities(allFeatures);
           [playerStats.languagesAllowed, playerStats.languages] = rules.getLanguages(playerStats, playerSummary);
           [playerStats.proficienciesAllowed, playerStats.proficiencies] = rules.getProficiencies(playerStats, false, playerSummary);
           [playerStats.skillProficienciesAllowed, playerStats.skillProficiencies] = rules.getProficiencies(playerStats, true, playerSummary);

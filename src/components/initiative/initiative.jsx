@@ -543,7 +543,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         if (!conditionPickerTarget || !conditionPickerSelected || !combatSummary) return
         const conditionDef = CONDITIONS.find(c => c.key === conditionPickerSelected)
         if (!conditionDef) return
-        addCondition(combatSummary, conditionPickerTarget.name, conditionDef, conditionPickerDc, conditionPickerAbility, getRuntimeValue, setRuntimeValue, campaignName)
+        const targetCharacter = characters.find(c => utils.getName(c.name) === conditionPickerTarget.name)
+        const targetStats = targetCharacter?.computedStats || targetCharacter
+        addCondition(combatSummary, conditionPickerTarget.name, conditionDef, conditionPickerDc, conditionPickerAbility, getRuntimeValue, setRuntimeValue, campaignName, targetStats)
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))
         setConditionPickerTarget(null)

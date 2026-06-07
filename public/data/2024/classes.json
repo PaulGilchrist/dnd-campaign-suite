@@ -516,10 +516,11 @@
                         "description": "You have Immunity to the Charmed and Frightened conditions while your Rage is active. If you're Charmed or Frightened when you enter your Rage, the condition ends on you.",
                         "level": 6,
                         "automation": {
-                            "type": "passive_immunity",
+                            "type": "condition_immunity_while_active",
                             "target": "self",
-                            "conditionImmunity": "Charmed and Frightened while raging",
-                            "casting_time": "1 action"
+                            "immunities": ["charmed", "frightened"],
+                            "requiresActive": "Rage",
+                            "casting_time": "passive"
                         }
                     },
                     {

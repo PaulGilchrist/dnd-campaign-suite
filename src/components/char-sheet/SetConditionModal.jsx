@@ -5,10 +5,11 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js
 import { addExpiration } from '../../services/rules/expirations.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { rollD20 } from '../../services/dice/diceRoller.js';
+import { playerIsImmuneToCondition } from '../../services/combat/automationService.js';
 import utils from '../../services/ui/utils.js';
 import storage from '../../services/ui/storage.js';
 
-function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, onClose, featureName = 'Abjure Foes', conditionName = 'frightened', saveType = 'WIS', rangeFeet = 60 }) {
+function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, onClose, characters, featureName = 'Abjure Foes', conditionName = 'frightened', saveType = 'WIS', rangeFeet = 60 }) {
     const [selected, setSelected] = useState(new Set());
     const [processing, setProcessing] = useState(false);
     const [results, setResults] = useState([]);
@@ -44,6 +45,17 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
 
         const conditionKey = conditionName.toLowerCase();
 
+        const targetCharacter = characters?.find(c => utils.getName(c.name) === targetName);
+        const targetStats = targetCharacter?.computedStats || targetCharacter;
+        if (targetStats && playerIsImmuneToCondition({
+            conditionKey,
+            playerStats: targetStats,
+            getRuntimeValue,
+            campaignName,
+        })) {
+            return;
+        }
+
         if (creature.type === 'player') {
             const conditions = getRuntimeValue(creature.name, 'activeConditions') || [];
             const filtered = conditions.filter(c => String(c).toLowerCase() !== conditionKey);
@@ -63,7 +75,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
             { type: conditionKey, condition: conditionKey },
            ], campaignName);
 
-     }, [combatSummary, attackerName, campaignName, conditionName, saveType]);
+     }, [combatSummary, attackerName, campaignName, conditionName, saveType, characters]);
 
     const logCondition = useCallback((targetName, saveDcValue) => {
         fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {

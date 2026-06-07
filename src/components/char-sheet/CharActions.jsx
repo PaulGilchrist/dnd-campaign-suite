@@ -477,6 +477,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 {setConditionModal && (
                     <SetConditionModal
                         {...setConditionModal}
+                        characters={characters}
                         onClose={() => setSetConditionModal(null)}
                     />
                 )}

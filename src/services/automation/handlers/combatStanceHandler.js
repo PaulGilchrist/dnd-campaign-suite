@@ -53,6 +53,19 @@ export async function handle(action, playerStats, campaignName) {
     }];
     setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
 
+    if (action.name === 'Rage') {
+        const currentConditions = getRuntimeValue(playerName, 'activeConditions', campaignName) || [];
+        if (Array.isArray(currentConditions)) {
+            const filtered = currentConditions.filter(c => {
+                const lower = String(c).toLowerCase();
+                return lower !== 'charmed' && lower !== 'frightened';
+            });
+            if (filtered.length !== currentConditions.length) {
+                setRuntimeValue(playerName, 'activeConditions', filtered, campaignName);
+            }
+        }
+    }
+
     return {
         type: 'popup',
         payload: {
