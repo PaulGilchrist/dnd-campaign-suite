@@ -593,8 +593,6 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'temp_hp_buff':
             case 'damage_aura':
             case 'combat_stance':
-            case 'conditional_advantage':
-            case 'conditional_disadvantage':
                 result.specialActions.push(info)
                 break
             case 'passive_buff':
@@ -603,6 +601,8 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'resistance':
             case 'auto_effect':
             case 'resource_restoration':
+            case 'conditional_advantage':
+            case 'conditional_disadvantage':
                 result.passives.push(info)
                 break
             default:
