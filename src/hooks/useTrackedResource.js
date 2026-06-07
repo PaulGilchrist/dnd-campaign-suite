@@ -1,28 +1,28 @@
 import React from 'react';
 import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from './useRuntimeState.js';
 
-function resolveCurrent(storageKey, playerName, playerStats) {
+function resolveCurrent(storageKey, playerName, playerStats, maxGetter) {
   const storedValue = getRuntimeValue(playerName, storageKey);
   if (storedValue != null) return storedValue;
   if (playerStats?._trackedResources?.[storageKey]) {
     return playerStats._trackedResources[storageKey].current;
   }
-  return null;
+  return maxGetter();
 }
 
 function useTrackedResource(storageKey, playerName, maxGetter, deps, campaignName, playerStats) {
   const [current, setCurrent] = React.useState(() =>
-    resolveCurrent(storageKey, playerName, playerStats)
+    resolveCurrent(storageKey, playerName, playerStats, maxGetter)
   );
 
   React.useEffect(() => {
-    const resolved = resolveCurrent(storageKey, playerName, playerStats);
+    const resolved = resolveCurrent(storageKey, playerName, playerStats, maxGetter);
     setCurrent(resolved);
   }, [deps, maxGetter, playerName, storageKey, campaignName, playerStats]);
 
   React.useEffect(() => {
     const reReadHandler = () => {
-      const resolved = resolveCurrent(storageKey, playerName, playerStats);
+      const resolved = resolveCurrent(storageKey, playerName, playerStats, maxGetter);
       setCurrent(resolved);
     };
 

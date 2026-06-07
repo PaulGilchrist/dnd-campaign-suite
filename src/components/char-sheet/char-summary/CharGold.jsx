@@ -7,7 +7,7 @@ import HiddenInput from '../../common/HiddenInput.jsx'
 function CharGold({ playerStats, campaignName }) {
 
     const storedGold = useRuntimeValue(playerStats.name, 'gold', campaignName);
-    const gold = storedGold ? storedGold : playerStats.inventory.gold;
+    const gold = storedGold ?? playerStats.inventory.gold ?? 0;
     const [showInputGold, setShowInputGold] = React.useState(false);
 
     const handleInputToggleGold = () => {

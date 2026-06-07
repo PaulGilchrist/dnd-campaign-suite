@@ -4,7 +4,7 @@ import './HiddenInput.css'
 
 function HiddenInput({ handleInputToggle, handleValueChange, showInput, value, displayValue = true }) {
     const inputRef = React.useRef(null);
-    const [localValue, setLocalValue] = React.useState(value);
+    const [localValue, setLocalValue] = React.useState(value ?? '');
     const isEditingRef = React.useRef(false);
     React.useEffect(() => {
         if(showInput) {

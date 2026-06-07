@@ -83,7 +83,7 @@ function NPCStatBlockForm({ formData, setFormData }) {
           <input
             type="text"
             className="ct-input"
-            value={formData.hitPoints}
+            value={formData.hitPoints ?? ''}
             onChange={(e) => handleFieldChange('hitPoints', e.target.value)}
             placeholder="e.g., 45"
           />
@@ -93,7 +93,7 @@ function NPCStatBlockForm({ formData, setFormData }) {
           <input
             type="text"
             className="ct-input"
-            value={formData.hitDice}
+            value={formData.hitDice ?? ''}
             onChange={(e) => handleFieldChange('hitDice', e.target.value)}
             placeholder="e.g., 6d8"
           />
@@ -113,7 +113,7 @@ function NPCStatBlockForm({ formData, setFormData }) {
           <input
             type="number"
             className="ct-input"
-            value={formData.initiativeBonus}
+            value={formData.initiativeBonus ?? ''}
             onChange={(e) => handleFieldChange('initiativeBonus', e.target.value)}
             placeholder="+0"
           />
@@ -223,21 +223,21 @@ function NPCStatBlockForm({ formData, setFormData }) {
               <input
                 type="text"
                 className="ct-input npcs-action-name"
-                value={action.name}
+                value={action.name ?? ''}
                 onChange={(e) => handleActionChange(i, 'name', e.target.value)}
                 placeholder="Action name"
               />
               <input
                 type="text"
                 className="ct-input npcs-action-bonus"
-                value={action.attack_bonus}
+                value={action.attack_bonus ?? ''}
                 onChange={(e) => handleActionChange(i, 'attack_bonus', e.target.value)}
                 placeholder="Atk bonus"
               />
               <input
                 type="text"
                 className="ct-input npcs-action-damage"
-                value={action.damage_dice}
+                value={action.damage_dice ?? ''}
                 onChange={(e) => handleActionChange(i, 'damage_dice', e.target.value)}
                 placeholder="Damage"
               />
@@ -266,7 +266,7 @@ function NPCStatBlockForm({ formData, setFormData }) {
       <h4 className="npcs-section-title">Traits</h4>
       <textarea
         className="ct-textarea"
-        value={formData.traits}
+        value={formData.traits ?? ''}
         onChange={(e) => handleFieldChange('traits', e.target.value)}
         placeholder="Special traits (one per line or markdown)"
         rows={3}
@@ -275,7 +275,7 @@ function NPCStatBlockForm({ formData, setFormData }) {
       <h4 className="npcs-section-title">Reactions</h4>
       <textarea
         className="ct-textarea"
-        value={formData.reactions}
+        value={formData.reactions ?? ''}
         onChange={(e) => handleFieldChange('reactions', e.target.value)}
         placeholder="Reactions (one per line or markdown)"
         rows={3}
