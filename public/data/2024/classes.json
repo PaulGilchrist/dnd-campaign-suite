@@ -189,7 +189,8 @@
                         "type": "class_feature",
                         "automation": {
                             "type": "passive_rule",
-                            "effect": "initiative_advantage"
+                            "effect": "initiative_advantage",
+                            "casting_time": "passive"
                         }
                     },
                     {

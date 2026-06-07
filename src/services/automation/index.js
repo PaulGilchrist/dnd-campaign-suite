@@ -38,6 +38,7 @@ const HANDLER_MAP = {
     temp_hp_buff: handleGenericPopup,
     conditional_advantage: handleGenericPopup,
     conditional_disadvantage: handleGenericPopup,
+    passive_rule: handleGenericPopup,
 };
 
 export async function executeHandler(action, playerStats, campaignName, mapName) {
