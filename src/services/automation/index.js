@@ -11,6 +11,7 @@ import { handle as handleResourcePool } from './handlers/resourcePoolHandler.js'
 import { handle as handleFontOfMagic } from './handlers/fontOfMagicHandler.js';
 import { handle as handleHealingPool } from './handlers/healingPoolHandler.js';
 import { handle as handleSpellModifier } from './handlers/spellModifierHandler.js';
+import { handle as handleCombatStance } from './handlers/combatStanceHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -29,7 +30,7 @@ const HANDLER_MAP = {
     font_of_magic: handleFontOfMagic,
     healing_pool: handleHealingPool,
     extra_action: handleGenericPopup,
-    combat_stance: handleGenericPopup,
+    combat_stance: handleCombatStance,
     damage_aura: handleGenericPopup,
     attack_rider: handleGenericPopup,
     damage_bonus: handleGenericPopup,

@@ -251,7 +251,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             result.logEntries.forEach(entry => addEntry(campaignName, entry).catch(() => {}));
          }
 
-        if (result.type === 'popup' && auto?.type === 'temp_buff') {
+        if (result.type === 'popup' && (auto?.type === 'temp_buff' || auto?.type === 'combat_stance')) {
             if (onBuffsChange) onBuffsChange();
          }
       }
