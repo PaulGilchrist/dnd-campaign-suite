@@ -1,9 +1,87 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { rollExpression } from '../../dice/diceRoller.js';
 import { logHealingToSSE } from '../common/healingRoll.js';
+import { getCombatContext } from '../../rules/damageUtils.js';
+import storage from '../../ui/storage.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
+
+    if (auto.effect === 'bonus_initiative_allies') {
+        const activeConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) || [];
+        if (activeConditions.includes('incapacitated')) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: `${action.name} cannot be used while Incapacitated.`,
+                },
+            };
+        }
+
+        const bardicMax = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_inspiration_uses
+            || playerStats?.proficiency || 0;
+        const bardicUsed = Number(getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName) ?? 0);
+        if (bardicUsed >= bardicMax) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: `${action.name} requires a use of Bardic Inspiration, but you have no uses remaining.`,
+                },
+            };
+        }
+
+        await setRuntimeValue(playerStats.name, 'bardicInspirationUses', bardicUsed + 1, campaignName);
+
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+        const bardicDie = classLevel?.bardic_die || 6;
+        const rollResult = rollExpression(`1d${bardicDie}`);
+        if (!rollResult) return null;
+
+        const bonusValue = rollResult.total;
+
+        const combatSummary = await getCombatContext(campaignName);
+        if (combatSummary?.creatures) {
+            const affected = [];
+            for (const creature of combatSummary.creatures) {
+                if (creature.type !== 'player') continue;
+                const currentInit = creature.initiative !== '' ? Number(creature.initiative) : null;
+                if (currentInit !== null) {
+                    creature.initiative = String(currentInit + bonusValue);
+                } else {
+                    const existingBonus = Number(getRuntimeValue(creature.name, 'tandemFootworkBonus', campaignName) ?? 0);
+                    await setRuntimeValue(creature.name, 'tandemFootworkBonus', existingBonus + bonusValue, campaignName);
+                }
+                affected.push(creature.name);
+            }
+            combatSummary.creatures.sort((a, b) => {
+                const aVal = Number(a.initiative) || 0;
+                const bVal = Number(b.initiative) || 0;
+                return bVal - aVal;
+            });
+            await storage.set('combatSummary', combatSummary, campaignName);
+            window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+        }
+
+        return {
+            type: 'popup',
+            payload: {
+                type: 'initiative_buff',
+                name: action.name,
+                formula: `1d${bardicDie}`,
+                rolls: rollResult.rolls,
+                bonus: 0,
+                modifier: 0,
+                description: `${action.name}: Rolled ${rollResult.total} (1d${bardicDie}). You and allies within 30 feet gain +${rollResult.total} to Initiative.`,
+                automationType: auto.type,
+            },
+        };
+    }
 
     if (auto.effect !== 'regain_focus_points_and_heal') {
         return {
@@ -74,4 +152,4 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             damageApplied: true,
              },
             };
-          }
+}

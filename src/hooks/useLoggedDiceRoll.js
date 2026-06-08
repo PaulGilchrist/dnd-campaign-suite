@@ -259,19 +259,24 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
 
     if (rollType === 'initiative') {
         const firstName = utils.getName(characterName);
+        const tandemFtBonus = Number(getRuntimeValue(firstName, 'tandemFootworkBonus', campaignName) ?? 0);
+        if (tandemFtBonus > 0) {
+            setRuntimeValue(firstName, 'tandemFootworkBonus', 0, campaignName);
+        }
+        const totalBonus = bonus + tandemFtBonus;
         const combatSummary = await loadCombatSummary(campaignName);
         if (combatSummary) {
             const creature = combatSummary.creatures.find(
                 c => c.type === 'player' && c.name === firstName
               );
             if (creature) {
-                creature.initiative = String(r1 + bonus);
+                creature.initiative = String(r1 + totalBonus);
                 combatSummary.creatures.sort((a, b) => b.initiative - a.initiative);
                 storage.set('combatSummary', combatSummary, campaignName);
               }
           }
          clearAllExpirationEffects(characterName, campaignName);
-         window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + bonus } }));
+         window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + totalBonus } }));
         }
      }
 

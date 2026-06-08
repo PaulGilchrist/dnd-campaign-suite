@@ -342,6 +342,7 @@ function buildAttackInfo(feature, playerStats) {
                 uses: auto.uses ?? 1,
                 usesMax: auto.uses ?? 1,
                 recharge: auto.recharge || 'long_rest',
+                resourceCost: auto.resourceCost || '',
                 resourceKey: feature.name.toLowerCase().replace(/\s+/g, '') + 'Uses',
                 hasAutomation: true
             }
