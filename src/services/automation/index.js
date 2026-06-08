@@ -17,6 +17,7 @@ import { handle as handleReactionDebuff } from './handlers/reactionDebuffHandler
 import { handle as handleAttackRider } from './handlers/attackRiderHandler.js';
 import { handle as handleTempHpBuff } from './handlers/tempHpBuffHandler.js';
 import { handle as handleWeaponMastery } from './handlers/weaponMasteryHandler.js';
+import { handle as handleBuffAlly } from './handlers/buffAllyHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -31,6 +32,7 @@ const HANDLER_MAP = {
     initiative_action: handleInitiative,
     bonus_attacks: handleGenericPopup,
     bonus_action_attack: handleGenericPopup,
+    buff_ally: handleBuffAlly,
     resource_pool: handleResourcePool,
     font_of_magic: handleFontOfMagic,
     healing_pool: handleHealingPool,

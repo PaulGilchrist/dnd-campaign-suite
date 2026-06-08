@@ -775,6 +775,8 @@
                             "duration": "until_start_of_next_turn",
                             "action": "bonus_action",
                             "recharge": "long_rest_or_expend_rage",
+                            "uses": 1,
+                            "resourceKey": "zealousPresenceUses",
                             "casting_time": "1 bonus action"
                         }
                     },

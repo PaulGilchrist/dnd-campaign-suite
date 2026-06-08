@@ -125,6 +125,19 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 break;
             }
 
+            case 'remove_active_buff': {
+                const allBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                if (Array.isArray(allBuffs)) {
+                    setRuntimeValue(
+                        targetName,
+                        'activeBuffs',
+                        allBuffs.filter(b => b.name !== effect.buffName),
+                        campaignName
+                    );
+                }
+                break;
+            }
+
             case 'condition':
                 removeActiveCondition(targetName, effect.condition, campaignName);
                 removeNpcCondition(targetName, effect.condition, campaignName);

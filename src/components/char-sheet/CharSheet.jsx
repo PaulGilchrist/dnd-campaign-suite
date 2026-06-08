@@ -147,6 +147,13 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         conditionEffects.targetAdvantageCount = (conditionEffects.targetAdvantageCount || 0) + 1;
     }
 
+    // Buff-ally effects (e.g., Zealous Presence): Advantage on attack rolls and saving throws
+    const buffAllyActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_attacks_and_saves');
+    if (buffAllyActive) {
+        conditionEffects.attackAdvantageCount = (conditionEffects.attackAdvantageCount || 0) + 1;
+        conditionEffects.saveAdvantageCount = (conditionEffects.saveAdvantageCount || 0) + 1;
+    }
+
     const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
     const conditionAttackMode = getNetAttackMode(conditionEffects.attackAdvantageCount, conditionEffects.attackDisadvantageCount)
 

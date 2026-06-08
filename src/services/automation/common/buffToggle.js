@@ -1,5 +1,15 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
+/**
+ * Toggle an active buff on/off for a character.
+ *
+ * For round-limited durations like "until_start_of_next_turn", the caller
+ * MUST also register an expiration via addExpiration(attacker, target,
+ * [{ type: 'remove_active_buff', buffName }], campaignName) so the buff
+ * is auto-cleared when expireStaleEffects runs on round advance.
+ *
+ * See buffAllyHandler.js for a complete example of this pattern.
+ */
 export function toggleBuff(playerName, actionName, auto, campaignName) {
     const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
     const activeBuffs = Array.isArray(stored) ? stored : [];

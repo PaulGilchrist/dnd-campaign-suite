@@ -77,7 +77,8 @@ export const LONG_REST_RESOURCES = [
      'warlockPactMagic',
      'luckyPoints',
      'innateSorceryUses',
-     'sorcerousRestorationUses'
+     'sorcerousRestorationUses',
+     'zealousPresenceUses'
  ]
 
 export function getLongRestResources() {
