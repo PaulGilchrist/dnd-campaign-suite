@@ -1,7 +1,12 @@
 import { toggleBuff } from '../common/buffToggle.js';
+import { handle as handleTeleport } from './tempTeleportHandler.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
+
+    if (auto?.effect === 'teleport_on_rage') {
+        return handleTeleport(action, playerStats, campaignName, _mapName);
+    }
 
     const { wasActive } = toggleBuff(
         playerStats.name,

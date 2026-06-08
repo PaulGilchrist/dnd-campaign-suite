@@ -24,6 +24,7 @@ import SetConditionModal from './SetConditionModal.jsx'
 import AttackRiderModal from './AttackRiderModal.jsx'
 import WeaponMasteryModal from './WeaponMasteryModal.jsx'
 import CombatStanceModal from './CombatStanceModal.jsx'
+import TeleportModal from './TeleportModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { getClassFeatures } from '../../services/character/classFeatures.js';
@@ -55,6 +56,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [attackRiderModal, setAttackRiderModal] = useState(null);
     const [weaponMasteryModal, setWeaponMasteryModal] = useState(null);
     const [combatStanceModal, setCombatStanceModal] = useState(null);
+    const [teleportModal, setTeleportModal] = useState(null);
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
 
     useEffect(() => {
@@ -311,6 +313,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'setCondition': setSetConditionModal(result.payload); break;
                     case 'attackRider': setAttackRiderModal(result.payload); break;
                     case 'combatStance': setCombatStanceModal(result.payload); break;
+                    case 'teleport': setTeleportModal(result.payload); break;
                  }
                 break;
             case 'roll':
@@ -536,6 +539,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <CombatStanceModal
                         {...combatStanceModal}
                         onClose={() => { setCombatStanceModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
+                    />
+                )}
+                {teleportModal && (
+                    <TeleportModal
+                        {...teleportModal}
+                        onClose={() => { setTeleportModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
                     />
                 )}
                 {selectedActionSpell && (

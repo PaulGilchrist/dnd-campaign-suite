@@ -1,5 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { grantTempHpOnRage } from './tempHpBuffHandler.js';
+import { clearExtendedFlag } from './tempTeleportHandler.js';
 
 function resolveResistanceTypes(resistanceTypes) {
     return resistanceTypes.flatMap(rt => {
@@ -31,6 +32,9 @@ export async function handle(action, playerStats, campaignName) {
     if (wasActive) {
         const newBuffs = activeBuffs.filter(b => b.name !== action.name);
         setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+        if (action.name === 'Rage') {
+            clearExtendedFlag(playerName, campaignName);
+        }
         return {
             type: 'popup',
             payload: {
@@ -141,6 +145,15 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
             if (sa.triggerOnRage) {
                 grantTempHpOnRage({ name: sa.name, automation: sa }, playerStats, campaignName);
             }
+        }
+
+        const teleportFeature = specialActions.find(sa => sa.effect === 'teleport_on_rage');
+        if (teleportFeature) {
+            return {
+                type: 'modal',
+                modalName: 'teleport',
+                payload: { action: teleportFeature, playerStats, campaignName, triggeredByRage: true },
+            };
         }
     }
 

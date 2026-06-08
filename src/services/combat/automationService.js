@@ -524,6 +524,12 @@ function buildAttackInfo(feature, playerStats) {
                 duration: auto.duration || '1_minute',
                 action: auto.action || 'bonus_action',
                 recharge: auto.recharge || 'long_rest',
+                distance: auto.distance || '',
+                extendedDistance: auto.extendedDistance || '',
+                oncePerRage: !!auto.oncePerRage,
+                bringAllies: !!auto.bringAllies,
+                allyCount: auto.allyCount || 0,
+                teleportRange: auto.teleportRange || '',
                 hasAutomation: true
             }
         }
