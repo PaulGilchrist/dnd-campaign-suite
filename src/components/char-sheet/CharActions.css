@@ -43,6 +43,11 @@
 .automation-btn:hover {
     background: rgba(139, 92, 246, 0.15);
 }
+.automation-btn--active {
+    background: rgba(139, 92, 246, 0.25);
+    border-color: #a78bfa;
+    color: #a78bfa;
+}
 .automation-btn i {
     margin-right: 3px;
 }

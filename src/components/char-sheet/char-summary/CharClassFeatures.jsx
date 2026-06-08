@@ -2,7 +2,7 @@
 import React from 'react'
 import TrackedResourceInput from './TrackedResourceInput.jsx';
 import { getClassFeatures } from '../../../services/character/classFeatures.js';
-import { useRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { useRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 /* ─── Barbarian ─── */
 const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
@@ -25,6 +25,16 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
         ? (classLevel?.weapon_mastery ?? 'N/A')
         : 'N/A';
 
+    const aspectChoice = useRuntimeValue(playerStats.name, 'aspectOfTheWildsOption', campaignName);
+    const hasAspectOfTheWilds = (playerStats.automation?.passives ?? []).some(
+        p => p.effect === 'animal_aspect'
+    );
+    const ASPECT_OPTIONS = ['Owl', 'Panther', 'Salmon'];
+
+    const handleAspectChoice = (option) => {
+        setRuntimeValue(playerStats.name, 'aspectOfTheWildsOption', option, campaignName);
+    };
+
     return (
          <div data-testid="char-class-barbarian">
              <div><b>Extra Attacks: </b>{extraAttacks}</div>
@@ -38,6 +48,22 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
                  {rageActive && <span className="automation-badge">BPS Resist, STR Adv, +{rageDamage} dmg</span>}
              </div>
              <div><b>Weapon Mastery: </b>{weaponMastery}</div>
+             {hasAspectOfTheWilds && (
+                 <div>
+                     <b>Aspect of the Wilds: </b>
+                     {ASPECT_OPTIONS.map(opt => (
+                         <button
+                             key={opt}
+                             className={'automation-btn' + (aspectChoice === opt ? ' automation-btn--active' : '')}
+                             onClick={() => handleAspectChoice(opt)}
+                             title={`Select ${opt}`}
+                         >
+                             <i className={`fas fa-${opt === 'Owl' ? 'eye' : opt === 'Panther' ? 'paw' : 'fish'}`}></i> {opt}{aspectChoice === opt ? ' ✓' : ''}
+                         </button>
+                     ))}
+                     {aspectChoice && <span className="automation-badge">{aspectChoice} active</span>}
+                 </div>
+             )}
          </div>
     );
 };

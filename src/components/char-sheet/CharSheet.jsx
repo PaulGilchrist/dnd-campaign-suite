@@ -46,6 +46,28 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                     });
                 }
             }
+
+            // Apply Aspect of the Wilds passive effects
+            const aspectOption = getRuntimeValue(playerSummary.name, 'aspectOfTheWildsOption');
+            if (aspectOption && stats.rules === '2024') {
+                if (aspectOption === 'Owl') {
+                    const existingDv = stats.senses?.find(s => s.name === 'Darkvision');
+                    if (existingDv) {
+                        const rangeMatch = existingDv.value.match(/(\d+)/);
+                        if (rangeMatch) {
+                            existingDv.value = `${parseInt(rangeMatch[1], 10) + 60} ft.`;
+                        }
+                    } else {
+                        if (!stats.senses) stats.senses = [];
+                        stats.senses.push({ name: 'Darkvision', value: '60 ft.' });
+                    }
+                } else if (aspectOption === 'Panther') {
+                    stats.climbSpeed = stats.race?.subrace?.speed || stats.race?.speed || 30;
+                } else if (aspectOption === 'Salmon') {
+                    stats.swimSpeed = stats.race?.subrace?.speed || stats.race?.speed || 30;
+                }
+            }
+
             setPlayerStats(stats);
         };
         fetchData();

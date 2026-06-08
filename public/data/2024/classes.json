@@ -607,11 +607,11 @@
                                 "climb_speed",
                                 "swim_speed"
                             ],
-                            "casting_time": "1 action"
-                        }
-                    },
-                    {
-                        "name": "Nature Speaker",
+                        "casting_time": "passive"
+                    }
+                },
+                {
+                    "name": "Nature Speaker",
                         "description": "You can cast the Commune with Nature spell but only as a Ritual. Wisdom is your spellcasting ability for it.",
                         "level": 10
                     },

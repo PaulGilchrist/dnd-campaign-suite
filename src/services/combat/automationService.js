@@ -308,6 +308,7 @@ function buildAttackInfo(feature, playerStats) {
                 bonusExpression: auto.bonusExpression || '',
                 conditionImmunity: auto.conditionImmunity || '',
                 resistances: auto.resistances || [],
+                options: auto.options || [],
                 hasAutomation: true
             }
         }
