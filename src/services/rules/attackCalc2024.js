@@ -81,6 +81,19 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
         }
     }
 
+    // College of Dance: Dazzling Footwork unarmed strikes (DEX-based, BI die damage)
+    if (playerStats.class?.name === 'Bard' && playerStats.class?.subclass?.name === 'College of Dance' && playerStats.level >= 3) {
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+        const bardicDie = classLevel?.bardic_die || 6;
+        const diceStr = `1d${bardicDie}`;
+        attacks.push(...buildMonkAttacks({ diceStr, dexterityBonus: dexterity.bonus, proficiency }).map(a => ({
+            ...a,
+            name: 'Unarmed Strike (Dance)',
+            damageFormula: `Damage Formula = Bardic Inspiration Die (${diceStr}) + Dexterity Bonus (${dexterity.bonus})`,
+            hitBonusFormula: `To Hit Bonus Formula = Dexterity Bonus (${dexterity.bonus}) + Proficiency (${proficiency})`,
+        })));
+    }
+
     // Spell attacks
     if (playerStats.spellAbilities) {
         attacks.push(...buildSpellAttacks(playerStats.spellAbilities.spells, allSpells, playerStats.spellAbilities, playerStats.level));

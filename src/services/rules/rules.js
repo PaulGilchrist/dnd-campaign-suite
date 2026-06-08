@@ -211,6 +211,7 @@ const rules = {
         const constitution = playerStats.abilities.find((ability) => ability.name === 'Constitution');
         const dexterity = playerStats.abilities.find((ability) => ability.name === 'Dexterity');
         const wisdom = playerStats.abilities.find((ability) => ability.name === 'Wisdom');
+        const charisma = playerStats.abilities.find((ability) => ability.name === 'Charisma');
 
         let armorName = playerStats.inventory.equipped.find(itemName => {
             let item = allEquipment.find((item) => item.name === parseMagicItemName(itemName).baseName);
@@ -278,7 +279,7 @@ const rules = {
              }
          }
 
-         // 5e-specific: Barbarian and Draconic Sorcerer unarmored defense
+        // 5e-specific: Barbarian and Draconic Sorcerer unarmored defense
         if (!is2024(playerStats, playerSummary)) {
             if (playerStats.class.name === 'Barbarian') {
                 const barbarianAc = 10 + dexterity.bonus + constitution.bonus;
@@ -291,6 +292,17 @@ const rules = {
                 if (sorcererAc > armorClass) {
                     armorClass = sorcererAc;
                     contributions = [`Unarmored AC (13) + Dexterity Bonus (${dexterity.bonus})`];
+                 }
+             }
+         }
+
+         // 2024: College of Dance unarmored defense (AC = 10 + DEX + CHA, no armor or shield)
+        if (is2024(playerStats, playerSummary)) {
+            if (playerStats.class.subclass && playerStats.class.subclass.name === 'College of Dance' && !armorName && !shield) {
+                const danceAc = 10 + dexterity.bonus + charisma.bonus;
+                if (danceAc > armorClass) {
+                    armorClass = danceAc;
+                    contributions = [`Unarmored AC (10) + Dexterity Bonus (${dexterity.bonus}) + Charisma Bonus (${charisma.bonus})`];
                  }
              }
          }

@@ -644,7 +644,9 @@ export function evaluateAutoExpression(expression, playerStats, prof, level) {
     prof = prof || 0
     level = level || 1
     const rageDamage = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.rage_damage ?? 2
+    const bardicDie = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_die || 6
     let expr = expression
+           .replace(/bardic_inspiration_die/g, bardicDie)
            .replace(/proficiency_bonus_d4/g, `${Math.max(1, prof)}d4`)
            .replace(/proficiency_bonus/g, prof)
            .replace(/monk level/gi, level)
