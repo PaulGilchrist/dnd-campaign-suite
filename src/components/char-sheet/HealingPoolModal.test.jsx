@@ -627,4 +627,105 @@ describe('HealingPoolModal', () => {
 
     expect(storage.set).not.toHaveBeenCalled();
     });
+
+  // ── Dice pool mode (Warrior of the Gods) ──
+
+  it('dice pool displays pool as dice count and die type', async () => {
+    await renderModal({ current: 3, max: 4 }, {
+      isDicePool: true,
+      dieType: 12,
+      name: 'Warrior of the Gods',
+      resourceKey: 'warriorofthegodsPool',
+    });
+    const poolText = getPoolParagraph();
+    expect(poolText).toBe('Pool: 3 / 4 d12');
+  });
+
+  it('dice pool shows Roll & Heal button instead of Apply Heal', async () => {
+    await renderModal({ current: 4, max: 4 }, {
+      isDicePool: true,
+      dieType: 12,
+      name: 'Warrior of the Gods',
+    });
+    expect(screen.getByText(/Roll & Heal/)).toBeInTheDocument();
+    expect(screen.queryByText(/Apply Heal/)).not.toBeInTheDocument();
+  });
+
+  it('dice pool uses dynamic feature name in heading', async () => {
+    await renderModal({ current: 4, max: 4 }, {
+      isDicePool: true,
+      dieType: 12,
+      name: 'Warrior of the Gods',
+    });
+    expect(screen.getByText('Warrior of the Gods')).toBeInTheDocument();
+    expect(screen.queryByText('Lay On Hands')).not.toBeInTheDocument();
+  });
+
+  it('dice pool Roll & Heal button disabled when pool is zero', async () => {
+    await renderModal({ current: 0, max: 4 }, {
+      isDicePool: true,
+      dieType: 12,
+    });
+    const btn = screen.getByRole('button', { name: /Roll & Heal/i });
+    expect(btn).toBeDisabled();
+  });
+
+  it('dice pool displays roll result after healing', async () => {
+    applyHealingService.applyHealingToTarget.mockReturnValue({
+      actualHeal: 10,
+      oldHp: 15,
+      newHp: 25,
+    });
+
+    await renderModal({ current: 3, max: 4 }, {
+      isDicePool: true,
+      dieType: 12,
+      name: 'Warrior of the Gods',
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Roll & Heal/i }));
+
+    expect(screen.getByText(/HP restored/)).toBeInTheDocument();
+  });
+
+  it('dice pool applies healing and logs entry on Roll & Heal', async () => {
+    applyHealingService.applyHealingToTarget.mockReturnValue({
+      actualHeal: 8,
+      oldHp: 15,
+      newHp: 23,
+    });
+
+    await renderModal({ current: 4, max: 4 }, {
+      isDicePool: true,
+      dieType: 12,
+      name: 'Warrior of the Gods',
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Roll & Heal/i }));
+
+    expect(applyHealingService.applyHealingToTarget).toHaveBeenCalled();
+    expect(updateFn).toHaveBeenCalled();
+    expect(screen.getByRole('table')).toBeInTheDocument();
+  });
+
+  it('dice pool applies self-heal when no combat context', async () => {
+    damageUtils.getCombatContext.mockResolvedValue(null);
+    damageUtils.getTargetFromAttacker.mockReturnValue(null);
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'currentHitPoints') return 20;
+      if (key === 'activeConditions') return [];
+      return null;
+    });
+
+    await renderModal({ current: 4, max: 4 }, {
+      isDicePool: true,
+      dieType: 12,
+      name: 'Warrior of the Gods',
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Roll & Heal/i }));
+
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalled();
+    const logCalls = global.fetch.mock.calls.filter(
+        (call) => call[0] === '/api/campaigns/test-campaign/log'
+      );
+    expect(logCalls.length).toBeGreaterThan(0);
+  });
 });

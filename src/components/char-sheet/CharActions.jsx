@@ -562,8 +562,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <HealingPoolModal
                         playerStats={playerStats}
                         campaignName={campaignName}
+                        name={healingPoolModal.name}
                         poolMax={healingPoolModal.pool}
                         poolExpression={healingPoolModal.poolExpression}
+                        isDicePool={healingPoolModal.isDicePool}
+                        dieType={healingPoolModal.dieType}
+                        resourceKey={healingPoolModal.resourceKey}
                         alsoCures={healingPoolModal.alsoCures}
                         cureCost={healingPoolModal.cureCost}
                         restoringTouchConditions={healingPoolModal.restoringTouchConditions}

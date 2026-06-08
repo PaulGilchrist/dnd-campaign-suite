@@ -287,14 +287,20 @@ function buildAttackInfo(feature, playerStats) {
         }
 
         case 'healing_pool': {
-            const pool = auto.poolExpression
-                ? evaluateAutoExpression(auto.poolExpression, playerStats, prof, level)
-                : 0
+            const baseExpression = auto.poolExpression || ''
+            const resolvedExpression = resolveHealingPoolExpression(baseExpression, auto.scaling, playerStats)
+            const diceMatch = resolvedExpression.match(/^(\d+)d(\d+)$/i)
+            const isDicePool = !!diceMatch
+            const pool = isDicePool
+                ? parseInt(diceMatch[1], 10)
+                : (resolvedExpression ? evaluateAutoExpression(resolvedExpression, playerStats, prof, level) : 0)
             return {
                 type: 'healing_pool',
                 name: feature.name,
                 pool,
-                poolExpression: auto.poolExpression || '',
+                poolExpression: resolvedExpression,
+                isDicePool,
+                dieType: isDicePool ? parseInt(diceMatch[2], 10) : null,
                 action: auto.action || 'action',
                 recharge: auto.recharge || 'long_rest',
                 alsoCures: auto.alsoCures || [],
@@ -595,6 +601,21 @@ function buildAttackInfo(feature, playerStats) {
             return null
        }
    }
+
+function resolveHealingPoolExpression(baseExpression, scaling, playerStats) {
+    if (!scaling) return baseExpression
+    const entries = Object.entries(scaling)
+        .map(([k, v]) => ({ level: parseInt(k, 10), expression: String(v) }))
+        .filter(e => !isNaN(e.level))
+        .sort((a, b) => a.level - b.level)
+    let resolved = baseExpression
+    for (const entry of entries) {
+        if (playerStats.level >= entry.level) {
+            resolved = entry.expression
+        }
+    }
+    return resolved
+}
 
 export function evaluateAutoExpression(expression, playerStats, prof, level) {
     if (!expression) return expression

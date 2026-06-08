@@ -12,10 +12,12 @@ export async function handle(action, playerStats, _campaignName, _mapName) {
             name: action.name,
             pool: auto.pool,
             poolExpression: auto.poolExpression,
+            isDicePool: auto.isDicePool,
+            dieType: auto.dieType,
             resourceKey: auto.resourceKey,
             alsoCures: auto.alsoCures || [],
             cureCost: auto.cureCost || 5,
             restoringTouchConditions: restoringTouchData?.automation?.cureConditions || [],
             },
           };
- }
+  }
