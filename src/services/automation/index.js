@@ -19,6 +19,8 @@ import { handle as handleTempHpBuff } from './handlers/tempHpBuffHandler.js';
 import { handle as handleWeaponMastery } from './handlers/weaponMasteryHandler.js';
 import { handle as handleBuffAlly } from './handlers/buffAllyHandler.js';
 import { handle as handleRevivification } from './handlers/revivificationHandler.js';
+import { handle as handleBardicInspiration } from './handlers/bardicInspirationHandler.js';
+import { handle as handleBardicInspirationUse } from './handlers/bardicInspirationUseHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -52,6 +54,8 @@ const HANDLER_MAP = {
     reaction_debuff: handleReactionDebuff,
     mastery_rider: handleWeaponMastery,
     revivification: handleRevivification,
+    bardic_inspiration: handleBardicInspiration,
+    bardic_inspiration_use: handleBardicInspirationUse,
 };
 
 export async function executeHandler(action, playerStats, campaignName, mapName) {

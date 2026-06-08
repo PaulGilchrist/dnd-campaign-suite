@@ -144,6 +144,24 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'bardic_inspiration': {
+            const usesMax = auto.uses_expression
+                ? evaluateAutoExpression(auto.uses_expression, playerStats)
+                : 0
+            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+            const dieSize = classLevel?.bardic_die || 6;
+            return {
+                type: 'bardic_inspiration',
+                name: feature.name,
+                range: auto.range || '60_ft',
+                action: auto.action || 'bonus_action',
+                usesMax,
+                usesRecharge: auto.recharge || 'long_rest',
+                dieSize,
+                hasAutomation: true
+            }
+        }
+
         case 'combat_stance': {
             return {
                 type: 'combat_stance',
@@ -672,6 +690,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'damage_bonus':
             case 'extra_action':
             case 'buff_ally':
+            case 'bardic_inspiration':
             case 'bonus_attacks':
             case 'bonus_action_attack':
             case 'reaction_damage':

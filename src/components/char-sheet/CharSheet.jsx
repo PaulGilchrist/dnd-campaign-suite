@@ -21,6 +21,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
     const storedExhaustion = useRuntimeValue(playerSummary?.name, 'exhaustionLevel', campaignName);
     const exhaustionLevel = typeof storedExhaustion === 'number' ? Math.min(EXHAUSTION_LEVELS, Math.max(0, storedExhaustion)) : 0;
+
+    const biDieRuntime = useRuntimeValue(playerSummary?.name, 'bardicInspirationDie', campaignName);
     React.useEffect(() => {
         const fetchData = async () => {
             const spellData = playerSummary.rules === '2024' ? allSpells2024 : allSpells;
@@ -69,10 +71,27 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 }
             }
 
+            // Inject synthetic "Use Bardic Inspiration" feature if this character has an active BI die
+            const biDie = getRuntimeValue(playerSummary.name, 'bardicInspirationDie', campaignName);
+            if (biDie) {
+                if (!stats.characterAdvancement) stats.characterAdvancement = [];
+                const hasBIUseFeature = stats.characterAdvancement.some(f => f.name === 'Use Bardic Inspiration');
+                if (!hasBIUseFeature) {
+                    const grantedBy = getRuntimeValue(playerSummary.name, 'bardicInspirationGrantedBy', campaignName) || 'unknown';
+                    stats.characterAdvancement.unshift({
+                        name: 'Use Bardic Inspiration',
+                        description: `Roll your Bardic Inspiration die (1d${biDie}) and add the result to an ability check. Die granted by ${grantedBy}.`,
+                        automation: {
+                            type: 'bardic_inspiration_use',
+                        },
+                    });
+                }
+            }
+
             setPlayerStats(stats);
         };
         fetchData();
-    }, [allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024]);
+    }, [allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, biDieRuntime, campaignName]);
 
     React.useEffect(() => {
         if (!playerStats) return;
@@ -231,7 +250,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 }<hr />
             <CharSpecialActions playerStats={playerStats}></CharSpecialActions><hr />
             <CharInventory playerStats={playerStats}></CharInventory><hr />
-            <div className='no-print'><CharCharacterAdvancement playerStats={playerStats}></CharCharacterAdvancement></div>
+            <div className='no-print'><CharCharacterAdvancement playerStats={playerStats} campaignName={campaignName}></CharCharacterAdvancement></div>
         </div>}
     </React.Fragment>)
 }

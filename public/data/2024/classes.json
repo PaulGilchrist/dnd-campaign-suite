@@ -841,12 +841,11 @@
                         "level": 1,
                         "type": "class_feature",
                         "automation": {
-                            "type": "buff_ally",
-                            "buffExpression": "bardic_inspiration_die",
+                            "type": "bardic_inspiration",
                             "range": "60_ft",
                             "action": "bonus_action",
                             "uses_expression": "CHA modifier",
-                            "recharge": "short_rest",
+                            "recharge": "long_rest",
                             "casting_time": "1 bonus action"
                         }
                     },
