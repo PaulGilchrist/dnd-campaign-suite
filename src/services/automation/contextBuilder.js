@@ -6,6 +6,7 @@ import { loadNPCs } from '../npcs/npcsService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { getInnateSorceryBonus } from '../combat/buffService.js';
 import { getWolfAdvantageAgainst } from '../combat/wolfAuraUtils.js';
+import { getLionDisadvantageAgainst } from '../combat/lionAuraUtils.js';
 
 export function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects) {
     const playerName = playerStats.name;
@@ -54,6 +55,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
 
         // Grant attack advantage if Reckless Attack (or similar buff) is active
         let targetsHaveAdvantage = false;
+        let ramActive = false;
         for (const buff of activeBuffs) {
             if (buff.effect === 'advantage_attacks_disadvantage_against') {
                 if (forcedMode === undefined) {
@@ -61,11 +63,16 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                 }
                 targetsHaveAdvantage = true;
             }
+            if (buff.optionName === 'Ram') {
+                ramActive = true;
+            }
         }
 
         const autoDamageFormula = stanceDamageBonus > 0
             ? `${attack.damage}+${stanceDamageBonus}`
             : attack.damage;
+
+        const isMelee = attack.weaponType === 'melee' || attack.weaponType === 'unarmed';
 
         return {
             damageType: attack.damageType,
@@ -79,6 +86,8 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             autoDamageFormula,
             autoDamageName: attack.name,
             targetsHaveAdvantage,
+            ramActive,
+            isMelee,
            };
        });
 }
@@ -124,6 +133,14 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                     });
                     if (wolfResult.advantage) {
                         base.forcedMode = 'advantage';
+                    }
+                    const lionResult = getLionDisadvantageAgainst({
+                        attackerName: playerStats.name,
+                        campaignName,
+                        mapData,
+                    });
+                    if (lionResult.disadvantage) {
+                        base.forcedMode = 'disadvantage';
                     }
                 }
 

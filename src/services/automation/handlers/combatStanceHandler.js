@@ -14,6 +14,11 @@ function getOptionProperty(option, prop, defaultValue) {
     return val != null ? val : defaultValue;
 }
 
+function isWearingArmor(playerStats) {
+    const formula = playerStats.armorClassFormula || '';
+    return formula.includes('Armor (');
+}
+
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -103,7 +108,16 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         damageBonusExpression: auto.damageBonusExpression || '',
         blocksSpellcasting: auto.blocksSpellcasting || false,
         optionName: chosenOption ? chosenOption.name : null,
+        noArmor: chosenOption ? (chosenOption.noArmor || false) : false,
+        range: chosenOption ? (chosenOption.range || null) : null,
     };
+
+    if (chosenOption && chosenOption.flySpeed) {
+        const blockedByArmor = chosenOption.noArmor && isWearingArmor(playerStats);
+        if (!blockedByArmor) {
+            buff.effect = 'fly_speed_equals_walk_speed';
+        }
+    }
     const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
     const activeBuffs = Array.isArray(stored) ? stored : [];
     const newBuffs = [...activeBuffs, buff];
@@ -131,6 +145,15 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
             optionEffects.push('You can take the Disengage and Dash action as part of this Bonus Action. While raging, you can take a Bonus Action to do both again.');
         } else if (chosenOption.name === 'Wolf') {
             optionEffects.push('While raging, allies have Advantage on attack rolls against enemies within 5 feet of you.');
+        } else if (chosenOption.name === 'Falcon') {
+            optionEffects.push('While raging, you have a Fly Speed equal to your Speed if you are not wearing armor.');
+        } else if (chosenOption.name === 'Lion') {
+            optionEffects.push('While raging, enemies within 5 feet of you have Disadvantage on attack rolls against targets other than you or another Barbarian with this option active.');
+        } else if (chosenOption.name === 'Ram') {
+            optionEffects.push('While raging, you can cause a Large or smaller creature to have the Prone condition when you hit it with a melee attack.');
+        }
+        if (chosenOption.name === 'Falcon' && chosenOption.flySpeed && chosenOption.noArmor && isWearingArmor(playerStats)) {
+            optionEffects.push('Blocked because you are wearing armor.');
         }
         description = `${chosenOption.name} chosen. ${optionEffects.join(' ')} (${currentResource - 1} use(s) remaining)`;
     }

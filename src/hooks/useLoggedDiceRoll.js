@@ -11,7 +11,7 @@ import {
 } from '../services/rules/applyDamage.js';
 import { sendSavePrompt, sendSaveResult } from '../services/combat/savePromptService.js';
 import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../services/rules/aoeService.js';
-import { getRuntimeValue } from '../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
 import { clearAllExpirationEffects } from '../services/rules/expirations.js';
 import { loadCombatSummary, getCombatSummary } from '../services/encounters/combatData.js';
 import { saveLastDamageEvent } from '../hooks/useMetamagic.js';
@@ -593,7 +593,35 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         applyResult = applyDamageToTarget(combatSummary, target.name, total, [damageType], campaignName, null);
        }
 
-     logEntry({
+      // Ram: apply Prone on melee hit from Power of the Wilds
+      if (context?.ramActive && context?.isMelee && target && applyResult) {
+        const isLargeOrSmaller = !target.size || ['Tiny', 'Small', 'Medium', 'Large'].includes(target.size);
+        if (isLargeOrSmaller) {
+          if (target.type === 'player') {
+            const conditions = getRuntimeValue(target.name, 'activeConditions', campaignName) || [];
+            if (Array.isArray(conditions) && !conditions.some(c => String(c).toLowerCase() === 'prone')) {
+              setRuntimeValue(target.name, 'activeConditions', [...conditions, 'Prone'], campaignName);
+            }
+          } else {
+            target.conditions = target.conditions || [];
+            if (!target.conditions.some(c => String(c.key).toLowerCase() === 'prone')) {
+              target.conditions.push({ key: 'prone' });
+              storage.set('combatSummary', combatSummary, campaignName);
+            }
+          }
+          logEntry({
+            type: 'condition',
+            action: 'applied',
+            characterName: target.name,
+            condition: 'Prone',
+            reason: 'Power of the Wilds (Ram)',
+            timestamp: Date.now(),
+          });
+          window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+        }
+      }
+
+      logEntry({
         type: 'roll',
           characterName,
            rollType: 'damage',

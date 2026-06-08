@@ -47,6 +47,9 @@ function CombatStanceModal({ action, playerStats, campaignName, onClose }) {
                             if (opt.name === 'Bear') effects.push('Resistance to all damage except Force, Necrotic, Psychic, Radiant');
                             if (opt.name === 'Eagle') effects.push('Disengage and Dash as part of the bonus action; repeatable each turn while raging');
                             if (opt.name === 'Wolf') effects.push('Allies have Advantage on attack rolls against enemies within 5 ft of you');
+                            if (opt.name === 'Falcon') effects.push('Fly Speed equal to your Speed while raging (no armor)');
+                            if (opt.name === 'Lion') effects.push('Enemies within 5 ft have Disadvantage on attacks against targets other than you');
+                            if (opt.name === 'Ram') effects.push('Melee hits cause Large or smaller creatures to have the Prone condition');
                             const isSelected = selected === opt.name;
                             return (
                                 <label key={i} style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: isSelected ? 'rgba(255,255,255,0.15)' : 'transparent', border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent' }}>
