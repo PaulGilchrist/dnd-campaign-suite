@@ -401,7 +401,7 @@ function buildAttackInfo(feature, playerStats) {
             const damage = scaling?.damage || auto.damage || ''
             const uses = resolveUses(playerStats, auto.uses)
             const saveDc = auto.saveDc === 'ability'
-                ? getSaveDc(playerStats, 'CON', prof)
+                ? getSaveDc(playerStats, auto.saveAbility || 'CON', prof)
                 : auto.saveDc || 10
             return {
                 type: 'save_attack',
@@ -410,6 +410,7 @@ function buildAttackInfo(feature, playerStats) {
                 damageType: auto.damageType || '',
                 saveType: auto.saveType || 'DEX',
                 saveDc,
+                saveAbility: auto.saveAbility || 'CON',
                 shape: auto.shape || '',
                 conditionInflicted: auto.conditionInflicted || null,
                 duration: auto.duration || '',

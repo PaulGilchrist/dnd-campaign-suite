@@ -189,10 +189,47 @@
     }
   },
   {
+    "index": "animal-messenger",
+    "name": "Animal Messenger",
+    "description": [
+      "Level 2 Enchantment (Bard, Druid, Ranger) Casting Time: Action or Ritual Range: 30 feet Components: V, S, M (a morsel of food) Duration: 24 hours A Tiny Beast of your choice that you can see within range must succeed on a Charisma saving throw, or it attempts to deliver a message for you (if the target's Challenge Rating isn't 0, it automatically succeeds). You specify a location you have visited and a recipient who matches a general description, such as \"a person dressed in the uniform of the town guard\" or \"a red-haired dwarf wearing a pointed hat.\" You also communicate a message of up to twenty-five words. The Beast travels for the duration toward the specified location, covering about 25 miles per 24 hours or 50 miles if the Beast can fly.<br/>When the Beast arrives, it delivers your message to the creature that you described, mimicking your communication. If the Beast doesn't reach its destination before the spell ends, the message is lost, and the Beast returns to where you cast the spell.<br/><b>Using a Higher-Level Spell Slot.</b> The spell's duration increases by 48 hours for each spell slot level above 2."
+    ],
+    "range": "30 feet",
+    "components": [
+      "V",
+      "S",
+      "M"
+    ],
+    "material": "a morsel of food",
+    "ritual": true,
+    "duration": "24 hours",
+    "concentration": false,
+    "casting_time": "Action or Ritual",
+    "level": 2,
+    "attack_type": null,
+    "damage": null,
+    "school": "Enchantment",
+    "classes": [
+      "Bard",
+      "Druid",
+      "Ranger"
+    ],
+    "subclasses": [],
+    "area_of_effect": null,
+    "saving_throw": null,
+    "status_effects": [],
+    "spell_list_order": 2,
+    "cantrip_scaling": {},
+    "dc": {
+      "dc_type": "CHA",
+      "dc_success": "none"
+    }
+  },
+  {
     "index": "animal-shapes",
     "name": "Animal Shapes",
     "description": [
-      "Level 8 Transmutation (Druid) Casting Time: Action Range: 30 feet Components: V, S Duration: 24 hours Choose any number of willing creatures that you can see within range. Each target shifts into a Large or smaller Beast of your choice that has a Challenge Rating of 4 or lower. You can choose a different form for each target. On later turns, you can take a Magic action to transform the targets again. A target's game statistics are replaced by the chosen Beast's statistics, but the target retains its creature type; Hit Points; Hit Point Dice; alignment; ability to communicate; and Intelligence, Wisdom, and Charisma scores. The target's actions are limited by the Beast form's anatomy, and it can't cast spells. The target's equipment melds into the new form, and the target can't use any of that equipment while in that form. The target gains a number of Temporary Hit Points equal to the Beast form's Hit Points. The transformation lasts for the duration for each target, until the target has no Temporary Hit Points, or until the target leaves the form as a Bonus Action."
+      "Level 8 Transmutation (Druid) Casting Time: Action Range: 30 feet Components: V, S Duration: 24 hours Choose any number of willing creatures that you can see within range. Each target shifts into a Large or smaller Beast of your choice that has a Challenge Rating of 4 or lower. You can choose a different form for each target. On later turns, you can take a Magic action to transform the targets again. A target's game statistics are replaced by the chosen Beast's statistics, but the target retains its creature type; Hit Points; Hit Point Dice; alignment; ability to communicate; and Intelligence, Wisdom, and Charisma scores. The target's actions are limited by the Beast form's anatomy, and it can't cast spells. The target's equipment melds into the new form, and the target can't use any of that equipment while in that form. The target gains a number of Temporary Hit Points equal to the Hit Points of the first form into which it shape-shifts. These Temporary Hit Points vanish if any remain when the spell ends. The transformation lasts for the duration or until the target ends it as a Bonus Action."
     ],
     "range": "30 feet",
     "components": [
@@ -318,6 +355,43 @@
     "cantrip_scaling": {}
   },
   {
+    "index": "antilife-shell",
+    "name": "Antilife Shell",
+    "description": [
+      "<p>An aura extends from you in a 10-foot Emanation for the duration. The aura prevents creatures other than Constructs and Undead from passing or reaching through it. An affected creature can cast spells or make attacks with Ranged or Reach weapons through the barrier.</p><p>If you move so that an affected creature is forced to pass through the barrier, the spell ends.</p>"
+    ],
+    "range": "Self",
+    "components": [
+      "V",
+      "S"
+    ],
+    "material": null,
+    "ritual": false,
+    "duration": "Concentration, up to 1 hour",
+    "concentration": true,
+    "casting_time": "Action",
+    "level": 5,
+    "attack_type": null,
+    "damage": null,
+    "school": "Abjuration",
+    "classes": [
+      "Druid"
+    ],
+    "subclasses": [],
+    "area_of_effect": {
+      "shape": "emanation",
+      "size": "10-foot Emanation"
+    },
+    "saving_throw": null,
+    "status_effects": [],
+    "spell_list_order": 5,
+    "cantrip_scaling": {},
+    "dc": {
+      "dc_type": "CON",
+      "dc_success": "none"
+    }
+  },
+  {
     "index": "antipathy-sympathy",
     "name": "Antipathy/Sympathy",
     "description": [
@@ -417,6 +491,37 @@
     "saving_throw": null,
     "status_effects": [],
     "spell_list_order": 6,
+    "cantrip_scaling": {}
+  },
+  {
+    "index": "arcane-lock",
+    "name": "Arcane Lock",
+    "description": [
+      "You touch a closed door, window, gate, container, or hatch and magically lock it for the duration. This lock can't be unlocked by any nonmagical means. You and any creatures you designate when you cast the spell can open and close the object despite the lock. You can also set a password that, when spoken within 5 feet of the object, unlocks it for 1 minute."
+    ],
+    "range": "Touch",
+    "components": [
+      "V",
+      "S",
+      "M"
+    ],
+    "material": "gold dust worth 25+ GP, which the spell consumes",
+    "ritual": false,
+    "duration": "Until dispelled",
+    "concentration": false,
+    "casting_time": "Action",
+    "level": 2,
+    "attack_type": null,
+    "damage": null,
+    "school": "Abjuration",
+    "classes": [
+      "Wizard"
+    ],
+    "subclasses": [],
+    "area_of_effect": null,
+    "saving_throw": null,
+    "status_effects": [],
+    "spell_list_order": 2,
     "cantrip_scaling": {}
   },
   {
@@ -776,6 +881,43 @@
     }
   },
   {
+    "index": "bane",
+    "name": "Bane",
+    "description": [
+      "<p>Level 1 Enchantment (Bard, Cleric, Warlock) Casting Time: Action Range: 30 feet Components: V, S, M (a drop of blood) Duration: Concentration, up to 1 minute Up to three creatures of your choice that you can see within range must each make a Charisma saving throw. Whenever a target that fails this save makes an attack roll or a saving throw before the spell ends, the target must subtract 1d4 from the attack roll or save.</p><p><b>Using a Higher-Level Spell Slot.</b> You can target one additional creature for each spell slot level above 1.</p>"
+    ],
+    "range": "30 feet",
+    "components": [
+      "V",
+      "S",
+      "M"
+    ],
+    "material": "a drop of blood",
+    "ritual": false,
+    "duration": "Concentration, up to 1 minute",
+    "concentration": true,
+    "casting_time": "Action",
+    "level": 1,
+    "attack_type": null,
+    "damage": null,
+    "school": "Enchantment",
+    "classes": [
+      "Bard",
+      "Cleric",
+      "Warlock"
+    ],
+    "subclasses": [],
+    "area_of_effect": null,
+    "saving_throw": null,
+    "status_effects": [],
+    "spell_list_order": 1,
+    "cantrip_scaling": {},
+    "dc": {
+      "dc_type": "CHA",
+      "dc_success": "none"
+    }
+  },
+  {
     "index": "banishment",
     "name": "Banishment",
     "description": [
@@ -874,6 +1016,42 @@
     "status_effects": [],
     "spell_list_order": 2,
     "cantrip_scaling": {}
+  },
+  {
+    "index": "barkskin",
+    "name": "Barkskin",
+    "description": [
+      "<p>You touch a willing creature. Until the spell ends, the target's skin assumes a bark-like appearance, and the target has an Armor Class of 17 if its AC is lower than that.</p>"
+    ],
+    "range": "Touch",
+    "components": [
+      "V",
+      "S",
+      "M"
+    ],
+    "material": "a handful of bark",
+    "ritual": false,
+    "duration": "1 hour",
+    "concentration": false,
+    "casting_time": "Bonus Action",
+    "level": 2,
+    "attack_type": null,
+    "damage": null,
+    "school": "Transmutation",
+    "classes": [
+      "Druid",
+      "Ranger"
+    ],
+    "subclasses": [],
+    "area_of_effect": null,
+    "saving_throw": null,
+    "status_effects": [],
+    "spell_list_order": 2,
+    "cantrip_scaling": {},
+    "dc": {
+      "dc_type": "WIS",
+      "dc_success": "none"
+    }
   },
   {
     "index": "befuddlement",
@@ -2431,10 +2609,10 @@
       "damage_type": "Lightning, Thunder, Fire, or Cold",
       "damage_at_slot_level": {
         "5": "8d8",
-        "6": "10d8",
-        "7": "12d8",
-        "8": "14d8",
-        "9": "16d8"
+        "6": "9d8",
+        "7": "10d8",
+        "8": "11d8",
+        "9": "12d8"
       }
     },
     "school": "Conjuration",
@@ -2476,9 +2654,9 @@
       "damage_type": "Psychic",
       "damage_at_slot_level": {
         "6": "3d12",
-        "7": "5d12",
-        "8": "7d12",
-        "9": "9d12"
+        "7": "4d12",
+        "8": "5d12",
+        "9": "6d12"
       }
     },
     "school": "Conjuration",
@@ -2516,11 +2694,11 @@
       "damage_type": "Acid, Cold, Fire, or Lightning",
       "damage_at_slot_level": {
         "4": "2d8",
-        "5": "4d8",
-        "6": "6d8",
-        "7": "8d8",
-        "8": "10d8",
-        "9": "12d8"
+        "5": "3d8",
+        "6": "4d8",
+        "7": "5d8",
+        "8": "6d8",
+        "9": "7d8"
       }
     },
     "school": "Conjuration",
@@ -5568,6 +5746,43 @@
     }
   },
   {
+    "index": "find-the-path",
+    "name": "Find the Path",
+    "description": [
+      "<p>You magically sense the most direct physical route to a location you name. You must be familiar with the location, and the spell fails if you name a destination on another plane of existence, a moving destination (such as a mobile fortress), or an unspecific destination (such as \"a green dragon's lair\"). For the duration, as long as you are on the same plane of existence as the destination, you know how far it is and in what direction it lies. Whenever you face a choice of paths along the way there, you know which path is the most direct.</p>"
+    ],
+    "range": "Self",
+    "components": [
+      "V",
+      "S",
+      "M"
+    ],
+    "material": "a set of divination tools-such as cards or runes-worth 100+ GP",
+    "ritual": false,
+    "duration": "Concentration, up to 1 day",
+    "concentration": true,
+    "casting_time": "1 minute",
+    "level": 6,
+    "attack_type": null,
+    "damage": null,
+    "school": "Divination",
+    "classes": [
+      "Bard",
+      "Cleric",
+      "Druid"
+    ],
+    "subclasses": [],
+    "area_of_effect": null,
+    "saving_throw": null,
+    "status_effects": [],
+    "spell_list_order": 6,
+    "cantrip_scaling": {},
+    "dc": {
+      "dc_type": "WIS",
+      "dc_success": "none"
+    }
+  },
+  {
     "index": "fly",
     "name": "Fly",
     "description": [
@@ -6090,6 +6305,40 @@
     "status_effects": [],
     "spell_list_order": 6,
     "cantrip_scaling": {}
+  },
+  {
+    "index": "giant-insect",
+    "name": "Giant Insect",
+    "description": [
+      "<p>You summon a giant centipede, spider, or wasp (chosen when you cast the spell). It manifests in an unoccupied space you can see within range and uses the Giant Insect stat block. The form you choose determines certain details in its stat block. The creature disappears when it drops to 0 Hit Points or when the spell ends.</p><p>The creature is an ally to you and your allies. In combat, the creature shares your Initiative count, but it takes its turn immediately after yours. It obeys your verbal commands (no action required by you). If you don't issue any, it takes the Dodge action and uses its movement to avoid danger.</p><p><b>Using a Higher-Level Spell Slot.</b> Use the spell slot's level for the spell's level in the stat block.</p>"
+    ],
+    "range": "60 feet",
+    "components": [
+      "V",
+      "S"
+    ],
+    "material": null,
+    "ritual": false,
+    "duration": "Concentration, up to 10 minutes",
+    "concentration": true,
+    "casting_time": "Action",
+    "level": 4,
+    "attack_type": null,
+    "damage": null,
+    "school": "Conjuration",
+    "classes": [
+      "Druid"
+    ],
+    "subclasses": [],
+    "area_of_effect": null,
+    "saving_throw": null,
+    "status_effects": [],
+    "spell_list_order": 4,
+    "cantrip_scaling": {},
+    "dc": {
+      "dc_type": "WIS",
+      "dc_success": "none"
+    }
   },
   {
     "index": "glyph-of-warding",
@@ -7151,6 +7400,49 @@
     }
   },
   {
+    "index": "inflict-wounds",
+    "name": "Inflict Wounds",
+    "description": [
+      "<p>A creature you touch makes a Constitution saving throw, taking 2d10 Necrotic damage on a failed save or half as much damage on a successful one.</p><p><b>Using a Higher-Level Spell Slot.</b> The damage increases by 1d10 for each spell slot level above 1.</p>"
+    ],
+    "range": "Touch",
+    "components": [
+      "V",
+      "S"
+    ],
+    "material": null,
+    "ritual": false,
+    "duration": "Instantaneous",
+    "concentration": false,
+    "casting_time": "Action",
+    "level": 1,
+    "attack_type": "melee",
+    "damage": {
+      "damage_type": "Necrotic",
+      "damage_at_slot_level": {
+        "1": "2d10",
+        "2": "3d10",
+        "3": "4d10",
+        "4": "5d10",
+        "5": "6d10",
+        "6": "7d10",
+        "7": "8d10",
+        "8": "9d10",
+        "9": "10d10"
+      }
+    },
+    "school": "Necromancy",
+    "classes": [
+      "Cleric"
+    ],
+    "subclasses": [],
+    "area_of_effect": null,
+    "saving_throw": null,
+    "status_effects": [],
+    "spell_list_order": 1,
+    "cantrip_scaling": {}
+  },
+  {
     "index": "hunters-mark",
     "name": "Hunter's Mark",
     "description": [
@@ -8008,6 +8300,86 @@
     "status_effects": [],
     "spell_list_order": 2,
     "cantrip_scaling": {}
+  },
+  {
+    "index": "locate-creature",
+    "name": "Locate Creature",
+    "description": [
+      "<p>Describe or name a creature that is familiar to you. You sense the direction to the creature's location if that creature is within 1,000 feet of you. If the creature is moving, you know the direction of its movement.</p><p>The spell can locate a specific creature known to you or the nearest creature of a specific kind (such as a human or a unicorn) if you have seen such a creature up close—within 30 feet—at least once. If the creature you described or named is in a different form, such as under the effects of a Flesh to Stone or Polymorph spell, this spell doesn't locate the creature.</p><p>This spell can't locate a creature if any thickness of lead blocks a direct path between you and the creature.</p>"
+    ],
+    "range": "Self",
+    "components": [
+      "V",
+      "S",
+      "M"
+    ],
+    "material": "fur from a bloodhound",
+    "ritual": false,
+    "duration": "Concentration, up to 1 hour",
+    "concentration": true,
+    "casting_time": "Action",
+    "level": 4,
+    "attack_type": null,
+    "damage": null,
+    "school": "Divination",
+    "classes": [
+      "Bard",
+      "Cleric",
+      "Druid",
+      "Paladin",
+      "Ranger",
+      "Wizard"
+    ],
+    "subclasses": [],
+    "area_of_effect": null,
+    "saving_throw": null,
+    "status_effects": [],
+    "spell_list_order": 4,
+    "cantrip_scaling": {},
+    "dc": {
+      "dc_type": "WIS",
+      "dc_success": "none"
+    }
+  },
+  {
+    "index": "locate-object",
+    "name": "Locate Object",
+    "description": [
+      "<p>Describe or name an object that is familiar to you. You sense the direction to the object's location if that object is within 1,000 feet of you. If the object is in motion, you know the direction of its movement.</p><p>The spell can locate a specific object known to you if you have seen it up close—within 30 feet—at least once. Alternatively, the spell can locate the nearest object of a particular kind, such as a certain kind of apparel, jewelry, furniture, tool, or weapon.</p><p>This spell can't locate an object if any thickness of lead blocks a direct path between you and the object.</p>"
+    ],
+    "range": "Self",
+    "components": [
+      "V",
+      "S",
+      "M"
+    ],
+    "material": "a forked twig",
+    "ritual": false,
+    "duration": "Concentration, up to 10 minutes",
+    "concentration": true,
+    "casting_time": "Action",
+    "level": 2,
+    "attack_type": null,
+    "damage": null,
+    "school": "Divination",
+    "classes": [
+      "Bard",
+      "Cleric",
+      "Druid",
+      "Paladin",
+      "Ranger",
+      "Wizard"
+    ],
+    "subclasses": [],
+    "area_of_effect": null,
+    "saving_throw": null,
+    "status_effects": [],
+    "spell_list_order": 2,
+    "cantrip_scaling": {},
+    "dc": {
+      "dc_type": "WIS",
+      "dc_success": "none"
+    }
   },
   {
     "index": "longstrider",
@@ -9080,6 +9452,123 @@
     "cantrip_scaling": {}
   },
   {
+    "index": "magic-weapon",
+    "name": "Magic Weapon",
+    "description": [
+      "<p>You touch a nonmagical weapon. Until the spell ends, that weapon becomes a magic weapon with a +1 bonus to attack rolls and damage rolls. The spell ends early if you cast it again.</p><p><b>Using a Higher-Level Spell Slot.</b> The bonus increases to +2 with a level 3-5 spell slot. The bonus increases to +3 with a level 6+ spell slot.</p>"
+    ],
+    "range": "Touch",
+    "components": [
+      "V",
+      "S"
+    ],
+    "material": null,
+    "ritual": false,
+    "duration": "1 hour",
+    "concentration": false,
+    "casting_time": "Bonus Action",
+    "level": 2,
+    "attack_type": null,
+    "damage": null,
+    "school": "Transmutation",
+    "classes": [
+      "Paladin",
+      "Ranger",
+      "Sorcerer",
+      "Wizard"
+    ],
+    "subclasses": [],
+    "area_of_effect": null,
+    "saving_throw": null,
+    "status_effects": [],
+    "spell_list_order": 2,
+    "cantrip_scaling": {},
+    "dc": {
+      "dc_type": "INT",
+      "dc_success": "none"
+    }
+  },
+  {
+    "index": "melfs-acid-arrow",
+    "name": "Melf's Acid Arrow",
+    "description": [
+      "<p>A shimmering green arrow streaks toward a target within range and bursts in a spray of acid. Make a ranged spell attack against the target. On a hit, the target takes 4d4 Acid damage and 2d4 Acid damage at the end of its next turn. On a miss, the arrow splashes the target with acid for half as much of the initial damage only.</p><p><b>Using a Higher-Level Spell Slot.</b> The damage (both initial and later) increases by 1d4 for each spell slot level above 2.</p>"
+    ],
+    "range": "90 feet",
+    "components": [
+      "V",
+      "S",
+      "M"
+    ],
+    "material": "powdered rhubarb leaf",
+    "ritual": false,
+    "duration": "Instantaneous",
+    "concentration": false,
+    "casting_time": "Action",
+    "level": 2,
+    "attack_type": "ranged",
+    "damage": {
+      "damage_type": "Acid",
+      "damage_at_slot_level": {
+        "2": "4d4",
+        "3": "5d4",
+        "4": "6d4",
+        "5": "7d4",
+        "6": "8d4",
+        "7": "9d4",
+        "8": "10d4",
+        "9": "11d4"
+      }
+    },
+    "school": "Evocation",
+    "classes": [
+      "Wizard"
+    ],
+    "subclasses": [],
+    "area_of_effect": null,
+    "saving_throw": null,
+    "status_effects": [],
+    "spell_list_order": 2,
+    "cantrip_scaling": {}
+  },
+  {
+    "index": "message",
+    "name": "Message",
+    "description": [
+      "<p>You point toward a creature within range and whisper a message. The target (and only the target) hears the message and can reply in a whisper that only you can hear. You can cast this spell through solid objects if you are familiar with the target and know it is beyond the barrier. Magical silence; 1 foot of stone, metal, or wood; or a thin sheet of lead blocks the spell.</p>"
+    ],
+    "range": "120 feet",
+    "components": [
+      "S",
+      "M"
+    ],
+    "material": "a copper wire",
+    "ritual": false,
+    "duration": "1 round",
+    "concentration": false,
+    "casting_time": "Action",
+    "level": 0,
+    "attack_type": null,
+    "damage": null,
+    "school": "Transmutation",
+    "classes": [
+      "Bard",
+      "Druid",
+      "Sorcerer",
+      "Wizard"
+    ],
+    "subclasses": [],
+    "area_of_effect": null,
+    "saving_throw": null,
+    "status_effects": [],
+    "spell_list_order": 0,
+    "cantrip_scaling": {},
+    "dc": {
+      "dc_type": "INT",
+      "dc_success": "none"
+    }
+  },
+  {
     "index": "mordenskains-sword",
     "name": "Mordenkainen's Sword",
     "description": [
@@ -9714,7 +10203,7 @@
     "index": "polymorph",
     "name": "Polymorph",
     "description": [
-      "<p>You attempt to transform a creature that you can see within range into a Beast. The target must succeed on a Wisdom saving throw or shape-shift into a Beast form for the duration. That form can be any Beast you choose that has a Challenge Rating equal to or less than the target's (or the target's level if it doesn't have a Challenge Rating). The target's game statistics are replaced by the stat block of the chosen Beast, but the target retains its alignment, personality, creature type, Hit Points, and Hit Point Dice.</p><p>The target gains a number of Temporary Hit Points equal to the Hit Points of the Beast form. The spell ends early on the target if it has no Temporary Hit Points left.</p><p>The target is limited in the actions it can perform by the anatomy of its new form, and it can't speak or cast spells.</p><p>The target's gear melds into the new form. The creature can't use or otherwise benefit from any of that equipment.</p>"
+      "<p>You attempt to transform a creature that you can see within range into a Beast. The target must succeed on a Wisdom saving throw or shape-shift into a Beast form for the duration. That form can be any Beast you choose that has a Challenge Rating equal to or less than the target's (or the target's level if it doesn't have a Challenge Rating). The target's game statistics are replaced by the stat block of the chosen Beast, but the target retains its alignment, personality, creature type, Hit Points, and Hit Point Dice.</p><p>The target gains a number of Temporary Hit Points equal to the Hit Points of the Beast form. These Temporary Hit Points vanish if any remain when the spell ends.The spell ends early on the target if it has no Temporary Hit Points left.</p><p>The target is limited in the actions it can perform by the anatomy of its new form, and it can't speak or cast spells.</p><p>The target's gear melds into the new form. The creature can't use or otherwise benefit from any of that equipment.</p>"
     ],
     "range": "60 feet",
     "components": [
@@ -10402,6 +10891,42 @@
     }
   },
   {
+    "index": "rarys-telepathic-bond",
+    "name": "Rary's Telepathic Bond",
+    "description": [
+      "<p>You forge a telepathic link among up to eight willing creatures of your choice within range, psychically linking each creature to all the others for the duration. Creatures that can't communicate in any languages aren't affected by this spell.</p><p>Until the spell ends, the targets can communicate telepathically through the bond whether or not they share a language. The communication is possible over any distance, though it can't extend to other planes of existence.</p>"
+    ],
+    "range": "30 feet",
+    "components": [
+      "V",
+      "S",
+      "M"
+    ],
+    "material": "two eggs",
+    "ritual": true,
+    "duration": "1 hour",
+    "concentration": false,
+    "casting_time": "Action or Ritual",
+    "level": 5,
+    "attack_type": null,
+    "damage": null,
+    "school": "Divination",
+    "classes": [
+      "Bard",
+      "Wizard"
+    ],
+    "subclasses": [],
+    "area_of_effect": null,
+    "saving_throw": null,
+    "status_effects": [],
+    "spell_list_order": 5,
+    "cantrip_scaling": {},
+    "dc": {
+      "dc_type": "INT",
+      "dc_success": "none"
+    }
+  },
+  {
     "index": "ray-of-sickness",
     "name": "Ray of Sickness",
     "description": [
@@ -11056,7 +11581,7 @@
     "index": "shapechange",
     "name": "Shapechange",
     "description": [
-      "<p>You shape-shift into another creature for the duration or until you take a Magic action to shape-shift into a different eligible form. The new form must be of a creature that has a Challenge Rating no higher than your level or Challenge Rating. You must have seen the sort of creature before, and it can't be a Construct or an Undead.</p><p>When you shape-shift, you gain a number of Temporary Hit Points equal to the Hit Points of the form. The spell ends early if you have no Temporary Hit Points left.</p><p>Your game statistics are replaced by the stat block of the chosen form, but you retain your creature type; alignment; personality; Intelligence, Wisdom, and Charisma scores; Hit Points; Hit Point Dice; proficiencies; and ability to communicate. If you have the Spellcasting feature, you retain it too.</p><p>Upon shape-shifting, you determine whether your equipment drops to the ground or changes in size and shape to fit the new form while you're in it.</p>"
+      "<p>You shape-shift into another creature for the duration or until you take a Magic action to shape-shift into a different eligible form. The new form must be of a creature that has a Challenge Rating no higher than your level or Challenge Rating. You must have seen the sort of creature before, and it can't be a Construct or an Undead.</p><p>When you cast the spell, you gain a number of Temporary Hit Points equal to the Hit Points of the first form into which you shape-shift. These Temporary Hit Points vanish if any remain when the spell ends.</p><p>Your game statistics are replaced by the stat block of the chosen form, but you retain your creature type; alignment; personality; Intelligence, Wisdom, and Charisma scores; Hit Points; Hit Point Dice; proficiencies; and ability to communicate. If you have the Spellcasting feature, you retain it too.</p><p>Upon shape-shifting, you determine whether your equipment drops to the ground or changes in size and shape to fit the new form while you're in it.</p>"
     ],
     "range": "Self",
     "components": [
@@ -13253,7 +13778,7 @@
     "index": "true-polymorph",
     "name": "True Polymorph",
     "description": [
-      "<p>Choose one creature or nonmagical object that you can see within range. The creature shape-shifts into a different creature or a nonmagical object, or the object shape-shifts into a creature (the object must be neither worn or carried). The transformation lasts for the duration or until the target dies or is destroyed, but if you maintain Concentration on this spell for the full duration, the spell lasts until dispelled.</p><p>An unwilling creature can make a Wisdom saving throw, and if it succeeds, it isn't affected by this spell.</p><p><strong>Creature into Creature.</strong> If you turn a creature into another kind of creature, the new form can be any kind you choose that has a Challenge Rating equal to or less than the target's Challenge Rating or level. The target's game statistics are replaced by the stat block of the new form, but it retains its Hit Points, Hit Point Dice, alignment, and personality. The target gains a number of Temporary Hit Points equal to the Hit Points of the new form. The spell ends early on the target if it has no Temporary Hit Points left. The target is limited in the actions it can perform by the anatomy of its new form, and it can't speak or cast spells. The target's gear melds into the new form. The creature can't use or otherwise benefit from any of that equipment.</p><p><strong>Object into Creature.</strong> You can turn an object into any kind of creature, as long as the creature's size is no larger than the object's size and the creature has a Challenge Rating of 9 or lower. The creature is Friendly to you and your allies. In combat, it takes its turns immediately after yours, and it obeys your commands. If the spell lasts more than an hour, you no longer control the creature. It might remain Friendly to you, depending on how you have treated it.</p><p><strong>Creature into Object.</strong> If you turn a creature into an object, it transforms along with whatever it is wearing and carrying into that form, as long as the object's size is no larger than the creature's size. The creature's statistics become those of the object, and the creature has no memory of time spent in this form after the spell ends and it returns to normal.</p>"
+      "<p>Choose one creature or nonmagical object that you can see within range. The creature shape-shifts into a different creature or a nonmagical object, or the object shape-shifts into a creature (the object must be neither worn or carried). The transformation lasts for the duration or until the target dies or is destroyed, but if you maintain Concentration on this spell for the full duration, the spell lasts until dispelled.</p><p>An unwilling creature can make a Wisdom saving throw, and if it succeeds, it isn't affected by this spell.</p><p><strong>Creature into Creature.</strong> If you turn a creature into another kind of creature, the new form can be any kind you choose that has a Challenge Rating equal to or less than the target's Challenge Rating or level. These Temporary Hit Points vanish if any remain when the spell ends.. The target gains a number of Temporary Hit Points equal to the Hit Points of the new form. The spell ends early on the target if it has no Temporary Hit Points left. The target is limited in the actions it can perform by the anatomy of its new form, and it can't speak or cast spells. The target's gear melds into the new form. The creature can't use or otherwise benefit from any of that equipment.</p><p><strong>Object into Creature.</strong> You can turn an object into any kind of creature, as long as the creature's size is no larger than the object's size and the creature has a Challenge Rating of 9 or lower. The creature is Friendly to you and your allies. In combat, it takes its turns immediately after yours, and it obeys your commands. If the spell lasts more than an hour, you no longer control the creature. It might remain Friendly to you, depending on how you have treated it.</p><p><strong>Creature into Object.</strong> If you turn a creature into an object, it transforms along with whatever it is wearing and carrying into that form, as long as the object's size is no larger than the creature's size. The creature's statistics become those of the object, and the creature has no memory of time spent in this form after the spell ends and it returns to normal.</p>"
     ],
     "range": "30 feet",
     "components": [

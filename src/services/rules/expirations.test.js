@@ -94,7 +94,7 @@ describe('addExpiration', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'Goblin',
       KEY,
-      [{ target: 'Human', effects: [{ type: 'stunned' }], appliedRound: 1 }],
+      [{ target: 'Human', effects: [{ type: 'stunned' }], appliedRound: 1, expiryRounds: 1 }],
       'MyCampaign'
     );
   });
@@ -112,7 +112,7 @@ describe('addExpiration', () => {
       KEY,
       [
         ...existingList,
-        { target: 'Human', effects: [{ type: 'stunned' }], appliedRound: 1 },
+        { target: 'Human', effects: [{ type: 'stunned' }], appliedRound: 1, expiryRounds: 1 },
       ],
       'MyCampaign'
     );

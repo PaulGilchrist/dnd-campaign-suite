@@ -73,6 +73,13 @@ export async function handle(action, playerStats, campaignName, mapName) {
             conditionName,
             saveType,
             rangeFeet,
+            durationRounds: (() => {
+                const lower = (auto.duration || '').toLowerCase();
+                if (lower.startsWith('1_minute')) return 10;
+                const match = lower.match(/(\d+)_round/);
+                if (match) return parseInt(match[1], 10);
+                return undefined;
+            })(),
          },
      };
 }

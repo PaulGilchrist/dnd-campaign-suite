@@ -545,12 +545,13 @@
                             "damageType": "",
                             "saveType": "WIS",
                             "saveDc": "ability",
+                            "saveAbility": "STR",
                             "conditionInflicted": "Frightened",
                             "shape": "emanation_30ft",
                             "duration": "1_minute_or_success_save",
                             "bonusAction": true,
                             "recharge": "long_rest_or_expend_rage",
-                            "casting_time": "1 action"
+                            "casting_time": "1 bonus action"
                         }
                     }
                 ],

@@ -1,15 +1,16 @@
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import utils from '../ui/utils.js';
+import storage from '../ui/storage.js';
 import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary } from '../encounters/combatData.js';
 
 const KEY = 'pendingExpirations';
 
-export function addExpiration(attackerName, targetName, effects, campaignName) {
+export function addExpiration(attackerName, targetName, effects, campaignName, rounds) {
     const list = getRuntimeValue(attackerName, KEY) || [];
     const currentRound = getCurrentCombatRound();
     setRuntimeValue(attackerName, KEY, [
          ...list,
-         { target: targetName, effects, appliedRound: currentRound }
+         { target: targetName, effects, appliedRound: currentRound, expiryRounds: rounds || 1 }
      ], campaignName);
 }
 
@@ -71,7 +72,8 @@ export function expireStaleEffects(campaignName) {
 
             let newEntries = [];
             for (const item of list) {
-                if (item.appliedRound < currentRound) {
+                const rounds = item.expiryRounds || 1;
+                if (currentRound >= item.appliedRound + rounds) {
                     clearExpirationEffects(item.effects, item.target, attacker.name, campaignName);
                     } else {
                       newEntries.push(item);
@@ -123,10 +125,28 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 break;
             }
 
+            case 'condition':
+                removeActiveCondition(targetName, effect.condition, campaignName);
+                removeNpcCondition(targetName, effect.condition, campaignName);
+                break;
+
             default:
                 break;
              }
           }
+}
+
+function removeNpcCondition(targetName, conditionName, campaignName) {
+    try {
+        const combatData = getCombatSummary() || {};
+        const creatures = combatData.creatures || [];
+        const creature = creatures.find(c => utils.getName(c.name) === utils.getName(targetName));
+        if (creature && creature.conditions) {
+            creature.conditions = creature.conditions.filter(c => c.key !== conditionName);
+            storage.set('combatSummary', combatData, campaignName);
+            window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+        }
+    } catch (e) { /* ignore */ }
 }
 
 function removeActiveCondition(targetName, conditionName, campaignName) {

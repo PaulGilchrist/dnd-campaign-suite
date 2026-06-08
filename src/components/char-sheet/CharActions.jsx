@@ -14,6 +14,7 @@ import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceR
 import * as mapsService from '../../services/maps/mapsService.js';
 import { computeFeatRangeEffects } from '../../services/character/featRangeService.js';
 import { hasAutomation } from '../../services/combat/automationService.js'
+import { isExhausted } from '../../services/automation/handlers/saveAttackHandler.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import utils from '../../services/ui/utils.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
@@ -519,24 +520,41 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     />
                 )}
                 {playerStats.actions.map((action) => {
-                    const isMetamagic = action.name === 'Metamagic' && action.automation?.type === 'spell_modifier';
-                    const isClickable = action.details || hasAutomation(action);
-                    const handleClick = () => {
-                        if (hasAutomation(action)) {
-                            handleAutomationAction(action);
-                        } else {
-                            setPopupHtml(buildFeatureDetailHtml(action));
-                        }
-                    };
-                    const displayName = isMetamagic ? 'Empowered Spell' : action.name;
-                    const displayDesc = isMetamagic ? getEmpoweredSpellDescription(action) : action.description;
-                    return <div key={action.name}>
-                        <b className={isClickable ? "clickable" : ""} onClick={handleClick}>{displayName}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayDesc) }}></span>
-                        {hasAutomation(action) && action.automation?.type === 'save_attack' && action.automation?.saveDc && <span className="automation-badge"> DC {action.automation.saveDc} {action.automation.saveType}</span>}
-                        {hasAutomation(action) && action.automation?.type === 'healing_pool' && <span className="automation-badge"> Pool: {action.automation.pool} HP</span>}
-                        {hasAutomation(action) && action.automation?.damage && <span className="automation-badge"> {action.automation.damage} {action.automation.damageType}</span>}
-                    </div>
-                })}
+                     const auto = action.automation;
+                     const isMetamagic = action.name === 'Metamagic' && auto?.type === 'spell_modifier';
+                     const isClickable = action.details || hasAutomation(action);
+                     const isRageExpendable = auto?.recharge === 'long_rest_or_expend_rage';
+                     const exhausted = isRageExpendable && isExhausted(action, playerStats, campaignName);
+                     const handleClick = () => {
+                         if (exhausted) return;
+                         if (hasAutomation(action)) {
+                             handleAutomationAction(action);
+                         } else {
+                             setPopupHtml(buildFeatureDetailHtml(action));
+                         }
+                      };
+                     const displayName = isMetamagic ? 'Empowered Spell' : action.name;
+                     const displayDesc = isMetamagic ? getEmpoweredSpellDescription(action) : action.description;
+                     const renderRageRestore = async () => {
+                         const rageKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+                         const currentRage = Number(getRuntimeValue(playerStats.name, 'ragePoints', campaignName) ?? 0);
+                         if (currentRage <= 0) {
+                             setPopupHtml(`<b>${action.name}</b><br/>No Rage remaining to restore this feature.`);
+                             return;
+                         }
+                         await setRuntimeValue(playerStats.name, 'ragePoints', currentRage - 1, campaignName);
+                         await setRuntimeValue(playerStats.name, rageKey, 0, campaignName);
+                         setPopupHtml(`<b>${action.name}</b><br/>Expended 1 Rage to restore use.`);
+                         window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+                      };
+                     return <div key={action.name}>
+                         <b className={isClickable && !exhausted ? "clickable" : ""} onClick={handleClick}>{displayName}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayDesc) }}></span>
+                         {hasAutomation(action) && auto?.type === 'save_attack' && auto?.saveDc && <span className="automation-badge"> DC {auto.saveDc} {auto.saveType}</span>}
+                         {hasAutomation(action) && auto?.type === 'healing_pool' && <span className="automation-badge"> Pool: {auto.pool} HP</span>}
+                         {hasAutomation(action) && auto?.damage && <span className="automation-badge"> {auto.damage} {auto.damageType}</span>}
+                         {exhausted && isRageExpendable && <span className="automation-badge clickable" onClick={renderRageRestore}><i className="fa-solid fa-fire-flame-curved"></i> Restore with Rage</span>}
+                     </div>
+                 })}
                 <div><b>Base Actions:</b> {actions.join(', ')}</div>
             </div>
             <CharBonusActions

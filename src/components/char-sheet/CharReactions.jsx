@@ -58,7 +58,19 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         if (!auto) return;
 
         const result = await executeHandler(reaction, playerStats, campaignName, mapName);
-        if (result?.type === 'popup') {
+        if (!result) {
+            const html = buildFeatureDetailHtml(reaction);
+            if (html) setPopupHtml(html);
+            return;
+        }
+
+        if (result.type === 'attack_roll') {
+            const { attack, targetName } = result.payload;
+            rollAttack(attack.name, attack.hitBonus, { targetName, forcedMode: undefined });
+            return;
+        }
+
+        if (result.type === 'popup') {
             setPopupHtml(result.payload);
             return;
         }

@@ -4,12 +4,13 @@ import { getAbilityModifier } from '../../shared/abilityLookup.js';
 
 export function buildSaveDc(auto, playerStats) {
     if (auto.saveDc === 'ability') {
-        const conBonus = getAbilityModifier(playerStats.abilities, 'CON');
+        const ability = auto.saveAbility || 'CON';
+        const abilityBonus = getAbilityModifier(playerStats.abilities, ability);
         const prof = playerStats.proficiency || 0;
-        return 8 + conBonus + prof;
+        return 8 + abilityBonus + prof;
      }
     return auto.saveDc || 10;
-}
+ }
 
 export function createSaveListener(campaignName, config) {
     const promptId = utils.guid();

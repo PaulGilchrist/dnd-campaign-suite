@@ -12,6 +12,7 @@ import { handle as handleFontOfMagic } from './handlers/fontOfMagicHandler.js';
 import { handle as handleHealingPool } from './handlers/healingPoolHandler.js';
 import { handle as handleSpellModifier } from './handlers/spellModifierHandler.js';
 import { handle as handleCombatStance } from './handlers/combatStanceHandler.js';
+import { handle as handleReactionDamage } from './handlers/reactionDamageHandler.js';
 import { handle as handleAttackRider } from './handlers/attackRiderHandler.js';
 
 const HANDLER_MAP = {
@@ -41,6 +42,7 @@ const HANDLER_MAP = {
     conditional_advantage: handleGenericPopup,
     passive_rule: handleGenericPopup,
     auto_reroll: handleGenericPopup,
+    reaction_damage: handleReactionDamage,
 };
 
 export async function executeHandler(action, playerStats, campaignName, mapName) {

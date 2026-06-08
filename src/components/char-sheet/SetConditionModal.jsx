@@ -9,7 +9,7 @@ import { playerIsImmuneToCondition } from '../../services/combat/automationServi
 import utils from '../../services/ui/utils.js';
 import storage from '../../services/ui/storage.js';
 
-function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, onClose, characters, featureName = 'Abjure Foes', conditionName = 'frightened', saveType = 'WIS', rangeFeet = 60 }) {
+function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, onClose, characters, featureName = 'Abjure Foes', conditionName = 'frightened', saveType = 'WIS', rangeFeet = 60, durationRounds }) {
     const [selected, setSelected] = useState(new Set());
     const [processing, setProcessing] = useState(false);
     const [results, setResults] = useState([]);
@@ -73,9 +73,9 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
 
         addExpiration(attackerName, targetName, [
             { type: conditionKey, condition: conditionKey },
-           ], campaignName);
+           ], campaignName, durationRounds);
 
-     }, [combatSummary, attackerName, campaignName, conditionName, saveType, characters]);
+     }, [combatSummary, attackerName, campaignName, conditionName, saveType, characters, durationRounds]);
 
     const logCondition = useCallback((targetName, saveDcValue) => {
         fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
