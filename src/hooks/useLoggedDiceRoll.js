@@ -234,26 +234,28 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
            coverAcBonus: context?.coverAcBonus,
            coverReason: context?.coverReason,
               });
-      setPopupHtml({
-         type: 'd20',
-         rollType,
-         name,
-         rolls: [r1, r2],
-         bonus,
-         targetName,
-         targetAc,
-         hit,
-         isAutoMiss,
-         rangeReason: context?.rangeReason,
-         resistanceNotice: context?.resistanceNotice,
-         coverLevel: context?.coverLevel,
-         coverAcBonus: context?.coverAcBonus,
-         coverReason: context?.coverReason,
-        forcedMode: context?.forcedMode,
-        isAutoCrit: context?.isAutoCrit,
-        isCrit,
-        autoDamage,
-      });
+       setPopupHtml({
+          type: 'd20',
+          rollType,
+          name,
+          rolls: [r1, r2],
+          bonus,
+          targetName,
+          targetAc,
+          hit,
+          isAutoMiss,
+          rangeReason: context?.rangeReason,
+          resistanceNotice: context?.resistanceNotice,
+          coverLevel: context?.coverLevel,
+          coverAcBonus: context?.coverAcBonus,
+          coverReason: context?.coverReason,
+         forcedMode: context?.forcedMode,
+         isAutoCrit: context?.isAutoCrit,
+         isCrit,
+         autoDamage,
+         autoReroll: context?.autoReroll,
+         autoRerollBonus: context?.autoRerollBonus,
+       });
 
     if (rollType === 'initiative') {
         const firstName = utils.getName(characterName);

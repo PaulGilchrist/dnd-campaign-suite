@@ -8,8 +8,9 @@ const CONDITIONS_THAT_SPEED_ZERO = new Set([
 
 const CONDITION_KEYWORDS = new Set(['charmed', 'frightened', 'poison', 'magic'])
 
-function saveModifierApplies(modifier, saveType, abilityName) {
+function saveModifierApplies(modifier, saveType, abilityName, isRaging = false) {
   if (modifier.target !== 'saving_throw' && modifier.target !== 'save') return false;
+  if (modifier.condition === 'raging') return isRaging;
   if (modifier.condition === 'charmed' && saveType === 'charmed') return true;
   if (modifier.condition === 'frightened' && saveType === 'frightened') return true;
   if (modifier.condition === 'poison' && saveType === 'poison') return true;
@@ -26,10 +27,10 @@ function saveModifierApplies(modifier, saveType, abilityName) {
   return true;
 }
 
-function applySaveModifiers(effects, modifiers, saveType, abilityName) {
+function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging = false) {
   if (!modifiers || modifiers.length === 0) return;
   for (const mod of modifiers) {
-    if (!saveModifierApplies(mod, saveType, abilityName)) continue;
+    if (!saveModifierApplies(mod, saveType, abilityName, isRaging)) continue;
     if (mod.effect === 'advantage') {
       if (mod.abilities && mod.abilities.length > 0 && !abilityName) {
         effects.saveAdvantageAbilities = [...new Set([
@@ -51,7 +52,7 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName) {
     }
 }
 
-function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = []) {
+function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false) {
   const effects = {
     attackAdvantageCount: 0,
     attackDisadvantageCount: 0,
@@ -105,7 +106,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
   const activeSaveModifiers = isIncapacitated
     ? saveModifiers.filter(mod => mod.condition !== 'visible_effect')
     : saveModifiers;
-  applySaveModifiers(effects, activeSaveModifiers, null, null);
+  applySaveModifiers(effects, activeSaveModifiers, null, null, isRaging);
 
   for (const key of conditionSet) {
     switch (key) {

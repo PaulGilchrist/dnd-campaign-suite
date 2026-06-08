@@ -8,7 +8,7 @@ import './CharAbilities.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
-function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects }) {
+function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects, onReroll }) {
      const abilityDesc = buildAbilityDetailHtml(allAbilityScores);
      const { popupHtml, setPopupHtml, rollAbilityCheck, rollSavingThrow, rollSkillCheck } = useLoggedDiceRoll(playerStats.name, campaignName);
 
@@ -45,7 +45,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                 {popupHtml && (
                     <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
                         {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
-                         <DiceRollResult {...popupHtml} />}
+                         <DiceRollResult {...popupHtml} onReroll={onReroll} />}
                     </Popup>
                 )}
             <div className='abilities'>

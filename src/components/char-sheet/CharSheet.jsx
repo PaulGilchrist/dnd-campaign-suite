@@ -12,6 +12,7 @@ import CharSpells from './char-spells/CharSpells.jsx'
 import CharSummary from './char-summary/CharSummary.jsx'
 import { computeAuraComboEffects } from '../../services/combat/auraComboEffects.js';
 import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditionEffects.js'
+import { evaluateAutoExpression } from '../../services/combat/automationService.js'
 import { EXHAUSTION_LEVELS } from '../../services/combat/exhaustionRules.js'
 import './CharSheet.css'
 
@@ -125,10 +126,21 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const allSaveModifiers = [...(playerStats?.saveModifiers || []), ...stanceSaveModifiers];
     const allTargetEffects = useRuntimeValue(campaignName, 'targetEffects') ?? [];
     const myTargetEffects = allTargetEffects.filter(te => te.target === (playerSummary?.name));
-    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects);
+    const isRaging = Array.isArray(activeBuffs) && activeBuffs.some(b => b.damageBonusExpression);
+    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging);
     if (playerStats) {
         const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
         if (speedHalvedTime) conditionEffects.speedHalved = true;
+    }
+    if (conditionEffects.autoRerollBonus && playerStats) {
+        conditionEffects.autoRerollBonus = evaluateAutoExpression(conditionEffects.autoRerollBonus, playerStats);
+    }
+    if (playerStats) {
+        const fanaticalFocusUsed = getRuntimeValue(playerStats.name, 'fanaticalFocusUsed', campaignName);
+        if (fanaticalFocusUsed && conditionEffects.autoReroll) {
+            conditionEffects.autoReroll = false;
+            conditionEffects.autoRerollBonus = null;
+        }
     }
     // Reckless Attack: enemies have Advantage on attack rolls against you
     if (Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_attacks_disadvantage_against')) {
@@ -137,6 +149,19 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
     const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
     const conditionAttackMode = getNetAttackMode(conditionEffects.attackAdvantageCount, conditionEffects.attackDisadvantageCount)
+
+    const handleReroll = React.useCallback(() => {
+        if (playerStats) {
+            setRuntimeValue(playerStats.name, 'fanaticalFocusUsed', true, campaignName);
+        }
+    }, [playerStats, campaignName]);
+
+    React.useEffect(() => {
+        if (!playerStats) return;
+        if (!isRaging) {
+            setRuntimeValue(playerStats.name, 'fanaticalFocusUsed', false, campaignName);
+        }
+    }, [isRaging, playerStats, campaignName]);
 
     const [auraComboEffects, setAuraComboEffects] = React.useState(null);
     React.useEffect(() => {
@@ -172,6 +197,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 campaignName={campaignName}
                 exhaustionPenalty={exhaustionPenalty}
                 conditionEffects={conditionEffects}
+                onReroll={handleReroll}
               ></CharAbilities><hr />
 
                <CharActions

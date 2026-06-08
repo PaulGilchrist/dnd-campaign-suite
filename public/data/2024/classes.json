@@ -756,8 +756,10 @@
                         "automation": {
                             "type": "auto_reroll",
                             "trigger": "failed_save_while_raging",
+                            "target": "saving_throw",
                             "bonusExpression": "rage_damage",
                             "oncePerRage": true,
+                            "condition": "raging",
                             "casting_time": "passive"
                         }
                     },

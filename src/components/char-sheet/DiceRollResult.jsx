@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, onReroll }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
+    const [rerollUsed, setRerollUsed] = useState(false);
+    const [rerollResult, setRerollResult] = useState(null);
 
     const isD20 = type === 'd20';
 
@@ -24,12 +26,22 @@ function DiceRollResult({ name, type, rolls, bonus = 0, bonusDetail, formula = '
          finalRoll = safeRolls.reduce((sum, r) => sum + r, 0);
       }
 
-    const total = finalRoll + bonus + modifier;
-    const showCrit = isCrit || isAutoCrit || (isD20 && finalRoll === 20);
+    const originalTotal = finalRoll + bonus + modifier;
+    const displayRoll = rerollResult !== null ? rerollResult.roll : finalRoll;
+    const displayTotal = rerollResult !== null ? rerollResult.total : originalTotal;
+    const showCrit = isCrit || isAutoCrit || (isD20 && displayRoll === 20);
 
     const saveAbilityLabel = saveType ? saveType.toUpperCase() : '';
 
     const isSaveDamageType = type === 'save-damage';
+
+    const handleReroll = () => {
+        const newRoll = Math.floor(Math.random() * 20) + 1;
+        const rerollBonus = autoRerollBonus || 0;
+        setRerollResult({ roll: newRoll, total: newRoll + bonus + rerollBonus });
+        setRerollUsed(true);
+        if (onReroll) onReroll();
+    };
 
     return (
         <div className="dice-roll-result">
@@ -42,10 +54,14 @@ function DiceRollResult({ name, type, rolls, bonus = 0, bonusDetail, formula = '
                 }`}></i>
                 {name}
             </div>
-            <div className="dice-roll-total">{total}</div>
+            <div className="dice-roll-total">{displayTotal}</div>
             <div className="dice-roll-breakdown">
                 {formula ? `${formula}: ` : type === 'd20' ? 'd20 ' : ''}
-                {isD20 && mode !== 'normal' && safeRolls.length === 2 ? (
+                {rerollResult !== null ? (
+                  <span className="dice-rolled">
+                    {rerollResult.roll} (reroll)
+                  </span>
+                ) : isD20 && mode !== 'normal' && safeRolls.length === 2 ? (
                   <span className="dice-rolled">
                     {safeRolls[0]}, {safeRolls[1]} → {finalRoll}
                   </span>
@@ -57,7 +73,9 @@ function DiceRollResult({ name, type, rolls, bonus = 0, bonusDetail, formula = '
                     }
                   </span>
                 )}
-                {(bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` :
+                {rerollResult !== null ? (
+                  ` +${rerollResult.total - rerollResult.roll}`
+                ) : (bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` :
                  (bonus + modifier) < 0 ? ` ${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` : ''}
             </div>
 
@@ -92,7 +110,7 @@ function DiceRollResult({ name, type, rolls, bonus = 0, bonusDetail, formula = '
             {showCrit && <div className="dice-roll-crit">{isAutoCrit ? 'AUTO-CRIT (target condition)' : 'Critical Hit!'} — damage dice doubled</div>}
              {targetName && hit !== undefined && !isSaveDamageType && (
                 <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
-                  {isAutoMiss ? `✗ AUTO-MISS (${coverReason || rangeReason || 'out of range'})` : (hit ? `✓ HIT (${total} vs AC ${targetAc ?? '—'})` : `✗ MISS (${total} vs AC ${targetAc ?? '—'})`)}
+                  {isAutoMiss ? `✗ AUTO-MISS (${coverReason || rangeReason || 'out of range'})` : (hit ? `✓ HIT (${displayTotal} vs AC ${targetAc ?? '—'})` : `✗ MISS (${displayTotal} vs AC ${targetAc ?? '—'})`)}
                 </div>
               )}
 
@@ -141,10 +159,24 @@ function DiceRollResult({ name, type, rolls, bonus = 0, bonusDetail, formula = '
             {finalDamage !== undefined && damageApplied && (
               <div className="dice-roll-damage-applied">
                 {damageReduced ? (
-                  <span><strong>{finalDamage}</strong> damage applied to <strong>{targetName}</strong> (reduced from {total}){targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalDamage} → ${targetCurrentHp}` : ''}</span>
+                  <span><strong>{finalDamage}</strong> damage applied to <strong>{targetName}</strong> (reduced from {originalTotal}){targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalDamage} → ${targetCurrentHp}` : ''}</span>
                 ) : (
                   <span><strong>{finalDamage}</strong> damage applied to <strong>{targetName}</strong>{targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalDamage} → ${targetCurrentHp}` : ''}</span>
                 )}
+              </div>
+            )}
+
+            {autoReroll && !rerollUsed && rollType === 'save' && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handleReroll} type="button">
+                  <i className="fa-solid fa-rotate"></i> Reroll Save{autoRerollBonus ? ` (+${autoRerollBonus})` : ''}
+                </button>
+              </div>
+            )}
+
+            {rerollUsed && rerollResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-rotate"></i> Rerolled: {rerollResult.roll} + {rerollResult.total - rerollResult.roll} = <strong>{rerollResult.total}</strong>
               </div>
             )}
 
