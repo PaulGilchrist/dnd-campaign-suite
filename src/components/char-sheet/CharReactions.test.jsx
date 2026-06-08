@@ -195,7 +195,7 @@ describe('CharReactions', () => {
     expect(mockSetPopupHtml).toHaveBeenCalledWith(expectedHtml);
    });
 
-  it('should call rollAttack when Opportunity Attack is clicked', () => {
+  it('should call rollAttack when Opportunity Attack is clicked', async () => {
     const mockRollAttack = vi.fn();
     useLoggedDiceRoll.mockImplementation(() => ({
       popupHtml: null,
@@ -218,7 +218,9 @@ describe('CharReactions', () => {
     const oaElement = screen.getByText(/Opportunity Attack/);
     fireEvent.click(oaElement);
 
-    expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5, { forcedMode: undefined });
+    await vi.waitFor(() => {
+      expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5, { forcedMode: undefined });
+    });
    });
 
   it('should handle empty playerStats gracefully', () => {

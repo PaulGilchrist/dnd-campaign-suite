@@ -8,8 +8,8 @@
        import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
        import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js'
        import { hasAutomation } from '../../services/combat/automationService.js'
-       import { getCombatContext, getTargetFromAttacker } from '../../services/rules/damageUtils.js'
-       import { useRuntimeValue } from '../../hooks/useRuntimeState.js'
+        import { getCombatContext, getTargetFromAttacker } from '../../services/rules/damageUtils.js'
+        import { useRuntimeValue, getRuntimeValue } from '../../hooks/useRuntimeState.js'
        import { executeHandler } from '../../services/automation/index.js'
      import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
      import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
@@ -58,14 +58,32 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
             return;
         }
         if (reaction.name === OPPORTUNITY_ATTACK.name) {
-            const meleeAttacks = playerStats.attacks.filter(a => a.type === 'Action' && a.range === MELEE_REACH_FEET);
-            const attackRoll = meleeAttacks.length > 0 ? meleeAttacks[0] : playerStats.attacks[0];
-            if (attackRoll) {
-                rollAttack(attackRoll.name, attackRoll.hitBonus, { forcedMode: undefined });
+            handleOpportunityAttack();
+            return;
+        }
+        const html = buildFeatureDetailHtml(reaction);
+        if (html) setPopupHtml(html);
+    };
+
+    const handleOpportunityAttack = async () => {
+        try {
+            const cs = await getCombatContext(campaignName);
+            if (cs) {
+                const target = getTargetFromAttacker(cs, playerStats.name);
+                if (target) {
+                    const targetNoOA = getRuntimeValue(target.name, 'inspiringMovementNoOA');
+                    if (targetNoOA) {
+                        const html = `<b>Opportunity Attack</b><br/>${target.name} is protected by Inspiring Movement and cannot be targeted by Opportunity Attacks right now.`;
+                        setPopupHtml(html);
+                        return;
+                    }
+                }
             }
-        } else {
-            const html = buildFeatureDetailHtml(reaction);
-            if (html) setPopupHtml(html);
+        } catch (e) { /* fall through to normal OA */ }
+        const meleeAttacks = playerStats.attacks.filter(a => a.type === 'Action' && a.range === MELEE_REACH_FEET);
+        const attackRoll = meleeAttacks.length > 0 ? meleeAttacks[0] : playerStats.attacks[0];
+        if (attackRoll) {
+            rollAttack(attackRoll.name, attackRoll.hitBonus, { forcedMode: undefined });
         }
     };
 

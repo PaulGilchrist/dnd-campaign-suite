@@ -163,7 +163,7 @@ function CreatureCard({
                         </div>
                     )
                 })}
-                <ConditionEffectBadges conditions={creature.conditions} targetEffects={myTargetEffects} />
+                <ConditionEffectBadges conditions={creature.conditions} targetEffects={myTargetEffects} creatureName={creature.name} campaignName={campaignName} />
                 {isLocalhost && (
                     <button
                         className='condition-add-btn'

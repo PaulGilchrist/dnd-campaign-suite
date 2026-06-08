@@ -144,6 +144,14 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 break;
             }
 
+            case 'inspiring_movement_no_oa':
+                setRuntimeValue(targetName, 'inspiringMovementNoOA', null, campaignName);
+                break;
+
+            case 'inspiring_movement_granted':
+                setRuntimeValue(targetName, 'inspiringMovementGranted', null, campaignName);
+                break;
+
             case 'condition':
                 removeActiveCondition(targetName, effect.condition, campaignName);
                 removeNpcCondition(targetName, effect.condition, campaignName);

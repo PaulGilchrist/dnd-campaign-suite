@@ -1,6 +1,7 @@
 import { computeConditionEffects } from '../../services/combat/conditionEffects.js'
+import { getRuntimeValue } from '../../hooks/useRuntimeState.js'
 
-function ConditionEffectBadges({ conditions, targetEffects = [] }) {
+function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, campaignName }) {
     const condKeys = (conditions || []).map(c => c.key)
     const effects = computeConditionEffects(condKeys, [], targetEffects)
     const badges = []
@@ -15,6 +16,9 @@ function ConditionEffectBadges({ conditions, targetEffects = [] }) {
     if (effects.riderSaveDisadvantage) badges.push({ label: 'Save Disadv', cls: 'effect-disadvantage', icon: 'fa-shield' })
     if (effects.riderAttackBonus > 0) badges.push({ label: `+${effects.riderAttackBonus} to hit`, cls: 'effect-target-adv', icon: 'fa-bullseye' })
     if (effects.riderCannotOpportunityAttack) badges.push({ label: 'No OA', cls: 'effect-cannot-act', icon: 'fa-ban' })
+    if (creatureName && campaignName && getRuntimeValue(creatureName, 'inspiringMovementNoOA', campaignName)) {
+        badges.push({ label: 'Insp. Move', cls: 'effect-cannot-act', icon: 'fa-person-walking' })
+    }
     return (
         <>
             {badges.map(b => (

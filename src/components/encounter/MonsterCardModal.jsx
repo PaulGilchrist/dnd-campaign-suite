@@ -45,6 +45,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
   const allTargetEffects = useRuntimeValue(campaignName, 'targetEffects') ?? [];
   const monsterTargetEffects = allTargetEffects.filter(te => te.target === (creatureName || monster?.name));
+  const inspiringMoveNoOA = useRuntimeValue(monsterName, 'inspiringMovementNoOA', campaignName);
 
   const { popupHtml, setPopupHtml, rollAttack, rollDamage, rollAbilityCheck, rollSavingThrow, rollSkillCheck, rollInitiative, quickRollPlayerSave } = useLoggedDiceRoll(
     monsterName,
@@ -266,6 +267,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       if (condEffects.riderSaveDisadvantage) condEffectBadges.push({ label: 'Save Disadv', cls: 'effect-disadvantage', icon: 'fa-shield' });
       if (condEffects.riderAttackBonus > 0) condEffectBadges.push({ label: `+${condEffects.riderAttackBonus} to hit`, cls: 'effect-target-adv', icon: 'fa-bullseye' });
       if (condEffects.riderCannotOpportunityAttack) condEffectBadges.push({ label: 'No OA', cls: 'effect-cannot-act', icon: 'fa-ban' });
+      if (inspiringMoveNoOA) condEffectBadges.push({ label: 'Insp. Move', cls: 'effect-cannot-act', icon: 'fa-person-walking' });
     }
 
     return (
