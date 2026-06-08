@@ -3,13 +3,14 @@
     import DiceRollResult from './DiceRollResult.jsx'
     import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
     import MetamagicPopup from './MetamagicPopup.jsx'
-     import { sanitizeHtml } from '../../services/ui/sanitize.js';
-      import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
-      import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
-      import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js'
-      import { hasAutomation } from '../../services/combat/automationService.js'
-      import { getCombatContext, getTargetFromAttacker } from '../../services/rules/damageUtils.js'
-      import { executeHandler } from '../../services/automation/index.js'
+      import { sanitizeHtml } from '../../services/ui/sanitize.js';
+       import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
+       import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
+       import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js'
+       import { hasAutomation } from '../../services/combat/automationService.js'
+       import { getCombatContext, getTargetFromAttacker } from '../../services/rules/damageUtils.js'
+       import { useRuntimeValue } from '../../hooks/useRuntimeState.js'
+       import { executeHandler } from '../../services/automation/index.js'
      import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
      import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
      import { executeSpellCast } from '../../services/rules/spellCastService.js'
@@ -20,8 +21,24 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     const { popupHtml, setPopupHtml, rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
     const [selectedSpell, setSelectedSpell] = React.useState(null);
 
+    const activeBuffs = useRuntimeValue(playerStats?.name, 'activeBuffs', campaignName) ?? [];
+
      // Build reactions list immutably
     let reactions = [...(playerStats.reactions || [])];
+
+    // Add dynamic reactions from active buffs (e.g., Revivification from Rage of the Gods)
+    for (const buff of activeBuffs) {
+        if (buff.reactionSave && !reactions.find(r => r.name === 'Revivification')) {
+            reactions.push({
+                name: 'Revivification',
+                description: 'When a creature within 30 feet of you would drop to 0 Hit Points, you can take a Reaction to expend a use of your Rage to instead change the target\'s Hit Points to a number equal to your Barbarian level.',
+                automation: {
+                    type: 'revivification',
+                    reactionSave: buff.reactionSave,
+                },
+            });
+        }
+    }
 
     let reactionSpells = [];
     if (playerStats.spellAbilities && playerStats.spellAbilities.spells.length > 0) {

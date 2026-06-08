@@ -114,7 +114,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
 
     let flySpeed = null;
     activeBuffs.forEach(buff => {
-        if (buff.effect === 'fly_speed_equals_walk_speed') flySpeed = speed;
+        if (buff.effect === 'fly_speed_equals_walk_speed' || buff.flySpeed) flySpeed = speed;
     });
 
     const exhaustionPenalty = 2 * exhaustionLevel;

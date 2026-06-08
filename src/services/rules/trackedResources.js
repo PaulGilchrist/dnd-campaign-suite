@@ -23,6 +23,7 @@ export const ALL_TRACKED_RESOURCES = [
   'warlockPactMagic',
   'sorcerousRestorationUses',
   'uncannymetabolismUses',
+  'rageOfTheGodsUses',
   'luckyPoints',
   'shortRestHitDice',
   'spell_slots_level_1',

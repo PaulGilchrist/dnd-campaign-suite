@@ -18,6 +18,7 @@ import { handle as handleAttackRider } from './handlers/attackRiderHandler.js';
 import { handle as handleTempHpBuff } from './handlers/tempHpBuffHandler.js';
 import { handle as handleWeaponMastery } from './handlers/weaponMasteryHandler.js';
 import { handle as handleBuffAlly } from './handlers/buffAllyHandler.js';
+import { handle as handleRevivification } from './handlers/revivificationHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -50,6 +51,7 @@ const HANDLER_MAP = {
     reaction_damage: handleReactionDamage,
     reaction_debuff: handleReactionDebuff,
     mastery_rider: handleWeaponMastery,
+    revivification: handleRevivification,
 };
 
 export async function executeHandler(action, playerStats, campaignName, mapName) {

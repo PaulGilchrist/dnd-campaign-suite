@@ -81,24 +81,45 @@ export async function applyStanceOption(action, playerStats, campaignName, optio
 async function activateStance(action, playerStats, campaignName, chosenOption) {
     const auto = action.automation;
     const playerName = playerStats.name;
-    const resourceKey = auto.resourceKey || 'ragePoints';
-    const storedResource = getRuntimeValue(playerName, resourceKey, campaignName);
-    const currentResource = storedResource != null ? Number(storedResource) : 0;
+    const maxUses = auto.uses || 0;
+    let usesUsed = 0;
 
-    if (currentResource <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                automationType: auto.type,
-                description: `No ${action.name} uses remaining.`,
-                automation: auto,
-            },
-        };
+    if (maxUses > 0) {
+        const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+        usesUsed = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? 0);
+        if (usesUsed >= maxUses) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: `${action.name} has been used and cannot be used again until a Long Rest.`,
+                    automation: auto,
+                },
+            };
+        }
+        await setRuntimeValue(playerName, usesKey, usesUsed + 1, campaignName);
+    } else {
+        const resourceKey = auto.resourceKey || 'ragePoints';
+        const storedResource = getRuntimeValue(playerName, resourceKey, campaignName);
+        const currentResource = storedResource != null ? Number(storedResource) : 0;
+
+        if (currentResource <= 0) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: `No ${action.name} uses remaining.`,
+                    automation: auto,
+                },
+            };
+        }
+
+        await setRuntimeValue(playerName, resourceKey, currentResource - 1, campaignName);
     }
-
-    await setRuntimeValue(playerName, resourceKey, currentResource - 1, campaignName);
 
     const resistanceTypes = chosenOption
         ? resolveResistanceTypes(getOptionProperty(chosenOption, 'resistanceTypes', []))
@@ -115,13 +136,22 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         optionName: chosenOption ? chosenOption.name : null,
         noArmor: chosenOption ? (chosenOption.noArmor || false) : false,
         range: chosenOption ? (chosenOption.range || null) : null,
+        flySpeed: null,
+        reactionSave: null,
     };
 
     if (chosenOption && chosenOption.flySpeed) {
         const blockedByArmor = chosenOption.noArmor && isWearingArmor(playerStats);
         if (!blockedByArmor) {
             buff.effect = 'fly_speed_equals_walk_speed';
+            buff.flySpeed = chosenOption.flySpeed;
         }
+    } else if (!chosenOption && auto.flySpeed) {
+        buff.flySpeed = auto.flySpeed;
+    }
+
+    if (auto.reactionSave) {
+        buff.reactionSave = auto.reactionSave;
     }
     const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
     const activeBuffs = Array.isArray(stored) ? stored : [];
@@ -157,7 +187,9 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         }
     }
 
-    let description = `${action.name} activated (${currentResource - 1} use(s) remaining)`;
+    let description = maxUses > 0
+        ? `${action.name} activated (${usesUsed + 1}/${maxUses} uses remaining)`
+        : `${action.name} activated`;
     if (chosenOption) {
         const optionEffects = [];
         if (chosenOption.name === 'Bear') {
@@ -176,7 +208,8 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         if (chosenOption.name === 'Falcon' && chosenOption.flySpeed && chosenOption.noArmor && isWearingArmor(playerStats)) {
             optionEffects.push('Blocked because you are wearing armor.');
         }
-        description = `${chosenOption.name} chosen. ${optionEffects.join(' ')} (${currentResource - 1} use(s) remaining)`;
+        const remainingRage = Number(getRuntimeValue(playerName, 'ragePoints', campaignName) ?? 0);
+        description = `${chosenOption.name} chosen. ${optionEffects.join(' ')} (${remainingRage} Rage use(s) remaining)`;
     }
 
     return {

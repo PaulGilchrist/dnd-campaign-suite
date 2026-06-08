@@ -78,7 +78,8 @@ export const LONG_REST_RESOURCES = [
      'luckyPoints',
      'innateSorceryUses',
      'sorcerousRestorationUses',
-     'zealousPresenceUses'
+     'zealousPresenceUses',
+     'rageOfTheGodsUses'
  ]
 
 export function getLongRestResources() {
