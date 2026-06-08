@@ -23,6 +23,20 @@ export function computeDamageAfterSave(rawDamage, saveSuccess, dcSuccess) {
   return 0;
 }
 
+export function hasEvasionForSave(evasionEffects, saveType) {
+  if (!evasionEffects || evasionEffects.length === 0) return false;
+  const upper = (saveType || '').toUpperCase();
+  return evasionEffects.some(e => e.saveType === upper);
+}
+
+export function computeDamageAfterEvasion(rawDamage, saveSuccess, dcSuccess, evasionActive) {
+  if (evasionActive && dcSuccess === 'half') {
+    if (saveSuccess) return 0;
+    return Math.floor(rawDamage / 2);
+  }
+  return computeDamageAfterSave(rawDamage, saveSuccess, dcSuccess);
+}
+
 export function rollSaveForCreature(creature, saveType, saveDc, disadvantage = false) {
   const bonus = creature?.saveBonuses?.[saveType] ?? 0;
   const roll1 = rollD20();

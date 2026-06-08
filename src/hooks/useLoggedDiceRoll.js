@@ -6,6 +6,7 @@ import storage from '../services/ui/storage.js';
 import { getTargetFromAttacker } from '../services/rules/damageUtils.js';
 import {
   computeDamageAfterSave,
+  computeDamageAfterEvasion,
   rollSaveForCreature,
   applyDamageToTarget,
 } from '../services/rules/applyDamage.js';
@@ -31,6 +32,8 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
   const { autoDamageRoll, characters } = options;
   const autoDamageRollRef = useRef(null);
   autoDamageRollRef.current = autoDamageRoll || null;
+  const charactersRef = useRef(characters);
+  charactersRef.current = characters || [];
 
   if (!window.__pendingSaves) window.__pendingSaves = {};
   const pendingSaves = window.__pendingSaves;
@@ -43,8 +46,19 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       if (!pending) return;
 
       const combatSummary = getCombatSummary();
-      const finalDamage = computeDamageAfterSave(
-        e.detail.rawDamage, e.detail.success, e.detail.dcSuccess
+      const saveTypeUpper = (e.detail.saveType || '').toUpperCase();
+      const targetChar = (charactersRef.current || []).find(c => c.name === e.detail.targetName);
+      const ownEvasion = targetChar?.computedStats?.evasionEffects;
+      const hasOwnEvasion = pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === saveTypeUpper);
+      const hasSharedEvasion = !hasOwnEvasion && pending.dcSuccess === 'half' &&
+        (charactersRef.current || []).some(c => {
+          if (c.name === e.detail.targetName) return false;
+          const ev = c?.computedStats?.evasionEffects;
+          return ev?.some(ef => ef.saveType === saveTypeUpper && ef.shareable && ef.shareRange >= 5);
+        });
+      const hasEvasion = hasOwnEvasion || hasSharedEvasion;
+      const finalDamage = computeDamageAfterEvasion(
+        e.detail.rawDamage, e.detail.success, e.detail.dcSuccess, hasEvasion
       );
       const pendingTargetName = pending.targetName;
       let targetMaxHp = 0;
@@ -719,7 +733,18 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
 
     const disadvantage = pending.metamagicHeighten || false;
     const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage);
-    const finalDamage = computeDamageAfterSave(pending.rawDamage, saveResult.success, pending.dcSuccess);
+    const saveTypeUpper = (saveType || '').toUpperCase();
+    const targetChar = (charactersRef.current || []).find(c => c.name === pending.targetName);
+    const ownEvasion = targetChar?.computedStats?.evasionEffects;
+    const hasOwnEvasion = pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === saveTypeUpper);
+    const hasSharedEvasion = !hasOwnEvasion && pending.dcSuccess === 'half' &&
+      (charactersRef.current || []).some(c => {
+        if (c.name === pending.targetName) return false;
+        const ev = c?.computedStats?.evasionEffects;
+        return ev?.some(ef => ef.saveType === saveTypeUpper && ef.shareable && ef.shareRange >= 5);
+      });
+    const hasEvasion = hasOwnEvasion || hasSharedEvasion;
+    const finalDamage = computeDamageAfterEvasion(pending.rawDamage, saveResult.success, pending.dcSuccess, hasEvasion);
     const applyResult = applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName, null);
 
     delete pendingSaves[promptId];

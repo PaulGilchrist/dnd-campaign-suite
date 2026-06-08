@@ -193,6 +193,17 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'evasion': {
+            return {
+                type: 'evasion',
+                name: feature.name,
+                saveType: auto.saveType || 'DEX',
+                shareable: !!auto.shareable,
+                shareRange: auto.shareRange || 0,
+                hasAutomation: true
+            }
+        }
+
         case 'conditional_disadvantage': {
             return {
                 type: 'conditional_disadvantage',
@@ -734,6 +745,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'auto_effect':
             case 'resource_restoration':
             case 'conditional_advantage':
+            case 'evasion':
             case 'conditional_disadvantage':
             case 'mastery_rider':
                 result.passives.push(info)
@@ -820,6 +832,22 @@ export function collectSaveModifiers(features) {
 
 export function hasAutomation(feature) {
     return !!(feature?.automation)
+}
+
+export function getEvasionEffects(features) {
+    const effects = [];
+    if (!features) return effects;
+    features.forEach(feature => {
+        if (feature?.automation?.type === 'evasion') {
+            effects.push({
+                source: feature.name,
+                saveType: (feature.automation.saveType || 'DEX').toUpperCase(),
+                shareable: !!feature.automation.shareable,
+                shareRange: feature.automation.shareRange || 0,
+            });
+        }
+    });
+    return effects;
 }
 
 export function getConditionImmunities(features) {

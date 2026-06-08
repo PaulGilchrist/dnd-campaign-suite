@@ -131,7 +131,22 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
             <div className="sp-body">
               <p><strong>{current.targetName}</strong> must make a <strong>{abilityLabel}</strong> saving throw.</p>
               <p className="sp-dc">DC {current.saveDc}</p>
-              {current.dcSuccess === 'half' && <p className="sp-note">Half damage on successful save</p>}
+              {current.dcSuccess === 'half' && (() => {
+                const saveTypeUpper = (current.saveType || '').toUpperCase();
+                const targetChar = (characters || []).find(c => utils.getName(c.name) === utils.getName(current.targetName));
+                const ownEvasion = targetChar?.computedStats?.evasionEffects;
+                const hasOwnEvasion = ownEvasion?.some(ef => ef.saveType === saveTypeUpper);
+                const hasSharedEvasion = !hasOwnEvasion &&
+                  (characters || []).some(c => {
+                    if (utils.getName(c.name) === utils.getName(current.targetName)) return false;
+                    const ev = c?.computedStats?.evasionEffects;
+                    return ev?.some(ef => ef.saveType === saveTypeUpper && ef.shareable && ef.shareRange >= 5);
+                  });
+                const hasEvasion = hasOwnEvasion || hasSharedEvasion;
+                return hasEvasion
+                  ? <p className="sp-note sp-evasion">Evasion: No damage on success, half damage on failure</p>
+                  : <p className="sp-note">Half damage on successful save</p>;
+              })()}
               {current.dcSuccess === 'none' && <p className="sp-note">No damage on successful save</p>}
               {current.sourceName && <p className="sp-source">Source: {current.sourceName}</p>}
               {hasResult && (
