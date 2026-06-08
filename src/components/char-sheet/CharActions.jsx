@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import MetamagicPopup from './MetamagicPopup.jsx'
@@ -13,7 +13,7 @@ import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { computeFeatRangeEffects } from '../../services/character/featRangeService.js';
-import { hasAutomation } from '../../services/combat/automationService.js'
+import { hasAutomation, collectWeaponMastery } from '../../services/combat/automationService.js'
 import { isExhausted } from '../../services/automation/handlers/saveAttackHandler.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import utils from '../../services/ui/utils.js'
@@ -22,6 +22,7 @@ import HandOfHealingModal from './HandOfHealingModal.jsx'
 import FontOfMagicModal from './FontOfMagicModal.jsx'
 import SetConditionModal from './SetConditionModal.jsx'
 import AttackRiderModal from './AttackRiderModal.jsx'
+import WeaponMasteryModal from './WeaponMasteryModal.jsx'
 import CombatStanceModal from './CombatStanceModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
@@ -52,12 +53,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [fontOfMagicModal, setFontOfMagicModal] = useState(null);
     const [setConditionModal, setSetConditionModal] = useState(null);
     const [attackRiderModal, setAttackRiderModal] = useState(null);
+    const [weaponMasteryModal, setWeaponMasteryModal] = useState(null);
     const [combatStanceModal, setCombatStanceModal] = useState(null);
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
 
     useEffect(() => {
-        computeFeatRangeEffects(playerStats.feats, playerStats.rules).then(setFeatRangeEffects).catch(() => { });
-    }, [playerStats.feats, playerStats.rules]);
+        computeFeatRangeEffects(playerStats.feats, playerStats.rules, playerStats).then(setFeatRangeEffects).catch(() => { });
+    }, [playerStats.feats, playerStats.rules, playerStats]);
 
     useEffect(() => {
         fetch('/data/actions.json')
@@ -134,6 +136,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         return await buildAttackContext(attack, playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects || null);
     }, [playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects]);
 
+    const pendingDamageRef = useRef(null);
+
+    const proceedWithDamage = (attack, formula, total, rolls, modifier) => {
+        (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
+            rollDamage(attack.name, formula, total, rolls, modifier, ctx);
+        }).catch(() => { });
+    };
+
     const handleDamageClick = (attack) => {
         const wasCrit = popupHtml?.isCrit;
         if (wasCrit && setPopupHtml) setPopupHtml(null);
@@ -204,9 +214,31 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }
         }
 
-        (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
-            rollDamage(attack.name, formula, total, rolls, modifier, ctx);
-        }).catch(() => { });
+        // Check for weapon mastery properties to activate on hit
+        if (attack.weaponType === 'melee') {
+            const available = collectWeaponMastery(attack.name, playerStats);
+            const hasMastery = available.baseMastery || available.extraMasteries?.length > 0;
+            if (hasMastery) {
+                pendingDamageRef.current = { attack, formula, total, rolls, modifier };
+                setWeaponMasteryModal({
+                    attackName: attack.name,
+                    baseMastery: available.baseMastery,
+                    extraMasteries: available.extraMasteries,
+                });
+                return;
+            }
+        }
+
+        proceedWithDamage(attack, formula, total, rolls, modifier);
+    };
+
+    const handleMasteryClose = () => {
+        setWeaponMasteryModal(null);
+        if (pendingDamageRef.current) {
+            const { attack, formula, total, rolls, modifier } = pendingDamageRef.current;
+            proceedWithDamage(attack, formula, total, rolls, modifier);
+            pendingDamageRef.current = null;
+        }
     };
 
     const handleAttackClick = React.useCallback((attack) => {
@@ -489,6 +521,15 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <AttackRiderModal
                         {...attackRiderModal}
                         onClose={() => { setAttackRiderModal(null); window.dispatchEvent(new CustomEvent('target-effects-updated')); }}
+                    />
+                )}
+                {weaponMasteryModal && (
+                    <WeaponMasteryModal
+                        {...weaponMasteryModal}
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        targetName={null}
+                        onClose={handleMasteryClose}
                     />
                 )}
                 {combatStanceModal && (

@@ -43,6 +43,7 @@ describe('computeFeatRangeEffects', () => {
       ignoresLongRangeDisadvantage: false,
       spellRangeBonus: 0,
       rangeMultiplier: 1,
+      meleeReachBonus: 0,
     })
   })
 

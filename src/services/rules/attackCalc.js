@@ -98,6 +98,7 @@ export function buildWeaponAttack(opts) {
         range: weapon.range.normal,
         type: actionType,
         weaponType,
+        mastery: weapon.mastery || null,
     };
 }
 

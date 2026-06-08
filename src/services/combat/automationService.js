@@ -1,4 +1,5 @@
 import { getAbilityModifier } from '../shared/abilityLookup.js'
+import { parseMagicItemName } from '../rules/attackCalc.js'
 
 function resolveUses(playerStats, usesSpec) {
     if (typeof usesSpec === 'number') return usesSpec
@@ -64,6 +65,17 @@ function buildAttackInfo(feature, playerStats) {
                 oncePerTurn: !!auto.oncePerTurn,
                 chooseOne: !!auto.chooseOne,
                 maxEffects: auto.maxEffects || 1,
+                hasAutomation: true
+            }
+        }
+
+        case 'mastery_rider': {
+            return {
+                type: 'mastery_rider',
+                name: feature.name,
+                masteries: auto.masteries || [],
+                extraMastery: auto.extraMastery || [],
+                trigger: auto.trigger || 'hit',
                 hasAutomation: true
             }
         }
@@ -323,10 +335,12 @@ function buildAttackInfo(feature, playerStats) {
                 target: auto.target || 'allies_in_range',
                 range_expression: auto.range_expression || '10_ft',
                 effect: auto.effect || '',
-                bonusExpression: auto.bonusExpression || '',
+                bonusExpression: auto.bonusExpression || auto.bonus || '',
+                condition: auto.condition || '',
                 conditionImmunity: auto.conditionImmunity || '',
                 resistances: auto.resistances || [],
                 options: auto.options || [],
+                extraMastery: auto.extraMastery || [],
                 hasAutomation: true
             }
         }
@@ -661,6 +675,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'resource_restoration':
             case 'conditional_advantage':
             case 'conditional_disadvantage':
+            case 'mastery_rider':
                 result.passives.push(info)
                 break
             default:
@@ -841,3 +856,32 @@ export function getPassiveBuffs(features, playerStats) {
 
     return buffs
 }
+
+/**
+ * Collect available weapon mastery properties for a given weapon.
+ * Combines the weapon's base mastery with any extra mastery from features
+ * (e.g., Battering Roots grants Push/Topple in addition to the weapon's own mastery).
+ * @param {string} weaponName - Name of the weapon (may include magic prefix)
+ * @param {Object} playerStats - PlayerStats object with equipment + automation.passives
+ * @returns {{ baseMastery: string|null, extraMasteries: string[] }}
+ */
+export function collectWeaponMastery(weaponName, playerStats) {
+    const { baseName } = parseMagicItemName(weaponName);
+    const weapon = playerStats.equipment?.find(item => item.name === baseName);
+    const baseMastery = weapon?.mastery || null;
+
+    const extraMasteries = [];
+    const passives = playerStats.automation?.passives || [];
+    for (const passive of passives) {
+        if (passive.extraMastery && Array.isArray(passive.extraMastery)) {
+            extraMasteries.push(...passive.extraMastery);
+        }
+    }
+
+    return {
+        baseMastery,
+        extraMasteries: [...new Set(extraMasteries)],
+    };
+}
+
+

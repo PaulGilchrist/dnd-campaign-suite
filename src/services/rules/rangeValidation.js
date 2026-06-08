@@ -48,12 +48,14 @@ export function computeRangeEffect(attackRange, distanceFt, featEffects = {}) {
   }
 
   if (numericRange <= MELEE_RANGE_FT) {
-    if (distanceFt <= MELEE_RANGE_FT) {
+    const meleeReachBonus = featEffects.meleeReachBonus || 0
+    const effectiveRange = MELEE_RANGE_FT + meleeReachBonus
+    if (distanceFt <= effectiveRange) {
       return { mode: 'normal' }
     }
     return {
       mode: 'miss',
-      reason: `Target out of melee range (${Math.round(distanceFt)} ft > ${MELEE_RANGE_FT} ft)`,
+      reason: `Target out of melee range (${Math.round(distanceFt)} ft > ${effectiveRange} ft)`,
     }
   }
 
