@@ -639,7 +639,7 @@
                                 }
                             ],
                             "duration": "while_raging",
-                            "casting_time": "1 bonus action"
+                            "casting_time": "passive"
                         }
                     }
                 ],
@@ -692,7 +692,7 @@
                                 "Push",
                                 "Topple"
                             ],
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     },
                     {

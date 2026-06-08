@@ -497,6 +497,11 @@ function buildAttackInfo(feature, playerStats) {
                 range: auto.range || '60_ft',
                 targets: auto.targets || 1,
                 extraEffect: auto.extraEffect || null,
+                tempHpExpression: auto.tempHpExpression || '',
+                triggerOnRage: !!auto.trigger_on_rage,
+                ongoingHealingExpression: auto.ongoingHealingExpression || '',
+                healingStartOfTurn: !!auto.healingStartOfTurn,
+                healingRange: auto.healingRange || '',
                 hasAutomation: true
             }
         }
@@ -550,6 +555,7 @@ export function evaluateAutoExpression(expression, playerStats, prof, level) {
     if (!expression) return expression
     prof = prof || 0
     level = level || 1
+    const rageDamage = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.rage_damage ?? 2
     let expr = expression
            .replace(/proficiency_bonus_d4/g, `${Math.max(1, prof)}d4`)
            .replace(/proficiency_bonus/g, prof)
@@ -558,7 +564,8 @@ export function evaluateAutoExpression(expression, playerStats, prof, level) {
            .replace(/paladin level/gi, level)
            .replace(/barbarian level/gi, level)
            .replace(/bard level/gi, level)
-           .replace(/rage_damage/g, playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.rage_damage ?? 2)
+           .replace(/rage_damage_d6/g, `${rageDamage}d6`)
+           .replace(/rage_damage/g, rageDamage)
            .replace(/level/gi, level)
     try {
         const result = new Function(`"use strict"; return (${expr})`)()

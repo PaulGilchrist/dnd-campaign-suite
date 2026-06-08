@@ -14,6 +14,7 @@ import { handle as handleSpellModifier } from './handlers/spellModifierHandler.j
 import { handle as handleCombatStance } from './handlers/combatStanceHandler.js';
 import { handle as handleReactionDamage } from './handlers/reactionDamageHandler.js';
 import { handle as handleAttackRider } from './handlers/attackRiderHandler.js';
+import { handle as handleTempHpBuff } from './handlers/tempHpBuffHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -37,7 +38,7 @@ const HANDLER_MAP = {
     attack_rider: handleAttackRider,
     damage_bonus: handleGenericPopup,
     spell_modifier: handleSpellModifier,
-    temp_hp_buff: handleGenericPopup,
+    temp_hp_buff: handleTempHpBuff,
     conditional_disadvantage: handleGenericPopup,
     conditional_advantage: handleGenericPopup,
     passive_rule: handleGenericPopup,

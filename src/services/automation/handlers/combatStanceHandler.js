@@ -1,4 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { grantTempHpOnRage } from './tempHpBuffHandler.js';
 
 function resolveResistanceTypes(resistanceTypes) {
     return resistanceTypes.flatMap(rt => {
@@ -132,6 +133,13 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
             });
             if (filtered.length !== currentConditions.length) {
                 setRuntimeValue(playerName, 'activeConditions', filtered, campaignName);
+            }
+        }
+
+        const specialActions = playerStats.automation?.specialActions || [];
+        for (const sa of specialActions) {
+            if (sa.triggerOnRage) {
+                grantTempHpOnRage({ name: sa.name, automation: sa }, playerStats, campaignName);
             }
         }
     }
