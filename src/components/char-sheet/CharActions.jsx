@@ -22,6 +22,7 @@ import HandOfHealingModal from './HandOfHealingModal.jsx'
 import FontOfMagicModal from './FontOfMagicModal.jsx'
 import SetConditionModal from './SetConditionModal.jsx'
 import AttackRiderModal from './AttackRiderModal.jsx'
+import CombatStanceModal from './CombatStanceModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { getClassFeatures } from '../../services/character/classFeatures.js';
@@ -51,6 +52,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [fontOfMagicModal, setFontOfMagicModal] = useState(null);
     const [setConditionModal, setSetConditionModal] = useState(null);
     const [attackRiderModal, setAttackRiderModal] = useState(null);
+    const [combatStanceModal, setCombatStanceModal] = useState(null);
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
 
     useEffect(() => {
@@ -276,6 +278,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'fontOfMagic': setFontOfMagicModal(true); break;
                     case 'setCondition': setSetConditionModal(result.payload); break;
                     case 'attackRider': setAttackRiderModal(result.payload); break;
+                    case 'combatStance': setCombatStanceModal(result.payload); break;
                  }
                 break;
             case 'roll':
@@ -486,6 +489,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <AttackRiderModal
                         {...attackRiderModal}
                         onClose={() => { setAttackRiderModal(null); window.dispatchEvent(new CustomEvent('target-effects-updated')); }}
+                    />
+                )}
+                {combatStanceModal && (
+                    <CombatStanceModal
+                        {...combatStanceModal}
+                        onClose={() => { setCombatStanceModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
                     />
                 )}
                 {selectedActionSpell && (

@@ -5,6 +5,7 @@ import { computeCover } from '../rules/coverService.js';
 import { loadNPCs } from '../npcs/npcsService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { getInnateSorceryBonus } from '../combat/buffService.js';
+import { getWolfAdvantageAgainst } from '../combat/wolfAuraUtils.js';
 
 export function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects) {
     const playerName = playerStats.name;
@@ -113,6 +114,18 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                           }
                       }
                   }
+
+                if (targetPos && base.forcedMode === undefined) {
+                    const wolfResult = getWolfAdvantageAgainst({
+                        targetPos,
+                        attackerName: playerStats.name,
+                        campaignName,
+                        mapData,
+                    });
+                    if (wolfResult.advantage) {
+                        base.forcedMode = 'advantage';
+                    }
+                }
 
                 const numericRange = rangeToFeet(attack.range) || 0;
                 const isRanged = numericRange > 8;

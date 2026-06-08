@@ -121,6 +121,7 @@ function buildAttackInfo(feature, playerStats) {
                 damageBonusExpression: auto.damageBonusExpression || '',
                 resistanceTypes: auto.resistanceTypes || [],
                 advantages: auto.advantages || [],
+                options: auto.options || [],
                 duration: auto.duration || '',
                 resourceKey: 'ragePoints',
                 blocksSpellcasting: auto.blocksSpellcasting || false,
