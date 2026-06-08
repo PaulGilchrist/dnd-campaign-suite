@@ -607,6 +607,7 @@ export function evaluateAutoExpression(expression, playerStats, prof, level) {
            .replace(/monk level/gi, level)
            .replace(/fighter level/gi, level)
            .replace(/paladin level/gi, level)
+           .replace(/barbarian_level/gi, level)
            .replace(/barbarian level/gi, level)
            .replace(/bard level/gi, level)
            .replace(/rage_damage_d6/g, `${rageDamage}d6`)

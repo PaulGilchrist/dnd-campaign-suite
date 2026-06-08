@@ -57,6 +57,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [weaponMasteryModal, setWeaponMasteryModal] = useState(null);
     const [combatStanceModal, setCombatStanceModal] = useState(null);
     const [teleportModal, setTeleportModal] = useState(null);
+    const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
 
     useEffect(() => {
@@ -202,6 +203,46 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 }
             }
 
+            // Apply Divine Fury damage bonus (first_hit_while_raging)
+            const divineFuryBonuses = isMeleeOrUnarmed ? playerStats.automation.actions.filter(
+                a => a.type === 'damage_bonus' && a.trigger === 'first_hit_while_raging'
+            ) : [];
+            if (divineFuryBonuses.length > 0) {
+                const playerName = playerStats.name;
+                const usedRound = getRuntimeValue(playerName, '_divineFuryUsedRound', campaignName);
+                const currentRound = getCurrentCombatRound();
+                if (usedRound !== currentRound) {
+                    const activeBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
+                    const isRaging = Array.isArray(activeBuffs) && activeBuffs.some(b => b.damageBonusExpression);
+                    if (isRaging) {
+                        const bonus = divineFuryBonuses[0];
+                        let expr = bonus.damageExpression || '';
+                        const barbHalf = Math.floor(playerStats.level / 2);
+                        expr = expr.replace(/barbarian_level\s*\/\s*2/gi, String(barbHalf))
+                            .replace(/barbarian_level/gi, String(playerStats.level));
+                        const bonusResult = rollExpression(expr);
+                        if (bonusResult) {
+                            const damageType = bonus.damageType || '';
+                            if (damageType.includes(' or ')) {
+                                pendingDamageRef.current = {
+                                    attack, formula, total, rolls, modifier,
+                                    bonusExpr: expr,
+                                    bonusTotal: bonusResult.total,
+                                    bonusRolls: bonusResult.rolls,
+                                };
+                                setDivineFuryChoice(damageType);
+                                return;
+                            } else {
+                                formula += ` + ${expr}[${damageType}]`;
+                                total += bonusResult.total;
+                                rolls = [...rolls, ...bonusResult.rolls];
+                            }
+                        }
+                        setRuntimeValue(playerName, '_divineFuryUsedRound', currentRound, campaignName);
+                    }
+                }
+            }
+
             // Apply attack_rider automations (e.g. Brutal Strike)
             const hitRiders = playerStats.automation.actions.filter(
                 a => a.type === 'attack_rider' && a.damageExpression && a.trigger === 'strength_attack_hit_after_reckless'
@@ -241,6 +282,36 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             proceedWithDamage(attack, formula, total, rolls, modifier);
             pendingDamageRef.current = null;
         }
+    };
+
+    const handleDivineFuryDamageType = (chosenType) => {
+        const pending = pendingDamageRef.current;
+        if (!pending) {
+            setDivineFuryChoice(null);
+            return;
+        }
+        const { attack, formula, total, rolls, modifier, bonusExpr, bonusTotal, bonusRolls } = pending;
+        const newFormula = `${formula} + ${bonusExpr}[${chosenType}]`;
+        const newTotal = total + bonusTotal;
+        const newRolls = [...rolls, ...bonusRolls];
+        const playerName = playerStats.name;
+        const currentRound = getCurrentCombatRound();
+        setRuntimeValue(playerName, '_divineFuryUsedRound', currentRound, campaignName);
+        setDivineFuryChoice(null);
+        pendingDamageRef.current = null;
+        proceedWithDamage(attack, newFormula, newTotal, newRolls, modifier);
+    };
+
+    const handleDivineFurySkip = () => {
+        const pending = pendingDamageRef.current;
+        if (!pending) {
+            setDivineFuryChoice(null);
+            return;
+        }
+        const { attack, formula, total, rolls, modifier } = pending;
+        setDivineFuryChoice(null);
+        pendingDamageRef.current = null;
+        proceedWithDamage(attack, formula, total, rolls, modifier);
     };
 
     const handleAttackClick = React.useCallback((attack) => {
@@ -546,6 +617,29 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         {...teleportModal}
                         onClose={() => { setTeleportModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
                     />
+                )}
+                {divineFuryChoice && (
+                    <div className="sp-overlay" onClick={handleDivineFurySkip}>
+                        <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                            <div className="sp-header">
+                                <i className="fa-solid fa-bolt"></i> Divine Fury — Damage Type
+                            </div>
+                            <div className="sp-body">
+                                <p>Choose the damage type for this hit:</p>
+                                <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                                    <button className="sp-roll-btn" style={{ marginRight: '12px' }} onClick={() => handleDivineFuryDamageType('Necrotic')}>
+                                        <i className="fa-solid fa-skull"></i> Necrotic
+                                    </button>
+                                    <button className="sp-roll-btn" onClick={() => handleDivineFuryDamageType('Radiant')}>
+                                        <i className="fa-solid fa-sun"></i> Radiant
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="sp-actions">
+                                <button className="sp-dismiss-btn" onClick={handleDivineFurySkip}>Skip</button>
+                            </div>
+                        </div>
+                    </div>
                 )}
                 {selectedActionSpell && (
                     <Popup onClickOrKeyDown={() => setSelectedActionSpell(null)}>

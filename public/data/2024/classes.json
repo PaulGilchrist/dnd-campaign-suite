@@ -729,7 +729,7 @@
                             "damageExpression": "1d6 + barbarian_level / 2",
                             "damageType": "Necrotic or Radiant",
                             "oncePerTurn": true,
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     },
                     {
