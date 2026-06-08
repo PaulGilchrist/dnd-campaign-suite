@@ -3,7 +3,7 @@ const CONDITIONS_THAT_CANNOT_ACT = new Set([
 ])
 
 const CONDITIONS_THAT_SPEED_ZERO = new Set([
-    'grappled', 'paralyzed', 'petrified', 'restrained', 'stunned', 'unconscious',
+    'grappled', 'paralyzed', 'petrified', 'restrained', 'stunned', 'unconscious', 'speed_zero',
 ])
 
 const CONDITION_KEYWORDS = new Set(['charmed', 'frightened', 'poison', 'magic'])
@@ -160,6 +160,10 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
         effects.attackDisadvantageCount++
         effects.targetAdvantageIfWithin5ft = true
         effects.targetDisadvantageIfBeyond5ft = true
+        break
+
+       case 'speed_zero':
+        effects.speedZero = true
         break
 
        case 'restrained':

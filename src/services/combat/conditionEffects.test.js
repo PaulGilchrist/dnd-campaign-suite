@@ -222,6 +222,7 @@ describe('CONDITIONS_THAT_SPEED_ZERO', () => {
       expect(CONDITIONS_THAT_SPEED_ZERO.has('petrified')).toBe(true)
       expect(CONDITIONS_THAT_SPEED_ZERO.has('restrained')).toBe(true)
       expect(CONDITIONS_THAT_SPEED_ZERO.has('unconscious')).toBe(true)
+      expect(CONDITIONS_THAT_SPEED_ZERO.has('speed_zero')).toBe(true)
      })
   })
 
