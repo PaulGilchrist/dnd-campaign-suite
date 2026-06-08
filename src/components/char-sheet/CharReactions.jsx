@@ -122,11 +122,11 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
 
       const cachedReactionCastPosRef = React.useRef(null);
 
-      const reactionCastAction = React.useCallback((spell, metaCtx) => {
+const reactionCastAction = React.useCallback((spell, metaCtx) => {
         const pos = cachedReactionCastPosRef.current;
-        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName });
+        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName });
         cachedReactionCastPosRef.current = null;
-       }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName]);
+    }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName]);
       const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, reactionCastAction);
       const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
 

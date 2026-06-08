@@ -412,6 +412,24 @@ function buildAttackInfo(feature, playerStats) {
                 name: feature.name,
                 effect: auto.effect || '',
                 criticalRange: auto.criticalRange || '',
+                spells: auto.spells || [],
+                riderSave: auto.riderSave || null,
+                hasAutomation: true
+            }
+        }
+
+        case 'post_cast_rider': {
+            return {
+                type: 'post_cast_rider',
+                name: feature.name,
+                saveType: auto.saveType || 'WIS',
+                saveDc: auto.saveDc || 'ability',
+                saveAbility: auto.saveAbility || 'CHA',
+                condition: auto.condition || '',
+                duration: auto.duration || '1_minute',
+                range: auto.range || '60 ft',
+                spellSchools: auto.spellSchools || [],
+                recharge: auto.recharge || 'long_rest',
                 hasAutomation: true
             }
         }
@@ -748,6 +766,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'evasion':
             case 'conditional_disadvantage':
             case 'mastery_rider':
+            case 'post_cast_rider':
                 result.passives.push(info)
                 break
             default:

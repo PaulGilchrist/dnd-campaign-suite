@@ -22,6 +22,7 @@ import { handle as handleRevivification } from './handlers/revivificationHandler
 import { handle as handleBardicInspiration } from './handlers/bardicInspirationHandler.js';
 import { handle as handleBardicInspirationUse } from './handlers/bardicInspirationUseHandler.js';
 import { handle as handleReactionBonus } from './handlers/reactionBonusHandler.js';
+import { handle as handlePostCastRider } from './handlers/postCastRiderHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -58,6 +59,7 @@ const HANDLER_MAP = {
      bardic_inspiration: handleBardicInspiration,
      bardic_inspiration_use: handleBardicInspirationUse,
      reaction_bonus: handleReactionBonus,
+     post_cast_rider: handlePostCastRider,
 };
 
 export async function executeHandler(action, playerStats, campaignName, mapName) {

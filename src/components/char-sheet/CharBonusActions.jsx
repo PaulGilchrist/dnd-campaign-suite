@@ -38,9 +38,9 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const bonusCastAction = React.useCallback((spell, metaCtx) => {
       const pos = cachedBonusCastPosRef.current;
-      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, innateSorceryActive: !!displaySaveDcBonus });
+      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, innateSorceryActive: !!displaySaveDcBonus, campaignName, mapName });
       cachedBonusCastPosRef.current = null;
-      }, [rollAttack, rollDamage, playerStats, getTargetInfo, displaySaveDcBonus]);
+      }, [rollAttack, rollDamage, playerStats, getTargetInfo, displaySaveDcBonus, campaignName, mapName]);
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, bonusCastAction);
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
 

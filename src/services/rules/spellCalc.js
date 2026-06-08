@@ -133,13 +133,13 @@ export function getSpellAbilities(allSpells, playerStats) {
                  }
              });
          }
-         // Add any subclass spells to known spells and set them to always prepared
+// Add any subclass spells to known spells and set them to always prepared
         if (playerStats.level > 2 && playerStats.class.subclass && playerStats.class.subclass.spells) {
-            playerStats.class.subclass.spells.forEach((subclassSpell) => {                    
+            playerStats.class.subclass.spells.forEach((subclassSpell) => {
                 const knownSpell = spellAbilities.spells.find((knownSpell) => knownSpell.name === subclassSpell.spell.name);
                 if (knownSpell) {
                     knownSpell.prepared = 'Always';
-                 } else {
+                } else {
                     const meetsLevel = (playerStats.level >= subclassSpell.prerequisites[0].index.split('-')[1]);
                     const meetsCircle = (playerStats.class.subclass.name != 'Land' || subclassSpell.prerequisites[1].name.endsWith(playerStats.class.subclass.circle));
                     if (meetsLevel && meetsCircle) {
@@ -147,11 +147,30 @@ export function getSpellAbilities(allSpells, playerStats) {
                         spellAbilities.spells.push({
                             name: subclassSpell.spell.name,
                             prepared: 'Always'
-                         });
-                     }
-                 }
-             });
-         }
+                        });
+                    }
+                }
+            });
+        }
+        // Add always prepared spells from features (e.g., Beguiling Magic)
+        if (playerStats.automation?.passives) {
+            playerStats.automation.passives.forEach(passive => {
+                if (passive.type === 'passive_rule' && passive.effect === 'always_prepared_spells' && passive.spells) {
+                    passive.spells.forEach(spellName => {
+                        const knownSpell = spellAbilities.spells.find(s => s.name === spellName);
+                        if (knownSpell) {
+                            knownSpell.prepared = 'Always';
+                        } else {
+                            if(spellAbilities.spells_known) spellAbilities.spells_known += 1;
+                            spellAbilities.spells.push({
+                                name: spellName,
+                                prepared: 'Always'
+                            });
+                        }
+                    });
+                }
+            });
+        }
         switch (playerStats.class.name) {
             case 'Cleric':
             case 'Druid':

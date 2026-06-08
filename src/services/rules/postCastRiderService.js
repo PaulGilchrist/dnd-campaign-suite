@@ -1,0 +1,92 @@
+import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { executeHandler } from '../automation/index.js';
+
+const ENCHANTMENT_SCHOOL = 'enchantment';
+const ILLUSION_SCHOOL = 'illusion';
+
+function isEnchantmentOrIllusion(spell) {
+    const school = (spell.school || '').toLowerCase();
+    return school === ENCHANTMENT_SCHOOL || school === ILLUSION_SCHOOL;
+}
+
+function usesSpellSlot(spell, metaCtx) {
+    return metaCtx?.slotLevel > 0 || spell.level > 0;
+}
+
+export function getPostCastRiderSaves(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.filter(p => p.type === 'post_cast_rider' || (p.type === 'passive_rule' && p.riderSave));
+}
+
+export function hasPostCastRiderSave(playerStats) {
+    return getPostCastRiderSaves(playerStats).length > 0;
+}
+
+export async function triggerPostCastRiderSaves(spell, metaCtx, playerStats, campaignName, mapName) {
+    if (!isEnchantmentOrIllusion(spell)) {
+        return null;
+    }
+
+    if (!usesSpellSlot(spell, metaCtx)) {
+        return null;
+    }
+
+    const riderSaves = getPostCastRiderSaves(playerStats);
+    if (riderSaves.length === 0) {
+        return null;
+    }
+
+    const results = [];
+    for (const rider of riderSaves) {
+        const riderName = rider.riderSave ? rider.name : rider.name;
+        const usesKey = `postCastRider_${riderName.replace(/\s+/g, '_')}`;
+        const uses = getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1;
+
+        if (uses <= 0) {
+            continue;
+        }
+
+        let riderConfig;
+        if (rider.riderSave) {
+            riderConfig = {
+                saveType: rider.riderSave.type,
+                saveDc: 'ability',
+                saveAbility: 'CHA',
+                condition: rider.riderSave.condition,
+                duration: rider.riderSave.duration,
+                range: rider.riderSave.range,
+                recharge: rider.riderSave.recharge,
+            };
+        } else {
+            riderConfig = {
+                saveType: rider.saveType,
+                saveDc: rider.saveDc,
+                saveAbility: rider.saveAbility,
+                condition: rider.condition,
+                duration: rider.duration,
+                range: rider.range,
+                spellSchools: rider.spellSchools,
+                recharge: rider.recharge,
+            };
+        }
+
+        const action = {
+            name: riderName,
+            automation: {
+                type: 'post_cast_rider',
+                ...riderConfig,
+            },
+        };
+
+        try {
+            const result = await executeHandler(action, playerStats, campaignName, mapName);
+            if (result) {
+                results.push(result);
+            }
+        } catch (e) {
+            console.error(`[postCastRider] Failed to execute rider save for ${riderName}:`, e);
+        }
+    }
+
+    return results.length > 0 ? results : null;
+}

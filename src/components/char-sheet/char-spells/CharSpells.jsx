@@ -92,9 +92,9 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
 
     const castAction = React.useCallback((spell, metaCtx) => {
       const pos = cachedCastPosRef.current;
-      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName });
+      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName });
       cachedCastPosRef.current = null;
-      }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName]);
+      }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName]);
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
 
