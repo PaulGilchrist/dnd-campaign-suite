@@ -216,8 +216,13 @@ async function applyImprovedWardingFlare(playerStats, defenderName, campaignName
     );
     if (!improvedWf) return null;
 
-    const amount = evaluateAutoExpression(improvedWf.automation.tempHpExpression, playerStats);
-    if (typeof amount !== 'number' || amount <= 0) return null;
+    const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
+    const wisMod = wis?.bonus ?? 0;
+
+    const roll1 = Math.floor(Math.random() * 6) + 1;
+    const roll2 = Math.floor(Math.random() * 6) + 1;
+    const amount = roll1 + roll2 + wisMod;
+    if (amount <= 0) return null;
 
     setRuntimeValue(defenderName, 'tempHp', amount, campaignName);
     return amount;

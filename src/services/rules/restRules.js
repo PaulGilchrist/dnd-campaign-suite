@@ -101,6 +101,11 @@ export async function applyShortRest(playerStats, campaignName) {
     updates[key] = null
    }
 
+  const hasImprovedWardingFlare = playerStats.characterAdvancement?.some(f => f.name === 'Improved Warding Flare')
+  if (hasImprovedWardingFlare) {
+    updates.wardingflareUses = null
+  }
+
       // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
   updates.activeBuffs = [];
   updates.activeConditions = [];
@@ -132,6 +137,11 @@ export async function applyLongRest(playerStats, campaignName) {
   getLongRestResources().forEach((key) => {
     charData[key] = null
      })
+
+  const hasImprovedWardingFlare = playerStats.characterAdvancement?.some(f => f.name === 'Improved Warding Flare')
+  if (hasImprovedWardingFlare) {
+    charData.wardingflareUses = null
+  }
 
   // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
   charData.activeBuffs = [];
