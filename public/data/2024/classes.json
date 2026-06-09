@@ -1804,7 +1804,7 @@
                             "damageExpression": "WIS modifier d8",
                             "damageType": "Radiant",
                             "extraVs": "undead",
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     }
                 ],

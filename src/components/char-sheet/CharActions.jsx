@@ -125,6 +125,49 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         },
     });
 
+    // Apply Searing Undead Radiant damage when Turn Undead resolves
+    useEffect(() => {
+        const handleTurnUndeadResult = (e) => {
+            if (!playerStats || !e.detail) return;
+            const { failedTargets, attackerName, campaignName: eventCampaign } = e.detail;
+            if (attackerName !== playerStats.name) return;
+            if (campaignName !== eventCampaign) return;
+
+            const searingUndead = playerStats.automation?.actions?.find(
+                a => a.type === 'damage_bonus' && a.trigger === 'turn_undead_fail'
+            );
+            if (!searingUndead) return;
+
+            const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
+            const wisMod = Math.max(1, wis?.bonus || 0);
+            const expr = `${wisMod}d8`;
+            const result = rollExpression(expr);
+            if (!result) return;
+
+            const baseContext = {
+                damageType: searingUndead.damageType || 'Radiant',
+                attackerName: playerStats.name,
+                saveDc: e.detail.saveDc,
+                saveType: e.detail.saveType,
+                dcSuccess: false,
+            };
+
+            for (const targetName of failedTargets) {
+                rollDamage(
+                    searingUndead.name,
+                    expr,
+                    result.total,
+                    result.rolls,
+                    result.modifier,
+                    { ...baseContext, targetName }
+                );
+            }
+        };
+
+        window.addEventListener('turn-undead-result', handleTurnUndeadResult);
+        return () => window.removeEventListener('turn-undead-result', handleTurnUndeadResult);
+    }, [playerStats, campaignName, rollDamage]);
+
     const getTargetInfo = React.useCallback(async () => {
         const cs = await getCombatContext(campaignName);
         if (!cs) return null;
