@@ -1560,7 +1560,7 @@
                             "trigger": "failed_ability_check_or_attack_roll",
                             "effect": "add_to_failed_roll",
                             "bonusExpression": "bardic_inspiration_die",
-                            "casting_time": "1 action"
+                            "casting_time": "1 reaction"
                         }
                     }
                 ],

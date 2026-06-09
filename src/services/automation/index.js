@@ -20,6 +20,7 @@ import { handle as handleWeaponMastery } from './handlers/weaponMasteryHandler.j
 import { handle as handleBuffAlly } from './handlers/buffAllyHandler.js';
 import { handle as handleRevivification } from './handlers/revivificationHandler.js';
 import { handle as handleBardicInspiration } from './handlers/bardicInspirationHandler.js';
+import { handle as handleAutoReroll } from './handlers/autoRerollHandler.js';
 import { handle as handleBardicInspirationUse } from './handlers/bardicInspirationUseHandler.js';
 import { handle as handleReactionBonus } from './handlers/reactionBonusHandler.js';
 import { handle as handlePostCastRider } from './handlers/postCastRiderHandler.js';
@@ -51,7 +52,7 @@ const HANDLER_MAP = {
     conditional_disadvantage: handleGenericPopup,
     conditional_advantage: handleGenericPopup,
     passive_rule: handleGenericPopup,
-    auto_reroll: handleGenericPopup,
+    auto_reroll: handleAutoReroll,
     reaction_damage: handleReactionDamage,
     reaction_debuff: handleReactionDebuff,
     mastery_rider: handleWeaponMastery,

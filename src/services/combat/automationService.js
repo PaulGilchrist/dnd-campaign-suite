@@ -82,6 +82,7 @@ function buildAttackInfo(feature, playerStats) {
                 target: auto.target || 'd20',
                 condition: auto.condition || '',
                 effect: auto.effect || 'reroll',
+                trigger: auto.trigger || '',
                 bonusExpression: auto.bonusExpression || '',
                 oncePerRage: !!auto.oncePerRage,
                 hasAutomation: true
