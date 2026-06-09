@@ -21,10 +21,21 @@ export function getMaxSorceryPoints(playerStats) {
   return features?.maxSorceryPoints || 0;
 }
 
+/**
+ * Save the last damage event for a character.
+ * Used by reaction features (e.g., Cutting Words) and metamagic (e.g., Empowered Spell)
+ * to retrieve the most recent damage roll for rollback / modification.
+ * Stored under runtime key 'lastMetamagicDamage' (legacy name — used for all damage events).
+ */
 export function saveLastDamageEvent(characterName, event, campaignName) {
   setRuntimeValue(characterName, 'lastMetamagicDamage', event, campaignName);
 }
 
+/**
+ * Retrieve the last damage event for a character.
+ * Used by reaction features (e.g., Cutting Words) and metamagic (e.g., Empowered Spell)
+ * to retrieve the most recent damage roll for rollback / modification.
+ */
 export function getLastDamageEvent(characterName) {
   return getRuntimeValue(characterName, 'lastMetamagicDamage');
 }

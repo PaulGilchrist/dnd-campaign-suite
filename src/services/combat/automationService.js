@@ -27,24 +27,6 @@ function getSaveDc(playerStats, ability, proficiency) {
     return 8 + getAbilityModifier(playerStats.abilities, ability) + (proficiency || 0)
 }
 
-function evaluateSaveDcExpression(expression, playerStats) {
-    if (!expression) return 10
-    const abilities = playerStats.abilities || []
-    let expr = expression
-    const abilityNames = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA']
-    for (const abil of abilityNames) {
-        const modifier = getAbilityModifier(abilities, abil)
-        expr = expr.replace(new RegExp(`${abil} modifier`, 'gi'), modifier)
-    }
-    const prof = playerStats.proficiency || 0
-    expr = expr.replace(/proficiency_bonus/g, prof)
-    try {
-        const result = new Function(`"use strict"; return (${expr})`)()
-        if (typeof result === 'number' && !isNaN(result)) return result
-    } catch (e) { /* fall through */ }
-    return 10
-}
-
 function buildAttackInfo(feature, playerStats) {
     const auto = feature.automation
     if (!auto) return null
@@ -475,15 +457,10 @@ function buildAttackInfo(feature, playerStats) {
                 type: 'reaction_debuff',
                 name: feature.name,
                 trigger: auto.trigger || '',
-                effect: auto.effect || '',
-                saveType: auto.saveType || 'STR',
-                saveDc: evaluateSaveDcExpression(auto.saveDcExpression, playerStats),
-                saveDcExpression: auto.saveDcExpression || '',
-                range: auto.range || '60_ft',
-                teleportRange: auto.teleportRange || '',
                 debuffExpression: auto.debuffExpression || '',
-                uses_expression: auto.uses_expression || '',
-                recharge: auto.recharge || '',
+                subtractive: !!auto.subtractive,
+                range: auto.range || '60_ft',
+                casting_time: auto.casting_time || '1 reaction',
                 hasAutomation: true
             }
         }
@@ -743,7 +720,6 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'bonus_attacks':
             case 'bonus_action_attack':
             case 'reaction_damage':
-            case 'reaction_debuff':
             case 'reaction_bonus':
             case 'free_spell':
                 if (info.action === 'bonus_action') {
@@ -764,6 +740,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break
             case 'damage_reduction':
             case 'auto_reroll':
+            case 'reaction_debuff':
                 result.reactions.push(info)
                 break
             case 'temp_buff':

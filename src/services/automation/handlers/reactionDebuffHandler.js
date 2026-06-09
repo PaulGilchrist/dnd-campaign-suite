@@ -1,77 +1,146 @@
-import { createSaveListener } from '../common/savePrompt.js';
-import { resolveTarget } from '../common/targetResolver.js';
-import { setRuntimeValue, getRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { resolveTarget, resolveMapPositions } from '../common/targetResolver.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { getDistanceFeet, rangeToFeet } from '../../rules/rangeValidation.js';
+import { getCombatContext } from '../../rules/damageUtils.js';
+import { applyHealingToTarget } from '../../rules/applyHealing.js';
+import { getLastDamageEvent } from '../../../hooks/useMetamagic.js';
 
-export async function handle(action, playerStats, campaignName, _mapName) {
+export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
+    const playerName = playerStats.name;
 
-    const saveDc = auto.saveDc || 10;
-    const targetInfo = await resolveTarget(campaignName, playerStats.name);
-    const targetName = targetInfo?.target?.name || playerStats.name;
+    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+    const bardicDieSize = classLevel?.bardic_die || 6;
 
-    const { promptId } = createSaveListener(campaignName, {
-        targetName,
-        saveType: auto.saveType || 'STR',
-        saveDc,
-    });
+    const usesMax = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_inspiration_uses
+        ?? (playerStats.proficiency || 0);
 
-    addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: playerStats.name,
-        abilityName: action.name,
-        description: `${action.name} triggered — target ${targetName} must make ${auto.saveType || 'STR'} save (DC ${saveDc})`,
-        promptId,
-    }).catch(() => {});
-
-    const handleSaveResult = async (event) => {
-        if (event.detail.promptId !== promptId) return;
-        window.removeEventListener('save-result', handleSaveResult);
-
-        if (event.detail.success) {
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: playerStats.name,
-                rollType: 'save-reaction_debuff',
-                targetName,
-                saveDc,
-                saveType: auto.saveType || 'STR',
-                success: true,
-                description: `${targetName} succeeded on ${auto.saveType || 'STR'} save. No effect.`,
-            }).catch(() => {});
-            return;
+    if (usesMax > 0) {
+        const usesUsed = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? 0);
+        if (usesUsed >= usesMax) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: `${action.name} has no uses remaining. Recharges on a Long Rest.`,
+                    automation: auto,
+                },
+            };
         }
+    }
 
-        const conditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-        const newConditions = Array.isArray(conditions) ? [...conditions, 'speed_zero'] : ['speed_zero'];
-        setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
+    const targetInfo = await resolveTarget(campaignName, playerName);
+    if (!targetInfo?.target) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name} requires a target. Select a creature in combat and try again.`,
+                automation: auto,
+            },
+        };
+    }
 
-        addExpiration(playerStats.name, targetName, [
-            { type: 'condition', condition: 'speed_zero' }
-        ], campaignName);
+    const attackerName = targetInfo.target.name;
+    const rangeFt = rangeToFeet(auto.range || '60_ft');
 
-        addEntry(campaignName, {
-            type: 'save_result',
-            characterName: playerStats.name,
-            rollType: 'save-reaction_debuff',
-            targetName,
-            saveDc,
-            saveType: auto.saveType || 'STR',
-            success: false,
-            description: `${targetName} failed ${auto.saveType || 'STR'} save. Teleported within ${auto.teleportRange || '5'} ft and speed reduced to 0 until end of turn.`,
-        }).catch(() => {});
+    if (mapName && rangeFt != null) {
+        const positions = await resolveMapPositions(campaignName, mapName, playerName);
+        if (positions?.attackerPos && positions?.targetPos) {
+            const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
+            if (dist != null && dist > rangeFt) {
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: action.name,
+                        description: `${attackerName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`,
+                        automation: auto,
+                    },
+                };
+            }
+        }
+    }
+
+    const lastEvent = getLastDamageEvent(attackerName);
+    if (!lastEvent || !lastEvent.rawDamage) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `No recent damage event found for ${attackerName}. Cutting Words can only be used after a damage roll.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const defenderName = lastEvent.targetName;
+    if (!defenderName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `Could not determine who ${attackerName} damaged. Cannot apply Cutting Words.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const biDieRoll = Math.floor(Math.random() * bardicDieSize) + 1;
+    const originalDamage = lastEvent.rawDamage;
+    const reducedDamage = Math.max(0, originalDamage - biDieRoll);
+    const healAmount = originalDamage - reducedDamage;
+
+    const combatSummary = await getCombatContext(campaignName);
+    if (!combatSummary) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `No combat context found. Cannot apply Cutting Words.`,
+                automation: auto,
+            },
+        };
+    }
+
+    let defenderHp = null;
+    if (healAmount > 0) {
+        const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount, campaignName);
+        defenderHp = healResult?.newHp ?? null;
+    }
+
+    if (usesMax > 0) {
+        const usesUsed = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? 0);
+        await setRuntimeValue(playerName, 'bardicInspirationUses', usesUsed + 1, campaignName);
+    }
+
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: action.name,
+        description: `${playerName} used ${action.name} on ${attackerName}'s attack against ${defenderName}: rolled 1d${bardicDieSize} (${biDieRoll}), reducing damage from ${originalDamage} to ${reducedDamage}.`,
+        targetName: attackerName,
+        biDieRoll,
+        biDieSize: bardicDieSize,
+        originalDamage,
+        reducedDamage,
+        timestamp: Date.now(),
     };
 
-    window.addEventListener('save-result', handleSaveResult);
+    addEntry(campaignName, logEntry).catch(() => {});
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: action.name,
-            targetName,
-            description: `${targetName} must make a ${auto.saveType || 'STR'} saving throw (DC ${saveDc}). On failure, teleported within ${auto.teleportRange || '5'} ft and speed is reduced to 0 until end of turn.`,
+            description: `<b>${action.name}</b><br/>Attacker: ${attackerName}<br/>Defender: ${defenderName}<br/>Bardic Inspiration die: 1d${bardicDieSize} = <b>${biDieRoll}</b><br/>Original damage: ${originalDamage}<br/>Reduced damage: <b>${reducedDamage}</b><br/>${healAmount > 0 ? `Healed ${defenderName} for ${healAmount} HP.` : ''}${defenderHp != null ? `<br/>${defenderName} HP: ${defenderHp}` : ''}`,
             automation: auto,
         },
     };
