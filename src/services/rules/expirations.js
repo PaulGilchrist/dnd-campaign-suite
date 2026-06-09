@@ -153,6 +153,11 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 setRuntimeValue(targetName, 'inspiringMovementGranted', null, campaignName);
                 break;
 
+            case 'unbreakable_majesty':
+                setRuntimeValue(targetName, 'unbreakableMajestyActive', null, campaignName);
+                setRuntimeValue(targetName, 'unbreakableMajestySaveDc', null, campaignName);
+                break;
+
             case 'condition':
                 removeActiveCondition(targetName, effect.condition, campaignName);
                 removeNpcCondition(targetName, effect.condition, campaignName);

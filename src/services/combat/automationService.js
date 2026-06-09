@@ -440,21 +440,24 @@ function buildAttackInfo(feature, playerStats) {
         }
 
          case 'reaction_bonus': {
-             return {
-                 type: 'reaction_bonus',
-                 name: feature.name,
-                 trigger: auto.trigger || '',
-                 bonusExpression: auto.bonusExpression || '',
-                 condition: auto.condition || '',
-                 selfMovement: auto.selfMovement || '',
-                 allyMovement: auto.allyMovement || '',
-                 allyRange: auto.allyRange || '30 ft',
-                 noOAs: !!auto.noOAs,
-                 resourceCost: auto.resourceCost || '',
-                 effect: auto.effect || '',
-                 hasAutomation: true
-             }
-         }
+              return {
+                  type: 'reaction_bonus',
+                  name: feature.name,
+                  trigger: auto.trigger || '',
+                  bonusExpression: auto.bonusExpression || '',
+                  condition: auto.condition || '',
+                  selfMovement: auto.selfMovement || '',
+                  allyMovement: auto.allyMovement || '',
+                  allyRange: auto.allyRange || '30 ft',
+                  noOAs: !!auto.noOAs,
+                  resourceCost: auto.resourceCost || '',
+                  effect: auto.effect || '',
+                  saveType: auto.saveType || '',
+                  saveDc: auto.saveDc || '',
+                  duration: auto.duration || '',
+                  hasAutomation: true
+              }
+          }
 
         case 'reaction_damage': {
             return {

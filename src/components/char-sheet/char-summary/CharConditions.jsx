@@ -8,6 +8,7 @@ import usePopup from '../../../hooks/usePopup.js'
 import Popup from '../../common/Popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
 import { computeAuraBonus } from '../../../services/combat/auraOfProtection.js'
+import { clearUnbreakableMajesty } from '../../../services/combat/unbreakableMajesty.js'
 import './CharConditions.css'
 
 const STORAGE_KEY = 'activeConditions'
@@ -131,8 +132,11 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
      }
 
     setActiveConditions(prev => prev.includes(key) ? prev.filter(c => c !== key) : [...prev, key])
-    onConditionsChange?.()
-  }
+     onConditionsChange?.()
+     if (key === 'incapacitated') {
+         clearUnbreakableMajesty(playerStats.name, campaignName)
+     }
+   }
 
   const adjustExhaustion = (delta) => {
     if (delta < 0 && exhaustionLevel > 0) {

@@ -12,6 +12,7 @@ import { npcToMonsterFormat, npcHasStatBlock } from '../../services/encounters/n
 import * as mapsService from '../../services/maps/mapsService.js'
 import { expireStaleEffects } from '../../services/rules/expirations.js'
 import { loadCombatSummary, getCombatSummary, getActiveCreatureName } from '../../services/encounters/combatData.js'
+import { clearPerRoundMajestyTrackers } from '../../services/combat/unbreakableMajesty.js'
 import {
     setupCreatures,
     addNpc,
@@ -257,16 +258,19 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
          if (!cs) return
         const { newActiveName, roundIncrement } = getNextCreatureName(cs, activeCreatureName)
          if (!roundIncrement) {
-            storage.set('activeCreatureName', newActiveName, campaignName)
-            setActiveCreatureName(newActiveName)
-           } else {
-             cs.round++
-             storage.set('combatSummary', cs, campaignName)
-             setCombatSummary(cloneDeep(cs))
              storage.set('activeCreatureName', newActiveName, campaignName)
              setActiveCreatureName(newActiveName)
-           }
-         expireStaleEffects(campaignName)
+            } else {
+              cs.round++
+              storage.set('combatSummary', cs, campaignName)
+              setCombatSummary(cloneDeep(cs))
+              storage.set('activeCreatureName', newActiveName, campaignName)
+              setActiveCreatureName(newActiveName)
+              for (const creature of cs.creatures) {
+                  clearPerRoundMajestyTrackers(creature.name, campaignName)
+              }
+            }
+          expireStaleEffects(campaignName)
         }, [activeCreatureName, campaignName])
 
     const handlePreviousCreature = React.useCallback(() => {

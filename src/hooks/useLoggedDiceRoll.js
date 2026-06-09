@@ -17,6 +17,22 @@ import { clearAllExpirationEffects } from '../services/rules/expirations.js';
 import { loadCombatSummary, getCombatSummary } from '../services/encounters/combatData.js';
 import { saveLastDamageEvent } from '../hooks/useMetamagic.js';
 import { SHOW_DICE_ROLL_DELAY } from '../config/ui-config.js';
+import {
+    isUnbreakableMajestyActive,
+    getUnbreakableMajestySaveDc,
+    hasAttackerTriggeredMajesty,
+    markAttackerTriggeredMajesty,
+} from '../services/combat/unbreakableMajesty.js';
+
+function dispatchUnbreakableMajestySave(campaignName, defenderName, attackerName, saveDc, promptId) {
+    sendSavePrompt(campaignName, {
+        promptId,
+        targetName: attackerName,
+        saveType: 'CHA',
+        saveDc,
+        sourceName: defenderName,
+    });
+}
 
 function readAoeContext(campaignName) {
   try {
@@ -188,7 +204,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
 
      const target = combatSummary ? getTargetFromAttacker(combatSummary, utils.getName(characterName)) : null;
 
-     const isAutoMiss = context?.isAutoMiss === true;
+     let isAutoMiss = context?.isAutoMiss === true;
 
       const coverAcBonus = context?.coverAcBonus || 0;
 
@@ -209,8 +225,58 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       }
 
       const effectiveAc = target ? targetAc + coverAcBonus : undefined;
-      const hit = isAutoMiss ? false : (target ? (r1 + bonus >= effectiveAc) : undefined);
+      let hit = isAutoMiss ? false : (target ? (r1 + bonus >= effectiveAc) : undefined);
       const targetName = target?.name || context?.targetName;
+      const attackerName = context.attackerName || characterName;
+
+      if (hit && target) {
+          const majActive = isUnbreakableMajestyActive(target.name, campaignName);
+          if (majActive && !hasAttackerTriggeredMajesty(target.name, attackerName, campaignName)) {
+              const majSaveDc = getUnbreakableMajestySaveDc(target.name, campaignName);
+              const promptId = `majesty-${utils.guid()}`;
+              markAttackerTriggeredMajesty(target.name, attackerName, campaignName);
+              dispatchUnbreakableMajestySave(campaignName, target.name, attackerName, majSaveDc, promptId);
+              logEntry({
+                  type: 'ability_use',
+                  characterName: target.name,
+                  abilityName: 'Unbreakable Majesty',
+                  description: `${target.name}'s Unbreakable Majesty — ${attackerName} must make a CHA save (DC ${majSaveDc}) or the attack misses.`,
+              });
+              let saveResolved = false;
+              await new Promise((resolve) => {
+                  const handler = (event) => {
+                      if (event.detail.promptId !== promptId) return;
+                      window.removeEventListener('save-result', handler);
+                      saveResolved = true;
+                      if (!event.detail.success) {
+                          hit = false;
+                          isAutoMiss = true;
+                          logEntry({
+                              type: 'ability_use',
+                              characterName: target.name,
+                              abilityName: 'Unbreakable Majesty',
+                              description: `${attackerName} failed the CHA save — attack misses due to Unbreakable Majesty!`,
+                          });
+                      } else {
+                          logEntry({
+                              type: 'ability_use',
+                              characterName: target.name,
+                              abilityName: 'Unbreakable Majesty',
+                              description: `${attackerName} succeeded on the CHA save — attack hits.`,
+                          });
+                      }
+                      resolve();
+                  };
+                  window.addEventListener('save-result', handler);
+                  setTimeout(() => {
+                      if (!saveResolved) {
+                          window.removeEventListener('save-result', handler);
+                          resolve();
+                      }
+                  }, 30000);
+              });
+          }
+      }
 
       const isCrit = !isAutoMiss && (r1 === 20 || context?.isAutoCrit) && hit;
 

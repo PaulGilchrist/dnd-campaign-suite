@@ -9,6 +9,11 @@ export function buildSaveDc(auto, playerStats) {
         const prof = playerStats.proficiency || 0;
         return 8 + abilityBonus + prof;
      }
+    if (auto.saveDc === 'spell_save_dc') {
+        const prof = playerStats.proficiency || 0;
+        const chaBonus = getAbilityModifier(playerStats.abilities, 'CHA');
+        return 8 + chaBonus + prof;
+    }
     return auto.saveDc || 10;
  }
 

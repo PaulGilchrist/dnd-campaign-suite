@@ -7,6 +7,72 @@ import { getDistanceFeet, rangeToFeet } from '../../rules/rangeValidation.js';
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
 
+    if (auto.effect === 'miss_on_failed_save') {
+        return handleUnbreakableMajesty(action, playerStats, campaignName);
+    }
+
+    return handleInspiringMovement(action, playerStats, campaignName, mapName);
+}
+
+async function handleUnbreakableMajesty(action, playerStats, campaignName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+
+    const activeKey = 'unbreakableMajestyActive';
+    const wasActive = getRuntimeValue(playerName, activeKey, campaignName) === true;
+
+    if (wasActive) {
+        setRuntimeValue(playerName, activeKey, null, campaignName);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: `${playerName} ended ${action.name}.`,
+        }).catch(() => {});
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name} ended.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const chaBonus = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
+    const prof = playerStats.proficiency || 0;
+    const saveDc = 8 + chaBonus + prof;
+
+    setRuntimeValue(playerName, activeKey, true, campaignName);
+    setRuntimeValue(playerName, 'unbreakableMajestySaveDc', saveDc, campaignName);
+
+    const durationRounds = parseDurationRounds(auto.duration) || 10;
+    addExpiration(playerName, playerName, [
+        { type: 'unbreakable_majesty' }
+    ], campaignName, durationRounds);
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: action.name,
+        description: `${playerName} activated ${action.name}. Attacks against them may miss on a failed CHA save (DC ${saveDc}).`,
+    }).catch(() => {});
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description: `${action.name} activated. For ${auto.duration || '1 minute'}, the first attack per turn that hits you forces the attacker to make a CHA save (DC ${saveDc}) or the attack misses. Ends if you are Incapacitated.`,
+            automation: auto,
+        },
+    };
+}
+
+async function handleInspiringMovement(action, playerStats, campaignName, mapName) {
+    const auto = action.automation;
+
     const usesMax = auto.uses_expression
         ? evaluateUses(auto.uses_expression, playerStats)
         : (auto.usesMax ?? auto.uses ?? 0);
@@ -112,4 +178,13 @@ function evaluateUses(expression, playerStats) {
         if (typeof result === 'number' && !isNaN(result)) return result;
     } catch (e) { /* not a simple expression */ }
     return 0;
+}
+
+function parseDurationRounds(duration) {
+    if (!duration) return undefined;
+    const lower = duration.toLowerCase();
+    if (lower.startsWith('1_minute')) return 10;
+    const match = lower.match(/(\d+)_round/);
+    if (match) return parseInt(match[1], 10);
+    return undefined;
 }
