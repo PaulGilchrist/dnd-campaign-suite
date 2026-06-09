@@ -2254,11 +2254,12 @@
                         "description": "As a Magic action, you present your Holy Symbol and expend a use of your Channel Divinity to evoke healing energy that can restore a number of Hit Points equal to five times your Cleric level. Choose Bloodied creatures within 30 feet of yourself and divide those Hit Points among them.",
                         "level": 3,
                         "automation": {
-                            "type": "healing",
+                            "type": "healing_pool",
                             "action": "action",
-                            "healExpression": "5 * cleric_level",
+                            "poolExpression": "5 * cleric_level",
                             "range": "30 ft",
                             "resourceCost": "channel_divinity",
+                            "bloodiedOnly": true,
                             "casting_time": "1 action"
                         }
                     },

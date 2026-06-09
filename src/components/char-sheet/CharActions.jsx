@@ -804,6 +804,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         resourceKey={healingPoolModal.resourceKey}
                         alsoCures={healingPoolModal.alsoCures}
                         cureCost={healingPoolModal.cureCost}
+                        bloodiedOnly={healingPoolModal.bloodiedOnly}
                         restoringTouchConditions={healingPoolModal.restoringTouchConditions}
                         onClose={() => setHealingPoolModal(null)}
                     />

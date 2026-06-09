@@ -358,6 +358,8 @@ function buildAttackInfo(feature, playerStats) {
                 recharge: auto.recharge || 'long_rest',
                 alsoCures: auto.alsoCures || [],
                 cureCost: auto.cureCost || 5,
+                range: auto.range || '',
+                resourceCost: auto.resourceCost || '',
                 resourceKey: feature.name.toLowerCase().replace(/\s+/g, '') + 'Pool',
                 hasAutomation: true
             }
@@ -732,6 +734,7 @@ export function evaluateAutoExpression(expression, playerStats, prof, level, slo
            .replace(/bard level/gi, level)
            .replace(/rage_damage_d6/g, `${rageDamage}d6`)
            .replace(/rage_damage/g, rageDamage)
+           .replace(/cleric_level/gi, level)
             .replace(/level/gi, level)
             .replace(/spell_slot_level/g, slotLevel)
     const abilities = playerStats?.abilities || {}

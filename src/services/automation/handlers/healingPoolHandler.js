@@ -17,6 +17,9 @@ export async function handle(action, playerStats, _campaignName, _mapName) {
             resourceKey: auto.resourceKey,
             alsoCures: auto.alsoCures || [],
             cureCost: auto.cureCost || 5,
+            range: auto.range || '',
+            resourceCost: auto.resourceCost || '',
+            bloodiedOnly: !!auto.bloodiedOnly,
             restoringTouchConditions: restoringTouchData?.automation?.cureConditions || [],
             },
           };

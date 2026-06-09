@@ -31,7 +31,7 @@ function conditionLabel(name) {
     return name;
 }
 
-function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay On Hands', poolMax: poolMaxProp = 0, _poolExpression, isDicePool = false, dieType = null, resourceKey: resourceKeyProp, alsoCures, cureCost, restoringTouchConditions, onClose }) {
+function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay On Hands', poolMax: poolMaxProp = 0, _poolExpression, isDicePool = false, dieType = null, resourceKey: resourceKeyProp, alsoCures, cureCost, restoringTouchConditions, bloodiedOnly = false, onClose }) {
     const layOnHandsPoolMax = 5 * (playerStats.level || 1);
     const effectivePoolMax = isDicePool ? poolMaxProp : layOnHandsPoolMax;
     const effectiveResourceKey = isDicePool ? (resourceKeyProp || featureName.toLowerCase().replace(/\s+/g, '') + 'Pool') : 'layOnHandsPool';
@@ -77,6 +77,8 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
           const stored = getRuntimeValue(playerStats.name, 'currentHitPoints');
           return stored != null && stored !== '' ? Number(stored) : playerStats.hitPoints;
         })();
+
+    const isTargetBloodied = targetCurrentHp > 0 && targetCurrentHp <= Math.floor(targetMaxHp / 2);
 
     const getTargetConditions = React.useCallback(() => {
         const runtimeConditions = getRuntimeValue(targetName, 'activeConditions') || [];
@@ -317,7 +319,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
 
                 {!isDicePool && (
                     <div className="short-rest-section">
-                        <h4>Heal — {targetName} ({targetCurrentHp} / {targetMaxHp} HP)</h4>
+                        <h4>Heal — {targetName} ({targetCurrentHp} / {targetMaxHp} HP){bloodiedOnly && <span className="bloodied-badge"> (Bloodied only)</span>}</h4>
                         <div className="short-rest-dice-row">
                             <label>
                                 Amount:
@@ -333,16 +335,19 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                                     style={{ width: '62px', marginLeft: '6px' }}
                                 />
                             </label>
-                            <button className="char-btn" onClick={applyHeal} disabled={safePool <= 0 || healAmount <= 0}>
+                            <button className="char-btn" onClick={applyHeal} disabled={safePool <= 0 || healAmount <= 0 || (bloodiedOnly && !isTargetBloodied)}>
                                 <i className="fas fa-heart"></i> Apply Heal
                             </button>
                         </div>
+                        {bloodiedOnly && !isTargetBloodied && (
+                            <p className="healing-restriction-note">This feature can only heal Bloodied creatures (at half HP or less).</p>
+                        )}
                     </div>
                 )}
 
                 {isDicePool && (
                     <div className="short-rest-section">
-                        <h4>Roll Dice — {targetName} ({targetCurrentHp} / {targetMaxHp} HP)</h4>
+                        <h4>Roll Dice — {targetName} ({targetCurrentHp} / {targetMaxHp} HP){bloodiedOnly && <span className="bloodied-badge"> (Bloodied only)</span>}</h4>
                         <div className="short-rest-dice-row">
                             <label>
                                 Dice:
@@ -359,10 +364,13 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                                 />
                             </label>
                             <span> of {safePool} d{dieType}</span>
-                            <button className="char-btn" onClick={applyDiceHeal} disabled={safePool <= 0}>
+                            <button className="char-btn" onClick={applyDiceHeal} disabled={safePool <= 0 || (bloodiedOnly && !isTargetBloodied)}>
                                 <i className="fas fa-dice-d12"></i> Roll & Heal
                             </button>
                         </div>
+                        {bloodiedOnly && !isTargetBloodied && (
+                            <p className="healing-restriction-note">This feature can only heal Bloodied creatures (at half HP or less).</p>
+                        )}
                         {lastRoll && (
                             <div className="healing-roll-details" style={{ marginTop: '8px' }}>
                                 <span className="healing-formula">Rolled {lastRoll.count}d{dieType}: </span>
