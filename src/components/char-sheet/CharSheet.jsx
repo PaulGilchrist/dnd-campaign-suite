@@ -23,6 +23,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const exhaustionLevel = typeof storedExhaustion === 'number' ? Math.min(EXHAUSTION_LEVELS, Math.max(0, storedExhaustion)) : 0;
 
     const biDieRuntime = useRuntimeValue(playerSummary?.name, 'bardicInspirationDie', campaignName);
+    const biCombatOptRuntime = useRuntimeValue(playerSummary?.name, 'bardicInspirationCombatOptions', campaignName);
     React.useEffect(() => {
         const fetchData = async () => {
             const spellData = playerSummary.rules === '2024' ? allSpells2024 : allSpells;
@@ -75,9 +76,9 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             const biDie = getRuntimeValue(playerSummary.name, 'bardicInspirationDie', campaignName);
             if (biDie) {
                 if (!stats.characterAdvancement) stats.characterAdvancement = [];
-                const hasBIUseFeature = stats.characterAdvancement.some(f => f.name === 'Use Bardic Inspiration');
-                if (!hasBIUseFeature) {
-                    const grantedBy = getRuntimeValue(playerSummary.name, 'bardicInspirationGrantedBy', campaignName) || 'unknown';
+                const grantedBy = getRuntimeValue(playerSummary.name, 'bardicInspirationGrantedBy', campaignName) || 'unknown';
+
+                if (!stats.characterAdvancement.some(f => f.name === 'Use Bardic Inspiration')) {
                     stats.characterAdvancement.unshift({
                         name: 'Use Bardic Inspiration',
                         description: `Roll your Bardic Inspiration die (1d${biDie}) and add the result to an ability check. Die granted by ${grantedBy}.`,
@@ -86,12 +87,41 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                         },
                     });
                 }
+
+                // Combat Inspiration (College of Valor) options:
+                // Defense — reaction to add BI die to AC when hit
+                // Offense — add BI die to damage after hitting
+                const combatOptRaw = getRuntimeValue(playerSummary.name, 'bardicInspirationCombatOptions', campaignName);
+                let combatOpts = [];
+                try { combatOpts = JSON.parse(combatOptRaw) || []; } catch (e) { /* combatOpts is not valid JSON, ignore */ }
+
+                if (combatOpts.includes('defense_add_to_ac') &&
+                    !stats.characterAdvancement.some(f => f.name === 'Bardic Inspiration: Defense')) {
+                    stats.characterAdvancement.unshift({
+                        name: 'Bardic Inspiration: Defense',
+                        description: `Use your Reaction when hit by an attack roll to roll your Bardic Inspiration die (1d${biDie}) and add the number rolled to your AC. Die granted by ${grantedBy}.`,
+                        automation: {
+                            type: 'bardic_inspiration_defense',
+                        },
+                    });
+                }
+
+                if (combatOpts.includes('offense_add_to_damage') &&
+                    !stats.characterAdvancement.some(f => f.name === 'Bardic Inspiration: Offense')) {
+                    stats.characterAdvancement.unshift({
+                        name: 'Bardic Inspiration: Offense',
+                        description: `Immediately after hitting a target with an attack roll, roll your Bardic Inspiration die (1d${biDie}) and add the number rolled to the attack's damage. Die granted by ${grantedBy}.`,
+                        automation: {
+                            type: 'bardic_inspiration_offense',
+                        },
+                    });
+                }
             }
 
             setPlayerStats(stats);
         };
         fetchData();
-    }, [allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, biDieRuntime, campaignName]);
+    }, [allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, biDieRuntime, biCombatOptRuntime, campaignName]);
 
     React.useEffect(() => {
         if (!playerStats) return;

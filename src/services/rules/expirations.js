@@ -142,6 +142,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             case 'remove_bardic_inspiration': {
                 setRuntimeValue(targetName, 'bardicInspirationDie', null, campaignName);
                 setRuntimeValue(targetName, 'bardicInspirationGrantedBy', null, campaignName);
+                setRuntimeValue(targetName, 'bardicInspirationCombatOptions', null, campaignName);
                 break;
             }
 

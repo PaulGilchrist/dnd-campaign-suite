@@ -145,6 +145,20 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'bardic_inspiration_defense':
+            return {
+                type: 'bardic_inspiration_defense',
+                name: feature.name,
+                hasAutomation: true,
+            }
+
+        case 'bardic_inspiration_offense':
+            return {
+                type: 'bardic_inspiration_offense',
+                name: feature.name,
+                hasAutomation: true,
+            }
+
         case 'combat_stance': {
             return {
                 type: 'combat_stance',
@@ -724,6 +738,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'reaction_damage':
             case 'reaction_bonus':
             case 'free_spell':
+            case 'bardic_inspiration_offense':
                 if (info.action === 'bonus_action') {
                     result.bonusActions.push(info)
                 } else {
@@ -743,6 +758,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'damage_reduction':
             case 'auto_reroll':
             case 'reaction_debuff':
+            case 'bardic_inspiration_defense':
                 result.reactions.push(info)
                 break
             case 'temp_buff':

@@ -68,6 +68,14 @@ export async function handle(action, playerStats, campaignName, mapName) {
     await setRuntimeValue(targetName, 'bardicInspirationDie', String(dieSize), campaignName);
     await setRuntimeValue(targetName, 'bardicInspirationGrantedBy', playerStats.name, campaignName);
 
+    const hasCombatOptions = (playerStats.automation?.passives || []).some(
+        p => p.effect === 'bardic_inspiration_combat_options'
+    );
+    if (hasCombatOptions) {
+        const options = auto.options || ['defense_add_to_ac', 'offense_add_to_damage'];
+        await setRuntimeValue(targetName, 'bardicInspirationCombatOptions', JSON.stringify(options), campaignName);
+    }
+
     addExpiration(playerStats.name, targetName, [
         { type: 'remove_bardic_inspiration' }
     ], campaignName, 100);

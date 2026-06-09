@@ -1577,14 +1577,13 @@
                         "description": "A creature that has a Bardic Inspiration die from you can use it for one of the following effects. Defense. When the creature is hit by an attack roll, that creature can use its Reaction to roll the Bardic Inspiration die and add the number rolled to its AC. Offense. Immediately after the creature hits a target with an attack roll, the creature can roll the Bardic Inspiration die and add the number rolled to the attack's damage.",
                         "level": 3,
                         "automation": {
-                            "type": "buff_ally",
-                            "buffExpression": "bardic_inspiration_die",
+                            "type": "passive_rule",
+                            "effect": "bardic_inspiration_combat_options",
                             "options": [
                                 "defense_add_to_ac",
                                 "offense_add_to_damage"
                             ],
-                            "range": "60 ft",
-                            "casting_time": "1 bonus action"
+                            "casting_time": "passive"
                         }
                     },
                     {

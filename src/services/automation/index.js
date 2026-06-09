@@ -24,6 +24,8 @@ import { handle as handleAutoReroll } from './handlers/autoRerollHandler.js';
 import { handle as handleBardicInspirationUse } from './handlers/bardicInspirationUseHandler.js';
 import { handle as handleReactionBonus } from './handlers/reactionBonusHandler.js';
 import { handle as handlePostCastRider } from './handlers/postCastRiderHandler.js';
+import { handle as handleBardicInspirationDefense } from './handlers/bardicInspirationDefenseHandler.js';
+import { handle as handleBardicInspirationOffense } from './handlers/bardicInspirationOffenseHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -61,6 +63,8 @@ const HANDLER_MAP = {
      bardic_inspiration_use: handleBardicInspirationUse,
      reaction_bonus: handleReactionBonus,
      post_cast_rider: handlePostCastRider,
+     bardic_inspiration_defense: handleBardicInspirationDefense,
+     bardic_inspiration_offense: handleBardicInspirationOffense,
 };
 
 export async function executeHandler(action, playerStats, campaignName, mapName) {
