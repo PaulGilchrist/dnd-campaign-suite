@@ -22,12 +22,14 @@ import HandOfHealingModal from './HandOfHealingModal.jsx'
 import FontOfMagicModal from './FontOfMagicModal.jsx'
 import SetConditionModal from './SetConditionModal.jsx'
 import DivineSparkModal from './DivineSparkModal.jsx'
+import DivineInterventionModal from './DivineInterventionModal.jsx'
 import AttackRiderModal from './AttackRiderModal.jsx'
 import WeaponMasteryModal from './WeaponMasteryModal.jsx'
 import CombatStanceModal from './CombatStanceModal.jsx'
 import TeleportModal from './TeleportModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
+import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/divineInterventionHandler.js';
 import { getClassFeatures } from '../../services/character/classFeatures.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
@@ -59,6 +61,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [combatStanceModal, setCombatStanceModal] = useState(null);
     const [teleportModal, setTeleportModal] = useState(null);
     const [divineSparkModal, setDivineSparkModal] = useState(null);
+    const [divineInterventionModal, setDivineInterventionModal] = useState(null);
+    const [divineInterventionAction, setDivineInterventionAction] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
@@ -549,6 +553,10 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'combatStance': setCombatStanceModal(result.payload); break;
                     case 'teleport': setTeleportModal(result.payload); break;
                     case 'divineSpark': setDivineSparkModal(result.payload); break;
+                    case 'divineIntervention':
+                        setDivineInterventionAction(action);
+                        setDivineInterventionModal(result.payload);
+                        break;
                  }
                 break;
             case 'roll':
@@ -576,6 +584,38 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             if (onBuffsChange) onBuffsChange();
          }
       }
+
+    const handleDivineInterventionCast = React.useCallback(async (selectedSpell) => {
+        setDivineInterventionModal(null);
+        const action = divineInterventionAction;
+        setDivineInterventionAction(null);
+        if (!action) return;
+
+        const result = await onDivineInterventionSpellSelected(action, playerStats, campaignName, selectedSpell);
+        if (!result) return;
+
+        if (result.type === 'spell_selected') {
+            const spell = result.spell;
+            const getTargetInfoFn = async () => {
+                const cs = await getCombatContext(campaignName);
+                return cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+            };
+            executeSpellCast(spell, {}, {
+                rollAttack,
+                rollDamage,
+                playerStats,
+                getTargetInfo: getTargetInfoFn,
+                campaignName,
+                mapName,
+            });
+
+            setPopupHtml({
+                type: 'automation_info',
+                name: result.name,
+                description: `Divine Intervention cast ${spell.name}. Divine Intervention recharges ${result.rechargeMessage}`,
+            });
+        }
+    }, [divineInterventionAction, playerStats, campaignName, rollAttack, rollDamage, mapName, setPopupHtml]);
 
     const getWeaponMastery = (weaponName) => {
         if (playerStats.rules !== '2024') {
@@ -790,6 +830,16 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <DivineSparkModal
                         {...divineSparkModal}
                         onClose={() => setDivineSparkModal(null)}
+                    />
+                )}
+                {divineInterventionModal && (
+                    <DivineInterventionModal
+                        {...divineInterventionModal}
+                        onSelect={handleDivineInterventionCast}
+                        onClose={() => {
+                            setDivineInterventionModal(null);
+                            setDivineInterventionAction(null);
+                        }}
                     />
                 )}
                 {divineFuryChoice && (

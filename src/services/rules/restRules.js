@@ -1,5 +1,5 @@
 import { getLevelAfterLongRest } from '../combat/exhaustionRules.js'
-import { getRuntimeValue, setRuntimeBatch } from '../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../hooks/useRuntimeState.js'
 import { clearAllExpirationEffects } from './expirations.js'
 
 export function getHitDieSize(playerStats) {
@@ -78,8 +78,9 @@ export const LONG_REST_RESOURCES = [
      'luckyPoints',
      'innateSorceryUses',
      'sorcerousRestorationUses',
-     'zealousPresenceUses',
-     'rageOfTheGodsUses'
+      'zealousPresenceUses',
+      'rageOfTheGodsUses',
+      'divineInterventionUses'
  ]
 
 export function getLongRestResources() {
@@ -149,6 +150,18 @@ export async function applyLongRest(playerStats, campaignName) {
 
       // Single atomic write fires ONE SSE event with the complete final state
   setRuntimeBatch(name, charData, campaignName)
+
+      // Handle Greater Divine Intervention Wish cooldown (2d4 long rests) — must run AFTER batch reset
+  const wishCooldown = getRuntimeValue(name, '_divineInterventionWishCooldown', campaignName)
+  if (wishCooldown != null && Number(wishCooldown) > 0) {
+    const newCooldown = Number(wishCooldown) - 1
+    if (newCooldown <= 0) {
+      setRuntimeValue(name, '_divineInterventionWishCooldown', 0, campaignName, true)
+    } else {
+      setRuntimeValue(name, '_divineInterventionWishCooldown', newCooldown, campaignName, true)
+      setRuntimeValue(name, 'divineInterventionUses', -1, campaignName, true)
+    }
+  }
 
   clearAllExpirationEffects(name, campaignName)
 }

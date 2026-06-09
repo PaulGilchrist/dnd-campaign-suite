@@ -27,6 +27,7 @@ import { handle as handlePostCastRider } from './handlers/postCastRiderHandler.j
 import { handle as handleBardicInspirationDefense } from './handlers/bardicInspirationDefenseHandler.js';
 import { handle as handleBardicInspirationOffense } from './handlers/bardicInspirationOffenseHandler.js';
 import { handle as handleDivineSpark } from './handlers/divineSparkHandler.js';
+import { handle as handleDivineIntervention } from './handlers/divineInterventionHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -44,6 +45,7 @@ const HANDLER_MAP = {
     buff_ally: handleBuffAlly,
     resource_pool: handleResourcePool,
     divine_spark: handleDivineSpark,
+    divine_intervention: handleDivineIntervention,
     font_of_magic: handleFontOfMagic,
     healing_pool: handleHealingPool,
     extra_action: handleGenericPopup,

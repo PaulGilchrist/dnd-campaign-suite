@@ -1947,11 +1947,10 @@
                         "level": 10,
                         "type": "class_feature",
                         "automation": {
-                            "type": "free_spell",
-                            "spell": "any_cleric_spell_level_5_or_lower",
-                            "action": "action",
+                            "type": "divine_intervention",
+                            "action": "magic_action",
                             "recharge": "long_rest",
-                            "casting_time": "1 action"
+                            "casting_time": "1 magic action"
                         }
                     }
                 ],
@@ -2209,12 +2208,11 @@
                         "level": 20,
                         "type": "class_feature",
                         "automation": {
-                            "type": "free_spell",
-                            "spell": "Wish",
-                            "action": "action",
-                            "recharge": "2d4_long_rests",
+                            "type": "divine_intervention",
+                            "action": "magic_action",
+                            "recharge": "long_rest",
                             "upgradeTo": "wish",
-                            "casting_time": "1 action"
+                            "casting_time": "1 magic action"
                         }
                     }
                 ],

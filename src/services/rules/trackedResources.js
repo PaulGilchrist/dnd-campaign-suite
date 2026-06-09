@@ -25,6 +25,7 @@ export const ALL_TRACKED_RESOURCES = [
   'uncannymetabolismUses',
   'rageOfTheGodsUses',
   'luckyPoints',
+  'divineInterventionUses',
   'shortRestHitDice',
   'spell_slots_level_1',
   'spell_slots_level_2',
@@ -147,6 +148,10 @@ export function computeTrackedResources(playerStats) {
   )
   const maxLP = isLucky ? (3 + Math.floor((playerStats.level || 0) / 2)) : 0
   resources.luckyPoints = { current: maxLP, max: maxLP }
+
+  const isCleric = playerStats.class?.name === 'Cleric'
+  const maxDI = isCleric && playerStats.level >= 10 ? 1 : 0
+  resources.divineInterventionUses = { current: maxDI, max: maxDI }
 
   return resources
 }

@@ -284,6 +284,18 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'divine_intervention': {
+            return {
+                type: 'divine_intervention',
+                name: feature.name,
+                action: auto.action || 'magic_action',
+                recharge: auto.recharge || 'long_rest',
+                upgradeTo: auto.upgradeTo || '',
+                casting_time: auto.casting_time || '1 magic action',
+                hasAutomation: true
+            }
+        }
+
         case 'font_of_magic': {
             return {
                 type: 'font_of_magic',
@@ -774,6 +786,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'reaction_damage':
             case 'reaction_bonus':
             case 'free_spell':
+            case 'divine_intervention':
             case 'bardic_inspiration_offense':
                 if (info.action === 'bonus_action') {
                     result.bonusActions.push(info)
