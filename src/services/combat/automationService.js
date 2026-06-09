@@ -93,6 +93,9 @@ function buildAttackInfo(feature, playerStats) {
             return {
                 type: 'bonus_action_attack',
                 name: feature.name,
+                trigger: auto.trigger || '',
+                action: auto.action || 'bonus_action',
+                weaponAttack: !!auto.weaponAttack,
                 extraDamageExpression: auto.extraDamageExpression || '',
                 resourceKey: auto.resourceKey || '',
                 hasAutomation: true

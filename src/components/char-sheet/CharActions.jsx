@@ -369,6 +369,18 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             window.dispatchEvent(new CustomEvent('focus-points-updated'));
          }
 
+        // Check trigger conditions for gated actions
+        if (auto?.trigger && auto.trigger !== '') {
+            if (auto.trigger === 'after_casting_action_spell') {
+                const lastCast = getRuntimeValue(playerStats.name, 'lastActionSpellCast', campaignName);
+                if (!lastCast) {
+                    setPopupHtml(`<b>${action.name}</b><br/>You must cast a spell with a casting time of an action first.`);
+                    return;
+                }
+                await setRuntimeValue(playerStats.name, 'lastActionSpellCast', 0, campaignName);
+            }
+        }
+
         const result = await executeHandler(action, playerStats, campaignName, mapName);
         if (!result) return;
 

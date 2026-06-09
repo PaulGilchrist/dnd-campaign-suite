@@ -2,11 +2,16 @@ import { rollExpression } from '../dice/diceRoller.js';
 import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet } from './rangeValidation.js';
 import { isInnateSorceryActive, getActiveBuffs } from '../combat/buffService.js';
 import { triggerPostCastRiderSaves } from './postCastRiderService.js';
+import { setRuntimeValue } from '../../hooks/useRuntimeState.js';
 
 export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName }) {
     if (getActiveBuffs(playerStats.name, campaignName).some(b => b.blocksSpellcasting)) {
         console.warn(`[spellCast] ${playerStats.name} cannot cast spells (blocked by active buff)`);
         return;
+    }
+
+    if (spell.casting_time === '1 action') {
+        setRuntimeValue(playerStats.name, 'lastActionSpellCast', 1, campaignName);
     }
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
   const slotDmg = spell.damage?.damage_at_slot_level;
