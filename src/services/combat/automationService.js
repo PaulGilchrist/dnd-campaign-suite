@@ -605,12 +605,15 @@ function buildAttackInfo(feature, playerStats) {
                 buffExpression: auto.buffExpression || '',
                 range: auto.range || '60_ft',
                 targets: auto.targets || 1,
+                targetsExpression: auto.targetsExpression || '',
+                bonusMovement: !!auto.bonusMovement,
                 extraEffect: auto.extraEffect || null,
                 tempHpExpression: auto.tempHpExpression || '',
                 triggerOnRage: !!auto.trigger_on_rage,
                 ongoingHealingExpression: auto.ongoingHealingExpression || '',
                 healingStartOfTurn: !!auto.healingStartOfTurn,
                 healingRange: auto.healingRange || '',
+                casting_time: auto.casting_time || '1 bonus action',
                 hasAutomation: true
             }
         }
