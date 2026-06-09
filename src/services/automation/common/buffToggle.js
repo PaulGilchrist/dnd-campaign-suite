@@ -10,19 +10,20 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState
  *
  * See buffAllyHandler.js for a complete example of this pattern.
  */
-export function toggleBuff(playerName, actionName, auto, campaignName) {
-    const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
-    const activeBuffs = Array.isArray(stored) ? stored : [];
-    const wasActive = activeBuffs.some(b => b.name === actionName);
+export function toggleBuff(playerName, actionName, auto, campaignName, targetName) {
+     const resolvedTarget = targetName || playerName;
+     const stored = getRuntimeValue(resolvedTarget, 'activeBuffs', campaignName);
+     const activeBuffs = Array.isArray(stored) ? stored : [];
+     const wasActive = activeBuffs.some(b => b.name === actionName);
 
-    const newBuffs = wasActive
-         ? activeBuffs.filter(b => b.name !== actionName)
-         : [...activeBuffs, { name: actionName, effect: auto.effect, duration: auto.duration, enemiesDisadvantageSaves: auto.enemies_disadvantage_saves || [], distance: auto.distance || '', extendedDistance: auto.extendedDistance || '' }];
+     const newBuffs = wasActive
+          ? activeBuffs.filter(b => b.name !== actionName)
+          : [...activeBuffs, { name: actionName, effect: auto.effect, duration: auto.duration, enemiesDisadvantageSaves: auto.enemies_disadvantage_saves || [], distance: auto.distance || '', extendedDistance: auto.extendedDistance || '', sourceCharacter: playerName }];
 
-    setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+     setRuntimeValue(resolvedTarget, 'activeBuffs', newBuffs, campaignName);
 
-    return { isActive: !wasActive, buffs: newBuffs, wasActive };
-}
+     return { isActive: !wasActive, buffs: newBuffs, wasActive, targetName: resolvedTarget };
+ }
 
 export function getActiveBuffs(playerName, campaignName) {
     const buffs = getRuntimeValue(playerName, 'activeBuffs', campaignName);

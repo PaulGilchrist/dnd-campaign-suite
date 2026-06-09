@@ -12,10 +12,14 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
      const abilityDesc = buildAbilityDetailHtml(allAbilityScores);
      const { popupHtml, setPopupHtml, rollAbilityCheck, rollSavingThrow, rollSkillCheck } = useLoggedDiceRoll(playerStats.name, campaignName);
 
-     const makeCheckContext = () => {
-       const forcedMode = conditionEffects?.abilityCheckDisadvantage ? 'disadvantage' : undefined
-       return forcedMode ? { forcedMode } : undefined
-     }
+      const makeCheckContext = (checkName) => {
+        let forcedMode = undefined
+        if (conditionEffects?.abilityCheckDisadvantage) forcedMode = 'disadvantage'
+        if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === checkName)) {
+          forcedMode = forcedMode === 'disadvantage' ? undefined : 'advantage'
+        }
+        return forcedMode ? { forcedMode } : undefined
+      }
 
       const makeSaveContext = (abilityName) => {
         const abbr = abilityName.substring(0, 3).toLowerCase()
@@ -56,18 +60,17 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                 <div className='left'><b>Skills</b></div>
             </div>
             {playerStats.abilities.map((ability) => {
-                const checkContext = makeCheckContext()
                 const saveContext = makeSaveContext(ability.name)
                 const abbr = ability.name.substring(0, 3).toLowerCase()
                 const autoFailSave = conditionEffects?.autoFailSaves?.includes(abbr)
                 return <div key={ability.name} className='abilities'>
                     <div className='clickable left' onClick={() => setPopupHtml(abilityDesc(ability.name))}>{ability.name}</div>
                     <div>{ability.totalScore}</div>
-                    <div className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => rollAbilityCheck(ability.name, ability.bonus - exhaustionPenalty, checkContext)}>{signFormatter.format(ability.bonus - exhaustionPenalty)}</div>
+                    <div className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => rollAbilityCheck(ability.name, ability.bonus - exhaustionPenalty, makeCheckContext(ability.name))}>{signFormatter.format(ability.bonus - exhaustionPenalty)}</div>
                      <div className={'clickable' + (exhaustionPenalty > 0 || autoFailSave || conditionEffects?.saveDisadvantage?.length > 0 ? ' stat--penalized' : '') + (hasSaveAdvantage(ability.name) ? ' stat--buffed' : '')} onClick={() => !autoFailSave && rollSavingThrow(ability.name, ability.save - exhaustionPenalty, saveContext)}>{autoFailSave ? 'AUTO FAIL' : signFormatter.format(ability.save - exhaustionPenalty)}{hasSaveAdvantage(ability.name) ? ' (Adv)' : ''}</div>
                     <div className='left'>{ability.skills.map((skill) => {
                         return <span key={skill.name}>
-                            <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => rollSkillCheck(skill.name, skill.bonus - exhaustionPenalty, checkContext)}>{skill.name} ({signFormatter.format(skill.bonus - exhaustionPenalty)})</span>
+                            <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => rollSkillCheck(skill.name, skill.bonus - exhaustionPenalty, makeCheckContext(skill.name))}>{skill.name} ({signFormatter.format(skill.bonus - exhaustionPenalty)})</span>
                             {ability.skills.indexOf(skill) < ability.skills.length - 1 ? ', ' : ''}
                         </span>;
                     })}</div>

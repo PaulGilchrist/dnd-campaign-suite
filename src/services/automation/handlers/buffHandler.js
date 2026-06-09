@@ -1,5 +1,7 @@
 import { toggleBuff } from '../common/buffToggle.js';
 import { handle as handleTeleport } from './tempTeleportHandler.js';
+import { getTargetFromAttacker } from '../../rules/damageUtils.js';
+import { getCombatSummary } from '../../encounters/combatData.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -8,13 +10,26 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return handleTeleport(action, playerStats, campaignName, _mapName);
     }
 
+    let targetName = playerStats.name;
+    if (auto?.target === 'willing_creature') {
+        const combatSummary = getCombatSummary();
+        if (combatSummary) {
+            const target = getTargetFromAttacker(combatSummary, playerStats.name);
+            if (target) {
+                targetName = target.name;
+            }
+        }
+    }
+
     const { wasActive } = toggleBuff(
         playerStats.name,
         action.name,
         auto,
-        campaignName
+        campaignName,
+        targetName
     );
 
+    const displayTarget = targetName === playerStats.name ? 'yourself' : targetName;
     return {
         type: 'popup',
         payload: {
@@ -23,7 +38,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             automationType: auto.type,
             description: wasActive
                 ? `${action.name} toggled OFF`
-                : `${action.name} activated (${auto.duration || '10 min'})`,
+                : `${action.name} activated on ${displayTarget} (${auto.duration || '10 min'})`,
             automation: auto,
         },
     };

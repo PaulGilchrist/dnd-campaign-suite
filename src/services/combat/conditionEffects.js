@@ -57,6 +57,8 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     attackAdvantageCount: 0,
     attackDisadvantageCount: 0,
     abilityCheckDisadvantage: false,
+    abilityCheckAdvantage: false,
+    abilityCheckAdvantageSkill: null,
     autoFailSaves: [],
     saveDisadvantage: [],
     cannotAct: false,

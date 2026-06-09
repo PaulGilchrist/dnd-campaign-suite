@@ -196,6 +196,13 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         conditionEffects.targetAdvantageCount = (conditionEffects.targetAdvantageCount || 0) + 1;
     }
 
+    // Blessing of the Trickster: Advantage on Dexterity (Stealth) checks
+    const hasTricksterBlessing = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_on_stealth');
+    if (hasTricksterBlessing) {
+        conditionEffects.abilityCheckAdvantage = true;
+        conditionEffects.abilityCheckAdvantageSkill = 'Stealth';
+    }
+
     // Buff-ally effects (e.g., Zealous Presence): Advantage on attack rolls and saving throws
     const buffAllyActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_attacks_and_saves');
     if (buffAllyActive) {
