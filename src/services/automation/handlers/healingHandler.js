@@ -1,8 +1,8 @@
-import { rollExpression } from '../../dice/diceRoller.js';
+import { rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.js';
 import { getClassFeatures } from '../../character/classFeatures.js';
 import { resolveTarget } from '../common/targetResolver.js';
 import { applyHealingDirectly, logHealingToSSE } from '../common/healingRoll.js';
-import { resolveHealingBonuses } from '../../combat/automationService.js';
+import { resolveHealingBonuses, hasHealingMaximization } from '../../combat/automationService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -18,7 +18,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const wisdom = playerStats.abilities?.find(a => a.name === 'Wisdom');
         const wisModifier = wisdom?.bonus || 0;
 
-        const rollResult = rollExpression(`1d${martialArtsDie}`);
+        const maximize = hasHealingMaximization(playerStats);
+        const rollResult = maximize ? rollExpressionMaximized(`1d${martialArtsDie}`) : rollExpression(`1d${martialArtsDie}`);
         if (!rollResult) return null;
 
         const baseHeal = rollResult.total + wisModifier;

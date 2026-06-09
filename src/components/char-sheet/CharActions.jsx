@@ -860,6 +860,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 {divineSparkModal && (
                     <DivineSparkModal
                         {...divineSparkModal}
+                        playerStats={playerStats}
                         onClose={() => setDivineSparkModal(null)}
                     />
                 )}

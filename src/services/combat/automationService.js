@@ -1085,4 +1085,9 @@ export function resolveHealingBonuses(playerStats, prof, level, slotLevel) {
     return totalBonus;
 }
 
+export function hasHealingMaximization(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p => p.type === 'passive_rule' && p.effect === 'maximize_healing_dice');
+}
+
 

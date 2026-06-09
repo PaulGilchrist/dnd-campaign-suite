@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { rollExpression } from '../../services/dice/diceRoller.js';
+import { rollExpression, rollExpressionMaximized } from '../../services/dice/diceRoller.js';
+import { hasHealingMaximization } from '../../services/combat/automationService.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { applyHealingDirectly, logHealingToSSE } from '../../services/automation/common/healingRoll.js';
 import { createSaveListener } from '../../services/automation/common/savePrompt.js';
 
-function DivineSparkModal({ featureName, attackerName, targetName, campaignName, healExpression, damageExpression, damageTypes, saveType, wisModifier, onClose }) {
+function DivineSparkModal({ featureName, attackerName, targetName, campaignName, healExpression, damageExpression, damageTypes, saveType, wisModifier, playerStats, onClose }) {
     const [mode, setMode] = useState(null);
     const [damageType, setDamageType] = useState(damageTypes[0] || 'Radiant');
     const [rolling, setRolling] = useState(false);
@@ -14,7 +15,8 @@ function DivineSparkModal({ featureName, attackerName, targetName, campaignName,
         setRolling(true);
         setMode('heal');
 
-        const rollResult = rollExpression(healExpression);
+        const maximize = hasHealingMaximization(playerStats);
+        const rollResult = maximize ? rollExpressionMaximized(healExpression) : rollExpression(healExpression);
         if (!rollResult) {
             setRolling(false);
             return;
@@ -164,7 +166,7 @@ function DivineSparkModal({ featureName, attackerName, targetName, campaignName,
                     {result && result.type === 'heal' && (
                         <>
                             <p><strong>{targetName}</strong> healed for <strong>{result.total}</strong> HP.</p>
-                            <p className="sp-note">Roll: {result.formula} = {result.total}</p>
+                            <p className="sp-note">Roll: {result.formula} = {result.total}{result.maximized ? ' (Maximized)' : ''}</p>
                             <p className="sp-note">Current HP: {result.newHp} / {result.maxHp} (healed {result.actualHeal})</p>
                         </>
                     )}

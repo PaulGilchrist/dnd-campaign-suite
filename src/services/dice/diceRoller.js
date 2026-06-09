@@ -55,4 +55,13 @@ function rollExpressionDoubled(formula) {
   return { total: total + modifier, rolls, modifier, formula };
 }
 
-export { rollD20, rollDie, rollDice, rollAdvantage, rollDisadvantage, parseExpression, rollExpression, rollExpressionDoubled };
+function rollExpressionMaximized(formula) {
+  const parsed = parseExpression(formula);
+  if (!parsed) return null;
+  const { count, sides, modifier } = parsed;
+  const maxTotal = count * sides;
+  const rolls = Array(count).fill(sides);
+  return { total: maxTotal + modifier, rolls, modifier, formula, maximized: true };
+}
+
+export { rollD20, rollDie, rollDice, rollAdvantage, rollDisadvantage, parseExpression, rollExpression, rollExpressionDoubled, rollExpressionMaximized };
