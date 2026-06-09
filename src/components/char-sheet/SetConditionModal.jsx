@@ -9,7 +9,7 @@ import { playerIsImmuneToCondition } from '../../services/combat/automationServi
 import utils from '../../services/ui/utils.js';
 import storage from '../../services/ui/storage.js';
 
-function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, onClose, characters, featureName = 'Abjure Foes', conditionName = 'frightened', saveType = 'WIS', rangeFeet = 60, durationRounds }) {
+function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, onClose, characters, featureName = 'Abjure Foes', conditionName = 'frightened', additionalCondition = null, saveType = 'WIS', rangeFeet = 60, durationRounds }) {
     const [selected, setSelected] = useState(new Set());
     const [processing, setProcessing] = useState(false);
     const [results, setResults] = useState([]);
@@ -39,16 +39,16 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
          });
      }, []);
 
-    const addConditionToCreature = useCallback((targetName, saveDcValue) => {
+    const applyConditionToCreature = useCallback((targetName, saveDcValue, condName) => {
         const creature = combatSummary.creatures.find(c => c.name === targetName);
         if (!creature) return;
 
-        const conditionKey = conditionName.toLowerCase();
+        const condKey = condName.toLowerCase();
 
         const targetCharacter = characters?.find(c => utils.getName(c.name) === targetName);
         const targetStats = targetCharacter?.computedStats || targetCharacter;
         if (targetStats && playerIsImmuneToCondition({
-            conditionKey,
+            conditionKey: condKey,
             playerStats: targetStats,
             getRuntimeValue,
             campaignName,
@@ -58,26 +58,39 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
 
         if (creature.type === 'player') {
             const conditions = getRuntimeValue(creature.name, 'activeConditions') || [];
-            const filtered = conditions.filter(c => String(c).toLowerCase() !== conditionKey);
-            setRuntimeValue(creature.name, 'activeConditions', [...filtered, conditionKey], campaignName);
+            const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
+            setRuntimeValue(creature.name, 'activeConditions', [...filtered, condKey], campaignName);
          } else {
-            creature.conditions = (creature.conditions || []).filter(c => c.key !== conditionKey);
+            creature.conditions = (creature.conditions || []).filter(c => c.key !== condKey);
             creature.conditions.push({
                 id: utils.guid(),
-                key: conditionKey,
-                label: conditionName.charAt(0).toUpperCase() + conditionName.slice(1),
+                key: condKey,
+                label: condName.charAt(0).toUpperCase() + condName.slice(1),
                 dc: saveDcValue,
                 ability: saveType.toLowerCase(),
              });
          }
+     }, [combatSummary, campaignName, characters, saveType]);
+
+    const addConditionToCreature = useCallback((targetName, saveDcValue) => {
+        applyConditionToCreature(targetName, saveDcValue, conditionName);
+
+        if (additionalCondition) {
+            applyConditionToCreature(targetName, saveDcValue, additionalCondition);
+        }
 
         addExpiration(attackerName, targetName, [
-            { type: conditionKey, condition: conditionKey },
+            { type: conditionName.toLowerCase(), condition: conditionName.toLowerCase() },
+            ...(additionalCondition ? [{ type: additionalCondition.toLowerCase(), condition: additionalCondition.toLowerCase() }] : []),
            ], campaignName, durationRounds);
 
-     }, [combatSummary, attackerName, campaignName, conditionName, saveType, characters, durationRounds]);
+     }, [attackerName, campaignName, conditionName, additionalCondition, durationRounds, applyConditionToCreature]);
 
     const logCondition = useCallback((targetName, saveDcValue) => {
+        const conditions = [conditionName.charAt(0).toUpperCase() + conditionName.slice(1)];
+        if (additionalCondition) {
+            conditions.push(additionalCondition.charAt(0).toUpperCase() + additionalCondition.slice(1));
+        }
         fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -85,14 +98,14 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
                 type: 'condition',
                 action: 'applied',
                 characterName: targetName,
-                condition: conditionName.charAt(0).toUpperCase() + conditionName.slice(1),
+                condition: conditions.join(' & '),
                 dc: saveDcValue,
                 ability: saveType,
                 sourceName: attackerName,
                 timestamp: Date.now(),
              }),
-         }).catch(() => {});
-     }, [campaignName, attackerName, conditionName, saveType]);
+          }).catch(() => {});
+     }, [campaignName, attackerName, conditionName, additionalCondition, saveType]);
 
     const handleApply = useCallback(() => {
         if (selected.size === 0) return;
@@ -233,7 +246,25 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
 
     const allResolved = processing && pendingPrompts.length === 0 && results.length >= selected.size;
 
-    const conditionLabel = conditionName.charAt(0).toUpperCase() + conditionName.slice(1);
+    React.useEffect(() => {
+        if (allResolved && featureName.toLowerCase().includes('turn undead')) {
+            const failedTargets = results.filter(r => !r.success).map(r => r.targetName);
+            if (failedTargets.length > 0) {
+                window.dispatchEvent(new CustomEvent('turn-undead-result', {
+                    detail: {
+                        failedTargets,
+                        attackerName,
+                        saveDc,
+                        saveType,
+                        campaignName,
+                    },
+                }));
+            }
+        }
+    }, [allResolved, featureName, results, attackerName, saveDc, saveType, campaignName]);
+
+    const conditionLabel = conditionName.charAt(0).toUpperCase() + conditionName.slice(1)
+        + (additionalCondition ? ' & ' + additionalCondition.charAt(0).toUpperCase() + additionalCondition.slice(1) : '');
 
     return (
          <div className="sp-overlay" onClick={onClose}>

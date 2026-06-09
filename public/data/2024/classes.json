@@ -1682,6 +1682,39 @@
                                 "Divine Spark",
                                 "Turn Undead"
                             ],
+                            "casting_time": "passive"
+                        }
+                    },
+                    {
+                        "name": "Divine Spark",
+                        "description": "As a Magic action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and add your Wisdom modifier. You either restore Hit Points to the creature equal to that total or force the creature to make a Constitution saving throw. On a failed save, the creature takes Necrotic or Radiant damage (your choice) equal to that total.",
+                        "level": 2,
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "divine_spark",
+                            "range": "30 ft",
+                            "healExpression": "1d8 + WIS modifier",
+                            "damageExpression": "1d8 + WIS modifier",
+                            "damageTypes": ["Necrotic", "Radiant"],
+                            "saveType": "CON",
+                            "resourceCost": "channel_divinity",
+                            "casting_time": "1 action"
+                        }
+                    },
+                    {
+                        "name": "Turn Undead",
+                        "description": "As a Magic action, you present your Holy Symbol and censure Undead creatures. Each Undead of your choice within 30 feet of you must make a Wisdom saving throw. If the creature fails its save, it has the Frightened and Incapacitated conditions for 1 minute.",
+                        "level": 2,
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "set_condition",
+                            "saveType": "WIS",
+                            "condition": "frightened",
+                            "additionalCondition": "incapacitated",
+                            "range": "30 ft",
+                            "duration": "1_minute",
+                            "target": "undead_in_range",
+                            "effect": "add_condition",
                             "casting_time": "1 action"
                         }
                     }

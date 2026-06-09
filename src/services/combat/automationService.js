@@ -560,12 +560,27 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'divine_spark': {
+            return {
+                type: 'divine_spark',
+                name: feature.name,
+                range: auto.range || '30 ft',
+                healExpression: auto.healExpression || '',
+                damageExpression: auto.damageExpression || '',
+                damageTypes: auto.damageTypes || [],
+                saveType: auto.saveType || 'CON',
+                resourceCost: auto.resourceCost || '',
+                hasAutomation: true
+            }
+        }
+
         case 'set_condition': {
             return {
                 type: 'set_condition',
                 name: feature.name,
                 target: auto.target,
                 condition: auto.condition,
+                additionalCondition: auto.additionalCondition || null,
                 cost: auto.cost || '',
                 range: auto.range || '60 ft',
                 saveType: auto.saveType || 'STR',
@@ -753,6 +768,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'initiative_action':
             case 'spell_modifier':
             case 'font_of_magic':
+            case 'divine_spark':
             case 'set_condition':
             case 'sorcery_aura':
             case 'sorcery_incarnate':

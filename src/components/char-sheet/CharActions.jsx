@@ -21,6 +21,7 @@ import HealingPoolModal from './HealingPoolModal.jsx'
 import HandOfHealingModal from './HandOfHealingModal.jsx'
 import FontOfMagicModal from './FontOfMagicModal.jsx'
 import SetConditionModal from './SetConditionModal.jsx'
+import DivineSparkModal from './DivineSparkModal.jsx'
 import AttackRiderModal from './AttackRiderModal.jsx'
 import WeaponMasteryModal from './WeaponMasteryModal.jsx'
 import CombatStanceModal from './CombatStanceModal.jsx'
@@ -57,6 +58,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [weaponMasteryModal, setWeaponMasteryModal] = useState(null);
     const [combatStanceModal, setCombatStanceModal] = useState(null);
     const [teleportModal, setTeleportModal] = useState(null);
+    const [divineSparkModal, setDivineSparkModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
 
@@ -397,6 +399,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'attackRider': setAttackRiderModal(result.payload); break;
                     case 'combatStance': setCombatStanceModal(result.payload); break;
                     case 'teleport': setTeleportModal(result.payload); break;
+                    case 'divineSpark': setDivineSparkModal(result.payload); break;
                  }
                 break;
             case 'roll':
@@ -632,6 +635,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <TeleportModal
                         {...teleportModal}
                         onClose={() => { setTeleportModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
+                    />
+                )}
+                {divineSparkModal && (
+                    <DivineSparkModal
+                        {...divineSparkModal}
+                        onClose={() => setDivineSparkModal(null)}
                     />
                 )}
                 {divineFuryChoice && (

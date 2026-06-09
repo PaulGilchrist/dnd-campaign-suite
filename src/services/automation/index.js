@@ -26,6 +26,7 @@ import { handle as handleReactionBonus } from './handlers/reactionBonusHandler.j
 import { handle as handlePostCastRider } from './handlers/postCastRiderHandler.js';
 import { handle as handleBardicInspirationDefense } from './handlers/bardicInspirationDefenseHandler.js';
 import { handle as handleBardicInspirationOffense } from './handlers/bardicInspirationOffenseHandler.js';
+import { handle as handleDivineSpark } from './handlers/divineSparkHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -42,6 +43,7 @@ const HANDLER_MAP = {
     bonus_action_attack: handleGenericPopup,
     buff_ally: handleBuffAlly,
     resource_pool: handleResourcePool,
+    divine_spark: handleDivineSpark,
     font_of_magic: handleFontOfMagic,
     healing_pool: handleHealingPool,
     extra_action: handleGenericPopup,

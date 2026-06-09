@@ -3,21 +3,32 @@ import { addEntry } from '../../ui/logService.js';
 import * as mapsService from '../../maps/mapsService.js';
 import { getCombatContext } from '../../rules/damageUtils.js';
 import { rangeToFeet } from '../../rules/rangeValidation.js';
+import { getAbilityModifier } from '../../shared/abilityLookup.js';
+
+function buildSaveDc(auto, playerStats) {
+    if (auto.saveDc === 'ability') {
+        const ability = auto.saveAbility || 'WIS';
+        const abilityBonus = getAbilityModifier(playerStats.abilities, ability);
+        const prof = playerStats.proficiency || 0;
+        return 8 + abilityBonus + prof;
+    }
+    if (auto.saveDc) return auto.saveDc;
+    const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
+    const wisBonus = wis?.bonus || 0;
+    const prof = playerStats.proficiency || 0;
+    return 8 + wisBonus + prof;
+}
 
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
 
-    const cha = playerStats.abilities?.find(a => a.name === 'Charisma');
-    const chaBonus = cha?.bonus || 0;
-    const prof = playerStats.proficiency || 0;
-    const saveDc = 8 + prof + chaBonus;
-
+    const saveDc = buildSaveDc(auto, playerStats);
     const conditionName = auto.condition || 'frightened';
+    const additionalCondition = auto.additionalCondition || null;
     const saveType = auto.saveType || 'WIS';
     const rangeFeet = rangeToFeet(auto.range) || 60;
 
     const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
-
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
     const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
@@ -31,9 +42,9 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 automationType: auto.type,
                 description: 'No Channel Divinity charges remaining.',
                 automation: auto,
-             },
-         };
-     }
+            },
+        };
+    }
 
     const newCharges = currentCharges - 1;
     setRuntimeValue(playerStats.name, 'channelDivinityCharges', newCharges, campaignName);
@@ -71,6 +82,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             mapData,
             featureName: action.name,
             conditionName,
+            additionalCondition,
             saveType,
             rangeFeet,
             durationRounds: (() => {
