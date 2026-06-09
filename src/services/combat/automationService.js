@@ -298,6 +298,11 @@ function buildAttackInfo(feature, playerStats) {
                 spell: auto.spell || '',
                 uses: auto.uses || 1,
                 recharge: auto.recharge || 'long_rest',
+                action: auto.action || 'action',
+                duration: auto.duration || '',
+                concentration: !!auto.concentration,
+                freeCasts: auto.freeCasts || '',
+                casting_time: auto.casting_time || '',
                 hasAutomation: true
             }
         }
@@ -738,6 +743,12 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'reaction_debuff':
             case 'reaction_bonus':
             case 'free_spell':
+                if (info.action === 'bonus_action') {
+                    result.bonusActions.push(info)
+                } else {
+                    result.actions.push(info)
+                }
+                break
             case 'resource_pool':
             case 'attack_rider':
             case 'initiative_action':

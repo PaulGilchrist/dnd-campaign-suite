@@ -45,6 +45,30 @@ export function getSpellAbilities(allSpells, playerStats) {
             spell.prepared = 'Always';
         });
 
+        if (playerStats.automation) {
+            const autoFeatures = [
+                ...(playerStats.automation.actions || []),
+                ...(playerStats.automation.bonusActions || []),
+                ...(playerStats.automation.passives || []),
+            ];
+            autoFeatures.forEach(feature => {
+                if (feature.type === 'passive_rule' && feature.effect === 'always_prepared_spells' && feature.spells) {
+                    feature.spells.forEach(spellName => {
+                        const knownSpell = spellAbilities.spells.find(s => s.name === spellName);
+                        if (!knownSpell) {
+                            spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+                        }
+                    });
+                }
+                if (feature.type === 'free_spell' && feature.spell) {
+                    const knownSpell = spellAbilities.spells.find(s => s.name === feature.spell);
+                    if (!knownSpell) {
+                        spellAbilities.spells.push({ name: feature.spell, prepared: 'Always' });
+                    }
+                }
+            });
+        }
+
         if (spellAbilities.spells.length > 0) {
             spellAbilities.spells = spellAbilities.spells.map(spell => {
                 let spellDetail = allSpells.find((spellDetail) => spellDetail.name === spell.name);

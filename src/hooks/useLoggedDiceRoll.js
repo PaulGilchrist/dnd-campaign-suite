@@ -154,6 +154,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         );
         if (creature && !e.detail.success) {
           creature.concentration = null;
+          setRuntimeValue(e.detail.targetName, 'mantleOfMajestyActive', null, campaignName);
           storage.set('combatSummary', combatSummary, campaignName);
           window.dispatchEvent(new CustomEvent('combat-summary-updated'));
         }

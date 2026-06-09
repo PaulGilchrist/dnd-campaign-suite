@@ -19,6 +19,7 @@ export function clearAllExpirationEffects(characterName, campaignName) {
 
      // Clear all active buffs (Innate Sorcery, Reckless Attack, etc.)
     setRuntimeValue(characterName, 'activeBuffs', [], campaignName);
+    setRuntimeValue(characterName, 'mantleOfMajestyActive', null, campaignName);
 
     const charLower = characterName.toLowerCase();
 
