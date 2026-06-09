@@ -2,10 +2,12 @@ import { rollExpression } from '../../dice/diceRoller.js';
 import { getClassFeatures } from '../../character/classFeatures.js';
 import { resolveTarget } from '../common/targetResolver.js';
 import { applyHealingDirectly, logHealingToSSE } from '../common/healingRoll.js';
+import { resolveHealingBonuses } from '../../combat/automationService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const isSelf = auto.type === 'self_healing';
+    const slotLevel = auto.slotLevel || 1;
 
     const expression = auto.healExpression || '';
     const isMonkHealing = expression.includes('martial_arts_die') && expression.includes('WIS');
@@ -19,7 +21,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const rollResult = rollExpression(`1d${martialArtsDie}`);
         if (!rollResult) return null;
 
-        const healAmount = rollResult.total + wisModifier;
+        const baseHeal = rollResult.total + wisModifier;
+        const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);
+        const healAmount = baseHeal + bonusHeal;
 
         let targetName;
         if (isSelf) {
@@ -46,9 +50,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             modalName: 'handOfHealing',
             payload: {
                 healName: action.name,
-                formula: `1d${martialArtsDie} + ${wisModifier}`,
+                formula: `1d${martialArtsDie} + ${wisModifier}${bonusHeal ? ` + ${bonusHeal}` : ''}`,
                 rolls: rollResult.rolls,
-                bonus: wisModifier,
+                bonus: wisModifier + bonusHeal,
                 healAmount,
                 monkName: playerStats.name,
                 targetName: isSelf ? playerStats.name : targetName,
@@ -58,15 +62,19 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 },
             };
       } else {
-        const healAmount = auto.healAmount || auto.healExpression;
+        const baseHeal = typeof auto.healAmount === 'number' ? auto.healAmount : null;
+        const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);
+        const totalHealAmount = baseHeal !== null ? baseHeal + bonusHeal : auto.healExpression;
 
         return {
             type: 'popup',
             payload: {
                 type: 'healing',
                 name: action.name,
-                healAmount: typeof healAmount === 'number' ? healAmount : auto.healExpression,
-                description: `${action.name}: Restores ${auto.healExpression} HP`,
+                healAmount: typeof totalHealAmount === 'number' ? totalHealAmount : auto.healExpression,
+                description: bonusHeal > 0
+                    ? `${action.name}: Restores ${auto.healExpression} + ${bonusHeal} bonus HP`
+                    : `${action.name}: Restores ${auto.healExpression} HP`,
                 },
             };
        }

@@ -2246,8 +2246,7 @@
                         "automation": {
                             "type": "passive_rule",
                             "effect": "bonus_healing",
-                            "bonusExpression": "2 + spell_slot_level",
-                            "casting_time": "1 action"
+                            "bonusExpression": "2 + spell_slot_level"
                         }
                     },
                     {
@@ -2271,8 +2270,7 @@
                             "type": "self_healing",
                             "action": "passive",
                             "healExpression": "2 + spell_slot_level",
-                            "condition": "after_casting_healing_spell_on_others",
-                            "casting_time": "1 action"
+                            "condition": "after_casting_healing_spell_on_others"
                         }
                     },
                     {
@@ -2281,8 +2279,7 @@
                         "level": 17,
                         "automation": {
                             "type": "passive_rule",
-                            "effect": "maximize_healing_dice",
-                            "casting_time": "1 action"
+                            "effect": "maximize_healing_dice"
                         }
                     }
                 ],

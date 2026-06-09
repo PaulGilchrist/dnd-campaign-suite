@@ -431,6 +431,7 @@ function buildAttackInfo(feature, playerStats) {
                 type: 'passive_rule',
                 name: feature.name,
                 effect: auto.effect || '',
+                bonusExpression: auto.bonusExpression || '',
                 criticalRange: auto.criticalRange || '',
                 spells: auto.spells || [],
                 riderSave: auto.riderSave || null,
@@ -712,10 +713,11 @@ function resolveHealingPoolExpression(baseExpression, scaling, playerStats) {
     return resolved
 }
 
-export function evaluateAutoExpression(expression, playerStats, prof, level) {
+export function evaluateAutoExpression(expression, playerStats, prof, level, slotLevel) {
     if (!expression) return expression
     prof = prof || 0
     level = level || 1
+    slotLevel = slotLevel || 1
     const rageDamage = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.rage_damage ?? 2
     const bardicDie = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_die || 6
     let expr = expression
@@ -731,6 +733,7 @@ export function evaluateAutoExpression(expression, playerStats, prof, level) {
            .replace(/rage_damage_d6/g, `${rageDamage}d6`)
            .replace(/rage_damage/g, rageDamage)
             .replace(/level/gi, level)
+            .replace(/spell_slot_level/g, slotLevel)
     const abilities = playerStats?.abilities || {}
     const abilityModifiers = {
         strength: getAbilityModifier(abilities, 'strength'),
@@ -1052,6 +1055,20 @@ export function collectWeaponMastery(weaponName, playerStats) {
         baseMastery,
         extraMasteries: [...new Set(extraMasteries)],
     };
+}
+
+export function resolveHealingBonuses(playerStats, prof, level, slotLevel) {
+    const passives = playerStats.automation?.passives || [];
+    let totalBonus = 0;
+    for (const passive of passives) {
+        if (passive.type === 'passive_rule' && passive.effect === 'bonus_healing' && passive.bonusExpression) {
+            const bonus = evaluateAutoExpression(passive.bonusExpression, playerStats, prof, level, slotLevel);
+            if (typeof bonus === 'number' && !isNaN(bonus)) {
+                totalBonus += bonus;
+            }
+        }
+    }
+    return totalBonus;
 }
 
 
