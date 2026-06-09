@@ -338,6 +338,30 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
          autoRerollBonus: context?.autoRerollBonus,
        });
 
+     if (rollType === 'attack') {
+         setRuntimeValue(characterName, 'lastAttackRoll', {
+             d20: r1,
+             bonus,
+             targetName,
+             targetAc,
+             hit,
+             isCrit,
+             effectiveAc,
+             coverAcBonus,
+             timestamp: Date.now(),
+         }, campaignName);
+     }
+
+     if (rollType === 'check' || rollType === 'skill') {
+         setRuntimeValue(characterName, 'lastAbilityCheck', {
+             d20: r1,
+             bonus,
+             checkName: name,
+             targetName,
+             timestamp: Date.now(),
+         }, campaignName);
+     }
+
     if (rollType === 'initiative') {
         const firstName = utils.getName(characterName);
         const tandemFtBonus = Number(getRuntimeValue(firstName, 'tandemFootworkBonus', campaignName) ?? 0);

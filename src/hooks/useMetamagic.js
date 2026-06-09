@@ -44,6 +44,22 @@ export function clearLastDamageEvent(characterName, campaignName) {
   setRuntimeValue(characterName, 'lastMetamagicDamage', null, campaignName);
 }
 
+export function saveLastAttackRoll(characterName, event, campaignName) {
+  setRuntimeValue(characterName, 'lastAttackRoll', event, campaignName);
+}
+
+export function getLastAttackRoll(characterName) {
+  return getRuntimeValue(characterName, 'lastAttackRoll');
+}
+
+export function saveLastAbilityCheck(characterName, event, campaignName) {
+  setRuntimeValue(characterName, 'lastAbilityCheck', event, campaignName);
+}
+
+export function getLastAbilityCheck(characterName) {
+  return getRuntimeValue(characterName, 'lastAbilityCheck');
+}
+
 export function logMetamagicUse(campaignName, characterName, spellName, options, spCost) {
   const remaining = getCurrentSorceryPoints(characterName);
   const entry = {

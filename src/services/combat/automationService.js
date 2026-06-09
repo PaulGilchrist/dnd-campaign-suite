@@ -461,6 +461,7 @@ function buildAttackInfo(feature, playerStats) {
                 subtractive: !!auto.subtractive,
                 range: auto.range || '60_ft',
                 casting_time: auto.casting_time || '1 reaction',
+                triggerTypes: ['attack_roll', 'damage_roll', 'ability_check'],
                 hasAutomation: true
             }
         }
