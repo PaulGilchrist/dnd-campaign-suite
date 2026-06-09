@@ -489,12 +489,19 @@ function buildAttackInfo(feature, playerStats) {
         }
 
         case 'reaction_debuff': {
+            const usesMax = auto.uses_expression
+                ? evaluateAutoExpression(auto.uses_expression, playerStats)
+                : 0
             return {
                 type: 'reaction_debuff',
                 name: feature.name,
                 trigger: auto.trigger || '',
                 debuffExpression: auto.debuffExpression || '',
                 subtractive: !!auto.subtractive,
+                effect: auto.effect || '',
+                uses_expression: auto.uses_expression || '',
+                usesMax,
+                recharge: auto.recharge || 'long_rest',
                 range: auto.range || '60_ft',
                 casting_time: auto.casting_time || '1 reaction',
                 triggerTypes: ['attack_roll', 'damage_roll', 'ability_check'],
@@ -773,7 +780,13 @@ export function evaluateAutoExpression(expression, playerStats, prof, level, slo
     if (!expression) return expression
     prof = prof || 0
     level = level || 1
-    const expr = resolveDiceExpression(expression, playerStats, slotLevel)
+    let expr = resolveDiceExpression(expression, playerStats, slotLevel)
+
+    const minMatch = expr.match(/^(.+?)_min_(\d+)$/)
+    if (minMatch) {
+        expr = `Math.max(${minMatch[2]}, (${minMatch[1]}))`
+    }
+
     try {
         const result = new Function(`"use strict"; return (${expr})`)()
         if (typeof result === 'number' && !isNaN(result)) return result

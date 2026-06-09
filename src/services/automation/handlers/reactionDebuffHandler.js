@@ -5,6 +5,7 @@ import { getDistanceFeet, rangeToFeet } from '../../rules/rangeValidation.js';
 import { getCombatContext } from '../../rules/damageUtils.js';
 import { applyHealingToTarget } from '../../rules/applyHealing.js';
 import { getLastDamageEvent, getLastAttackRoll, getLastAbilityCheck } from '../../../hooks/useMetamagic.js';
+import { evaluateAutoExpression } from '../../combat/automationService.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -13,7 +14,11 @@ function isStale(event) {
     return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
 }
 
-async function handleAttackRollDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
+function getRuntimeUsesKey(featureName) {
+    return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
+}
+
+async function handleAttackRollDebuff(action, _playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
     const auto = action.automation;
 
     const attackEvent = getLastAttackRoll(attackerName);
@@ -23,7 +28,7 @@ async function handleAttackRollDebuff(action, playerStats, campaignName, attacke
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `No recent attack roll found for ${attackerName}. Cutting Words can only be used shortly after an attack roll.`,
+                description: `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`,
                 automation: auto,
             },
         };
@@ -69,7 +74,7 @@ async function handleAttackRollDebuff(action, playerStats, campaignName, attacke
     };
 }
 
-async function handleAbilityCheckDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, _combatSummary) {
+async function handleAbilityCheckDebuff(action, _playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, _combatSummary) {
     const auto = action.automation;
 
     const checkEvent = getLastAbilityCheck(attackerName);
@@ -79,7 +84,7 @@ async function handleAbilityCheckDebuff(action, playerStats, campaignName, attac
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `No recent ability check found for ${attackerName}. Cutting Words can only be used shortly after an ability check.`,
+                description: `No recent ability check found for ${attackerName}. ${action.name} can only be used shortly after an ability check.`,
                 automation: auto,
             },
         };
@@ -98,7 +103,7 @@ async function handleAbilityCheckDebuff(action, playerStats, campaignName, attac
     };
 }
 
-async function handleDamageDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
+async function handleDamageDebuff(action, _playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
     const auto = action.automation;
 
     const lastEvent = getLastDamageEvent(attackerName);
@@ -108,7 +113,7 @@ async function handleDamageDebuff(action, playerStats, campaignName, attackerNam
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `No recent damage event found for ${attackerName}. Cutting Words can only be used shortly after a damage roll.`,
+                description: `No recent damage event found for ${attackerName}. ${action.name} can only be used shortly after a damage roll.`,
                 automation: auto,
             },
         };
@@ -121,7 +126,7 @@ async function handleDamageDebuff(action, playerStats, campaignName, attackerNam
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `Could not determine who ${attackerName} damaged. Cannot apply Cutting Words.`,
+                description: `Could not determine who ${attackerName} damaged. Cannot apply ${action.name}.`,
                 automation: auto,
             },
         };
@@ -146,25 +151,106 @@ async function handleDamageDebuff(action, playerStats, campaignName, attackerNam
     };
 }
 
+async function handleDisadvantageDebuff(action, _playerStats, campaignName, attackerName, combatSummary) {
+    const auto = action.automation;
+
+    const attackEvent = getLastAttackRoll(attackerName);
+    if (!attackEvent || isStale(attackEvent)) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const { d20, bonus, targetName, targetAc, hit, effectiveAc } = attackEvent;
+    const ac = effectiveAc ?? targetAc;
+    const defenderName = targetName;
+
+    const secondD20 = Math.floor(Math.random() * 20) + 1;
+    const finalD20 = Math.min(d20, secondD20);
+    const finalHit = ac != null ? (finalD20 + bonus >= ac) : null;
+
+    let defenderHp = null;
+
+    if (hit === true && finalHit === false && defenderName) {
+        const damageEvent = getLastDamageEvent(attackerName);
+        if (damageEvent && damageEvent.targetName === defenderName && !isStale(damageEvent) && damageEvent.rawDamage > 0) {
+            const healResult = applyHealingToTarget(combatSummary, defenderName, damageEvent.rawDamage, campaignName);
+            defenderHp = healResult?.newHp ?? null;
+        }
+    }
+
+    let description = `<b>${action.name}</b><br/>Attacker: ${attackerName}<br/>`;
+    description += `Attack roll: d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${hit ? 'HIT' : 'MISS'}</b><br/>`;
+    description += `Disadvantage (second d20: ${secondD20}): d20(${finalD20}) + ${bonus} = ${finalD20 + bonus} vs AC ${ac != null ? ac : '—'} → <b>${finalHit == null ? 'N/A' : finalHit ? 'HIT' : 'MISS'}</b><br/>`;
+
+    if (hit === true && finalHit === true) {
+        description += `<br/><i>Attack still hits.</i>`;
+    } else if (hit === true && finalHit === false) {
+        description += `<br/><i>The attack now misses!</i>`;
+        if (defenderHp != null) {
+            description += `<br/>${defenderName} healed to ${defenderHp} HP.`;
+        } else if (defenderName) {
+            description += `<br/><i>No damage event found to reverse for ${defenderName}.</i>`;
+        }
+    } else if (hit === false) {
+        description += `<br/><i>The attack already missed — no effect.</i>`;
+    }
+
+    return {
+        type: 'popup',
+        payload: { type: 'automation_info', name: action.name, description, automation: auto },
+        defenderHp,
+        defenderName,
+    };
+}
+
+async function applyImprovedWardingFlare(playerStats, defenderName, campaignName) {
+    const improvedWf = (playerStats.characterAdvancement || []).find(
+        f => f.name === 'Improved Warding Flare' && f.automation?.tempHpExpression
+    );
+    if (!improvedWf) return null;
+
+    const amount = evaluateAutoExpression(improvedWf.automation.tempHpExpression, playerStats);
+    if (typeof amount !== 'number' || amount <= 0) return null;
+
+    setRuntimeValue(defenderName, 'tempHp', amount, campaignName);
+    return amount;
+}
+
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
+    const featureName = action.name || 'Feature';
 
-    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-    const bardicDieSize = classLevel?.bardic_die || 6;
+    const usesKey = getRuntimeUsesKey(featureName);
+    const usesMax = auto.uses_expression
+        ? (typeof auto.uses_expression === 'number'
+            ? auto.uses_expression
+            : evaluateAutoExpression(auto.uses_expression, playerStats))
+        : 0;
 
-    const usesMax = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_inspiration_uses
-        ?? (playerStats.proficiency || 0);
+    const bardicUsesMax = !auto.uses_expression
+        ? (playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_inspiration_uses
+            ?? (playerStats.proficiency || 0))
+        : 0;
 
-    if (usesMax > 0) {
-        const usesUsed = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? 0);
-        if (usesUsed >= usesMax) {
+    const effectiveUsesMax = usesMax || bardicUsesMax;
+
+    if (effectiveUsesMax > 0) {
+        const usesUsed = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? 0);
+        if (usesUsed >= effectiveUsesMax) {
             return {
                 type: 'popup',
                 payload: {
                     type: 'automation_info',
-                    name: action.name,
-                    description: `${action.name} has no uses remaining. Recharges on a Long Rest.`,
+                    name: featureName,
+                    description: `${featureName} has no uses remaining. Recharges on a ${auto.recharge === 'short_rest' ? 'Short or Long Rest' : 'Long Rest'}.`,
                     automation: auto,
                 },
             };
@@ -177,8 +263,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: action.name,
-                description: `${action.name} requires a target. Select a creature in combat and try again.`,
+                name: featureName,
+                description: `${featureName} requires a target. Select a creature in combat and try again.`,
                 automation: auto,
             },
         };
@@ -196,7 +282,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                     type: 'popup',
                     payload: {
                         type: 'automation_info',
-                        name: action.name,
+                        name: featureName,
                         description: `${attackerName} is out of range (${Math.round(dist)} ft > ${rangeFt} ft).`,
                         automation: auto,
                     },
@@ -205,63 +291,88 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }
     }
 
-    const biDieRoll = Math.floor(Math.random() * bardicDieSize) + 1;
-
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: action.name,
-                description: `No combat context found. Cannot apply Cutting Words.`,
+                name: featureName,
+                description: `No combat context found. Cannot apply ${featureName}.`,
                 automation: auto,
             },
         };
     }
 
-    const attackEvent = getLastAttackRoll(attackerName);
-    const damageEvent = getLastDamageEvent(attackerName);
-    const abilityEvent = getLastAbilityCheck(attackerName);
-
-    const attackFresh = attackEvent && !isStale(attackEvent);
-    const damageFresh = damageEvent && !isStale(damageEvent) && damageEvent.rawDamage;
-    const abilityFresh = abilityEvent && !isStale(abilityEvent);
-
-    if (!attackFresh && !damageFresh && !abilityFresh) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No recent roll found for ${attackerName} (attack, damage, or ability check). Cutting Words must be used shortly after the roll.`,
-                automation: auto,
-            },
-        };
-    }
-
+    const effect = auto.effect || '';
     let result;
-    if (attackFresh) {
-        result = await handleAttackRollDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
-    } else if (damageFresh) {
-        result = await handleDamageDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+
+    if (effect === 'disadvantage_on_attack_roll') {
+        const attackEvent = getLastAttackRoll(attackerName);
+        if (!attackEvent || isStale(attackEvent)) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: featureName,
+                    description: `No recent attack roll found for ${attackerName}. ${featureName} can only be used shortly after an attack roll.`,
+                    automation: auto,
+                },
+            };
+        }
+        result = await handleDisadvantageDebuff(action, playerStats, campaignName, attackerName, combatSummary);
     } else {
-        result = await handleAbilityCheckDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+        const bardicDieSize = classLevel?.bardic_die || 6;
+        const biDieRoll = Math.floor(Math.random() * bardicDieSize) + 1;
+
+        const attackEvent = getLastAttackRoll(attackerName);
+        const damageEvent = getLastDamageEvent(attackerName);
+        const abilityEvent = getLastAbilityCheck(attackerName);
+
+        const attackFresh = attackEvent && !isStale(attackEvent);
+        const damageFresh = damageEvent && !isStale(damageEvent) && damageEvent.rawDamage;
+        const abilityFresh = abilityEvent && !isStale(abilityEvent);
+
+        if (!attackFresh && !damageFresh && !abilityFresh) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: featureName,
+                    description: `No recent roll found for ${attackerName} (attack, damage, or ability check). ${featureName} must be used shortly after the roll.`,
+                    automation: auto,
+                },
+            };
+        }
+
+        if (attackFresh) {
+            result = await handleAttackRollDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+        } else if (damageFresh) {
+            result = await handleDamageDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+        } else {
+            result = await handleAbilityCheckDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+        }
     }
 
-    if (usesMax > 0) {
-        const usesUsed = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? 0);
-        await setRuntimeValue(playerName, 'bardicInspirationUses', usesUsed + 1, campaignName);
+    if (effectiveUsesMax > 0) {
+        const usesUsed = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? 0);
+        await setRuntimeValue(playerName, usesKey, usesUsed + 1, campaignName);
+    }
+
+    if (effect === 'disadvantage_on_attack_roll' && result?.defenderName) {
+        const tempHpAmount = await applyImprovedWardingFlare(playerStats, result.defenderName, campaignName);
+        if (tempHpAmount) {
+            result.payload.description += `<br/><br/>${result.defenderName} gains ${tempHpAmount} Temporary Hit Points from Improved Warding Flare.`;
+        }
     }
 
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
-        abilityName: action.name,
-        description: `${playerName} used ${action.name} on ${attackerName}: rolled 1d${bardicDieSize} (${biDieRoll}).`,
+        abilityName: featureName,
+        description: `${playerName} used ${featureName} on ${attackerName}.`,
         targetName: attackerName,
-        biDieRoll,
-        biDieSize: bardicDieSize,
         timestamp: Date.now(),
     }).catch(() => {});
 

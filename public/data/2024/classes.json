@@ -2361,7 +2361,7 @@
                             "trigger": "attack_roll_within_30ft",
                             "effect": "disadvantage_on_attack_roll",
                             "uses_expression": "WIS modifier_min_1",
-                            "recharge": "proficiency_bonus",
+                            "recharge": "long_rest",
                             "casting_time": "1 reaction"
                         }
                     },
@@ -2370,11 +2370,10 @@
                         "description": "You gain all expended uses of your Warding Flare when you finish a Short or Long Rest. In addition, whenever you use Warding Flare, you can give the target of the triggering attack a number of Temporary Hit Points equal to 2d6 plus your Wisdom modifier.",
                         "level": 6,
                         "automation": {
-                            "type": "temp_hp_buff",
+                            "type": "passive_rule",
+                            "effect": "improved_warding_flare",
                             "tempHpExpression": "2d6 + WIS modifier",
-                            "trigger": "after_warding_flare_use",
-                            "target": "attacker_target",
-                            "casting_time": "1 bonus action"
+                            "casting_time": "passive"
                         }
                     },
                     {
