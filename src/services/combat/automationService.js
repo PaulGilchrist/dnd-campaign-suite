@@ -242,6 +242,7 @@ function buildAttackInfo(feature, playerStats) {
                 oncePerTurn: !!auto.oncePerTurn,
                 options: auto.options || [],
                 tempHpExpression: auto.tempHpExpression || '',
+                upgrades: auto.upgrades || '',
                 hasAutomation: true
             }
         }

@@ -2057,6 +2057,7 @@
                                 "Potent Spellcasting"
                             ],
                             "tempHpExpression": "2 * WIS modifier",
+                            "upgrades": "Blessed Strikes",
                             "casting_time": "passive"
                         }
                     }

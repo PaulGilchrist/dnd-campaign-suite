@@ -65,6 +65,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [divineInterventionAction, setDivineInterventionAction] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
+    const [featureChoice, setFeatureChoice] = useState(null);
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
 
     useEffect(() => {
@@ -312,7 +313,10 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             const weaponHitBonuses = playerStats.automation.actions.filter(
                 a => a.type === 'damage_bonus' && a.trigger === 'weapon_attack_hit'
             );
-            for (const bonus of weaponHitBonuses) {
+            // Deduplicate: skip features that are upgraded by a higher-level feature
+            const upgradedNames = new Set(weaponHitBonuses.filter(b => b.upgrades).map(b => b.upgrades));
+            const filteredBonuses = weaponHitBonuses.filter(b => !upgradedNames.has(b.name));
+            for (const bonus of filteredBonuses) {
                 const optionKey = `_${bonus.name.replace(/\s+/g, '_')}_option`;
                 const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
                 const selected = chosenOption || bonus.options?.[0] || '';
@@ -360,7 +364,10 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 const cantripBonuses = playerStats.automation.actions.filter(
                     a => a.type === 'damage_bonus' && a.trigger === 'weapon_attack_hit' && a.options?.length > 0
                 );
-                for (const bonus of cantripBonuses) {
+                // Deduplicate: skip features that are upgraded by a higher-level feature
+                const upgradedNames = new Set(cantripBonuses.filter(b => b.upgrades).map(b => b.upgrades));
+                const filteredBonuses = cantripBonuses.filter(b => !upgradedNames.has(b.name));
+                for (const bonus of filteredBonuses) {
                     const optionKey = `_${bonus.name.replace(/\s+/g, '_')}_option`;
                     const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
                     const selected = chosenOption || bonus.options?.[0] || '';
@@ -375,7 +382,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     if (bonus.tempHpExpression) {
                         const tempHp = evaluateAutoExpression(bonus.tempHpExpression, playerStats);
                         if (tempHp && !isNaN(tempHp)) {
-                            setRuntimeValue(playerStats.name, '_potentSpellcastingTempHp', tempHp, campaignName);
+                            const existing = getRuntimeValue(playerStats.name, 'tempHp', campaignName) || 0;
+                            setRuntimeValue(playerStats.name, 'tempHp', Math.max(existing, tempHp), campaignName);
                         }
                     }
                 }
@@ -469,6 +477,18 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         proceedWithDamage(attack, formula, total, rolls, modifier);
     };
 
+    const handleFeatureChoiceConfirm = (chosenOption) => {
+        if (!featureChoice) return;
+        const { action, optionKey } = featureChoice;
+        setRuntimeValue(playerStats.name, optionKey, chosenOption, campaignName);
+        setFeatureChoice(null);
+        setPopupHtml(`<b>${action.name}</b><br/>Option chosen: <b>${chosenOption}</b>. This choice can be changed by clicking the feature again.`);
+    };
+
+    const handleFeatureChoiceSkip = () => {
+        setFeatureChoice(null);
+    };
+
     const handleAttackClick = React.useCallback((attack) => {
         if (cannotAct) return;
          buildCtx(attack).then(ctx => {
@@ -509,6 +529,16 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             setPopupHtml(buildEmpoweredSpellState(playerStats));
             return;
          }
+
+        // If feature has options that need choosing (e.g. Blessed Strikes), present choice
+        if (auto?.type === 'damage_bonus' && auto?.options?.length > 0) {
+            const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
+            const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+            if (!chosenOption) {
+                setFeatureChoice({ action, options: auto.options, optionKey });
+                return;
+            }
+        }
 
          // Spend 1 focus point for monk Ki features before dispatching
         if (MONK_KI_FEATURES.includes(action.name)) {
@@ -888,6 +918,34 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             </div>
                             <div className="sp-actions">
                                 <button className="sp-dismiss-btn" onClick={handleGenericDamageTypeSkip}>Skip</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {featureChoice && (
+                    <div className="sp-overlay" onClick={handleFeatureChoiceSkip}>
+                        <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                            <div className="sp-header">
+                                <i className="fa-solid fa-bolt"></i> {featureChoice.action.name}
+                            </div>
+                            <div className="sp-body">
+                                <p><b>Choose your option:</b></p>
+                                <p style={{ opacity: 0.8, fontSize: '0.9em' }}>{featureChoice.action.description}</p>
+                                <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                                    {featureChoice.options.map((opt) => (
+                                        <button
+                                            key={opt}
+                                            className="sp-roll-btn"
+                                            style={{ margin: '0 6px 8px 6px' }}
+                                            onClick={() => handleFeatureChoiceConfirm(opt)}
+                                        >
+                                            {opt}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="sp-actions">
+                                <button className="sp-dismiss-btn" onClick={handleFeatureChoiceSkip}>Cancel</button>
                             </div>
                         </div>
                     </div>
