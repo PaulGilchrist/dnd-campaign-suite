@@ -292,7 +292,7 @@ function buildAttackInfo(feature, playerStats) {
                 action: auto.action || 'magic_action',
                 recharge: auto.recharge || 'long_rest',
                 upgradeTo: auto.upgradeTo || '',
-                casting_time: auto.casting_time || '1 magic action',
+                casting_time: auto.casting_time || '1 action',
                 hasAutomation: true
             }
         }

@@ -1950,7 +1950,7 @@
                             "type": "divine_intervention",
                             "action": "magic_action",
                             "recharge": "long_rest",
-                            "casting_time": "1 magic action"
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -2213,7 +2213,7 @@
                             "action": "magic_action",
                             "recharge": "long_rest",
                             "upgradeTo": "wish",
-                            "casting_time": "1 magic action"
+                            "casting_time": "1 action"
                         }
                     }
                 ],
@@ -2246,7 +2246,8 @@
                         "automation": {
                             "type": "passive_rule",
                             "effect": "bonus_healing",
-                            "bonusExpression": "2 + spell_slot_level"
+                            "bonusExpression": "2 + spell_slot_level",
+                            "casting_time": "passive"
                         }
                     },
                     {
@@ -2270,7 +2271,8 @@
                         "automation": {
                             "type": "post_cast_self_heal",
                             "healExpression": "2 + spell_slot_level",
-                            "othersOnly": true
+                            "othersOnly": true,
+                            "casting_time": "passive"
                         }
                     },
                     {
@@ -2279,7 +2281,8 @@
                         "level": 17,
                         "automation": {
                             "type": "passive_rule",
-                            "effect": "maximize_healing_dice"
+                            "effect": "maximize_healing_dice",
+                            "casting_time": "passive"
                         }
                     }
                 ],
