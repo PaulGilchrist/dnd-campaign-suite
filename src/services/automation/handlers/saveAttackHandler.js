@@ -25,6 +25,15 @@ function parseDurationRounds(duration) {
 export function isExhausted(action, playerStats, campaignName) {
     const auto = action.automation;
     if (!auto) return false;
+
+    if (auto.resourceCost === 'channel_divinity') {
+        const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
+        const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
+        const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
+        const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
+        return currentCharges <= 0;
+    }
+
     if (auto.uses === undefined && auto.usesMax === undefined) return false;
     const maxUses = auto.usesMax ?? auto.uses ?? 1;
     const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
@@ -35,24 +44,46 @@ export function isExhausted(action, playerStats, campaignName) {
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
 
-    const maxUses = auto.usesMax ?? auto.uses ?? 1;
+    if (auto.resourceCost === 'channel_divinity') {
+        const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
+        const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
+        const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
+        const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
 
-    if (maxUses > 0) {
-        const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
-        const usesUsed = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
-        if (usesUsed >= maxUses) {
+        if (currentCharges <= 0) {
             return {
                 type: 'popup',
                 payload: {
                     type: 'automation_info',
                     name: action.name,
-                    description: `${action.name} has been used and cannot be used again until a long rest.` +
-                        (auto.recharge === 'long_rest_or_expend_rage' ? ' You may expend one use of Rage to restore it.' : ''),
+                    description: 'No Channel Divinity charges remaining.',
                     automation: auto,
                 },
             };
-         }
-        await setRuntimeValue(playerStats.name, usesKey, usesUsed + 1, campaignName);
+        }
+
+        const newCharges = currentCharges - 1;
+        await setRuntimeValue(playerStats.name, 'channelDivinityCharges', newCharges, campaignName);
+    } else {
+        const maxUses = auto.usesMax ?? auto.uses ?? 1;
+
+        if (maxUses > 0) {
+            const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+            const usesUsed = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
+            if (usesUsed >= maxUses) {
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: action.name,
+                        description: `${action.name} has been used and cannot be used again until a long rest.` +
+                            (auto.recharge === 'long_rest_or_expend_rage' ? ' You may expend one use of Rage to restore it.' : ''),
+                        automation: auto,
+                    },
+                };
+             }
+            await setRuntimeValue(playerStats.name, usesKey, usesUsed + 1, campaignName);
+        }
     }
 
     const dcSuccess = auto.shape === 'cone' ? 0.5 : 0;
@@ -109,6 +140,11 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const damageResult = rollExpression(auto.damage);
     if (!damageResult) return null;
 
+    const notes = [];
+    if (auto.shape && isAreaShape(auto.shape)) {
+        notes.push('Magical Darkness in the area is dispelled.');
+    }
+
     return {
         type: 'roll',
         payload: {
@@ -118,6 +154,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             total: damageResult.total,
             rolls: damageResult.rolls,
             modifier: damageResult.modifier,
+            notes: notes.length > 0 ? notes.join(' ') : undefined,
             contextConfig: {
                 damageType: auto.damageType || '',
                 saveDc: saveDcValue,

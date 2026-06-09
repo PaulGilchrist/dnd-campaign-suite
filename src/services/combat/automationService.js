@@ -525,7 +525,8 @@ function buildAttackInfo(feature, playerStats) {
 
         case 'save_attack': {
             const scaling = resolveScaling(playerStats, auto.scaling)
-            const damage = scaling?.damage || auto.damage || ''
+            const rawDamage = scaling?.damage || auto.damage || ''
+            const damage = resolveDiceExpression(rawDamage, playerStats)
             const uses = resolveUses(playerStats, auto.uses)
             const saveDc = auto.saveDc === 'ability'
                 ? getSaveDc(playerStats, auto.saveAbility || 'CON', prof)
@@ -544,6 +545,7 @@ function buildAttackInfo(feature, playerStats) {
                 uses,
                 usesMax: uses,
                 recharge: auto.recharge || 'long_rest',
+                resourceCost: auto.resourceCost || '',
                 hasAutomation: true
             }
         }
@@ -725,10 +727,10 @@ function resolveHealingPoolExpression(baseExpression, scaling, playerStats) {
     return resolved
 }
 
-export function evaluateAutoExpression(expression, playerStats, prof, level, slotLevel) {
+function resolveDiceExpression(expression, playerStats, slotLevel) {
     if (!expression) return expression
-    prof = prof || 0
-    level = level || 1
+    const prof = playerStats?.proficiency || 0
+    const level = playerStats?.level || 1
     slotLevel = slotLevel || 1
     const rageDamage = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.rage_damage ?? 2
     const bardicDie = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_die || 6
@@ -745,8 +747,9 @@ export function evaluateAutoExpression(expression, playerStats, prof, level, slo
            .replace(/rage_damage_d6/g, `${rageDamage}d6`)
            .replace(/rage_damage/g, rageDamage)
            .replace(/cleric_level/gi, level)
-            .replace(/level/gi, level)
-            .replace(/spell_slot_level/g, slotLevel)
+           .replace(/cleric level/gi, level)
+           .replace(/level/gi, level)
+           .replace(/spell_slot_level/g, slotLevel)
     const abilities = playerStats?.abilities || {}
     const abilityModifiers = {
         strength: getAbilityModifier(abilities, 'strength'),
@@ -763,6 +766,14 @@ export function evaluateAutoExpression(expression, playerStats, prof, level, slo
         .replace(/INT modifier/gi, abilityModifiers.intelligence)
         .replace(/WIS modifier/gi, abilityModifiers.wisdom)
         .replace(/CHA modifier/gi, abilityModifiers.charisma)
+    return expr
+}
+
+export function evaluateAutoExpression(expression, playerStats, prof, level, slotLevel) {
+    if (!expression) return expression
+    prof = prof || 0
+    level = level || 1
+    const expr = resolveDiceExpression(expression, playerStats, slotLevel)
     try {
         const result = new Function(`"use strict"; return (${expr})`)()
         if (typeof result === 'number' && !isNaN(result)) return result
