@@ -695,6 +695,16 @@ function buildAttackInfo(feature, playerStats) {
               }
           }
 
+        case 'post_cast_self_heal': {
+            return {
+                type: 'post_cast_self_heal',
+                name: feature.name,
+                healExpression: auto.healExpression || '0',
+                othersOnly: auto.othersOnly ?? true,
+                hasAutomation: true
+            }
+        }
+
         default:
             return null
        }
@@ -836,6 +846,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'conditional_disadvantage':
             case 'mastery_rider':
             case 'post_cast_rider':
+            case 'post_cast_self_heal':
                 result.passives.push(info)
                 break
             default:

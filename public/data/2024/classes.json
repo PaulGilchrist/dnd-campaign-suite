@@ -2268,10 +2268,9 @@
                         "description": "When you cast a healing spell on others that targets one or more creatures other than yourself, you regain Hit Points equal to 2 plus the spell slot's level.",
                         "level": 6,
                         "automation": {
-                            "type": "self_healing",
-                            "action": "passive",
+                            "type": "post_cast_self_heal",
                             "healExpression": "2 + spell_slot_level",
-                            "condition": "after_casting_healing_spell_on_others"
+                            "othersOnly": true
                         }
                     },
                     {

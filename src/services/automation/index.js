@@ -67,6 +67,7 @@ const HANDLER_MAP = {
      bardic_inspiration_use: handleBardicInspirationUse,
      reaction_bonus: handleReactionBonus,
      post_cast_rider: handlePostCastRider,
+     post_cast_self_heal: handleGenericPopup,
      bardic_inspiration_defense: handleBardicInspirationDefense,
      bardic_inspiration_offense: handleBardicInspirationOffense,
 };
