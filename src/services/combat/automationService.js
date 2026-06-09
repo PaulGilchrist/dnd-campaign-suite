@@ -240,6 +240,8 @@ function buildAttackInfo(feature, playerStats) {
                 extraDamage: auto.extraDamage || '',
                 resourceType: auto.resourceType || 'spell_slot',
                 oncePerTurn: !!auto.oncePerTurn,
+                options: auto.options || [],
+                tempHpExpression: auto.tempHpExpression || '',
                 hasAutomation: true
             }
         }
@@ -715,7 +717,23 @@ export function evaluateAutoExpression(expression, playerStats, prof, level) {
            .replace(/bard level/gi, level)
            .replace(/rage_damage_d6/g, `${rageDamage}d6`)
            .replace(/rage_damage/g, rageDamage)
-           .replace(/level/gi, level)
+            .replace(/level/gi, level)
+    const abilities = playerStats?.abilities || {}
+    const abilityModifiers = {
+        strength: getAbilityModifier(abilities, 'strength'),
+        dexterity: getAbilityModifier(abilities, 'dexterity'),
+        constitution: getAbilityModifier(abilities, 'constitution'),
+        intelligence: getAbilityModifier(abilities, 'intelligence'),
+        wisdom: getAbilityModifier(abilities, 'wisdom'),
+        charisma: getAbilityModifier(abilities, 'charisma'),
+    }
+    expr = expr
+        .replace(/STR modifier/gi, abilityModifiers.strength)
+        .replace(/DEX modifier/gi, abilityModifiers.dexterity)
+        .replace(/CON modifier/gi, abilityModifiers.constitution)
+        .replace(/INT modifier/gi, abilityModifiers.intelligence)
+        .replace(/WIS modifier/gi, abilityModifiers.wisdom)
+        .replace(/CHA modifier/gi, abilityModifiers.charisma)
     try {
         const result = new Function(`"use strict"; return (${expr})`)()
         if (typeof result === 'number' && !isNaN(result)) return result

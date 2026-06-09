@@ -1870,7 +1870,7 @@
                                 "Divine Strike",
                                 "Potent Spellcasting"
                             ],
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     }
                 ],
@@ -2053,8 +2053,12 @@
                             "damageExpression": "2d8",
                             "damageType": "Necrotic or Radiant",
                             "oncePerTurn": true,
+                            "options": [
+                                "Divine Strike",
+                                "Potent Spellcasting"
+                            ],
                             "tempHpExpression": "2 * WIS modifier",
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     }
                 ],
@@ -2906,7 +2910,7 @@
                                 "Potent Spellcasting",
                                 "Primal Strike"
                             ],
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     }
                 ],
@@ -3133,8 +3137,12 @@
                             "damageExpression": "2d8",
                             "damageType": "Cold Fire Lightning or Thunder",
                             "oncePerTurn": true,
+                            "options": [
+                                "Potent Spellcasting",
+                                "Primal Strike"
+                            ],
                             "rangeBonusCantrip": "300 ft",
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     }
                 ],

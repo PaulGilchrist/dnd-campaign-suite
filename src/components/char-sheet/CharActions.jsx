@@ -13,7 +13,7 @@ import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { computeFeatRangeEffects } from '../../services/character/featRangeService.js';
-import { hasAutomation, collectWeaponMastery } from '../../services/combat/automationService.js'
+import { hasAutomation, collectWeaponMastery, evaluateAutoExpression } from '../../services/combat/automationService.js'
 import { isExhausted } from '../../services/automation/handlers/saveAttackHandler.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import utils from '../../services/ui/utils.js'
@@ -60,6 +60,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [teleportModal, setTeleportModal] = useState(null);
     const [divineSparkModal, setDivineSparkModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
+    const [damageTypeChoice, setDamageTypeChoice] = useState(null);
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
 
     useEffect(() => {
@@ -302,6 +303,81 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }
         }
 
+        // Apply weapon_attack_hit damage bonus automations (e.g. Divine Strike, Primal Strike)
+        if (playerStats.automation?.actions) {
+            const weaponHitBonuses = playerStats.automation.actions.filter(
+                a => a.type === 'damage_bonus' && a.trigger === 'weapon_attack_hit'
+            );
+            for (const bonus of weaponHitBonuses) {
+                const optionKey = `_${bonus.name.replace(/\s+/g, '_')}_option`;
+                const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+                const selected = chosenOption || bonus.options?.[0] || '';
+                if (bonus.options?.length > 0) {
+                    const isStrikeOption = selected.toLowerCase().includes('strike');
+                    if (!isStrikeOption) continue;
+                }
+                const usedKey = `_${bonus.name.replace(/\s+/g, '_')}_usedRound`;
+                const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
+                const currentRound = getCurrentCombatRound();
+                if (bonus.oncePerTurn && usedRound === currentRound) continue;
+                const bonusResult = rollExpression(bonus.damageExpression);
+                if (bonusResult) {
+                    const damageType = bonus.damageType || '';
+                    if (damageType.includes(' or ')) {
+                        const types = damageType.split(/\s+or\s+/).flatMap(t => t.split(/\s+/)).filter(Boolean);
+                        pendingDamageRef.current = {
+                            attack, formula, total, rolls, modifier,
+                            bonusExpr: bonus.damageExpression,
+                            bonusTotal: bonusResult.total,
+                            bonusRolls: bonusResult.rolls,
+                            oncePerTurnKey: usedKey,
+                        };
+                        setDamageTypeChoice({
+                            title: `${bonus.name} — Damage Type`,
+                            types,
+                        });
+                        return;
+                    } else {
+                        formula += ` + ${bonus.damageExpression}[${damageType}]`;
+                        total += bonusResult.total;
+                        rolls = [...rolls, ...bonusResult.rolls];
+                    }
+                }
+                if (bonus.oncePerTurn) {
+                    setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+                }
+            }
+        }
+
+        // Apply Potent Spellcasting: add WIS modifier to cantrip damage
+        if (playerStats.automation?.actions) {
+            const isCantrip = playerStats.spellAbilities?.spells?.some(s => s.name === attack.name && s.level === 0);
+            if (isCantrip) {
+                const cantripBonuses = playerStats.automation.actions.filter(
+                    a => a.type === 'damage_bonus' && a.trigger === 'weapon_attack_hit' && a.options?.length > 0
+                );
+                for (const bonus of cantripBonuses) {
+                    const optionKey = `_${bonus.name.replace(/\s+/g, '_')}_option`;
+                    const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+                    const selected = chosenOption || bonus.options?.[0] || '';
+                    const isPotentSpellcasting = selected.toLowerCase().includes('spellcasting');
+                    if (!isPotentSpellcasting) continue;
+                    const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
+                    const wisMod = Math.max(0, wis?.bonus || 0);
+                    if (wisMod > 0) {
+                        formula += ` + ${wisMod}[Cantrip]`;
+                        total += wisMod;
+                    }
+                    if (bonus.tempHpExpression) {
+                        const tempHp = evaluateAutoExpression(bonus.tempHpExpression, playerStats);
+                        if (tempHp && !isNaN(tempHp)) {
+                            setRuntimeValue(playerStats.name, '_potentSpellcastingTempHp', tempHp, campaignName);
+                        }
+                    }
+                }
+            }
+        }
+
         // Check for weapon mastery properties to activate on hit
         if (attack.weaponType === 'melee') {
             const available = collectWeaponMastery(attack.name, playerStats);
@@ -355,6 +431,36 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         }
         const { attack, formula, total, rolls, modifier } = pending;
         setDivineFuryChoice(null);
+        pendingDamageRef.current = null;
+        proceedWithDamage(attack, formula, total, rolls, modifier);
+    };
+
+    const handleGenericDamageTypeChoice = (chosenType) => {
+        const pending = pendingDamageRef.current;
+        if (!pending) {
+            setDamageTypeChoice(null);
+            return;
+        }
+        const { attack, formula, total, rolls, modifier, bonusExpr, bonusTotal, bonusRolls, oncePerTurnKey } = pending;
+        const newFormula = `${formula} + ${bonusExpr}[${chosenType}]`;
+        const newTotal = total + bonusTotal;
+        const newRolls = [...rolls, ...bonusRolls];
+        if (oncePerTurnKey) {
+            setRuntimeValue(playerStats.name, oncePerTurnKey, getCurrentCombatRound(), campaignName);
+        }
+        setDamageTypeChoice(null);
+        pendingDamageRef.current = null;
+        proceedWithDamage(attack, newFormula, newTotal, newRolls, modifier);
+    };
+
+    const handleGenericDamageTypeSkip = () => {
+        const pending = pendingDamageRef.current;
+        if (!pending) {
+            setDamageTypeChoice(null);
+            return;
+        }
+        const { attack, formula, total, rolls, modifier } = pending;
+        setDamageTypeChoice(null);
         pendingDamageRef.current = null;
         proceedWithDamage(attack, formula, total, rolls, modifier);
     };
@@ -705,6 +811,33 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             </div>
                             <div className="sp-actions">
                                 <button className="sp-dismiss-btn" onClick={handleDivineFurySkip}>Skip</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {damageTypeChoice && (
+                    <div className="sp-overlay" onClick={handleGenericDamageTypeSkip}>
+                        <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                            <div className="sp-header">
+                                <i className="fa-solid fa-bolt"></i> {damageTypeChoice.title}
+                            </div>
+                            <div className="sp-body">
+                                <p>Choose the damage type for this hit:</p>
+                                <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                                    {damageTypeChoice.types.map((type) => (
+                                        <button
+                                            key={type}
+                                            className="sp-roll-btn"
+                                            style={{ margin: '0 6px 8px 6px' }}
+                                            onClick={() => handleGenericDamageTypeChoice(type)}
+                                        >
+                                            {type}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="sp-actions">
+                                <button className="sp-dismiss-btn" onClick={handleGenericDamageTypeSkip}>Skip</button>
                             </div>
                         </div>
                     </div>
