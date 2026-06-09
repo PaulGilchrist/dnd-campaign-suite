@@ -207,7 +207,7 @@
     {
         "name": "Boon Of Dimensional Travel",
         "type": "Epic Boon Feat",
-        "description": "<p><b>Ability Score Increase.</b> Increase one ability score of your choice by 1, to a maximum of 30.</p><p><b>Blink Steps.</b> Immediately after you take the Attack action or the Magic action, you can teleport up to 30 feet to an unoccupied space you can see.</p>",
+        "description": "<p><b>Ability Score Increase.</b> Increase one ability score of your choice by 1, to a maximum of 30.</p><p><b>Blink Steps.</b> Immediately after you take the Attack action or the Action, you can teleport up to 30 feet to an unoccupied space you can see.</p>",
         "prerequisites": {
             "level": 19
         },
@@ -219,11 +219,11 @@
             },
             {
                 "name": "Blink Steps",
-                "description": "Immediately after you take the Attack action or the Magic action, you can teleport up to 30 feet to an unoccupied space you can see.",
+                "description": "Immediately after you take the Attack action or the Action, you can teleport up to 30 feet to an unoccupied space you can see.",
                 "type": "movement",
                 "automation": {
                     "type": "temp_buff",
-                    "trigger": "after_attack_or_magic_action",
+                    "trigger": "after_attack_or_action",
                     "effect": "bonus_teleport",
                     "distance": "30 ft",
                     "requiresLineOfSight": true,

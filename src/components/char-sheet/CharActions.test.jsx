@@ -422,7 +422,7 @@ describe('CharActions', () => {
     });
   });
 
-  it('should show Empowered Spell popup when clicking Metamagic action with damage event', async () => {
+  it('should show Empowered Spell popup when clicking Metaaction with damage event', async () => {
     const { getLastDamageEvent } = await import('../../hooks/useMetamagic.js');
     getLastDamageEvent.mockReturnValue({
       targetName: 'Goblin',

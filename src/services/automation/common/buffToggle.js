@@ -17,7 +17,7 @@ export function toggleBuff(playerName, actionName, auto, campaignName) {
 
     const newBuffs = wasActive
          ? activeBuffs.filter(b => b.name !== actionName)
-         : [...activeBuffs, { name: actionName, effect: auto.effect, duration: auto.duration }];
+         : [...activeBuffs, { name: actionName, effect: auto.effect, duration: auto.duration, enemiesDisadvantageSaves: auto.enemies_disadvantage_saves || [], distance: auto.distance || '', extendedDistance: auto.extendedDistance || '' }];
 
     setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
 

@@ -1,5 +1,9 @@
 # 🐉 D&D Character Sheet
 
+> <strong>WARNING:</strong> This application is going through a major enhancement of automating ALL class, subclass, race, subrace, background, and feat special abilities and should be considered Alpha software until that implementation is complete, and this warning is removed.
+
+---
+
 **A complete, self-hosted D&D toolkit — character sheets, real-time party sync, and a full GM campaign suite. No accounts, no database, no subscriptions. Just your browser and your imagination.**
 
 <p>

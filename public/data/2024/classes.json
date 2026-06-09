@@ -1669,7 +1669,7 @@
                 "features": [
                     {
                         "name": "Channel Divinity",
-                        "description": "You can channel divine energy directly from the Outer Planes to fuel magical effects. You start with two such effects: Divine Spark and Turn Undead. You can use this class's Channel Divinity twice. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Divine Spark. As a Magic action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and add your Wisdom modifier. You either restore Hit Points to the creature equal to that total or force the creature to make a Constitution saving throw. On a failed save, the creature takes Necrotic or Radiant damage (your choice) equal to that total. Turn Undead. As a Magic action, you present your Holy Symbol and censure Undead creatures. Each Undead of your choice within 30 feet of you must make a Wisdom saving throw. If the creature fails its save, it has the Frightened and Incapacitated conditions for 1 minute.",
+                        "description": "You can channel divine energy directly from the Outer Planes to fuel magical effects. You start with two such effects: Divine Spark and Turn Undead. You can use this class's Channel Divinity twice. You regain one of its expended uses when you finish a Short Rest, and you regain all expended uses when you finish a Long Rest. Divine Spark. As a Action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and add your Wisdom modifier. You either restore Hit Points to the creature equal to that total or force the creature to make a Constitution saving throw. On a failed save, the creature takes Necrotic or Radiant damage (your choice) equal to that total. Turn Undead. As a Action, you present your Holy Symbol and censure Undead creatures. Each Undead of your choice within 30 feet of you must make a Wisdom saving throw. If the creature fails its save, it has the Frightened and Incapacitated conditions for 1 minute.",
                         "level": 2,
                         "type": "class_feature",
                         "automation": {
@@ -1687,7 +1687,7 @@
                     },
                     {
                         "name": "Divine Spark",
-                        "description": "As a Magic action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and add your Wisdom modifier. You either restore Hit Points to the creature equal to that total or force the creature to make a Constitution saving throw. On a failed save, the creature takes Necrotic or Radiant damage (your choice) equal to that total.",
+                        "description": "As a Action, you point your Holy Symbol at another creature you can see within 30 feet of yourself and focus divine energy at it. Roll 1d8 and add your Wisdom modifier. You either restore Hit Points to the creature equal to that total or force the creature to make a Constitution saving throw. On a failed save, the creature takes Necrotic or Radiant damage (your choice) equal to that total.",
                         "level": 2,
                         "type": "class_feature",
                         "automation": {
@@ -1703,7 +1703,7 @@
                     },
                     {
                         "name": "Turn Undead",
-                        "description": "As a Magic action, you present your Holy Symbol and censure Undead creatures. Each Undead of your choice within 30 feet of you must make a Wisdom saving throw. If the creature fails its save, it has the Frightened and Incapacitated conditions for 1 minute.",
+                        "description": "As a Action, you present your Holy Symbol and censure Undead creatures. Each Undead of your choice within 30 feet of you must make a Wisdom saving throw. If the creature fails its save, it has the Frightened and Incapacitated conditions for 1 minute.",
                         "level": 2,
                         "type": "class_feature",
                         "automation": {
@@ -1943,12 +1943,11 @@
                 "features": [
                     {
                         "name": "Divine Intervention",
-                        "description": "You can call on your deity or pantheon to intervene on your behalf. As a Magic action, choose any Cleric spell of level 5 or lower that doesn't require a Reaction to cast. As part of the same action, you cast that spell without expending a spell slot or needing Material components. You can't use this feature again until you finish a Long Rest.",
+                        "description": "You can call on your deity or pantheon to intervene on your behalf. As a Action, choose any Cleric spell of level 5 or lower that doesn't require a Reaction to cast. As part of the same action, you cast that spell without expending a spell slot or needing Material components. You can't use this feature again until you finish a Long Rest.",
                         "level": 10,
                         "type": "class_feature",
                         "automation": {
                             "type": "divine_intervention",
-                            "action": "magic_action",
                             "recharge": "long_rest",
                             "casting_time": "1 action"
                         }
@@ -2210,7 +2209,6 @@
                         "type": "class_feature",
                         "automation": {
                             "type": "divine_intervention",
-                            "action": "magic_action",
                             "recharge": "long_rest",
                             "upgradeTo": "wish",
                             "casting_time": "1 action"
@@ -2252,7 +2250,7 @@
                     },
                     {
                         "name": "Preserve Life",
-                        "description": "As a Magic action, you present your Holy Symbol and expend a use of your Channel Divinity to evoke healing energy that can restore a number of Hit Points equal to five times your Cleric level. Choose Bloodied creatures within 30 feet of yourself and divide those Hit Points among them.",
+                        "description": "As a Action, you present your Holy Symbol and expend a use of your Channel Divinity to evoke healing energy that can restore a number of Hit Points equal to five times your Cleric level. Choose Bloodied creatures within 30 feet of yourself and divide those Hit Points among them.",
                         "level": 3,
                         "automation": {
                             "type": "healing_pool",
@@ -2339,7 +2337,7 @@
                 "features": [
                     {
                         "name": "Radiance of the Dawn",
-                        "description": "As a Magic action, you present your Holy Symbol and expend a use of your Channel Divinity to emit a flash of light in a 30-foot Emanation originating from yourself. Any magical Darkness in that area is dispelled. Each creature of your choice in that area must make a Constitution saving throw or take Radiant damage equal to 2d10 plus your Cleric level.",
+                        "description": "As a Action, you present your Holy Symbol and expend a use of your Channel Divinity to emit a flash of light in a 30-foot Emanation originating from yourself. Any magical Darkness in that area is dispelled. Each creature of your choice in that area must make a Constitution saving throw or take Radiant damage equal to 2d10 plus your Cleric level.",
                         "level": 3,
                         "automation": {
                             "type": "save_attack",
@@ -2378,7 +2376,7 @@
                     },
                     {
                         "name": "Corona of Light",
-                        "description": "As a Magic action, you cause yourself to emit an aura of sunlight that lasts for 1 minute. You emit Bright Light in a 60-foot radius and Dim Light for an additional 30 feet. Your enemies in the Bright Light have Disadvantage on saving throws against spells that deal Fire or Radiant damage.",
+                        "description": "As a Action, you cause yourself to emit an aura of sunlight that lasts for 1 minute. You emit Bright Light in a 60-foot radius and Dim Light for an additional 30 feet. Your enemies in the Bright Light have Disadvantage on saving throws against spells that deal Fire or Radiant damage.",
                         "level": 17,
                         "automation": {
                             "type": "temp_buff",
@@ -2444,7 +2442,7 @@
                 "features": [
                     {
                         "name": "Blessing of the Trickster",
-                        "description": "As a Magic action, you can choose yourself or a willing creature within 30 feet of yourself to have Advantage on Dexterity (Stealth) checks. This blessing lasts until you finish a Long Rest or you use this feature again.",
+                        "description": "As a Action, you can choose yourself or a willing creature within 30 feet of yourself to have Advantage on Dexterity (Stealth) checks. This blessing lasts until you finish a Long Rest or you use this feature again.",
                         "level": 3,
                         "automation": {
                             "type": "temp_buff",
@@ -2737,7 +2735,7 @@
                     },
                     {
                         "name": "Wild Companion",
-                        "description": "You can summon a nature spirit that assumes an animal form to aid you. As a Magic action, you can expend a spell slot or a use of Wild Shape to cast the Find Familiar spell without Material components. When you cast the spell in this way, the familiar is Fey and disappears when you finish a Long Rest.",
+                        "description": "You can summon a nature spirit that assumes an animal form to aid you. As a Action, you can expend a spell slot or a use of Wild Shape to cast the Find Familiar spell without Material components. When you cast the spell in this way, the familiar is Fey and disappears when you finish a Long Rest.",
                         "level": 2,
                         "type": "class_feature"
                     }
@@ -3323,7 +3321,7 @@
                     },
                     {
                         "name": "Land's Aid",
-                        "description": "As a Magic action, expend a use of Wild Shape and choose a point within 60 feet. Creatures in a 10-foot-radius Sphere make a Constitution saving throw, taking 2d6 Necrotic damage on a failed save or half on success. One creature regains 2d6 Hit Points. Damage and healing increase by 1d6 at Druid levels 10 (3d6) and 14 (4d6).",
+                        "description": "As a Action, expend a use of Wild Shape and choose a point within 60 feet. Creatures in a 10-foot-radius Sphere make a Constitution saving throw, taking 2d6 Necrotic damage on a failed save or half on success. One creature regains 2d6 Hit Points. Damage and healing increase by 1d6 at Druid levels 10 (3d6) and 14 (4d6).",
                         "level": 3
                     },
                     {
@@ -3338,7 +3336,7 @@
                     },
                     {
                         "name": "Nature's Sanctuary",
-                        "description": "As a Magic action, expend Wild Shape to cause spectral trees and vines to appear in a 15-foot Cube within 120 feet. Lasts 1 minute. You and allies have Half Cover; allies gain current Nature's Ward Resistance. As a Bonus Action, move the Cube up to 60 feet.",
+                        "description": "As a Action, expend Wild Shape to cause spectral trees and vines to appear in a 15-foot Cube within 120 feet. Lasts 1 minute. You and allies have Half Cover; allies gain current Nature's Ward Resistance. As a Bonus Action, move the Cube up to 60 feet.",
                         "level": 14
                     }
                 ],
@@ -3694,7 +3692,7 @@
                 "features": [
                     {
                         "name": "Action Surge",
-                        "description": "You can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action, except the Magic action. Once you use this feature, you can't do so again until you finish a Short or Long Rest. Starting at level 17, you can use it twice before a rest but only once on a turn.",
+                        "description": "You can push yourself beyond your normal limits for a moment. On your turn, you can take one additional action, except the Action. Once you use this feature, you can't do so again until you finish a Short or Long Rest. Starting at level 17, you can use it twice before a rest but only once on a turn.",
                         "level": 2,
                         "type": "class_feature",
                         "automation": {
@@ -4433,7 +4431,7 @@
                 "features": [
                     {
                         "name": "Psionic Power",
-                        "description": "Psionic Energy Dice: Level 3: d6 x6. Level 9: d8 x8. Level 11: d10 x8. Level 13: d10 x10. Level 17: d12 x12. Protective Field: Reaction to reduce damage by die roll + Intelligence modifier. Psionic Strike: Once per turn, after hitting with weapon attack, deal extra Force damage (die + Intelligence). Telekinetic Movement: Magic action to move object or willing creature up to 30 feet.",
+                        "description": "Psionic Energy Dice: Level 3: d6 x6. Level 9: d8 x8. Level 11: d10 x8. Level 13: d10 x10. Level 17: d12 x12. Protective Field: Reaction to reduce damage by die roll + Intelligence modifier. Psionic Strike: Once per turn, after hitting with weapon attack, deal extra Force damage (die + Intelligence). Telekinetic Movement: Action to move object or willing creature up to 30 feet.",
                         "level": 3
                     },
                     {
@@ -5035,7 +5033,7 @@
                     },
                     {
                         "name": "Hand of Healing",
-                        "description": "Magic action, expend 1 Focus Point to touch a creature and restore Hit Points (Martial Arts die + Wisdom modifier). When using Flurry of Blows, replace one Unarmed Strike with Hand of Healing without expending Focus Point.",
+                        "description": "Action, expend 1 Focus Point to touch a creature and restore Hit Points (Martial Arts die + Wisdom modifier). When using Flurry of Blows, replace one Unarmed Strike with Hand of Healing without expending Focus Point.",
                         "level": 3
                     },
                     {
@@ -5055,7 +5053,7 @@
                     },
                     {
                         "name": "Hand of Ultimate Mercy",
-                        "description": "Magic action, touch corpse of creature that died within 24 hours, expend 5 Focus Points. Creature returns to life with 4d10 + Wisdom modifier Hit Points. Conditions removed: Blinded, Deafened, Paralyzed, Poisoned, Stunned.",
+                        "description": "Action, touch corpse of creature that died within 24 hours, expend 5 Focus Points. Creature returns to life with 4d10 + Wisdom modifier Hit Points. Conditions removed: Blinded, Deafened, Paralyzed, Poisoned, Stunned.",
                         "level": 17
                     }
                 ],
@@ -5117,7 +5115,7 @@
                     },
                     {
                         "name": "Cloak of Shadows",
-                        "description": "Magic action in Dim Light or Darkness, expend 3 Focus Points for 1 minute. Invisibility. Partially Incorporeal - move through occupied spaces. Shadow Flurry - use Flurry of Blows without expending Focus Points.",
+                        "description": "Action in Dim Light or Darkness, expend 3 Focus Points for 1 minute. Invisibility. Partially Incorporeal - move through occupied spaces. Shadow Flurry - use Flurry of Blows without expending Focus Points.",
                         "level": 17
                     }
                 ],
@@ -5196,7 +5194,7 @@
                     },
                     {
                         "name": "Elemental Burst",
-                        "description": "Magic action, expend 2 Focus Points, 20-foot-radius Sphere centered on point within 120 feet. Choose damage type. Dexterity save or take damage equal to three Martial Arts die. Half on success.",
+                        "description": "Action, expend 2 Focus Points, 20-foot-radius Sphere centered on point within 120 feet. Choose damage type. Dexterity save or take damage equal to three Martial Arts die. Half on success.",
                         "level": 6
                     },
                     {
@@ -5548,7 +5546,7 @@
                 "features": [
                     {
                         "name": "Abjure Foes",
-                        "description": "As a Magic action, expend one use of Channel Divinity. Target creatures equal to Charisma modifier (minimum 1) within 60 feet. Each makes Wisdom save or has Frightened condition for 1 minute or until taking damage. While Frightened, can only do one of: move, take action, or take Bonus Action.",
+                        "description": "As a Action, expend one use of Channel Divinity. Target creatures equal to Charisma modifier (minimum 1) within 60 feet. Each makes Wisdom save or has Frightened condition for 1 minute or until taking damage. While Frightened, can only do one of: move, take action, or take Bonus Action.",
                         "level": 9,
                         "type": "class_feature",
                         "automation": {
@@ -6024,7 +6022,7 @@
                 "features": [
                     {
                         "name": "Nature's Wrath",
-                        "description": "As a magic action, you can expend one use of your Channel Divinity to conjure spectral vines around nearby creatures.  Each creature of your choice that you can see within 15 feet of yourself must succeed on a Strength saving throw or have the Restrained condition for 1 minute.  A Restrained creature repeats the save at the end of each of its turns, ending the effect on itself on a success.",
+                        "description": "As a action, you can expend one use of your Channel Divinity to conjure spectral vines around nearby creatures.  Each creature of your choice that you can see within 15 feet of yourself must succeed on a Strength saving throw or have the Restrained condition for 1 minute.  A Restrained creature repeats the save at the end of each of its turns, ending the effect on itself on a success.",
                         "level": 3,
                         "automation": {
                             "type": "set_condition",
@@ -6437,7 +6435,7 @@
                 "features": [
                     {
                         "name": "Tireless",
-                        "description": "Temporary Hit Points. As a Magic action, you can give yourself Temporary Hit Points equal to 1d8 + Wisdom modifier (minimum 1). Uses = Wisdom modifier (minimum once). Regain all on Long Rest. Decrease Exhaustion. Whenever you finish a Short Rest, your Exhaustion level decreases by 1.",
+                        "description": "Temporary Hit Points. As a Action, you can give yourself Temporary Hit Points equal to 1d8 + Wisdom modifier (minimum 1). Uses = Wisdom modifier (minimum once). Regain all on Long Rest. Decrease Exhaustion. Whenever you finish a Short Rest, your Exhaustion level decreases by 1.",
                         "level": 10,
                         "type": "class_feature"
                     }
@@ -6691,7 +6689,7 @@
                 "features": [
                     {
                         "name": "Primal Companion",
-                        "description": "Magically summon a primal beast. Choose stat block: Beast of the Land (Medium, AC 13+Wis, HP 5+5xRanger level, Speed 40 ft climb, Beast's Strike 1d8+2+Wis Bludgeoning/Piercing/Slashing), Beast of the Sea (Medium, AC 13+Wis, HP 5+5xRanger level, Speed 5 ft swim 60 ft, Beast's Strike 1d6+2+Wis Bludgeoning/Piercing + Grappled), or Beast of the Sky (Small, AC 13+Wis, HP 4+4xRanger level, Speed 10 ft fly 60 ft, Beast's Strike 1d4+3+Wis Slashing). The beast is Friendly to you and your allies. In combat, acts during your turn. Dodge action unless you take Bonus Action to command it. You can sacrifice one of your attacks to command Beast's Strike. Restoring: Magic action, touch dead beast (within 1 hour), expend spell slot, beast returns after 1 minute with all HP restored.",
+                        "description": "Magically summon a primal beast. Choose stat block: Beast of the Land (Medium, AC 13+Wis, HP 5+5xRanger level, Speed 40 ft climb, Beast's Strike 1d8+2+Wis Bludgeoning/Piercing/Slashing), Beast of the Sea (Medium, AC 13+Wis, HP 5+5xRanger level, Speed 5 ft swim 60 ft, Beast's Strike 1d6+2+Wis Bludgeoning/Piercing + Grappled), or Beast of the Sky (Small, AC 13+Wis, HP 4+4xRanger level, Speed 10 ft fly 60 ft, Beast's Strike 1d4+3+Wis Slashing). The beast is Friendly to you and your allies. In combat, acts during your turn. Dodge action unless you take Bonus Action to command it. You can sacrifice one of your attacks to command Beast's Strike. Restoring: Action, touch dead beast (within 1 hour), expend spell slot, beast returns after 1 minute with all HP restored.",
                         "level": 3
                     },
                     {
@@ -7579,7 +7577,7 @@
                 "features": [
                     {
                         "name": "Psionic Power",
-                        "description": "Psionic Energy Dice: Level 3: d6 x4. Level 5: d8 x6. Level 9: d8 x8. Level 11: d10 x8. Level 13: d10 x10. Level 17: d12 x12. Psi-Bolstered Knack: If you fail an ability check using skill/tool with proficiency, roll one Psionic Energy Die and add to check. Expended only if roll then succeeds. Psychic Whispers: Magic action, choose creatures up to Proficiency Bonus, roll one Psionic Energy Die. For hours equal to number rolled, chosen creatures can speak telepathically with you (within 35 feet). First use after Long Rest doesn't expend die.",
+                        "description": "Psionic Energy Dice: Level 3: d6 x4. Level 5: d8 x6. Level 9: d8 x8. Level 11: d10 x8. Level 13: d10 x10. Level 17: d12 x12. Psi-Bolstered Knack: If you fail an ability check using skill/tool with proficiency, roll one Psionic Energy Die and add to check. Expended only if roll then succeeds. Psychic Whispers: Action, choose creatures up to Proficiency Bonus, roll one Psionic Energy Die. For hours equal to number rolled, chosen creatures can speak telepathically with you (within 35 feet). First use after Long Rest doesn't expend die.",
                         "level": 3
                     },
                     {
@@ -7594,7 +7592,7 @@
                     },
                     {
                         "name": "Psychic Veil",
-                        "description": "Magic action, gain Invisible condition for 1 hour. Ends after dealing damage or forcing saving throw. Once per Long Rest (or expend Psionic Energy Die to restore).",
+                        "description": "Action, gain Invisible condition for 1 hour. Ends after dealing damage or forcing saving throw. Once per Long Rest (or expend Psionic Energy Die to restore).",
                         "level": 13
                     },
                     {
@@ -7612,7 +7610,7 @@
                 "features": [
                     {
                         "name": "Fast Hands",
-                        "description": "Bonus Action: Sleight of Hand (pick lock/disarm trap with Thieves' Tools or pick pocket), or Use an Object (Utilize action or Magic action to use magic item).",
+                        "description": "Bonus Action: Sleight of Hand (pick lock/disarm trap with Thieves' Tools or pick pocket), or Use an Object (Utilize action or Action to use magic item).",
                         "level": 3
                     },
                     {
@@ -8297,7 +8295,7 @@
                     },
                     {
                         "name": "Warping Implosion",
-                        "description": "Magic action, teleport to unoccupied space within 120 feet. Each creature within 30 feet of space you left makes Strength save or takes 3d10 Force damage and pulled toward space you left. Once per Long Rest (or spend 5 SP to restore).",
+                        "description": "Action, teleport to unoccupied space within 120 feet. Each creature within 30 feet of space you left makes Strength save or takes 3d10 Force damage and pulled toward space you left. Once per Long Rest (or spend 5 SP to restore).",
                         "level": 18
                     }
                 ],
@@ -8365,7 +8363,7 @@
                     },
                     {
                         "name": "Bastion of Law",
-                        "description": "Magic action, expend 1-5 Sorcery Points to create magical ward around self or creature within 30 feet. Ward represented by number of d8s equal to SP spent. When warded creature takes damage, can expend dice, roll them, reduce damage by total rolled. Ward lasts until Long Rest or use again.",
+                        "description": "Action, expend 1-5 Sorcery Points to create magical ward around self or creature within 30 feet. Ward represented by number of d8s equal to SP spent. When warded creature takes damage, can expend dice, roll them, reduce damage by total rolled. Ward lasts until Long Rest or use again.",
                         "level": 6
                     },
                     {
@@ -8375,7 +8373,7 @@
                     },
                     {
                         "name": "Clockwork Cavalcade",
-                        "description": "Magic action, summon spirits in 30-foot Cube. Effects: Heal (up to 100 HP divided among creatures), Repair (damaged objects repaired instantly), Dispel (every spell of level 6 and lower ends). Once per Long Rest (or spend 7 SP to restore).",
+                        "description": "Action, summon spirits in 30-foot Cube. Effects: Heal (up to 100 HP divided among creatures), Repair (damaged objects repaired instantly), Dispel (every spell of level 6 and lower ends). Once per Long Rest (or spend 7 SP to restore).",
                         "level": 18
                     }
                 ],

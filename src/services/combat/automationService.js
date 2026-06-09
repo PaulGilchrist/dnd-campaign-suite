@@ -289,7 +289,6 @@ function buildAttackInfo(feature, playerStats) {
             return {
                 type: 'divine_intervention',
                 name: feature.name,
-                action: auto.action || 'magic_action',
                 recharge: auto.recharge || 'long_rest',
                 upgradeTo: auto.upgradeTo || '',
                 casting_time: auto.casting_time || '1 action',
@@ -640,6 +639,7 @@ function buildAttackInfo(feature, playerStats) {
                 bringAllies: !!auto.bringAllies,
                 allyCount: auto.allyCount || 0,
                 teleportRange: auto.teleportRange || '',
+                enemiesDisadvantageSaves: auto.enemies_disadvantage_saves || [],
                 hasAutomation: true
             }
         }

@@ -7,6 +7,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js
 import { getInnateSorceryBonus } from '../combat/buffService.js';
 import { getWolfAdvantageAgainst } from '../combat/wolfAuraUtils.js';
 import { getLionDisadvantageAgainst } from '../combat/lionAuraUtils.js';
+import { getCoronaSaveDisadvantage } from '../combat/coronaAuraUtils.js';
 
 export function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects) {
     const playerName = playerStats.name;
@@ -74,6 +75,39 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
 
         const isMelee = attack.weaponType === 'melee' || attack.weaponType === 'unarmed';
 
+        // Aura checks when no map is active — all creatures considered in range
+        if (forcedMode === undefined) {
+            const noMapWolf = getWolfAdvantageAgainst({
+                attackerName: playerName,
+                campaignName,
+                skipRangeCheck: true,
+            });
+            if (noMapWolf.advantage) {
+                forcedMode = 'advantage';
+            }
+        }
+        if (forcedMode === undefined) {
+            const noMapLion = getLionDisadvantageAgainst({
+                attackerName: playerName,
+                campaignName,
+                skipRangeCheck: true,
+            });
+            if (noMapLion.disadvantage) {
+                forcedMode = 'disadvantage';
+            }
+        }
+        if (forcedMode === undefined && targetName) {
+            const noMapCorona = getCoronaSaveDisadvantage({
+                targetName,
+                campaignName,
+                damageType: attack.damageType,
+                skipRangeCheck: true,
+            });
+            if (noMapCorona.disadvantage) {
+                forcedMode = 'disadvantage';
+            }
+        }
+
         return {
             damageType: attack.damageType,
             resistanceNotice,
@@ -125,24 +159,67 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                   }
 
                 if (targetPos && base.forcedMode === undefined) {
-                    const wolfResult = getWolfAdvantageAgainst({
-                        targetPos,
-                        attackerName: playerStats.name,
-                        campaignName,
-                        mapData,
-                    });
-                    if (wolfResult.advantage) {
-                        base.forcedMode = 'advantage';
-                    }
-                    const lionResult = getLionDisadvantageAgainst({
-                        attackerName: playerStats.name,
-                        campaignName,
-                        mapData,
-                    });
-                    if (lionResult.disadvantage) {
-                        base.forcedMode = 'disadvantage';
-                    }
-                }
+                     const wolfResult = getWolfAdvantageAgainst({
+                         targetPos,
+                         attackerName: playerStats.name,
+                         campaignName,
+                         mapData,
+                     });
+                     if (wolfResult.advantage) {
+                         base.forcedMode = 'advantage';
+                     }
+                     const lionResult = getLionDisadvantageAgainst({
+                         attackerName: playerStats.name,
+                         campaignName,
+                         mapData,
+                     });
+                     if (lionResult.disadvantage) {
+                         base.forcedMode = 'disadvantage';
+                     }
+                     const coronaResult = getCoronaSaveDisadvantage({
+                         targetName: base.targetName,
+                         campaignName,
+                         mapData,
+                         damageType: base.damageType,
+                     });
+                     if (coronaResult.disadvantage && base.forcedMode === undefined) {
+                         base.forcedMode = 'disadvantage';
+                     }
+                 }
+
+                 // When map is active but target has no position, fall back to no-map aura checks
+                 if (!targetPos && base.forcedMode === undefined) {
+                     const noMapWolf = getWolfAdvantageAgainst({
+                         attackerName: playerStats.name,
+                         campaignName,
+                         mapData,
+                         skipRangeCheck: true,
+                     });
+                     if (noMapWolf.advantage) {
+                         base.forcedMode = 'advantage';
+                     }
+                     const noMapLion = getLionDisadvantageAgainst({
+                         attackerName: playerStats.name,
+                         campaignName,
+                         mapData,
+                         skipRangeCheck: true,
+                     });
+                     if (noMapLion.disadvantage) {
+                         base.forcedMode = 'disadvantage';
+                     }
+                     if (base.forcedMode === undefined) {
+                         const noMapCorona = getCoronaSaveDisadvantage({
+                             targetName: base.targetName,
+                             campaignName,
+                             mapData,
+                             damageType: base.damageType,
+                             skipRangeCheck: true,
+                         });
+                         if (noMapCorona.disadvantage) {
+                             base.forcedMode = 'disadvantage';
+                         }
+                     }
+                 }
 
                 const numericRange = rangeToFeet(attack.range) || 0;
                 const isRanged = numericRange > 8;

@@ -51606,7 +51606,7 @@
       },
       {
         "name": "Curse of the Riddle",
-        "description": "Intelligence Saving Throw: DC 15, one creature the sphinx can see within 60 feet. Failure: 21 (6d6) Psychic damage, and the target is cursed with a riddle. The cursed target has Disadvantage on ability checks and attack rolls. In addition, if it takes the Magic action, it must succeed on a DC 15 Intelligence saving throw or that action is wasted. The cursed target can take a Study action to make a DC 15 Intelligence check, solving the riddle and ending the curse on a success. The curse ends early if the sphinx curses another target.",
+        "description": "Intelligence Saving Throw: DC 15, one creature the sphinx can see within 60 feet. Failure: 21 (6d6) Psychic damage, and the target is cursed with a riddle. The cursed target has Disadvantage on ability checks and attack rolls. In addition, if it takes the Action, it must succeed on a DC 15 Intelligence saving throw or that action is wasted. The cursed target can take a Study action to make a DC 15 Intelligence check, solving the riddle and ending the curse on a success. The curse ends early if the sphinx curses another target.",
         "save_dc": 15,
         "save_type": "Intelligence",
         "damage": "21 (6d6)",
