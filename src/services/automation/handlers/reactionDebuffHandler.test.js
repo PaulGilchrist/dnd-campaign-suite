@@ -996,7 +996,7 @@ describe('reactionDebuffHandler.handle', () => {
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
       const event = freshAttackEvent({ d20: 14, bonus: 3, hit: true, effectiveAc: null });
-      event.timestamp = Date.now() - 59999; // under threshold → fresh
+      event.timestamp = Date.now() - 5000; // well under threshold → fresh
       useMetamagic.getLastAttackRoll.mockReturnValue(event);
 
       await handle(action, ps, campaignName, mapName);
