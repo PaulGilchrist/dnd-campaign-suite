@@ -27,6 +27,7 @@ import AttackRiderModal from './AttackRiderModal.jsx'
 import WeaponMasteryModal from './WeaponMasteryModal.jsx'
 import CombatStanceModal from './CombatStanceModal.jsx'
 import TeleportModal from './TeleportModal.jsx'
+import HealingIllusionModal from './HealingIllusionModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/divineInterventionHandler.js';
@@ -60,6 +61,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [weaponMasteryModal, setWeaponMasteryModal] = useState(null);
     const [combatStanceModal, setCombatStanceModal] = useState(null);
     const [teleportModal, setTeleportModal] = useState(null);
+    const [healingIllusionModal, setHealingIllusionModal] = useState(null);
     const [divineSparkModal, setDivineSparkModal] = useState(null);
     const [divineInterventionModal, setDivineInterventionModal] = useState(null);
     const [divineInterventionAction, setDivineInterventionAction] = useState(null);
@@ -582,6 +584,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'attackRider': setAttackRiderModal(result.payload); break;
                     case 'combatStance': setCombatStanceModal(result.payload); break;
                     case 'teleport': setTeleportModal(result.payload); break;
+                    case 'healingIllusion': setHealingIllusionModal(result.payload); break;
                     case 'divineSpark': setDivineSparkModal(result.payload); break;
                     case 'divineIntervention':
                         setDivineInterventionAction(action);
@@ -855,6 +858,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <TeleportModal
                         {...teleportModal}
                         onClose={() => { setTeleportModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
+                    />
+                )}
+                {healingIllusionModal && (
+                    <HealingIllusionModal
+                        {...healingIllusionModal}
+                        onClose={() => { setHealingIllusionModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
                     />
                 )}
                 {divineSparkModal && (

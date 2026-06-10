@@ -1,7 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { grantTempHpOnRage } from './tempHpBuffHandler.js';
 import { clearExtendedFlag } from './tempTeleportHandler.js';
-import { logHealingToSSE } from '../common/healingRoll.js';
 
 function resolveResistanceTypes(resistanceTypes) {
     return resistanceTypes.flatMap(rt => {
@@ -36,22 +35,12 @@ export async function handle(action, playerStats, campaignName) {
         if (action.name === 'Rage') {
             clearExtendedFlag(playerName, campaignName);
         }
-        let description = `${action.name} ended`;
         if (auto.effect === 'create_illusion' && playerStats.automation?.passives?.some(p => p.effect === 'enhanced_distraction_and_healing')) {
-            const healAmount = playerStats.level || 1;
-            const currentHp = Number(getRuntimeValue(playerName, 'currentHitPoints', campaignName)) || 0;
-            const maxHp = playerStats.hitPoints;
-            const newHp = Math.min(maxHp, currentHp + healAmount);
-            setRuntimeValue(playerName, 'currentHitPoints', newHp, campaignName);
-            logHealingToSSE(campaignName, {
-                targetName: playerName,
-                sourceName: action.name,
-                actualHeal: newHp - currentHp,
-                newHp,
-                maxHp,
-            });
-            window.dispatchEvent(new CustomEvent('combat-summary-updated'));
-            description += ` — Healing Illusion restored ${newHp - currentHp} HP (Cleric level ${healAmount})`;
+            return {
+                type: 'modal',
+                modalName: 'healingIllusion',
+                payload: { action, playerStats, campaignName },
+            };
         }
         return {
             type: 'popup',
@@ -59,7 +48,7 @@ export async function handle(action, playerStats, campaignName) {
                 type: 'automation_info',
                 name: action.name,
                 automationType: auto.type,
-                description,
+                description: `${action.name} ended`,
                 automation: auto,
             },
         };
@@ -163,6 +152,8 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         ? resolveResistanceTypes(getOptionProperty(chosenOption, 'resistanceTypes', []))
         : (auto.resistanceTypes || []);
 
+    const isImprovedDuplicity = auto.effect === 'create_illusion' && playerStats.automation?.passives?.some(p => p.effect === 'enhanced_distraction_and_healing');
+
     const buff = {
         name: action.name,
         effect: auto.effect || 'stance',
@@ -176,6 +167,7 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         range: chosenOption ? (chosenOption.range || null) : null,
         flySpeed: null,
         reactionSave: null,
+        isImprovedDuplicity,
     };
 
     if (chosenOption && chosenOption.flySpeed) {

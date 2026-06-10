@@ -6,6 +6,7 @@ import { loadNPCs } from '../npcs/npcsService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { getInnateSorceryBonus } from '../combat/buffService.js';
 import { getWolfAdvantageAgainst } from '../combat/wolfAuraUtils.js';
+import { getDuplicityAdvantageAgainst } from '../combat/duplicityAuraUtils.js';
 import { getLionDisadvantageAgainst } from '../combat/lionAuraUtils.js';
 import { getCoronaSaveDisadvantage } from '../combat/coronaAuraUtils.js';
 
@@ -55,14 +56,12 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         }
 
         // Grant attack advantage if Reckless Attack (or similar buff) is active
-        let targetsHaveAdvantage = false;
         let ramActive = false;
         for (const buff of activeBuffs) {
             if (buff.effect === 'advantage_attacks_disadvantage_against') {
                 if (forcedMode === undefined) {
                     forcedMode = 'advantage';
                 }
-                targetsHaveAdvantage = true;
             }
             if (buff.optionName === 'Ram') {
                 ramActive = true;
@@ -75,14 +74,10 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
 
         const isMelee = attack.weaponType === 'melee' || attack.weaponType === 'unarmed';
 
-        // Invoke Duplicity: Distract grants Advantage on melee attack rolls while the illusion is active
-        if (isMelee && activeBuffs.some(b => b.effect === 'create_illusion')) {
+        // Invoke Duplicity: Distract grants Advantage on attack rolls while the illusion is active
+        if (activeBuffs.some(b => b.effect === 'create_illusion')) {
             if (forcedMode === undefined) {
                 forcedMode = 'advantage';
-            }
-            // Improved Duplicity (level 17): allies also gain Advantage
-            if (playerStats.automation?.passives?.some(p => p.effect === 'enhanced_distraction_and_healing')) {
-                targetsHaveAdvantage = true;
             }
         }
 
@@ -94,6 +89,16 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                 skipRangeCheck: true,
             });
             if (noMapWolf.advantage) {
+                forcedMode = 'advantage';
+            }
+        }
+        if (forcedMode === undefined) {
+            const noMapDuplicity = getDuplicityAdvantageAgainst({
+                attackerName: playerName,
+                campaignName,
+                skipRangeCheck: true,
+            });
+            if (noMapDuplicity.advantage) {
                 forcedMode = 'advantage';
             }
         }
@@ -130,7 +135,6 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             forcedMode,
             autoDamageFormula,
             autoDamageName: attack.name,
-            targetsHaveAdvantage,
             ramActive,
             isMelee,
            };
@@ -169,17 +173,28 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                       }
                   }
 
-                if (targetPos && base.forcedMode === undefined) {
-                     const wolfResult = getWolfAdvantageAgainst({
-                         targetPos,
-                         attackerName: playerStats.name,
-                         campaignName,
-                         mapData,
-                     });
-                     if (wolfResult.advantage) {
-                         base.forcedMode = 'advantage';
-                     }
-                     const lionResult = getLionDisadvantageAgainst({
+                 if (targetPos && base.forcedMode === undefined) {
+                      const wolfResult = getWolfAdvantageAgainst({
+                          targetPos,
+                          attackerName: playerStats.name,
+                          campaignName,
+                          mapData,
+                      });
+                      if (wolfResult.advantage) {
+                          base.forcedMode = 'advantage';
+                      }
+                      if (base.forcedMode === undefined) {
+                          const duplicityResult = getDuplicityAdvantageAgainst({
+                              targetPos,
+                              attackerName: playerStats.name,
+                              campaignName,
+                              mapData,
+                          });
+                          if (duplicityResult.advantage) {
+                              base.forcedMode = 'advantage';
+                          }
+                      }
+                      const lionResult = getLionDisadvantageAgainst({
                          attackerName: playerStats.name,
                          campaignName,
                          mapData,
@@ -198,18 +213,29 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                      }
                  }
 
-                 // When map is active but target has no position, fall back to no-map aura checks
-                 if (!targetPos && base.forcedMode === undefined) {
-                     const noMapWolf = getWolfAdvantageAgainst({
-                         attackerName: playerStats.name,
-                         campaignName,
-                         mapData,
-                         skipRangeCheck: true,
-                     });
-                     if (noMapWolf.advantage) {
-                         base.forcedMode = 'advantage';
-                     }
-                     const noMapLion = getLionDisadvantageAgainst({
+                  // When map is active but target has no position, fall back to no-map aura checks
+                  if (!targetPos && base.forcedMode === undefined) {
+                      const noMapWolf = getWolfAdvantageAgainst({
+                          attackerName: playerStats.name,
+                          campaignName,
+                          mapData,
+                          skipRangeCheck: true,
+                      });
+                      if (noMapWolf.advantage) {
+                          base.forcedMode = 'advantage';
+                      }
+                      if (base.forcedMode === undefined) {
+                          const noMapDuplicity = getDuplicityAdvantageAgainst({
+                              attackerName: playerStats.name,
+                              campaignName,
+                              mapData,
+                              skipRangeCheck: true,
+                          });
+                          if (noMapDuplicity.advantage) {
+                              base.forcedMode = 'advantage';
+                          }
+                      }
+                      const noMapLion = getLionDisadvantageAgainst({
                          attackerName: playerStats.name,
                          campaignName,
                          mapData,
