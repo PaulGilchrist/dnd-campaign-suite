@@ -536,6 +536,10 @@ function buildAttackInfo(feature, playerStats) {
                 uses_expression: auto.uses_expression || '',
                 recharge_short_rest: auto.recharge_short_rest || '',
                 recharge_long_rest: auto.recharge_long_rest || '',
+                conversion: auto.conversion || '',
+                reverseConversion: auto.reverseConversion || '',
+                reverseRecharge: auto.reverseRecharge || '',
+                casting_time: auto.casting_time || 'passive',
                 hasAutomation: true
             }
         }

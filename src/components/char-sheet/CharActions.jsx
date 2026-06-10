@@ -20,6 +20,7 @@ import utils from '../../services/ui/utils.js'
 import HealingPoolModal from './HealingPoolModal.jsx'
 import HandOfHealingModal from './HandOfHealingModal.jsx'
 import FontOfMagicModal from './FontOfMagicModal.jsx'
+import ResourcePoolModal from './ResourcePoolModal.jsx'
 import SetConditionModal from './SetConditionModal.jsx'
 import DivineSparkModal from './DivineSparkModal.jsx'
 import DivineInterventionModal from './DivineInterventionModal.jsx'
@@ -56,6 +57,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [healingPoolModal, setHealingPoolModal] = useState(null);
     const [handOfHealingModal, setHandOfHealingModal] = useState(null);
     const [fontOfMagicModal, setFontOfMagicModal] = useState(null);
+    const [resourcePoolModal, setResourcePoolModal] = useState(null);
     const [setConditionModal, setSetConditionModal] = useState(null);
     const [attackRiderModal, setAttackRiderModal] = useState(null);
     const [weaponMasteryModal, setWeaponMasteryModal] = useState(null);
@@ -580,6 +582,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'healingPool': setHealingPoolModal(result.payload); break;
                     case 'handOfHealing': setHandOfHealingModal(result.payload); break;
                     case 'fontOfMagic': setFontOfMagicModal(true); break;
+                    case 'resourcePool': setResourcePoolModal(result.payload); break;
                     case 'setCondition': setSetConditionModal(result.payload); break;
                     case 'attackRider': setAttackRiderModal(result.payload); break;
                     case 'combatStance': setCombatStanceModal(result.payload); break;
@@ -824,6 +827,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         playerStats={playerStats}
                         campaignName={campaignName}
                         onClose={() => setFontOfMagicModal(null)}
+                    />
+                )}
+                {resourcePoolModal && (
+                    <ResourcePoolModal
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        automation={resourcePoolModal.automation}
+                        onClose={() => setResourcePoolModal(null)}
                     />
                 )}
                 {setConditionModal && (

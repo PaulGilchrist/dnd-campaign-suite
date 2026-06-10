@@ -2837,7 +2837,7 @@
                             "conversion": "spell_slot_to_wild_shape",
                             "reverseConversion": "wild_shape_to_spell_slot",
                             "reverseRecharge": "long_rest",
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     }
                 ],
