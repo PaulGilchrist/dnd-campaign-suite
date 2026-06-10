@@ -13,6 +13,12 @@ vi.mock('../ui/utils.js', () => ({
   },
 }));
 
+vi.mock('../ui/storage.js', () => ({
+  default: {
+    set: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 vi.mock('../encounters/combatData.js', () => ({
   getCurrentCombatRound: vi.fn(),
   getActiveCreatureName: vi.fn(),
@@ -29,6 +35,7 @@ import {
 
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import utils from '../ui/utils.js';
+import storage from '../ui/storage.js';
 import {
   getCurrentCombatRound,
   getActiveCreatureName,
@@ -43,6 +50,8 @@ function resetMocks() {
   vi.clearAllMocks();
   // Reset localStorage between tests so clearAllExpirationEffects doesn't see stale keys
   localStorage.clear();
+  // Reset dispatchEvent so CustomEvent tests don't interfere
+  window.dispatchEvent = vi.fn();
 }
 
 // Make utils.getName default to identity (pass-through) for most tests
@@ -968,38 +977,257 @@ describe('expireStaleEffects — additional edge cases', () => {
     expect(() => expireStaleEffects('MyCampaign')).not.toThrow();
   });
 
-  it('handles fresh entries not being stale (appliedRound === currentRound)', () => {
+  it('clears fly_speed_equals_walk_speed effect via expireStaleEffects', () => {
+    const list = [
+      { target: 'Human', effects: [{ type: 'fly_speed_equals_walk_speed' }], appliedRound: 0 },
+    ];
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     getCurrentCombatRound.mockReturnValue(3);
-    const list = [
-      { target: 'Human', effects: [{ type: 'stunned' }], appliedRound: 3 }, // not stale (===)
-    ];
-    getRuntimeValue.mockReturnValueOnce(list);
+
+    // Entry is stale → clearExpirationEffects processes fly_speed_equals_walk_speed
+    // which gets targetName's activeBuffs and filters, then sets back
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (name === 'Goblin' && key === KEY) return list;
+      return null;
+    });
 
     expireStaleEffects('MyCampaign');
 
-    // Entry should be KEPT because appliedRound >= currentRound
+    // fly_speed_equals_walk_speed calls setRuntimeValue with filtered activeBuffs
+    const filterCall = setRuntimeValue.mock.calls.find(
+      (c) => c[1] === 'activeBuffs' && c[0] === 'Human'
+    );
+    expect(filterCall).toBeTruthy();
+    expect(filterCall[2]).toEqual([]);
+
+    // Stale entry removed from list
     const finalCall = setRuntimeValue.mock.calls.find(
       (c) => c[0] === 'Goblin' && c[1] === KEY
     );
     expect(finalCall).toBeTruthy();
-    expect(finalCall[2]).toEqual(list);
+    expect(finalCall[2]).toEqual([]);
   });
 
-  it('handles entries with appliedRound greater than currentRound (future)', () => {
-    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
-    getCurrentCombatRound.mockReturnValue(1);
+  it('clears remove_active_buff effect via expireStaleEffects', () => {
     const list = [
-      { target: 'Human', effects: [{ type: 'stunned' }], appliedRound: 5 }, // future
+      { target: 'Human', effects: [{ type: 'remove_active_buff', buffName: 'RecklessAttack' }], appliedRound: 0 },
     ];
-    getRuntimeValue.mockReturnValueOnce(list);
+    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
+    getCurrentCombatRound.mockReturnValue(3);
+
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (name === 'Goblin' && key === KEY) return list;
+      return null;
+    });
 
     expireStaleEffects('MyCampaign');
 
-    const finalCall = setRuntimeValue.mock.calls.find(
-      (c) => c[0] === 'Goblin' && c[1] === KEY
+    // remove_active_buff calls setRuntimeValue with filtered activeBuffs (by buffName)
+    const filterCall = setRuntimeValue.mock.calls.find(
+      (c) => c[1] === 'activeBuffs' && c[0] === 'Human'
     );
-    expect(finalCall).toBeTruthy();
-    expect(finalCall[2]).toEqual(list); // kept because not stale
+    expect(filterCall).toBeTruthy();
+    expect(filterCall[2]).toEqual([]);
+  });
+
+  it('clears remove_bardic_inspiration effect via expireStaleEffects', () => {
+    const list = [
+      { target: 'Human', effects: [{ type: 'remove_bardic_inspiration' }], appliedRound: 0 },
+    ];
+    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
+    getCurrentCombatRound.mockReturnValue(3);
+
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (name === 'Goblin' && key === KEY) return list;
+      return null;
+    });
+
+    expireStaleEffects('MyCampaign');
+
+    // remove_bardic_inspiration sets bardicInspirationDie, bardicInspirationGrantedBy,
+    // and bardicInspirationCombatOptions to null
+    expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'bardicInspirationDie', null, 'MyCampaign');
+    expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'bardicInspirationGrantedBy', null, 'MyCampaign');
+    expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'bardicInspirationCombatOptions', null, 'MyCampaign');
+  });
+
+  it('clears inspiring_movement_no_oa effect via expireStaleEffects', () => {
+    const list = [
+      { target: 'Human', effects: [{ type: 'inspiring_movement_no_oa' }], appliedRound: 0 },
+    ];
+    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
+    getCurrentCombatRound.mockReturnValue(3);
+
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (name === 'Goblin' && key === KEY) return list;
+      return null;
+    });
+
+    expireStaleEffects('MyCampaign');
+
+    expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'inspiringMovementNoOA', null, 'MyCampaign');
+  });
+
+  it('clears inspiring_movement_granted effect via expireStaleEffects', () => {
+    const list = [
+      { target: 'Human', effects: [{ type: 'inspiring_movement_granted' }], appliedRound: 0 },
+    ];
+    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
+    getCurrentCombatRound.mockReturnValue(3);
+
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (name === 'Goblin' && key === KEY) return list;
+      return null;
+    });
+
+    expireStaleEffects('MyCampaign');
+
+    expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'inspiringMovementGranted', null, 'MyCampaign');
+  });
+
+  it('clears unbreakable_majesty effect via expireStaleEffects', () => {
+    const list = [
+      { target: 'Human', effects: [{ type: 'unbreakable_majesty' }], appliedRound: 0 },
+    ];
+    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
+    getCurrentCombatRound.mockReturnValue(3);
+
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (name === 'Goblin' && key === KEY) return list;
+      return null;
+    });
+
+    expireStaleEffects('MyCampaign');
+
+    // unbreakable_majesty sets unbreakableMajestyActive and unbreakableMajestySaveDc to null
+    expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'unbreakableMajestyActive', null, 'MyCampaign');
+    expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'unbreakableMajestySaveDc', null, 'MyCampaign');
+  });
+
+  it('cleared activeBuffs with fly_speed_equals_walk_speed mixed with other buffs', () => {
+    const list = [
+      { target: 'Human', effects: [{ type: 'fly_speed_equals_walk_speed' }], appliedRound: 0 },
+    ];
+    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
+    getCurrentCombatRound.mockReturnValue(3);
+
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (name === 'Goblin' && key === KEY) return list;
+      // Human has mixed activeBuffs
+      if (name === 'Human' && key === 'activeBuffs') return [
+        { effect: 'fly_speed_equals_walk_speed', duration: 3 },
+        { effect: 'double_move', duration: 2 },
+      ];
+      return null;
+    });
+
+    expireStaleEffects('MyCampaign');
+
+    // Should keep 'double_move' but remove 'fly_speed_equals_walk_speed'
+    const filterCall = setRuntimeValue.mock.calls.find(
+      (c) => c[1] === 'activeBuffs' && c[0] === 'Human'
+    );
+    expect(filterCall).toBeTruthy();
+    expect(filterCall[2]).toEqual([{ effect: 'double_move', duration: 2 }]);
+  });
+
+  it('cleared activeBuffs with remove_active_buff mixed with other buffs', () => {
+    const list = [
+      { target: 'Human', effects: [{ type: 'remove_active_buff', buffName: 'RecklessAttack' }], appliedRound: 0 },
+    ];
+    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
+    getCurrentCombatRound.mockReturnValue(3);
+
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (name === 'Goblin' && key === KEY) return list;
+      // Human has mixed activeBuffs
+      if (name === 'Human' && key === 'activeBuffs') return [
+        { name: 'RecklessAttack', duration: 3 },
+        { name: 'DivineSmite', duration: 2 },
+      ];
+      return null;
+    });
+
+    expireStaleEffects('MyCampaign');
+
+    // Should keep 'DivineSmite' but remove 'RecklessAttack'
+    const filterCall = setRuntimeValue.mock.calls.find(
+      (c) => c[1] === 'activeBuffs' && c[0] === 'Human'
+    );
+    expect(filterCall).toBeTruthy();
+    expect(filterCall[2]).toEqual([{ name: 'DivineSmite', duration: 2 }]);
+  });
+
+  it('handles clearing condition type effect via clearAllExpirationEffects', () => {
+    const myList = [
+      { target: 'Orc', effects: [{ type: 'condition', condition: 'stunned' }], appliedRound: 1 },
+    ];
+    getRuntimeValue.mockReturnValueOnce(myList);
+    // removeActiveCondition gets Orc's activeConditions
+    getRuntimeValue.mockReturnValueOnce([]);
+
+    clearAllExpirationEffects('Goblin', 'MyCampaign');
+
+    // removeActiveCondition called to remove 'stunned' from Orc's activeConditions
+    expect(setRuntimeValue).toHaveBeenCalledWith('Orc', 'activeConditions', [], 'MyCampaign');
+  });
+
+  it('handles clearing condition type effect — condition type never directly tested via expireStaleEffects as a separate path since the condition type handler calls both removeActiveCondition and removeNpcCondition', () => {
+    const list = [
+      { target: 'Orc', effects: [{ type: 'condition', condition: 'poisoned' }], appliedRound: 0 },
+    ];
+    getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
+    getCurrentCombatRound.mockReturnValue(3);
+
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (name === 'Goblin' && key === KEY) return list;
+      // removeActiveCondition gets Orc's activeConditions
+      if (name === 'Orc' && key === 'activeConditions') return ['poisoned'];
+      return null;
+    });
+
+    expireStaleEffects('MyCampaign');
+
+    // removeActiveCondition filters out 'poisoned'
+    expect(setRuntimeValue).toHaveBeenCalledWith('Orc', 'activeConditions', [], 'MyCampaign');
+
+    // Stale entry removed from list
+    expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', KEY, [], 'MyCampaign');
+  });
+
+  it('removes NPC condition via removeNpcCondition when matching NPC found in combat summary', () => {
+    const list = [
+      { target: 'Orc', effects: [{ type: 'condition', condition: 'poisoned' }], appliedRound: 0 },
+    ];
+    // Combat summary includes BOTH the attacker (Goblin) AND the target NPC (Orc) with conditions
+    getCombatSummary.mockReturnValue({
+      creatures: [
+        { name: 'Goblin', conditions: [] },
+        { name: 'Orc', conditions: [{ key: 'poisoned' }, { key: 'exhausted' }] },
+      ],
+    });
+    getCurrentCombatRound.mockReturnValue(3);
+
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (name === 'Goblin' && key === KEY) return list;
+      // removeActiveCondition gets Orc's activeConditions
+      if (name === 'Orc' && key === 'activeConditions') return ['poisoned'];
+      return null;
+    });
+
+    expireStaleEffects('MyCampaign');
+
+    // removeNpcCondition should find Orc, filter out 'poisoned', save combatSummary, and dispatch event
+    expect(storage.set).toHaveBeenCalledWith(
+      'combatSummary',
+      {
+        creatures: [
+          { name: 'Goblin', conditions: [] },
+          { name: 'Orc', conditions: [{ key: 'exhausted' }] },
+        ],
+      },
+      'MyCampaign'
+    );
+    expect(window.dispatchEvent).toHaveBeenCalled();
   });
 });

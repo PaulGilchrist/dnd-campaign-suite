@@ -11,6 +11,24 @@ vi.mock('./rangeValidation.js', () => ({
   computeRangeEffect: vi.fn(),
   computeEffectiveSpellRange: vi.fn(),
   getDistanceFeet: vi.fn(),
+  rangeToFeet: vi.fn(),
+}));
+
+vi.mock('../../hooks/useRuntimeState.js', () => ({
+  setRuntimeValue: vi.fn(),
+}));
+
+vi.mock('../combat/buffService.js', () => ({
+  isInnateSorceryActive: vi.fn(),
+  getActiveBuffs: vi.fn().mockReturnValue([]),
+}));
+
+vi.mock('./postCastRiderService.js', () => ({
+  triggerPostCastRiderSaves: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('./postCastHealService.js', () => ({
+  triggerPostCastSelfHeals: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ── Imports (Vite returns mocked versions) ─────────────────────
@@ -22,7 +40,12 @@ import {
   computeRangeEffect,
   computeEffectiveSpellRange,
   getDistanceFeet,
+  rangeToFeet,
 } from './rangeValidation.js';
+import * as useRuntimeState from '../../hooks/useRuntimeState.js';
+import * as buffService from '../combat/buffService.js';
+import * as postCastRiderService from './postCastRiderService.js';
+import * as postCastHealService from './postCastHealService.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -490,6 +513,264 @@ describe('executeSpellCast', () => {
            { ...options, attackerPos: {}, targetPos: {} },
          );
        expect(options.rollDamage).toHaveBeenCalled();
-     });
-   });
+    });
+  });
+
+  // ── Casting time: setRuntimeValue for '1 action' ───────────────
+
+  describe('casting_time side-effects', () => {
+    it('calls setRuntimeValue when casting_time is "1 action"', async () => {
+      const options = baseOptions();
+      const spell = makeSpell();
+      spell.casting_time = '1 action';
+      await executeSpellCast(spell, {}, options);
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Aragorn', 'lastActionSpellCast', 1, undefined,
+      );
+    });
+
+    it('does not call setRuntimeValue when casting_time is not "1 action"', async () => {
+      const options = baseOptions();
+      const spell = makeSpell();
+      spell.casting_time = '1 bonus action';
+      await executeSpellCast(spell, {}, options);
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('does not call setRuntimeValue when casting_time is undefined', async () => {
+      const options = baseOptions();
+      const spell = makeSpell(); // no casting_time set
+      await executeSpellCast(spell, {}, options);
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('passes campaignName to setRuntimeValue', async () => {
+      const options = baseOptions();
+      const spell = makeSpell();
+      spell.casting_time = '1 action';
+      await executeSpellCast(spell, {}, { ...options, campaignName: 'Forgotten Realms' });
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Aragorn', 'lastActionSpellCast', 1, 'Forgotten Realms',
+      );
+    });
+  });
+
+  // ── Blocked spellcasting ────────────────────────────────────────
+
+  describe('blocked spellcasting', () => {
+    it('returns undefined when a buff blocks spellcasting', async () => {
+      buffService.getActiveBuffs.mockReturnValue([{ blocksSpellcasting: true }]);
+      const options = baseOptions();
+      const result = await executeSpellCast(makeSpell(), {}, options);
+      expect(result).toBeUndefined();
+      expect(options.rollAttack).not.toHaveBeenCalled();
+    });
+
+    it('does not block when no buffs are active', async () => {
+      buffService.getActiveBuffs.mockReturnValue([]);
+      const options = baseOptions();
+      await executeSpellCast(makeSpell(), {}, options);
+      expect(options.rollAttack).toHaveBeenCalled();
+    });
+
+    it('does not block when active buff does not block spellcasting', async () => {
+      buffService.getActiveBuffs.mockReturnValue([{ name: 'Haste' }]);
+      const options = baseOptions();
+      await executeSpellCast(makeSpell(), {}, options);
+      expect(options.rollAttack).toHaveBeenCalled();
+    });
+  });
+
+  // ── Cantrip range bonus ─────────────────────────────────────────
+
+  describe('cantrip range bonus', () => {
+    it('adds cantripRangeBonus to effectiveRange for level 0 spell', async () => {
+      const options = baseOptions();
+      const spell = makeSpell();
+      spell.level = 0;
+      spell.range = '30 feet';
+
+      computeEffectiveSpellRange.mockReturnValue(30);
+      rangeToFeet.mockReturnValue(30);
+      getDistanceFeet.mockReturnValue(25);
+      computeRangeEffect.mockReturnValue({ mode: 'normal' });
+
+      await executeSpellCast(
+        spell, {}, { ...options, attackerPos: {}, targetPos: {}, featEffects: { cantripRangeBonus: 30 } },
+      );
+
+      // rangeToFeet should have been called for the cantrip bonus logic
+      expect(rangeToFeet).toHaveBeenCalledWith('30 feet');
+      // computeRangeEffect should be called with the boosted range (30 + 30 = 60)
+      expect(computeRangeEffect).toHaveBeenCalledWith(60, 25, { cantripRangeBonus: 30 });
+    });
+
+    it('does not add cantripRangeBonus when spell level is not 0', async () => {
+      const options = baseOptions();
+      const spell = makeSpell();
+      spell.level = 1;
+      spell.range = '30 feet';
+
+      computeEffectiveSpellRange.mockReturnValue(30);
+      rangeToFeet.mockReturnValue(30);
+      getDistanceFeet.mockReturnValue(25);
+      computeRangeEffect.mockReturnValue({ mode: 'normal' });
+
+      await executeSpellCast(
+        spell, {}, { ...options, attackerPos: {}, targetPos: {}, featEffects: { cantripRangeBonus: 30 } },
+      );
+
+      // rangeToFeet should NOT be called because level !== 0
+      expect(rangeToFeet).not.toHaveBeenCalled();
+      // computeRangeEffect should be called with the unboosted range (30)
+      expect(computeRangeEffect).toHaveBeenCalledWith(30, 25, { cantripRangeBonus: 30 });
+    });
+
+    it('does not add cantripRangeBonus when cantripRangeBonus is 0', async () => {
+      const options = baseOptions();
+      const spell = makeSpell();
+      spell.level = 0;
+      spell.range = '30 feet';
+
+      computeEffectiveSpellRange.mockReturnValue(30);
+      rangeToFeet.mockReturnValue(30);
+      getDistanceFeet.mockReturnValue(25);
+      computeRangeEffect.mockReturnValue({ mode: 'normal' });
+
+      await executeSpellCast(
+        spell, {}, { ...options, attackerPos: {}, targetPos: {}, featEffects: { cantripRangeBonus: 0 } },
+      );
+
+      expect(rangeToFeet).not.toHaveBeenCalled();
+      expect(computeRangeEffect).toHaveBeenCalledWith(30, 25, { cantripRangeBonus: 0 });
+    });
+
+    it('does not add cantripRangeBonus when baseRange < 10', async () => {
+      const options = baseOptions();
+      const spell = makeSpell();
+      spell.level = 0;
+      spell.range = '5 feet';
+
+      computeEffectiveSpellRange.mockReturnValue(5);
+      rangeToFeet.mockReturnValue(5);
+      getDistanceFeet.mockReturnValue(3);
+      computeRangeEffect.mockReturnValue({ mode: 'normal' });
+
+      await executeSpellCast(
+        spell, {}, { ...options, attackerPos: {}, targetPos: {}, featEffects: { cantripRangeBonus: 30 } },
+      );
+
+      // rangeToFeet IS called (the check runs), but the bonus is NOT applied
+      expect(rangeToFeet).toHaveBeenCalledWith('5 feet');
+      // effectiveRange stays at 5 (no bonus added)
+      expect(computeRangeEffect).toHaveBeenCalledWith(5, 3, { cantripRangeBonus: 30 });
+    });
+
+    it('does not add cantripRangeBonus when baseRange is null', async () => {
+      const options = baseOptions();
+      const spell = makeSpell();
+      spell.level = 0;
+      spell.range = 'touch';
+
+      computeEffectiveSpellRange.mockReturnValue(5);
+      rangeToFeet.mockReturnValue(null);
+      getDistanceFeet.mockReturnValue(3);
+      computeRangeEffect.mockReturnValue({ mode: 'normal' });
+
+      await executeSpellCast(
+        spell, {}, { ...options, attackerPos: {}, targetPos: {}, featEffects: { cantripRangeBonus: 30 } },
+      );
+
+      expect(rangeToFeet).toHaveBeenCalledWith('touch');
+      // effectiveRange stays at 5 (no bonus added)
+      expect(computeRangeEffect).toHaveBeenCalledWith(5, 3, { cantripRangeBonus: 30 });
+    });
+
+    it('does not add cantripRangeBonus when featEffects is undefined', async () => {
+      const options = baseOptions();
+      const spell = makeSpell();
+      spell.level = 0;
+      spell.range = '30 feet';
+
+      computeEffectiveSpellRange.mockReturnValue(30);
+      rangeToFeet.mockReturnValue(30);
+      getDistanceFeet.mockReturnValue(25);
+      computeRangeEffect.mockReturnValue({ mode: 'normal' });
+
+      await executeSpellCast(
+        spell, {}, { ...options, attackerPos: {}, targetPos: {} },
+      );
+
+      expect(rangeToFeet).not.toHaveBeenCalled();
+      expect(computeRangeEffect).toHaveBeenCalledWith(30, 25, {});
+    });
+  });
+
+  // ── Innate Sorcery advantage ────────────────────────────────────
+
+  describe('innate sorcery advantage', () => {
+    it('passes forcedMode: advantage when innateSorceryActive is true', async () => {
+      buffService.isInnateSorceryActive.mockReturnValue(true);
+      const options = baseOptions();
+      await executeSpellCast(makeSpell(), {}, options);
+      const ctx = options.rollAttack.mock.calls[0][2];
+      expect(ctx.forcedMode).toBe('advantage');
+    });
+
+    it('does not pass forcedMode when innateSorceryActive is false', async () => {
+      buffService.isInnateSorceryActive.mockReturnValue(false);
+      const options = baseOptions();
+      await executeSpellCast(makeSpell(), {}, options);
+      const ctx = options.rollAttack.mock.calls[0][2];
+      expect(ctx.forcedMode).toBeUndefined();
+    });
+
+    it('preserves existing forcedMode when innateSorceryActive is true', async () => {
+      buffService.isInnateSorceryActive.mockReturnValue(true);
+      const options = baseOptions();
+      await executeSpellCast(makeSpell(), { forcedMode: 'disadvantage' }, options);
+      const ctx = options.rollAttack.mock.calls[0][2];
+      // forcedMode from metaCtx is preserved (not overridden)
+      expect(ctx.forcedMode).toBe('disadvantage');
+    });
+  });
+
+  // ── Post-cast error handling ────────────────────────────────────
+
+  describe('post-cast error handling', () => {
+    it('handles rejection from triggerPostCastRiderSaves', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      postCastRiderService.triggerPostCastRiderSaves.mockRejectedValue(new Error('rider save failed'));
+      const options = baseOptions();
+      await executeSpellCast(makeSpell(), {}, options);
+      // Wait for the .catch() to fire (it's async)
+      await Promise.resolve();
+      expect(consoleSpy).toHaveBeenCalledWith('[spellCast] Post-cast rider save failed:', expect.any(Error));
+      consoleSpy.mockRestore();
+    });
+
+    it('handles rejection from triggerPostCastSelfHeals', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      postCastHealService.triggerPostCastSelfHeals.mockRejectedValue(new Error('self-heal failed'));
+      const options = baseOptions();
+      await executeSpellCast(makeSpell(), {}, options);
+      // Wait for the .catch() to fire (it's async)
+      await Promise.resolve();
+      expect(consoleSpy).toHaveBeenCalledWith('[spellCast] Post-cast self-heal failed:', expect.any(Error));
+      consoleSpy.mockRestore();
+    });
+
+    it('handles rejections from both post-cast services', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      postCastRiderService.triggerPostCastRiderSaves.mockRejectedValue(new Error('rider failed'));
+      postCastHealService.triggerPostCastSelfHeals.mockRejectedValue(new Error('heal failed'));
+      const options = baseOptions();
+      await executeSpellCast(makeSpell(), {}, options);
+      // Wait for both .catch() handlers to fire
+      await Promise.resolve();
+      expect(consoleSpy).toHaveBeenCalledWith('[spellCast] Post-cast rider save failed:', expect.any(Error));
+      expect(consoleSpy).toHaveBeenCalledWith('[spellCast] Post-cast self-heal failed:', expect.any(Error));
+      consoleSpy.mockRestore();
+    });
+  });
 });

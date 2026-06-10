@@ -422,5 +422,208 @@ describe('spellCalc', () => {
       expect(result.spells).toHaveLength(1);
       expect(result.spells[0].name).toBe('Unknown Spell');
     });
+
+    it('should create spellAbilities for Tiefling when class has no spellcasting', () => {
+      const playerStats = makePlayerStats({
+        class: {
+          name: 'Barbarian',
+          subclass: null,
+          class_levels: [],
+          spell_casting_ability: null,
+        },
+        race: { name: 'Tiefling', subrace: null },
+      });
+      playerStats.class.class_levels = [];
+      for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
+      // No spellcasting on any level — spellAbilities starts as null
+      const result = getSpellAbilities([], playerStats);
+      expect(result).not.toBeNull();
+      // Line 41: spellCastingAbility defaults to 'Charisma' for Tiefling
+      expect(result.spellCastingAbility).toBe('Charisma');
+      expect(result.cantrips_known).toBe(1);
+      const spellNames = result.spells.map(s => s.name);
+      expect(spellNames).toContain('Thaumaturgy');
+    });
+
+    it('should populate all spells for Druid from catalog', () => {
+      const allSpells = [
+        { name: 'Druidcraft', level: 0, classes: ['Druid'] },
+        { name: 'Acid Splash', level: 1, classes: ['Druid'] },
+        { name: 'Shield', level: 1, classes: ['Wizard'] },
+        { name: 'Sacred Flame', level: 1, classes: ['Druid'] },
+      ];
+      const playerStats = makePlayerStats({
+        class: {
+          name: 'Druid',
+          subclass: null,
+          class_levels: [],
+          spell_casting_ability: 'Wisdom',
+        },
+      });
+      playerStats.class.class_levels = [];
+      for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
+      setSpellcasting(playerStats, {
+        cantrips_known: 2,
+        spells_known: null,
+        spell_slots_level_1: 2,
+        spellCastingAbility: 'Wisdom',
+      });
+      const result = getSpellAbilities(allSpells, playerStats);
+      expect(result).not.toBeNull();
+      // Lines 125-135: spells_known set to null, all matching spells populated
+      // Level 0 (cantrips) and non-Druid classes are filtered out by source on line 128
+      expect(result.spells_known).toBeNull();
+      const spellNames = result.spells.map(s => s.name);
+      expect(spellNames).toContain('Acid Splash');
+      expect(spellNames).toContain('Sacred Flame');
+      expect(spellNames).not.toContain('Druidcraft'); // level 0 cantrips filtered out
+      expect(spellNames).not.toContain('Shield'); // Wizard-only spell filtered out
+    });
+
+    it('should add unknown spell from automation passives', () => {
+      const allSpells = [
+        { name: 'Fire Bolt', level: 0, classes: ['Wizard', 'Sorcerer'] },
+        { name: 'Charm Person', level: 1, classes: ['Wizard', 'Bard'] },
+      ];
+      const playerStats = makePlayerStats({
+        class: {
+          name: 'Wizard',
+          subclass: null,
+          class_levels: [],
+          spell_casting_ability: 'Intelligence',
+        },
+        spells: ['Fire Bolt'],
+        spellsKnown: 3,
+        automation: {
+          passives: [
+            {
+              type: 'passive_rule',
+              effect: 'always_prepared_spells',
+              spells: ['Charm Person'],
+            },
+          ],
+        },
+      });
+      playerStats.class.class_levels = [];
+      for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
+      setSpellcasting(playerStats, {
+        cantrips_known: 3,
+        spell_slots: {},
+        spells_known: 3,
+        spellCastingAbility: 'Intelligence',
+      });
+      const result = getSpellAbilities(allSpells, playerStats);
+      expect(result).not.toBeNull();
+      // Lines 164-168: unknown spell gets added and marked as 'Always' prepared
+      expect(result.spells_known).toBe(4); // 3 + 1 for unknown spell
+      const addedSpell = result.spells.find(s => s.name === 'Charm Person');
+      expect(addedSpell).toBeDefined();
+      expect(addedSpell.prepared).toBe('Always');
+    });
+
+    it('should set all spells to always prepared for Sorcerer (default case)', () => {
+      const allSpells = [
+        { name: 'Charm Person', level: 1, classes: ['Sorcerer'] },
+        { name: 'Magic Missile', level: 1, classes: ['Wizard'] },
+      ];
+      const playerStats = makePlayerStats({
+        class: {
+          name: 'Sorcerer',
+          subclass: null,
+          class_levels: [],
+          spell_casting_ability: 'Charisma',
+        },
+        spells: ['Charm Person'],
+      });
+      playerStats.class.class_levels = [];
+      for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
+      setSpellcasting(playerStats, {
+        cantrips_known: 2,
+        spell_slots: {},
+        spells_known: 3,
+        spellCastingAbility: 'Charisma',
+      });
+      const result = getSpellAbilities(allSpells, playerStats);
+      expect(result).not.toBeNull();
+      // Line 186: default switch case sets all spells to 'Always'
+      expect(result.maxPreparedSpells).toBeUndefined(); // Not Cleric/Druid/Wizard/Paladin
+      expect(result.spells[0].prepared).toBe('Always');
+    });
+
+    it('should mark subclass spell as always prepared when already known', () => {
+      const allSpells = [
+        { name: 'Lesser Restoration', level: 2, classes: ['Cleric'] },
+      ];
+      const playerStats = makePlayerStats({
+        level: 5,
+        class: {
+          name: 'Cleric',
+          subclass: {
+            name: 'Life',
+            spells: [
+              {
+                spell: { name: 'Lesser Restoration' },
+                prerequisites: [{ index: 'class-3' }],
+              },
+            ],
+          },
+          class_levels: [],
+          spell_casting_ability: 'Wisdom',
+        },
+        spells: ['Lesser Restoration'],
+      });
+      playerStats.class.class_levels = [];
+      for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
+      setSpellcasting(playerStats, {
+        cantrips_known: 3,
+        spell_slots: {},
+        spells_known: 0,
+        spellCastingAbility: 'Wisdom',
+      });
+      const result = getSpellAbilities(allSpells, playerStats);
+      expect(result).not.toBeNull();
+      // Line 141: subclass spell already in array → set to 'Always'
+      const spell = result.spells.find(s => s.name === 'Lesser Restoration');
+      expect(spell.prepared).toBe('Always');
+    });
+
+    it('should mark existing spell as always prepared from automation passives', () => {
+      const allSpells = [
+        { name: 'Fire Bolt', level: 0, classes: ['Wizard'] },
+        { name: 'Magic Missile', level: 1, classes: ['Wizard'] },
+      ];
+      const playerStats = makePlayerStats({
+        class: {
+          name: 'Wizard',
+          subclass: null,
+          class_levels: [],
+          spell_casting_ability: 'Intelligence',
+        },
+        spells: ['Fire Bolt', 'Magic Missile'],
+        automation: {
+          passives: [
+            {
+              type: 'passive_rule',
+              effect: 'always_prepared_spells',
+              spells: ['Magic Missile'],
+            },
+          ],
+        },
+      });
+      playerStats.class.class_levels = [];
+      for (let i = 0; i < 5; i++) playerStats.class.class_levels[i] = { spellcasting: null };
+      setSpellcasting(playerStats, {
+        cantrips_known: 3,
+        spell_slots: {},
+        spells_known: 0,
+        spellCastingAbility: 'Intelligence',
+      });
+      const result = getSpellAbilities(allSpells, playerStats);
+      expect(result).not.toBeNull();
+      // Line 162: spell already known → set to 'Always' from automation
+      const mm = result.spells.find(s => s.name === 'Magic Missile');
+      expect(mm).toBeDefined();
+      expect(mm.prepared).toBe('Always');
+    });
   });
 });
