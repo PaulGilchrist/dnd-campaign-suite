@@ -2,6 +2,8 @@ import { toggleBuff } from '../common/buffToggle.js';
 import { handle as handleTeleport } from './tempTeleportHandler.js';
 import { getTargetFromAttacker } from '../../rules/damageUtils.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
+import { evaluateAutoExpression } from '../../combat/automationService.js';
+import { setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -28,6 +30,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         campaignName,
         targetName
     );
+
+    if (!wasActive && auto?.tempHpExpression) {
+        const amount = evaluateAutoExpression(auto.tempHpExpression, playerStats);
+        if (typeof amount === 'number' && amount > 0) {
+            setRuntimeValue(playerStats.name, 'tempHp', amount, campaignName);
+        }
+    }
 
     const displayTarget = targetName === playerStats.name ? 'yourself' : targetName;
     return {

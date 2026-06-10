@@ -2732,7 +2732,8 @@
                             "uses": 2,
                             "recharge_short_rest": 1,
                             "recharge_long_rest": "all",
-                            "casting_time": "1 bonus action"
+                            "casting_time": "1 bonus action",
+                            "blocksSpellcasting": true
                         }
                     },
                     {

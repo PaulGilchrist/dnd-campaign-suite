@@ -766,6 +766,7 @@ function resolveDiceExpression(expression, playerStats, slotLevel) {
            .replace(/rage_damage/g, rageDamage)
            .replace(/cleric_level/gi, level)
            .replace(/cleric level/gi, level)
+           .replace(/druid_level/gi, level)
            .replace(/level/gi, level)
            .replace(/spell_slot_level/g, slotLevel)
     const abilities = playerStats?.abilities || {}

@@ -142,6 +142,22 @@ describe('toggleBuff', () => {
             expect(getActiveBuffs('ranger', campaign)[0].extendedDistance).toBe('');
         });
 
+        it('defaults blocksSpellcasting to false when not on auto', () => {
+            trackKey('sorcerer2');
+            const auto = { effect: 'boost', duration: '1 minute' };
+            toggleBuff('sorcerer2', 'Metamagic', auto, campaign);
+
+            expect(getActiveBuffs('sorcerer2', campaign)[0].blocksSpellcasting).toBe(false);
+        });
+
+        it('stores blocksSpellcasting true from auto object', () => {
+            trackKey('druid2');
+            const auto = { effect: 'shape_shift', duration: '1 hour', blocksSpellcasting: true };
+            toggleBuff('druid2', 'Wild Shape', auto, campaign);
+
+            expect(getActiveBuffs('druid2', campaign)[0].blocksSpellcasting).toBe(true);
+        });
+
         it('carries enemies_disadvantage_saves from auto object', () => {
             trackKey('caster2');
             const auto = makeAuto({ enemies_disadvantage_saves: ['str', 'dex'] });

@@ -627,6 +627,12 @@ describe('evaluateAutoExpression', () => {
     const result = evaluateAutoExpression('WIS modifier', ps)
     expect(result).toBe(0)
    })
+
+  it('resolves druid_level placeholder to character level', () => {
+    const ps = makePlayerStats({ level: 7 })
+    const result = evaluateAutoExpression('druid_level', ps)
+    expect(result).toBe(7)
+   })
 })
 
 // ── collectAutomationFromFeatures ─────────────────────────────────
