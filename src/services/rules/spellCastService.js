@@ -1,5 +1,5 @@
 import { rollExpression } from '../dice/diceRoller.js';
-import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet } from './rangeValidation.js';
+import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet, rangeToFeet } from './rangeValidation.js';
 import { isInnateSorceryActive, getActiveBuffs } from '../combat/buffService.js';
 import { triggerPostCastRiderSaves } from './postCastRiderService.js';
 import { triggerPostCastSelfHeals } from './postCastHealService.js';
@@ -30,8 +30,15 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
   const rollContext = { ...metaCtx, damageType };
 
   if (attackerPos && targetPos) {
-    const effectiveRange = computeEffectiveSpellRange(spell.range, metaCtx);
+    let effectiveRange = computeEffectiveSpellRange(spell.range, metaCtx);
     if (effectiveRange != null) {
+      const cantripRangeBonus = (featEffects?.cantripRangeBonus) || 0;
+      if (cantripRangeBonus > 0 && spell.level === 0) {
+        const baseRange = rangeToFeet(spell.range);
+        if (baseRange != null && baseRange >= 10) {
+          effectiveRange += cantripRangeBonus;
+        }
+      }
       const distanceFt = getDistanceFeet(attackerPos, targetPos);
       const rangeResult = computeRangeEffect(effectiveRange, distanceFt, featEffects || {});
       if (rangeResult.mode === 'miss') {
@@ -39,7 +46,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         rollContext.rangeReason = rangeResult.reason;
        }
      }
-    }
+   }
 
   if (spell.dc) {
     const target = await getTargetInfo();

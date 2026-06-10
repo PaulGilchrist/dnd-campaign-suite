@@ -238,22 +238,6 @@ function buildAttackInfo(feature, playerStats) {
         }
 
         case 'damage_bonus': {
-                // existing damage bonus automation
-                // fall through to retain behavior
-                // Note: no break needed because we return object below
-                // (handled by existing code)
-                //
-                // New automation type for flat damage modifiers (e.g., Potent Spellcasting)
-            }
-            case 'damage_modifier': {
-                return {
-                    type: 'damage_modifier',
-                    name: feature.name,
-                    trigger: auto.trigger || '',
-                    modifierExpression: auto.modifierExpression || '',
-                    hasAutomation: true
-                };
-            }
             return {
                 type: 'damage_bonus',
                 name: feature.name,
@@ -268,6 +252,17 @@ function buildAttackInfo(feature, playerStats) {
                 options: auto.options || [],
                 tempHpExpression: auto.tempHpExpression || '',
                 upgrades: auto.upgrades || '',
+                rangeBonusCantrip: auto.rangeBonusCantrip || '',
+                hasAutomation: true
+            }
+        }
+
+        case 'damage_modifier': {
+            return {
+                type: 'damage_modifier',
+                name: feature.name,
+                trigger: auto.trigger || '',
+                modifierExpression: auto.modifierExpression || '',
                 hasAutomation: true
             }
         }
@@ -913,7 +908,20 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break
             default:
                 result.specialActions.push(info)
-                break
+                break;
+        }
+
+        if (info && info.type === 'damage_bonus' && info.rangeBonusCantrip) {
+            const bonusMatch = String(info.rangeBonusCantrip).match(/(\d+)/);
+            if (bonusMatch) {
+                result.passives.push({
+                    type: 'cantrip_range_bonus',
+                    name: info.name,
+                    effect: 'cantrip_range_bonus',
+                    bonusExpression: bonusMatch[1],
+                    hasAutomation: true,
+                });
+            }
         }
     })
 

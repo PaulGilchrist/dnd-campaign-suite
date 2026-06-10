@@ -315,7 +315,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         // Apply weapon_attack_hit damage bonus automations (e.g. Divine Strike, Primal Strike)
         if (playerStats.automation?.actions) {
             const weaponHitBonuses = playerStats.automation.actions.filter(
-                a => a.type === 'damage_bonus' && a.trigger === 'weapon_attack_hit'
+                a => a.type === 'damage_bonus' && (a.trigger === 'weapon_attack_hit' || a.trigger === 'weapon_or_beast_form_attack_hit')
             );
             // Deduplicate: skip features that are upgraded by a higher-level feature
             const upgradedNames = new Set(weaponHitBonuses.filter(b => b.upgrades).map(b => b.upgrades));

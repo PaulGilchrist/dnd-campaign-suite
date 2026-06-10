@@ -44,6 +44,7 @@ describe('computeFeatRangeEffects', () => {
       spellRangeBonus: 0,
       rangeMultiplier: 1,
       meleeReachBonus: 0,
+      cantripRangeBonus: 0,
     })
   })
 

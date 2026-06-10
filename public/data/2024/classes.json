@@ -3161,6 +3161,7 @@
                             "damageExpression": "2d8",
                             "damageType": "Cold Fire Lightning or Thunder",
                             "oncePerTurn": true,
+                            "upgrades": "Elemental Fury",
                             "options": [
                                 "Potent Spellcasting",
                                 "Primal Strike"

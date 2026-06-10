@@ -8,15 +8,23 @@ export async function computeFeatRangeEffects(featNames = [], ruleset = '5e', pl
     spellRangeBonus: 0,
     rangeMultiplier: 1,
     meleeReachBonus: 0,
+    cantripRangeBonus: 0,
   }
 
   // Scan class/race feature passive buffs for extra reach (e.g. Battering Roots)
+  // and cantrip range bonus (e.g. Improved Elemental Fury)
   if (playerStats?.automation?.passives) {
     for (const passive of playerStats.automation.passives) {
       if (passive.effect === 'extra_reach' && passive.bonusExpression) {
         const bonus = parseInt(passive.bonusExpression, 10)
         if (!isNaN(bonus) && bonus > result.meleeReachBonus) {
           result.meleeReachBonus = bonus
+        }
+      }
+      if (passive.effect === 'cantrip_range_bonus' && passive.bonusExpression) {
+        const bonus = parseInt(passive.bonusExpression, 10)
+        if (!isNaN(bonus) && bonus > result.cantripRangeBonus) {
+          result.cantripRangeBonus = bonus
         }
       }
     }
