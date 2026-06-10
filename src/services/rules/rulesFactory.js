@@ -132,6 +132,16 @@ const rulesFactory = {
         playerStats.immunities = rr.getImmunities(playerStats);
         playerStats.resistances = rr.getResistances(playerStats);
 
+        const autoResistances = (playerStats.automation?.passives || [])
+            .filter(p => p.type === 'resistance')
+            .flatMap(p => p.damageTypes || []);
+        if (autoResistances.length) {
+            playerStats.resistances = [...new Set([
+                ...(playerStats.resistances || []),
+                ...autoResistances
+            ])];
+        }
+
         playerStats._trackedResources = computeTrackedResources(playerStats);
 
         return playerStats;
