@@ -238,6 +238,22 @@ function buildAttackInfo(feature, playerStats) {
         }
 
         case 'damage_bonus': {
+                // existing damage bonus automation
+                // fall through to retain behavior
+                // Note: no break needed because we return object below
+                // (handled by existing code)
+                //
+                // New automation type for flat damage modifiers (e.g., Potent Spellcasting)
+            }
+            case 'damage_modifier': {
+                return {
+                    type: 'damage_modifier',
+                    name: feature.name,
+                    trigger: auto.trigger || '',
+                    modifierExpression: auto.modifierExpression || '',
+                    hasAutomation: true
+                };
+            }
             return {
                 type: 'damage_bonus',
                 name: feature.name,

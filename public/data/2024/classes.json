@@ -2897,6 +2897,31 @@
                     {
                         "name": "Elemental Fury",
                         "description": "The might of the elements flows through you. You gain one of the following options of your choice. Potent Spellcasting. Add your Wisdom modifier to the damage you deal with any Druid cantrip. Primal Strike. Once on each of your turns when you hit a creature with an attack roll using a weapon or a Beast form's attack in Wild Shape, you can cause the target to take an extra 1d8 Cold, Fire, Lightning, or Thunder damage (choose when you hit).",
+                        "automation": {
+                            "type": "choice_bundle",
+                            "selectionType": "single",
+                            "options": [
+                                {
+                                    "name": "Potent Spellcasting",
+                                    "automation": {
+                                        "type": "damage_modifier",
+                                        "trigger": "cantrip_damage",
+                                        "modifierExpression": "wisdomMod"
+                                    }
+                                },
+                                {
+                                    "name": "Primal Strike",
+                                    "automation": {
+                                        "type": "damage_bonus",
+                                        "trigger": "weapon_or_beast_form_attack_hit",
+                                        "damageExpression": "1d8",
+                                        "damageType": "Cold|Fire|Lightning|Thunder",
+                                        "oncePerTurn": true,
+                                        "userChoice": true
+                                    }
+                                }
+                            ]
+                        },
                         "level": 7,
                         "type": "class_feature",
                         "automation": {

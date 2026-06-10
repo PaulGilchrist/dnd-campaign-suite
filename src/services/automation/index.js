@@ -53,7 +53,7 @@ const HANDLER_MAP = {
     combat_stance: handleCombatStance,
     damage_aura: handleGenericPopup,
     attack_rider: handleAttackRider,
-    damage_bonus: handleGenericPopup,
+    damage_modifier: handleGenericPopup,
     spell_modifier: handleSpellModifier,
     temp_hp_buff: handleTempHpBuff,
     conditional_disadvantage: handleGenericPopup,
