@@ -6,7 +6,7 @@ import { getCombatSummary } from '../../encounters/combatData.js';
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
-    if (auto?.effect === 'teleport_on_rage') {
+    if (auto?.effect === 'teleport_on_rage' || auto?.effect === 'teleport_swap_with_illusion') {
         return handleTeleport(action, playerStats, campaignName, _mapName);
     }
 

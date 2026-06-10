@@ -75,6 +75,17 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
 
         const isMelee = attack.weaponType === 'melee' || attack.weaponType === 'unarmed';
 
+        // Invoke Duplicity: Distract grants Advantage on melee attack rolls while the illusion is active
+        if (isMelee && activeBuffs.some(b => b.effect === 'create_illusion')) {
+            if (forcedMode === undefined) {
+                forcedMode = 'advantage';
+            }
+            // Improved Duplicity (level 17): allies also gain Advantage
+            if (playerStats.automation?.passives?.some(p => p.effect === 'enhanced_distraction_and_healing')) {
+                targetsHaveAdvantage = true;
+            }
+        }
+
         // Aura checks when no map is active — all creatures considered in range
         if (forcedMode === undefined) {
             const noMapWolf = getWolfAdvantageAgainst({

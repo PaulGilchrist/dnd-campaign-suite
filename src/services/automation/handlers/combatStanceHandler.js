@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { grantTempHpOnRage } from './tempHpBuffHandler.js';
 import { clearExtendedFlag } from './tempTeleportHandler.js';
+import { logHealingToSSE } from '../common/healingRoll.js';
 
 function resolveResistanceTypes(resistanceTypes) {
     return resistanceTypes.flatMap(rt => {
@@ -35,13 +36,30 @@ export async function handle(action, playerStats, campaignName) {
         if (action.name === 'Rage') {
             clearExtendedFlag(playerName, campaignName);
         }
+        let description = `${action.name} ended`;
+        if (auto.effect === 'create_illusion' && playerStats.automation?.passives?.some(p => p.effect === 'enhanced_distraction_and_healing')) {
+            const healAmount = playerStats.level || 1;
+            const currentHp = Number(getRuntimeValue(playerName, 'currentHitPoints', campaignName)) || 0;
+            const maxHp = playerStats.hitPoints;
+            const newHp = Math.min(maxHp, currentHp + healAmount);
+            setRuntimeValue(playerName, 'currentHitPoints', newHp, campaignName);
+            logHealingToSSE(campaignName, {
+                targetName: playerName,
+                sourceName: action.name,
+                actualHeal: newHp - currentHp,
+                newHp,
+                maxHp,
+            });
+            window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+            description += ` — Healing Illusion restored ${newHp - currentHp} HP (Cleric level ${healAmount})`;
+        }
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: action.name,
                 automationType: auto.type,
-                description: `${action.name} ended`,
+                description,
                 automation: auto,
             },
         };
@@ -100,6 +118,26 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
             };
         }
         await setRuntimeValue(playerName, usesKey, usesUsed + 1, campaignName);
+    } else if (auto.resourceCost === 'channel_divinity') {
+        const storedCharges = getRuntimeValue(playerName, 'channelDivinityCharges', campaignName);
+        const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
+        const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
+        const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
+
+        if (currentCharges <= 0) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: 'No Channel Divinity charges remaining.',
+                    automation: auto,
+                },
+            };
+        }
+
+        await setRuntimeValue(playerName, 'channelDivinityCharges', currentCharges - 1, campaignName);
     } else {
         const resourceKey = auto.resourceKey || 'ragePoints';
         const storedResource = getRuntimeValue(playerName, resourceKey, campaignName);
@@ -190,6 +228,9 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
     let description = maxUses > 0
         ? `${action.name} activated (${usesUsed + 1}/${maxUses} uses remaining)`
         : `${action.name} activated`;
+    if (auto.effect === 'create_illusion') {
+        description += ' While active, you can cast spells as though you were in the illusion\'s space.';
+    }
     if (chosenOption) {
         const optionEffects = [];
         if (chosenOption.name === 'Bear') {

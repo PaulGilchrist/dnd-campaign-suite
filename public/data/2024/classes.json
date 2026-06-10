@@ -2490,7 +2490,7 @@
                             "bonusExpression": "cleric_level",
                             "healingRange": "5_ft",
                             "attackAdvantageRange": "5_ft",
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     }
                 ],
