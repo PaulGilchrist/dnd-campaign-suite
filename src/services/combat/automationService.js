@@ -94,6 +94,9 @@ function buildAttackInfo(feature, playerStats) {
         }
 
         case 'bonus_action_attack': {
+            const usesMax = auto.uses_expression
+                ? evaluateAutoExpression(auto.uses_expression, playerStats)
+                : 0
             return {
                 type: 'bonus_action_attack',
                 name: feature.name,
@@ -101,7 +104,9 @@ function buildAttackInfo(feature, playerStats) {
                 action: auto.action || 'bonus_action',
                 weaponAttack: !!auto.weaponAttack,
                 extraDamageExpression: auto.extraDamageExpression || '',
-                resourceKey: auto.resourceKey || '',
+                usesMax,
+                recharge: auto.recharge || 'long_rest',
+                resourceKey: 'warPriestUses',
                 hasAutomation: true
             }
         }

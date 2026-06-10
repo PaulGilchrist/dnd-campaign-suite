@@ -28,6 +28,7 @@ import { handle as handleBardicInspirationDefense } from './handlers/bardicInspi
 import { handle as handleBardicInspirationOffense } from './handlers/bardicInspirationOffenseHandler.js';
 import { handle as handleDivineSpark } from './handlers/divineSparkHandler.js';
 import { handle as handleDivineIntervention } from './handlers/divineInterventionHandler.js';
+import { handle as handleBonusActionAttack } from './handlers/bonusActionAttackHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -41,7 +42,7 @@ const HANDLER_MAP = {
     free_spell: handleSpellCast,
     initiative_action: handleInitiative,
     bonus_attacks: handleGenericPopup,
-    bonus_action_attack: handleGenericPopup,
+    bonus_action_attack: handleBonusActionAttack,
     buff_ally: handleBuffAlly,
     resource_pool: handleResourcePool,
     divine_spark: handleDivineSpark,

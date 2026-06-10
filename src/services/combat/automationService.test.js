@@ -102,10 +102,20 @@ describe('buildAttackInfo – all automation types', () => {
     expect(info.effect).toBe('reroll')
      })
 
-  it('returns bonus_action_attack info', () => {
-    const info = getAutomationInfo(makeFeature({ type: 'bonus_action_attack', trigger: 'melee_hit' }), ps)
+  it('returns bonus_action_attack info with defaults', () => {
+    const info = getAutomationInfo(makeFeature({ type: 'bonus_action_attack' }), ps)
     expect(info.type).toBe('bonus_action_attack')
     expect(info.action).toBe('bonus_action')
+    expect(info.usesMax).toBe(0)
+    expect(info.recharge).toBe('long_rest')
+    expect(info.resourceKey).toBe('warPriestUses')
+     })
+
+  it('returns bonus_action_attack info with uses_expression', () => {
+    const info = getAutomationInfo(makeFeature({ type: 'bonus_action_attack', uses_expression: 'WIS modifier_min_1' }), ps)
+    expect(info.type).toBe('bonus_action_attack')
+    expect(info.usesMax).toBe(1)
+    expect(info.recharge).toBe('long_rest')
      })
 
   it('returns bonus_attacks info with defaults', () => {
