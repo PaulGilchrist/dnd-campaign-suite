@@ -4,6 +4,7 @@ import './CharSheet.css';
 
 function TeleportModal({ action, playerStats, campaignName, onClose }) {
     const auto = action.automation;
+    const isSwap = auto?.effect === 'teleport_swap_with_illusion';
     const extendedAvailable = isExtendedAvailable(playerStats.name, campaignName);
     const [useExtended, setUseExtended] = useState(false);
     const [applied, setApplied] = useState(false);
@@ -20,12 +21,33 @@ function TeleportModal({ action, playerStats, campaignName, onClose }) {
             <div className="sp-overlay" onClick={onClose}>
                 <div className="sp-modal" onClick={e => e.stopPropagation()}>
                     <div className="sp-header">
-                        <i className="fa-solid fa-tree"></i> {action.name}
+                        <i className={`fa-solid ${isSwap ? 'fa-arrows-rotate' : 'fa-tree'}`}></i> {action.name}
                     </div>
                     <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload.description }}>
                     </div>
                     <div className="sp-actions">
                         <button className="sp-roll-btn" onClick={onClose}>Done</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (isSwap) {
+        return (
+            <div className="sp-overlay" onClick={onClose}>
+                <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                    <div className="sp-header">
+                        <i className="fa-solid fa-arrows-rotate"></i> {action.name}
+                    </div>
+                    <div className="sp-body">
+                        <p>Swap places with your illusion (up to {auto.distance || '30 ft'}).</p>
+                    </div>
+                    <div className="sp-actions">
+                        <button className="sp-roll-btn" onClick={handleConfirm}>
+                            <i className="fa-solid fa-arrows-rotate"></i> Swap
+                        </button>
+                        <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
                     </div>
                 </div>
             </div>

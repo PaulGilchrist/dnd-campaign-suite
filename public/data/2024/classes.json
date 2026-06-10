@@ -2477,6 +2477,7 @@
                             "effect": "teleport_swap_with_illusion",
                             "action": "bonus_action",
                             "duration": "while_illusion_active",
+                            "distance": "30 ft",
                             "casting_time": "1 bonus action"
                         }
                     },

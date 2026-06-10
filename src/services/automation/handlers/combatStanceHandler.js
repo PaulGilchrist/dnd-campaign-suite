@@ -225,6 +225,17 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         }
     }
 
+    if (auto.effect === 'create_illusion') {
+        const illusionTeleport = (playerStats.automation?.specialActions || []).find(sa => sa.effect === 'teleport_swap_with_illusion');
+        if (illusionTeleport) {
+            return {
+                type: 'modal',
+                modalName: 'teleport',
+                payload: { action: illusionTeleport, playerStats, campaignName, triggeredByDuplicity: true },
+            };
+        }
+    }
+
     let description = maxUses > 0
         ? `${action.name} activated (${usesUsed + 1}/${maxUses} uses remaining)`
         : `${action.name} activated`;

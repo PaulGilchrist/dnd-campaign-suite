@@ -20,10 +20,14 @@ export async function confirmTeleport(action, playerStats, campaignName, useExte
         setRuntimeValue(playerName, '_teleportExtendedUsed', true, campaignName);
     }
 
-    let description = `${action.name}: Teleported ${distance} to an unoccupied space you can see.`;
-
-    if (useExtended && auto.bringAllies && auto.allyCount > 0) {
-        description += ` Also brought up to ${auto.allyCount} willing creatures within ${auto.teleportRange || '10 ft'} of your destination.`;
+    let description;
+    if (auto.effect === 'teleport_swap_with_illusion') {
+        description = `${action.name}: Swapped places with your illusion.`;
+    } else {
+        description = `${action.name}: Teleported ${distance} to an unoccupied space you can see.`;
+        if (useExtended && auto.bringAllies && auto.allyCount > 0) {
+            description += ` Also brought up to ${auto.allyCount} willing creatures within ${auto.teleportRange || '10 ft'} of your destination.`;
+        }
     }
 
     return {
