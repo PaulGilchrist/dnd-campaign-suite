@@ -83,7 +83,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             .catch(error => console.error('Error loading actions:', error));
     }, []);
 
-    // Passive: recover Focus Points when anyone rolls initiative
+    // Passive: recover Focus Points and Wild Shape uses when anyone rolls initiative
     useEffect(() => {
         const handleInitiativeRolled = (e) => {
             if (!playerStats || !e.detail || !e.detail.characterName) return;
@@ -91,26 +91,40 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             const myName = utils.getName(playerStats.name);
             if (rollingName !== myName) return;
 
-            // Check if this character has an initiative_action with regain_focus_points_and_heal effect
-            const hasInitAction = playerStats.actions?.some(a => a.automation?.type === 'initiative_action');
-            if (!hasInitAction) return;
-
             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-            const maxFP = classLevel?.focus_points || getRuntimeValue(playerStats.name, 'focusPoints', campaignName) || 0;
-            if (!maxFP) return;
 
-            const currentFP = Number(getRuntimeValue(playerStats.name, 'focusPoints', campaignName) ?? 0);
-            if (currentFP >= maxFP) return;
+            // Recover Focus Points (Monk Uncanny Metabolism)
+            const hasFocusPointsAction = playerStats.actions?.some(a => a.automation?.type === 'initiative_action' && a.automation?.effect !== 'wild_shape_regen_on_initiative');
+            if (hasFocusPointsAction) {
+                const maxFP = classLevel?.focus_points || getRuntimeValue(playerStats.name, 'focusPoints', campaignName) || 0;
+                if (maxFP > 0) {
+                    const currentFP = Number(getRuntimeValue(playerStats.name, 'focusPoints', campaignName) ?? 0);
+                    if (currentFP < maxFP) {
+                        setRuntimeValue(playerStats.name, 'focusPoints', maxFP, campaignName);
+                     }
+                }
+             }
 
-            setRuntimeValue(playerStats.name, 'focusPoints', maxFP, campaignName);
-        };
+            // Recover Wild Shape use on initiative (Archdruid Evergreen Wild Shape)
+            const hasEvergreen = playerStats.actions?.some(a => a.automation?.type === 'initiative_action' && a.automation?.effect === 'wild_shape_regen_on_initiative');
+            if (hasEvergreen) {
+                const druidLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+                const maxWS = druidLevel?.wild_shape || 0;
+                if (maxWS > 0) {
+                    const currentWS = Number(getRuntimeValue(playerStats.name, 'wildShapeUses', campaignName) ?? 0);
+                    if (currentWS === 0) {
+                        setRuntimeValue(playerStats.name, 'wildShapeUses', 1, campaignName);
+                     }
+                }
+             }
+         };
 
         window.addEventListener('initiative-rolled', handleInitiativeRolled);
 
         return () => {
             window.removeEventListener('initiative-rolled', handleInitiativeRolled);
-        };
-    }, [playerStats, campaignName]);
+         };
+     }, [playerStats, campaignName]);
     const { popupHtml, setPopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
         autoDamageRoll: (autoDamage, isCrit) => {

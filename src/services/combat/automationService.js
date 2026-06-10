@@ -550,10 +550,11 @@ function buildAttackInfo(feature, playerStats) {
                 conversion: auto.conversion || '',
                 reverseConversion: auto.reverseConversion || '',
                 reverseRecharge: auto.reverseRecharge || '',
+                conversionRate: auto.conversionRate || '',
                 casting_time: auto.casting_time || 'passive',
                 hasAutomation: true
-            }
-        }
+             }
+         }
 
         case 'save_attack': {
             const scaling = resolveScaling(playerStats, auto.scaling)

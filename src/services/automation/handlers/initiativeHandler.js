@@ -81,7 +81,38 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 automationType: auto.type,
             },
         };
-    }
+     }
+
+    if (auto.effect === 'wild_shape_regen_on_initiative') {
+        const resourceKey = auto.resourceKey || 'wildShapeUses';
+        const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
+        if (maxWS === 0) return null;
+
+        const currentWS = Number(getRuntimeValue(playerStats.name, resourceKey, campaignName) ?? 0);
+        if (currentWS > 0) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: `${action.name}: You have ${currentWS} Wild Shape use(s) remaining. No need to regain.`,
+                   },
+               };
+          }
+
+        await setRuntimeValue(playerStats.name, resourceKey, 1, campaignName);
+
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name}: You regained 1 use of Wild Shape.`,
+               },
+          };
+     }
 
     if (auto.effect !== 'regain_focus_points_and_heal') {
         return {
