@@ -2,31 +2,31 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
     buildSaveDc,
     createSaveListener,
-} from '../savePrompt.js';
+} from './savePrompt.js';
 
 // ── Dependency mocks ──────────────────────────────────────────────
 
-vi.mock('../../../combat/savePromptService.js', () => ({
+vi.mock('../../combat/savePromptService.js', () => ({
     sendSavePrompt: vi.fn(),
   }));
 
-vi.mock('../../../ui/utils.js', () => {
+vi.mock('../../ui/utils.js', () => {
     const utils = { guid: vi.fn() };
     return { default: utils };
   });
 
-vi.mock('../../../shared/abilityLookup.js', () => ({
+vi.mock('../../shared/abilityLookup.js', () => ({
     getAbilityModifier: vi.fn(),
   }));
 
 // Re-import after mocking
 const { sendSavePrompt } = await import(
-    '../../../combat/savePromptService.js'
+    '../../combat/savePromptService.js'
 );
-const utilsModule = await import('../../../ui/utils.js');
+const utilsModule = await import('../../ui/utils.js');
 const utils = utilsModule.default;
 const { getAbilityModifier } = await import(
-    '../../../shared/abilityLookup.js'
+    '../../shared/abilityLookup.js'
 );
 
 // ── Test fixtures ─────────────────────────────────────────────────

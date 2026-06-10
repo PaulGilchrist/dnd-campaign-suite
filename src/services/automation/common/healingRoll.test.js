@@ -3,54 +3,54 @@ import {
     rollHealingForAction,
     applyHealingDirectly,
     logHealingToSSE,
-} from '../healingRoll.js';
+} from './healingRoll.js';
 
 // ── Dependency mocks ──────────────────────────────────────────────
 // Paths are relative to this test file (__tests__/), so they need one extra '../'
 // compared to what healingRoll.js imports (which are relative to common/).
 
-vi.mock('../../../dice/diceRoller.js', () => ({
+vi.mock('../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
     rollExpressionMaximized: vi.fn(),
 }));
 
-vi.mock('../../../combat/automationService.js', () => ({
+vi.mock('../../combat/automationService.js', () => ({
     hasHealingMaximization: vi.fn(),
 }));
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
     getTargetFromAttacker: vi.fn(),
 }));
 
-vi.mock('../../../rules/applyHealing.js', () => ({
+vi.mock('../../rules/applyHealing.js', () => ({
     applyHealingToTarget: vi.fn(),
 }));
 
-vi.mock('../../../shared/logPoster.js', () => ({
+vi.mock('../../shared/logPoster.js', () => ({
     postLogEntry: vi.fn(),
 }));
 
 // Re-import after mocking (paths match mock specifiers above)
 const { rollExpression, rollExpressionMaximized } = await import(
-     '../../../dice/diceRoller.js'
+     '../../dice/diceRoller.js'
 );
 const { hasHealingMaximization } = await import(
-     '../../../combat/automationService.js'
+     '../../combat/automationService.js'
 );
 const { getRuntimeValue, setRuntimeValue } = await import(
-     '../../../../hooks/useRuntimeState.js'
+     '../../../hooks/useRuntimeState.js'
 );
 const { getCombatContext, getTargetFromAttacker } = await import(
-     '../../../rules/damageUtils.js'
+     '../../rules/damageUtils.js'
 );
-const { applyHealingToTarget } = await import('../../../rules/applyHealing.js');
-const { postLogEntry } = await import('../../../shared/logPoster.js');
+const { applyHealingToTarget } = await import('../../rules/applyHealing.js');
+const { postLogEntry } = await import('../../shared/logPoster.js');
 
 // ── Test fixtures ─────────────────────────────────────────────────
 

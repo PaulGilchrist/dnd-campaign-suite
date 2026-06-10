@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { clearRuntimeState, setRuntimeValue as setRuntimeProp } from '../../../../hooks/useRuntimeState.js';
-import { toggleBuff, getActiveBuffs, isBuffActive } from '../buffToggle.js';
+import { clearRuntimeState, setRuntimeValue as setRuntimeProp } from '../../../hooks/useRuntimeState.js';
+import { toggleBuff, getActiveBuffs, isBuffActive } from './buffToggle.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 const trackedKeys = new Set();
