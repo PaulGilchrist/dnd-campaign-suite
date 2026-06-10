@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { computeFeatRangeEffects } from './featRangeService.js'
+import * as dataLoader from '../ui/dataLoader.js'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -14,6 +15,10 @@ function mockFetch(data) {
     json: async () => data,
   })
 }
+
+vi.mock('../ui/dataLoader.js', () => ({
+  loadFeatData: vi.fn(),
+}))
 
 describe('computeFeatRangeEffects', () => {
   const crossbowExpert5e = {
@@ -55,34 +60,34 @@ describe('computeFeatRangeEffects', () => {
   })
 
   it('detects Crossbow Expert melee disadvantage immunity', async () => {
-    mockFetch(feats5e)
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats5e)
     const result = await computeFeatRangeEffects(['Crossbow Expert'], '5e')
     expect(result.ignoresMeleeDisadvantage).toBe(true)
     expect(result.ignoresLongRangeDisadvantage).toBe(false)
   })
 
   it('detects Sharpshooter long range disadvantage immunity', async () => {
-    mockFetch(feats5e)
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats5e)
     const result = await computeFeatRangeEffects(['Sharpshooter'], '5e')
     expect(result.ignoresLongRangeDisadvantage).toBe(true)
     expect(result.ignoresMeleeDisadvantage).toBe(false)
   })
 
   it('detects Spell Sniper melee disadvantage immunity for spells', async () => {
-    mockFetch(feats5e)
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats5e)
     const result = await computeFeatRangeEffects(['Spell Sniper'], '5e')
     expect(result.ignoresMeleeDisadvantage).toBe(true)
   })
 
   it('combines effects from multiple feats', async () => {
-    mockFetch(feats5e)
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats5e)
     const result = await computeFeatRangeEffects(['Crossbow Expert', 'Sharpshooter'], '5e')
     expect(result.ignoresMeleeDisadvantage).toBe(true)
     expect(result.ignoresLongRangeDisadvantage).toBe(true)
   })
 
   it('ignores feats not found in data', async () => {
-    mockFetch(feats5e)
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats5e)
     const result = await computeFeatRangeEffects(['Nonexistent Feat'], '5e')
     expect(result.ignoresMeleeDisadvantage).toBe(false)
     expect(result.ignoresLongRangeDisadvantage).toBe(false)
@@ -94,19 +99,19 @@ describe('computeFeatRangeEffects', () => {
       index: 'crossbow-expert',
       rangeEffects: { ignoresMeleeDisadvantage: true, appliesToWeaponType: 'crossbow' },
     }
-    mockFetch([crossbowExpert2024])
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue([crossbowExpert2024])
     const result = await computeFeatRangeEffects(['Crossbow Expert'], '2024')
     expect(result.ignoresMeleeDisadvantage).toBe(true)
   })
 
   it('handles feats without rangeEffects gracefully', async () => {
-    mockFetch([{ name: 'Tough', index: 'tough' }])
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue([{ name: 'Tough', index: 'tough' }])
     const result = await computeFeatRangeEffects(['Tough'], '5e')
     expect(result.ignoresMeleeDisadvantage).toBe(false)
   })
 
   it('uses strip-parentheses matching for feat names', async () => {
-    mockFetch(feats5e)
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue(feats5e)
     const result = await computeFeatRangeEffects(['Crossbow Expert (Level 4)'], '5e')
     expect(result.ignoresMeleeDisadvantage).toBe(true)
   })
@@ -187,14 +192,7 @@ describe('computeFeatRangeEffects', () => {
   })
 
   it('returns defaults when allFeats is empty array', async () => {
-    // Mock fetch to return empty array
-    const headers = new Map()
-    headers.set('content-type', 'application/json')
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      headers,
-      json: async () => [],
-    })
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue([])
 
     const result = await computeFeatRangeEffects(['Some Feat'], '5e')
 
@@ -208,7 +206,7 @@ describe('computeFeatRangeEffects', () => {
       index: 'spell-sniper',
       rangeEffects: { ignoresMeleeDisadvantage: true, spellRangeBonus: 30 },
     }
-    mockFetch([spellSniperWithRange])
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue([spellSniperWithRange])
 
     const result = await computeFeatRangeEffects(['Spell Sniper'], '5e')
 
@@ -226,7 +224,7 @@ describe('computeFeatRangeEffects', () => {
       index: 'feat-b',
       rangeEffects: { spellRangeBonus: 50 },
     }
-    mockFetch([feat1, feat2])
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue([feat1, feat2])
 
     const result = await computeFeatRangeEffects(['Feat A', 'Feat B'], '5e')
 
@@ -234,6 +232,9 @@ describe('computeFeatRangeEffects', () => {
   })
 
   it('combines passive automation bonuses with feat effects', async () => {
+    vi.mocked(dataLoader.loadFeatData).mockResolvedValue([
+      { name: 'Crossbow Expert', index: 'crossbow-expert', rangeEffects: { ignoresMeleeDisadvantage: true, appliesToWeaponType: 'crossbow' } },
+    ])
     const result = await computeFeatRangeEffects(['Crossbow Expert'], '5e', {
       automation: {
         passives: [
