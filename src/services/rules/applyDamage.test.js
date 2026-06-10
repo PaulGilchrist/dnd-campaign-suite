@@ -31,6 +31,8 @@ vi.mock('../ui/utils.js', () => ({ default: { guid: vi.fn(() => 'test-guid-001')
 import {
   computeDamageAfterResistances,
   computeDamageAfterSave,
+  hasEvasionForSave,
+  computeDamageAfterEvasion,
   rollSaveForCreature,
   applyDamageToTarget,
 } from './applyDamage.js';
@@ -738,6 +740,147 @@ describe('applyDamageToTarget', () => {
       const cs = makeCombatSummary([npc]);
       applyDamageToTarget(cs, 'Skeleton', 10, ['Necrotic'], 'TestCampaign');
       expect(rollConcentrationSave).not.toHaveBeenCalled();
+      });
      });
-   });
+  });
+
+describe('hasEvasionForSave', () => {
+    it('returns false when evasionEffects is null', () => {
+      expect(hasEvasionForSave(null, 'dex')).toBe(false);
+    });
+
+    it('returns false when evasionEffects is undefined', () => {
+      expect(hasEvasionForSave(undefined, 'dex')).toBe(false);
+    });
+
+    it('returns false when evasionEffects is empty', () => {
+      expect(hasEvasionForSave([], 'dex')).toBe(false);
+    });
+
+    it('returns true when saveType matches', () => {
+      const effects = [{ saveType: 'DEX' }, { saveType: 'CON' }];
+      expect(hasEvasionForSave(effects, 'dex')).toBe(true);
+    });
+
+    it('is case-insensitive for saveType comparison', () => {
+      const effects = [{ saveType: 'DEX' }];
+      expect(hasEvasionForSave(effects, 'dex')).toBe(true);
+      expect(hasEvasionForSave(effects, 'Dex')).toBe(true);
+    });
+
+    it('returns false when no saveType matches', () => {
+      const effects = [{ saveType: 'DEX' }, { saveType: 'CON' }];
+      expect(hasEvasionForSave(effects, 'wis')).toBe(false);
+    });
+
+    it('handles null saveType gracefully', () => {
+      const effects = [{ saveType: '' }];
+      expect(hasEvasionForSave(effects, null)).toBe(true);
+    });
+  });
+
+describe('computeDamageAfterEvasion', () => {
+  it('falls through to computeDamageAfterSave when evasion is not active', () => {
+    // evasion=false → calls computeDamageAfterSave(10, true, 'half') → Math.floor(10/2) = 5
+    expect(computeDamageAfterEvasion(10, true, 'half', false)).toBe(5);
+  });
+
+  it('returns raw damage when dcSuccess is not half', () => {
+    expect(computeDamageAfterEvasion(10, true, 'none', true)).toBe(0);
+  });
+
+  it('returns 0 on save success with evasion active and dcSuccess half', () => {
+    expect(computeDamageAfterEvasion(10, true, 'half', true)).toBe(0);
+  });
+
+  it('returns half damage on save fail with evasion active and dcSuccess half', () => {
+    expect(computeDamageAfterEvasion(10, false, 'half', true)).toBe(5);
+    expect(computeDamageAfterEvasion(9, false, 'half', true)).toBe(4);
+  });
+
+  it('falls through to computeDamageAfterSave when evasion not active', () => {
+    // evasion=false → calls computeDamageAfterSave(10, true, 'half') → Math.floor(10/2) = 5
+    expect(computeDamageAfterEvasion(10, true, 'half', false)).toBe(5);
+    expect(computeDamageAfterEvasion(10, true, 'none', false)).toBe(0);
+  });
+
+  it('handles saveSuccess true with dcSuccess not half — returns 0', () => {
+    expect(computeDamageAfterEvasion(10, true, 'none', true)).toBe(0);
+  });
+
+  it('handles saveSuccess false with dcSuccess not half — returns raw damage', () => {
+    expect(computeDamageAfterEvasion(10, false, 'none', true)).toBe(10);
+  });
 });
+
+describe('applyDamageToTarget — buff resistance merging', () => {
+    it('merges resistanceTypes from activeBuffs for player', () => {
+      getRuntimeValue
+        .mockReturnValueOnce([{ resistanceTypes: ['fire'], resistanceTypes2: ['cold'] }]) // activeBuffs
+        .mockReturnValueOnce(30) // currentHitPoints
+        .mockReturnValueOnce([]); // activeConditions
+      const player = createPlayerCreature('Wizard');
+      const cs = makeCombatSummary([player]);
+      const result = applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', []);
+      // Fire resistance from buff should halve damage
+      expect(result.finalDamage).toBe(5);
+    });
+
+    it('deduplicates resistanceTypes from multiple buffs', () => {
+      getRuntimeValue
+        .mockReturnValueOnce([
+          { resistanceTypes: ['fire'] },
+          { resistanceTypes: ['fire', 'cold'] },
+        ]) // activeBuffs
+        .mockReturnValueOnce(30) // currentHitPoints
+        .mockReturnValueOnce([]); // activeConditions
+      const player = createPlayerCreature('Wizard');
+      const cs = makeCombatSummary([player]);
+      applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', []);
+      // Should still halve fire damage (not quarter it)
+    });
+
+    it('handles non-array activeBuffs gracefully', () => {
+      getRuntimeValue
+        .mockReturnValueOnce('not-an-array') // activeBuffs
+        .mockReturnValueOnce(30) // currentHitPoints
+        .mockReturnValueOnce([]); // activeConditions
+      const player = createPlayerCreature('Wizard');
+      const cs = makeCombatSummary([player]);
+      const result = applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', []);
+      expect(result.finalDamage).toBe(10); // no buffs applied
+    });
+
+    it('handles null activeBuffs gracefully', () => {
+      getRuntimeValue
+        .mockReturnValueOnce(null) // activeBuffs
+        .mockReturnValueOnce(30) // currentHitPoints
+        .mockReturnValueOnce([]); // activeConditions
+      const player = createPlayerCreature('Wizard');
+      const cs = makeCombatSummary([player]);
+      const result = applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', []);
+      expect(result.finalDamage).toBe(10); // no buffs applied
+    });
+
+    it('combines base resistances with buff resistanceTypes', () => {
+      getRuntimeValue
+        .mockReturnValueOnce([{ resistanceTypes: ['cold'] }]) // activeBuffs
+        .mockReturnValueOnce(30) // currentHitPoints
+        .mockReturnValueOnce([]); // activeConditions
+      const player = createPlayerCreature('Paladin');
+      const characters = [createPlayerCharacter('Paladin', {
+        computedExtra: { resistances: ['fire'] },
+      })];
+      const cs = makeCombatSummary([player]);
+      const result = applyDamageToTarget(cs, 'Paladin', 10, ['Cold'], 'TestCampaign', characters);
+      // Cold resistance from buff should halve damage
+      expect(result.finalDamage).toBe(5);
+    });
+
+    it('does not apply buff merging for NPCs', () => {
+      const npc = createNpcCreature('Goblin', 10, 10);
+      const cs = makeCombatSummary([npc]);
+      applyDamageToTarget(cs, 'Goblin', 5, ['Slashing'], 'TestCampaign');
+      expect(getRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'activeBuffs', 'TestCampaign');
+    });
+  });

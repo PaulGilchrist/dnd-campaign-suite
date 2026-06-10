@@ -265,6 +265,75 @@ describe('featureCategorizationUtils', () => {
       expect(result.specialActions[0].name).toBe('Mystery Feature');
          });
 
+    it('should categorize features with casting_time "passive" as characterAdvancement', () => {
+      const items = [
+        { name: 'Racial Trait', description: 'Passive ability', automation: { casting_time: 'passive', type: 'racial' } }
+            ];
+
+      const result = categorizeFeatures(items, mockCategories);
+
+      expect(result.characterAdvancement).toHaveLength(1);
+      expect(result.characterAdvancement[0].name).toBe('Racial Trait');
+         });
+
+    it('should deduplicate characterAdvancement by name when casting_time is passive', () => {
+      const items = [
+        { name: 'Racial Trait', description: 'First level', automation: { casting_time: 'passive' } },
+        { name: 'Racial Trait', description: 'Higher level', automation: { casting_time: 'passive' } },
+            ];
+
+      const result = categorizeFeatures(items, mockCategories);
+
+      expect(result.characterAdvancement).toHaveLength(1);
+      expect(result.characterAdvancement[0].description).toBe('First level');
+         });
+
+    it('should prefer casting_time categorization over name-based for characterAdvancement', () => {
+      const items = [
+        // "Ability Score Improvement" is in mockCategories.characterAdvancement by name,
+        // but casting_time should also categorize it there
+        { name: 'Ability Score Improvement', description: 'Level 4', automation: { casting_time: 'passive' } },
+            ];
+
+      const result = categorizeFeatures(items, mockCategories);
+
+      expect(result.characterAdvancement).toHaveLength(1);
+      expect(result.characterAdvancement[0].name).toBe('Ability Score Improvement');
+         });
+
+    it('should handle items with automation but no casting_time', () => {
+      const items = [
+        { name: 'Feature With Automation', description: 'Has automation but no casting_time', automation: { type: 'extra_action' } },
+            ];
+
+      const result = categorizeFeatures(items, mockCategories);
+
+      // Falls back to name-based categorization → specialActions
+      expect(result.specialActions).toHaveLength(1);
+      expect(result.specialActions[0].name).toBe('Feature With Automation');
+         });
+
+    it('should handle automation with null casting_time', () => {
+      const items = [
+        { name: 'Feature', description: 'Test', automation: { casting_time: null } },
+            ];
+
+      const result = categorizeFeatures(items, mockCategories);
+
+      // null casting_time is falsy → falls back to name-based
+      expect(result.specialActions).toHaveLength(1);
+         });
+
+    it('should handle automation with undefined casting_time', () => {
+      const items = [
+        { name: 'Feature', description: 'Test', automation: {} },
+            ];
+
+      const result = categorizeFeatures(items, mockCategories);
+
+      expect(result.specialActions).toHaveLength(1);
+         });
+
     it('should categorize mixed features correctly', () => {
       const items = [
             { name: 'Action Surge', description: 'Action' },

@@ -168,6 +168,38 @@ describe('attackCalc', () => {
       expect(result.type).toBe('Bonus Action');
     });
 
+    it('should include only magic bonus in off-hand damage (no ability bonus)', () => {
+      const result = buildWeaponAttack({
+        weapon,
+        weaponName: '+1 Dagger',
+        abilityBonus: 3,
+        abilityName: 'Strength',
+        proficiency: 2,
+        actionType: 'Bonus Action',
+        includeAbilityBonusInDamage: false,
+      });
+
+      expect(result.damage).toBe('1d8+1'); // only magic bonus, no ability
+      expect(result.hitBonus).toBe(6); // 3 (ability) + 2 (prof) + 1 (magic)
+    });
+
+    it('should build off-hand with magic bonus and extra damage', () => {
+      const result = buildWeaponAttack({
+        weapon,
+        weaponName: '+1 Dagger',
+        abilityBonus: 3,
+        abilityName: 'Strength',
+        proficiency: 2,
+        actionType: 'Bonus Action',
+        includeAbilityBonusInDamage: false,
+        extraDamage: '+3',
+        extraDamageLabel: 'Two-Weapon Fighting Style (3)',
+      });
+
+      expect(result.damage).toBe('1d8+1+3'); // magic + extra, no ability
+      expect(result.hitBonus).toBe(6); // 3 + 2 + 1
+    });
+
     it('should include Two-Weapon Fighting bonus damage', () => {
       const result = buildWeaponAttack({
         weapon,
@@ -255,6 +287,45 @@ describe('attackCalc', () => {
     it('should handle empty spell list', () => {
       const result = buildSpellAttacks([], allSpells, { modifier: 4 });
       expect(result).toHaveLength(0);
+    });
+
+    it('should include spell not found in catalog with prepared flag and damage', () => {
+      const playerSpells = [{ name: 'Custom Spell', prepared: 'Always', damage: { damage_type: 'Force' }, range: '60 feet', casting_time: '1 action' }];
+      const result = buildSpellAttacks(playerSpells, [], { modifier: 4 });
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Custom Spell');
+      expect(result[0].damageType).toBe('Force');
+    });
+
+    it('should skip spell not in catalog when unprepared', () => {
+      const playerSpells = [{ name: 'Custom Spell', prepared: '' }];
+      const result = buildSpellAttacks(playerSpells, [], { modifier: 4 });
+      expect(result).toHaveLength(0);
+    });
+
+    it('should skip spell not in catalog when casting time is not combat-relevant', () => {
+      const playerSpells = [{ name: 'Ritual Spell', prepared: 'Always', damage: { damage_type: 'Force' }, range: '30 feet', casting_time: '1 minute' }];
+      const result = buildSpellAttacks(playerSpells, [], { modifier: 4 });
+      expect(result).toHaveLength(0);
+    });
+
+    it('should use character-level damage when slot-level is empty', () => {
+      const allSpellsWithCharLevel = [
+        { name: 'Charm Spell', damage: { damage_at_character_level: { '1': '2d6' }, damage_at_slot_level: {} }, damage_type: 'Psychic', range: '60 feet', casting_time: '1 action', level: 1, classes: ['Bard'] },
+      ];
+      const playerSpells = [{ name: 'Charm Spell', prepared: 'Prepared' }];
+      const result = buildSpellAttacks(playerSpells, allSpellsWithCharLevel, { modifier: 3 });
+      expect(result).toHaveLength(1);
+      expect(result[0].damage).toBe('2d6');
+    });
+
+    it('should deduplicate spell attacks by name', () => {
+      const playerSpells = [
+        { name: 'Fire Bolt', prepared: 'Always' },
+        { name: 'Fire Bolt', prepared: 'Prepared' },
+      ];
+      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4 });
+      expect(result).toHaveLength(1);
     });
   });
 

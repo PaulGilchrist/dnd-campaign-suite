@@ -76,6 +76,13 @@ describe('rangeToFeet', () => {
     expect(rangeToFeet(undefined)).toBeNull()
     expect(rangeToFeet('')).toBeNull()
   })
+
+  it('returns null for strings that pass guard but match no pattern', () => {
+    expect(rangeToFeet('abc')).toBeNull()
+    expect(rangeToFeet('yards')).toBeNull()
+    expect(rangeToFeet('  ')).toBeNull()
+    expect(rangeToFeet('120 feet extra')).toBeNull() // trailing text doesn't match
+  })
 })
 
 describe('computeEffectiveSpellRange', () => {
