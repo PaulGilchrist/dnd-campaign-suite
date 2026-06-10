@@ -2,6 +2,9 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState
 import { addEntry } from '../../ui/logService.js';
 import { getLastAttackRoll, getLastAbilityCheck } from '../../../hooks/useMetamagic.js';
 import { automationInfoPopup } from '../../shared/popupResponse.js';
+import { getCombatContext } from '../../rules/damageUtils.js';
+import { getDistanceFeet, rangeToFeet } from '../../rules/rangeValidation.js';
+import { resolveMapPositions } from '../common/targetResolver.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -10,22 +13,7 @@ function isStale(event) {
     return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
 }
 
-function handleAttackRoll(action, playerStats, campaignName, bonus) {
-    const auto = action.automation;
-
-    const attackEvent = getLastAttackRoll(playerStats.name);
-    if (!attackEvent || isStale(attackEvent)) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No recent attack roll found. This feature can only be used shortly after an attack roll.`,
-                automation: auto,
-            },
-        };
-    }
-
+function buildAttackRollDescription(action, attackerName, bonus, attackEvent) {
     const { d20, bonus: atkBonus, targetAc, hit, effectiveAc } = attackEvent;
     const ac = effectiveAc ?? targetAc;
     const modifiedD20 = d20 + bonus;
@@ -33,6 +21,9 @@ function handleAttackRoll(action, playerStats, campaignName, bonus) {
     const modifiedHit = ac != null ? (modifiedD20 + atkBonus >= ac) : null;
 
     let description = `<b>${action.name}</b><br/>`;
+    if (attackerName) {
+        description += `Attacker: ${attackerName}<br/>`;
+    }
     description += `Bonus: +${bonus}<br/>`;
     description += `Attack roll: d20(${d20}) + ${atkBonus} = ${d20 + atkBonus} vs AC ${ac != null ? ac : '—'} → <b>${hit ? 'HIT' : 'MISS'}</b><br/>`;
     description += `Modified: d20(${modifiedD20}) + ${atkBonus} = ${modifiedTotal} vs AC ${ac != null ? ac : '—'} → <b>${modifiedHit == null ? 'N/A' : modifiedHit ? 'HIT' : 'MISS'}</b><br/>`;
@@ -45,23 +36,46 @@ function handleAttackRoll(action, playerStats, campaignName, bonus) {
         description += `<br/><i>Still a miss.</i>`;
     }
 
+    return description;
+}
+
+function handleAttackRoll(action, playerStats, campaignName, bonus, attackerName) {
+    const auto = action.automation;
+
+    const targetName = attackerName || playerStats.name;
+    const attackEvent = getLastAttackRoll(targetName);
+    if (!attackEvent || isStale(attackEvent)) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `No recent attack roll found for ${targetName}. This feature can only be used shortly after an attack roll.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const description = buildAttackRollDescription(action, attackerName, bonus, attackEvent);
+
     return {
         type: 'popup',
         payload: { type: 'automation_info', name: action.name, description, automation: auto },
     };
 }
 
-function handleAbilityCheck(action, playerStats, _campaignName, bonus) {
+function handleAbilityCheck(action, playerStats, _campaignName, bonus, creatureName) {
     const auto = action.automation;
 
-    const checkEvent = getLastAbilityCheck(playerStats.name);
+    const targetName = creatureName || playerStats.name;
+    const checkEvent = getLastAbilityCheck(targetName);
     if (!checkEvent || isStale(checkEvent)) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `No recent ability check found. This feature can only be used shortly after an ability check.`,
+                description: `No recent ability check found for ${targetName}. This feature can only be used shortly after an ability check.`,
                 automation: auto,
             },
         };
@@ -83,13 +97,60 @@ function handleAbilityCheck(action, playerStats, _campaignName, bonus) {
     };
 }
 
+async function consumeResourceCost(auto, playerStats, campaignName) {
+    if (auto.resourceCost === 'channel_divinity') {
+        const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
+        const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
+        const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
+        const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
+
+        if (currentCharges <= 0) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: playerStats.name,
+                    description: 'No Channel Divinity charges remaining.',
+                    automation: auto,
+                },
+            };
+        }
+
+        await setRuntimeValue(playerStats.name, 'channelDivinityCharges', currentCharges - 1, campaignName);
+    }
+    return null;
+}
+
+async function findAllyMissedAttack(playerStats, campaignName, mapName, rangeFt) {
+    const combatSummary = await getCombatContext(campaignName);
+    if (!combatSummary?.creatures) return null;
+
+    const playerName = playerStats.name;
+    for (const creature of combatSummary.creatures) {
+        if (creature.name === playerName) continue;
+        const attackEvent = getLastAttackRoll(creature.name);
+        if (!attackEvent || isStale(attackEvent) || attackEvent.hit !== false) continue;
+
+        if (mapName && rangeFt != null) {
+            const positions = await resolveMapPositions(campaignName, mapName, playerName);
+            if (positions?.attackerPos && positions?.targetPos) {
+                const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
+                if (dist != null && dist > rangeFt) continue;
+            }
+        }
+
+        return { name: creature.name, attackEvent };
+    }
+    return null;
+}
+
 function getBardicDieSize(playerStats) {
     if (!playerStats.class?.class_levels) return 0;
     const classLevel = playerStats.class.class_levels.find(cl => cl.level === playerStats.level);
     return classLevel?.bardic_die || 0;
 }
 
-export async function handle(action, playerStats, campaignName) {
+export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
@@ -162,6 +223,9 @@ export async function handle(action, playerStats, campaignName) {
     if (auto.bonus != null) {
         const bonus = Number(auto.bonus);
 
+        const costError = await consumeResourceCost(auto, playerStats, campaignName);
+        if (costError) return costError;
+
         const attackEvent = getLastAttackRoll(playerName);
         const abilityEvent = getLastAbilityCheck(playerName);
 
@@ -169,11 +233,54 @@ export async function handle(action, playerStats, campaignName) {
         const abilityFresh = abilityEvent && !isStale(abilityEvent);
 
         if (attackFresh) {
-            return handleAttackRoll(action, playerStats, campaignName, bonus);
+            const result = handleAttackRoll(action, playerStats, campaignName, bonus);
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerName,
+                abilityName: action.name,
+                description: `${playerName} used ${action.name}: +${bonus} to own failed attack roll.`,
+                timestamp: Date.now(),
+            }).catch(() => {});
+            return result;
         }
         if (abilityFresh) {
-            return handleAbilityCheck(action, playerStats, campaignName, bonus);
+            const result = handleAbilityCheck(action, playerStats, campaignName, bonus);
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerName,
+                abilityName: action.name,
+                description: `${playerName} used ${action.name}: +${bonus} to own failed ability check.`,
+                timestamp: Date.now(),
+            }).catch(() => {});
+            return result;
         }
+
+        if (auto.range) {
+            const rangeFt = rangeToFeet(auto.range);
+            const ally = await findAllyMissedAttack(playerStats, campaignName, mapName, rangeFt);
+            if (ally) {
+                const result = handleAttackRoll(action, playerStats, campaignName, bonus, ally.name);
+                addEntry(campaignName, {
+                    type: 'ability_use',
+                    characterName: playerName,
+                    abilityName: action.name,
+                    description: `${playerName} used ${action.name}: +${bonus} to ${ally.name}'s failed attack roll.`,
+                    targetName: ally.name,
+                    timestamp: Date.now(),
+                }).catch(() => {});
+                return result;
+            }
+        }
+
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: 'No recent failed attack roll or ability check found for you or any ally within range.',
+                automation: auto,
+            },
+        };
     }
 
     return automationInfoPopup(action);

@@ -83,6 +83,10 @@ function buildAttackInfo(feature, playerStats) {
                 condition: auto.condition || '',
                 effect: auto.effect || 'reroll',
                 trigger: auto.trigger || '',
+                bonus: auto.bonus ?? null,
+                range: auto.range || '',
+                resourceCost: auto.resourceCost || '',
+                casting_time: auto.casting_time || '',
                 bonusExpression: auto.bonusExpression || '',
                 oncePerRage: !!auto.oncePerRage,
                 hasAutomation: true
@@ -847,10 +851,16 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 result.actions.push(info)
                 break
             case 'damage_reduction':
-            case 'auto_reroll':
             case 'reaction_debuff':
             case 'bardic_inspiration_defense':
                 result.reactions.push(info)
+                break
+            case 'auto_reroll':
+                if (info.casting_time === '1 action') {
+                    result.actions.push(info)
+                } else {
+                    result.reactions.push(info)
+                }
                 break
             case 'temp_buff':
             case 'temp_hp_buff':
