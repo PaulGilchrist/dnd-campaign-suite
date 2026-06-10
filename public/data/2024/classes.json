@@ -2575,10 +2575,11 @@
                         "level": 6,
                         "automation": {
                             "type": "free_spell",
-                            "spell": "Shield of Faith or Spiritual Weapon",
+                            "spell": ["Shield of Faith", "Spiritual Weapon"],
                             "resourceCost": "channel_divinity",
                             "noConcentration": true,
                             "duration": "1_minute",
+                            "action": "action",
                             "casting_time": "1 action"
                         }
                     },

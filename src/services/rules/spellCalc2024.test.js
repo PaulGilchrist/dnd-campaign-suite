@@ -604,6 +604,35 @@ describe('spellCalc2024', () => {
       expect(result.spells).toHaveLength(1);
      });
 
+    it('should add multiple spells from an array free_spell', () => {
+      const allSpells = [
+        { name: 'Shield of Faith', level: 1, damage: {}, casting_time: '1 bonus action', range: '60 feet' },
+        { name: 'Spiritual Weapon', level: 2, damage: {}, casting_time: '1 bonus action', range: '60 feet' },
+       ];
+      const playerStats = {
+        level: 1,
+        class: {
+          name: 'Cleric',
+          class_levels: [{ level: 1, spellcasting: { cantrips_known: 4, spell_slots: { '1': 4 } } }],
+          spell_casting_ability: 'Wisdom',
+         },
+        abilities: [{ name: 'Wisdom', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 }],
+        spells: [],
+        proficiency: 3,
+        automation: {
+          passives: [
+            { type: 'free_spell', spell: ['Shield of Faith', 'Spiritual Weapon'] },
+           ],
+         },
+       };
+
+      const result = getSpellAbilities(allSpells, playerStats);
+
+      expect(result.spells).toHaveLength(2);
+      expect(result.spells[0].name).toBe('Shield of Faith');
+      expect(result.spells[1].name).toBe('Spiritual Weapon');
+     });
+
     it('should skip free_spell when spell property is missing', () => {
       const playerStats = {
         level: 1,

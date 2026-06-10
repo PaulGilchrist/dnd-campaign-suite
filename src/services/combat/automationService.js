@@ -324,6 +324,8 @@ function buildAttackInfo(feature, playerStats) {
                 action: auto.action || 'action',
                 duration: auto.duration || '',
                 concentration: !!auto.concentration,
+                noConcentration: !!auto.noConcentration,
+                resourceCost: auto.resourceCost || '',
                 freeCasts: auto.freeCasts || '',
                 casting_time: auto.casting_time || '',
                 hasAutomation: true

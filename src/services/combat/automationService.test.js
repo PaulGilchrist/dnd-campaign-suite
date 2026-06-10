@@ -242,6 +242,21 @@ describe('buildAttackInfo – all automation types', () => {
     expect(info.concentration).toBe(true)
      })
 
+  it('returns free_spell info with array spell and resourceCost', () => {
+    const info = getAutomationInfo(makeFeature({
+      type: 'free_spell',
+      spell: ['Shield of Faith', 'Spiritual Weapon'],
+      resourceCost: 'channel_divinity',
+      noConcentration: true,
+      duration: '1_minute',
+    }, 'War God\'s Blessing'), ps)
+    expect(info.type).toBe('free_spell')
+    expect(info.spell).toEqual(['Shield of Faith', 'Spiritual Weapon'])
+    expect(info.resourceCost).toBe('channel_divinity')
+    expect(info.noConcentration).toBe(true)
+    expect(info.duration).toBe('1_minute')
+     })
+
   it('returns healing info with healExpression resolved', () => {
     const ps2 = makePlayerStats({ level: 3 })
     const info = getAutomationInfo(makeFeature({ type: 'healing', healExpression: 'level + 5' }, 'Heal'), ps2)

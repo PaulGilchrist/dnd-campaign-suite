@@ -3,13 +3,21 @@ import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
 import { getActiveBuffs } from '../../../services/combat/buffService.js'
 
+function isFreeCastAuthorized(playerName, spellName) {
+  const raw = getRuntimeValue(playerName, '_War_God_s_Blessing_freeCast');
+  if (!raw) return false;
+  const spells = Array.isArray(raw) ? raw : [];
+  return spells.includes(spellName);
+}
+
 function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, upcastLevels = [], playerLevel = 1 }) {
   const isCantrip = spell.level === 0;
   const slotDmg = spell.damage?.damage_at_slot_level;
   const charDmg = spell.damage?.damage_at_character_level;
   const isUpcastable = !isCantrip && slotDmg && Object.keys(slotDmg).length > 1;
 
-  const hasAnySlots = isCantrip || upcastLevels.some(l => l.availableSlots > 0);
+  const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spell.name, campaignName);
+  const hasAnySlots = isCantrip || freeCastAuthorized || upcastLevels.some(l => l.availableSlots > 0);
 
   const [selectedUpcastLvl, setSelectedUpcastLvl] = useState(() => {
     const firstAvailable = upcastLevels.find(l => l.availableSlots > 0);
@@ -32,7 +40,8 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
       onCast(modifiedSpell);
       return;
     }
-    if (isUpcastable) {
+    const isUpcast = isUpcastable && Number(selectedUpcastLvl) !== spell.level;
+    if (isUpcast) {
       const upcastLevel = Number(selectedUpcastLvl);
       const slotKey = `spell_slots_level_${upcastLevel}`;
       const currentSlots = getRuntimeValue(playerStats.name, slotKey);
@@ -45,23 +54,25 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
       onCast(modifiedSpell);
       return;
     }
-    const spellSlotKey = `spell_slots_level_${spell.level}`;
-    const currentSlots = getRuntimeValue(playerStats.name, spellSlotKey);
-    const maxSlots = (playerStats.spellAbilities && playerStats.spellAbilities[spellSlotKey]) || 0;
-    const availableSlots = currentSlots != null ? currentSlots : maxSlots;
-    if (availableSlots > 0) {
-      setRuntimeValue(playerStats.name, spellSlotKey, availableSlots - 1, campaignName);
+    if (!freeCastAuthorized) {
+      const spellSlotKey = `spell_slots_level_${spell.level}`;
+      const currentSlots = getRuntimeValue(playerStats.name, spellSlotKey);
+      const maxSlots = (playerStats.spellAbilities && playerStats.spellAbilities[spellSlotKey]) || 0;
+      const availableSlots = currentSlots != null ? currentSlots : maxSlots;
+      if (availableSlots > 0) {
+        setRuntimeValue(playerStats.name, spellSlotKey, availableSlots - 1, campaignName);
+      }
     }
     onCast(spell);
   };
 
   const isRaging = getActiveBuffs(playerStats.name, campaignName).some(b => b.name === 'Rage');
-  const canCast = !isRaging && (isCantrip || (isUpcastable ? hasAnySlots : (() => {
+  const canCast = !isRaging && (isCantrip || (isUpcastable ? hasAnySlots : (freeCastAuthorized || (() => {
     const baseKey = `spell_slots_level_${spell.level}`;
     const stored = getRuntimeValue(playerStats.name, baseKey);
     const max = (playerStats.spellAbilities && playerStats.spellAbilities[baseKey]) || 0;
     return (stored != null ? stored : max) > 0;
-  })()));
+  })())));
 
   const showUpcastSelector = isUpcastable && upcastLevels.length > 1;
 
@@ -122,7 +133,10 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
             <i className="fa-solid fa-times"></i> Close
           </button>
         </div>
-        {!canCast && !isCantrip && (
+          {freeCastAuthorized && (
+            <p className="spell-detail-free-cast"><i className="fa-solid fa-bolt"></i> Free Cast — no Concentration, lasts 1 minute</p>
+          )}
+          {!canCast && !isCantrip && !freeCastAuthorized && (
           <p className="spell-detail-no-slots">No spell slots available for this level.</p>
         )}
       </div>

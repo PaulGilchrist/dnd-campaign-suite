@@ -61,10 +61,12 @@ export function getSpellAbilities(allSpells, playerStats) {
                     });
                 }
                 if (feature.type === 'free_spell' && feature.spell) {
-                    const knownSpell = spellAbilities.spells.find(s => s.name === feature.spell);
-                    if (!knownSpell) {
-                        spellAbilities.spells.push({ name: feature.spell, prepared: 'Always' });
-                    }
+                    const spellNames = Array.isArray(feature.spell) ? feature.spell : [feature.spell];
+                    spellNames.forEach(spellName => {
+                        if (!spellAbilities.spells.find(s => s.name === spellName)) {
+                            spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+                        }
+                    });
                 }
             });
         }

@@ -3,23 +3,46 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
-    const spellName = auto.spell || action.name;
 
-    const mantleActiveKey = 'mantleOfMajestyActive';
-    const isActive = auto.freeCasts === 'at_will_while_active'
-        ? getRuntimeValue(playerStats.name, mantleActiveKey) === true
-        : false;
+    if (auto.resourceCost === 'channel_divinity') {
+        const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
+        const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
+        const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
+        const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
 
-    if (auto.freeCasts === 'at_will_while_active' && !isActive) {
-        if (campaignName) {
-            setRuntimeValue(playerStats.name, mantleActiveKey, true, campaignName);
+        if (currentCharges <= 0) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: 'No Channel Divinity charges remaining.',
+                    automation: auto,
+                },
+            };
         }
-        const durInfo = auto.duration ? ` Duration: ${auto.duration}.` : '';
-        const concInfo = auto.concentration ? ' Requires Concentration.' : '';
+
+        const newCharges = currentCharges - 1;
+        await setRuntimeValue(playerStats.name, 'channelDivinityCharges', newCharges, campaignName);
+    }
+
+    const spellNames = Array.isArray(auto.spell) ? auto.spell : [auto.spell || action.name];
+    const spellName = spellNames.join(' or ');
+
+    const noConcLabel = auto.noConcentration ? ' Does not require Concentration.' : '';
+    const durLabel = auto.duration ? ` Duration: ${auto.duration.replace('_', ' ')}.` : '';
+
+    if (spellNames.length > 1) {
+        const freeCastKey = `_${action.name.replace(/\s+/g, '_')}_freeCast`;
+        const storedSpells = getRuntimeValue(playerStats.name, freeCastKey, campaignName);
+        if (!storedSpells) {
+            await setRuntimeValue(playerStats.name, freeCastKey, spellNames, campaignName);
+        }
+
         return {
             type: 'popup',
             payload: {
-                html: `<b>${action.name} — Activated</b><br/>${action.description || ''}<br/><br/><b>Mantle of Majesty is now active.</b>${durInfo}${concInfo}<br/>You can now cast ${spellName} as a Bonus Action without expending a spell slot while the Mantle is active.`,
+                html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Channel Divinity expended.</b><br/>You can now cast <b>${spellName}</b> without expending a spell slot.${noConcLabel}${durLabel}<br/><br/><em>Open your spell sheet and cast ${spellName} normally — no spell slot will be consumed.</em>`,
             },
         };
     }
@@ -59,14 +82,16 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                  }
                }
 
-    const usesInfo = auto.uses ? ` (${auto.uses}/long rest)` : '';
-    const freeInfo = auto.freeCasts === 'at_will_while_active' ? ' <em>(free cast — Mantle active)</em>' : '';
-    const durReminder = (auto.freeCasts === 'at_will_while_active' && auto.duration) ? `<br/><em>Mantle active — ${auto.duration} remaining.</em>` : '';
-    const concReminder = (auto.freeCasts === 'at_will_while_active' && auto.concentration) ? ' Requires Concentration.' : '';
+    const freeCastKey = `_${action.name.replace(/\s+/g, '_')}_freeCast`;
+    const storedSpells = getRuntimeValue(playerStats.name, freeCastKey, campaignName);
+    if (!storedSpells) {
+        await setRuntimeValue(playerStats.name, freeCastKey, spellNames, campaignName);
+    }
+
     return {
         type: 'popup',
         payload: {
-            html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Free cast of:</b> ${spellName}${usesInfo}${freeInfo}${concReminder}${durReminder}`,
+            html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Free cast of:</b> ${spellName}${noConcLabel}${durLabel}`,
             },
           };
  }
