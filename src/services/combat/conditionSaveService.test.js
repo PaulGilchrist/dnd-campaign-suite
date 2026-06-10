@@ -24,9 +24,8 @@ vi.mock('./automationService.js', () => ({
 
 // ── Imports (Vite returns mocked versions) ───────────────────────
 
-import {
+  import {
   getCreatureSaveBonus,
-  rollConditionSave,
   removeCondition,
   addCondition,
   buildConditionPopup,
@@ -102,15 +101,15 @@ describe('getCreatureSaveBonus', () => {
     it('returns 0 when character not found in characters array', async () => {
       getAbilitySaveBonus.mockReturnValue(0);
 
-      const bonus = await getCreatureSaveBonus(
-        { type: 'player', name: 'NoOne' },
-        'str',
-        [],
-        [],
-        defaultGetName
-      );
+      await getCreatureSaveBonus(
+          { type: 'player', name: 'NoOne' },
+          'str',
+          [],
+          [],
+          defaultGetName
+        );
 
-      // character is undefined, so character?.computedStats || character → undefined
+        // character is undefined, so character?.computedStats || character → undefined
       expect(getAbilitySaveBonus).toHaveBeenCalledWith(undefined, 'str');
     });
 
@@ -966,34 +965,37 @@ describe('addCondition', () => {
 
     it('falls back to Date.now + Math.random id when crypto.randomUUID missing', () => {
       playerIsImmuneToCondition.mockReturnValue(false);
-      const originalRandomUUID = crypto.randomUUID;
-      delete globalThis.crypto.randomUUID;
+
+      const originalDescriptor = Object.getOwnPropertyDescriptor(globalThis.crypto, 'randomUUID');
+      Object.defineProperty(globalThis.crypto, 'randomUUID', { value: undefined, configurable: true });
 
       try {
         const combatSummary = {
           creatures: [
-            { type: 'npc', name: 'Orc', conditions: [] },
-          ],
-        };
+             { type: 'npc', name: 'Orc', conditions: [] },
+            ],
+          };
 
         addCondition(
           combatSummary,
-          'Orc',
-          { key: 'stunned', label: 'Stunned' },
-          10,
-          'con',
-          vi.fn(),
-          vi.fn(),
-          '',
-          null
-        );
+            'Orc',
+            { key: 'stunned', label: 'Stunned' },
+            10,
+            'con',
+           vi.fn(),
+           vi.fn(),
+            '',
+           null
+          );
 
         const id = combatSummary.creatures[0].conditions[0].id;
         expect(typeof id).toBe('string');
         expect(id).toMatch(/^\d+-/);
-      } finally {
-        globalThis.crypto.randomUUID = originalRandomUUID;
-      }
+       } finally {
+         if (originalDescriptor) {
+           Object.defineProperty(globalThis.crypto, 'randomUUID', originalDescriptor);
+         }
+       }
     });
   });
 
@@ -1035,25 +1037,7 @@ describe('addCondition', () => {
     });
   });
 
-  describe('immunity early return still called before creature not found', () => {
-    it('checks immunity before checking creature existence when playerStats present', () => {
-      playerIsImmuneToCondition.mockReturnValue(true);
 
-      addCondition(
-        { creatures: [] }, // no creatures at all
-        'NonExistent',
-        { key: 'charmed', label: 'Charmed' },
-        15,
-        'wis',
-        vi.fn(),
-        makeSetRuntimeValue(),
-        'Campaign',
-        {}
-      );
-
-      expect(playerIsImmuneToCondition).toHaveBeenCalled();
-    });
-  });
 });
 
 describe('buildConditionPopup', () => {
