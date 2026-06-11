@@ -248,6 +248,21 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'countercharm': {
+            return {
+                type: 'countercharm',
+                name: feature.name,
+                trigger: auto.trigger || '',
+                range: auto.range || '',
+                conditions: auto.conditions || [],
+                effect: auto.effect || '',
+                uses: auto.uses || 1,
+                recharge: auto.recharge || 'long_rest',
+                casting_time: auto.casting_time || '1 reaction',
+                hasAutomation: true
+            }
+        }
+
         case 'damage_aura': {
             return {
                 type: 'damage_aura',
@@ -346,6 +361,15 @@ function buildAttackInfo(feature, playerStats) {
                 type: 'font_of_magic',
                 name: feature.name,
                 casting_time: auto.casting_time || '1 bonus action',
+                hasAutomation: true
+            }
+        }
+
+        case 'font_of_inspiration': {
+            return {
+                type: 'font_of_inspiration',
+                name: feature.name,
+                casting_time: auto.casting_time || 'passive',
                 hasAutomation: true
             }
         }
@@ -970,6 +994,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 result.actions.push(info)
                 break
             case 'reaction_damage':
+            case 'countercharm':
             case 'damage_reduction':
             case 'reaction_debuff':
             case 'bardic_inspiration_defense':
@@ -996,6 +1021,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'resistance':
             case 'auto_effect':
             case 'resource_restoration':
+            case 'font_of_inspiration':
             case 'conditional_advantage':
             case 'conditional_replacement':
             case 'evasion':

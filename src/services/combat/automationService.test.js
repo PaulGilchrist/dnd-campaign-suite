@@ -1458,3 +1458,91 @@ describe('hasHealingMaximization', () => {
     expect(hasHealingMaximization(ps)).toBe(false)
   })
 })
+
+// ── font_of_inspiration automation type ────────────────────────────
+describe('font_of_inspiration automation type', () => {
+  it('returns font_of_inspiration info with defaults', () => {
+    const ps = makePlayerStats()
+    const info = getAutomationInfo(makeFeature({ type: 'font_of_inspiration' }), ps)
+    expect(info.type).toBe('font_of_inspiration')
+    expect(info.name).toBe('Test Feature')
+    expect(info.casting_time).toBe('passive')
+    expect(info.hasAutomation).toBe(true)
+  })
+
+  it('returns font_of_inspiration info with custom casting_time', () => {
+    const ps = makePlayerStats()
+    const info = getAutomationInfo(makeFeature({ type: 'font_of_inspiration', casting_time: '1 action' }), ps)
+    expect(info.casting_time).toBe('1 action')
+  })
+})
+
+// ── countercharm automation type ───────────────────────────────────
+describe('countercharm automation type', () => {
+  it('returns countercharm info with defaults', () => {
+    const ps = makePlayerStats()
+    const info = getAutomationInfo(makeFeature({ type: 'countercharm' }), ps)
+    expect(info.type).toBe('countercharm')
+    expect(info.name).toBe('Test Feature')
+    expect(info.trigger).toBe('')
+    expect(info.range).toBe('')
+    expect(info.conditions).toEqual([])
+    expect(info.effect).toBe('')
+    expect(info.uses).toBe(1)
+    expect(info.recharge).toBe('long_rest')
+    expect(info.casting_time).toBe('1 reaction')
+    expect(info.hasAutomation).toBe(true)
+  })
+
+  it('returns countercharm info with custom values', () => {
+    const ps = makePlayerStats()
+    const info = getAutomationInfo(makeFeature({
+      type: 'countercharm',
+      trigger: 'failed_save_charmed_or_frightened',
+      range: '30 ft',
+      conditions: ['charmed', 'frightened'],
+      effect: 'reroll_with_advantage',
+      uses: 1,
+      recharge: 'long_rest',
+      casting_time: '1 reaction'
+    }), ps)
+    expect(info.trigger).toBe('failed_save_charmed_or_frightened')
+    expect(info.range).toBe('30 ft')
+    expect(info.conditions).toEqual(['charmed', 'frightened'])
+    expect(info.effect).toBe('reroll_with_advantage')
+    expect(info.uses).toBe(1)
+    expect(info.casting_time).toBe('1 reaction')
+  })
+})
+
+// ── collectAutomationFromFeatures – countercharm and font_of_inspiration ─
+describe('collectAutomationFromFeatures – countercharm and font_of_inspiration', () => {
+  it('adds countercharm to reactions', () => {
+    const ps = makePlayerStats()
+    const features = [makeFeature({
+      type: 'countercharm',
+      trigger: 'failed_save_charmed_or_frightened',
+      range: '30 ft',
+      conditions: ['charmed', 'frightened'],
+      effect: 'reroll_with_advantage',
+      uses: 1,
+      recharge: 'long_rest',
+      casting_time: '1 reaction'
+    }, 'Countercharm')]
+    const result = collectAutomationFromFeatures(features, ps)
+    expect(result.reactions).toHaveLength(1)
+    expect(result.reactions[0].type).toBe('countercharm')
+    expect(result.reactions[0].name).toBe('Countercharm')
+    expect(result.reactions[0].casting_time).toBe('1 reaction')
+  })
+
+  it('adds font_of_inspiration to passives', () => {
+    const ps = makePlayerStats()
+    const features = [makeFeature({ type: 'font_of_inspiration' }, 'Font of Inspiration')]
+    const result = collectAutomationFromFeatures(features, ps)
+    expect(result.passives).toHaveLength(1)
+    expect(result.passives[0].type).toBe('font_of_inspiration')
+    expect(result.passives[0].name).toBe('Font of Inspiration')
+    expect(result.passives[0].casting_time).toBe('passive')
+  })
+})

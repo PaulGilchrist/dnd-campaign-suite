@@ -237,6 +237,56 @@ describe('applyShortRest', () => {
 
     expect(setRuntimeBatch).toHaveBeenCalledWith('Grog', expect.any(Object), 'MyCampaign')
   })
+
+  it('restores Bardic Inspiration for characters with Font of Inspiration', () => {
+    const charismaBonus = 3
+    const playerStats = {
+      name: 'Bard',
+      hitPoints: 30,
+      level: 5,
+      abilities: [{ name: 'Charisma', bonus: charismaBonus }],
+      automation: {
+        passives: [{ type: 'font_of_inspiration' }],
+      },
+    }
+    getRuntimeValue.mockReturnValue(1)
+    applyShortRest(playerStats, 'Campaign1')
+
+    const data = setRuntimeBatch.mock.calls[0][1]
+    expect(data.bardicInspirationUses).toBe(charismaBonus)
+  })
+
+  it('does not restore Bardic Inspiration when Font of Inspiration is missing', () => {
+    const playerStats = {
+      name: 'Bard',
+      hitPoints: 30,
+      level: 5,
+      abilities: [{ name: 'Charisma', bonus: 3 }],
+    }
+    getRuntimeValue.mockReturnValue(1)
+    applyShortRest(playerStats, 'Campaign1')
+
+    const data = setRuntimeBatch.mock.calls[0][1]
+    expect(data.bardicInspirationUses).toBeUndefined()
+  })
+
+  it('does not set Bardic Inspiration when already at max', () => {
+    const charismaBonus = 3
+    const playerStats = {
+      name: 'Bard',
+      hitPoints: 30,
+      level: 5,
+      abilities: [{ name: 'Charisma', bonus: charismaBonus }],
+      automation: {
+        passives: [{ type: 'font_of_inspiration' }],
+      },
+    }
+    getRuntimeValue.mockReturnValue(3)
+    applyShortRest(playerStats, 'Campaign1')
+
+    const data = setRuntimeBatch.mock.calls[0][1]
+    expect(data.bardicInspirationUses).toBeUndefined()
+  })
 })
 
 describe('applyLongRest', () => {

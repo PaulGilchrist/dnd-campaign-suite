@@ -117,6 +117,16 @@ export async function applyShortRest(playerStats, campaignName) {
     updates.wardingflareUses = null
   }
 
+  const hasFontOfInspiration = (playerStats.automation?.passives ?? []).some(p => p.type === 'font_of_inspiration')
+  if (hasFontOfInspiration) {
+    const charisma = playerStats.abilities?.find(a => a.name === 'Charisma')
+    const maxBI = charisma?.bonus || 0
+    const currentBI = Number(getRuntimeValue(name, 'bardicInspirationUses', campaignName) ?? maxBI)
+    if (currentBI < maxBI) {
+      updates.bardicInspirationUses = maxBI
+    }
+  }
+
       // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
   updates.activeBuffs = [];
   updates.activeConditions = [];

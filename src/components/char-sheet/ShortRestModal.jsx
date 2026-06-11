@@ -18,6 +18,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [rollLog, setRollLog] = React.useState([]);
     const [songOfRestApplied, setSongOfRestApplied] = React.useState(false);
     const [restorationRequested, setRestorationRequested] = React.useState(false);
+    const [fontOfInspirationRequested, setFontOfInspirationRequested] = React.useState(false);
 
     const isSorcerer = playerStats?.class?.name === 'Sorcerer';
     const sorcRestoration = isSorcerer && (playerStats.automation?.passives ?? []).find(
@@ -25,6 +26,11 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
       );
     const restorationCur = getRuntimeValue(playerStats.name, 'sorcerousRestorationUses');
     const restorationAvailable = !!sorcRestoration && restorationCur !== 0;
+
+    const hasFontOfInspiration = (playerStats.automation?.passives ?? []).some(p => p.type === 'font_of_inspiration');
+    const bardicInspirationMax = (() => { const charisma = playerStats.abilities?.find(a => a.name === 'Charisma'); return charisma?.bonus || 0; })();
+    const bardicInspirationCur = getRuntimeValue(playerStats.name, 'bardicInspirationUses');
+    const fontOfInspirationAvailable = hasFontOfInspiration && (bardicInspirationCur == null || Number(bardicInspirationCur) < bardicInspirationMax);
 
     const maxHitDice = playerStats.level;
     const hitDie = getHitDieSize(playerStats);
@@ -82,6 +88,11 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
         setRestorationRequested(true);
        };
 
+    const handleApplyFontOfInspiration = () => {
+        if (!hasFontOfInspiration || !fontOfInspirationAvailable || fontOfInspirationRequested) return;
+        setFontOfInspirationRequested(true);
+       };
+
     const handleComplete = () => {
         setRuntimeValue(playerStats.name, 'shortRestHitDice', remainingHitDice, campaignName);
 
@@ -102,6 +113,10 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             const maxSp = getClassFeatures(playerStats)?.maxSorceryPoints || 0;
             setRuntimeValue(playerStats.name, 'sorceryPoints', Math.min(maxSp, (curSorcery != null ? Number(curSorcery) : 0) + restoreAmount), campaignName);
             setRuntimeValue(playerStats.name, 'sorcerousRestorationUses', 0, campaignName);
+            }
+
+        if (hasFontOfInspiration && fontOfInspirationAvailable && fontOfInspirationRequested) {
+            setRuntimeValue(playerStats.name, 'bardicInspirationUses', bardicInspirationMax, campaignName);
             }
 
         clearAllExpirationEffects(playerStats.name, campaignName);
@@ -165,23 +180,39 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                      </div>
                    )}
 
-                  {sorcRestoration && (restorationAvailable || restorationRequested) && (
-                       <div className="short-rest-section">
-                           <h4>Sorcerous Restoration</h4>
-                           <p>Regain {restoreAmount} expended sorcery points.</p>
-                           <div className="short-rest-dice-row">
-                               {restorationRequested ? (
-                                   <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Restoration requested</span>
-                                 ) : (
-                                   <button className="char-btn" onClick={handleApplySorcerousRestoration} disabled={!restorationAvailable}>
-                                       <i className="fas fa-wand-magic-sparkles"></i> Regain {restoreAmount} Sorcery Points
-                                   </button>
-                                 )}
-                           </div>
-                       </div>
-                   )}
+                   {sorcRestoration && (restorationAvailable || restorationRequested) && (
+                        <div className="short-rest-section">
+                            <h4>Sorcerous Restoration</h4>
+                            <p>Regain {restoreAmount} expended sorcery points.</p>
+                            <div className="short-rest-dice-row">
+                                {restorationRequested ? (
+                                    <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Restoration requested</span>
+                                  ) : (
+                                    <button className="char-btn" onClick={handleApplySorcerousRestoration} disabled={!restorationAvailable}>
+                                        <i className="fas fa-wand-magic-sparkles"></i> Regain {restoreAmount} Sorcery Points
+                                    </button>
+                                  )}
+                            </div>
+                        </div>
+                    )}
 
-                    {resourceLabels.length > 0 && (
+                    {hasFontOfInspiration && (fontOfInspirationAvailable || fontOfInspirationRequested) && (
+                        <div className="short-rest-section">
+                            <h4>Font of Inspiration</h4>
+                            <p>Regain {bardicInspirationMax} expended Bardic Inspiration uses.</p>
+                            <div className="short-rest-dice-row">
+                                {fontOfInspirationRequested ? (
+                                    <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Font of Inspiration applied</span>
+                                  ) : (
+                                    <button className="char-btn" onClick={handleApplyFontOfInspiration} disabled={!fontOfInspirationAvailable}>
+                                        <i className="fas fa-wand-magic-sparkles"></i> Regain {bardicInspirationMax} Bardic Inspiration Uses
+                                    </button>
+                                  )}
+                            </div>
+                        </div>
+                    )}
+
+                     {resourceLabels.length > 0 && (
                       <div className="short-rest-section">
                           <h4>Resources Restored</h4>
                           <ul>

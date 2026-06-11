@@ -1025,7 +1025,11 @@
                         "name": "Font of Inspiration",
                         "description": "You now regain all your expended uses of Bardic Inspiration when you finish a Short or Long Rest. In addition, you can expend a spell slot (no action required) to regain one expended use of Bardic Inspiration.",
                         "level": 5,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "font_of_inspiration",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -1079,7 +1083,17 @@
                         "name": "Countercharm",
                         "description": "You can use musical notes or words of power to disrupt mind-influencing effects. If you or a creature within 30 feet of you fails a saving throw against an effect that applies the Charmed or Frightened condition, you can take a Reaction to cause the save to be rerolled, and the new roll has Advantage.",
                         "level": 7,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "countercharm",
+                            "trigger": "failed_save_charmed_or_frightened",
+                            "range": "30 ft",
+                            "conditions": ["charmed", "frightened"],
+                            "effect": "reroll_with_advantage",
+                            "uses": 1,
+                            "recharge": "long_rest",
+                            "casting_time": "1 reaction"
+                        }
                     }
                 ],
                 "spellcasting": {

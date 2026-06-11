@@ -33,6 +33,8 @@ import { handle as handleExtraAction } from './handlers/extraActionHandler.js';
 import { handle as handleDamageReduction } from './handlers/damageReductionHandler.js';
 import { handle as handleOpenHandTechnique } from './handlers/openHandTechniqueHandler.js';
 import { handle as handleReactionSaveHeal } from './handlers/reactionSaveHealHandler.js';
+import { handle as handleCountercharm } from './handlers/countercharmHandler.js';
+import { handle as handleFontOfInspiration } from './handlers/fontOfInspirationHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -76,8 +78,10 @@ const HANDLER_MAP = {
      reaction_bonus: handleReactionBonus,
      post_cast_rider: handlePostCastRider,
      post_cast_self_heal: handleGenericPopup,
-     bardic_inspiration_defense: handleBardicInspirationDefense,
-     bardic_inspiration_offense: handleBardicInspirationOffense,
+      bardic_inspiration_defense: handleBardicInspirationDefense,
+      bardic_inspiration_offense: handleBardicInspirationOffense,
+      countercharm: handleCountercharm,
+      font_of_inspiration: handleFontOfInspiration,
 };
 
 export async function executeHandler(action, playerStats, campaignName, mapName) {
