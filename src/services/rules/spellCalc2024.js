@@ -28,6 +28,12 @@ export function getSpellAbilities(allSpells, playerStats) {
         spellAbilities.cantrips_known = (spellAbilities.cantrips_known || 0) + 1;
     }
 
+    // Primal Order: Magician grants one extra cantrip
+    if (playerStats.class?.primalOrder === 'Magician' && playerStats.class?.name === 'Druid') {
+        spellAbilities = spellAbilities || {};
+        spellAbilities.cantrips_known = (spellAbilities.cantrips_known || 0) + 1;
+    }
+
     if (spellAbilities) {
         if (playerStats.spells) {
             spellAbilities.spells = playerStats.spells.map(spell => { return { name: spell, prepared: '' } });

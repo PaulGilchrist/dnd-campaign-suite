@@ -11,8 +11,10 @@ function WizardStepRaceClass({
 }) {
   const selectedClass = formData.class?.name || '';
   const isCleric2024 = ruleset === '2024' && selectedClass === 'Cleric';
+  const isDruid2024 = ruleset === '2024' && selectedClass === 'Druid';
 
   const divineOrderOptions = isCleric2024 ? ['Protector', 'Thaumaturge'] : [];
+  const primalOrderOptions = isDruid2024 ? ['Magician', 'Warden'] : [];
 
   return (
     <div className="wizard-step">
@@ -71,6 +73,23 @@ function WizardStepRaceClass({
             ))}
           </select>
           {errors['divineOrder'] && <span className="error-message">{errors['divineOrder']}</span>}
+        </div>
+      )}
+
+      {isDruid2024 && (
+        <div className="form-group">
+          <label>Primal Order *</label>
+          <select
+            value={formData.class?.primalOrder || ''}
+            onChange={(e) => onInputChange('class', { ...formData.class, primalOrder: e.target.value })}
+            className={errors['primalOrder'] ? 'error' : ''}
+          >
+            <option value="">Select a Primal Order</option>
+            {primalOrderOptions.map(option => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+          {errors['primalOrder'] && <span className="error-message">{errors['primalOrder']}</span>}
         </div>
       )}
       

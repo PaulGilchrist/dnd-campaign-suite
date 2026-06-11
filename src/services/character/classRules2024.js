@@ -102,6 +102,11 @@ const classRules = {
                 characterClass.proficiencies = [...characterClass.proficiencies, 'Martial Weapons', 'Heavy Armor'];
             }
 
+            // Primal Order: Warden grants Martial weapons and Medium armor
+            if (playerSummary.class?.primalOrder === 'Warden' && characterClass.name === 'Druid') {
+                characterClass.proficiencies = [...characterClass.proficiencies, 'Martial Weapons', 'Medium Armor'];
+            }
+
             return characterClass;
        },
     getDruidMaxWildShapeChallengeRating(playerStats) {

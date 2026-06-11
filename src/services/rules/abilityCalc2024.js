@@ -36,6 +36,19 @@ export async function getAbilities(playerStats) {
             });
         }
 
+        // Primal Order: Magician grants WIS mod (min +1) bonus to Arcana and Nature checks
+        if (playerStats.class?.primalOrder === 'Magician' && playerStats.class?.name === 'Druid') {
+            const wisAbility = playerStats.abilities.find(a => a.name === 'Wisdom');
+            const wisMod = wisAbility?.bonus || 0;
+            const primalBonus = Math.max(1, wisMod);
+            newAbility.skills = newAbility.skills.map((skill) => {
+                if (skill.name === 'Arcana' || skill.name === 'Nature') {
+                    return { ...skill, bonus: skill.bonus + primalBonus };
+                }
+                return skill;
+            });
+        }
+
         return newAbility;
        });
 }
