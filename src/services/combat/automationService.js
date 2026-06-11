@@ -524,6 +524,7 @@ function buildAttackInfo(feature, playerStats) {
                 spells: auto.spells || [],
                 riderSave: auto.riderSave || null,
                 primalKnowledge: auto.skills || [],
+                casting_time: auto.casting_time || '',
                 hasAutomation: true
             }
         }

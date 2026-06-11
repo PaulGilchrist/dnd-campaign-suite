@@ -347,17 +347,20 @@ const classRules = {
                const expertise = playerStats.class?.expertise || [];
                return { sneakAttack, expertise };
            },
-          getBardFeatures: (playerStats) => {
-        // 2024 Rules: Get Bard features
-        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-        const bardicDie = classLevel?.bardic_die || 0;
-        return {
-            bardicDie,
-            songOfRestDie: null,
-            magicalSecrets: null,
-            subclassMagicalSecrets: 0
-        };
-    }
+           getBardFeatures: (playerStats) => {
+         // 2024 Rules: Get Bard features
+         const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+         const bardicDie = classLevel?.bardic_die || 0;
+         const magicalSecrets = classLevel?.class_specific?.magical_secrets ?? null;
+         let subclassMagicalSecrets = 0;
+         // 2024 has no Additional Magical Secrets for subclasses
+         return {
+             bardicDie,
+             songOfRestDie: null,
+             magicalSecrets,
+             subclassMagicalSecrets
+         };
+     }
 };
 
 export default classRules;

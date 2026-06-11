@@ -349,6 +349,19 @@ export async function validateSpells(formData, selectedSpells, allSpells, versio
   // Add any explicitly granted spells (auto-assigned from subclass/race/subrace/feats)
   grantedSpells.forEach(spell => allowedSpells.add(spell));
   
+  // Check if Bard has Magical Secrets (2024) — load class data once
+  const className = sources.class.name;
+  const isMagicalSecretsBard = className === 'Bard' && version === '2024';
+  let magicalSecretsLevelEntry = null;
+  if (isMagicalSecretsBard) {
+    const classData = await loadClassData(version);
+    const bardData = classData.find(c => c.name === className || c.index === 'bard');
+    if (bardData) {
+      magicalSecretsLevelEntry = bardData.class_levels?.find(entry => entry.level === formData.level);
+    }
+  }
+  const magicalSecretsClasses = ['Bard', 'Cleric', 'Druid', 'Wizard'];
+  
   // Check each selected spell
   const spellsOutsideClassList = [];
 
@@ -367,14 +380,18 @@ export async function validateSpells(formData, selectedSpells, allSpells, versio
     void _spellLevel;
     
     // Check if spell is allowed by class
-    const className = sources.class.name;
-       const isClassSpell = spellClasses.includes(className) ||
+    const isClassSpell = spellClasses.includes(className) ||
        (className === 'Fighter' && spellClasses.includes('Wizard')) ||
        (className === 'Rogue' && spellClasses.includes('Wizard'));
+    // 2024 Bard Magical Secrets: allow spells from Bard, Cleric, Druid, and Wizard lists
+    const isMagicalSecretsSpell = isMagicalSecretsBard && 
+      magicalSecretsLevelEntry?.class_specific?.magical_secrets != null && 
+      magicalSecretsLevelEntry.class_specific.magical_secrets > 0 &&
+      magicalSecretsClasses.some(c => spellClasses.includes(c));
     const isGrantedSpell = allowedSpells.has(spellName);
     
-      // If not a class spell and not granted by another source, collect it
-    if (!isClassSpell && !isGrantedSpell) {
+      // If not a class spell and not granted by another source and not a Magical Secrets spell, collect it
+    if (!isClassSpell && !isGrantedSpell && !isMagicalSecretsSpell) {
       spellsOutsideClassList.push(spellName);
      }
    }
