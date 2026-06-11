@@ -1,12 +1,40 @@
 import React from 'react'
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from './useMetamagic.js'
 import { addEntry } from '../services/ui/logService.js'
+import { getMultiTargetSpreadForSpell } from '../services/rules/postCastRiderService.js'
+import { getCombatSummary } from '../services/encounters/combatData.js'
+
+function getCreatureTargets(excludeName) {
+  const cs = getCombatSummary();
+  if (!cs?.creatures) return [];
+  return cs.creatures
+    .filter(c => c.name !== excludeName)
+    .map(c => c.name);
+}
 
 export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
   const isSorcerer = playerStats?.class?.name === 'Sorcerer';
   const [pendingMetamagic, setPendingMetamagic] = React.useState(null);
+  const [pendingMultiTarget, setPendingMultiTarget] = React.useState(null);
 
   const gateMetamagic = React.useCallback((spell) => {
+    const multiTargetSpread = getMultiTargetSpreadForSpell(playerStats, spell.name);
+
+    if (multiTargetSpread) {
+      const creatureTargets = getCreatureTargets(playerStats?.name);
+      if (creatureTargets.length > 0) {
+        setPendingMultiTarget({
+          spell,
+          spellName: spell.name,
+          spellLevel: spell.level || 0,
+          castingTime: spell.casting_time,
+          range: multiTargetSpread.range || '10 ft',
+          creatureTargets,
+        });
+        return;
+      }
+    }
+
     if (!isSorcerer) {
       addEntry(campaignName, {
         type: 'spell',
@@ -82,5 +110,48 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     onExecute(pending.spell, {});
   }, [pendingMetamagic, playerStats.name, campaignName, onExecute]);
 
-  return { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip };
+  const handleMultiTargetConfirm = React.useCallback((result) => {
+    const pending = pendingMultiTarget;
+    setPendingMultiTarget(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: ['Words of Creation'],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+
+    const metaCtx = {};
+    if (result?.secondTarget) {
+      metaCtx.multiTarget = result.secondTarget;
+    }
+
+    onExecute(pending.spell, metaCtx);
+  }, [pendingMultiTarget, playerStats, campaignName, onExecute]);
+
+  const handleMultiTargetSkip = React.useCallback(() => {
+    const pending = pendingMultiTarget;
+    setPendingMultiTarget(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+
+    onExecute(pending.spell, {});
+  }, [pendingMultiTarget, playerStats, campaignName, onExecute]);
+
+  return { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip };
 }

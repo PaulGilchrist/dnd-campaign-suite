@@ -8,6 +8,7 @@ import DiceRollResult from '../DiceRollResult.jsx'
 import MetamagicPopup from '../MetamagicPopup.jsx'
 import SpellDetailPopup from './SpellDetailPopup.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
+import MultiTargetPopup from '../MultiTargetPopup.jsx'
 import { rollExpression, rollExpressionDoubled } from '../../../services/dice/diceRoller.js';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../services/rules/damageUtils.js';
@@ -95,7 +96,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
       executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName });
       cachedCastPosRef.current = null;
       }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName]);
-    const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
+    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
 
     const resolveSpellPositions = React.useCallback(async () => {
@@ -285,6 +286,17 @@ return (
                         campaignName={campaignName}
                         onConfirm={handleSimpleConfirm}
                         onSkip={handleSimpleSkip}
+                      />
+                    )}
+                    {pendingMultiTarget && (
+                      <MultiTargetPopup
+                        spell={{ name: pendingMultiTarget.spellName, level: pendingMultiTarget.spellLevel || 0 }}
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        range={pendingMultiTarget.range}
+                        creatureTargets={pendingMultiTarget.creatureTargets}
+                        onConfirm={handleMultiTargetConfirm}
+                        onSkip={handleMultiTargetSkip}
                       />
                     )}
             <hr />

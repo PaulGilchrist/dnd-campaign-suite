@@ -574,9 +574,64 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                 twinFinalDamage: twinApplyResult?.finalDamage,
                 twinTargetCurrentHp: twinApplyResult?.newHp,
                  twinTargetMaxHp: twinTarget.type === 'npc'
-                   ? twinTarget.maxHp
-                   : (getRuntimeValue(twinTarget.name, 'hitPoints') ?? 0),
-               }));
+                    ? twinTarget.maxHp
+                    : (getRuntimeValue(twinTarget.name, 'hitPoints') ?? 0),
+                }));
+            }
+          }
+
+          if (context?.multiTarget) {
+            const multiTarget = combatSummary?.creatures?.find(c => c.name === context.multiTarget);
+            if (multiTarget && multiTarget.name !== target.name) {
+              if (saveType && saveDc) {
+                const multiSaveResult = rollSaveForCreature(multiTarget, saveType, saveDc, false);
+                const multiFinalDamage = computeDamageAfterSave(total, multiSaveResult.success, dcSuccess);
+                const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, multiFinalDamage, [damageType], campaignName, null);
+                logEntry({
+                  type: 'roll',
+                  characterName,
+                  rollType: 'save-damage',
+                  name: `${name} (Words of Creation)`,
+                  formula,
+                  rolls,
+                  total,
+                  modifier,
+                  damageType,
+                  targetName: multiTarget.name,
+                  saveType,
+                  saveDc,
+                  saveResult: multiSaveResult.success ? 'success' : 'failure',
+                  saveRoll: multiSaveResult.roll,
+                  saveBonus: multiSaveResult.bonus,
+                  saveRawRolls: multiSaveResult.rawRolls,
+                  mode: 'normal',
+                  finalDamage: multiApplyResult?.finalDamage ?? total,
+                });
+                setPopupHtml(prev => ({
+                  ...prev,
+                  twinTargetName: multiTarget.name,
+                  twinFinalDamage: multiApplyResult?.finalDamage,
+                  twinTargetCurrentHp: multiApplyResult?.newHp,
+                  twinTargetMaxHp: multiTarget.type === 'npc'
+                    ? multiTarget.maxHp
+                    : (getRuntimeValue(multiTarget.name, 'hitPoints') ?? 0),
+                }));
+              } else {
+                const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null);
+                logEntry({
+                  type: 'roll',
+                  characterName,
+                  rollType: 'save-damage',
+                  name: `${name} (Words of Creation)`,
+                  formula,
+                  rolls,
+                  total,
+                  modifier,
+                  damageType,
+                  targetName: multiTarget.name,
+                  finalDamage: multiApplyResult?.finalDamage ?? total,
+                });
+              }
             }
           }
           return;
@@ -774,7 +829,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
 
         setPopupHtml(popupData);
 
-      if (context?.metamagicTwinTarget && target) {
+       if (context?.metamagicTwinTarget && target) {
         const twinTarget = combatSummary?.creatures?.find(c => c.name === context.metamagicTwinTarget);
         if (twinTarget && twinTarget.name !== target.name) {
           const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, total, [damageType], campaignName, null);
@@ -799,6 +854,35 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             twinTargetMaxHp: twinTarget.type === 'player'
             ? (getRuntimeValue(twinTarget.name, 'hitPoints') ?? 0)
             : twinTarget.maxHp,
+          }));
+        }
+      }
+
+      if (context?.multiTarget && target) {
+        const multiTarget = combatSummary?.creatures?.find(c => c.name === context.multiTarget);
+        if (multiTarget && multiTarget.name !== target.name) {
+          const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null);
+          logEntry({
+            type: 'roll',
+            characterName,
+            rollType: 'damage',
+            name: `${name} (Words of Creation)`,
+            formula,
+            rolls,
+            total,
+            modifier,
+            damageType,
+            targetName: multiTarget.name,
+            finalDamage: multiApplyResult?.finalDamage,
+          });
+          setPopupHtml(prev => ({
+            ...prev,
+            twinTargetName: multiTarget.name,
+            twinFinalDamage: multiApplyResult?.finalDamage,
+            twinTargetCurrentHp: multiApplyResult?.newHp,
+            twinTargetMaxHp: multiTarget.type === 'player'
+              ? (getRuntimeValue(multiTarget.name, 'hitPoints') ?? 0)
+              : multiTarget.maxHp,
           }));
         }
       }

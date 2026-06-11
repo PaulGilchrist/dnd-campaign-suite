@@ -850,6 +850,16 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'multi_target_spread': {
+            return {
+                type: 'multi_target_spread',
+                name: feature.name,
+                spellFilter: auto.spellFilter || [],
+                range: auto.range || '10 ft',
+                hasAutomation: true
+            }
+        }
+
         case 'jack_of_all_trades': {
             return {
                 type: 'jack_of_all_trades',
@@ -1030,6 +1040,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'mastery_rider':
             case 'post_cast_rider':
             case 'post_cast_self_heal':
+            case 'multi_target_spread':
             case 'jack_of_all_trades':
                 result.passives.push(info)
                 if (info.type === 'passive_rule' && info.effect === 'primal_knowledge' && info.primalKnowledge.length > 0) {

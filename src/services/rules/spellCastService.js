@@ -3,7 +3,10 @@ import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet, rangeT
 import { isInnateSorceryActive, getActiveBuffs } from '../combat/buffService.js';
 import { triggerPostCastRiderSaves } from './postCastRiderService.js';
 import { triggerPostCastSelfHeals } from './postCastHealService.js';
-import { setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { setRuntimeValue, getRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { applyHealingToTarget } from './applyHealing.js';
+import { getCombatContext } from './damageUtils.js';
+import { postLogEntry } from '../shared/logPoster.js';
 
 export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName }) {
     if (getActiveBuffs(playerStats.name, campaignName).some(b => b.blocksSpellcasting)) {
@@ -14,6 +17,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     if (spell.casting_time === '1 action') {
         setRuntimeValue(playerStats.name, 'lastActionSpellCast', 1, campaignName);
     }
+
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
   const slotDmg = spell.damage?.damage_at_slot_level;
   const charDmg = spell.damage?.damage_at_character_level;
@@ -25,7 +29,16 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     null;
   const damageType = spell.damage?.damage_type || '';
 
-  if (!formula) return;
+  if (!formula) {
+      if (spell.name.toLowerCase() === 'power word heal' && metaCtx?.multiTarget) {
+          const target = await getTargetInfo();
+          if (target?.name) {
+              await applyPowerWordHealToTarget(target.name, playerStats, campaignName);
+              await applyPowerWordHealToTarget(metaCtx.multiTarget, playerStats, campaignName);
+          }
+      }
+      return;
+  }
 
   const rollContext = { ...metaCtx, damageType };
 
@@ -76,5 +89,52 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     });
     triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast self-heal failed:', e);
+    });
+}
+
+async function applyPowerWordHealToTarget(targetName, playerStats, campaignName) {
+    const combatSummary = await getCombatContext(campaignName);
+    if (!combatSummary) return;
+
+    const creature = combatSummary.creatures.find(c => c.name === targetName);
+    if (!creature) return;
+
+    const maxHp = creature.maxHp || playerStats.hitPoints || 0;
+    const currentHp = creature.currentHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? maxHp;
+    const healAmount = maxHp - currentHp;
+
+    if (healAmount > 0) {
+        applyHealingToTarget(combatSummary, targetName, healAmount, campaignName);
+    }
+
+    const conditionsToRemove = ['charmed', 'frightened', 'paralyzed', 'poisoned', 'stunned'];
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const newConditions = conditions.filter(c => !conditionsToRemove.includes(String(c).toLowerCase()));
+    if (newConditions.length !== conditions.length) {
+        setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
+        for (const removed of conditionsToRemove) {
+            if (!newConditions.some(c => String(c).toLowerCase() === removed)) {
+                postLogEntry(campaignName, {
+                    type: 'condition',
+                    action: 'removed',
+                    characterName: targetName,
+                    condition: removed.charAt(0).toUpperCase() + removed.slice(1),
+                    reason: 'Power Word Heal',
+                    timestamp: Date.now(),
+                });
+            }
+        }
+    }
+
+    postLogEntry(campaignName, {
+        type: 'hp_change',
+        targetName,
+        delta: healAmount,
+        currentHp: Math.min(maxHp, currentHp + healAmount),
+        maxHp,
+        isHealing: true,
+        sourceName: playerStats.name,
+        note: 'Power Word Heal',
     });
 }

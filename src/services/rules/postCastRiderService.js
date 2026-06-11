@@ -18,6 +18,22 @@ export function getPostCastRiderSaves(playerStats) {
     return passives.filter(p => p.type === 'post_cast_rider' || (p.type === 'passive_rule' && p.riderSave));
 }
 
+export function getMultiTargetSpreads(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.filter(p => p.type === 'multi_target_spread');
+}
+
+export function getMultiTargetSpreadForSpell(playerStats, spellName) {
+    const spreads = getMultiTargetSpreads(playerStats);
+    for (const spread of spreads) {
+        const filter = spread.spellFilter || [];
+        if (filter.includes(spellName)) {
+            return spread;
+        }
+    }
+    return null;
+}
+
 export function hasPostCastRiderSave(playerStats) {
     return getPostCastRiderSaves(playerStats).length > 0;
 }

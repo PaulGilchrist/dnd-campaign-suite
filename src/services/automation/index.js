@@ -35,6 +35,7 @@ import { handle as handleOpenHandTechnique } from './handlers/openHandTechniqueH
 import { handle as handleReactionSaveHeal } from './handlers/reactionSaveHealHandler.js';
 import { handle as handleCountercharm } from './handlers/countercharmHandler.js';
 import { handle as handleFontOfInspiration } from './handlers/fontOfInspirationHandler.js';
+import { handle as handleMultiTarget } from './handlers/multiTargetHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -80,8 +81,9 @@ const HANDLER_MAP = {
      post_cast_self_heal: handleGenericPopup,
       bardic_inspiration_defense: handleBardicInspirationDefense,
       bardic_inspiration_offense: handleBardicInspirationOffense,
-      countercharm: handleCountercharm,
-      font_of_inspiration: handleFontOfInspiration,
+       countercharm: handleCountercharm,
+       font_of_inspiration: handleFontOfInspiration,
+       multi_target_spread: handleMultiTarget,
 };
 
 export async function executeHandler(action, playerStats, campaignName, mapName) {
