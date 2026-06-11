@@ -6,6 +6,9 @@ export async function getAbilities(playerStats) {
         const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
         const newAbility = { ...ability };
         newAbility.totalScore = ability.baseScore + ability.abilityImprovements + ability.miscBonus;
+        if ((newAbility.name === 'Strength' || newAbility.name === 'Constitution') && playerStats.class.name === 'Barbarian' && playerStats.level > 19) {
+            newAbility.totalScore = Math.min(newAbility.totalScore + 4, 25);
+        }
         newAbility.bonus = Math.floor((newAbility.totalScore - 10) / 2);
         newAbility.proficient = playerStats.class.saving_throw_proficiencies ? playerStats.class.saving_throw_proficiencies.includes(newAbility.name) : false;
         newAbility.save = newAbility.proficient ? newAbility.bonus + proficiency : newAbility.bonus;

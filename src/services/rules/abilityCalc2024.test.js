@@ -302,6 +302,123 @@ describe('abilityCalc2024', () => {
       // Score 30: totalScore=30, bonus=Math.floor((30-10)/2)=Math.floor(10)=10
       expect(dex.bonus).toBe(10);
     });
+
+    it('should apply Primal Champion at level 20 for Barbarian', async () => {
+      const playerStats = {
+        level: 20,
+        abilities: [
+          { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Constitution', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+        ],
+        class: {
+          name: 'Barbarian',
+          saving_throw_proficiencies: [],
+        },
+        skillProficiencies: [],
+        expertise: [],
+      };
+
+      const result = await getAbilities(playerStats);
+      const str = result.find(a => a.name === 'Strength');
+      const con = result.find(a => a.name === 'Constitution');
+
+      // 16 + 4 (Primal Champion) = 20, bonus = 5
+      expect(str.totalScore).toBe(20);
+      expect(str.bonus).toBe(5);
+
+      // 14 + 4 (Primal Champion) = 18, bonus = 4
+      expect(con.totalScore).toBe(18);
+      expect(con.bonus).toBe(4);
+    });
+
+    it('should not apply Primal Champion for non-Barbarian', async () => {
+      const playerStats = {
+        level: 20,
+        abilities: [
+          { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Constitution', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+        ],
+        class: {
+          name: 'Fighter',
+          saving_throw_proficiencies: [],
+        },
+        skillProficiencies: [],
+        expertise: [],
+      };
+
+      const result = await getAbilities(playerStats);
+      const str = result.find(a => a.name === 'Strength');
+      const con = result.find(a => a.name === 'Constitution');
+
+      expect(str.totalScore).toBe(16);
+      expect(str.bonus).toBe(3);
+      expect(con.totalScore).toBe(14);
+      expect(con.bonus).toBe(2);
+    });
+
+    it('should not apply Primal Champion before level 20', async () => {
+      const playerStats = {
+        level: 19,
+        abilities: [
+          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Constitution', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+        ],
+        class: {
+          name: 'Barbarian',
+          saving_throw_proficiencies: [],
+        },
+        skillProficiencies: [],
+        expertise: [],
+      };
+
+      const result = await getAbilities(playerStats);
+      const str = result.find(a => a.name === 'Strength');
+      const con = result.find(a => a.name === 'Constitution');
+
+      expect(str.totalScore).toBe(15);
+      expect(str.bonus).toBe(2);
+      expect(con.totalScore).toBe(14);
+      expect(con.bonus).toBe(2);
+    });
+
+    it('should enforce 25 cap on Primal Champion', async () => {
+      const playerStats = {
+        level: 20,
+        abilities: [
+          { name: 'Strength', baseScore: 22, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Constitution', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+        ],
+        class: {
+          name: 'Barbarian',
+          saving_throw_proficiencies: [],
+        },
+        skillProficiencies: [],
+        expertise: [],
+      };
+
+      const result = await getAbilities(playerStats);
+      const str = result.find(a => a.name === 'Strength');
+
+      // 22 + 4 = 26, capped at 25
+      expect(str.totalScore).toBe(25);
+      expect(str.bonus).toBe(7);
+    });
   });
 
   describe('getHitPoints', () => {
