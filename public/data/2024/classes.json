@@ -5348,25 +5348,25 @@
                         "description": "Whenever you hit a creature with an Unarmed Strike as part of your Flurry of Blows, you can impose one of the following effects on the target. It must succeed on a Strength saving throw (DC 8 + your Wisdom modifier + Proficiency Bonus) or: Push it up to 15 feet away. It has Disadvantage on its next attack roll. It can't take Reactions until the start of your next turn.",
                         "level": 3,
                         "automation": {
-                            "type": "flurry_effect",
+                            "type": "open_hand_technique",
                             "options": [
                                 {
                                     "name": "Push",
-                                    "distance": "15 ft"
+                                    "effect": "push_15ft"
                                 },
                                 {
                                     "name": "Disadvantage Next Attack",
-                                    "duration": "until_next_attack"
+                                    "effect": "disadvantage_next_attack"
                                 },
                                 {
                                     "name": "No Reactions",
-                                    "duration": "until_start_of_next_turn"
+                                    "effect": "no_reactions"
                                 }
                             ],
                             "saveType": "STR",
-                            "saveDcExpression": "8 + WIS modifier + proficiency_bonus",
-                            "trigger": "flurry_of_blows_unarmed_strike_hit",
-                            "casting_time": "1 bonus action"
+                            "saveDc": "ability",
+                            "saveAbility": "WIS",
+                            "trigger": "flurry_of_blows_unarmed_strike_hit"
                         }
                     },
                     {

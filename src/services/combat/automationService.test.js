@@ -218,11 +218,12 @@ describe('buildAttackInfo – all automation types', () => {
     expect(info.resourceKey).toBe('extrastrikeUses')
      })
 
-  it('returns flurry_effect info', () => {
-    const info = getAutomationInfo(makeFeature({ type: 'flurry_effect' }, 'Flurry'), ps)
-    expect(info.type).toBe('flurry_effect')
-    expect(info.trigger).toBe('flurry_of_blows_hit')
-     })
+   it('returns open_hand_technique info', () => {
+     const info = getAutomationInfo(makeFeature({ type: 'open_hand_technique' }, 'Open Hand'), ps)
+     expect(info.type).toBe('open_hand_technique')
+     expect(info.saveType).toBe('STR')
+     expect(info.saveDc).toBe('ability')
+      })
 
   it('returns divine_intervention info', () => {
     const info = getAutomationInfo(makeFeature({ type: 'divine_intervention' }, 'DI'), ps)

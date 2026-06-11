@@ -25,6 +25,7 @@ import SetConditionModal from './SetConditionModal.jsx'
 import DivineSparkModal from './DivineSparkModal.jsx'
 import DivineInterventionModal from './DivineInterventionModal.jsx'
 import AttackRiderModal from './AttackRiderModal.jsx'
+import OpenHandTechniqueModal from './OpenHandTechniqueModal.jsx'
 import WeaponMasteryModal from './WeaponMasteryModal.jsx'
 import CombatStanceModal from './CombatStanceModal.jsx'
 import TeleportModal from './TeleportModal.jsx'
@@ -60,6 +61,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [resourcePoolModal, setResourcePoolModal] = useState(null);
     const [setConditionModal, setSetConditionModal] = useState(null);
     const [attackRiderModal, setAttackRiderModal] = useState(null);
+    const [openHandTechniqueModal, setOpenHandTechniqueModal] = useState(null);
     const [weaponMasteryModal, setWeaponMasteryModal] = useState(null);
     const [combatStanceModal, setCombatStanceModal] = useState(null);
     const [teleportModal, setTeleportModal] = useState(null);
@@ -624,6 +626,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'resourcePool': setResourcePoolModal(result.payload); break;
                     case 'setCondition': setSetConditionModal(result.payload); break;
                     case 'attackRider': setAttackRiderModal(result.payload); break;
+                    case 'openHandTechnique': setOpenHandTechniqueModal(result.payload); break;
                     case 'combatStance': setCombatStanceModal(result.payload); break;
                     case 'teleport': setTeleportModal(result.payload); break;
                     case 'healingIllusion': setHealingIllusionModal(result.payload); break;
@@ -887,6 +890,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <AttackRiderModal
                         {...attackRiderModal}
                         onClose={() => { setAttackRiderModal(null); window.dispatchEvent(new CustomEvent('target-effects-updated')); }}
+                    />
+                )}
+                {openHandTechniqueModal && (
+                    <OpenHandTechniqueModal
+                        {...openHandTechniqueModal}
+                        onClose={() => { setOpenHandTechniqueModal(null); window.dispatchEvent(new CustomEvent('target-effects-updated')); window.dispatchEvent(new CustomEvent('combat-summary-updated')); }}
                     />
                 )}
                 {weaponMasteryModal && (

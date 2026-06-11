@@ -80,6 +80,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     riderSaveDisadvantage: false,
     riderAttackBonus: 0,
     riderCannotOpportunityAttack: false,
+    riderNoReactions: false,
    }
 
   const conditionSet = new Set(conditions)
@@ -209,6 +210,9 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     }
     if (te.noOpportunityAttacks) {
       effects.riderCannotOpportunityAttack = true;
+    }
+    if (te.effect === 'no_reactions') {
+      effects.riderNoReactions = true;
     }
   }
 

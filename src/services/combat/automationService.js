@@ -63,6 +63,18 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'open_hand_technique': {
+            return {
+                type: 'open_hand_technique',
+                name: feature.name,
+                options: auto.options || [],
+                saveType: auto.saveType || 'STR',
+                saveDc: auto.saveDc || 'ability',
+                saveAbility: auto.saveAbility || 'WIS',
+                hasAutomation: true
+            }
+        }
+
         case 'mastery_rider': {
             return {
                 type: 'mastery_rider',
@@ -314,18 +326,6 @@ function buildAttackInfo(feature, playerStats) {
                 recharge: auto.recharge || 'short_rest',
                 oncePerTurn: !!auto.oncePerTurn,
                 resourceKey: feature.name.toLowerCase().replace(/\s+/g, '') + 'Uses',
-                hasAutomation: true
-            }
-        }
-
-        case 'flurry_effect': {
-            return {
-                type: 'flurry_effect',
-                name: feature.name,
-                options: auto.options || [],
-                saveType: auto.saveType || 'varies',
-                saveDc: auto.saveDc || 'ability',
-                trigger: auto.trigger || 'flurry_of_blows_hit',
                 hasAutomation: true
             }
         }
@@ -919,6 +919,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break
             case 'resource_pool':
             case 'attack_rider':
+            case 'open_hand_technique':
             case 'initiative_action':
             case 'spell_modifier':
             case 'font_of_magic':

@@ -31,6 +31,7 @@ import { handle as handleDivineIntervention } from './handlers/divineInterventio
 import { handle as handleBonusActionAttack } from './handlers/bonusActionAttackHandler.js';
 import { handle as handleExtraAction } from './handlers/extraActionHandler.js';
 import { handle as handleDamageReduction } from './handlers/damageReductionHandler.js';
+import { handle as handleOpenHandTechnique } from './handlers/openHandTechniqueHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -65,6 +66,7 @@ const HANDLER_MAP = {
     reaction_damage: handleReactionDamage,
     reaction_debuff: handleReactionDebuff,
     damage_reduction: handleDamageReduction,
+    open_hand_technique: handleOpenHandTechnique,
     mastery_rider: handleWeaponMastery,
     revivification: handleRevivification,
      bardic_inspiration: handleBardicInspiration,
