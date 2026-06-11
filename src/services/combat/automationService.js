@@ -500,12 +500,33 @@ function buildAttackInfo(feature, playerStats) {
           }
 
         case 'reaction_damage': {
+            let resolvedExpr = auto.damageExpression || ''
+            if (auto.scaling) {
+                const entries = Object.entries(auto.scaling)
+                    .map(([k, v]) => ({ level: parseInt(k, 10), expr: String(v) }))
+                    .filter(e => !isNaN(e.level))
+                    .sort((a, b) => a.level - b.level)
+                for (const entry of entries) {
+                    if (playerStats.level >= entry.level) {
+                        resolvedExpr = entry.expr
+                    }
+                }
+            }
             return {
                 type: 'reaction_damage',
                 name: feature.name,
                 trigger: auto.trigger || '',
-                damageExpression: auto.damageExpression || '',
+                damageExpression: resolvedExpr,
+                damageType: auto.damageType || '',
+                saveType: auto.saveType || null,
+                saveDc: auto.saveDc === 'ability'
+                    ? getSaveDc(playerStats, auto.saveAbility || 'WIS', prof)
+                    : auto.saveDc || null,
+                saveAbility: auto.saveAbility || 'WIS',
+                alsoInflicts: auto.alsoInflicts || null,
+                resourceCost: auto.resourceCost || null,
                 range: auto.range || '5_ft',
+                casting_time: auto.casting_time || '1 reaction',
                 hasAutomation: true
             }
         }
@@ -854,7 +875,6 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'bardic_inspiration':
             case 'bonus_attacks':
             case 'bonus_action_attack':
-            case 'reaction_damage':
             case 'reaction_bonus':
             case 'free_spell':
             case 'divine_intervention':
@@ -876,6 +896,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'sorcery_incarnate':
                 result.actions.push(info)
                 break
+            case 'reaction_damage':
             case 'damage_reduction':
             case 'reaction_debuff':
             case 'bardic_inspiration_defense':

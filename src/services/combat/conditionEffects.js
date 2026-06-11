@@ -204,6 +204,9 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
         effects.riderAttackBonus = bonus;
       }
     }
+    if (te.effect === 'disadvantage_next_attack') {
+      effects.attackDisadvantageCount = (effects.attackDisadvantageCount || 0) + 1;
+    }
     if (te.noOpportunityAttacks) {
       effects.riderCannotOpportunityAttack = true;
     }
