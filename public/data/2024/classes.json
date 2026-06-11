@@ -5314,15 +5314,16 @@
                     },
                     {
                         "name": "Stride of the Elements",
-                        "description": "While Elemental Attunement active, gain Fly Speed and Swim Speed equal to your Speed.",
-                        "level": 11,
-                        "automation": {
-                            "type": "passive_buff",
-                            "effect": "elemental_attunement_movement",
-                            "condition": "elemental_attunement_active",
-                            "grantsFlySpeed": true,
-                            "grantsSwimSpeed": true
-                        }
+    "description": "While Elemental Attunement active, gain Fly Speed and Swim Speed equal to your Speed.",
+      "level": 11,
+      "automation": {
+        "type": "passive_buff",
+        "effect": "elemental_attunement_movement",
+        "condition": "elemental_attunement_active",
+        "grantsFlySpeed": true,
+        "grantsSwimSpeed": true,
+        "casting_time": "passive"
+      }
                     },
                     {
                         "name": "Elemental Epitome",
