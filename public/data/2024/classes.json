@@ -934,7 +934,11 @@
                         "name": "Jack of All Trades",
                         "description": "You can add half your Proficiency Bonus (round down) to any ability check you make that uses a skill proficiency you lack and that doesn't otherwise use your Proficiency Bonus.",
                         "level": 2,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "jack_of_all_trades",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spellcasting": {

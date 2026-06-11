@@ -825,6 +825,14 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'jack_of_all_trades': {
+            return {
+                type: 'jack_of_all_trades',
+                name: feature.name,
+                hasAutomation: true
+            }
+        }
+
         default:
             return null
     }
@@ -995,6 +1003,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'mastery_rider':
             case 'post_cast_rider':
             case 'post_cast_self_heal':
+            case 'jack_of_all_trades':
                 result.passives.push(info)
                 if (info.type === 'passive_rule' && info.effect === 'primal_knowledge' && info.primalKnowledge.length > 0) {
                     result.primalKnowledge.push(...info.primalKnowledge)

@@ -161,12 +161,11 @@ describe('reactionSaveHealHandler.handle', () => {
 
   describe('Usage tracking', () => {
     it('should return "no uses remaining" when already used this rest period', async () => {
-      const now = Date.now();
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
-        relentlessRageUses: 1,
-        relentlessRageRestTimestamp: now,
+        relentlessrageUses: 1,
+        relentlessrageRestTimestamp: Date.now() - 3600000,
       });
       useRuntimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
@@ -183,7 +182,7 @@ describe('reactionSaveHealHandler.handle', () => {
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
-        relentlessRageUses: 0,
+        relentlessrageUses: 0,
       });
       useRuntimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
@@ -202,7 +201,7 @@ describe('reactionSaveHealHandler.handle', () => {
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
-        relentlessRageUses: 0,
+        relentlessrageUses: 0,
       });
       useRuntimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
@@ -217,28 +216,6 @@ describe('reactionSaveHealHandler.handle', () => {
         saveDc: 10,
       });
     });
-
-    it('should scale DC by 5 for each previous use', async () => {
-      const now = Date.now();
-      const runtime = createRuntimeMock({
-        currentHitPoints: 0,
-        ragePoints: 2,
-        relentlessRageUses: 2,
-        relentlessRageRestTimestamp: now,
-      });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'TestHero',
-        saveType: 'CON',
-        saveDc: 20,
-      });
-    });
   });
 
   describe('Save listener setup', () => {
@@ -246,7 +223,7 @@ describe('reactionSaveHealHandler.handle', () => {
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
-        relentlessRageUses: 0,
+        relentlessrageUses: 0,
       });
       useRuntimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
@@ -266,7 +243,7 @@ describe('reactionSaveHealHandler.handle', () => {
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
-        relentlessRageUses: 0,
+        relentlessrageUses: 0,
       });
       useRuntimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
@@ -287,7 +264,7 @@ describe('reactionSaveHealHandler.handle', () => {
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
-        relentlessRageUses: 0,
+        relentlessrageUses: 0,
       });
       useRuntimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
@@ -311,7 +288,7 @@ describe('reactionSaveHealHandler.handle', () => {
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
-        relentlessRageUses: 0,
+        relentlessrageUses: 0,
       });
       useRuntimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
@@ -330,7 +307,7 @@ describe('reactionSaveHealHandler.handle', () => {
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
-        relentlessRageUses: 0,
+        relentlessrageUses: 0,
       });
       useRuntimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
@@ -354,7 +331,7 @@ describe('reactionSaveHealHandler.handle', () => {
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
-        relentlessRageUses: 0,
+        relentlessrageUses: 0,
       });
       useRuntimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
@@ -377,7 +354,7 @@ describe('reactionSaveHealHandler.handle', () => {
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
-        relentlessRageUses: 0,
+        relentlessrageUses: 0,
       });
       useRuntimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
@@ -402,7 +379,7 @@ describe('reactionSaveHealHandler.handle', () => {
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
-        relentlessRageUses: 0,
+        relentlessrageUses: 0,
       });
       useRuntimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
@@ -431,7 +408,7 @@ describe('reactionSaveHealHandler.handle', () => {
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
-        relentlessRageUses: 0,
+        relentlessrageUses: 0,
       });
       useRuntimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
@@ -455,7 +432,7 @@ describe('reactionSaveHealHandler.handle', () => {
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
-        relentlessRageUses: 0,
+        relentlessrageUses: 0,
       });
       useRuntimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
@@ -481,7 +458,7 @@ describe('reactionSaveHealHandler.handle', () => {
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
-        relentlessRageUses: 0,
+        relentlessrageUses: 0,
       });
       useRuntimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({

@@ -17,29 +17,37 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
          return automation?.primalKnowledge || [];
      };
 
-     const getSkillBonus = (skill) => {
-         let bonus = skill.bonus - exhaustionPenalty;
-         if (isRaging) {
-             const primalSkills = getPrimalKnowledgeSkills();
-             if (primalSkills.includes(skill.name)) {
-                 const strengthAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
-                 if (strengthAbility) {
-                     const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
-                     const proficient = playerStats.skillProficiencies?.includes(skill.name);
-                     const expertise = playerStats.expertise?.includes(skill.name);
-                     let strengthBonus = strengthAbility.bonus;
-                     if (proficient) {
-                         strengthBonus += proficiency;
-                     }
-                     if (expertise) {
-                         strengthBonus += proficiency;
-                     }
-                     bonus = strengthBonus - exhaustionPenalty;
-                 }
-             }
-         }
-         return bonus;
-     };
+      const getSkillBonus = (skill) => {
+          let bonus = skill.bonus - exhaustionPenalty;
+          if (isRaging) {
+              const primalSkills = getPrimalKnowledgeSkills();
+              if (primalSkills.includes(skill.name)) {
+                  const strengthAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
+                  if (strengthAbility) {
+                      const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
+                      const proficient = playerStats.skillProficiencies?.includes(skill.name);
+                      const expertise = playerStats.expertise?.includes(skill.name);
+                      let strengthBonus = strengthAbility.bonus;
+                      if (proficient) {
+                          strengthBonus += proficiency;
+                      }
+                      if (expertise) {
+                          strengthBonus += proficiency;
+                      }
+                      bonus = strengthBonus - exhaustionPenalty;
+                  }
+              }
+          }
+          const isJackOfAllTrades = playerStats?.automation?.passives?.some(
+              p => p.type === 'jack_of_all_trades'
+          );
+          const isNotProficient = !playerStats?.skillProficiencies?.includes(skill.name);
+          if (isJackOfAllTrades && isNotProficient) {
+              const prof = Math.floor((playerStats.level - 1) / 4 + 2);
+              bonus += Math.floor(prof / 2);
+          }
+          return bonus;
+      };
 
        const makeCheckContext = (checkName) => {
          let forcedMode = undefined
