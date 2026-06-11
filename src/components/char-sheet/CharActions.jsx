@@ -242,6 +242,21 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 }
             }
 
+            // Apply monk weapon / unarmed strike damage bonuses (e.g. Elemental Strike)
+            const monkHitBonuses = playerStats.automation.actions.filter(
+                a => a.type === 'damage_bonus' && a.trigger === 'monk_weapon_or_unarmed_hit'
+            );
+            for (const bonus of monkHitBonuses) {
+                const bonusResult = rollExpression(bonus.damageExpression);
+                if (bonusResult) {
+                    const elemOption = getRuntimeValue(playerStats.name, '_Elemental_Attunement_option', campaignName);
+                    const damageType = elemOption ? elemOption.toLowerCase() : 'fire';
+                    formula += ` + ${bonus.damageExpression}[${damageType}]`;
+                    total += bonusResult.total;
+                    rolls = [...rolls, ...bonusResult.rolls];
+                }
+            }
+
             // Apply Frenzy damage bonus (reckless_attack_hit_while_raging)
             const frenzyBonuses = isMeleeOrUnarmed ? playerStats.automation.actions.filter(
                 a => a.type === 'damage_bonus' && a.trigger === 'reckless_attack_hit_while_raging'

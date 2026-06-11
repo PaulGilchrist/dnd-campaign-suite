@@ -36,12 +36,24 @@ function buildAttackInfo(feature, playerStats) {
 
     switch (auto.type) {
         case 'attack_rider': {
+            let resolvedExpr = auto.damageExpression || '';
+            if (auto.scaling) {
+                const entries = Object.entries(auto.scaling)
+                    .map(([k, v]) => ({ level: parseInt(k, 10), expr: String(v) }))
+                    .filter(e => !isNaN(e.level))
+                    .sort((a, b) => a.level - b.level);
+                for (const entry of entries) {
+                    if (playerStats.level >= entry.level) {
+                        resolvedExpr = entry.expr;
+                    }
+                }
+            }
             return {
                 type: 'attack_rider',
                 name: feature.name,
                 options: auto.options || [],
                 cost: auto.cost || null,
-                damageExpression: auto.damageExpression || '',
+                damageExpression: resolvedExpr,
                 damageType: auto.damageType || '',
                 trigger: auto.trigger || '',
                 oncePerTurn: !!auto.oncePerTurn,
@@ -238,11 +250,23 @@ function buildAttackInfo(feature, playerStats) {
         }
 
         case 'damage_bonus': {
+            let resolvedExpr = auto.damageExpression || '';
+            if (auto.scaling) {
+                const entries = Object.entries(auto.scaling)
+                    .map(([k, v]) => ({ level: parseInt(k, 10), expr: String(v) }))
+                    .filter(e => !isNaN(e.level))
+                    .sort((a, b) => a.level - b.level);
+                for (const entry of entries) {
+                    if (playerStats.level >= entry.level) {
+                        resolvedExpr = entry.expr;
+                    }
+                }
+            }
             return {
                 type: 'damage_bonus',
                 name: feature.name,
                 trigger: auto.trigger || '',
-                damageExpression: auto.damageExpression || '',
+                damageExpression: resolvedExpr,
                 damageType: auto.damageType || '',
                 maxDamage: auto.maxDamage || '',
                 extraVs: auto.extraVs || null,

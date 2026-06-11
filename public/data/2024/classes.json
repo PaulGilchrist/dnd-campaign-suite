@@ -5293,14 +5293,13 @@
                         "level": 10,
                         "automation": {
                             "type": "damage_bonus",
-                            "trigger": "unarmed_or_monk_weapon_hit",
+                            "trigger": "monk_weapon_or_unarmed_hit",
                             "damageExpression": "1d6",
-                            "damageType": "elemental_attunement_type",
                             "scaling": {
                                 "11": "2d6",
                                 "17": "3d6"
                             },
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     },
                     {
