@@ -3,6 +3,7 @@ import { getClassFeatures } from '../../character/classFeatures.js';
 import { resolveTarget } from '../common/targetResolver.js';
 import { applyHealingDirectly, logHealingToSSE } from '../common/healingRoll.js';
 import { resolveHealingBonuses, hasHealingMaximization } from '../../combat/automationService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -62,7 +63,49 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 hasPhysiciansTouch,
                 },
             };
-      } else {
+      } else if (isSelf && auto.healExpression) {
+        let resolvedExpression = auto.healExpression
+            .replace(/\bfighter level\b/gi, String(playerStats.level || 1));
+
+        const maximize = hasHealingMaximization(playerStats);
+        const rollResult = maximize ? rollExpressionMaximized(resolvedExpression) : rollExpression(resolvedExpression);
+        if (!rollResult) return null;
+
+        const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);
+        const healAmount = rollResult.total + bonusHeal;
+
+        const { newHp, maxHp, actualHeal } = applyHealingDirectly(playerStats, playerStats.name, healAmount, campaignName);
+
+        logHealingToSSE(campaignName, {
+            targetName: playerStats.name,
+            sourceName: action.name,
+            actualHeal,
+            newHp,
+            maxHp,
+        });
+
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+        const maxSW = classLevel?.second_wind || 0;
+        const currentUses = Number(getRuntimeValue(playerStats.name, 'secondWindUses', campaignName) ?? maxSW);
+        if (currentUses > 0) {
+            await setRuntimeValue(playerStats.name, 'secondWindUses', currentUses - 1, campaignName, true);
+        }
+
+        const remainingUses = Math.max(0, currentUses - 1);
+        const description = remainingUses > 0
+            ? `${action.name}: Regained ${actualHeal} HP (${remainingUses} use${remainingUses > 1 ? 's' : ''} remaining).`
+            : `${action.name}: Regained ${actualHeal} HP (no uses remaining).`;
+
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description,
+                },
+            };
+       } else {
         const baseHeal = typeof auto.healAmount === 'number' ? auto.healAmount : null;
         const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);
         const totalHealAmount = baseHeal !== null ? baseHeal + bonusHeal : auto.healExpression;

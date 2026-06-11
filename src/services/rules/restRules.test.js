@@ -149,7 +149,6 @@ describe('SHORT_REST_RESOURCES', () => {
   it('contains expected resource keys', () => {
     expect(SHORT_REST_RESOURCES).toContain('channelDivinityCharges')
     expect(SHORT_REST_RESOURCES).toContain('wildShapeUses')
-    expect(SHORT_REST_RESOURCES).toContain('secondwindUses')
     expect(SHORT_REST_RESOURCES).toContain('psionicEnergy')
     expect(SHORT_REST_RESOURCES).toContain('focusPoints')
   })

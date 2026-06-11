@@ -46,7 +46,6 @@ export function computeShortRestHpNewCurrent(currentHp, maxHp, recoveredAmount) 
 export const SHORT_REST_RESOURCES = [
   'channelDivinityCharges',
   'wildShapeUses',
-  'secondwindUses',
   'psionicEnergy',
   'focusPoints',
   'superiorityDice',
@@ -101,6 +100,15 @@ export async function applyShortRest(playerStats, campaignName) {
   for (const key of getShortRestResources()) {
     updates[key] = null
    }
+
+  if (playerStats.class?.name === 'Fighter') {
+    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+    const maxSW = classLevel?.second_wind || 0;
+    const currentSW = Number(getRuntimeValue(name, 'secondWindUses', campaignName) ?? 0);
+    if (currentSW < maxSW) {
+      updates.secondWindUses = Math.min(maxSW, currentSW + 1);
+    }
+  }
 
   const hasImprovedWardingFlare = playerStats.characterAdvancement?.some(f => f.name === 'Improved Warding Flare')
   if (hasImprovedWardingFlare) {

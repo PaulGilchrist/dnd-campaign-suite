@@ -25,6 +25,11 @@ vi.mock('../../combat/automationService.js', () => ({
   hasHealingMaximization: vi.fn(),
 }));
 
+vi.mock('../../../hooks/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn(),
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './healingHandler.js';
@@ -33,6 +38,7 @@ import * as classFeatures from '../../character/classFeatures.js';
 import * as targetResolver from '../common/targetResolver.js';
 import * as healingRoll from '../common/healingRoll.js';
 import * as automationService from '../../combat/automationService.js';
+import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -215,6 +221,144 @@ describe('healingHandler.handle', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.payload.hasPhysiciansTouch).toBe(false);
+    });
+  });
+
+  describe('Self Healing with Expression (Second Wind)', () => {
+    function makeFighterStats(overrides = {}) {
+      return {
+        name: 'TestFighter',
+        level: 3,
+        proficiencyBonus: 2,
+        abilities: [],
+        characterAdvancement: [],
+        class: {
+          name: 'Fighter',
+          class_levels: [
+            { level: 1, second_wind: 2 },
+            { level: 2, second_wind: 2 },
+            { level: 3, second_wind: 2 },
+            { level: 4, second_wind: 3 },
+          ],
+        },
+        ...overrides,
+      };
+    }
+
+    it('should roll dice, apply healing, and decrement uses', async () => {
+      const ps = makeFighterStats();
+      const action = {
+        name: 'Second Wind',
+        automation: {
+          type: 'self_healing',
+          healExpression: '1d10 + fighter level',
+        },
+      };
+
+      diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [7] });
+      automationService.resolveHealingBonuses.mockReturnValue(0);
+      automationService.hasHealingMaximization.mockReturnValue(false);
+      healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 22, maxHp: 30, actualHeal: 7 });
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d10 + 3');
+      expect(healingRoll.applyHealingDirectly).toHaveBeenCalledWith(ps, ps.name, 7, campaignName);
+      expect(healingRoll.logHealingToSSE).toHaveBeenCalledWith(campaignName, {
+        targetName: ps.name,
+        sourceName: action.name,
+        actualHeal: 7,
+        newHp: 22,
+        maxHp: 30,
+      });
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(ps.name, 'secondWindUses', 1, campaignName, true);
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('Regained 7 HP');
+      expect(result.payload.description).toContain('1 use remaining');
+    });
+
+    it('should return null when roll fails', async () => {
+      const ps = makeFighterStats();
+      const action = {
+        name: 'Second Wind',
+        automation: {
+          type: 'self_healing',
+          healExpression: '1d10 + fighter level',
+        },
+      };
+
+      diceRoller.rollExpression.mockReturnValue(null);
+      automationService.hasHealingMaximization.mockReturnValue(false);
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result).toBeNull();
+    });
+
+    it('should use rollExpressionMaximized when maximization active', async () => {
+      const ps = makeFighterStats();
+      const action = {
+        name: 'Second Wind',
+        automation: {
+          type: 'self_healing',
+          healExpression: '1d10 + fighter level',
+        },
+      };
+
+      diceRoller.rollExpressionMaximized.mockReturnValue({ total: 13, rolls: [10, 3] });
+      automationService.hasHealingMaximization.mockReturnValue(true);
+      healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 28, maxHp: 30, actualHeal: 13 });
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
+
+      await handle(action, ps, campaignName, null);
+
+      expect(diceRoller.rollExpressionMaximized).toHaveBeenCalledWith('1d10 + 3');
+      expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+    });
+
+    it('should show no uses remaining when last use consumed', async () => {
+      const ps = makeFighterStats();
+      const action = {
+        name: 'Second Wind',
+        automation: {
+          type: 'self_healing',
+          healExpression: '1d10',
+        },
+      };
+
+      diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5] });
+      automationService.resolveHealingBonuses.mockReturnValue(0);
+      automationService.hasHealingMaximization.mockReturnValue(false);
+      healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 20, maxHp: 30, actualHeal: 5 });
+      useRuntimeState.getRuntimeValue.mockReturnValue(1);
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(ps.name, 'secondWindUses', 0, campaignName, true);
+      expect(result.payload.description).toContain('no uses remaining');
+    });
+
+    it('should include bonus healing in total', async () => {
+      const ps = makeFighterStats();
+      const action = {
+        name: 'Second Wind',
+        automation: {
+          type: 'self_healing',
+          healExpression: '1d10 + fighter level',
+        },
+      };
+
+      diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [7] });
+      automationService.resolveHealingBonuses.mockReturnValue(3);
+      automationService.hasHealingMaximization.mockReturnValue(false);
+      healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 25, maxHp: 30, actualHeal: 10 });
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
+
+      await handle(action, ps, campaignName, null);
+
+      expect(healingRoll.applyHealingDirectly).toHaveBeenCalledWith(ps, ps.name, 10, campaignName);
     });
   });
 
