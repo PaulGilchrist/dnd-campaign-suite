@@ -52,7 +52,12 @@
                         "name": "Unarmored Defense",
                         "description": "While you aren't wearing any armor, your base Armor Class equals 10 plus your Dexterity and Constitution modifiers.",
                         "level": 1,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "unarmored_defense_ac",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Weapon Mastery",

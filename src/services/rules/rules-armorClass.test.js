@@ -285,7 +285,7 @@ describe('rules', () => {
       expect(ac).toBe(12);
     });
 
-    it('should not apply Barbarian unarmored defense in 2024 mode', () => {
+    it('should apply Barbarian unarmored defense in 2024 mode', () => {
       const playerStats = {
         rules: '2024',
         class: { name: 'Barbarian' },
@@ -296,7 +296,7 @@ describe('rules', () => {
         inventory: { equipped: [] }
       };
       const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
-      expect(ac).toBe(12); // 10 + 2, no Con bonus
+      expect(ac).toBe(15); // 10 + 2 + 3
     });
 
     it('should not apply Draconic Sorcerer unarmored defense in 2024 mode', () => {
