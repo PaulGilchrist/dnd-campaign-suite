@@ -1,20 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { computeFeatRangeEffects } from './featRangeService.js'
 import * as dataLoader from '../ui/dataLoader.js'
 
 beforeEach(() => {
   vi.clearAllMocks()
 })
-
-function mockFetch(data) {
-  const headers = new Map()
-  headers.set('content-type', 'application/json')
-  global.fetch = vi.fn().mockResolvedValue({
-    ok: true,
-    headers,
-    json: async () => data,
-  })
-}
 
 vi.mock('../ui/dataLoader.js', () => ({
   loadFeatData: vi.fn(),
