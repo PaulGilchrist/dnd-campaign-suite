@@ -46,13 +46,14 @@ export const WIZARD_STEPS = [
     step: 3,
     title: 'Race & Class',
     component: WizardStepRaceClass,
-    getProps: ({ formData, errors, racesData, classSubtypes, ruleset, onInputChange }) => ({
+    getProps: ({ formData, errors, racesData, classSubtypes, ruleset, onInputChange, allClasses }) => ({
       formData,
       errors,
       racesData,
       classSubtypes,
       ruleset,
       onInputChange,
+      allClasses,
     }),
   },
   {

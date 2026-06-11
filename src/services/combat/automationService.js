@@ -868,6 +868,14 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'divine_order': {
+            return {
+                type: 'divine_order',
+                name: feature.name,
+                hasAutomation: true
+            }
+        }
+
         default:
             return null
     }
@@ -1042,6 +1050,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'post_cast_self_heal':
             case 'multi_target_spread':
             case 'jack_of_all_trades':
+            case 'divine_order':
                 result.passives.push(info)
                 if (info.type === 'passive_rule' && info.effect === 'primal_knowledge' && info.primalKnowledge.length > 0) {
                     result.primalKnowledge.push(...info.primalKnowledge)

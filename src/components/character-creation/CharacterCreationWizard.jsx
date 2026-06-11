@@ -27,6 +27,7 @@ const WizardStepRenderer = React.memo(({
   backgrounds,
   racesData,
   classSubtypes,
+  allClasses,
   feats,
   magicItems,
   allSpells,
@@ -76,6 +77,7 @@ const WizardStepRenderer = React.memo(({
     backgrounds,
     racesData,
     classSubtypes,
+    allClasses,
     feats,
     magicItems,
     allSpells,
@@ -117,7 +119,7 @@ const WizardStepRenderer = React.memo(({
 });
 WizardStepRenderer.displayName = 'WizardStepRenderer';
 
-function CharacterCreationWizard({ onComplete, onCancel, allSpells, characterData, isEditing = false }) {
+function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, characterData, isEditing = false }) {
   // Core form state
   const {
     formData,
@@ -301,6 +303,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, characterDat
         backgrounds={backgrounds}
         racesData={racesData}
         classSubtypes={classSubtypes}
+        allClasses={allClasses}
         feats={feats}
         magicItems={magicItems}
         allSpells={allSpells}
@@ -347,6 +350,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, characterDat
     backgrounds,
     racesData,
     classSubtypes,
+    allClasses,
     feats,
     magicItems,
     allSpells,

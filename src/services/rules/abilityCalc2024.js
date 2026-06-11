@@ -22,6 +22,20 @@ export async function getAbilities(playerStats) {
               }
             return newSkill;
            });
+
+        // Divine Order: Thaumaturge grants WIS mod (min +1) bonus to Arcana and Religion checks
+        if (playerStats.class?.divineOrder === 'Thaumaturge' && playerStats.class?.name === 'Cleric') {
+            const wisAbility = playerStats.abilities.find(a => a.name === 'Wisdom');
+            const wisMod = wisAbility?.bonus || 0;
+            const divineBonus = Math.max(1, wisMod);
+            newAbility.skills = newAbility.skills.map((skill) => {
+                if (skill.name === 'Arcana' || skill.name === 'Religion') {
+                    return { ...skill, bonus: skill.bonus + divineBonus };
+                }
+                return skill;
+            });
+        }
+
         return newAbility;
        });
 }

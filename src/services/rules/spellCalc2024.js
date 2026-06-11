@@ -22,6 +22,12 @@ export function getSpellAbilities(allSpells, playerStats) {
         }
     }
 
+    // Divine Order: Thaumaturge grants one extra cantrip
+    if (playerStats.class?.divineOrder === 'Thaumaturge' && playerStats.class?.name === 'Cleric') {
+        spellAbilities = spellAbilities || {};
+        spellAbilities.cantrips_known = (spellAbilities.cantrips_known || 0) + 1;
+    }
+
     if (spellAbilities) {
         if (playerStats.spells) {
             spellAbilities.spells = playerStats.spells.map(spell => { return { name: spell, prepared: '' } });

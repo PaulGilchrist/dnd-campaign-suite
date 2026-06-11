@@ -7,8 +7,13 @@ function WizardStepRaceClass({
   racesData, 
   classSubtypes,
   ruleset,
-  onInputChange 
+  onInputChange
 }) {
+  const selectedClass = formData.class?.name || '';
+  const isCleric2024 = ruleset === '2024' && selectedClass === 'Cleric';
+
+  const divineOrderOptions = isCleric2024 ? ['Protector', 'Thaumaturge'] : [];
+
   return (
     <div className="wizard-step">
       <h2>Step 3: Race & Class</h2>
@@ -51,6 +56,23 @@ function WizardStepRaceClass({
         errors={errors}
         childExtraFields={{ type: '' }}
       />
+
+      {isCleric2024 && (
+        <div className="form-group">
+          <label>Divine Order *</label>
+          <select
+            value={formData.class?.divineOrder || ''}
+            onChange={(e) => onInputChange('class', { ...formData.class, divineOrder: e.target.value })}
+            className={errors['divineOrder'] ? 'error' : ''}
+          >
+            <option value="">Select a Divine Order</option>
+            {divineOrderOptions.map(option => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+          {errors['divineOrder'] && <span className="error-message">{errors['divineOrder']}</span>}
+        </div>
+      )}
       
     </div>
   );

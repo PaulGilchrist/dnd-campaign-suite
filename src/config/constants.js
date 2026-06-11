@@ -27,6 +27,7 @@ export const DEFAULT_FORM_DATA = {
     class: {
         name: 'Fighter',
         subclass: { name: '' },
+        divineOrder: '',
       },
     expertSkills: [],
     feats: [],

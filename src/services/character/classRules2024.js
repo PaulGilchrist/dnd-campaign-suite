@@ -85,19 +85,24 @@ const classRules = {
                }
            }
 
-           // Parse skill proficiencies
-             // If it starts with "Choose", the player has already selected their skills in character JSON
-             // Otherwise, parse the skill list into "Skill: Name" format
-        if (characterClass.skill_proficiencies || characterClass.skill_proficiencies_choices) {
-            const skillString = characterClass.skill_proficiencies || characterClass.skill_proficiencies_choices;
-            if (!skillString.startsWith('Choose')) {
-                     // Parse skills like "History, Insight, Medicine, Persuasion, or Religion"
-                const skills = skillString.split(',').map(skill => skill.trim().replace(' or ', ''));
-                characterClass.proficiencies = [...characterClass.proficiencies, ...skills.map(skill => `Skill: ${skill}`)];
-               }
-           }
+            // Parse skill proficiencies
+              // If it starts with "Choose", the player has already selected their skills in character JSON
+              // Otherwise, parse the skill list into "Skill: Name" format
+         if (characterClass.skill_proficiencies || characterClass.skill_proficiencies_choices) {
+             const skillString = characterClass.skill_proficiencies || characterClass.skill_proficiencies_choices;
+             if (!skillString.startsWith('Choose')) {
+                      // Parse skills like "History, Insight, Medicine, Persuasion, or Religion"
+                 const skills = skillString.split(',').map(skill => skill.trim().replace(' or ', ''));
+                 characterClass.proficiencies = [...characterClass.proficiencies, ...skills.map(skill => `Skill: ${skill}`)];
+                }
+            }
 
-        return characterClass;
+            // Divine Order: Protector grants Martial weapons and Heavy armor
+            if (playerSummary.class?.divineOrder === 'Protector' && characterClass.name === 'Cleric') {
+                characterClass.proficiencies = [...characterClass.proficiencies, 'Martial Weapons', 'Heavy Armor'];
+            }
+
+            return characterClass;
        },
     getDruidMaxWildShapeChallengeRating(playerStats) {
              // 2024 Rules: Use beast_max_cr from class_levels
