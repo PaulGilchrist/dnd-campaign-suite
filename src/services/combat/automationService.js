@@ -288,6 +288,7 @@ function buildAttackInfo(feature, playerStats) {
                 name: feature.name,
                 uses: auto.uses || 1,
                 recharge: auto.recharge || 'short_rest',
+                oncePerTurn: !!auto.oncePerTurn,
                 resourceKey: feature.name.toLowerCase().replace(/\s+/g, '') + 'Uses',
                 hasAutomation: true
             }

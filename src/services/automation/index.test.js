@@ -33,6 +33,7 @@ vi.mock('./handlers/bardicInspirationOffenseHandler.js', () => ({ handle: vi.fn(
 vi.mock('./handlers/divineSparkHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/divineInterventionHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/bonusActionAttackHandler.js', () => ({ handle: vi.fn() }));
+vi.mock('./handlers/extraActionHandler.js', () => ({ handle: vi.fn() }));
 
 // ── Imports ────────────────────────────────────────────────────
 
@@ -68,6 +69,7 @@ import * as bardicInspirationOffenseHandler from './handlers/bardicInspirationOf
 import * as divineSparkHandler from './handlers/divineSparkHandler.js';
 import * as divineInterventionHandler from './handlers/divineInterventionHandler.js';
 import * as bonusActionAttackHandler from './handlers/bonusActionAttackHandler.js';
+import * as extraActionHandler from './handlers/extraActionHandler.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -537,13 +539,13 @@ describe('executeHandler', () => {
       expect(result).toEqual({ result: 'bonus' });
     });
 
-    it('extra_action maps to genericPopup handler', async () => {
+    it('extra_action maps to extraAction handler', async () => {
       const action = makeAction({ type: 'extra_action' });
-      genericPopupHandler.handle.mockResolvedValue({ result: 'extra' });
+      extraActionHandler.handle.mockResolvedValue({ result: 'extra' });
 
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
-      expect(genericPopupHandler.handle).toHaveBeenCalled();
+      expect(extraActionHandler.handle).toHaveBeenCalled();
       expect(result).toEqual({ result: 'extra' });
     });
 

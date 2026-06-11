@@ -3746,6 +3746,7 @@
                             "type": "extra_action",
                             "uses": 1,
                             "recharge": "short_rest",
+                            "oncePerTurn": true,
                             "casting_time": "1 action"
                         }
                     },
@@ -4211,13 +4212,14 @@
                 "features": [
                     {
                         "name": "Action Surge",
-                        "description": "Starting at level 17, you can use Action Surge twice before a Long Rest.",
+                        "description": "Starting at level 17, you can use Action Surge twice before a Long Rest but only once on a turn.",
                         "level": 17,
                         "type": "class_feature",
                         "automation": {
                             "type": "extra_action",
-                            "uses": 1,
+                            "uses": 2,
                             "recharge": "short_rest",
+                            "oncePerTurn": true,
                             "casting_time": "1 action"
                         }
                     },

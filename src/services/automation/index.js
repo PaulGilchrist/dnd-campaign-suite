@@ -29,6 +29,7 @@ import { handle as handleBardicInspirationOffense } from './handlers/bardicInspi
 import { handle as handleDivineSpark } from './handlers/divineSparkHandler.js';
 import { handle as handleDivineIntervention } from './handlers/divineInterventionHandler.js';
 import { handle as handleBonusActionAttack } from './handlers/bonusActionAttackHandler.js';
+import { handle as handleExtraAction } from './handlers/extraActionHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -49,7 +50,7 @@ const HANDLER_MAP = {
     divine_intervention: handleDivineIntervention,
     font_of_magic: handleFontOfMagic,
     healing_pool: handleHealingPool,
-    extra_action: handleGenericPopup,
+    extra_action: handleExtraAction,
     combat_stance: handleCombatStance,
     damage_aura: handleGenericPopup,
     attack_rider: handleAttackRider,
