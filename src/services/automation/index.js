@@ -30,6 +30,7 @@ import { handle as handleDivineSpark } from './handlers/divineSparkHandler.js';
 import { handle as handleDivineIntervention } from './handlers/divineInterventionHandler.js';
 import { handle as handleBonusActionAttack } from './handlers/bonusActionAttackHandler.js';
 import { handle as handleExtraAction } from './handlers/extraActionHandler.js';
+import { handle as handleDamageReduction } from './handlers/damageReductionHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -63,6 +64,7 @@ const HANDLER_MAP = {
     auto_reroll: handleAutoReroll,
     reaction_damage: handleReactionDamage,
     reaction_debuff: handleReactionDebuff,
+    damage_reduction: handleDamageReduction,
     mastery_rider: handleWeaponMastery,
     revivification: handleRevivification,
      bardic_inspiration: handleBardicInspiration,
