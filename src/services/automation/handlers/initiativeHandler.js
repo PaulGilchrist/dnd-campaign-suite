@@ -114,6 +114,38 @@ export async function handle(action, playerStats, campaignName, _mapName) {
           };
      }
 
+    if (auto.effect === 'regain_bardic_inspiration_on_initiative') {
+        const minTarget = auto.minTarget || 2;
+        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+        const maxBI = classLevel?.bardic_inspiration_uses ?? playerStats?.proficiency ?? 0;
+        const currentBI = Number(getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName) ?? maxBI);
+
+        if (currentBI >= minTarget) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: `${action.name}: You already have ${currentBI} Bardic Inspiration use(s). No need to regain.`,
+                },
+            };
+        }
+
+        const newBI = Math.min(maxBI, minTarget);
+        await setRuntimeValue(playerStats.name, 'bardicInspirationUses', newBI, campaignName);
+
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name}: Regained Bardic Inspiration uses. Now have ${newBI}/${maxBI}.`,
+            },
+        };
+    }
+
     if (auto.effect !== 'regain_focus_points_and_heal') {
         return {
             type: 'popup',

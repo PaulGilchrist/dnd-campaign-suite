@@ -1375,7 +1375,15 @@
                         "name": "Superior Inspiration",
                         "description": "When you roll Initiative, you regain expended uses of Bardic Inspiration until you have two if you have fewer than that.",
                         "level": 18,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "initiative_action",
+                            "effect": "regain_bardic_inspiration_on_initiative",
+                            "minTarget": 2,
+                            "resourceCost": "bardic_inspiration",
+                            "trigger": "roll_initiative",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spellcasting": {

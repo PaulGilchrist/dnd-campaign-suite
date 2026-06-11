@@ -1358,7 +1358,15 @@
                         "name": "Superior Inspiration",
                         "level": 20,
                         "prerequisites": [],
-                        "description": "When you roll initiative and have no uses of Bardic Inspiration left, you regain one use."
+                        "description": "When you roll initiative and have no uses of Bardic Inspiration left, you regain one use.",
+                        "automation": {
+                            "type": "initiative_action",
+                            "effect": "regain_bardic_inspiration_on_initiative",
+                            "minTarget": 1,
+                            "resourceCost": "bardic_inspiration",
+                            "trigger": "roll_initiative",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spellcasting": {
