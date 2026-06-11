@@ -227,7 +227,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       const effectiveAc = target ? targetAc + coverAcBonus : undefined;
       let hit = isAutoMiss ? false : (target ? (r1 + bonus >= effectiveAc) : undefined);
       const targetName = target?.name || context?.targetName;
-      const attackerName = context.attackerName || characterName;
+      const attackerName = context?.attackerName || characterName;
 
       if (hit && target) {
           const majActive = isUnbreakableMajestyActive(target.name, campaignName);

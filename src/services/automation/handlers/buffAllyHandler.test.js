@@ -140,7 +140,7 @@ describe('buffAllyHandler.handle', () => {
       expect(buffToggle.toggleBuff).toHaveBeenCalledWith(
         'Fighter',
         'Tactical Warning',
-        { type: 'buff_ally', effect: 'effect_value', buffExpression: 'custom_expression', effect: 'custom_expression' },
+        { type: 'buff_ally', effect: 'custom_expression', buffExpression: 'custom_expression' },
         campaignName,
       );
     });

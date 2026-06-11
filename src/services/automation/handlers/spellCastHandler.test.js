@@ -437,7 +437,7 @@ describe('spellCastHandler.handle', () => {
       global.fetch = vi.fn().mockResolvedValue(mockResponse);
       diceRoller.rollExpression.mockReturnValue({ total: 8, rolls: [8], modifier: 0 });
 
-      const result = await handle(action, ps, campaignName, null);
+      await handle(action, ps, campaignName, null);
 
       expect(global.fetch).toHaveBeenCalledWith('/data/spells.json');
     });

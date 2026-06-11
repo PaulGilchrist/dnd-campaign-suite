@@ -40,7 +40,6 @@ vi.mock('../common/targetResolver.js', () => ({
 }));
 
 describe('autoRerollHandler.handle', () => {
-    let action;
     let playerStats;
     const campaignName = 'TestCampaign';
     const mapName = 'TestMap';

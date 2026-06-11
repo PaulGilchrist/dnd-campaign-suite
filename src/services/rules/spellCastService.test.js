@@ -307,14 +307,33 @@ describe('executeSpellCast', () => {
      });
 
     it('uses undefined targetName when getTargetInfo resolves to null', async () => {
-       const options = dcOptions();
-       options.getTargetInfo.mockResolvedValue(null);
-       rollExpression.mockReturnValue({ total: 12, rolls: [6, 6], modifier: 0 });
-       await executeSpellCast(makeSpellWithDc(), {}, options);
-       const ctx = options.rollDamage.mock.calls[0][5];
-       expect(ctx.targetName).toBeUndefined();
-     });
-   });
+        const options = dcOptions();
+        options.getTargetInfo.mockResolvedValue(null);
+        rollExpression.mockReturnValue({ total: 12, rolls: [6, 6], modifier: 0 });
+        await executeSpellCast(makeSpellWithDc(), {}, options);
+        const ctx = options.rollDamage.mock.calls[0][5];
+        expect(ctx.targetName).toBeUndefined();
+      });
+
+    it('adds +1 to saveDc when innateSorceryActive is true (DC path)', async () => {
+        buffService.isInnateSorceryActive.mockReturnValue(true);
+        const options = dcOptions();
+        rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
+        await executeSpellCast(makeSpellWithDc(), {}, options);
+        const ctx = options.rollDamage.mock.calls[0][5];
+        // base saveDc is 13, +1 for innate sorcery = 14
+        expect(ctx.saveDc).toBe(14);
+      });
+
+    it('keeps saveDc unchanged when innateSorceryActive is false (DC path)', async () => {
+        buffService.isInnateSorceryActive.mockReturnValue(false);
+        const options = dcOptions();
+        rollExpression.mockReturnValue({ total: 10, rolls: [10], modifier: 0 });
+        await executeSpellCast(makeSpellWithDc(), {}, options);
+        const ctx = options.rollDamage.mock.calls[0][5];
+        expect(ctx.saveDc).toBe(13);
+      });
+    });
 
    // ── Range validation integration ─────────────────────────────
 
