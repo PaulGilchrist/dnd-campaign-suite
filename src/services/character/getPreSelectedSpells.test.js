@@ -412,4 +412,52 @@ describe('getPreSelectedSpells', () => {
       expect(loadRaceData).toHaveBeenCalledWith('2024');
     });
   });
+
+  describe('Druidic feature (2024)', () => {
+    it('adds Speak with Animals for Druid in 2024 ruleset', async () => {
+      const formData = {
+        rules: '2024',
+        level: 1,
+        class: { name: 'Druid' },
+      };
+      const result = await getPreSelectedSpells(formData);
+      expect(result).toContain('Speak with Animals');
+    });
+
+    it('does not add Speak with Animals for Druid in 5e ruleset', async () => {
+      const formData = {
+        rules: '5e',
+        level: 1,
+        class: { name: 'Druid' },
+      };
+      const result = await getPreSelectedSpells(formData);
+      expect(result).not.toContain('Speak with Animals');
+    });
+
+    it('adds Speak with Animals regardless of subclass', async () => {
+      const mockClassesWithDruid = [
+        ...mockClasses,
+        { name: 'Druid', index: 'druid', subclasses: [{ name: 'Circle of the Land' }] },
+      ];
+      vi.mocked(loadClassData).mockResolvedValue(mockClassesWithDruid);
+
+      const formData = {
+        rules: '2024',
+        level: 1,
+        class: { name: 'Druid', subclass: { name: 'Circle of the Land' } },
+      };
+      const result = await getPreSelectedSpells(formData);
+      expect(result).toContain('Speak with Animals');
+    });
+
+    it('adds Speak with Animals even without subclass', async () => {
+      const formData = {
+        rules: '2024',
+        level: 1,
+        class: { name: 'Druid' },
+      };
+      const result = await getPreSelectedSpells(formData);
+      expect(result).toContain('Speak with Animals');
+    });
+  });
 });

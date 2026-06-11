@@ -233,6 +233,10 @@ export async function getPreSelectedSpells(formData) {
       const subclassSpells = getSubclassSpells(classData, subclassName, charLevel);
       classSpells.push(...subclassSpells);
     }
+
+    if (className === 'Druid' && version === '2024') {
+      classSpells.push('Speak with Animals');
+    }
   }
 
   if (raceName) {
