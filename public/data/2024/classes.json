@@ -3959,9 +3959,10 @@
                         "automation": {
                             "type": "auto_reroll",
                             "trigger": "failed_saving_throw",
+                            "target": "saving_throw",
                             "bonusExpression": "fighter_level",
                             "recharge": "long_rest",
-                            "casting_time": "1 action"
+                            "casting_time": "passive"
                         }
                     },
                     {
@@ -4088,7 +4089,15 @@
                         "name": "Indomitable",
                         "description": "If you fail a saving throw, you can reroll it with a bonus equal to your Fighter level.",
                         "level": 13,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "auto_reroll",
+                            "trigger": "failed_saving_throw",
+                            "target": "saving_throw",
+                            "bonusExpression": "fighter_level",
+                            "recharge": "long_rest",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Studied Attacks",
@@ -4227,7 +4236,15 @@
                         "name": "Indomitable",
                         "description": "If you fail a saving throw, you can reroll it with a bonus equal to your Fighter level.",
                         "level": 17,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "auto_reroll",
+                            "trigger": "failed_saving_throw",
+                            "target": "saving_throw",
+                            "bonusExpression": "fighter_level",
+                            "recharge": "long_rest",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "energy": {

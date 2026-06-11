@@ -190,6 +190,12 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             conditionEffects.autoReroll = false;
             conditionEffects.autoRerollBonus = null;
         }
+        const indomitableUses = Number(getRuntimeValue(playerStats.name, 'indomitableUses', campaignName) ?? 0);
+        const indomitableMax = playerStats.level >= 17 ? 3 : playerStats.level >= 13 ? 2 : 1;
+        if (indomitableUses >= indomitableMax && conditionEffects.autoReroll) {
+            conditionEffects.autoReroll = false;
+            conditionEffects.autoRerollBonus = null;
+        }
     }
     // Reckless Attack: enemies have Advantage on attack rolls against you
     if (Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_attacks_disadvantage_against')) {
@@ -215,9 +221,14 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
     const handleReroll = React.useCallback(() => {
         if (playerStats) {
-            setRuntimeValue(playerStats.name, 'fanaticalFocusUsed', true, campaignName);
+            if (conditionEffects.autoRerollCondition === 'raging') {
+                setRuntimeValue(playerStats.name, 'fanaticalFocusUsed', true, campaignName);
+            } else {
+                const current = Number(getRuntimeValue(playerStats.name, 'indomitableUses', campaignName) ?? 0);
+                setRuntimeValue(playerStats.name, 'indomitableUses', current + 1, campaignName);
+            }
         }
-    }, [playerStats, campaignName]);
+    }, [playerStats, campaignName, conditionEffects.autoRerollCondition]);
 
     React.useEffect(() => {
         if (!playerStats) return;
