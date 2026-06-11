@@ -5176,14 +5176,8 @@
                         "description": "Your Shadow Step generates a burst of shadows. Teleporting with your Shadow Step leaves behind a cloud of shadows in the space you left. Creatures in that space have Disadvantage on Wisdom (Perception) checks and must make a Wisdom saving throw or have the Blinded condition until the start of your next turn.",
                         "level": 10,
                         "automation": {
-                            "type": "temp_buff",
-                            "effect": "shadow_step_area_debuff",
-                            "conditions_inflicted": [
-                                "Blinded",
-                                "disadvantage_perception"
-                            ],
-                            "saveType": "WIS",
-                            "casting_time": "1 bonus action"
+                            "type": "shadow_step_rider",
+                            "casting_time": "passive"
                         }
                     },
                     {

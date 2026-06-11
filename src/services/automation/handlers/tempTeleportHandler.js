@@ -1,4 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { buildSaveDc, createSaveListener } from '../common/savePrompt.js';
+import { resolveTarget } from '../common/targetResolver.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     return {
@@ -40,6 +42,43 @@ export async function confirmTeleport(action, playerStats, campaignName, useExte
             duration: 'until_end_of_turn',
         };
         setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, newEffect], campaignName);
+
+        const allFeatures = playerStats.allFeatures || [];
+        const improvedStep = allFeatures.find(f => f.name === 'Improved Shadow Step');
+        if (improvedStep) {
+            const targetInfo = await resolveTarget(campaignName, playerStats.name);
+            const targetName = targetInfo?.target?.name || 'Unknown';
+
+            const currentEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+            const perceptionEffect = {
+                target: targetName,
+                source: 'Improved Shadow Step',
+                effect: 'disadvantage_perception_checks',
+                value: null,
+                duration: 'until_start_of_next_turn',
+            };
+            setRuntimeValue(campaignName, 'targetEffects', [...currentEffects, perceptionEffect], campaignName);
+
+            const saveDc = buildSaveDc({ saveDc: 'ability', saveAbility: 'WIS' }, playerStats);
+            const { promptId } = createSaveListener(campaignName, {
+                targetName,
+                saveType: 'WIS',
+                saveDc,
+            });
+
+            const handleSaveResult = (event) => {
+                if (event.detail.promptId !== promptId) return;
+                if (!event.detail.success) {
+                    const storedConds = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+                    const newConds = Array.isArray(storedConds) ? [...storedConds, 'blinded'] : ['blinded'];
+                    setRuntimeValue(targetName, 'activeConditions', newConds, campaignName);
+                }
+                window.removeEventListener('save-result', handleSaveResult);
+            };
+            window.addEventListener('save-result', handleSaveResult);
+
+            description += ` Improved Shadow Step: ${targetName} has perception disadvantage and must make a WIS save (DC ${saveDc}) or be Blinded.`;
+        }
     }
 
     return {
