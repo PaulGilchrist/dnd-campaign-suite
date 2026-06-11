@@ -593,6 +593,20 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'reaction_save_heal': {
+            return {
+                type: 'reaction_save_heal',
+                name: feature.name,
+                saveType: auto.saveType || 'CON',
+                saveDc: auto.saveDc || 10,
+                dcScaling: auto.dcScaling || 0,
+                healExpression: auto.healExpression || '',
+                recharge: auto.recharge || 'short_or_long_rest',
+                casting_time: auto.casting_time || '1 reaction',
+                hasAutomation: true
+            }
+        }
+
         case 'resistance': {
             return {
                 type: 'resistance',
@@ -951,6 +965,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'damage_reduction':
             case 'reaction_debuff':
             case 'bardic_inspiration_defense':
+            case 'reaction_save_heal':
                 result.reactions.push(info)
                 break
             case 'auto_reroll':
