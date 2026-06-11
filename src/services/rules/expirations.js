@@ -126,6 +126,32 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 break;
             }
 
+            case 'ice_walk': {
+                const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                if (Array.isArray(buffs)) {
+                    setRuntimeValue(
+                        targetName,
+                        'activeBuffs',
+                        buffs.filter(b => b.effect !== 'ice_walk'),
+                        campaignName
+                    );
+                }
+                break;
+            }
+
+            case 'speed_boost': {
+                const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                if (Array.isArray(buffs)) {
+                    setRuntimeValue(
+                        targetName,
+                        'activeBuffs',
+                        buffs.filter(b => b.effect !== 'speed_boost'),
+                        campaignName
+                    );
+                }
+                break;
+            }
+
             case 'remove_active_buff': {
                 const allBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
                 if (Array.isArray(allBuffs)) {

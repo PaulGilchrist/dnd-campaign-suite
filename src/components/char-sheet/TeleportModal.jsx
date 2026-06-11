@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { confirmTeleport, isExtendedAvailable } from '../../services/automation/handlers/tempTeleportHandler.js';
 import './CharSheet.css';
 
-function TeleportModal({ action, playerStats, campaignName, onClose }) {
+function TeleportModal({ action, playerStats, campaignName, onClose, triggeredByElementalStride }) {
     const auto = action.automation;
     const isSwap = auto?.effect === 'teleport_swap_with_illusion';
     const extendedAvailable = isExtendedAvailable(playerStats.name, campaignName);
@@ -10,7 +10,27 @@ function TeleportModal({ action, playerStats, campaignName, onClose }) {
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
 
+    const elementalOption = triggeredByElementalStride
+        ? (auto?.options || []).find(o => o.effect === 'teleport')
+        : null;
+    const elementalDistance = elementalOption?.teleportDistance || '30 ft';
+
     const handleConfirm = async () => {
+        if (triggeredByElementalStride) {
+            const description = `${action.name}: Teleported ${elementalDistance} to an unoccupied space you can see.`;
+            setResult({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description,
+                    automation: auto,
+                },
+            });
+            setApplied(true);
+            return;
+        }
         const res = await confirmTeleport(action, playerStats, campaignName, useExtended);
         setResult(res);
         setApplied(true);
@@ -21,12 +41,33 @@ function TeleportModal({ action, playerStats, campaignName, onClose }) {
             <div className="sp-overlay" onClick={onClose}>
                 <div className="sp-modal" onClick={e => e.stopPropagation()}>
                     <div className="sp-header">
-                        <i className={`fa-solid ${isSwap ? 'fa-arrows-rotate' : 'fa-tree'}`}></i> {action.name}
+                        <i className={`fa-solid ${isSwap ? 'fa-arrows-rotate' : triggeredByElementalStride ? 'fa-wind' : 'fa-tree'}`}></i> {action.name}
                     </div>
                     <div className="sp-body" dangerouslySetInnerHTML={{ __html: result.payload.description }}>
                     </div>
                     <div className="sp-actions">
                         <button className="sp-roll-btn" onClick={onClose}>Done</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (triggeredByElementalStride) {
+        return (
+            <div className="sp-overlay" onClick={onClose}>
+                <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                    <div className="sp-header">
+                        <i className="fa-solid fa-wind"></i> {action.name} — Thunder
+                    </div>
+                    <div className="sp-body">
+                        <p>Teleport up to {elementalDistance} to an unoccupied space you can see.</p>
+                    </div>
+                    <div className="sp-actions">
+                        <button className="sp-roll-btn" onClick={handleConfirm}>
+                            <i className="fa-solid fa-wind"></i> Teleport
+                        </button>
+                        <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
                     </div>
                 </div>
             </div>

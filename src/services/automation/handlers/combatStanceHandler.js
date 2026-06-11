@@ -180,6 +180,19 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         buff.flySpeed = auto.flySpeed;
     }
 
+    if (chosenOption && chosenOption.effect === 'ice_walk') {
+        buff.effect = 'ice_walk';
+    } else if (chosenOption && chosenOption.effect === 'speed_boost') {
+        buff.effect = 'speed_boost';
+        buff.speedBonus = chosenOption.speedBonus || 10;
+    } else if (chosenOption && chosenOption.effect === 'fly_speed') {
+        buff.effect = 'fly_speed_equals_walk_speed';
+        buff.flySpeed = 'equals_walk_speed';
+    } else if (chosenOption && chosenOption.effect === 'teleport') {
+        buff.effect = 'teleport_ready';
+        buff.teleportDistance = chosenOption.teleportDistance || '30 ft';
+    }
+
     if (auto.reactionSave) {
         buff.reactionSave = auto.reactionSave;
     }
@@ -228,6 +241,14 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
         }
     }
 
+    if (chosenOption && chosenOption.effect === 'teleport') {
+        return {
+            type: 'modal',
+            modalName: 'teleport',
+            payload: { action, playerStats, campaignName, triggeredByElementalStride: true },
+        };
+    }
+
     let description = maxUses > 0
         ? `${action.name} activated (${usesUsed + 1}/${maxUses} uses remaining)`
         : `${action.name} activated`;
@@ -248,6 +269,14 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
             optionEffects.push('While raging, enemies within 5 feet of you have Disadvantage on attack rolls against targets other than you or another Barbarian with this option active.');
         } else if (chosenOption.name === 'Ram') {
             optionEffects.push('While raging, you can cause a Large or smaller creature to have the Prone condition when you hit it with a melee attack.');
+        } else if (chosenOption.name === 'Cold') {
+            optionEffects.push('Ice Walk: You can walk across and climb icy or wet surfaces without needing to make an Ability Check. You ignore difficult terrain that is composed of ice or snow.');
+        } else if (chosenOption.name === 'Fire') {
+            optionEffects.push(`Speed Boost: Your Speed increases by ${chosenOption.speedBonus || 10} feet.`);
+        } else if (chosenOption.name === 'Lightning') {
+            optionEffects.push('Fly Speed: You gain a Fly Speed equal to your Speed for 1 round.');
+        } else if (chosenOption.name === 'Thunder') {
+            optionEffects.push(`Teleport: You can teleport up to ${chosenOption.teleportDistance || '30 ft'} to an unoccupied space you can see.`);
         }
         if (chosenOption.name === 'Falcon' && chosenOption.flySpeed && chosenOption.noArmor && isWearingArmor(playerStats)) {
             optionEffects.push('Blocked because you are wearing armor.');

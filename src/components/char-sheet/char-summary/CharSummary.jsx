@@ -113,9 +113,20 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const allResistances = [...new Set([...baseResistances, ...auraResistances])];
 
     let flySpeed = null;
+    let swimSpeed = null;
+    let buffSpeedBonus = 0;
+    let iceWalkActive = false;
     activeBuffs.forEach(buff => {
         if (buff.effect === 'fly_speed_equals_walk_speed' || buff.flySpeed) flySpeed = speed;
+        if (buff.effect === 'speed_boost' && buff.speedBonus) buffSpeedBonus += buff.speedBonus;
+        if (buff.effect === 'ice_walk') iceWalkActive = true;
     });
+    const elementalMovementPassive = (playerStats.passives || []).find(p => p.effect === 'elemental_attunement_movement');
+    if (elementalMovementPassive) {
+        flySpeed = speed;
+        swimSpeed = speed;
+    }
+    const totalSpeedWithBuff = totalSpeed + buffSpeedBonus;
 
     const exhaustionPenalty = 2 * exhaustionLevel;
     const effectiveInitiative = playerStats.initiative - exhaustionPenalty;
@@ -176,7 +187,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 <div>
                     <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{playerStats.armorClass}</div>
                     <CharHitPoints playerStats={playerStats} campaignName={campaignName}></CharHitPoints>
-                      <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeed}{playerStats.climbSpeed ? `, climb ${playerStats.climbSpeed}` : ''}{playerStats.swimSpeed ? `, swim ${playerStats.swimSpeed}` : ''}{flySpeed !== null ? `, fly ${flySpeed + auraSpeedBonus}` : ''}</span> ft.{auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}<br />
+                      <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeedWithBuff}{playerStats.climbSpeed ? `, climb ${playerStats.climbSpeed}` : ''}{playerStats.swimSpeed ? `, swim ${playerStats.swimSpeed}` : ''}{swimSpeed !== null ? `, swim ${swimSpeed}` : ''}{flySpeed !== null ? `, fly ${flySpeed + auraSpeedBonus}` : ''}{iceWalkActive ? ', ice walk' : ''}</span> ft.{auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}<br />
                     <CharGold playerStats={playerStats} campaignName={campaignName}></CharGold>
                 </div>
                 <div>

@@ -426,6 +426,8 @@ function buildAttackInfo(feature, playerStats) {
                 resistances: auto.resistances || [],
                 options: auto.options || [],
                 extraMastery: auto.extraMastery || [],
+                grantsFlySpeed: !!auto.grantsFlySpeed,
+                grantsSwimSpeed: !!auto.grantsSwimSpeed,
                 hasAutomation: true
             }
         }

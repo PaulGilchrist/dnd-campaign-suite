@@ -5260,15 +5260,31 @@
                         "description": "When you use your Elemental Attunement, you can gain a special movement type: Cold = Ice Walk (walk on water/ice), Fire = +10ft Speed, Lightning = Fly Speed equal to your Speed for 1 round, Thunder = teleport 30 ft.",
                         "level": 6,
                         "automation": {
-                            "type": "temp_buff",
+                            "type": "combat_stance",
                             "effect": "elemental_movement",
+                            "duration": "1_round",
+                            "casting_time": "1 bonus action",
                             "options": [
-                                "ice_walk",
-                                "speed_boost_10",
-                                "fly_speed",
-                                "teleport_30"
-                            ],
-                            "casting_time": "1 action"
+                                {
+                                    "name": "Cold",
+                                    "effect": "ice_walk"
+                                },
+                                {
+                                    "name": "Fire",
+                                    "effect": "speed_boost",
+                                    "speedBonus": 10
+                                },
+                                {
+                                    "name": "Lightning",
+                                    "effect": "fly_speed",
+                                    "flySpeed": "equals_walk_speed"
+                                },
+                                {
+                                    "name": "Thunder",
+                                    "effect": "teleport",
+                                    "teleportDistance": "30 ft"
+                                }
+                            ]
                         }
                     },
                     {
@@ -5300,7 +5316,14 @@
                     {
                         "name": "Stride of the Elements",
                         "description": "While Elemental Attunement active, gain Fly Speed and Swim Speed equal to your Speed.",
-                        "level": 11
+                        "level": 11,
+                        "automation": {
+                            "type": "passive_buff",
+                            "effect": "elemental_attunement_movement",
+                            "condition": "elemental_attunement_active",
+                            "grantsFlySpeed": true,
+                            "grantsSwimSpeed": true
+                        }
                     },
                     {
                         "name": "Elemental Epitome",
