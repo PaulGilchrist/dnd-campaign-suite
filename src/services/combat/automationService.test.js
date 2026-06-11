@@ -484,6 +484,12 @@ describe('buildAttackInfo – all automation types', () => {
     expect(info.type).toBe('passive_rule')
      })
 
+  it('returns passive_rule info with primalKnowledge skills', () => {
+    const info = getAutomationInfo(makeFeature({ type: 'passive_rule', effect: 'primal_knowledge', skills: ['Acrobatics', 'Stealth'] }, 'Primal Knowledge'), ps)
+    expect(info.type).toBe('passive_rule')
+    expect(info.primalKnowledge).toEqual(['Acrobatics', 'Stealth'])
+     })
+
   it('returns null for unsupported automation type', () => {
     const info = getAutomationInfo(makeFeature({ type: 'nonexistent_type' }), ps)
     expect(info).toBeNull()
@@ -657,7 +663,7 @@ describe('collectAutomationFromFeatures', () => {
 
   it('returns empty result object when features is undefined', () => {
     const result = collectAutomationFromFeatures(undefined, playerStats)
-    expect(Object.keys(result)).toHaveLength(7)
+    expect(Object.keys(result)).toHaveLength(8)
   })
 
   it('skips features without automation property', () => {
@@ -679,6 +685,19 @@ describe('collectAutomationFromFeatures', () => {
     const result = collectAutomationFromFeatures(features, playerStats)
     expect(result.passives).toHaveLength(1)
     expect(result.passives[0].type).toBe('passive_rule')
+  })
+
+  it('extracts primalKnowledge skills from passive_rule with effect primal_knowledge', () => {
+    const features = [makeFeature({ type: 'passive_rule', effect: 'primal_knowledge', skills: ['Acrobatics', 'Intimidation', 'Perception', 'Stealth', 'Survival'] }, 'Primal Knowledge')]
+    const result = collectAutomationFromFeatures(features, playerStats)
+    expect(result.passives).toHaveLength(1)
+    expect(result.primalKnowledge).toEqual(['Acrobatics', 'Intimidation', 'Perception', 'Stealth', 'Survival'])
+  })
+
+  it('does not populate primalKnowledge for passive_rule without skills', () => {
+    const features = [makeFeature({ type: 'passive_rule', effect: 'bonus_healing', bonusExpression: '3' }, 'Bonus Healing')]
+    const result = collectAutomationFromFeatures(features, playerStats)
+    expect(result.primalKnowledge).toEqual([])
   })
 
   it('categorizes damage_reduction into reactions', () => {

@@ -271,6 +271,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 campaignName={campaignName}
                 exhaustionPenalty={exhaustionPenalty}
                 conditionEffects={conditionEffects}
+                isRaging={isRaging}
                 onReroll={handleReroll}
               ></CharAbilities><hr />
 

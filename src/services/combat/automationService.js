@@ -486,6 +486,7 @@ function buildAttackInfo(feature, playerStats) {
                 criticalRange: auto.criticalRange || '',
                 spells: auto.spells || [],
                 riderSave: auto.riderSave || null,
+                primalKnowledge: auto.skills || [],
                 hasAutomation: true
             }
         }
@@ -886,7 +887,8 @@ export function collectAutomationFromFeatures(features, playerStats) {
         specialActions: [],
         passives: [],
         autoEffects: [],
-        saveModifiers: []
+        saveModifiers: [],
+        primalKnowledge: []
     }
 
     if (!features) return result
@@ -963,6 +965,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'post_cast_rider':
             case 'post_cast_self_heal':
                 result.passives.push(info)
+                if (info.type === 'passive_rule' && info.effect === 'primal_knowledge' && info.primalKnowledge.length > 0) {
+                    result.primalKnowledge.push(...info.primalKnowledge)
+                }
                 break
             default:
                 result.specialActions.push(info)

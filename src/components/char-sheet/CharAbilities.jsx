@@ -8,9 +8,38 @@ import './CharAbilities.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
-function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects, onReroll }) {
+function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects, isRaging = false, onReroll }) {
      const abilityDesc = buildAbilityDetailHtml(allAbilityScores);
      const { popupHtml, setPopupHtml, rollAbilityCheck, rollSavingThrow, rollSkillCheck } = useLoggedDiceRoll(playerStats.name, campaignName);
+
+     const getPrimalKnowledgeSkills = () => {
+         const automation = playerStats?.automation;
+         return automation?.primalKnowledge || [];
+     };
+
+     const getSkillBonus = (skill) => {
+         let bonus = skill.bonus - exhaustionPenalty;
+         if (isRaging) {
+             const primalSkills = getPrimalKnowledgeSkills();
+             if (primalSkills.includes(skill.name)) {
+                 const strengthAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
+                 if (strengthAbility) {
+                     const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
+                     const proficient = playerStats.skillProficiencies?.includes(skill.name);
+                     const expertise = playerStats.expertise?.includes(skill.name);
+                     let strengthBonus = strengthAbility.bonus;
+                     if (proficient) {
+                         strengthBonus += proficiency;
+                     }
+                     if (expertise) {
+                         strengthBonus += proficiency;
+                     }
+                     bonus = strengthBonus - exhaustionPenalty;
+                 }
+             }
+         }
+         return bonus;
+     };
 
       const makeCheckContext = (checkName) => {
         let forcedMode = undefined
@@ -69,8 +98,9 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                     <div className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => rollAbilityCheck(ability.name, ability.bonus - exhaustionPenalty, makeCheckContext(ability.name))}>{signFormatter.format(ability.bonus - exhaustionPenalty)}</div>
                      <div className={'clickable' + (exhaustionPenalty > 0 || autoFailSave || conditionEffects?.saveDisadvantage?.length > 0 ? ' stat--penalized' : '') + (hasSaveAdvantage(ability.name) ? ' stat--buffed' : '')} onClick={() => !autoFailSave && rollSavingThrow(ability.name, ability.save - exhaustionPenalty, saveContext)}>{autoFailSave ? 'AUTO FAIL' : signFormatter.format(ability.save - exhaustionPenalty)}{hasSaveAdvantage(ability.name) ? ' (Adv)' : ''}</div>
                     <div className='left'>{ability.skills.map((skill) => {
+                        const skillBonus = getSkillBonus(skill);
                         return <span key={skill.name}>
-                            <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => rollSkillCheck(skill.name, skill.bonus - exhaustionPenalty, makeCheckContext(skill.name))}>{skill.name} ({signFormatter.format(skill.bonus - exhaustionPenalty)})</span>
+                            <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => rollSkillCheck(skill.name, skillBonus, makeCheckContext(skill.name))}>{skill.name} ({signFormatter.format(skillBonus)})</span>
                             {ability.skills.indexOf(skill) < ability.skills.length - 1 ? ', ' : ''}
                         </span>;
                     })}</div>
