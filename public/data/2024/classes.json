@@ -5209,16 +5209,49 @@
                         "automation": {
                             "type": "save_attack",
                             "action": "bonus_action",
-                            "damageExpression": "varies_by_element",
-                            "saveType": "varies",
+                            "saveDc": "ability",
+                            "saveAbility": "WIS",
                             "range": "60 ft",
                             "duration": "1_minute",
+                            "hasOptions": true,
                             "options": [
                                 "Cold",
                                 "Fire",
                                 "Lightning",
                                 "Thunder"
                             ],
+                            "optionDetails": {
+                                "Cold": {
+                                    "saveType": "DEX",
+                                    "shape": "sphere",
+                                    "radius": "5 ft",
+                                    "effect": "speed_reduction",
+                                    "effectValue": "15_ft"
+                                },
+                                "Fire": {
+                                    "damage": "1d10",
+                                    "damageType": "fire",
+                                    "saveType": "DEX",
+                                    "shape": "sphere",
+                                    "radius": "5 ft"
+                                },
+                                "Lightning": {
+                                    "damage": "1d8",
+                                    "damageType": "lightning",
+                                    "saveType": "DEX",
+                                    "shape": "line",
+                                    "lineLength": "60 ft"
+                                },
+                                "Thunder": {
+                                    "damage": "1d6",
+                                    "damageType": "thunder",
+                                    "saveType": "CON",
+                                    "shape": "sphere",
+                                    "radius": "5 ft",
+                                    "effect": "push",
+                                    "effectValue": "10 ft"
+                                }
+                            },
                             "casting_time": "1 bonus action"
                         }
                     },

@@ -41,8 +41,33 @@ export function isExhausted(action, playerStats, campaignName) {
     return usesUsed >= maxUses;
 }
 
+function getRiderDescription(effect, effectValue) {
+    if (!effect) return '';
+    switch (effect) {
+        case 'speed_reduction': {
+            const feet = effectValue?.replace('_ft', '')?.replace('_', '') || '15';
+            return `the target's Speed is reduced by ${feet} ft`;
+        }
+        case 'push': {
+            const dist = effectValue?.replace('_ft', '')?.replace('_', '') || '10';
+            return `the target is pushed ${dist} ft`;
+        }
+        default:
+            return effect;
+    }
+}
+
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
+
+    // Resolve per-option details if applicable
+    if (auto.hasOptions && auto.optionDetails) {
+        const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
+        const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+        if (chosenOption && auto.optionDetails[chosenOption]) {
+            Object.assign(auto, auto.optionDetails[chosenOption]);
+        }
+    }
 
     if (auto.resourceCost === 'channel_divinity') {
         const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
@@ -137,12 +162,29 @@ export async function handle(action, playerStats, campaignName, mapName) {
         };
     }
 
+    // Handle effect-only (no damage) case, e.g. Cold's speed reduction
+    if (!auto.damage && auto.effect) {
+        const riderDesc = getRiderDescription(auto.effect, auto.effectValue);
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name} — ${auto.saveType || 'DEX'} save DC ${saveDcValue}. On a failed save, ${riderDesc}.`,
+                automation: auto,
+            },
+        };
+    }
+
     const damageResult = rollExpression(auto.damage);
     if (!damageResult) return null;
 
     const notes = [];
     if (auto.shape && isAreaShape(auto.shape)) {
         notes.push('Magical Darkness in the area is dispelled.');
+    }
+    if (auto.effect) {
+        notes.push(getRiderDescription(auto.effect, auto.effectValue));
     }
 
     return {

@@ -558,6 +558,16 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }
         }
 
+        // For save_attack features with element options (e.g. Elemental Attunement)
+        if (auto?.type === 'save_attack' && auto?.hasOptions && auto?.options?.length > 0) {
+            const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
+            const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+            if (!chosenOption) {
+                setFeatureChoice({ action, options: auto.options, optionKey });
+                return;
+            }
+        }
+
          // Spend 1 focus point for monk Ki features before dispatching
         if (MONK_KI_FEATURES.includes(action.name)) {
             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);

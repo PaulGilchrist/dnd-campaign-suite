@@ -590,18 +590,23 @@ function buildAttackInfo(feature, playerStats) {
             return {
                 type: 'save_attack',
                 name: feature.name,
+                action: auto.action || 'action',
                 damage,
                 damageType: auto.damageType || '',
                 saveType: auto.saveType || 'DEX',
                 saveDc,
                 saveAbility: auto.saveAbility || 'CON',
                 shape: auto.shape || '',
+                range: auto.range || '',
                 conditionInflicted: auto.conditionInflicted || null,
                 duration: auto.duration || '',
                 uses,
                 usesMax: uses,
                 recharge: auto.recharge || 'long_rest',
                 resourceCost: auto.resourceCost || '',
+                hasOptions: !!auto.hasOptions,
+                options: auto.options || [],
+                optionDetails: auto.optionDetails || {},
                 hasAutomation: true
             }
         }
