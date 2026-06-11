@@ -33,6 +33,41 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const durLabel = auto.duration ? ` Duration: ${auto.duration.replace('_', ' ')}.` : '';
 
     if (spellNames.length > 1) {
+        if (auto.perSpellTracking) {
+            const availableSpells = [];
+            for (const sn of spellNames) {
+                const usedKey = `_${action.name.replace(/\s+/g, '_')}_${sn.replace(/\s+/g, '_')}_used`;
+                const used = getRuntimeValue(playerStats.name, usedKey, campaignName);
+                if (!used) {
+                    const freeKey = `_${action.name.replace(/\s+/g, '_')}_${sn.replace(/\s+/g, '_')}_freeCast`;
+                    const stored = getRuntimeValue(playerStats.name, freeKey, campaignName);
+                    if (!stored) {
+                        await setRuntimeValue(playerStats.name, freeKey, true, campaignName);
+                    }
+                    availableSpells.push(sn);
+                }
+            }
+
+            if (availableSpells.length === 0) {
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: action.name,
+                        description: 'All spells from this feature have been used. Finish a Long Rest to regain them.',
+                        automation: auto,
+                    },
+                };
+            }
+
+            return {
+                type: 'popup',
+                payload: {
+                    html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Available free casts:</b> ${availableSpells.join(', ')}<br/><br/><em>Open your spell sheet and cast one — no spell slot will be consumed.</em>`,
+                },
+            };
+        }
+
         const freeCastKey = `_${action.name.replace(/\s+/g, '_')}_freeCast`;
         const storedSpells = getRuntimeValue(playerStats.name, freeCastKey, campaignName);
         if (!storedSpells) {

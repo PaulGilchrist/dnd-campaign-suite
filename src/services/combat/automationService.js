@@ -340,6 +340,7 @@ function buildAttackInfo(feature, playerStats) {
                 resourceCost: auto.resourceCost || '',
                 freeCasts: auto.freeCasts || '',
                 casting_time: auto.casting_time || '',
+                perSpellTracking: !!auto.perSpellTracking,
                 hasAutomation: true
             }
         }

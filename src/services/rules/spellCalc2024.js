@@ -8,6 +8,9 @@ export function getSpellAbilities(allSpells, playerStats) {
     if (!spellcasting) {
         spellcasting = classRules.getHighestMajorLevel(playerStats)?.spellcasting;
     }
+    if (!spellcasting) {
+        spellcasting = playerStats.class.major?.spellcasting;
+    }
 
     if (spellcasting) {
         const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name;
@@ -26,8 +29,10 @@ export function getSpellAbilities(allSpells, playerStats) {
             spellAbilities.spells = [];
         }
 
-        if (playerStats.class.spell_casting_ability) {
-            spellAbilities.spellCastingAbility = playerStats.class.spell_casting_ability;
+        const castingAbility = playerStats.class.spell_casting_ability
+            || playerStats.class.major?.spell_casting_ability;
+        if (castingAbility) {
+            spellAbilities.spellCastingAbility = castingAbility;
         }
 
         const spellAbility = playerStats.abilities.find(ability => ability.name === spellAbilities.spellCastingAbility);

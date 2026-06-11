@@ -5124,7 +5124,22 @@
                         "level": 17
                     }
                 ],
-                "spells": []
+                "spells": [],
+                "spell_casting_ability": "Wisdom",
+                "spellcasting": {
+                    "cantrips_known": 0,
+                    "prepared_spells": 0,
+                    "spell_slots_level_1": 0,
+                    "spell_slots_level_2": 0,
+                    "spell_slots_level_3": 0,
+                    "spell_slots_level_4": 0,
+                    "spell_slots_level_5": 0,
+                    "spell_slots_level_6": 0,
+                    "spell_slots_level_7": 0,
+                    "spell_slots_level_8": 0,
+                    "spell_slots_level_9": 0,
+                    "spell_type": "known"
+                }
             },
             {
                 "name": "Warrior of Shadow",
@@ -5137,7 +5152,8 @@
                         "level": 3,
                         "automation": {
                             "type": "free_spell",
-                            "spell": "Darkness, Darkvision, Pass Without Trace, Silence",
+                            "spell": ["Darkness", "Darkvision", "Pass Without Trace", "Silence"],
+                            "perSpellTracking": true,
                             "recharge": "long_rest",
                             "casting_time": "1 action"
                         }
