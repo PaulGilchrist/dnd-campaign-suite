@@ -118,16 +118,16 @@ describe('saveAttackHandler.isExhausted', () => {
     expect(isExhausted(action, ps, campaignName)).toBe(false);
   });
 
-  it('returns true when usesUsed >= maxUses', () => {
+  it('returns true when currentUses <= 0 (exhausted)', () => {
     const action = makeAction({ usesMax: 3 });
     const ps = makePlayerStats();
 
-    runtimeState.getRuntimeValue.mockReturnValue(3);
+    runtimeState.getRuntimeValue.mockReturnValue(0);
 
     expect(isExhausted(action, ps, campaignName)).toBe(true);
   });
 
-  it('returns false when usesUsed < maxUses', () => {
+  it('returns false when currentUses > 0 (has uses remaining)', () => {
     const action = makeAction({ usesMax: 3 });
     const ps = makePlayerStats();
 
@@ -140,7 +140,7 @@ describe('saveAttackHandler.isExhausted', () => {
     const action = makeAction({ uses: 2 });
     const ps = makePlayerStats();
 
-    runtimeState.getRuntimeValue.mockReturnValue(2);
+    runtimeState.getRuntimeValue.mockReturnValue(0);
 
     expect(isExhausted(action, ps, campaignName)).toBe(true);
   });
@@ -290,7 +290,7 @@ describe('saveAttackHandler.handle - Uses/UsesMax', () => {
     const ps = makePlayerStats();
     const action = makeAction({ usesMax: 3 });
 
-    runtimeState.getRuntimeValue.mockReturnValue(3);
+    runtimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName, null);
 
@@ -304,7 +304,7 @@ describe('saveAttackHandler.handle - Uses/UsesMax', () => {
     const ps = makePlayerStats();
     const action = makeAction({ usesMax: 3, recharge: 'long_rest_or_expend_rage' });
 
-    runtimeState.getRuntimeValue.mockReturnValue(3);
+    runtimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName, null);
 
@@ -315,7 +315,7 @@ describe('saveAttackHandler.handle - Uses/UsesMax', () => {
     const ps = makePlayerStats();
     const action = makeAction({ usesMax: 3, recharge: 'short_rest' });
 
-    runtimeState.getRuntimeValue.mockReturnValue(3);
+    runtimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName, null);
 
@@ -335,7 +335,7 @@ describe('saveAttackHandler.handle - Uses/UsesMax', () => {
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
       'TestHero',
       'radianceattackUses',
-      2,
+      0,
       campaignName,
     );
     expect(result.type).toBe('roll');
@@ -354,7 +354,7 @@ describe('saveAttackHandler.handle - Uses/UsesMax', () => {
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
       'TestHero',
       'myCustomKey',
-      2,
+      0,
       campaignName,
     );
     expect(result.type).toBe('roll');

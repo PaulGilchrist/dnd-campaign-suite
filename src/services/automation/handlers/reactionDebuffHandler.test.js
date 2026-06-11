@@ -162,7 +162,7 @@ describe('reactionDebuffHandler.handle', () => {
       const ps = makePlayerStats({});
       const action = makeAction({ uses_expression: 3 });
       automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(3);
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
       const result = await handle(action, ps, campaignName, mapName);
 
@@ -175,7 +175,7 @@ describe('reactionDebuffHandler.handle', () => {
       const ps = makePlayerStats({});
       const action = makeAction({ uses_expression: 'proficiency_bonus' });
       automationService.evaluateAutoExpression.mockReturnValue(2);
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
       const result = await handle(action, ps, campaignName, mapName);
 
@@ -186,7 +186,7 @@ describe('reactionDebuffHandler.handle', () => {
       const ps = makePlayerStats({});
       const action = makeAction({ uses_expression: 3 });
       automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
@@ -212,7 +212,7 @@ describe('reactionDebuffHandler.handle', () => {
       const ps = makePlayerStats({});
       const action = makeAction({ uses_expression: 3, recharge: 'long_rest' });
       automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(3);
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
       const result = await handle(action, ps, campaignName, mapName);
       expect(result.payload.description).toContain('Long Rest');
@@ -222,7 +222,7 @@ describe('reactionDebuffHandler.handle', () => {
       const ps = makePlayerStats({});
       const action = makeAction({ uses_expression: 3, recharge: 'short_rest' });
       automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(3);
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
       const result = await handle(action, ps, campaignName, mapName);
       expect(result.payload.description).toContain('Short or Long Rest');
@@ -241,7 +241,7 @@ describe('reactionDebuffHandler.handle', () => {
       const ps = makePlayerStats({});
       const action = makeAction({ uses_expression: 3 });
       automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(null);
@@ -254,7 +254,7 @@ describe('reactionDebuffHandler.handle', () => {
       const ps = makePlayerStats({});
       const action = makeAction({ uses_expression: 3 });
       automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       rangeValidation.rangeToFeet.mockReturnValueOnce(30);
@@ -766,6 +766,7 @@ describe('reactionDebuffHandler.handle', () => {
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
       useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 5, bonus: 3, hit: false }));
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
       await handle(action, ps, campaignName, mapName);
 
@@ -781,7 +782,7 @@ describe('reactionDebuffHandler.handle', () => {
       const ps = makePlayerStats({});
       const action = makeAction({ uses_expression: 3 });
       automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(5);
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
       await handle(action, ps, campaignName, mapName);
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
@@ -817,12 +818,11 @@ describe('reactionDebuffHandler.handle', () => {
       await handle(action, ps, campaignName, mapName);
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
-
     it('uses correct usesKey derived from feature name', async () => {
       const ps = makePlayerStats({});
       const action = makeAction({ uses_expression: 3 });
       automationService.evaluateAutoExpression.mockReturnValue(3);
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
@@ -840,19 +840,20 @@ describe('reactionDebuffHandler.handle', () => {
       const action = makeAction({ uses_expression: 3 });
       automationService.evaluateAutoExpression.mockReturnValue(3);
       useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(1) // early check: usesUsed=1, max=3 → proceed
-        .mockReturnValueOnce(1); // decrement: read 1 again
+        .mockReturnValueOnce(2) // early check: usesUsed=2, max=3 → proceed
+        .mockReturnValueOnce(2); // decrement: read 2 again
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
       useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 5, bonus: 3, hit: false }));
+
 
       await handle(action, ps, campaignName, mapName);
 
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Bard',
         'cuttingwordsUses',
-        2, // read 1, write 1+1=2
+        1, // read 2, write 2-1=1
         campaignName
       );
     });

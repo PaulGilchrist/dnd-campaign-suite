@@ -70,7 +70,7 @@ describe('bardicInspirationHandler.handle', () => {
 
     it('should return popup when uses are exhausted', async () => {
         evaluateAutoExpression.mockReturnValue(2);
-        getRuntimeValue.mockReturnValue(2);
+        getRuntimeValue.mockReturnValue(0);
 
         const result = await handle(action, playerStats, campaignName, mapName);
 
@@ -92,7 +92,7 @@ describe('bardicInspirationHandler.handle', () => {
 
         await handle(action, playerStats, campaignName, mapName);
 
-        expect(setRuntimeValue).toHaveBeenCalledWith('Bard', 'bardicInspirationUses', 2, campaignName);
+        expect(setRuntimeValue).toHaveBeenCalledWith('Bard', 'bardicInspirationUses', 0, campaignName);
     });
 
     it('should use default uses (0) if no expression is provided', async () => {
@@ -105,6 +105,7 @@ describe('bardicInspirationHandler.handle', () => {
     });
 
     it('should return popup when no target is resolved', async () => {
+        getRuntimeValue.mockReturnValue(2);
         resolveTarget.mockResolvedValue(null);
 
         const result = await handle(action, playerStats, campaignName, mapName);
@@ -121,6 +122,7 @@ describe('bardicInspirationHandler.handle', () => {
     });
 
     it('should return popup when target is out of range', async () => {
+        getRuntimeValue.mockReturnValue(2);
         rangeToFeet.mockReturnValue(60);
         getDistanceFeet.mockReturnValue(100);
 
@@ -131,13 +133,14 @@ describe('bardicInspirationHandler.handle', () => {
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `Ally is out of range (100 ft > 60 ft).`,
+                description: `Ally is out of range (${Math.round(100)} ft > 60 ft).`,
                 automation: action.automation,
             },
         });
     });
 
     it('should ignore range check if mapName is not provided', async () => {
+        getRuntimeValue.mockReturnValue(2);
         getDistanceFeet.mockReturnValue(100); // Far away but no map
         rangeToFeet.mockReturnValue(60);
 
@@ -148,6 +151,7 @@ describe('bardicInspirationHandler.handle', () => {
     });
 
     it('should ignore range check if positions cannot be resolved', async () => {
+        getRuntimeValue.mockReturnValue(2);
         resolveMapPositions.mockResolvedValue(null);
 
         const result = await handle(action, playerStats, campaignName, mapName);
@@ -157,6 +161,7 @@ describe('bardicInspirationHandler.handle', () => {
     });
 
     it('should apply inspiration and create expiration', async () => {
+        getRuntimeValue.mockReturnValue(2);
         const result = await handle(action, playerStats, campaignName, mapName);
 
         expect(setRuntimeValue).toHaveBeenCalledWith('Ally', 'bardicInspirationDie', '8', campaignName);
@@ -175,6 +180,7 @@ describe('bardicInspirationHandler.handle', () => {
     });
 
     it('should use default die size if class level is missing', async () => {
+        getRuntimeValue.mockReturnValue(2);
         playerStats.class = { class_levels: [] }; // No matching level 3
 
         await handle(action, playerStats, campaignName, mapName);
@@ -183,6 +189,7 @@ describe('bardicInspirationHandler.handle', () => {
     });
 
     it('should set combat options if passive is present', async () => {
+        getRuntimeValue.mockReturnValue(2);
         playerStats.automation.passives = [{ effect: 'bardic_inspiration_combat_options' }];
         action.automation.options = ['custom_option'];
 
@@ -192,6 +199,7 @@ describe('bardicInspirationHandler.handle', () => {
     });
 
     it('should use default combat options if passive is present but no options specified in action', async () => {
+        getRuntimeValue.mockReturnValue(2);
         playerStats.automation.passives = [{ effect: 'bardic_inspiration_combat_options' }];
         delete action.automation.options;
 

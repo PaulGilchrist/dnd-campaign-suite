@@ -272,7 +272,7 @@ describe('healingHandler.handle', () => {
         newHp: 22,
         maxHp: 30,
       });
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(ps.name, 'secondWindUses', 1, campaignName, true);
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(ps.name, 'secondwindUses', 1, campaignName, true);
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('Regained 7 HP');
@@ -332,11 +332,11 @@ describe('healingHandler.handle', () => {
       automationService.resolveHealingBonuses.mockReturnValue(0);
       automationService.hasHealingMaximization.mockReturnValue(false);
       healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 20, maxHp: 30, actualHeal: 5 });
-      useRuntimeState.getRuntimeValue.mockReturnValue(1);
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(ps.name, 'secondWindUses', 0, campaignName, true);
+      expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('no uses remaining');
     });
 

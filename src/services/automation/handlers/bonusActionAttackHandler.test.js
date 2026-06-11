@@ -73,7 +73,7 @@ describe('bonusActionAttackHandler.handle', () => {
   it('should return "no uses remaining" popup when usesUsed >= usesMax', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ usesMax: 3 });
-    useRuntimeState.getRuntimeValue.mockReturnValue(3);
+    useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName);
 
@@ -88,7 +88,7 @@ describe('bonusActionAttackHandler.handle', () => {
   it('should include recharge value in description when auto.recharge is set', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ usesMax: 3, recharge: 'Short Rest' });
-    useRuntimeState.getRuntimeValue.mockReturnValue(3);
+    useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName);
 
@@ -98,7 +98,7 @@ describe('bonusActionAttackHandler.handle', () => {
   it('should use "Long Rest" as default recharge text when auto.recharge is missing', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ usesMax: 3 });
-    useRuntimeState.getRuntimeValue.mockReturnValue(3);
+    useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName);
 
@@ -116,7 +116,7 @@ describe('bonusActionAttackHandler.handle', () => {
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       ps.name,
       'warPriestUses',
-      2,
+      0,
       campaignName,
     );
   });
@@ -124,7 +124,7 @@ describe('bonusActionAttackHandler.handle', () => {
   it('should use custom resourceKey from auto.resourceKey', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ usesMax: 3, resourceKey: 'channelDivinityUses' });
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
     popupResponse.automationInfoPopup.mockReturnValue({ type: 'popup', payload: {} });
 
     await handle(action, ps, campaignName);
@@ -140,7 +140,7 @@ describe('bonusActionAttackHandler.handle', () => {
   it('should use default "warPriestUses" when auto.resourceKey is missing', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ usesMax: 3 });
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
     popupResponse.automationInfoPopup.mockReturnValue({ type: 'popup', payload: {} });
 
     await handle(action, ps, campaignName);

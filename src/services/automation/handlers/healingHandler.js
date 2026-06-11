@@ -64,6 +64,22 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 },
             };
       } else if (isSelf && auto.healExpression) {
+        const maxUses = auto.usesMax ?? auto.uses ?? 1;
+        const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
+
+        if (currentUses <= 0) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: `${action.name} has no uses remaining. Recharges on a ${auto.recharge === 'long_rest' ? 'Long Rest' : 'Short Rest'}.`,
+                },
+            };
+        }
+
         let resolvedExpression = auto.healExpression
             .replace(/\bfighter level\b/gi, String(playerStats.level || 1));
 
@@ -84,14 +100,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             maxHp,
         });
 
-        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-        const maxSW = classLevel?.second_wind || 0;
-        const currentUses = Number(getRuntimeValue(playerStats.name, 'secondWindUses', campaignName) ?? maxSW);
-        if (currentUses > 0) {
-            await setRuntimeValue(playerStats.name, 'secondWindUses', currentUses - 1, campaignName, true);
-        }
+        await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName, true);
 
-        const remainingUses = Math.max(0, currentUses - 1);
+        const remainingUses = currentUses - 1;
         const description = remainingUses > 0
             ? `${action.name}: Regained ${actualHeal} HP (${remainingUses} use${remainingUses > 1 ? 's' : ''} remaining).`
             : `${action.name}: Regained ${actualHeal} HP (no uses remaining).`;

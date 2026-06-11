@@ -84,8 +84,8 @@ async function handleMantleOfInspiration(action, playerStats, campaignName, mapN
         || getAbilityModifier(playerStats, 'Charisma');
 
     if (usesMax > 0) {
-        const usesUsed = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? 0);
-        if (usesUsed >= usesMax) {
+        const currentUses = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? usesMax);
+        if (currentUses <= 0) {
             return {
                 type: 'popup',
                 payload: {
@@ -96,7 +96,7 @@ async function handleMantleOfInspiration(action, playerStats, campaignName, mapN
                 },
             };
         }
-        await setRuntimeValue(playerName, 'bardicInspirationUses', usesUsed + 1, campaignName);
+        await setRuntimeValue(playerName, 'bardicInspirationUses', currentUses - 1, campaignName);
     }
 
     const dieRoll = rollDie(bardicDieSize);

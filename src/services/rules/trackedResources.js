@@ -27,6 +27,7 @@ export const ALL_TRACKED_RESOURCES = [
   'warPriestUses',
   'luckyPoints',
   'divineInterventionUses',
+  'wholenessofbodyUses',
   'shortRestHitDice',
   'spell_slots_level_1',
   'spell_slots_level_2',
@@ -153,6 +154,10 @@ export function computeTrackedResources(playerStats) {
   const isCleric = playerStats.class?.name === 'Cleric'
   const maxDI = isCleric && playerStats.level >= 10 ? 1 : 0
   resources.divineInterventionUses = { current: maxDI, max: maxDI }
+
+  const isMonk = playerStats.class?.name === 'Monk'
+  const maxWB = isMonk && playerStats.level >= 6 ? 1 : 0
+  resources.wholenessofbodyUses = { current: maxWB, max: maxWB }
 
   const wis = playerStats.abilities?.find(a => a.name === 'Wisdom')
   const maxWP = wis ? Math.max(wis.bonus, 1) : 1

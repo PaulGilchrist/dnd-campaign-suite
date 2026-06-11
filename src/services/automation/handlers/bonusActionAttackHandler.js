@@ -8,8 +8,8 @@ export async function handle(action, playerStats, campaignName) {
 
     if (usesMax > 0) {
         const usesKey = auto.resourceKey || 'warPriestUses';
-        const usesUsed = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
-        if (usesUsed >= usesMax) {
+        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+        if (currentUses <= 0) {
             return {
                 type: 'popup',
                 payload: {
@@ -20,7 +20,7 @@ export async function handle(action, playerStats, campaignName) {
                 },
             };
         }
-        await setRuntimeValue(playerStats.name, usesKey, usesUsed + 1, campaignName);
+        await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
     }
 
     return automationInfoPopup(action);

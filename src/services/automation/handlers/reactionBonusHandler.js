@@ -79,8 +79,8 @@ async function handleInspiringMovement(action, playerStats, campaignName, mapNam
 
     if (usesMax > 0) {
         const usesKey = auto.resourceKey || 'bardicInspirationUses';
-        const usesUsed = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
-        if (usesUsed >= usesMax) {
+        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? usesMax);
+        if (currentUses <= 0) {
             return {
                 type: 'popup',
                 payload: {
@@ -91,7 +91,7 @@ async function handleInspiringMovement(action, playerStats, campaignName, mapNam
                 },
             };
         }
-        await setRuntimeValue(playerStats.name, usesKey, usesUsed + 1, campaignName);
+        await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
     }
 
     const allyRangeFt = rangeToFeet(auto.allyRange || '30 ft');

@@ -28,11 +28,11 @@ async function consumeResourceCost(auto, playerStats, campaignName, actionName) 
     if (auto.uses_expression) {
         const usesKey = getRuntimeUsesKey(actionName);
         const maxUses = evaluateAutoExpression(auto.uses_expression, playerStats);
-        const usesUsed = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
-        if (usesUsed >= maxUses) {
+        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
+        if (currentUses <= 0) {
             return { ok: false, message: `${actionName} has no uses remaining.` };
         }
-        await setRuntimeValue(playerStats.name, usesKey, usesUsed + 1, campaignName);
+        await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
         return { ok: true };
     }
 

@@ -23,8 +23,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         const bardicMax = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_inspiration_uses
             || playerStats?.proficiency || 0;
-        const bardicUsed = Number(getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName) ?? 0);
-        if (bardicUsed >= bardicMax) {
+        const currentBI = Number(getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName) ?? bardicMax);
+        if (currentBI <= 0) {
             return {
                 type: 'popup',
                 payload: {
@@ -36,7 +36,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             };
         }
 
-        await setRuntimeValue(playerStats.name, 'bardicInspirationUses', bardicUsed + 1, campaignName);
+        await setRuntimeValue(playerStats.name, 'bardicInspirationUses', currentBI - 1, campaignName);
 
         const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
         const bardicDie = classLevel?.bardic_die || 6;
@@ -127,8 +127,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
 
     const resourceKey = auto.resourceKey || action.name.toLowerCase().replace(/\s+/g, '') + 'Uses';
-    const usesUsed = Number(getRuntimeValue(playerStats.name, resourceKey, campaignName) ?? 0);
-    if (usesUsed >= (auto.usesMax || auto.uses || 1)) {
+    const maxUses = auto.usesMax || auto.uses || 1;
+    const currentUses = Number(getRuntimeValue(playerStats.name, resourceKey, campaignName) ?? maxUses);
+    if (currentUses <= 0) {
         return {
             type: 'popup',
             payload: {
@@ -164,7 +165,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         });
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
-    setRuntimeValue(playerStats.name, resourceKey, usesUsed + 1, campaignName);
+    setRuntimeValue(playerStats.name, resourceKey, currentUses - 1, campaignName);
 
     return {
         type: 'popup',

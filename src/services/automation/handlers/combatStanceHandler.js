@@ -89,12 +89,12 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const maxUses = auto.uses || 0;
-    let usesUsed = 0;
+    let currentUses = 0;
 
     if (maxUses > 0) {
         const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
-        usesUsed = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? 0);
-        if (usesUsed >= maxUses) {
+        currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? maxUses);
+        if (currentUses <= 0) {
             return {
                 type: 'popup',
                 payload: {
@@ -106,7 +106,7 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
                 },
             };
         }
-        await setRuntimeValue(playerName, usesKey, usesUsed + 1, campaignName);
+        await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
     } else if (auto.resourceCost === 'channel_divinity') {
         const storedCharges = getRuntimeValue(playerName, 'channelDivinityCharges', campaignName);
         const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
@@ -250,7 +250,7 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
     }
 
     let description = maxUses > 0
-        ? `${action.name} activated (${usesUsed + 1}/${maxUses} uses remaining)`
+        ? `${action.name} activated (${currentUses - 1}/${maxUses} uses remaining)`
         : `${action.name} activated`;
     if (auto.effect === 'create_illusion') {
         description += ' While active, you can cast spells as though you were in the illusion\'s space.';

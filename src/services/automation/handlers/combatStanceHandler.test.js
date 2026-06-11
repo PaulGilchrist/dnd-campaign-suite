@@ -340,7 +340,7 @@ describe('activateStance uses-based path', () => {
     const action = makeAction({ uses: 3 }); // no resourceKey → derive from name
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]); // not active
-    useRuntimeState.getRuntimeValue.mockReturnValue(3); // usesUsed === maxUses
+    useRuntimeState.getRuntimeValue.mockReturnValue(0); // usesUsed === 0 <= 0
 
     const result = await handle(action, ps, campaignName);
 
@@ -362,7 +362,7 @@ describe('activateStance uses-based path', () => {
 
     const setCall = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'rageUses');
     expect(setCall).toBeDefined();
-    expect(setCall[2]).toBe(2); // 1 + 1 = 2
+    expect(setCall[2]).toBe(0); // 1 - 1 = 0
   });
 
   it('uses custom resourceKey for uses tracking when provided', async () => {
@@ -370,7 +370,7 @@ describe('activateStance uses-based path', () => {
     const action = makeAction({ uses: 3, resourceKey: 'customUses' });
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]); // not active
-    useRuntimeState.getRuntimeValue.mockReturnValue(0); // customUses=0 < 3
+    useRuntimeState.getRuntimeValue.mockReturnValue(2); // customUses=2 < 3
 
     await handle(action, ps, campaignName);
 
@@ -384,7 +384,7 @@ describe('activateStance uses-based path', () => {
     const action = makeAction({ uses: 2 }, { name: 'Extra Attack' });
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]); // activeBuffs (handle line 28)
-    useRuntimeState.getRuntimeValue.mockReturnValue(0); // extraAttackUses=0 < 2
+    useRuntimeState.getRuntimeValue.mockReturnValue(2); // extraAttackUses=2 < 2
 
     await handle(action, ps, campaignName);
 
@@ -399,11 +399,11 @@ describe('activateStance uses-based path', () => {
     const action = makeAction({ uses: 3 });
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
-    useRuntimeState.getRuntimeValue.mockReturnValue(1); // usesUsed=1, activates to 2/3
+    useRuntimeState.getRuntimeValue.mockReturnValue(2); // usesUsed=2, activates to 1/3
 
     const result = await handle(action, ps, campaignName);
 
-    expect(result.payload.description).toBe('Rage activated (2/3 uses remaining)');
+    expect(result.payload.description).toBe('Rage activated (1/3 uses remaining)');
   });
 
   it('does NOT touch ragePoints or resources when maxUses > 0', async () => {
@@ -525,7 +525,7 @@ describe('activateStance buff construction', () => {
     const action = makeAction({ uses: 3, effect: 'damage_resistance' });
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
     await handle(action, ps, campaignName);
 
@@ -537,7 +537,7 @@ describe('activateStance buff construction', () => {
     const action = makeAction({ uses: 3, duration: '1_hour' });
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
     await handle(action, ps, campaignName);
 
@@ -549,7 +549,7 @@ describe('activateStance buff construction', () => {
     const action = makeAction({ uses: 3, resistanceTypes: ['acid', 'fire'] });
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
     await handle(action, ps, campaignName);
 
@@ -566,7 +566,7 @@ describe('activateStance buff construction', () => {
     });
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
     await handle(action, ps, campaignName);
 
@@ -581,7 +581,7 @@ describe('activateStance buff construction', () => {
     const action = makeAction({ uses: 3, reactionSave: 'dexterity_save_dc_15' });
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
     await handle(action, ps, campaignName);
 
@@ -672,7 +672,7 @@ describe('activateStance flySpeed logic', () => {
     const action = makeAction({ uses: 3, flySpeed: '30_ft' });
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
     await handle(action, ps, campaignName);
 
@@ -684,7 +684,7 @@ describe('activateStance flySpeed logic', () => {
     const action = makeAction({ uses: 3, flySpeed: '30_ft' });
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
     await handle(action, ps, campaignName);
 
@@ -1113,7 +1113,7 @@ describe('edge cases', () => {
     const action = makeAction({ uses: 3 }); // uses-based to avoid ragePoints read
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
-    useRuntimeState.getRuntimeValue.mockReturnValue(0); // usesUsed=0 < maxUses=3
+    useRuntimeState.getRuntimeValue.mockReturnValue(2); // usesUsed=2 < maxUses=3
 
     await handle(action, ps, campaignName);
 
@@ -1192,7 +1192,7 @@ describe('full activation/deactivation cycle', () => {
 
      // First call — activates
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]); // not active
-    useRuntimeState.getRuntimeValue.mockReturnValue(0); // usesUsed=0 < maxUses=3
+    useRuntimeState.getRuntimeValue.mockReturnValue(2); // usesUsed=2 < maxUses=3
 
     const result1 = await handle(action, ps, campaignName);
     expect(result1.type).toBe('popup');
@@ -1224,7 +1224,7 @@ describe('payload structure', () => {
     const action = makeAction({ uses: 3 });
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
     const result = await handle(action, ps, campaignName);
 
@@ -1342,7 +1342,7 @@ describe('uses-based activation description', () => {
     const action = makeAction({ uses: 3 }, { name: 'Second Wind' });
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
-    useRuntimeState.getRuntimeValue.mockReturnValue(0); // usesUsed=0 → activates to 1/3
+    useRuntimeState.getRuntimeValue.mockReturnValue(2); // usesUsed=2 → activates to 1/3
 
     const result = await handle(action, ps, campaignName);
 

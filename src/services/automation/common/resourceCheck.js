@@ -21,6 +21,6 @@ export function spendResource(playerName, resourceNameOrKey, amount, campaignNam
 
 export function checkResourceRemaining(resourceKey, maxUses, playerName, campaignName) {
     const current = getRuntimeValue(playerName, resourceKey, campaignName);
-    const used = current != null ? Number(current) : 0;
-    return { remaining: maxUses - used, canUse: used < maxUses };
+    const remaining = current != null ? Number(current) : maxUses;
+    return { remaining, canUse: remaining > 0 };
 }

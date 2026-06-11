@@ -37,8 +37,8 @@ export function isExhausted(action, playerStats, campaignName) {
     if (auto.uses === undefined && auto.usesMax === undefined) return false;
     const maxUses = auto.usesMax ?? auto.uses ?? 1;
     const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
-    const usesUsed = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
-    return usesUsed >= maxUses;
+    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
+    return currentUses <= 0;
 }
 
 function getRiderDescription(effect, effectValue) {
@@ -94,8 +94,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
         if (maxUses > 0) {
             const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
-            const usesUsed = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
-            if (usesUsed >= maxUses) {
+            const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
+            if (currentUses <= 0) {
                 return {
                     type: 'popup',
                     payload: {
@@ -107,7 +107,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                     },
                 };
              }
-            await setRuntimeValue(playerStats.name, usesKey, usesUsed + 1, campaignName);
+            await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
         }
     }
 

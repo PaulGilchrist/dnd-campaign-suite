@@ -13,8 +13,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
         : 0;
 
     if (usesMax > 0) {
-        const usesUsed = Number(getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName) ?? 0);
-        if (usesUsed >= usesMax) {
+        const currentUses = Number(getRuntimeValue(playerStats.name, 'bardicInspirationUses', campaignName) ?? usesMax);
+        if (currentUses <= 0) {
             return {
                 type: 'popup',
                 payload: {
@@ -25,7 +25,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 },
             };
         }
-        await setRuntimeValue(playerStats.name, 'bardicInspirationUses', usesUsed + 1, campaignName);
+        await setRuntimeValue(playerStats.name, 'bardicInspirationUses', currentUses - 1, campaignName);
     }
 
     const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);

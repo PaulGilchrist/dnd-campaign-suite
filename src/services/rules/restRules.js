@@ -80,8 +80,9 @@ export const LONG_REST_RESOURCES = [
       'zealousPresenceUses',
       'rageOfTheGodsUses',
       'divineInterventionUses',
-       'wildResurgenceReversedThisRest',
-       'indomitableUses'
+        'wholenessofbodyUses',
+        'wildResurgenceReversedThisRest',
+        'indomitableUses'
  ]
 
 export function getLongRestResources() {

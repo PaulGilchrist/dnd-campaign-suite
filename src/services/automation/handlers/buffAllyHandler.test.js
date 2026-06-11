@@ -152,7 +152,7 @@ describe('buffAllyHandler.handle', () => {
     it('returns early popup when usesUsed >= usesMax (usesMax field)', async () => {
       const ps = makePlayerStats({});
       const action = makeAction({ usesMax: 3 });
-      useRuntimeState.getRuntimeValue.mockReturnValue(3);
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
       const result = await handle(action, ps, campaignName, null);
 
@@ -165,7 +165,7 @@ describe('buffAllyHandler.handle', () => {
     it('returns early popup when usesUsed >= auto.uses (uses field)', async () => {
       const ps = makePlayerStats({});
       const action = makeAction({ uses: 2 });
-      useRuntimeState.getRuntimeValue.mockReturnValue(2);
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
       const result = await handle(action, ps, campaignName, null);
 
@@ -175,7 +175,7 @@ describe('buffAllyHandler.handle', () => {
     it('prefers usesMax over uses for max calculation', async () => {
       const ps = makePlayerStats({});
       const action = makeAction({ usesMax: 1, uses: 5 });
-      useRuntimeState.getRuntimeValue.mockReturnValue(1); // >= usesMax (1)
+      useRuntimeState.getRuntimeValue.mockReturnValue(0); // >= usesMax (1)
 
       const result = await handle(action, ps, campaignName, null);
 
@@ -185,7 +185,7 @@ describe('buffAllyHandler.handle', () => {
     it('includes recharge Rage hint when recharge is long_rest_or_expend_rage', async () => {
       const ps = makePlayerStats({});
       const action = makeAction({ usesMax: 1, recharge: 'long_rest_or_expend_rage' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(1);
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
       const result = await handle(action, ps, campaignName, null);
 
@@ -195,7 +195,7 @@ describe('buffAllyHandler.handle', () => {
     it('does not include recharge hint when recharge is a different value', async () => {
       const ps = makePlayerStats({});
       const action = makeAction({ usesMax: 1, recharge: 'short_rest' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(1);
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
       const result = await handle(action, ps, campaignName, null);
 
@@ -217,7 +217,7 @@ describe('buffAllyHandler.handle', () => {
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Fighter',
         'tacticalwarningUses',
-        2,
+        0,
         campaignName,
       );
     });
@@ -225,7 +225,7 @@ describe('buffAllyHandler.handle', () => {
     it('uses custom resourceKey for uses tracking when provided', async () => {
       const ps = makePlayerStats({});
       const action = makeAction({ usesMax: 3, resourceKey: 'myCustomResource' });
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
       buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
       await handle(action, ps, campaignName, null);
@@ -244,7 +244,7 @@ describe('buffAllyHandler.handle', () => {
         name: 'Tactical Warning',
         automation: { type: 'buff_ally', effect: '', usesMax: 3 },
       };
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
       buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
       await handle(action, ps, campaignName, null);
@@ -261,7 +261,7 @@ describe('buffAllyHandler.handle', () => {
     it('handles null runtime value as zero before incrementing', async () => {
       const ps = makePlayerStats({});
       const action = makeAction({ usesMax: 3 });
-      useRuntimeState.getRuntimeValue.mockReturnValue(null); // null ?? 0 = 0
+      useRuntimeState.getRuntimeValue.mockReturnValue(null); // null ?? maxUses = 3
       buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
       await handle(action, ps, campaignName, null);
@@ -269,7 +269,7 @@ describe('buffAllyHandler.handle', () => {
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Fighter',
         'tacticalwarningUses',
-        1,
+        2,
         campaignName,
       );
     });
@@ -277,7 +277,7 @@ describe('buffAllyHandler.handle', () => {
     it('handles undefined runtime value as zero before incrementing', async () => {
       const ps = makePlayerStats({});
       const action = makeAction({ usesMax: 3 });
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined); // undefined ?? 0 = 0
+      useRuntimeState.getRuntimeValue.mockReturnValue(undefined); // undefined ?? maxUses = 3
       buffToggle.toggleBuff.mockReturnValue({ wasActive: false });
 
       await handle(action, ps, campaignName, null);
@@ -285,7 +285,7 @@ describe('buffAllyHandler.handle', () => {
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Fighter',
         'tacticalwarningUses',
-        1,
+        2,
         campaignName,
       );
     });

@@ -827,6 +827,7 @@ function resolveDiceExpression(expression, playerStats, slotLevel) {
         .replace(/proficiency_bonus_d4/g, `${Math.max(1, prof)}d4`)
         .replace(/proficiency_bonus/g, prof)
         .replace(/monk level/gi, level)
+        .replace(/monk_level/gi, level)
         .replace(/fighter_level/gi, level)
         .replace(/fighter level/gi, level)
         .replace(/paladin level/gi, level)

@@ -5373,10 +5373,11 @@
                         "name": "Wholeness of Body",
                         "description": "As a Bonus Action, you can regain Hit Points equal to three times your Monk level. You must finish a Long Rest before you can use this feature again.",
                         "level": 6,
-                        "automation": {
+                         "automation": {
                             "type": "self_healing",
                             "healExpression": "3 * monk_level",
                             "action": "bonus_action",
+                            "uses": 1,
                             "recharge": "long_rest",
                             "casting_time": "1 bonus action"
                         }

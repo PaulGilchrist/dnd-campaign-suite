@@ -889,7 +889,7 @@ describe('handleInspiringMovement — uses tracking', () => {
     const ps = makePlayerStats({});
     const action = makeAction({ effect: 'inspiring_movement', usesMax: 3 });
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(3); // usesUsed=3 >= usesMax=3
+    useRuntimeState.getRuntimeValue.mockReturnValue(0); // usesUsed=0 <= 0
 
     const result = await handle(action, ps, campaignName, mapName);
 
@@ -902,7 +902,7 @@ describe('handleInspiringMovement — uses tracking', () => {
     const ps = makePlayerStats({});
     const action = makeAction({ effect: 'inspiring_movement', uses: 2, usesMax: null }); // falls back to auto.uses
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(2); // >= 2
+    useRuntimeState.getRuntimeValue.mockReturnValue(0); // >= 2
 
     const result = await handle(action, ps, campaignName, mapName);
 
@@ -918,7 +918,7 @@ describe('handleInspiringMovement — uses tracking', () => {
     await handle(action, ps, campaignName, mapName);
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Bard', 'customUses', 2, campaignName
+      'Bard', 'customUses', 0, campaignName
     );
   });
 
@@ -926,7 +926,7 @@ describe('handleInspiringMovement — uses tracking', () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ effect: 'inspiring_movement', usesMax: 3, resourceKey: null });
 
-    useRuntimeState.getRuntimeValue.mockReturnValueOnce(0); // used=0 < max=3
+    useRuntimeState.getRuntimeValue.mockReturnValueOnce(2); // used=2 < max=3
 
     await handle(action, ps, campaignName, mapName);
 
@@ -939,7 +939,7 @@ describe('handleInspiringMovement — uses tracking', () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ effect: 'inspiring_movement', usesMax: 3 });
 
-    useRuntimeState.getRuntimeValue.mockReturnValueOnce(null); // → Number(null ?? 0) = 0 < 3
+    useRuntimeState.getRuntimeValue.mockReturnValueOnce(2); // → Number(2 ?? 3) = 2 < 3
 
     await handle(action, ps, campaignName, mapName);
 
@@ -1010,7 +1010,7 @@ describe('handleInspiringMovement — uses tracking', () => {
     const ps = makePlayerStats({ name: 'Bard' });
     const action = makeAction({ effect: 'inspiring_movement', usesMax: 2 });
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(2); // used=2 >= max=2 → early return
+    useRuntimeState.getRuntimeValue.mockReturnValue(0); // used=0 <= max=2 → early return
 
     await handle(action, ps, campaignName, mapName);
 

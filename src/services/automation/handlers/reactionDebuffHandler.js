@@ -248,8 +248,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const effectiveUsesMax = usesMax || bardicUsesMax;
 
     if (effectiveUsesMax > 0) {
-        const usesUsed = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? 0);
-        if (usesUsed >= effectiveUsesMax) {
+        const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? effectiveUsesMax);
+        if (currentUses <= 0) {
             return {
                 type: 'popup',
                 payload: {
@@ -361,8 +361,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
     }
 
     if (effectiveUsesMax > 0) {
-        const usesUsed = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? 0);
-        await setRuntimeValue(playerName, usesKey, usesUsed + 1, campaignName);
+        const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? effectiveUsesMax);
+        await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
     }
 
     if (effect === 'disadvantage_on_attack_roll' && result?.defenderName) {

@@ -161,8 +161,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
             ?? (playerStats.proficiency || 0);
 
         if (usesMax > 0) {
-            const usesUsed = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? 0);
-            if (usesUsed >= usesMax) {
+            const currentUses = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? usesMax);
+            if (currentUses <= 0) {
                 return {
                     type: 'popup',
                     payload: {
@@ -203,8 +203,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }
 
         if (usesMax > 0) {
-            const usesUsed = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? 0);
-            await setRuntimeValue(playerName, 'bardicInspirationUses', usesUsed + 1, campaignName);
+            const currentUses = Number(getRuntimeValue(playerName, 'bardicInspirationUses', campaignName) ?? usesMax);
+            await setRuntimeValue(playerName, 'bardicInspirationUses', currentUses - 1, campaignName);
         }
 
         addEntry(campaignName, {

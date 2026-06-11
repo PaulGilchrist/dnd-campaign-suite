@@ -8,8 +8,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const maxUses = auto.usesMax ?? auto.uses ?? 0;
     if (maxUses > 0) {
         const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
-        const usesUsed = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
-        if (usesUsed >= maxUses) {
+        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
+        if (currentUses <= 0) {
             return {
                 type: 'popup',
                 payload: {
@@ -21,7 +21,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 },
             };
         }
-        await setRuntimeValue(playerStats.name, usesKey, usesUsed + 1, campaignName);
+        await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
     }
 
     const { wasActive } = toggleBuff(

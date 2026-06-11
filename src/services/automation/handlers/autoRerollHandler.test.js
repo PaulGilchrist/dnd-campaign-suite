@@ -76,7 +76,7 @@ describe('autoRerollHandler.handle', () => {
         });
 
         it('should return popup when uses are exhausted', async () => {
-            getRuntimeValue.mockReturnValue(2); // used 2, max is 2
+            getRuntimeValue.mockReturnValue(0); // used 0, max is 2
             const result = await handle(bardAction, playerStats, campaignName, mapName);
             expect(result).toEqual({
                 type: 'popup',
@@ -90,7 +90,7 @@ describe('autoRerollHandler.handle', () => {
         });
 
         it('should return popup when even with uses, no recent failure is found', async () => {
-            getRuntimeValue.mockReturnValue(0);
+            getRuntimeValue.mockReturnValue(2);
             getLastAttackRoll.mockReturnValue(null);
             getLastAbilityCheck.mockReturnValue(null);
             const result = await handle(bardAction, playerStats, campaignName, mapName);
@@ -106,7 +106,7 @@ describe('autoRerollHandler.handle', () => {
         });
 
         it('should apply to a fresh failed attack roll', async () => {
-            getRuntimeValue.mockReturnValue(0);
+            getRuntimeValue.mockReturnValue(2);
             getLastAttackRoll.mockReturnValue({
                 timestamp: Date.now(),
                 d20: 5,
@@ -124,7 +124,7 @@ describe('autoRerollHandler.handle', () => {
         });
 
         it('should apply to a fresh ability check', async () => {
-            getRuntimeValue.mockReturnValue(0);
+            getRuntimeValue.mockReturnValue(2);
             getLastAttackRoll.mockReturnValue(null);
             getLastAbilityCheck.mockReturnValue({
                 timestamp: Date.now(),
@@ -140,7 +140,7 @@ describe('autoRerollHandler.handle', () => {
         });
 
         it('should ignore stale failures', async () => {
-            getRuntimeValue.mockReturnValue(0);
+            getRuntimeValue.mockReturnValue(2);
             getLastAttackRoll.mockReturnValue({ timestamp: Date.now() - 70000, hit: false });
             getLastAbilityCheck.mockReturnValue({ timestamp: Date.now() - 70000 });
 

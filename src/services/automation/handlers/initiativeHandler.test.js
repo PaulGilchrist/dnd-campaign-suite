@@ -110,7 +110,7 @@ describe('initiativeHandler.handle', () => {
       const action = makeAction({ effect: 'bonus_initiative_allies' });
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce([]) // activeConditions — not incapacitated
-        .mockReturnValueOnce(4); // bardicInspirationUses (max is 4 for level 3)
+        .mockReturnValueOnce(0); // bardicInspirationUses = 0 <= 0
 
       const result = await handle(action, ps, campaignName, null);
 
@@ -123,7 +123,7 @@ describe('initiativeHandler.handle', () => {
       const action = makeAction({ effect: 'bonus_initiative_allies' });
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce([])
-        .mockReturnValueOnce(2); // bardicUsed = 2, bardicMax = 2
+        .mockReturnValueOnce(0); // bardicUsed = 0 <= 0
 
       const result = await handle(action, ps, campaignName, null);
 
@@ -135,7 +135,7 @@ describe('initiativeHandler.handle', () => {
       const action = makeAction({ effect: 'bonus_initiative_allies' });
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce([])
-        .mockReturnValueOnce(0); // bardicUsed = 0
+        .mockReturnValueOnce(2); // bardicUsed = 2
       diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
       damageUtils.getCombatContext.mockResolvedValue(null);
 
@@ -172,7 +172,7 @@ describe('initiativeHandler.handle', () => {
       const action = makeAction({ effect: 'bonus_initiative_allies' });
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce([])
-        .mockReturnValueOnce(0);
+        .mockReturnValueOnce(2);
       diceRoller.rollExpression.mockReturnValue(null);
 
       const result = await handle(action, ps, campaignName, null);
@@ -185,7 +185,7 @@ describe('initiativeHandler.handle', () => {
       const action = makeAction({ effect: 'bonus_initiative_allies' });
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce([])
-        .mockReturnValueOnce(0);
+        .mockReturnValueOnce(2);
       diceRoller.rollExpression.mockReturnValue({ total: 8, rolls: [8] });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary([
         { name: 'Ally1', type: 'player', initiative: '12' },
@@ -203,11 +203,11 @@ describe('initiativeHandler.handle', () => {
      it('sets tandemFootworkBonus for allies without initiative', async () => {
        const ps = makePlayerStats({ level: 3 });
        const action = makeAction({ effect: 'bonus_initiative_allies' });
-       // First two calls: activeConditions ([]), bardicInspirationUses (0)
+       // First two calls: activeConditions ([]), bardicInspirationUses (2)
        // Third call: tandemFootworkBonus for ally (0)
        useRuntimeState.getRuntimeValue
           .mockReturnValueOnce([])
-          .mockReturnValueOnce(0)
+          .mockReturnValueOnce(2)
           .mockReturnValueOnce(0);
        diceRoller.rollExpression.mockReturnValue({ total: 8, rolls: [8] });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary([
@@ -229,7 +229,7 @@ describe('initiativeHandler.handle', () => {
       const action = makeAction({ effect: 'bonus_initiative_allies' });
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce([])
-        .mockReturnValueOnce(0);
+        .mockReturnValueOnce(2);
       diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary([
         { name: 'Goblin', type: 'npc', initiative: '15' },
@@ -243,11 +243,11 @@ describe('initiativeHandler.handle', () => {
      it('sorts creatures by initiative after updating', async () => {
        const ps = makePlayerStats({ level: 3 });
        const action = makeAction({ effect: 'bonus_initiative_allies' });
-        // First two: activeConditions ([]), bardicInspirationUses (0)
+        // First two: activeConditions ([]), bardicInspirationUses (2)
         // Next calls: tandemFootworkBonus for allies without initiative
        useRuntimeState.getRuntimeValue
            .mockReturnValueOnce([])
-           .mockReturnValueOnce(0)
+           .mockReturnValueOnce(2)
            .mockReturnValueOnce(0)
            .mockReturnValueOnce(0);
        diceRoller.rollExpression.mockReturnValue({ total: 10, rolls: [10] });
@@ -268,7 +268,7 @@ describe('initiativeHandler.handle', () => {
       const action = makeAction({ effect: 'bonus_initiative_allies' });
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce([])
-        .mockReturnValueOnce(0);
+        .mockReturnValueOnce(2);
       diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary([
         { name: 'Ally1', type: 'player', initiative: '10' },
@@ -284,7 +284,7 @@ describe('initiativeHandler.handle', () => {
       const action = makeAction({ effect: 'bonus_initiative_allies' });
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce([])
-        .mockReturnValueOnce(0);
+        .mockReturnValueOnce(2);
       diceRoller.rollExpression.mockReturnValue({ total: 8, rolls: [8] });
       damageUtils.getCombatContext.mockResolvedValue(null);
 
@@ -300,7 +300,7 @@ describe('initiativeHandler.handle', () => {
       const action = makeAction({ effect: 'bonus_initiative_allies' });
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce([])
-        .mockReturnValueOnce(0);
+        .mockReturnValueOnce(2);
       diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
       damageUtils.getCombatContext.mockResolvedValue(null);
 
@@ -318,7 +318,7 @@ describe('initiativeHandler.handle', () => {
       const action = makeAction({ effect: 'bonus_initiative_allies' });
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce([])
-        .mockReturnValueOnce(0);
+        .mockReturnValueOnce(2);
       diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
       damageUtils.getCombatContext.mockResolvedValue(null);
 
@@ -422,7 +422,7 @@ describe('initiativeHandler.handle', () => {
         effect: 'regain_focus_points_and_heal',
         usesMax: 1,
       });
-      useRuntimeState.getRuntimeValue.mockReturnValue(1); // used 1, max is 1
+      useRuntimeState.getRuntimeValue.mockReturnValue(0); // used 0 <= 0
 
       const result = await handle(action, ps, campaignName, null);
 
@@ -436,7 +436,7 @@ describe('initiativeHandler.handle', () => {
         effect: 'regain_focus_points_and_heal',
         uses: 1, // uses instead of usesMax
       });
-      useRuntimeState.getRuntimeValue.mockReturnValue(1);
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
       const result = await handle(action, ps, campaignName, null);
 
@@ -449,9 +449,9 @@ describe('initiativeHandler.handle', () => {
          effect: 'regain_focus_points_and_heal',
          usesMax: 2,
         });
-        // First call: usesUsed (0), second: currentHitPoints (15)
+        // First call: usesUsed (2), second: currentHitPoints (15)
        useRuntimeState.getRuntimeValue
-            .mockReturnValueOnce(0)
+            .mockReturnValueOnce(2)
             .mockReturnValueOnce(15);
        diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
 
@@ -470,9 +470,9 @@ describe('initiativeHandler.handle', () => {
          effect: 'regain_focus_points_and_heal',
          usesMax: 2,
          });
-          // First call: usesUsed (0), second: currentHitPoints (18)
+           // First call: usesUsed (2), second: currentHitPoints (18)
        useRuntimeState.getRuntimeValue
-             .mockReturnValueOnce(0)
+             .mockReturnValueOnce(2)
              .mockReturnValueOnce(18);
        diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
 
@@ -488,10 +488,10 @@ describe('initiativeHandler.handle', () => {
          effect: 'regain_focus_points_and_heal',
          usesMax: 2,
          resourceKey: 'focusUses',
-          });
-        // First call: usesUsed (0), second: currentHitPoints (15)
+           });
+         // First call: usesUsed (2), second: currentHitPoints (15)
        useRuntimeState.getRuntimeValue
-             .mockReturnValueOnce(0)
+             .mockReturnValueOnce(2)
              .mockReturnValueOnce(15);
        diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
 
@@ -507,7 +507,7 @@ describe('initiativeHandler.handle', () => {
         usesMax: 2,
       });
       useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(2)
         .mockReturnValueOnce(15);
       diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
 
@@ -523,7 +523,7 @@ describe('initiativeHandler.handle', () => {
         usesMax: 2,
       });
       useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(2)
         .mockReturnValueOnce(15);
       diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
 
@@ -537,7 +537,7 @@ describe('initiativeHandler.handle', () => {
        const ps = makeMonkStats({});
        const action = makeAction({ effect: 'regain_focus_points_and_heal', usesMax: 2 });
          // Proceed past uses check — no need for second getRuntimeValue call
-       useRuntimeState.getRuntimeValue.mockReturnValueOnce(0);
+       useRuntimeState.getRuntimeValue.mockReturnValueOnce(2);
       diceRoller.rollExpression.mockReturnValue(null);
 
       const result = await handle(action, ps, campaignName, null);
@@ -556,7 +556,7 @@ describe('initiativeHandler.handle', () => {
         },
       };
       useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(2)
         .mockReturnValueOnce(15);
       diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
 
@@ -569,9 +569,9 @@ describe('initiativeHandler.handle', () => {
     it('handles currentHitPoints as null (uses default 0)', async () => {
        const ps = makeMonkStats({ hitPoints: 30 });
        const action = makeAction({ effect: 'regain_focus_points_and_heal', usesMax: 2 });
-       // First call: usesUsed (0), second: currentHitPoints (null → 0)
+       // First call: usesUsed (2), second: currentHitPoints (null → 0)
        useRuntimeState.getRuntimeValue
-              .mockReturnValueOnce(0)
+              .mockReturnValueOnce(2)
               .mockReturnValueOnce(null);
       diceRoller.rollExpression.mockReturnValue({ total: 4, rolls: [4] });
 

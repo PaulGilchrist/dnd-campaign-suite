@@ -340,15 +340,12 @@ describe('handleMantleOfInspiration — no uses remaining', () => {
       },
     });
 
-    // Call 1: getRuntimeValue for 'bardicInspirationUses' — returns uses used (2)
-    useRuntimeState.getRuntimeValue.mockReturnValue(2);
-    // Class has usesMax=2 so 2>=2 → exhausted pop-up before any other mocks needed.
+    useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName);
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toBe('Second Wind has no uses remaining. Recharges on a Long Rest.');
-    // Should NOT have incremented usage or set temp HP on others
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 
@@ -359,12 +356,11 @@ describe('handleMantleOfInspiration — no uses remaining', () => {
     });
     const ps = makePlayerStats({
       level: 1,
-      class: { name: 'Bard', class_levels: [{ level: 1 }] }, // no bardic_inspiration_uses field
-      abilities: [{ name: 'Charisma', score: 14 }], // Cha mod = +2 ⇒ usesMax=2
+      class: { name: 'Bard', class_levels: [{ level: 1 }] },
+      abilities: [{ name: 'Charisma', score: 14 }],
     });
 
-    // getRuntimeValue('bardicInspirationUses') → 2 (>= usesMax which is Cha mod = 2)
-    useRuntimeState.getRuntimeValue.mockReturnValue(2);
+    useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName);
 
@@ -396,12 +392,12 @@ describe('handleMantleOfInspiration — successful (no map)', () => {
           { level: 3, bardic_die: 6, bardic_inspiration_uses: 2 },
         ],
       },
-      abilities: [{ name: 'Charisma', score: 14 }], // Cha mod = +2
+      abilities: [{ name: 'Charisma', score: 14 }],
     });
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0); // usesUsed=0 < usesMax=2
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
-    const result = await handle(action, ps, campaignName, null); // no mapName
+    const result = await handle(action, ps, campaignName, null);
 
     expect(result.type).toBe('roll');
     expect(result.payload.name).toBe('Second Wind');
@@ -410,7 +406,6 @@ describe('handleMantleOfInspiration — successful (no map)', () => {
     expect(result.payload.description).toContain('no targets in range');
     expect(result.payload.description).toContain('Rolled');
 
-      // Verifies that bardicInspirationUses was incremented (usesMax > 0)
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalled();
   });
 
@@ -427,7 +422,7 @@ describe('handleMantleOfInspiration — successful (no map)', () => {
       },
     });
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0); // usesUsed=0
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
     await handle(action, ps, campaignName, null);
 
@@ -435,7 +430,7 @@ describe('handleMantleOfInspiration — successful (no map)', () => {
       c => c[1] === 'bardicInspirationUses',
     );
     expect(setCall).toBeDefined();
-    expect(setCall[2]).toBe(1); // 0 + 1
+    expect(setCall[2]).toBe(1); // 2 - 1 = 1
   });
 
   it('does NOT increment bardicInspirationUses when usesMax === 0', async () => {
@@ -483,7 +478,7 @@ describe('handleMantleOfInspiration — with map and targets', () => {
         name: 'Bard',
         class_levels: [{ level: 1, bardic_inspiration_uses: 2 }],
       },
-      abilities: [{ name: 'Charisma', score: 14 }], // Cha mod +2 → maxTargets=2
+      abilities: [{ name: 'Charisma', score: 14 }],
     });
 
     const mapData = {
@@ -495,13 +490,13 @@ describe('handleMantleOfInspiration — with map and targets', () => {
       ],
     };
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0); // usesUsed=0
-    rangeValidation.rangeToFeet.mockReturnValue(60); // auto.range → 60 ft
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
+    rangeValidation.rangeToFeet.mockReturnValue(60);
     mapsService.loadMapData.mockResolvedValue(mapData);
     rangeValidation.getDistanceFeet
-      .mockReturnValueOnce(10)   // Ally1 in range (10 <= 60)
-      .mockReturnValueOnce(37.5) // Ally2 in range (37.5 <= 60)
-      .mockReturnValueOnce(384.1); // FarAway out of range (> 60)
+      .mockReturnValueOnce(10)
+      .mockReturnValueOnce(37.5)
+      .mockReturnValueOnce(384.1);
 
     const result = await handle(action, ps, campaignName, 'some-map');
 
@@ -517,7 +512,6 @@ describe('handleMantleOfInspiration — with map and targets', () => {
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die'
      });
-    // Cha mod +1 → maxTargets=1
     const ps = makePlayerStats({
       name: 'Faldorn',
       level: 1,
@@ -525,7 +519,7 @@ describe('handleMantleOfInspiration — with map and targets', () => {
         name: 'Bard',
         class_levels: [{ level: 1, bardic_inspiration_uses: 2 }],
       },
-      abilities: [{ name: 'Charisma', score: 12 }], // Cha mod +1
+      abilities: [{ name: 'Charisma', score: 12 }],
     });
 
     const mapData = {
@@ -536,16 +530,16 @@ describe('handleMantleOfInspiration — with map and targets', () => {
       ],
     };
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
     rangeValidation.rangeToFeet.mockReturnValue(60);
     mapsService.loadMapData.mockResolvedValue(mapData);
-    rangeValidation.getDistanceFeet.mockReturnValue(5); // all in range
+    rangeValidation.getDistanceFeet.mockReturnValue(5);
 
     const result = await handle(action, ps, campaignName, 'some-map');
 
     expect(result.payload.targets.length).toBe(1);
     expect(result.payload.targets).toContain('AllyNear');
-    expect(result.payload.targets).not.toContain('AlsoNear'); // maxTargets=1
+    expect(result.payload.targets).not.toContain('AlsoNear');
   });
 
   it('sets tempHp and inspiringMovementNoOA for each target', async () => {
@@ -560,7 +554,7 @@ describe('handleMantleOfInspiration — with map and targets', () => {
         name: 'Bard',
         class_levels: [{ level: 1, bardic_inspiration_uses: 2 }],
       },
-      abilities: [{ name: 'Charisma', score: 14 }], // +2 → maxTargets=2
+      abilities: [{ name: 'Charisma', score: 14 }],
     });
 
     const mapData = {
@@ -570,14 +564,13 @@ describe('handleMantleOfInspiration — with map and targets', () => {
       ],
     };
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
     rangeValidation.rangeToFeet.mockReturnValue(60);
     mapsService.loadMapData.mockResolvedValue(mapData);
     rangeValidation.getDistanceFeet.mockReturnValue(10);
 
     await handle(action, ps, campaignName, 'some-map');
 
-      // setRuntimeValue should have been called for Ally1's tempHp and inspiringMovementNoOA
     const calls = useRuntimeState.setRuntimeValue.mock.calls;
     const tempCall = calls.find(c => c[0] === 'Ally1' && c[1] === 'tempHp');
     expect(tempCall).toBeDefined();
@@ -600,7 +593,7 @@ describe('handleMantleOfInspiration — with map and targets', () => {
         name: 'Bard',
         class_levels: [{ level: 1, bardic_inspiration_uses: 2 }],
       },
-      abilities: [{ name: 'Charisma', score: 14 }], // +2 maxTargets
+      abilities: [{ name: 'Charisma', score: 14 }],
     });
 
     const mapData = {
@@ -610,7 +603,7 @@ describe('handleMantleOfInspiration — with map and targets', () => {
       ],
     };
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
     rangeValidation.rangeToFeet.mockReturnValue(60);
     mapsService.loadMapData.mockResolvedValue(mapData);
     rangeValidation.getDistanceFeet.mockReturnValue(10);
@@ -626,7 +619,7 @@ describe('handleMantleOfInspiration — with map and targets', () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
-      range: 'self', // rangeToFeet('self') → null
+      range: 'self',
     });
 
     const ps = makePlayerStats({
@@ -638,8 +631,8 @@ describe('handleMantleOfInspiration — with map and targets', () => {
       },
     });
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    rangeValidation.rangeToFeet.mockReturnValue(null); // self → null
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
+    rangeValidation.rangeToFeet.mockReturnValue(null);
 
     const result = await handle(action, ps, campaignName, 'some-map');
 
@@ -684,11 +677,11 @@ describe('handleMantleOfInspiration — with map and targets', () => {
 
     const mapData = {
       players: [
-        { name: 'Faldorn', gridX: 0, gridY: 0 }, // self — should be skipped
+        { name: 'Faldorn', gridX: 0, gridY: 0 },
       ],
     };
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
     rangeValidation.rangeToFeet.mockReturnValue(60);
     mapsService.loadMapData.mockResolvedValue(mapData);
 
@@ -789,14 +782,13 @@ describe('handleMantleOfInspiration — roll result payload', () => {
       ],
     };
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
     rangeValidation.rangeToFeet.mockReturnValue(60);
     mapsService.loadMapData.mockResolvedValue(mapData);
     rangeValidation.getDistanceFeet.mockReturnValue(10);
 
     const result = await handle(action, ps, campaignName, 'some-map');
 
-      // Description should contain the Reaction note since targets.length > 0
     expect(result.payload.description).toContain('Reaction to move up to their Speed without provoking Opportunity Attacks');
   });
 
