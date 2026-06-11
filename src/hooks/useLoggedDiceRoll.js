@@ -334,9 +334,12 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
          isAutoCrit: context?.isAutoCrit,
          isCrit,
          autoDamage,
-         autoReroll: context?.autoReroll,
-         autoRerollBonus: context?.autoRerollBonus,
-       });
+          autoReroll: context?.autoReroll,
+          autoRerollBonus: context?.autoRerollBonus,
+          strSaveReplace: context?.strSaveReplace,
+          strScore: context?.strScore,
+          strCheckReplace: context?.strCheckReplace,
+        });
 
      if (rollType === 'attack') {
          setRuntimeValue(characterName, 'lastAttackRoll', {

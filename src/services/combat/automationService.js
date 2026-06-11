@@ -477,6 +477,19 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'conditional_replacement': {
+            return {
+                type: 'conditional_replacement',
+                name: feature.name,
+                target: auto.target || 'saving_throw',
+                saveType: auto.saveType || '',
+                condition: auto.condition || '',
+                effect: auto.effect || '',
+                replacementAbility: auto.replacementAbility || '',
+                hasAutomation: true
+            }
+        }
+
         case 'passive_rule': {
             return {
                 type: 'passive_rule',
@@ -722,6 +735,8 @@ function buildAttackInfo(feature, playerStats) {
                 allyCount: auto.allyCount || 0,
                 teleportRange: auto.teleportRange || '',
                 enemiesDisadvantageSaves: auto.enemies_disadvantage_saves || [],
+                triggerOnRage: !!auto.triggerOnRage,
+                distanceExpression: auto.distanceExpression || '',
                 hasAutomation: true
             }
         }
@@ -959,6 +974,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'auto_effect':
             case 'resource_restoration':
             case 'conditional_advantage':
+            case 'conditional_replacement':
             case 'evasion':
             case 'conditional_disadvantage':
             case 'mastery_rider':
@@ -1055,6 +1071,16 @@ export function collectSaveModifiers(features) {
                 effect: 'reroll',
                 bonusExpression: auto.bonusExpression || '',
                 oncePerRage: !!auto.oncePerRage,
+            })
+        }
+        if (auto.type === 'conditional_replacement') {
+            modifiers.push({
+                source: feature.name,
+                target: auto.target,
+                condition: auto.condition,
+                effect: 'replacement',
+                saveType: auto.saveType || '',
+                replacementAbility: auto.replacementAbility || '',
             })
         }
     })

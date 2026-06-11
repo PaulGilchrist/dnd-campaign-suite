@@ -94,7 +94,22 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
         const unarmoredMovement = classLevel?.class_specific?.unarmored_movement || 0;
         speed += unarmoredMovement;
-     }
+      }
+
+    // Apply passive_buff speed_bonus effects (e.g., Fast Movement: +10 speed without heavy armor)
+    const passives = playerStats.automation?.passives || [];
+    for (const passive of passives) {
+      if (passive.type === 'passive_buff' && passive.effect === 'speed_bonus' && passive.condition === 'no_heavy_armor') {
+        const bonus = passive.bonusExpression ? parseInt(passive.bonusExpression, 10) : 10;
+        const isWearingHeavy = playerStats.equipment
+          ? playerStats.equipment.find(eq => playerStats.inventory.equipped?.includes(eq.name) && eq.armor_category === 'Heavy')
+          : (playerStats.armorClassFormula?.includes('Heavy') || false);
+        if (!isWearingHeavy) {
+          buffSpeedBonus += bonus;
+        }
+      }
+    }
+
     speed = Math.max(0, speed - (5 * exhaustionLevel));
     if (conditionEffects?.speedZero) speed = 0;
     if (conditionEffects?.speedHalved) speed = Math.floor(speed / 2);

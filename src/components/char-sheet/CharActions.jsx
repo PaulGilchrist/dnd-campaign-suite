@@ -119,6 +119,18 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                      }
                 }
              }
+
+            // Recover Rage uses on initiative (Persistent Rage - Barbarian level 15)
+            const hasPersistentRage = (playerStats.automation?.passives ?? []).some(p => p.type === 'passive_rule' && p.effect === 'persistent_rage');
+            if (hasPersistentRage && playerStats.class?.name === 'Barbarian') {
+                const rageCount = classLevel?.rages || 0;
+                if (rageCount > 0) {
+                    const currentRage = Number(getRuntimeValue(playerStats.name, 'ragePoints', campaignName) ?? rageCount);
+                    if (currentRage < rageCount) {
+                        setRuntimeValue(playerStats.name, 'ragePoints', rageCount, campaignName);
+                    }
+                }
+             }
          };
 
         window.addEventListener('initiative-rolled', handleInitiativeRolled);

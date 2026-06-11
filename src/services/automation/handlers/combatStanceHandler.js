@@ -228,6 +228,21 @@ async function activateStance(action, playerStats, campaignName, chosenOption) {
                 payload: { action: teleportFeature, playerStats, campaignName, triggeredByRage: true },
             };
         }
+
+        const instinctivePounce = specialActions.find(sa => sa.effect === 'rage_bonus_movement');
+        if (instinctivePounce) {
+            const speed = playerStats.speed || 30;
+            const maxMove = Math.floor(speed / 2);
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: instinctivePounce.name,
+                    description: `${instinctivePounce.name}: You can move up to ${maxMove} feet as part of entering your Rage. Move your token on the combat map.`,
+                    automationType: instinctivePounce.automation?.type,
+                },
+            };
+        }
     }
 
     if (auto.effect === 'create_illusion') {

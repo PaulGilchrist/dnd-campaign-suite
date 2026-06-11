@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, onReroll }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, onReroll }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
@@ -29,6 +29,8 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
     const originalTotal = finalRoll + bonus + modifier;
     const displayRoll = rerollResult !== null ? rerollResult.roll : finalRoll;
     const displayTotal = rerollResult !== null ? rerollResult.total : originalTotal;
+    const appliesReplace = (strSaveReplace && rollType === 'save') || (strCheckReplace && (rollType === 'check' || rollType === 'skill'));
+    const finalDisplayTotal = appliesReplace && displayTotal < (strScore || 10) ? strScore : displayTotal;
     const showCrit = isCrit || isAutoCrit || (isD20 && displayRoll === 20);
 
     const saveAbilityLabel = saveType ? saveType.toUpperCase() : '';
@@ -54,7 +56,7 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                 }`}></i>
                 {name}
             </div>
-            <div className="dice-roll-total">{displayTotal}</div>
+            <div className="dice-roll-total">{finalDisplayTotal}</div>
             <div className="dice-roll-breakdown">
                 {formula ? `${formula}: ` : type === 'd20' ? 'd20 ' : ''}
                 {rerollResult !== null ? (

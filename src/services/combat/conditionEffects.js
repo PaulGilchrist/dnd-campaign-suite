@@ -9,6 +9,7 @@ const CONDITIONS_THAT_SPEED_ZERO = new Set([
 const CONDITION_KEYWORDS = new Set(['charmed', 'frightened', 'poison', 'magic'])
 
 function saveModifierApplies(modifier, saveType, abilityName, isRaging = false) {
+  if (modifier.effect === 'replacement') return true;
   if (modifier.target !== 'saving_throw' && modifier.target !== 'save') return false;
   if (modifier.condition === 'raging') return isRaging;
   if (modifier.condition === 'charmed' && saveType === 'charmed') return true;
@@ -42,14 +43,24 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
       }
      } else if (mod.effect === 'disadvantage') {
       effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
-      } else if (mod.effect === 'reroll') {
-       effects.autoReroll = true;
-       effects.autoRerollCondition = mod.condition;
-       if (mod.bonusExpression) {
-         effects.autoRerollBonus = mod.bonusExpression;
+       } else if (mod.effect === 'reroll') {
+        effects.autoReroll = true;
+        effects.autoRerollCondition = mod.condition;
+        if (mod.bonusExpression) {
+          effects.autoRerollBonus = mod.bonusExpression;
+        }
+        } else if (mod.effect === 'replacement') {
+         if (mod.saveType === 'STR') {
+           if (mod.target === 'saving_throw' || mod.target === 'save') {
+             effects.strSaveReplace = true;
+           }
+           if (mod.target === 'ability_check' || mod.target === 'check' || !mod.target) {
+             effects.strCheckReplace = true;
+           }
+         }
+
        }
-      }
-    }
+     }
 }
 
 function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false) {
@@ -77,6 +88,8 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     autoReroll: false,
     autoRerollCondition: null,
     autoRerollBonus: null,
+    strSaveReplace: false,
+    strCheckReplace: false,
     riderSaveDisadvantage: false,
     riderAttackBonus: 0,
     riderCannotOpportunityAttack: false,

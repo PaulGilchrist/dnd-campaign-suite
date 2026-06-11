@@ -41,14 +41,19 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
          return bonus;
      };
 
-      const makeCheckContext = (checkName) => {
-        let forcedMode = undefined
-        if (conditionEffects?.abilityCheckDisadvantage) forcedMode = 'disadvantage'
-        if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === checkName)) {
-          forcedMode = forcedMode === 'disadvantage' ? undefined : 'advantage'
-        }
-        return forcedMode ? { forcedMode } : undefined
-      }
+       const makeCheckContext = (checkName) => {
+         let forcedMode = undefined
+         if (conditionEffects?.abilityCheckDisadvantage) forcedMode = 'disadvantage'
+         if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === checkName)) {
+           forcedMode = forcedMode === 'disadvantage' ? undefined : 'advantage'
+         }
+         const ctx = forcedMode ? { forcedMode } : undefined
+         if (conditionEffects?.strCheckReplace) {
+           const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
+           return { ...ctx, strCheckReplace: true, strScore: strAbility?.totalScore || 10 }
+         }
+         return ctx
+       }
 
       const makeSaveContext = (abilityName) => {
         const abbr = abilityName.substring(0, 3).toLowerCase()
@@ -63,10 +68,14 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
         if (!autoFail && !forcedMode && conditionEffects?.saveAdvantageAbilities?.includes(abilityName.substring(0, 3).toUpperCase())) {
           forcedMode = 'advantage'
          }
-         if (conditionEffects?.autoReroll) {
-           return { forcedMode, autoFail: autoFail || undefined, autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition, autoRerollBonus: conditionEffects.autoRerollBonus || null }
-         }
-        return { forcedMode, autoFail: autoFail || undefined }
+          if (conditionEffects?.autoReroll) {
+            return { forcedMode, autoFail: autoFail || undefined, autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition, autoRerollBonus: conditionEffects.autoRerollBonus || null }
+          }
+         if (conditionEffects?.strSaveReplace) {
+            const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
+            return { forcedMode, autoFail: autoFail || undefined, strSaveReplace: true, strScore: strAbility?.totalScore || 10 }
+          }
+         return { forcedMode, autoFail: autoFail || undefined }
       }
 
         const hasSaveAdvantage = (abilityName) => {

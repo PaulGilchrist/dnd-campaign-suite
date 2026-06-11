@@ -166,7 +166,14 @@
                         "name": "Fast Movement",
                         "description": "Your speed increases by 10 feet while you aren't wearing Heavy armor.",
                         "level": 5,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_buff",
+                            "effect": "speed_bonus",
+                            "bonusExpression": "10",
+                            "condition": "no_heavy_armor",
+                            "casting_time": "passive"
+                        }
                     }
                 ]
             },
@@ -209,7 +216,14 @@
                         "name": "Instinctive Pounce",
                         "description": "As part of the Bonus Action you take to enter your Rage, you can move up to half your Speed.",
                         "level": 7,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "temp_buff",
+                            "effect": "rage_bonus_movement",
+                            "distanceExpression": "speed / 2",
+                            "triggerOnRage": true,
+                            "casting_time": "passive"
+                        }
                     }
                 ]
             },
@@ -387,7 +401,12 @@
                         "name": "Persistent Rage",
                         "description": "When you roll Initiative, you can regain all expended uses of Rage. After you regain uses of Rage in this way, you can't do so again until you finish a Long Rest. In addition, your Rage is so fierce that it now lasts for 10 minutes without you needing to do anything to extend it from round to round. Your Rage ends early if you have the Unconscious condition (not just the Incapacitated condition) or don Heavy armor.",
                         "level": 15,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "persistent_rage",
+                            "casting_time": "passive"
+                        }
                     }
                 ]
             },
@@ -466,7 +485,16 @@
                         "name": "Indomitable Might",
                         "description": "If your total for a Strength check or Strength saving throw is less than your Strength score, you can use that score in place of the total.",
                         "level": 18,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "conditional_replacement",
+                            "target": "ability_check",
+                            "saveType": "STR",
+                            "condition": "low_total",
+                            "effect": "replacement",
+                            "replacementAbility": "STR",
+                            "casting_time": "passive"
+                        }
                     }
                 ]
             },
