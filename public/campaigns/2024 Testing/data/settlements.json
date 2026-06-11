@@ -87,5 +87,54 @@
     "tags": "city, human-culture, tailor, many-services",
     "notes": "",
     "threat": "A serial arsonist has been targeting warehouses, and the merchant guild is offering a reward."
+  },
+  {
+    "name": "Grimstrike Vault",
+    "size": "town",
+    "description": "The town's walls are old but well-maintained, with a walkway along the top patrolled by the town guard. A public market cross where proclamations are read and traveling merchants set up their stalls. The town's famous inn, where the ale is said to be the best in the region and the beds are legendary. A covered market hall where traders sell goods regardless of weather, its roof a forest of timber beams. A public school, funded by the town council, offering basic education to all children of citizens.",
+    "atmosphere": "The press of the crowd at the town hall during elections is a hot, tense, argumentative mass.",
+    "government": "A mayor elected by all householders governs with the advice of an appointed council of experts.",
+    "population": "800-1,500 souls",
+    "services": [
+      {
+        "type": "temple",
+        "name": "The Silver Love",
+        "description": "A small temple to the local patron deity. An acolyte offers blessings for a modest donation."
+      },
+      {
+        "type": "tailor",
+        "name": "Beatrix's Fabric Shop",
+        "description": "A small clothing shop with ready-made items in common sizes."
+      },
+      {
+        "type": "inn",
+        "name": "Chalice & Butterfly",
+        "description": "A quiet inn with clean rooms and a warm hearth. The rooms are modest but well-kept."
+      }
+    ],
+    "notableNPCs": [
+      {
+        "name": "Voren",
+        "role": "Acolyte",
+        "description": "The Acolyte of The Silver Love. Known for fair dealing and a dry sense of humor."
+      },
+      {
+        "name": "Gerald",
+        "role": "Tailor",
+        "description": "The Tailor of Beatrix's Fabric Shop. Warm and welcoming, treats every guest like family."
+      },
+      {
+        "name": "Godfrey",
+        "role": "Barkeep",
+        "description": "The Barkeep of Chalice & Butterfly. Cheerful and optimistic, regardless of circumstances."
+      }
+    ],
+    "rumors": [
+      "A caravan of undead merchants crosses the salt flats every new moon selling cursed goods.",
+      "Grain shipments from the eastern farms have been delayed by bandits."
+    ],
+    "tags": "town, dwarven-culture, temple",
+    "notes": "",
+    "threat": "The town's isolation has bred suspicion of outsiders, making trade and diplomacy nearly impossible."
   }
 ]

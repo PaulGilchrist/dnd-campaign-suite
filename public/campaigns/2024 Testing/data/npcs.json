@@ -1,6 +1,5 @@
 [
   {
-    "id": "n1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6",
     "name": "Elder Kito",
     "race": "Human",
     "classRole": "Village Elder",
@@ -11,10 +10,13 @@
     "notes": "Kito can provide the party with information about the yuan-ti cult's activities, the missing villagers, and the general location of the sunken temple. He will offer the party supplies and a guide if they agree to help, but he cannot leave the village himself. He knows several ancient chulan prayers that may be useful in the temple.",
     "tags": "village leader, quest giver, chulan heritage, yuan-ti victim",
     "attitude": "positive",
+    "image": "",
+    "imageName": "",
     "imagePath": "campaigns/2024 Testing/images/Elder Kito.png",
-    "hitPoints": "",
-    "hitDice": "",
-    "initiativeBonus": "",
+    "armorClass": 15,
+    "hitPoints": "45",
+    "hitDice": "6d8",
+    "initiativeBonus": "0",
     "speed": {
       "walk": "30 ft."
     },
@@ -31,10 +33,17 @@
     "damageResistances": [],
     "damageImmunities": [],
     "conditionImmunities": [],
-    "actions": [],
+    "actions": [
+      {
+        "name": "Shortsword",
+        "attack_bonus": "+2",
+        "damage_dice": "1d6",
+        "description": ""
+      }
+    ],
     "traits": "",
     "reactions": "",
-    "armorClass": null
+    "id": "n1a2b3c4-d5e6-f7a8-b9c0-d1e2f3a4b5c6"
   },
   {
     "id": "n2b3c4d5-e6f7-a8b9-c0d1-e2f3a4b5c6d7",

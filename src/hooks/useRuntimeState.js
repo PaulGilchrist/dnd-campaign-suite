@@ -69,7 +69,7 @@ export function setRuntimeValue(characterKey, propertyName, value, campaignName)
     return;
   }
   store.set(propertyName, value);
-  console.log(`[SSE] setRuntimeValue ${characterKey}.${propertyName}:`, existing, '->', value);
+  // console.log(`[SSE] setRuntimeValue ${characterKey}.${propertyName}:`, existing, '->', value);
 
   const obj = Object.fromEntries(store);
   try { localStorage.setItem(characterKey, JSON.stringify(obj)); } catch { /* ignore */ }
@@ -101,7 +101,7 @@ export function setRuntimeObject(characterKey, fullObject, campaignName, skipSyn
     }
   }
   if (changed) {
-    console.log(`[SSE] setRuntimeObject ${characterKey}: keys [${changedKeys.join(', ')}] changed`);
+    // console.log(`[SSE] setRuntimeObject ${characterKey}: keys [${changedKeys.join(', ')}] changed`);
     try { localStorage.setItem(characterKey, JSON.stringify(Object.fromEntries(store))); } catch { /* ignore */ }
 
     if (campaignName && !skipSync) {

@@ -482,25 +482,25 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
-         case 'reaction_bonus': {
-              return {
-                  type: 'reaction_bonus',
-                  name: feature.name,
-                  trigger: auto.trigger || '',
-                  bonusExpression: auto.bonusExpression || '',
-                  condition: auto.condition || '',
-                  selfMovement: auto.selfMovement || '',
-                  allyMovement: auto.allyMovement || '',
-                  allyRange: auto.allyRange || '30 ft',
-                  noOAs: !!auto.noOAs,
-                  resourceCost: auto.resourceCost || '',
-                  effect: auto.effect || '',
-                  saveType: auto.saveType || '',
-                  saveDc: auto.saveDc || '',
-                  duration: auto.duration || '',
-                  hasAutomation: true
-              }
-          }
+        case 'reaction_bonus': {
+            return {
+                type: 'reaction_bonus',
+                name: feature.name,
+                trigger: auto.trigger || '',
+                bonusExpression: auto.bonusExpression || '',
+                condition: auto.condition || '',
+                selfMovement: auto.selfMovement || '',
+                allyMovement: auto.allyMovement || '',
+                allyRange: auto.allyRange || '30 ft',
+                noOAs: !!auto.noOAs,
+                resourceCost: auto.resourceCost || '',
+                effect: auto.effect || '',
+                saveType: auto.saveType || '',
+                saveDc: auto.saveDc || '',
+                duration: auto.duration || '',
+                hasAutomation: true
+            }
+        }
 
         case 'reaction_damage': {
             let resolvedExpr = auto.damageExpression || ''
@@ -578,8 +578,8 @@ function buildAttackInfo(feature, playerStats) {
                 conversionRate: auto.conversionRate || '',
                 casting_time: auto.casting_time || 'passive',
                 hasAutomation: true
-             }
-         }
+            }
+        }
 
         case 'save_attack': {
             const scaling = resolveScaling(playerStats, auto.scaling)
@@ -730,13 +730,13 @@ function buildAttackInfo(feature, playerStats) {
                 recharge: auto.recharge || 'long_rest',
                 casting_time: auto.casting_time || '1 bonus action',
                 hasAutomation: true
-             }
+            }
         }
 
         case 'resource_restoration': {
             const restoreAmount = auto.restore_expression
-                  ? evaluateAutoExpression(auto.restore_expression, playerStats)
-                  : 0
+                ? evaluateAutoExpression(auto.restore_expression, playerStats)
+                : 0
             return {
                 type: 'resource_restoration',
                 name: feature.name,
@@ -748,8 +748,8 @@ function buildAttackInfo(feature, playerStats) {
                 uses_max: auto.uses_max ?? 1,
                 recharge: auto.recharge || 'long_rest',
                 hasAutomation: true
-              }
-          }
+            }
+        }
 
         case 'sorcery_incarnate': {
             return {
@@ -758,8 +758,8 @@ function buildAttackInfo(feature, playerStats) {
                 casting_time: auto.casting_time || '1 bonus action',
                 cost: auto.cost || 2,
                 hasAutomation: true
-              }
-          }
+            }
+        }
 
         case 'post_cast_self_heal': {
             return {
@@ -773,8 +773,8 @@ function buildAttackInfo(feature, playerStats) {
 
         default:
             return null
-       }
-   }
+    }
+}
 
 function resolveHealingPoolExpression(baseExpression, scaling, playerStats) {
     if (!scaling) return baseExpression
@@ -799,23 +799,23 @@ function resolveDiceExpression(expression, playerStats, slotLevel) {
     const rageDamage = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.rage_damage ?? 2
     const bardicDie = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_die || 6
     let expr = expression
-           .replace(/bardic_inspiration_die/g, bardicDie)
-           .replace(/proficiency_bonus_d4/g, `${Math.max(1, prof)}d4`)
-           .replace(/proficiency_bonus/g, prof)
-           .replace(/monk level/gi, level)
-           .replace(/fighter_level/gi, level)
-           .replace(/fighter level/gi, level)
-           .replace(/paladin level/gi, level)
-           .replace(/barbarian_level/gi, level)
-           .replace(/barbarian level/gi, level)
-           .replace(/bard level/gi, level)
-           .replace(/rage_damage_d6/g, `${rageDamage}d6`)
-           .replace(/rage_damage/g, rageDamage)
-           .replace(/cleric_level/gi, level)
-           .replace(/cleric level/gi, level)
-           .replace(/druid_level/gi, level)
-           .replace(/level/gi, level)
-           .replace(/spell_slot_level/g, slotLevel)
+        .replace(/bardic_inspiration_die/g, bardicDie)
+        .replace(/proficiency_bonus_d4/g, `${Math.max(1, prof)}d4`)
+        .replace(/proficiency_bonus/g, prof)
+        .replace(/monk level/gi, level)
+        .replace(/fighter_level/gi, level)
+        .replace(/fighter level/gi, level)
+        .replace(/paladin level/gi, level)
+        .replace(/barbarian_level/gi, level)
+        .replace(/barbarian level/gi, level)
+        .replace(/bard level/gi, level)
+        .replace(/rage_damage_d6/g, `${rageDamage}d6`)
+        .replace(/rage_damage/g, rageDamage)
+        .replace(/cleric_level/gi, level)
+        .replace(/cleric level/gi, level)
+        .replace(/druid_level/gi, level)
+        .replace(/level/gi, level)
+        .replace(/spell_slot_level/g, slotLevel)
     const abilities = playerStats?.abilities || {}
     const abilityModifiers = {
         strength: getAbilityModifier(abilities, 'strength'),
@@ -849,7 +849,7 @@ export function evaluateAutoExpression(expression, playerStats, prof, level, slo
     try {
         const result = new Function(`"use strict"; return (${expr})`)()
         if (typeof result === 'number' && !isNaN(result)) return result
-      } catch (e) { /* not a simple expression, return as string */ }
+    } catch (e) { /* not a simple expression, return as string */ }
     return expr
 }
 

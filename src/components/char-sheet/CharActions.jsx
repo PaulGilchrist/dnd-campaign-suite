@@ -978,16 +978,19 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                 <p><b>Choose your option:</b></p>
                                 <p style={{ opacity: 0.8, fontSize: '0.9em' }}>{featureChoice.action.description}</p>
                                 <div style={{ textAlign: 'center', marginTop: '16px' }}>
-                                    {featureChoice.options.map((opt) => (
-                                        <button
-                                            key={opt}
-                                            className="sp-roll-btn"
-                                            style={{ margin: '0 6px 8px 6px' }}
-                                            onClick={() => handleFeatureChoiceConfirm(opt)}
-                                        >
-                                            {opt}
-                                        </button>
-                                    ))}
+                                    {featureChoice.options.map((opt, i) => {
+                                        const optName = typeof opt === 'string' ? opt : opt.name;
+                                        return (
+                                            <button
+                                                key={optName || i}
+                                                className="sp-roll-btn"
+                                                style={{ margin: '0 6px 8px 6px' }}
+                                                onClick={() => handleFeatureChoiceConfirm(optName)}
+                                            >
+                                                {optName}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
                             <div className="sp-actions">
