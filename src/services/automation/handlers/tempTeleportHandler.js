@@ -30,6 +30,18 @@ export async function confirmTeleport(action, playerStats, campaignName, useExte
         }
     }
 
+    if (auto.effect === 'shadow_step_teleport') {
+        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+        const newEffect = {
+            target: playerName,
+            source: action.name,
+            effect: 'next_attack_advantage',
+            value: null,
+            duration: 'until_end_of_turn',
+        };
+        setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, newEffect], campaignName);
+    }
+
     return {
         type: 'popup',
         payload: {

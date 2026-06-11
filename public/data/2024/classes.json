@@ -5183,18 +5183,8 @@
                                 "disadvantage_perception"
                             ],
                             "saveType": "WIS",
-                            "casting_time": "1 action"
+                            "casting_time": "1 bonus action"
                         }
-                    },
-                    {
-                        "name": "Shadow Step",
-                        "description": "While entirely within Dim Light or Darkness, Bonus Action teleport up to 60 feet to unoccupied space in Dim Light or Darkness. Advantage on next melee attack.",
-                        "level": 6
-                    },
-                    {
-                        "name": "Improved Shadow Step",
-                        "description": "Expend 1 Focus Point to remove Dim Light/Darkness requirement. Make Unarmed Strike after teleporting.",
-                        "level": 11
                     },
                     {
                         "name": "Cloak of Shadows",

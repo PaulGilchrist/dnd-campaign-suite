@@ -8,7 +8,7 @@ import { setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
-    if (auto?.effect === 'teleport_on_rage' || auto?.effect === 'teleport_swap_with_illusion') {
+    if (auto?.effect === 'teleport_on_rage' || auto?.effect === 'teleport_swap_with_illusion' || auto?.effect === 'shadow_step_teleport') {
         return handleTeleport(action, playerStats, campaignName, _mapName);
     }
 

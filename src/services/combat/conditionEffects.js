@@ -199,10 +199,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
       effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
     }
     if (te.effect === 'next_attack_advantage') {
-      const bonus = parseInt(te.value) || 5;
-      if (bonus > effects.riderAttackBonus) {
-        effects.riderAttackBonus = bonus;
-      }
+      effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;
     }
     if (te.effect === 'disadvantage_next_attack') {
       effects.attackDisadvantageCount = (effects.attackDisadvantageCount || 0) + 1;
