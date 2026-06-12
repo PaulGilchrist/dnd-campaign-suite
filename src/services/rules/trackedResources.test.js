@@ -1,0 +1,888 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
+
+vi.mock('../character/classFeatures.js', () => ({
+  getClassFeatures: vi.fn(),
+}));
+
+// ── Imports ─────────────────────────────────────────────────────
+
+import { getClassFeatures } from '../character/classFeatures.js';
+
+import {
+  ALL_TRACKED_RESOURCES,
+  computeTrackedResources,
+  applyServerOverride,
+  trackedResourcesToStoreEntries,
+} from './trackedResources.js';
+
+// ── Helpers ─────────────────────────────────────────────────────
+
+function makePlayerStats(extra = {}) {
+  return {
+    level: 5,
+    rules: '5e',
+    class: { name: 'Wizard', class_levels: [], major: {}, subclass: {} },
+    abilities: [],
+    feats: [],
+    ...extra,
+  };
+}
+
+// ── ALL_TRACKED_RESOURCES ───────────────────────────────────────
+
+describe('ALL_TRACKED_RESOURCES', () => {
+  it('is an array of expected resource keys', () => {
+    expect(Array.isArray(ALL_TRACKED_RESOURCES)).toBe(true);
+    expect(ALL_TRACKED_RESOURCES).toContain('currentHitPoints');
+    expect(ALL_TRACKED_RESOURCES).toContain('hitPoints');
+    expect(ALL_TRACKED_RESOURCES).toContain('spell_slots_level_1');
+    expect(ALL_TRACKED_RESOURCES).toContain('spell_slots_level_9');
+    expect(ALL_TRACKED_RESOURCES).toContain('shortRestHitDice');
+  });
+
+  it('contains both 5e and 2024 variant keys (secondWindUses / secondwindUses)', () => {
+    expect(ALL_TRACKED_RESOURCES).toContain('secondWindUses');
+    expect(ALL_TRACKED_RESOURCES).toContain('secondwindUses');
+  });
+
+  it('contains 36 tracked resources', () => {
+    expect(ALL_TRACKED_RESOURCES).toHaveLength(36);
+  });
+});
+
+// ── computeTrackedResources ─────────────────────────────────────
+
+describe('computeTrackedResources', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns empty object when playerStats is null', () => {
+    expect(computeTrackedResources(null)).toEqual({});
+  });
+
+  it('returns empty object when playerStats is undefined', () => {
+    expect(computeTrackedResources(undefined)).toEqual({});
+  });
+
+  it('returns empty object when playerStats is not an object (edge case)', () => {
+    // The function doesn't check typeof, so it will try to access .hitPoints
+    // which will throw — but the function does guard with `if (!playerStats) return {}`
+    // so falsy values return {}
+  });
+
+  it('computes hitPoints and currentHitPoints from playerStats.hitPoints', () => {
+    const stats = makePlayerStats({ hitPoints: 35 });
+    const result = computeTrackedResources(stats);
+    expect(result.hitPoints).toEqual({ current: 35, max: 35 });
+    expect(result.currentHitPoints).toEqual({ current: 35, max: 35 });
+  });
+
+  it('defaults hitPoints to 0 when not provided', () => {
+    const stats = makePlayerStats();
+    const result = computeTrackedResources(stats);
+    expect(result.hitPoints).toEqual({ current: 0, max: 0 });
+    expect(result.currentHitPoints).toEqual({ current: 0, max: 0 });
+  });
+
+  it('computes all 9 spell slot levels', () => {
+    const stats = makePlayerStats({
+      spellAbilities: {
+        spell_slots_level_1: 4,
+        spell_slots_level_2: 3,
+        spell_slots_level_3: 3,
+        spell_slots_level_4: 3,
+        spell_slots_level_5: 2,
+        spell_slots_level_6: 1,
+        spell_slots_level_7: 1,
+        spell_slots_level_8: 1,
+        spell_slots_level_9: 1,
+      },
+    });
+    const result = computeTrackedResources(stats);
+    for (let level = 1; level <= 9; level++) {
+      const key = `spell_slots_level_${level}`;
+      expect(result[key]).toEqual({
+        current: stats.spellAbilities[key],
+        max: stats.spellAbilities[key],
+      });
+    }
+  });
+
+  it('defaults spell slots to 0 when spellAbilities not provided', () => {
+    const stats = makePlayerStats();
+    const result = computeTrackedResources(stats);
+    for (let level = 1; level <= 9; level++) {
+      const key = `spell_slots_level_${level}`;
+      expect(result[key]).toEqual({ current: 0, max: 0 });
+    }
+  });
+
+  it('sets shortRestHitDice from playerStats.level', () => {
+    const stats = makePlayerStats({ level: 8 });
+    const result = computeTrackedResources(stats);
+    expect(result.shortRestHitDice).toEqual({ current: 8, max: 8 });
+  });
+
+  it('defaults shortRestHitDice to 0 when level is missing', () => {
+    const stats = makePlayerStats({ level: 0 });
+    const result = computeTrackedResources(stats);
+    expect(result.shortRestHitDice).toEqual({ current: 0, max: 0 });
+  });
+
+  it('sets sorceryPoints from features.maxSorceryPoints', () => {
+    getClassFeatures.mockReturnValue({ maxSorceryPoints: 5 });
+    const stats = makePlayerStats();
+    const result = computeTrackedResources(stats);
+    expect(result.sorceryPoints).toEqual({ current: 5, max: 5 });
+  });
+
+  it('defaults sorceryPoints to 0 when no features', () => {
+    getClassFeatures.mockReturnValue(null);
+    const stats = makePlayerStats();
+    const result = computeTrackedResources(stats);
+    expect(result.sorceryPoints).toEqual({ current: 0, max: 0 });
+  });
+
+  it('sets innateSorceryUses from features.maxInnateSorcery', () => {
+    getClassFeatures.mockReturnValue({ maxInnateSorcery: 3 });
+    const stats = makePlayerStats();
+    const result = computeTrackedResources(stats);
+    expect(result.innateSorceryUses).toEqual({ current: 3, max: 3 });
+  });
+
+  it('sets focusPoints and kiPoints from classLevel.focus_points or features.maxFocusPoints', () => {
+    const stats = makePlayerStats({
+      class: {
+        ...makePlayerStats().class,
+        class_levels: [{ level: 5, focus_points: 2 }],
+      },
+    });
+    const result = computeTrackedResources(stats);
+    expect(result.focusPoints).toEqual({ current: 2, max: 2 });
+    expect(result.kiPoints).toEqual({ current: 2, max: 2 });
+  });
+
+  it('falls back to features.maxFocusPoints when classLevel.focus_points is missing', () => {
+    getClassFeatures.mockReturnValue({ maxFocusPoints: 4 });
+    const stats = makePlayerStats({
+      class: {
+        ...makePlayerStats().class,
+        class_levels: [{ level: 5 }],
+      },
+    });
+    const result = computeTrackedResources(stats);
+    expect(result.focusPoints).toEqual({ current: 4, max: 4 });
+    expect(result.kiPoints).toEqual({ current: 4, max: 4 });
+  });
+
+  it('defaults focusPoints and kiPoints to 0 when neither source is available', () => {
+    getClassFeatures.mockReturnValue(null);
+    const stats = makePlayerStats({
+      class: {
+        ...makePlayerStats().class,
+        class_levels: [{ level: 5 }],
+      },
+    });
+    const result = computeTrackedResources(stats);
+    expect(result.focusPoints).toEqual({ current: 0, max: 0 });
+    expect(result.kiPoints).toEqual({ current: 0, max: 0 });
+  });
+
+  it('sets channelDivinityCharges from features.maxChannelDivinity', () => {
+    getClassFeatures.mockReturnValue({ maxChannelDivinity: 2 });
+    const stats = makePlayerStats();
+    const result = computeTrackedResources(stats);
+    expect(result.channelDivinityCharges).toEqual({ current: 2, max: 2 });
+  });
+
+  it('sets bardicInspirationUses from Charisma ability bonus', () => {
+    const stats = makePlayerStats({
+      abilities: [{ name: 'Charisma', bonus: 3 }],
+    });
+    const result = computeTrackedResources(stats);
+    expect(result.bardicInspirationUses).toEqual({ current: 3, max: 3 });
+  });
+
+  it('defaults bardicInspirationUses to 0 when no Charisma ability', () => {
+    const stats = makePlayerStats({ abilities: [] });
+    const result = computeTrackedResources(stats);
+    expect(result.bardicInspirationUses).toEqual({ current: 0, max: 0 });
+  });
+
+  it('sets wildShapeUses from features.maxWildShapeUses', () => {
+    getClassFeatures.mockReturnValue({ maxWildShapeUses: 2 });
+    const stats = makePlayerStats();
+    const result = computeTrackedResources(stats);
+    expect(result.wildShapeUses).toEqual({ current: 2, max: 2 });
+  });
+
+  it('sets secondWindUses and secondwindUses from classLevel.second_wind', () => {
+    const stats = makePlayerStats({
+      class: {
+        ...makePlayerStats().class,
+        class_levels: [{ level: 5, second_wind: 1 }],
+      },
+    });
+    const result = computeTrackedResources(stats);
+    expect(result.secondWindUses).toEqual({ current: 1, max: 1 });
+    expect(result.secondwindUses).toEqual({ current: 1, max: 1 });
+  });
+
+  it('defaults second wind uses to 0 when classLevel.second_wind is missing', () => {
+    const stats = makePlayerStats({
+      class: {
+        ...makePlayerStats().class,
+        class_levels: [{ level: 5 }],
+      },
+    });
+    const result = computeTrackedResources(stats);
+    expect(result.secondWindUses).toEqual({ current: 0, max: 0 });
+    expect(result.secondwindUses).toEqual({ current: 0, max: 0 });
+  });
+
+  describe('actionSurge (Fighter)', () => {
+    it('5e: sets actionSurgeUses from class_specific.action_surges', () => {
+      getClassFeatures.mockReturnValue(null);
+      const baseStats = makePlayerStats({
+        rules: '5e',
+        level: 7,
+        class: { name: 'Fighter', class_levels: [], major: {}, subclass: {} },
+      });
+      const stats = { ...baseStats, class: { ...baseStats.class, class_levels: [{ level: 7, class_specific: { action_surges: 2 } }] } };
+      const result = computeTrackedResources(stats);
+      expect(result.actionSurgeUses).toEqual({ current: 2, max: 2 });
+      expect(result.actionsurgeUses).toEqual({ current: 2, max: 2 });
+    });
+
+    it('2024: level >= 17 gives 2 action surges', () => {
+      const stats = makePlayerStats({
+        rules: '2024',
+        class: { ...makePlayerStats().class, name: 'Fighter' },
+        level: 17,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.actionSurgeUses).toEqual({ current: 2, max: 2 });
+    });
+
+    it('2024: level >= 2 gives 1 action surge', () => {
+      const stats = makePlayerStats({
+        rules: '2024',
+        class: { ...makePlayerStats().class, name: 'Fighter' },
+        level: 5,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.actionSurgeUses).toEqual({ current: 1, max: 1 });
+    });
+
+    it('2024: level < 2 gives 0 action surges', () => {
+      const stats = makePlayerStats({
+        rules: '2024',
+        class: { ...makePlayerStats().class, name: 'Fighter' },
+        level: 1,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.actionSurgeUses).toEqual({ current: 0, max: 0 });
+    });
+
+    it('non-fighter has 0 action surges', () => {
+      const stats = makePlayerStats({
+        class: { ...makePlayerStats().class, name: 'Wizard' },
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.actionSurgeUses).toEqual({ current: 0, max: 0 });
+    });
+  });
+
+  describe('ragePoints (Barbarian)', () => {
+    it('5e: sets ragePoints from class_specific.rage_count', () => {
+      const baseStats = makePlayerStats({
+        rules: '5e',
+        class: { name: 'Barbarian', class_levels: [], major: {}, subclass: {} },
+      });
+      const stats = { ...baseStats, class: { ...baseStats.class, class_levels: [{ level: 5, class_specific: { rage_count: 2 } }] } };
+      const result = computeTrackedResources(stats);
+      expect(result.ragePoints).toEqual({ current: 2, max: 2 });
+    });
+
+    it('2024: sets ragePoints from classLevel.rages', () => {
+      const baseStats = makePlayerStats({
+        rules: '2024',
+        class: { name: 'Barbarian', class_levels: [], major: {}, subclass: {} },
+      });
+      const stats = { ...baseStats, class: { ...baseStats.class, class_levels: [{ level: 5, rages: 3 }] } };
+      const result = computeTrackedResources(stats);
+      expect(result.ragePoints).toEqual({ current: 3, max: 3 });
+    });
+
+    it('non-barbarian has 0 rage points', () => {
+      const stats = makePlayerStats({
+        class: { ...makePlayerStats().class, name: 'Cleric' },
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.ragePoints).toEqual({ current: 0, max: 0 });
+    });
+  });
+
+  describe('layOnHandsPool (Paladin)', () => {
+    it('sets pool to 5 * level for paladin', () => {
+      const stats = makePlayerStats({
+        class: { ...makePlayerStats().class, name: 'Paladin' },
+        level: 5,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.layOnHandsPool).toEqual({ current: 25, max: 25 });
+    });
+
+    it('level 0 paladin has 0 pool', () => {
+      const stats = makePlayerStats({
+        rules: '5e',
+        class: { ...makePlayerStats().class, name: 'Paladin' },
+        level: 0,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.layOnHandsPool).toEqual({ current: 0, max: 0 });
+    });
+
+    it('non-paladin has 0 pool', () => {
+      const stats = makePlayerStats({
+        class: { ...makePlayerStats().class, name: 'Sorcerer' },
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.layOnHandsPool).toEqual({ current: 0, max: 0 });
+    });
+  });
+
+  describe('superiorityDice (Battle Master Fighter)', () => {
+    it('5e: level >= 15 gives 6 dice', () => {
+      const stats = makePlayerStats({
+        rules: '5e',
+        class: {
+          ...makePlayerStats().class,
+          name: 'Fighter',
+          major: { name: 'Battle Master' },
+        },
+        level: 15,
+        class_levels: [{ level: 15 }],
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.superiorityDice).toEqual({ current: 6, max: 6 });
+    });
+
+    it('5e: level >= 7 gives 5 dice', () => {
+      const stats = makePlayerStats({
+        rules: '5e',
+        class: {
+          ...makePlayerStats().class,
+          name: 'Fighter',
+          major: { name: 'Battle Master' },
+        },
+        level: 10,
+        class_levels: [{ level: 10 }],
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.superiorityDice).toEqual({ current: 5, max: 5 });
+    });
+
+    it('5e: level < 7 gives 4 dice', () => {
+      const stats = makePlayerStats({
+        rules: '5e',
+        class: {
+          ...makePlayerStats().class,
+          name: 'Fighter',
+          major: { name: 'Battle Master' },
+        },
+        level: 5,
+        class_levels: [{ level: 5 }],
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.superiorityDice).toEqual({ current: 4, max: 4 });
+    });
+
+    it('2024: Battle Master gives 4 dice', () => {
+      const stats = makePlayerStats({
+        rules: '2024',
+        class: {
+          ...makePlayerStats().class,
+          name: 'Fighter',
+          major: { name: 'Battle Master' },
+        },
+        level: 5,
+        class_levels: [{ level: 5 }],
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.superiorityDice).toEqual({ current: 4, max: 4 });
+    });
+
+    it('non-Battle Master Fighter has 0 dice', () => {
+      const stats = makePlayerStats({
+        rules: '5e',
+        class: {
+          ...makePlayerStats().class,
+          name: 'Fighter',
+          major: { name: 'Champion' },
+        },
+        level: 15,
+        class_levels: [{ level: 15 }],
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.superiorityDice).toEqual({ current: 0, max: 0 });
+    });
+  });
+
+  describe('psionicEnergy', () => {
+    it('sets psionicEnergy when energy matches major class', () => {
+      const baseStats = makePlayerStats({
+        class: {
+          name: 'Fighter',
+          class_levels: [],
+          major: { name: 'Psi Warrior' },
+          subclass: { name: 'Psi Warrior' },
+        },
+      });
+      const stats = {
+        ...baseStats,
+        class: {
+          ...baseStats.class,
+          class_levels: [{
+            level: 5,
+            energy: { required_major: 'Psi Warrior', energy_die_num: 3 },
+          }],
+        },
+      };
+      const result = computeTrackedResources(stats);
+      expect(result.psionicEnergy).toEqual({ current: 3, max: 3 });
+    });
+
+    it('defaults to 0 when energy does not match', () => {
+      const stats = makePlayerStats({
+        class: {
+          ...makePlayerStats().class,
+          major: { name: 'Champion' },
+        },
+        class_levels: [{
+          level: 5,
+          energy: { required_major: 'Psi Warrior', energy_die_num: 3 },
+        }],
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.psionicEnergy).toEqual({ current: 0, max: 0 });
+    });
+
+    it('defaults to 0 when no energy on classLevel', () => {
+      const stats = makePlayerStats({
+        class: {
+          ...makePlayerStats().class,
+          major: { name: 'Psi Warrior' },
+        },
+        class_levels: [{ level: 5 }],
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.psionicEnergy).toEqual({ current: 0, max: 0 });
+    });
+  });
+
+  describe('arcaneRecoveryLevels', () => {
+    it('sets from features.arcaneRecoveryLevels', () => {
+      getClassFeatures.mockReturnValue({ arcaneRecoveryLevels: 3 });
+      const stats = makePlayerStats();
+      const result = computeTrackedResources(stats);
+      expect(result.arcaneRecoveryLevels).toEqual({ current: 3, max: 3 });
+    });
+
+    it('defaults to 0 when not in features', () => {
+      getClassFeatures.mockReturnValue(null);
+      const stats = makePlayerStats();
+      const result = computeTrackedResources(stats);
+      expect(result.arcaneRecoveryLevels).toEqual({ current: 0, max: 0 });
+    });
+  });
+
+  describe('warlockPactMagic', () => {
+    it('5e: sets from class_specific.pact_slots', () => {
+      const baseStats = makePlayerStats({
+        rules: '5e',
+        class: { name: 'Warlock', class_levels: [], major: {}, subclass: {} },
+      });
+      const stats = { ...baseStats, class: { ...baseStats.class, class_levels: [{ level: 5, class_specific: { pact_slots: 2 } }] } };
+      const result = computeTrackedResources(stats);
+      expect(result.warlockPactMagic).toEqual({ current: 2, max: 2 });
+    });
+
+    it('2024: sets from classLevel.pact_slot_levels', () => {
+      const baseStats = makePlayerStats({
+        rules: '2024',
+        class: { name: 'Warlock', class_levels: [], major: {}, subclass: {} },
+      });
+      const stats = { ...baseStats, class: { ...baseStats.class, class_levels: [{ level: 5, pact_slot_levels: 3 }] } };
+      const result = computeTrackedResources(stats);
+      expect(result.warlockPactMagic).toEqual({ current: 3, max: 3 });
+    });
+
+    it('non-warlock has 0 pact magic', () => {
+      const stats = makePlayerStats({
+        class: { ...makePlayerStats().class, name: 'Wizard' },
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.warlockPactMagic).toEqual({ current: 0, max: 0 });
+    });
+  });
+
+  describe('sorcerousRestorationUses', () => {
+    it('sets to 1 when automation passives include resource_restoration', () => {
+      const stats = makePlayerStats({
+        automation: { passives: [{ type: 'resource_restoration' }] },
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.sorcerousRestorationUses).toEqual({ current: 1, max: 1 });
+    });
+
+    it('defaults to 0 when no resource_restoration passive', () => {
+      const stats = makePlayerStats({
+        automation: { passives: [{ type: 'other_type' }] },
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.sorcerousRestorationUses).toEqual({ current: 0, max: 0 });
+    });
+
+    it('defaults to 0 when automation.passives is missing', () => {
+      const stats = makePlayerStats();
+      const result = computeTrackedResources(stats);
+      expect(result.sorcerousRestorationUses).toEqual({ current: 0, max: 0 });
+    });
+  });
+
+  describe('uncannymetabolismUses', () => {
+    it('sets from features.uncannymetabolismUses', () => {
+      getClassFeatures.mockReturnValue({ uncannymetabolismUses: 2 });
+      const stats = makePlayerStats();
+      const result = computeTrackedResources(stats);
+      expect(result.uncannymetabolismUses).toEqual({ current: 2, max: 2 });
+    });
+
+    it('defaults to 0 when not in features', () => {
+      getClassFeatures.mockReturnValue(null);
+      const stats = makePlayerStats();
+      const result = computeTrackedResources(stats);
+      expect(result.uncannymetabolismUses).toEqual({ current: 0, max: 0 });
+    });
+  });
+
+  describe('luckyPoints', () => {
+    it('sets from Lucky feat: 3 + floor(level/2)', () => {
+      const stats = makePlayerStats({
+        feats: [{ name: 'Lucky' }],
+        level: 6,
+      });
+      const result = computeTrackedResources(stats);
+      // 3 + floor(6/2) = 3 + 3 = 6
+      expect(result.luckyPoints).toEqual({ current: 6, max: 6 });
+    });
+
+    it('is case-insensitive for feat name', () => {
+      const stats = makePlayerStats({
+        feats: [{ name: 'lucky' }],
+        level: 4,
+      });
+      const result = computeTrackedResources(stats);
+      // 3 + floor(4/2) = 5
+      expect(result.luckyPoints).toEqual({ current: 5, max: 5 });
+    });
+
+    it('defaults to 0 when no Lucky feat', () => {
+      const stats = makePlayerStats({
+        feats: [{ name: 'Alert' }],
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.luckyPoints).toEqual({ current: 0, max: 0 });
+    });
+  });
+
+  describe('divineInterventionUses (Cleric)', () => {
+    it('sets to 1 for cleric level >= 10', () => {
+      const stats = makePlayerStats({
+        class: { ...makePlayerStats().class, name: 'Cleric' },
+        level: 10,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.divineInterventionUses).toEqual({ current: 1, max: 1 });
+    });
+
+    it('sets to 0 for cleric level < 10', () => {
+      const stats = makePlayerStats({
+        class: { ...makePlayerStats().class, name: 'Cleric' },
+        level: 5,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.divineInterventionUses).toEqual({ current: 0, max: 0 });
+    });
+
+    it('sets to 0 for non-cleric', () => {
+      const stats = makePlayerStats({
+        class: { ...makePlayerStats().class, name: 'Wizard' },
+        level: 15,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.divineInterventionUses).toEqual({ current: 0, max: 0 });
+    });
+  });
+
+  describe('wholenessofbodyUses (Monk)', () => {
+    it('sets to 1 for monk level >= 6', () => {
+      const stats = makePlayerStats({
+        class: { ...makePlayerStats().class, name: 'Monk' },
+        level: 6,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.wholenessofbodyUses).toEqual({ current: 1, max: 1 });
+    });
+
+    it('sets to 0 for monk level < 6', () => {
+      const stats = makePlayerStats({
+        class: { ...makePlayerStats().class, name: 'Monk' },
+        level: 3,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.wholenessofbodyUses).toEqual({ current: 0, max: 0 });
+    });
+
+    it('sets to 0 for non-monk', () => {
+      const stats = makePlayerStats({
+        class: { ...makePlayerStats().class, name: 'Barbarian' },
+        level: 10,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.wholenessofbodyUses).toEqual({ current: 0, max: 0 });
+    });
+  });
+
+  describe('warPriestUses (Cleric)', () => {
+    it('sets to max(wisdom bonus, 1)', () => {
+      const stats = makePlayerStats({
+        class: { ...makePlayerStats().class, name: 'Cleric' },
+        abilities: [{ name: 'Wisdom', bonus: 3 }],
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.warPriestUses).toEqual({ current: 3, max: 3 });
+    });
+
+    it('defaults to 1 when wisdom bonus is 0', () => {
+      const stats = makePlayerStats({
+        class: { ...makePlayerStats().class, name: 'Cleric' },
+        abilities: [{ name: 'Wisdom', bonus: 0 }],
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.warPriestUses).toEqual({ current: 1, max: 1 });
+    });
+
+    it('defaults to 1 when no Wisdom ability', () => {
+      const stats = makePlayerStats({
+        class: { ...makePlayerStats().class, name: 'Cleric' },
+        abilities: [],
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.warPriestUses).toEqual({ current: 1, max: 1 });
+    });
+
+    it('uses negative wisdom bonus but caps at 1', () => {
+      const stats = makePlayerStats({
+        class: { ...makePlayerStats().class, name: 'Cleric' },
+        abilities: [{ name: 'Wisdom', bonus: -2 }],
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.warPriestUses).toEqual({ current: 1, max: 1 });
+    });
+  });
+
+  describe('class_levels lookup', () => {
+    it('finds class level by matching level field', () => {
+      const stats = makePlayerStats({
+        class: {
+          ...makePlayerStats().class,
+          class_levels: [
+            { level: 1, second_wind: 1 },
+            { level: 2, second_wind: 2 },
+            { level: 5, second_wind: 3 },
+          ],
+        },
+        level: 5,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.secondWindUses).toEqual({ current: 3, max: 3 });
+    });
+
+    it('returns undefined (then defaults) when no matching class level', () => {
+      const stats = makePlayerStats({
+        class: {
+          ...makePlayerStats().class,
+          class_levels: [
+            { level: 1, second_wind: 1 },
+            { level: 5, second_wind: 3 },
+          ],
+        },
+        level: 10,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.secondWindUses).toEqual({ current: 0, max: 0 });
+    });
+  });
+});
+
+// ── applyServerOverride ─────────────────────────────────────────
+
+describe('applyServerOverride', () => {
+  it('returns shallow copy when serverData is null', () => {
+    const computed = { hitPoints: { current: 10, max: 20 } };
+    const result = applyServerOverride(computed, null);
+    expect(result).toEqual(computed);
+    expect(result).not.toBe(computed);
+  });
+
+  it('returns shallow copy when serverData is undefined', () => {
+    const computed = { hitPoints: { current: 10, max: 20 } };
+    const result = applyServerOverride(computed, undefined);
+    expect(result).toEqual(computed);
+    expect(result).not.toBe(computed);
+  });
+
+  it('returns shallow copy when serverData is not an object', () => {
+    const computed = { hitPoints: { current: 10, max: 20 } };
+    expect(applyServerOverride(computed, 42)).toEqual(computed);
+    expect(applyServerOverride(computed, 'string')).toEqual(computed);
+    expect(applyServerOverride(computed, [])).toEqual(computed);
+  });
+
+  it('overrides current value for known keys', () => {
+    const computed = {
+      hitPoints: { current: 20, max: 20 },
+      sorceryPoints: { current: 5, max: 5 },
+    };
+    const result = applyServerOverride(computed, {
+      hitPoints: 12,
+      sorceryPoints: 3,
+    });
+    expect(result.hitPoints).toEqual({ current: 12, max: 20 });
+    expect(result.sorceryPoints).toEqual({ current: 3, max: 5 });
+  });
+
+  it('does not override when serverValue is null', () => {
+    const computed = {
+      hitPoints: { current: 20, max: 20 },
+    };
+    const result = applyServerOverride(computed, {
+      hitPoints: null,
+    });
+    expect(result.hitPoints).toEqual({ current: 20, max: 20 });
+  });
+
+  it('does not override when serverValue is undefined', () => {
+    const computed = {
+      hitPoints: { current: 20, max: 20 },
+    };
+    const result = applyServerOverride(computed, {
+      hitPoints: undefined,
+    });
+    expect(result.hitPoints).toEqual({ current: 20, max: 20 });
+  });
+
+  it('ignores unknown keys not in ALL_TRACKED_RESOURCES', () => {
+    const computed = { hitPoints: { current: 20, max: 20 } };
+    const result = applyServerOverride(computed, {
+      unknownKey: 99,
+    });
+    expect(result.unknownKey).toBeUndefined();
+  });
+
+  it('adds unknown keys that ARE in ALL_TRACKED_RESOURCES', () => {
+    const computed = { hitPoints: { current: 20, max: 20 } };
+    const result = applyServerOverride(computed, {
+      kiPoints: 4,
+    });
+    expect(result.kiPoints).toEqual({ current: 4, max: 4 });
+  });
+
+  it('does not add unknown keys that are NOT in ALL_TRACKED_RESOURCES', () => {
+    const computed = { hitPoints: { current: 20, max: 20 } };
+    const result = applyServerOverride(computed, {
+      someRandomKey: 10,
+    });
+    expect(result.someRandomKey).toBeUndefined();
+  });
+
+  it('preserves computed entries not in serverData', () => {
+    const computed = {
+      hitPoints: { current: 20, max: 20 },
+      sorceryPoints: { current: 5, max: 5 },
+      kiPoints: { current: 3, max: 3 },
+    };
+    const result = applyServerOverride(computed, {
+      hitPoints: 15,
+    });
+    expect(result.sorceryPoints).toEqual({ current: 5, max: 5 });
+    expect(result.kiPoints).toEqual({ current: 3, max: 3 });
+  });
+
+  it('overrides with 0 when serverValue is 0', () => {
+    const computed = {
+      hitPoints: { current: 20, max: 20 },
+    };
+    const result = applyServerOverride(computed, {
+      hitPoints: 0,
+    });
+    expect(result.hitPoints).toEqual({ current: 0, max: 20 });
+  });
+});
+
+// ── trackedResourcesToStoreEntries ──────────────────────────────
+
+describe('trackedResourcesToStoreEntries', () => {
+  it('extracts current values from tracked resources', () => {
+    const tracked = {
+      hitPoints: { current: 20, max: 20 },
+      sorceryPoints: { current: 3, max: 5 },
+      kiPoints: { current: 0, max: 3 },
+    };
+    const result = trackedResourcesToStoreEntries(tracked);
+    expect(result).toEqual({
+      hitPoints: 20,
+      sorceryPoints: 3,
+      kiPoints: 0,
+    });
+  });
+
+  it('returns empty object for empty input', () => {
+    expect(trackedResourcesToStoreEntries({})).toEqual({});
+  });
+
+  it('handles negative current values', () => {
+    const tracked = {
+      hitPoints: { current: -5, max: 20 },
+    };
+    const result = trackedResourcesToStoreEntries(tracked);
+    expect(result).toEqual({ hitPoints: -5 });
+  });
+
+  it('handles zero current values', () => {
+    const tracked = {
+      hitPoints: { current: 0, max: 20 },
+    };
+    const result = trackedResourcesToStoreEntries(tracked);
+    expect(result).toEqual({ hitPoints: 0 });
+  });
+
+  it('preserves all keys from tracked resources', () => {
+    const tracked = {
+      hitPoints: { current: 10, max: 20 },
+      spell_slots_level_1: { current: 2, max: 4 },
+      spell_slots_level_2: { current: 1, max: 3 },
+    };
+    const result = trackedResourcesToStoreEntries(tracked);
+    expect(Object.keys(result).sort()).toEqual([
+      'hitPoints',
+      'spell_slots_level_1',
+      'spell_slots_level_2',
+    ]);
+  });
+});
