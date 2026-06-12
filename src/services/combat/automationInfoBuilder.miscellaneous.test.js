@@ -90,3 +90,46 @@ describe('buildAttackInfo – divine_order', () => {
         })
     })
 })
+
+describe('buildAttackInfo – damage_type_modifier', () => {
+    beforeEach(() => vi.clearAllMocks())
+
+    it('returns correct structure with defaults', () => {
+        const feature = { ...BASE_FEATURE, automation: { type: 'damage_type_modifier' } }
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result).toEqual({
+            type: 'damage_type_modifier',
+            name: 'Test Feature',
+            trigger: '',
+            weaponTypes: [],
+            options: [],
+            hasAutomation: true,
+        })
+    })
+
+    it('includes all fields from Empowered Strikes', () => {
+        const feature = {
+            ...BASE_FEATURE,
+            automation: {
+                type: 'damage_type_modifier',
+                trigger: 'unarmed_strike_hit',
+                weaponTypes: ['unarmed'],
+                options: [
+                    { name: 'Force', damageType: 'Force' },
+                    { name: 'Bludgeoning', damageType: 'Bludgeoning' },
+                ],
+                casting_time: 'passive',
+            },
+        }
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.type).toBe('damage_type_modifier')
+        expect(result.name).toBe('Test Feature')
+        expect(result.trigger).toBe('unarmed_strike_hit')
+        expect(result.weaponTypes).toEqual(['unarmed'])
+        expect(result.options).toEqual([
+            { name: 'Force', damageType: 'Force' },
+            { name: 'Bludgeoning', damageType: 'Bludgeoning' },
+        ])
+        expect(result.hasAutomation).toBe(true)
+    })
+})

@@ -127,7 +127,7 @@ describe('DeathSavingThrows', () => {
     const rollBtn = screen.getByRole('button', { name: /roll/i });
     fireEvent.click(rollBtn);
 
-    expect(deathSaveRules.rollDeathSave).toHaveBeenCalledWith([false, false, false], [false, false, false]);
+    expect(deathSaveRules.rollDeathSave).toHaveBeenCalledWith([false, false, false], [false, false, false], false);
   });
 
   it('should call rollDeathSaveWithAdvantage when player has advantage', () => {

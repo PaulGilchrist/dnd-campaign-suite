@@ -216,6 +216,11 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 setRuntimeValue(targetName, 'naturesSanctuaryResistance', null, campaignName);
                 break;
 
+            case 'remove_bulwark_of_force':
+                setRuntimeValue(targetName, 'bulwarkOfForceActive', null, campaignName);
+                setRuntimeValue(targetName, 'bulwarkOfForceTargets', null, campaignName);
+                break;
+
             case 'unbreakable_majesty':
                 setRuntimeValue(targetName, 'unbreakableMajestyActive', null, campaignName);
                 setRuntimeValue(targetName, 'unbreakableMajestySaveDc', null, campaignName);

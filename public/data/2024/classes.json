@@ -4158,7 +4158,7 @@
                 "energy": {
                     "required_major": "Psi Warrior",
                     "energy_die_type": 6,
-                    "energy_die_num": 4
+                    "energy_die_num": 6
                 },
                 "spellcasting": {
                     "required_major": "Eldritch Knight",
@@ -4179,16 +4179,16 @@
                 "weapon_mastery": 4,
                 "features": [
                     {
-                        "name": "Ability Score Improvement",
+                    "name": "Ability Score Improvement",
                         "description": "You gain the Ability Score Improvement feat. You gain this feature again at Fighter levels 6, 8, 12, 14, and 16.",
-                        "level": 4,
+                        "level": 5,
                         "type": "class_feature"
                     }
                 ],
                 "energy": {
                     "required_major": "Psi Warrior",
                     "energy_die_type": 6,
-                    "energy_die_num": 4
+                    "energy_die_num": 6
                 },
                 "spellcasting": {
                     "required_major": "Eldritch Knight",
@@ -4227,7 +4227,7 @@
                 ],
                 "energy": {
                     "required_major": "Psi Warrior",
-                    "energy_die_type": 8,
+                    "energy_die_type": 6,
                     "energy_die_num": 6
                 },
                 "spellcasting": {
@@ -4257,7 +4257,7 @@
                 ],
                 "energy": {
                     "required_major": "Psi Warrior",
-                    "energy_die_type": 8,
+                    "energy_die_type": 6,
                     "energy_die_num": 6
                 },
                 "spellcasting": {
@@ -4287,13 +4287,13 @@
                 ],
                 "energy": {
                     "required_major": "Psi Warrior",
-                    "energy_die_type": 8,
+                    "energy_die_type": 6,
                     "energy_die_num": 6
                 },
                 "spellcasting": {
                     "required_major": "Eldritch Knight",
                     "cantrips_known": 2,
-                    "prepared_spells": 5,
+                    "prepared_spells": 4,
                     "spell_slots_level_1": 4,
                     "spell_slots_level_2": 2,
                     "spell_slots_level_3": 0,
@@ -4317,7 +4317,7 @@
                 ],
                 "energy": {
                     "required_major": "Psi Warrior",
-                    "energy_die_type": 8,
+                    "energy_die_type": 6,
                     "energy_die_num": 6
                 },
                 "spellcasting": {
@@ -4939,7 +4939,30 @@
                     {
                         "name": "Survivor",
                         "description": "Defy Death - Advantage on Death Saving Throws, rolling 18-20 counts as 20. Heroic Rally - regain Hit Points equal to 5 + Constitution modifier if Bloodied and have at least 1 Hit Point.",
-                        "level": 18
+                        "level": 18,
+                        "automation": [
+                            {
+                                "type": "conditional_advantage",
+                                "target": "death_saving_throws",
+                                "condition": "",
+                                "effect": "advantage",
+                                "abilities": []
+                            },
+                            {
+                                "type": "passive_rule",
+                                "effect": "death_save_nat18_as_20",
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "self_healing",
+                                "healExpression": "5 + CON modifier",
+                                "action": "action",
+                                "uses": 1,
+                                "usesMax": 1,
+                                "recharge": "long_rest",
+                                "bloodiedOnly": true
+                            }
+                        ]
                     }
                 ],
                 "spells": []
@@ -4957,27 +4980,85 @@
                     {
                         "name": "War Bond",
                         "description": "Ritual to create magical bond with one weapon. Can't be disarmed unless Incapacitated. Summon as Bonus Action. Can have up to two bonded weapons.",
-                        "level": 3
+                        "level": 3,
+                        "type": "class_feature",
+                        "automation": [
+                            {
+                                "type": "passive_buff",
+                                "effect": "war_bond_disarm_protection",
+                                "target": "self",
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "war_bond_summon",
+                                "action": "bonus_action",
+                                "bondedWeaponCount": 2,
+                                "casting_time": "1 bonus action"
+                            }
+                        ]
                     },
                     {
                         "name": "War Magic",
                         "description": "Replace one attack with a Wizard cantrip (casting time: action).",
-                        "level": 7
+                        "level": 7,
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "war_magic_cantrip",
+                            "spellList": "wizard_cantrips",
+                            "action": "action",
+                            "casting_time": "1 action"
+                        }
                     },
                     {
                         "name": "Eldritch Strike",
                         "description": "When you hit with a weapon attack, target has Disadvantage on next saving throw against your spell.",
-                        "level": 10
+                        "level": 10,
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "attack_rider",
+                            "trigger": "weapon_attack_hit",
+                            "oncePerTurn": true,
+                            "options": [
+                                {
+                                    "name": "Eldritch Strike",
+                                    "effect": "disadvantage_on_next_save"
+                                }
+                            ],
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Arcane Charge",
                         "description": "When you use Action Surge, teleport up to 30 feet before or after the additional action.",
-                        "level": 15
+                        "level": 15,
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "arcane_charge",
+                            "distance": "30 ft",
+                            "casting_time": "1 action"
+                        }
                     },
                     {
                         "name": "Improved War Magic",
                         "description": "Replace two attacks with level 1 or 2 Wizard spells (casting time: action).",
-                        "level": 18
+                        "level": 18,
+                        "type": "class_feature",
+                        "automation": [
+                            {
+                                "type": "war_magic_cantrip",
+                                "spellList": "wizard_cantrips",
+                                "action": "action",
+                                "casting_time": "1 action"
+                            },
+                            {
+                                "type": "war_magic_spell",
+                                "spellList": "wizard_spells",
+                                "maxSpellLevel": 2,
+                                "action": "action",
+                                "casting_time": "1 action",
+                                "replacesWarMagic": true
+                            }
+                        ]
                     }
                 ],
                 "spells": [
@@ -5011,27 +5092,128 @@
                     {
                         "name": "Psionic Power",
                         "description": "Psionic Energy Dice: Level 3: d6 x6. Level 9: d8 x8. Level 11: d10 x8. Level 13: d10 x10. Level 17: d12 x12. Protective Field: Reaction to reduce damage by die roll + Intelligence modifier. Psionic Strike: Once per turn, after hitting with weapon attack, deal extra Force damage (die + Intelligence). Telekinetic Movement: Action to move object or willing creature up to 30 feet.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "psionic_strike",
+                            "resource": "psionicEnergy",
+                            "damageExpression": "psionic_energy_die + INT modifier",
+                            "damageType": "Force",
+                            "oncePerTurn": true,
+                            "casting_time": "1 reaction, after attack"
+                        }
+                    },
+                    {
+                        "name": "Protective Field",
+                        "description": "Reaction to reduce damage by Psionic Energy Die roll + Intelligence modifier.",
+                        "level": 3,
+                        "automation": {
+                            "type": "damage_reduction",
+                            "reductionExpression": "psionic_energy_die + INT modifier",
+                            "trigger": "any_damage",
+                            "reaction": true,
+                            "cost": {
+                                "resource": "psionicEnergy",
+                                "amount": 1
+                            },
+                            "casting_time": "1 reaction"
+                        }
+                    },
+                    {
+                        "name": "Telekinetic Movement",
+                        "description": "Action to move an object or willing creature up to 30 feet.",
+                        "level": 3,
+                        "automation": {
+                            "type": "telekinetic_movement",
+                            "range": "30_ft",
+                            "casting_time": "1 action"
+                        }
                     },
                     {
                         "name": "Telekinetic Adept",
                         "description": "Psi-Powered Leap - Bonus Action Fly Speed (2x Speed) until end of turn. Telekinetic Thrust - on Psionic Strike damage, force Strength save or be Prone/pushed 10 feet.",
-                        "level": 7
+                        "level": 7,
+                        "automation": [
+                            {
+                                "type": "telekinetic_leap",
+                                "action": "bonus_action",
+                                "duration": "until_end_of_turn",
+                                "flySpeed": "2x_speed",
+                                "casting_time": "1 bonus action"
+                            },
+                            {
+                                "type": "telekinetic_thrust",
+                                "saveType": "STR",
+                                "saveAbility": "INT",
+                                "saveDc": "ability",
+                                "options": [
+                                    {
+                                        "name": "Prone + Push 10ft",
+                                        "effect": "prone_and_push",
+                                        "value": 10
+                                    }
+                                ],
+                                "trigger": "after_attack_hit",
+                                "oncePerTurn": true,
+                                "casting_time": "1 reaction, after attack"
+                            }
+                        ]
                     },
                     {
                         "name": "Guarded Mind",
                         "description": "Resistance to Psychic damage. Can expend Psionic Energy Die to end Charmed/Frightened conditions.",
-                        "level": 10
+                        "level": 10,
+                        "automation": [
+                            {
+                                "type": "resistance",
+                                "damageTypes": ["Psychic"]
+                            },
+                            {
+                                "type": "guarded_mind",
+                                "resource": "psionicEnergy",
+                                "casting_time": "1 action"
+                            }
+                        ]
                     },
                     {
                         "name": "Bulwark of Force",
                         "description": "Bonus Action to give Half Cover to creatures within 30 feet (Int modifier max).",
-                        "level": 15
+                        "level": 15,
+                        "automation": {
+                            "type": "bulwark_of_force",
+                            "range": "30_ft",
+                            "duration": "1_round",
+                            "casting_time": "1 bonus action"
+                        }
                     },
                     {
                         "name": "Telekinetic Master",
                         "description": "Always have Telekinesis spell prepared. Cast without spell slot. On each turn while maintaining Concentration, make one weapon attack as Bonus Action.",
-                        "level": 18
+                        "level": 18,
+                        "automation": [
+                            {
+                                "type": "passive_rule",
+                                "effect": "always_prepared_spells",
+                                "spells": ["Telekinesis"],
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "free_spell",
+                                "spell": "Telekinesis",
+                                "concentration": true,
+                                "noConcentration": false,
+                                "action": "action",
+                                "duration": "Concentration, up to 10 minutes",
+                                "casting_time": "1 action"
+                            },
+                            {
+                                "type": "concentration_bonus_attack",
+                                "trigger": "each_turn",
+                                "action": "bonus_action",
+                                "weaponAttack": true,
+                                "concentrationSpell": "Telekinesis",
+                                "casting_time": "1 bonus action"
+                            }
+                        ]
                     }
                 ],
                 "spells": [
@@ -5158,7 +5340,13 @@
                         "name": "Unarmored Movement",
                         "description": "Your speed increases by 10 feet while you aren't wearing armor or wielding a Shield. This bonus increases at certain Monk levels.",
                         "level": 2,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_buff",
+                            "effect": "speed_bonus",
+                            "condition": "no_armor_no_shield",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Deflect Attacks",
@@ -5276,7 +5464,17 @@
                         "name": "Empowered Strikes",
                         "description": "Whenever you deal damage with your Unarmed Strike, it can deal Force damage or its normal damage type (your choice).",
                         "level": 6,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "damage_type_modifier",
+                            "trigger": "unarmed_strike_hit",
+                            "weaponTypes": ["unarmed"],
+                            "options": [
+                                { "name": "Force", "damageType": "Force" },
+                                { "name": "Bludgeoning", "damageType": "Bludgeoning" }
+                            ],
+                            "casting_time": "passive"
+                        }
                     }
                 ]
             },
@@ -5292,7 +5490,11 @@
                         "name": "Evasion",
                         "description": "When subjected to an effect that allows a Dexterity saving throw for half damage, you take no damage on success and half damage on failure. Doesn't work if Incapacitated.",
                         "level": 7,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "evasion",
+                            "saveType": "DEX"
+                        }
                     }
                 ]
             },
@@ -7738,7 +7940,11 @@
                         "name": "Evasion",
                         "description": "When you're subjected to an effect that allows a Dexterity saving throw to take only half damage, you take no damage if you succeed and only half damage if you fail. Can't use if Incapacitated.",
                         "level": 7,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "evasion",
+                            "saveType": "DEX"
+                        }
                     },
                     {
                         "name": "Reliable Talent",

@@ -34,6 +34,9 @@ import HealingIllusionModal from './HealingIllusionModal.jsx'
 import SaveAttackHealModal from './SaveAttackHealModal.jsx'
 import MoonlightStepResourceModal from './MoonlightStepResourceModal.jsx'
 import ConstellationSelectionModal from './ConstellationSelectionModal.jsx'
+import ArcaneChargeModal from './ArcaneChargeModal.jsx'
+import WarMagicCantripModal from './WarMagicCantripModal.jsx'
+import WarMagicSpellModal from './WarMagicSpellModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { applyConstellationOption } from '../../services/automation/handlers/starryFormHandler.js';
@@ -79,6 +82,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [moonlightStepResourceModal, setMoonlightStepResourceModal] = useState(null);
     const [starryFormConstellationModal, setStarryFormConstellationModal] = useState(null);
     const [twinklingConstellationModal, setTwinklingConstellationModal] = useState(null);
+    const [arcaneChargeModal, setArcaneChargeModal] = useState(null);
+    const [warMagicCantripModal, setWarMagicCantripModal] = useState(null);
+    const [warMagicSpellModal, setWarMagicSpellModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
     const [featureChoice, setFeatureChoice] = useState(null);
@@ -262,7 +268,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         }).catch(() => { });
     };
 
-    const handleDamageClick = (attack) => {
+    const handleDamageClick = async (attack) => {
         const wasCrit = popupHtml?.isCrit;
         if (wasCrit && setPopupHtml) setPopupHtml(null);
         const result = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
@@ -436,6 +442,43 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }
         }
 
+        // Apply attack_rider automations with weapon_attack_hit trigger (e.g. Eldritch Strike)
+        if (playerStats.automation?.actions) {
+            const eldritchStrikes = playerStats.automation.actions.filter(
+                a => a.type === 'attack_rider' && a.trigger === 'weapon_attack_hit' && !a.damageExpression
+            );
+            for (const rider of eldritchStrikes) {
+                const usedKey = `_${rider.name.replace(/\s+/g, '_')}_usedRound`;
+                const currentRound = getCurrentCombatRound();
+                const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
+                if (rider.oncePerTurn && usedRound === currentRound) continue;
+
+                const cs = await getCombatContext(campaignName);
+                const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                const targetName = target?.name || null;
+
+                if (targetName && rider.options?.length > 0) {
+                    const option = rider.options[0];
+                    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                    const newEffect = {
+                        target: targetName,
+                        source: rider.name,
+                        option: option.name,
+                        effect: option.effect,
+                        value: option.value || null,
+                        noOpportunityAttacks: option.noOpportunityAttacks || false,
+                        duration: 'until_start_of_next_turn',
+                    };
+                    const updatedEffects = [...storedEffects, newEffect];
+                    setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+
+                    if (rider.oncePerTurn) {
+                        setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+                    }
+                }
+            }
+        }
+
         // Apply Potent Spellcasting: add WIS modifier to cantrip damage
         if (playerStats.automation?.actions) {
             const isCantrip = playerStats.spellAbilities?.spells?.some(s => s.name === attack.name && s.level === 0);
@@ -481,6 +524,35 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     extraMasteries: available.extraMasteries,
                 });
                 return;
+            }
+        }
+
+        // Apply damage_type_modifier automations for Unarmed Strike (e.g. Empowered Strikes)
+        if (attack.weaponType === 'unarmed' && playerStats.automation?.passives) {
+            const damageTypeModifiers = playerStats.automation.passives.filter(
+                a => a.type === 'damage_type_modifier' && a.trigger === 'unarmed_strike_hit'
+            );
+            for (const modifier of damageTypeModifiers) {
+                const usedKey = `_${modifier.name.replace(/\s+/g, '_')}_usedRound`;
+                const currentRound = getCurrentCombatRound();
+                const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
+                if (modifier.oncePerTurn && usedRound === currentRound) continue;
+
+                const storedType = getRuntimeValue(playerStats.name, 'empoweredStrikesDamageType', campaignName);
+                if (storedType) {
+                    attack.damageType = storedType;
+                    setRuntimeValue(playerStats.name, 'empoweredStrikesDamageType', null, campaignName);
+                    break;
+                }
+
+                if (modifier.options?.length > 0) {
+                    pendingDamageRef.current = { attack, formula, total, rolls, modifier, _damageTypeModifier: modifier };
+                    setDamageTypeChoice({
+                        title: `${modifier.name} — Damage Type`,
+                        types: modifier.options.map(o => o.damageType),
+                    });
+                    return;
+                }
             }
         }
 
@@ -551,6 +623,39 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             return;
         }
         const { attack, formula, total, rolls, modifier } = pending;
+        setDamageTypeChoice(null);
+        pendingDamageRef.current = null;
+        proceedWithDamage(attack, formula, total, rolls, modifier);
+    };
+
+    const handleDamageTypeModifierChoice = (chosenType) => {
+        const pending = pendingDamageRef.current;
+        if (!pending) {
+            setDamageTypeChoice(null);
+            return;
+        }
+        const { attack, formula, total, rolls, modifier, _damageTypeModifier } = pending;
+        if (_damageTypeModifier) {
+            attack.damageType = chosenType;
+            const usedKey = `_${_damageTypeModifier.name.replace(/\s+/g, '_')}_usedRound`;
+            setRuntimeValue(playerStats.name, usedKey, getCurrentCombatRound(), campaignName);
+        }
+        setDamageTypeChoice(null);
+        pendingDamageRef.current = null;
+        proceedWithDamage(attack, formula, total, rolls, modifier);
+    };
+
+    const handleDamageTypeModifierSkip = () => {
+        const pending = pendingDamageRef.current;
+        if (!pending) {
+            setDamageTypeChoice(null);
+            return;
+        }
+        const { attack, formula, total, rolls, modifier, _damageTypeModifier } = pending;
+        if (_damageTypeModifier) {
+            const usedKey = `_${_damageTypeModifier.name.replace(/\s+/g, '_')}_usedRound`;
+            setRuntimeValue(playerStats.name, usedKey, getCurrentCombatRound(), campaignName);
+        }
         setDamageTypeChoice(null);
         pendingDamageRef.current = null;
         proceedWithDamage(attack, formula, total, rolls, modifier);
@@ -701,6 +806,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'moonlightStepResource': setMoonlightStepResourceModal(result.payload); break;
                     case 'starryFormConstellation': setStarryFormConstellationModal(result.payload); break;
                     case 'twinklingConstellation': setTwinklingConstellationModal(result.payload); break;
+                    case 'arcaneCharge': setArcaneChargeModal(result.payload); break;
+                    case 'warMagicCantrip': setWarMagicCantripModal(result.payload); break;
+                    case 'warMagicSpell': setWarMagicSpellModal(result.payload); break;
                  }
                 break;
             case 'roll':
@@ -1029,6 +1137,24 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         }}
                     />
                 )}
+                {arcaneChargeModal && (
+                    <ArcaneChargeModal
+                        {...arcaneChargeModal}
+                        onClose={() => setArcaneChargeModal(null)}
+                    />
+                )}
+                {warMagicCantripModal && (
+                    <WarMagicCantripModal
+                        {...warMagicCantripModal}
+                        onClose={() => setWarMagicCantripModal(null)}
+                    />
+                )}
+                {warMagicSpellModal && (
+                    <WarMagicSpellModal
+                        {...warMagicSpellModal}
+                        onClose={() => setWarMagicSpellModal(null)}
+                    />
+                )}
                 {divineFuryChoice && (
                     <div className="sp-overlay" onClick={handleDivineFurySkip}>
                         <div className="sp-modal" onClick={e => e.stopPropagation()}>
@@ -1053,7 +1179,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     </div>
                 )}
                 {damageTypeChoice && (
-                    <div className="sp-overlay" onClick={handleGenericDamageTypeSkip}>
+                    <div className="sp-overlay" onClick={pendingDamageRef.current?._damageTypeModifier ? handleDamageTypeModifierSkip : handleGenericDamageTypeSkip}>
                         <div className="sp-modal" onClick={e => e.stopPropagation()}>
                             <div className="sp-header">
                                 <i className="fa-solid fa-bolt"></i> {damageTypeChoice.title}
@@ -1066,7 +1192,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                             key={type}
                                             className="sp-roll-btn"
                                             style={{ margin: '0 6px 8px 6px' }}
-                                            onClick={() => handleGenericDamageTypeChoice(type)}
+                                            onClick={() => pendingDamageRef.current?._damageTypeModifier ? handleDamageTypeModifierChoice(type) : handleGenericDamageTypeChoice(type)}
                                         >
                                             {type}
                                         </button>
@@ -1074,7 +1200,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                 </div>
                             </div>
                             <div className="sp-actions">
-                                <button className="sp-dismiss-btn" onClick={handleGenericDamageTypeSkip}>Skip</button>
+                                <button className="sp-dismiss-btn" onClick={pendingDamageRef.current?._damageTypeModifier ? handleDamageTypeModifierSkip : handleGenericDamageTypeSkip}>Skip</button>
                             </div>
                         </div>
                     </div>

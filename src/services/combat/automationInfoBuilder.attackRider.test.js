@@ -75,6 +75,9 @@ describe('buildAttackInfo – attack_rider', () => {
             oncePerTurn: false,
             chooseOne: false,
             maxEffects: 1,
+            saveType: null,
+            saveDc: null,
+            saveAbility: null,
             hasAutomation: true,
         })
     })

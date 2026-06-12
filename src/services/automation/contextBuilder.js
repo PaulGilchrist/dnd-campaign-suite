@@ -314,6 +314,15 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                         }
                     }
 
+                    // Check Bulwark of Force half cover (target must be in the allowed targets list)
+                    const bulwarkActive = getRuntimeValue(playerStats.name, 'bulwarkOfForceActive', campaignName);
+                    if (bulwarkActive) {
+                        const bulwarkTargets = getRuntimeValue(playerStats.name, 'bulwarkOfForceTargets', campaignName) || [];
+                        if (bulwarkTargets.includes(base.targetName) && coverResult.acBonus < 2) {
+                            coverResult = { level: 'half', acBonus: 2 };
+                        }
+                    }
+
                     if (coverResult.level === 'full') {
                         base.isAutoMiss = true;
                         base.coverReason = 'Target has full cover';

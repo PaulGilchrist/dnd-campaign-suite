@@ -8,18 +8,19 @@ function isDead(failures) {
   return failures.filter(Boolean).length >= 3
 }
 
-function rollDeathSave(currentSaves, currentFailures) {
+function rollDeathSave(currentSaves, currentFailures, treat18AsNat20 = false) {
   const roll = rollD20()
   const isNat20 = roll === 20
   const isNat1 = roll === 1
+  const isTreatedAsNat20 = treat18AsNat20 && roll === 18
 
-  if (isNat20) {
+  if (isNat20 || isTreatedAsNat20) {
     return {
       newSaves: [false, false, false],
       newFailures: [false, false, false],
       result: 'nat20',
       roll,
-      isNat20,
+      isNat20: isNat20 || isTreatedAsNat20,
       isNat1,
       restoredToHp: 1,
     }
@@ -67,21 +68,22 @@ function rollDeathSave(currentSaves, currentFailures) {
   }
 }
 
-function rollDeathSaveWithAdvantage(currentSaves, currentFailures) {
+function rollDeathSaveWithAdvantage(currentSaves, currentFailures, treat18AsNat20 = false) {
   const roll1 = rollD20()
   const roll2 = rollD20()
   const bestRoll = Math.max(roll1, roll2)
 
   const isNat20 = bestRoll === 20
   const isNat1 = bestRoll === 1
+  const isTreatedAsNat20 = treat18AsNat20 && bestRoll === 18
 
-  if (isNat20) {
+  if (isNat20 || isTreatedAsNat20) {
     return {
       newSaves: [false, false, false],
       newFailures: [false, false, false],
       result: 'nat20',
       roll: bestRoll,
-      isNat20,
+      isNat20: isNat20 || isTreatedAsNat20,
       isNat1,
       restoredToHp: 1,
     }

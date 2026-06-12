@@ -44,6 +44,19 @@ import { handle as handleTwinklingConstellation } from './handlers/twinklingCons
 import { handle as handleTacticalMind } from './handlers/tacticalMindHandler.js';
 import { handle as handleCombatSuperiority } from './handlers/combatSuperiorityHandler.js';
 import { handle as handleKnowEnemy } from './handlers/knowEnemyHandler.js';
+import { handle as handleWarBond } from './handlers/warBondHandler.js';
+import { handle as handleWarMagicCantrip } from './handlers/warMagicCantripHandler.js';
+import { handle as handleWarMagicSpell } from './handlers/warMagicSpellHandler.js';
+import { handle as handleArcaneCharge } from './handlers/arcaneChargeHandler.js';
+import { handle as handlePsionicStrike } from './handlers/psionicStrikeHandler.js';
+import { handle as handleProtectiveField } from './handlers/protectiveFieldHandler.js';
+import { handle as handleTelekineticMovement } from './handlers/telekineticMovementHandler.js';
+import { handle as handleTelekineticLeap } from './handlers/telekineticLeapHandler.js';
+import { handle as handleTelekineticThrust } from './handlers/telekineticThrustHandler.js';
+import { handle as handleGuardedMind } from './handlers/guardedMindHandler.js';
+import { handle as handleBulwarkOfForce } from './handlers/bulwarkOfForceHandler.js';
+import { handle as handleConcentrationBonusAttack } from './handlers/concentrationBonusAttackHandler.js';
+import { handle as handleDamageTypeModifier } from './handlers/damageTypeModifierHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -102,6 +115,19 @@ const HANDLER_MAP = {
         tactical_mind: handleTacticalMind,
         combat_superiority: handleCombatSuperiority,
         know_enemy: handleKnowEnemy,
+        war_bond_summon: handleWarBond,
+        war_magic_cantrip: handleWarMagicCantrip,
+        war_magic_spell: handleWarMagicSpell,
+        arcane_charge: handleArcaneCharge,
+        psionic_strike: handlePsionicStrike,
+        protective_field: handleProtectiveField,
+        telekinetic_movement: handleTelekineticMovement,
+        telekinetic_leap: handleTelekineticLeap,
+        telekinetic_thrust: handleTelekineticThrust,
+        guarded_mind: handleGuardedMind,
+        bulwark_of_force: handleBulwarkOfForce,
+        concentration_bonus_attack: handleConcentrationBonusAttack,
+        damage_type_modifier: handleDamageTypeModifier,
 };
 
 export async function executeHandler(action, playerStats, campaignName, mapName) {

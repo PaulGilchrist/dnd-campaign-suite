@@ -48,6 +48,18 @@ function getSuperiorityDieSize(playerStats) {
     return 8
 }
 
+function getPsionicEnergyDieSize(playerStats) {
+    const level = playerStats?.level || 3
+    const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)
+    if (classLevel?.energy) {
+        return classLevel.energy.energy_die_type || 6
+    }
+    if (level >= 17) return 12
+    if (level >= 13) return 10
+    if (level >= 9) return 8
+    return 6
+}
+
 function resolveDiceExpression(expression, playerStats, slotLevel) {
     if (!expression) return expression
     const prof = playerStats?.proficiency || 0
@@ -56,6 +68,8 @@ function resolveDiceExpression(expression, playerStats, slotLevel) {
     const rageDamage = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.rage_damage ?? 2
     const bardicDie = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_die || 6
     const superiorityDie = getSuperiorityDieSize(playerStats)
+    const psionicEnergyDie = getPsionicEnergyDieSize(playerStats)
+    const martialArtsDie = playerStats?.class?.class_levels?.find(cl => cl.level === playerStats.level)?.martial_arts_die || 4
     let expr = expression
         .replace(/bardic_inspiration_die/g, bardicDie)
         .replace(/proficiency_bonus_d4/g, `${Math.max(1, prof)}d4`)
@@ -74,6 +88,8 @@ function resolveDiceExpression(expression, playerStats, slotLevel) {
         .replace(/cleric level/gi, level)
         .replace(/druid_level/gi, level)
         .replace(/superiority_die/g, superiorityDie)
+        .replace(/psionic_energy_die/g, psionicEnergyDie)
+        .replace(/martial_arts_die/g, martialArtsDie)
         .replace(/level/gi, level)
         .replace(/spell_slot_level/g, slotLevel)
     const abilities = playerStats?.abilities || {}
@@ -113,4 +129,4 @@ export function evaluateAutoExpression(expression, playerStats, prof, level, slo
     return expr
 }
 
-export { resolveUses, resolveScaling, getSaveDc, resolveHealingPoolExpression, resolveDiceExpression, getSuperiorityDieSize }
+export { resolveUses, resolveScaling, getSaveDc, resolveHealingPoolExpression, resolveDiceExpression, getSuperiorityDieSize, getPsionicEnergyDieSize }

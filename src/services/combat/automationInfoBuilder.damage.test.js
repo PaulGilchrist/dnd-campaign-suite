@@ -209,6 +209,7 @@ describe('buildAttackInfo – damage_reduction', () => {
             redirectCost: null,
             redirectDamage: '',
             redirectSave: 'DEX',
+            cost: null,
             hasAutomation: true,
         })
     })

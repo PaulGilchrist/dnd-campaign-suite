@@ -64,6 +64,24 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 },
             };
       } else if (isSelf && auto.healExpression) {
+        const bloodiedOnly = !!auto.bloodiedOnly;
+        if (bloodiedOnly) {
+            const currentHp = playerStats.currentHitPoints ?? 0;
+            const maxHp = playerStats.maxHitPoints ?? 0;
+            const isBloodied = currentHp > 0 && currentHp <= Math.floor(maxHp / 2);
+            if (!isBloodied) {
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: action.name,
+                        automationType: auto.type,
+                        description: `${action.name} can only be used when Bloodied (at half HP or less).`,
+                    },
+                };
+            }
+        }
+
         const maxUses = auto.usesMax ?? auto.uses ?? 1;
         const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
         const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);

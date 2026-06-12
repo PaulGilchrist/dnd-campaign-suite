@@ -34,6 +34,9 @@ function buildAttackInfo(feature, playerStats) {
                 oncePerTurn: !!auto.oncePerTurn,
                 chooseOne: !!auto.chooseOne,
                 maxEffects: auto.maxEffects || 1,
+                saveType: auto.saveType || null,
+                saveDc: auto.saveDc || null,
+                saveAbility: auto.saveAbility || null,
                 hasAutomation: true
             }
         }
@@ -293,6 +296,17 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'damage_type_modifier': {
+            return {
+                type: 'damage_type_modifier',
+                name: feature.name,
+                trigger: auto.trigger || '',
+                weaponTypes: auto.weaponTypes || [],
+                options: auto.options || [],
+                hasAutomation: true
+            }
+        }
+
         case 'damage_reduction': {
             return {
                 type: 'damage_reduction',
@@ -304,6 +318,54 @@ function buildAttackInfo(feature, playerStats) {
                 redirectCost: auto.redirectCost || null,
                 redirectDamage: auto.redirectDamage || '',
                 redirectSave: auto.redirectSave || 'DEX',
+                cost: auto.cost || null,
+                hasAutomation: true
+            }
+        }
+
+        case 'psionic_strike': {
+            return {
+                type: 'psionic_strike',
+                name: feature.name,
+                resource: auto.resource || 'psionicEnergy',
+                damageExpression: auto.damageExpression || '',
+                damageType: auto.damageType || 'Force',
+                oncePerTurn: !!auto.oncePerTurn,
+                trigger: auto.trigger || 'after_attack_hit',
+                hasAutomation: true
+            }
+        }
+
+        case 'telekinetic_movement': {
+            return {
+                type: 'telekinetic_movement',
+                name: feature.name,
+                range: auto.range || '30_ft',
+                hasAutomation: true
+            }
+        }
+
+        case 'telekinetic_leap': {
+            return {
+                type: 'telekinetic_leap',
+                name: feature.name,
+                action: auto.action || 'bonus_action',
+                duration: auto.duration || 'until_end_of_turn',
+                flySpeed: auto.flySpeed || '2x_speed',
+                hasAutomation: true
+            }
+        }
+
+        case 'telekinetic_thrust': {
+            return {
+                type: 'telekinetic_thrust',
+                name: feature.name,
+                saveType: auto.saveType || 'STR',
+                saveDc: auto.saveDc || 'ability',
+                saveAbility: auto.saveAbility || 'INT',
+                options: auto.options || [],
+                trigger: auto.trigger || 'after_attack_hit',
+                oncePerTurn: !!auto.oncePerTurn,
                 hasAutomation: true
             }
         }
@@ -731,6 +793,7 @@ function buildAttackInfo(feature, playerStats) {
                 uses: auto.uses ?? 1,
                 usesMax: auto.uses ?? 1,
                 recharge: auto.recharge || 'short_rest',
+                bloodiedOnly: !!auto.bloodiedOnly,
                 hasAutomation: true
             }
         }
@@ -1001,6 +1064,86 @@ function buildAttackInfo(feature, playerStats) {
                 name: feature.name,
                 range: auto.range || '30_ft',
                 usesMax: auto.uses_max || 4,
+                hasAutomation: true
+            };
+        }
+
+        case 'war_bond_summon': {
+            return {
+                type: 'war_bond_summon',
+                name: feature.name,
+                action: auto.action || 'bonus_action',
+                bondedWeaponCount: auto.bondedWeaponCount || 2,
+                casting_time: auto.casting_time || '1 bonus action',
+                hasAutomation: true
+            };
+        }
+
+        case 'war_magic_cantrip': {
+            return {
+                type: 'war_magic_cantrip',
+                name: feature.name,
+                spellList: auto.spellList || 'wizard_cantrips',
+                action: auto.action || 'action',
+                casting_time: auto.casting_time || '1 action',
+                hasAutomation: true
+            };
+        }
+
+        case 'war_magic_spell': {
+            return {
+                type: 'war_magic_spell',
+                name: feature.name,
+                spellList: auto.spellList || 'wizard_spells',
+                maxSpellLevel: auto.maxSpellLevel || 2,
+                action: auto.action || 'action',
+                casting_time: auto.casting_time || '1 action',
+                replacesWarMagic: !!auto.replacesWarMagic,
+                hasAutomation: true
+            };
+        }
+
+        case 'arcane_charge': {
+            return {
+                type: 'arcane_charge',
+                name: feature.name,
+                distance: auto.distance || '30 ft',
+                casting_time: auto.casting_time || '1 action',
+                hasAutomation: true
+            };
+        }
+
+        case 'guarded_mind': {
+            return {
+                type: 'guarded_mind',
+                name: feature.name,
+                resource: auto.resource || 'psionicEnergy',
+                action: auto.action || 'action',
+                casting_time: auto.casting_time || '1 action',
+                hasAutomation: true
+            };
+        }
+
+        case 'bulwark_of_force': {
+            return {
+                type: 'bulwark_of_force',
+                name: feature.name,
+                range: auto.range || '30_ft',
+                duration: auto.duration || '1_round',
+                casting_time: auto.casting_time || '1 bonus action',
+                hasAutomation: true
+            };
+        }
+
+        case 'concentration_bonus_attack': {
+            return {
+                type: 'concentration_bonus_attack',
+                name: feature.name,
+                trigger: auto.trigger || 'each_turn',
+                action: auto.action || 'bonus_action',
+                weaponAttack: !!auto.weaponAttack,
+                concentrationSpell: auto.concentrationSpell || '',
+                casting_time: auto.casting_time || '1 bonus action',
                 hasAutomation: true
             };
         }

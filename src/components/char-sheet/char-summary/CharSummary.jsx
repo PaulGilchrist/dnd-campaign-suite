@@ -4,6 +4,7 @@ import './CharSummary.css'
 import DiceRollResult from '../DiceRollResult.jsx'
 
 import rulesFactory from '../../../services/rules/rulesFactory.js'
+import { parseMagicItemName } from '../../../services/rules/attackCalc.js'
 import CharGold from './CharGold.jsx'
 import CharHitPoints from './CharHitPoints.jsx'
 import CharClassFeatures from './CharClassFeatures.jsx'
@@ -94,28 +95,60 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         circleFormsACOverride = 13 + wisMod;
     }
     let speed = playerStats.race.subrace && playerStats.race.subrace.speed ? playerStats.race.subrace.speed : playerStats.race.speed;
+
+    // Check if character is wearing armor or wielding a shield (for Unarmored Movement)
+    const equippedItems = playerStats.inventory?.equipped || [];
+    const allEquipment = playerStats.equipment || [];
+    let isWearingArmor = false;
+    let isWieldingShield = false;
+    for (const itemName of equippedItems) {
+        const parsedName = parseMagicItemName(itemName);
+        const baseName = parsedName.baseName;
+        const item = allEquipment.find(eq => eq.name === baseName);
+        if (item && item.equipment_category === 'Armor') {
+            isWearingArmor = true;
+            break;
+        }
+        if (baseName === 'Shield') {
+            isWieldingShield = true;
+            break;
+        }
+    }
+    const hasArmorOrShield = isWearingArmor || isWieldingShield;
+
     if (playerStats.class.name === 'Monk') {
         const { classRules: cr } = rulesFactory.getRules(playerStats);
         if (typeof cr.getUnarmoredMovementIncrease === 'function') {
-            speed += cr.getUnarmoredMovementIncrease(playerStats);
+            const unarmoredMovementIncrease = cr.getUnarmoredMovementIncrease(playerStats);
+            if (!hasArmorOrShield) {
+                speed += unarmoredMovementIncrease;
+            }
          }
      }
         if (playerStats.class.name === 'Barbarian') {
         const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
         const unarmoredMovement = classLevel?.class_specific?.unarmored_movement || 0;
-        speed += unarmoredMovement;
+        if (!hasArmorOrShield) {
+            speed += unarmoredMovement;
+        }
       }
 
     // Apply passive_buff speed_bonus effects (e.g., Fast Movement: +10 speed without heavy armor)
     const passives = playerStats.automation?.passives || [];
     for (const passive of passives) {
-      if (passive.type === 'passive_buff' && passive.effect === 'speed_bonus' && passive.condition === 'no_heavy_armor') {
+      if (passive.type === 'passive_buff' && passive.effect === 'speed_bonus') {
         const bonus = passive.bonusExpression ? parseInt(passive.bonusExpression, 10) : 10;
-        const isWearingHeavy = playerStats.equipment
-          ? playerStats.equipment.find(eq => playerStats.inventory.equipped?.includes(eq.name) && eq.armor_category === 'Heavy')
-          : (playerStats.armorClassFormula?.includes('Heavy') || false);
-        if (!isWearingHeavy) {
-          buffSpeedBonus += bonus;
+        if (passive.condition === 'no_heavy_armor') {
+          const isWearingHeavy = playerStats.equipment
+            ? playerStats.equipment.find(eq => playerStats.inventory.equipped?.includes(eq.name) && eq.armor_category === 'Heavy')
+            : (playerStats.armorClassFormula?.includes('Heavy') || false);
+          if (!isWearingHeavy) {
+            buffSpeedBonus += bonus;
+          }
+        } else if (passive.condition === 'no_armor_no_shield') {
+          if (!hasArmorOrShield) {
+            buffSpeedBonus += bonus;
+          }
         }
       }
     }
@@ -145,6 +178,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     activeBuffs.forEach(buff => {
         if (buff.effect === 'fly_speed_equals_walk_speed' || buff.flySpeed) flySpeed = speed;
         if (buff.effect === 'fly_speed_20_hover') flySpeed = 20;
+        if (buff.effect === 'telekinetic_leap') flySpeed = buff.flySpeed;
         if (buff.effect === 'speed_boost' && buff.speedBonus) buffSpeedBonus += buff.speedBonus;
         if (buff.effect === 'ice_walk') iceWalkActive = true;
     });

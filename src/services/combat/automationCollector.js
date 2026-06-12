@@ -79,6 +79,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'reaction_damage':
             case 'countercharm':
             case 'damage_reduction':
+            case 'psionic_strike':
             case 'reaction_debuff':
             case 'bardic_inspiration_defense':
             case 'reaction_save_heal':
@@ -121,6 +122,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'jack_of_all_trades':
             case 'divine_order':
             case 'moonlight_step_rider':
+            case 'damage_type_modifier':
                 result.passives.push(info)
                 if (info.type === 'passive_rule' && info.effect === 'primal_knowledge' && info.primalKnowledge.length > 0) {
                     result.primalKnowledge.push(...info.primalKnowledge)
@@ -151,6 +153,47 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break
             case 'know_enemy':
                 result.bonusActions.push(info)
+                break
+            case 'war_bond_summon':
+                result.bonusActions.push(info)
+                break
+            case 'war_magic_cantrip':
+                result.actions.push(info)
+                break
+            case 'war_magic_spell':
+                result.actions.push(info)
+                break
+            case 'arcane_charge':
+            case 'telekinetic_movement':
+                result.actions.push(info)
+                result.actions.push(info)
+                break
+            case 'guarded_mind':
+                if (info.action === 'bonus_action') {
+                    result.bonusActions.push(info)
+                } else {
+                    result.actions.push(info)
+                }
+                break
+            case 'bulwark_of_force':
+                result.bonusActions.push(info)
+                break
+            case 'concentration_bonus_attack':
+                if (info.action === 'bonus_action') {
+                    result.bonusActions.push(info)
+                } else {
+                    result.actions.push(info)
+                }
+                break
+            case 'telekinetic_leap':
+                if (info.action === 'bonus_action') {
+                    result.bonusActions.push(info)
+                } else {
+                    result.actions.push(info)
+                }
+                break
+            case 'telekinetic_thrust':
+                result.reactions.push(info)
                 break
             default:
                 result.specialActions.push(info)

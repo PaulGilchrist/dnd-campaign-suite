@@ -5,6 +5,7 @@ import { sendSaveResult, clearSavePrompt } from '../../services/combat/savePromp
 import Subscriber from './Subscriber.jsx';
 import { computeAuraBonus } from '../../services/combat/auraOfProtection.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditionUtils.js';
+import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import './savePromptModal.css';
 
 function SavePromptModal({ campaignName, characters, activeMapName }) {
@@ -134,9 +135,11 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
               {current.dcSuccess === 'half' && (() => {
                 const saveTypeUpper = (current.saveType || '').toUpperCase();
                 const targetChar = (characters || []).find(c => utils.getName(c.name) === utils.getName(current.targetName));
+                const targetConditions = getRuntimeValue(current.targetName, 'activeConditions', campaignName) || [];
+                const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
                 const ownEvasion = targetChar?.computedStats?.evasionEffects;
-                const hasOwnEvasion = ownEvasion?.some(ef => ef.saveType === saveTypeUpper);
-                const hasSharedEvasion = !hasOwnEvasion &&
+                const hasOwnEvasion = !isIncapacitated && ownEvasion?.some(ef => ef.saveType === saveTypeUpper);
+                const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated &&
                   (characters || []).some(c => {
                     if (utils.getName(c.name) === utils.getName(current.targetName)) return false;
                     const ev = c?.computedStats?.evasionEffects;

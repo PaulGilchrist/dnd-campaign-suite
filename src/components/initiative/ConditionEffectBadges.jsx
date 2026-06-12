@@ -9,6 +9,7 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
     if (effects.speedZero) badges.push({ label: 'Speed 0', cls: 'effect-speed-zero', icon: 'fa-stop' })
     if (effects.speedReduction) badges.push({ label: `Speed -${effects.speedReduction}`, cls: 'effect-speed-zero', icon: 'fa-minus' })
     if (effects.pushEffect) badges.push({ label: `Push ${effects.pushDistance || 10} ft`, cls: 'effect-push', icon: 'fa-angles-right' })
+    if (effects.proneEffect) badges.push({ label: 'Prone', cls: 'effect-prone', icon: 'fa-person-falling' })
     if (effects.autoCritWithin5ft) badges.push({ label: 'Auto-Crit', cls: 'effect-auto-crit', icon: 'fa-bolt' })
     if (effects.concentrationBroken) badges.push({ label: 'No Conc.', cls: 'effect-no-conc', icon: 'fa-spinner' })
     if (effects.autoFailSaves.length > 0) badges.push({ label: `Auto-Fail ${effects.autoFailSaves.join('/').toUpperCase()}`, cls: 'effect-auto-fail', icon: 'fa-shield' })

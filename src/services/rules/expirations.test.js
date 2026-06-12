@@ -31,6 +31,7 @@ import {
   addExpiration,
   clearAllExpirationEffects,
   expireStaleEffects,
+  applyTurnStartEffects,
 } from './expirations.js';
 
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
@@ -1229,5 +1230,112 @@ describe('expireStaleEffects — additional edge cases', () => {
       'MyCampaign'
     );
     expect(window.dispatchEvent).toHaveBeenCalled();
+  });
+});
+
+describe('applyTurnStartEffects', () => {
+  beforeEach(() => {
+    resetMocks();
+    getRuntimeValue.mockReset();
+    setRuntimeValue.mockReset();
+  });
+
+  it('returns early when activeName is null', () => {
+    applyTurnStartEffects(null, { turnStartEffects: [] }, 'TestCampaign');
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('returns early when playerStats is null', () => {
+    applyTurnStartEffects('TestCharacter', null, 'TestCampaign');
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('returns early when playerStats has no turnStartEffects', () => {
+    applyTurnStartEffects('TestCharacter', {}, 'TestCampaign');
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('grants hasInspiration when turnStartEffects contains heroic_inspiration and not already set', () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (prop === 'hasInspiration') return false;
+      return null;
+    });
+
+    applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{ type: 'heroic_inspiration', name: 'Heroic Warrior' }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'TestCharacter',
+      'hasInspiration',
+      true,
+      'TestCampaign'
+    );
+  });
+
+  it('does NOT grant hasInspiration when already set to true', () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (prop === 'hasInspiration') return true;
+      return null;
+    });
+
+    applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{ type: 'heroic_inspiration', name: 'Heroic Warrior' }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('does NOT grant hasInspiration when already set to false (falsy but not yet granted)', () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (prop === 'hasInspiration') return false;
+      return null;
+    });
+
+    applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{ type: 'heroic_inspiration', name: 'Heroic Warrior' }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'TestCharacter',
+      'hasInspiration',
+      true,
+      'TestCampaign'
+    );
+  });
+
+  it('ignores unknown effect types', () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (prop === 'hasInspiration') return false;
+      return null;
+    });
+
+    applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{ type: 'unknown_effect', name: 'Some Feature' }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('handles multiple turn start effects, only applies heroic_inspiration', () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (prop === 'hasInspiration') return false;
+      return null;
+    });
+
+    applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [
+        { type: 'heroic_inspiration', name: 'Heroic Warrior' },
+        { type: 'unknown_effect', name: 'Some Feature' }
+      ]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'TestCharacter',
+      'hasInspiration',
+      true,
+      'TestCampaign'
+    );
   });
 });

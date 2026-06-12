@@ -49,9 +49,12 @@ function DeathSavingThrows({ playerStats, campaignName }) {
         if (isStable || isDead) return;
 
         const hasAdvantage = hasSaveModifier(playerStats?.saveModifiers, 'death_saving_throws');
+        const treat18AsNat20 = (playerStats?.automation?.passives || []).some(
+            p => p.type === 'passive_rule' && p.effect === 'death_save_nat18_as_20'
+        );
         const result = hasAdvantage
-            ? deathSaveRules.rollDeathSaveWithAdvantage(saves, failures)
-            : deathSaveRules.rollDeathSave(saves, failures);
+            ? deathSaveRules.rollDeathSaveWithAdvantage(saves, failures, treat18AsNat20)
+            : deathSaveRules.rollDeathSave(saves, failures, treat18AsNat20);
 
         setLastRoll({ roll: result.roll, success: result.result === 'success' || result.result === 'nat20' || result.result === 'stable', isNat20: result.isNat20, isNat1: result.isNat1 });
         setTimeout(() => setLastRoll(null), 2000);

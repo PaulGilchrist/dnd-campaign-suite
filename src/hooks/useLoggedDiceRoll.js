@@ -64,9 +64,11 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       const combatSummary = getCombatSummary();
       const saveTypeUpper = (e.detail.saveType || '').toUpperCase();
       const targetChar = (charactersRef.current || []).find(c => c.name === e.detail.targetName);
+      const targetConditions = getRuntimeValue(e.detail.targetName, 'activeConditions', pending.campaignName) || [];
+      const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
       const ownEvasion = targetChar?.computedStats?.evasionEffects;
-      const hasOwnEvasion = pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === saveTypeUpper);
-      const hasSharedEvasion = !hasOwnEvasion && pending.dcSuccess === 'half' &&
+      const hasOwnEvasion = !isIncapacitated && pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === saveTypeUpper);
+      const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && pending.dcSuccess === 'half' &&
         (charactersRef.current || []).some(c => {
           if (c.name === e.detail.targetName) return false;
           const ev = c?.computedStats?.evasionEffects;
@@ -278,7 +280,17 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           }
       }
 
-      const isCrit = !isAutoMiss && (r1 === 20 || context?.isAutoCrit) && hit;
+      const criticalRange = context?.criticalRange;
+      let rollsInCriticalRange = false;
+      if (criticalRange) {
+          const match = criticalRange.match(/^(\d+)-(\d+)$/);
+          if (match) {
+              const low = parseInt(match[1], 10);
+              const high = parseInt(match[2], 10);
+              rollsInCriticalRange = r1 >= low && r1 <= high;
+          }
+      }
+      const isCrit = !isAutoMiss && (r1 === 20 || context?.isAutoCrit || rollsInCriticalRange) && hit;
 
       const autoDamage = hit && context?.autoDamageFormula ? {
         name: context.autoDamageName || name,
@@ -913,9 +925,11 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
     const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage);
     const saveTypeUpper = (saveType || '').toUpperCase();
     const targetChar = (charactersRef.current || []).find(c => c.name === pending.targetName);
+    const targetConditions = getRuntimeValue(pending.targetName, 'activeConditions', campaignName) || [];
+    const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
     const ownEvasion = targetChar?.computedStats?.evasionEffects;
-    const hasOwnEvasion = pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === saveTypeUpper);
-    const hasSharedEvasion = !hasOwnEvasion && pending.dcSuccess === 'half' &&
+    const hasOwnEvasion = !isIncapacitated && pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === saveTypeUpper);
+    const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && pending.dcSuccess === 'half' &&
       (charactersRef.current || []).some(c => {
         if (c.name === pending.targetName) return false;
         const ev = c?.computedStats?.evasionEffects;

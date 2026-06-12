@@ -264,6 +264,13 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
         effects.pushDistance = te.value || 10;
       }
     }
+    if (te.effect === 'prone_and_push') {
+      effects.pushEffect = true;
+      if (!effects.pushDistance) {
+        effects.pushDistance = te.value || 10;
+      }
+      effects.proneEffect = true;
+    }
   }
 
   return effects

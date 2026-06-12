@@ -50,6 +50,7 @@ export const actions = [
     "Supreme Sneak",
     "Tactical Master",
     "Tireless",
+    "War Magic",
     "Witch Bolt",
     "Words of Creation"
 ];
