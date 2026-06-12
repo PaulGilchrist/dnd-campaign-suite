@@ -18,7 +18,7 @@ const MASTERY_EFFECTS = {
     Sap: {
         label: 'Sap (Disadvantage)',
         description: 'The creature has Disadvantage on its next attack roll before the start of your next turn.',
-        effect: 'disadvantage_on_next_save',
+        effect: 'disadvantage_next_attack',
     },
     Slow: {
         label: 'Slow (Speed -10 ft)',

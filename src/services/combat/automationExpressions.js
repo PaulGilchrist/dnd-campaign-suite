@@ -41,6 +41,13 @@ function resolveHealingPoolExpression(baseExpression, scaling, playerStats) {
     return resolved
 }
 
+function getSuperiorityDieSize(playerStats) {
+    const level = playerStats?.level || 1
+    if (level >= 18) return 12
+    if (level >= 10) return 10
+    return 8
+}
+
 function resolveDiceExpression(expression, playerStats, slotLevel) {
     if (!expression) return expression
     const prof = playerStats?.proficiency || 0
@@ -48,6 +55,7 @@ function resolveDiceExpression(expression, playerStats, slotLevel) {
     slotLevel = slotLevel || 1
     const rageDamage = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.rage_damage ?? 2
     const bardicDie = playerStats?.class?.class_levels?.[(playerStats.level || 1) - 1]?.bardic_die || 6
+    const superiorityDie = getSuperiorityDieSize(playerStats)
     let expr = expression
         .replace(/bardic_inspiration_die/g, bardicDie)
         .replace(/proficiency_bonus_d4/g, `${Math.max(1, prof)}d4`)
@@ -65,6 +73,7 @@ function resolveDiceExpression(expression, playerStats, slotLevel) {
         .replace(/cleric_level/gi, level)
         .replace(/cleric level/gi, level)
         .replace(/druid_level/gi, level)
+        .replace(/superiority_die/g, superiorityDie)
         .replace(/level/gi, level)
         .replace(/spell_slot_level/g, slotLevel)
     const abilities = playerStats?.abilities || {}
@@ -104,4 +113,4 @@ export function evaluateAutoExpression(expression, playerStats, prof, level, slo
     return expr
 }
 
-export { resolveUses, resolveScaling, getSaveDc, resolveHealingPoolExpression, resolveDiceExpression }
+export { resolveUses, resolveScaling, getSaveDc, resolveHealingPoolExpression, resolveDiceExpression, getSuperiorityDieSize }

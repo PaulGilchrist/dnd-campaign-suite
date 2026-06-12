@@ -2,12 +2,24 @@ import * as concentrationRules from './concentrationRules.js'
 import { computeAuraBonus } from './auraOfProtection.js'
 import { getCreatureSaveBonus } from './conditionSaveService.js'
 
+function hasDragonConstellation(creature, characters) {
+    if (!creature || !creature.name) return false;
+    const target = characters?.find(c => {
+        const name = typeof c === 'string' ? c : c.name;
+        return name === creature.name;
+    });
+    if (!target || typeof target === 'string') return false;
+    const activeBuffs = target.activeBuffs || target.computedStats?.activeBuffs || [];
+    return activeBuffs.some(b => b.name === 'Starry Form' && b.constellation === 'Dragon');
+}
+
 async function rollConcentrationSave(creature, concentration, characters, campaignNpcs, campaignName, mapName, getName) {
     const saveBonus = await getCreatureSaveBonus(creature, 'con', characters, campaignNpcs, getName)
     const aura = await computeAuraBonus({ targetName: creature.name, characters, campaignName, activeMapName: mapName })
     const auraBonus = aura.bonus
     const effectiveSaveBonus = saveBonus + auraBonus
-    const { roll: r1, success } = concentrationRules.rollConcentrationSave(effectiveSaveBonus, concentration.dc)
+    const dragonConstellationActive = hasDragonConstellation(creature, characters)
+    const { roll: r1, success } = concentrationRules.rollConcentrationSave(effectiveSaveBonus, concentration.dc, dragonConstellationActive)
     const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined
     return { roll: r1, success, bonus: effectiveSaveBonus, bonusDetail }
 }

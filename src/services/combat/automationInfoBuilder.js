@@ -1,5 +1,7 @@
 import { evaluateAutoExpression, resolveHealingPoolExpression, getSaveDc, resolveUses, resolveDiceExpression, resolveScaling } from './automationExpressions.js'
 
+const CONSTELLATION_OPTIONS = ['Archer', 'Chalice', 'Dragon'];
+
 function buildAttackInfo(feature, playerStats) {
     const auto = feature.automation
     if (!auto) return null
@@ -348,11 +350,17 @@ function buildAttackInfo(feature, playerStats) {
         }
 
         case 'free_spell': {
+            let usesMax = auto.uses || 1;
+            if (auto.uses_expression) {
+                usesMax = evaluateAutoExpression(auto.uses_expression, playerStats) || 1;
+            }
             return {
                 type: 'free_spell',
                 name: feature.name,
                 spell: auto.spell || '',
                 uses: auto.uses || 1,
+                uses_expression: auto.uses_expression || '',
+                usesMax,
                 recharge: auto.recharge || 'long_rest',
                 action: auto.action || 'action',
                 duration: auto.duration || '',
@@ -434,6 +442,14 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'moonlight_step_rider': {
+            return {
+                type: 'moonlight_step_rider',
+                name: feature.name,
+                hasAutomation: true
+            }
+        }
+
         case 'passive_buff': {
             return {
                 type: 'passive_buff',
@@ -447,6 +463,7 @@ function buildAttackInfo(feature, playerStats) {
                 resistances: auto.resistances || [],
                 options: auto.options || [],
                 extraMastery: auto.extraMastery || [],
+                replaceMastery: auto.replaceMastery || [],
                 grantsFlySpeed: !!auto.grantsFlySpeed,
                 grantsSwimSpeed: !!auto.grantsSwimSpeed,
                 hasAutomation: true
@@ -614,6 +631,16 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'land_resistance': {
+            return {
+                type: 'land_resistance',
+                name: feature.name,
+                conditionImmunity: auto.conditionImmunity || '',
+                landMappings: auto.landMappings || {},
+                hasAutomation: true
+            }
+        }
+
         case 'resource_pool': {
             return {
                 type: 'resource_pool',
@@ -635,10 +662,23 @@ function buildAttackInfo(feature, playerStats) {
             const scaling = resolveScaling(playerStats, auto.scaling)
             const rawDamage = scaling?.damage || auto.damage || ''
             const damage = resolveDiceExpression(rawDamage, playerStats)
-            const uses = resolveUses(playerStats, auto.uses)
+            let uses = resolveUses(playerStats, auto.uses)
+            if (auto.resourceCost === 'wild_shape') {
+                uses = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0
+            }
             const saveDc = auto.saveDc === 'ability'
                 ? getSaveDc(playerStats, auto.saveAbility || 'CON', prof)
                 : auto.saveDc || 10
+            let healExpression = auto.healExpression || ''
+            if (auto.healScaling) {
+                const healScaling = resolveScaling(playerStats, auto.healScaling)
+                if (healScaling?.healExpression) {
+                    healExpression = healScaling.healExpression
+                }
+            }
+            if (healExpression) {
+                healExpression = resolveDiceExpression(healExpression, playerStats)
+            }
             return {
                 type: 'save_attack',
                 name: feature.name,
@@ -659,6 +699,8 @@ function buildAttackInfo(feature, playerStats) {
                 hasOptions: !!auto.hasOptions,
                 options: auto.options || [],
                 optionDetails: auto.optionDetails || {},
+                healExpression,
+                dcSuccess: auto.dcSuccess || null,
                 hasAutomation: true
             }
         }
@@ -820,7 +862,18 @@ function buildAttackInfo(feature, playerStats) {
                 healExpression: auto.healExpression || '0',
                 othersOnly: auto.othersOnly ?? true,
                 hasAutomation: true
-            }
+            };
+        }
+
+        case 'post_cast_ally_heal': {
+            return {
+                type: 'post_cast_ally_heal',
+                name: feature.name,
+                healExpression: auto.healExpression || '0',
+                othersOnly: auto.othersOnly ?? true,
+                range: auto.range || '30_ft',
+                hasAutomation: true
+            };
         }
 
         case 'multi_target_spread': {
@@ -847,6 +900,109 @@ function buildAttackInfo(feature, playerStats) {
                 name: feature.name,
                 hasAutomation: true
             }
+        }
+
+        case 'nature_sanctuary': {
+            return {
+                type: 'nature_sanctuary',
+                name: feature.name,
+                range: auto.range || '120_ft',
+                cubeSize: auto.cubeSize || 15,
+                duration: auto.duration || '1_minute',
+                moveRange: auto.moveRange || 60,
+                movesPerDuration: auto.movesPerDuration || 1,
+                resourceCost: auto.resourceCost || 'wild_shape',
+                hasAutomation: true
+            }
+        }
+
+        case 'nature_sanctuary_move': {
+            return {
+                type: 'nature_sanctuary_move',
+                name: feature.name,
+                action: 'bonus_action',
+                moveRange: auto.moveRange || 60,
+                hasAutomation: true
+            };
+        }
+
+        case 'starry_form': {
+            return {
+                type: 'starry_form',
+                name: feature.name,
+                effect: auto.effect || 'starry_form',
+                duration: auto.duration || '1_minute',
+                options: auto.options || CONSTELLATION_OPTIONS,
+                resourceKey: auto.resourceKey || 'starryFormUses',
+                uses: auto.uses || 0,
+                hasAutomation: true
+            };
+        }
+
+        case 'cosmic_omen': {
+            let usesMax = 0;
+            if (auto.uses_expression) {
+                usesMax = evaluateAutoExpression(auto.uses_expression, playerStats) || 0;
+            }
+            return {
+                type: 'cosmic_omen',
+                name: feature.name,
+                usesMax,
+                usesRecharge: auto.recharge || 'long_rest',
+                action: auto.action || 'action',
+                casting_time: auto.casting_time || '1 action',
+                hasAutomation: true
+            };
+        }
+
+        case 'twinkling_constellations': {
+            return {
+                type: 'twinkling_constellations',
+                name: feature.name,
+                options: auto.options || CONSTELLATION_OPTIONS,
+                hasAutomation: true
+            };
+        }
+
+        case 'tactical_mind': {
+            return {
+                type: 'tactical_mind',
+                name: feature.name,
+                bonusExpression: auto.bonusExpression || '',
+                hasAutomation: true
+            };
+        }
+
+        case 'combat_superiority': {
+            const saveAbility = auto.saveAbility || 'STR'
+            const prof = playerStats.proficiency || 0
+            const saveDc = auto.saveDc === 'ability'
+                ? getSaveDc(playerStats, saveAbility, prof)
+                : auto.saveDc || 10
+            return {
+                type: 'combat_superiority',
+                name: feature.name,
+                saveType: auto.saveType || 'WIS',
+                saveDc,
+                saveAbility,
+                dieExpression: auto.dieExpression || 'superiority_die',
+                usesMax: auto.uses_max || 4,
+                usesRecharge: auto.recharge || 'short_rest',
+                options: auto.options || [],
+                oncePerTurn: !!auto.oncePerTurn,
+                chooseOne: !!auto.chooseOne,
+                hasAutomation: true
+            };
+        }
+
+        case 'know_enemy': {
+            return {
+                type: 'know_enemy',
+                name: feature.name,
+                range: auto.range || '30_ft',
+                usesMax: auto.uses_max || 4,
+                hasAutomation: true
+            };
         }
 
         default:

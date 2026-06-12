@@ -105,5 +105,6 @@ export const characterAdvancement = [
     "Scholar",
     "Slippery Mind",
     "Skillful",
+    "Student of War",
     "Versatile"
 ];

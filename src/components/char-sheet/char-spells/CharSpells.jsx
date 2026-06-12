@@ -20,7 +20,7 @@ import { executeSpellCast } from '../../../services/rules/spellCastService.js'
 import * as mapsService from '../../../services/maps/mapsService.js';
 import { getNearestPlacedItem } from '../../../services/rules/rangeValidation.js';
 import { isInnateSorceryActive } from '../../../services/combat/buffService.js';
-import { useRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { useRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, characters }) {
@@ -49,6 +49,15 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
               context.metamagicHeighten = autoDamage.metamagicHeighten;
             }
             rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
+            }
+            // Remarkable Athlete: after critical hit, enable movement without opportunity attacks
+            if (isCrit) {
+                const hasRemarkableAthlete = (playerStats.automation?.passives || []).some(
+                    p => p.type === 'auto_effect' && p.effect === 'remarkable_athlete_movement'
+                );
+                if (hasRemarkableAthlete) {
+                    setRuntimeValue(playerStats.name, 'remarkableAthleteNoOA', Date.now(), campaignName);
+                }
             }
            },
          });

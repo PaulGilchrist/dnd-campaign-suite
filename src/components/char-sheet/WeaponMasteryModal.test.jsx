@@ -8,7 +8,7 @@ vi.mock('../../services/automation/handlers/weaponMasteryHandler.js', () => ({
     MASTERY_EFFECTS: {
         Push: { label: 'Push (10 ft)', description: 'Push the creature up to 10 feet straight away from you.', effect: 'push', value: 10 },
         Topple: { label: 'Topple (Prone)', description: 'Force the creature to make a Constitution saving throw or fall Prone.', effect: 'topple', requiresSave: true, saveAbility: 'CON' },
-        Sap: { label: 'Sap (Disadvantage)', description: 'The creature has Disadvantage on its next attack roll.', effect: 'disadvantage_on_next_save' },
+        Sap: { label: 'Sap (Disadvantage)', description: 'The creature has Disadvantage on its next attack roll.', effect: 'disadvantage_next_attack' },
         Slow: { label: 'Slow (Speed -10 ft)', description: 'Reduce the creature\'s Speed by 10 feet.', effect: 'speed_reduction', value: 10 },
         Vex: { label: 'Vex (Advantage)', description: 'You have Advantage on your next attack roll.', effect: 'next_attack_advantage', value: 5 },
         Cleave: { label: 'Cleave (Extra Attack)', description: 'Make a melee attack roll with the weapon against a second creature.', effect: 'cleave' },

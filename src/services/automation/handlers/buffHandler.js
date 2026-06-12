@@ -8,7 +8,7 @@ import { setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
-    if (auto?.effect === 'teleport_on_rage' || auto?.effect === 'teleport_swap_with_illusion' || auto?.effect === 'shadow_step_teleport') {
+    if (auto?.effect === 'teleport_on_rage' || auto?.effect === 'teleport_swap_with_illusion' || auto?.effect === 'shadow_step_teleport' || auto?.effect === 'moonlight_step_teleport') {
         return handleTeleport(action, playerStats, campaignName, _mapName);
     }
 
@@ -32,7 +32,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     );
 
     if (!wasActive && auto?.tempHpExpression) {
-        const amount = evaluateAutoExpression(auto.tempHpExpression, playerStats);
+        let amount = evaluateAutoExpression(auto.tempHpExpression, playerStats);
+        // Circle of the Moon: Circle Forms overrides temp HP to 3 × Druid level
+        const isMoonDruid = playerStats.class?.major?.name === 'Moon' || playerStats.class?.subclass?.name === 'Moon';
+        if (isMoonDruid && auto?.effect === 'shape_shift') {
+            amount = 3 * (playerStats.level || 1);
+        }
         if (typeof amount === 'number' && amount > 0) {
             setRuntimeValue(playerStats.name, 'tempHp', amount, campaignName);
         }

@@ -54,7 +54,18 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
     const auraBonus = aura.bonus;
 
     const hasAdvantage = hasSaveModifier(saveModifiers, 'concentration_saving_throws', 'CON');
-    const roll = hasAdvantage ? Math.max(rollD20(), rollD20()) : rollD20();
+    const starryFormBuff = (saveModifiers || []).length > 0 && (() => {
+      const character = (characters || []).find(c => {
+        const name = typeof c === 'string' ? c : c.name;
+        return name && utils.getName(name) === utils.getName(current.targetName);
+      });
+      const buffs = character?.activeBuffs || character?.computedStats?.activeBuffs || [];
+      return buffs.some(b => b.name === 'Starry Form' && b.constellation === 'Dragon');
+    })();
+    let roll = hasAdvantage ? Math.max(rollD20(), rollD20()) : rollD20();
+    if (starryFormBuff && roll <= 9) {
+      roll = 10;
+    }
     const total = roll + saveBonus + auraBonus;
     const success = total >= current.dc;
     const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined;

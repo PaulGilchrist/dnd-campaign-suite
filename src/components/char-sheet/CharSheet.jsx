@@ -72,6 +72,15 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 }
             }
 
+            // Apply Aquatic Affinity passive (Circle of the Sea level 6 swim speed + emanation range)
+            const aquaticAffinityPassive = (stats.automation?.passives || []).find(p => p.effect === 'aquatic_affinity');
+            if (aquaticAffinityPassive) {
+                if (!stats.swimSpeed) {
+                    stats.swimSpeed = stats.race?.subrace?.speed || stats.race?.speed || 30;
+                }
+                await setRuntimeValue(playerSummary.name, 'aquaticAffinityEmanationRange', 10, campaignName);
+            }
+
             // Inject synthetic "Use Bardic Inspiration" feature if this character has an active BI die
             const biDie = getRuntimeValue(playerSummary.name, 'bardicInspirationDie', campaignName);
             if (biDie) {
@@ -176,7 +185,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const allTargetEffects = useRuntimeValue(campaignName, 'targetEffects') ?? [];
     const myTargetEffects = allTargetEffects.filter(te => te.target === (playerSummary?.name));
     const isRaging = Array.isArray(activeBuffs) && activeBuffs.some(b => b.damageBonusExpression);
-    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging);
+    const shapeShiftActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shape_shift');
+    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive);
     if (playerStats) {
         const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
         if (speedHalvedTime) conditionEffects.speedHalved = true;

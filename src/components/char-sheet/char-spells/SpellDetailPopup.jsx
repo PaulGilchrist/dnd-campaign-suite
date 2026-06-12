@@ -7,11 +7,21 @@ function isFreeCastAuthorized(playerName, spellName, playerStats) {
   const raw = getRuntimeValue(playerName, '_War_God_s_Blessing_freeCast');
   if (raw && Array.isArray(raw) && raw.includes(spellName)) return true;
 
+  const naturalRecoveryFreeCast = getRuntimeValue(playerName, 'naturalRecoveryFreeCast');
+  if (naturalRecoveryFreeCast && Array.isArray(naturalRecoveryFreeCast) && naturalRecoveryFreeCast.includes(spellName)) return true;
+
   const actions = playerStats?.automation?.actions || [];
   for (const entry of actions) {
     if (entry.type !== 'free_spell') continue;
     const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
     if (!spells.includes(spellName)) continue;
+
+    // Counter-based free casts (uses_expression)
+    if (entry.uses_expression && entry.usesMax) {
+      const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+      const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
+      return count > 0;
+    }
 
     if (entry.perSpellTracking) {
       const freeKey = `_${entry.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_freeCast`;
@@ -73,13 +83,29 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     if (freeCastAuthorized) {
       const actions = playerStats?.automation?.actions || [];
       for (const entry of actions) {
-        if (entry.type !== 'free_spell' || !entry.perSpellTracking) continue;
+        if (entry.type !== 'free_spell') continue;
         const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-        if (spells.includes(spell.name)) {
+        if (!spells.includes(spell.name)) continue;
+
+        // Counter-based free casts (uses_expression)
+        if (entry.uses_expression && entry.usesMax) {
+          const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+          const count = Number(getRuntimeValue(playerStats.name, freeCastCountKey) ?? entry.usesMax);
+          if (count > 0) {
+            setRuntimeValue(playerStats.name, freeCastCountKey, count - 1, campaignName);
+          }
+          break;
+        }
+
+        if (entry.perSpellTracking) {
           const usedKey = `_${entry.name.replace(/\s+/g, '_')}_${spell.name.replace(/\s+/g, '_')}_used`;
           setRuntimeValue(playerStats.name, usedKey, true, campaignName);
           break;
         }
+      }
+      const nrFreeCast = getRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast');
+      if (nrFreeCast && Array.isArray(nrFreeCast) && nrFreeCast.includes(spell.name)) {
+        setRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast', null, campaignName);
       }
     } else {
       const spellSlotKey = `spell_slots_level_${spell.level}`;

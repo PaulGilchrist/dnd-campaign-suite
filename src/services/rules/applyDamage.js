@@ -144,7 +144,11 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     combatSummaryChanged = true;
     if (creature.concentration && finalDamage > 0) {
       const saveBonus = creature?.saveBonuses?.['con'] ?? 0;
-      const { success, roll, total } = rollConcentrationSave(saveBonus, creature.concentration.dc);
+      const dragonConstellationActive = (() => {
+        const activeBuffs = getRuntimeValue(creature.name, 'activeBuffs') || [];
+        return activeBuffs.some(b => b.name === 'Starry Form' && b.constellation === 'Dragon');
+      })();
+      const { success, roll, total } = rollConcentrationSave(saveBonus, creature.concentration.dc, dragonConstellationActive);
       if (!success) {
         const spellName = creature.concentration.spell;
         const dc = creature.concentration.dc;

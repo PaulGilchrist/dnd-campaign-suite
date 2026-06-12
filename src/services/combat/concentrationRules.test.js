@@ -37,6 +37,43 @@ describe('rollConcentrationSave', () => {
     expect(result.total).toBe(12)
     expect(result.success).toBe(true)
   })
+
+  it('treats d20 rolls of 9 or lower as 10 when dragonConstellationActive is true', () => {
+    rollD20.mockReturnValue(5)
+    const result = rollConcentrationSave(3, 15, true)
+    expect(result.roll).toBe(10)
+    expect(result.total).toBe(13)
+    expect(result.success).toBe(false)
+  })
+
+  it('treats d20 roll of 9 as 10 when dragonConstellationActive is true', () => {
+    rollD20.mockReturnValue(9)
+    const result = rollConcentrationSave(3, 15, true)
+    expect(result.roll).toBe(10)
+    expect(result.total).toBe(13)
+    expect(result.success).toBe(false)
+  })
+
+  it('does not modify d20 roll of 10 when dragonConstellationActive is true', () => {
+    rollD20.mockReturnValue(10)
+    const result = rollConcentrationSave(3, 15, true)
+    expect(result.roll).toBe(10)
+    expect(result.total).toBe(13)
+  })
+
+  it('does not modify d20 roll when dragonConstellationActive is false', () => {
+    rollD20.mockReturnValue(5)
+    const result = rollConcentrationSave(3, 15, false)
+    expect(result.roll).toBe(5)
+    expect(result.total).toBe(8)
+  })
+
+  it('does not modify d20 roll when dragonConstellationActive is undefined', () => {
+    rollD20.mockReturnValue(5)
+    const result = rollConcentrationSave(3, 15)
+    expect(result.roll).toBe(5)
+    expect(result.total).toBe(8)
+  })
 })
 
 describe('breakConcentration', () => {

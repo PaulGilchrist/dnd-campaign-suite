@@ -91,7 +91,7 @@ describe('weaponMasteryHandler.MASTERY_EFFECTS', () => {
 
   it('Sap has correct properties', () => {
     expect(MASTERY_EFFECTS.Sap.label).toBe('Sap (Disadvantage)');
-    expect(MASTERY_EFFECTS.Sap.effect).toBe('disadvantage_on_next_save');
+    expect(MASTERY_EFFECTS.Sap.effect).toBe('disadvantage_next_attack');
   });
 
   it('Slow has correct properties', () => {
@@ -476,7 +476,7 @@ describe('weaponMasteryHandler.applyMasteryEffect', () => {
   it('appends to existing stored effects', async () => {
     const ps = makePlayerStats();
     useRuntimeState.getRuntimeValue.mockReturnValue([
-      { target: 'Orc', source: 'Sap', effect: 'disadvantage_on_next_save' },
+      { target: 'Orc', source: 'Sap', effect: 'disadvantage_next_attack' },
     ]);
 
     await applyMasteryEffect('Push', ps, campaignName, 'Goblin');

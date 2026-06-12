@@ -20,7 +20,8 @@ const SHORT_REST_RESOURCE_LABELS = [
     { key: 'actionSurgeUses', label: 'Action Surge', classes: ['Fighter'] },
     { key: 'focusPoints', label: 'Focus Points', classes: ['Monk'] },
     { key: 'psionicEnergy', label: 'Psionic Energy', classes: ['Fighter'], subclasses: ['Psi Warrior'] },
-    { key: 'superiorityDice', label: 'Superiority Dice', classes: ['Fighter'], subclasses: ['Battle Master'] }
+    { key: 'superiorityDice', label: 'Superiority Dice', classes: ['Fighter'], subclasses: ['Battle Master'] },
+    { key: 'naturalRecoverySlots', label: 'Natural Recovery (Spell Slots)', classes: ['Druid'], subclasses: ['Circle of the Land'] }
 ];
 
 export function getShortRestResourceLabels(playerStats) {
@@ -59,31 +60,34 @@ export function getShortRestResources() {
 }
 
 export const LONG_REST_RESOURCES = [
-     'ragePoints',
-     'bardicInspirationUses',
-     'channelDivinityCharges',
-     'wildShapeUses',
-     'secondwindUses',
-     'psionicEnergy',
-     'focusPoints',
-     'uncannymetabolismUses',
-     'sorceryPoints',
-     'arcaneRecoveryLevels',
-     'superiorityDice',
-     'kiPoints',
-     'actionsurgeUses',
-     'layOnHandsPool',
-     'warlockPactMagic',
-     'luckyPoints',
-     'innateSorceryUses',
-     'sorcerousRestorationUses',
-      'zealousPresenceUses',
-      'rageOfTheGodsUses',
-      'divineInterventionUses',
-        'wholenessofbodyUses',
-        'wildResurgenceReversedThisRest',
-        'indomitableUses'
- ]
+      'ragePoints',
+      'bardicInspirationUses',
+      'channelDivinityCharges',
+      'wildShapeUses',
+      'secondwindUses',
+      'psionicEnergy',
+      'focusPoints',
+      'uncannymetabolismUses',
+      'sorceryPoints',
+      'arcaneRecoveryLevels',
+      'superiorityDice',
+      'kiPoints',
+      'actionsurgeUses',
+      'layOnHandsPool',
+      'warlockPactMagic',
+      'luckyPoints',
+      'innateSorceryUses',
+      'sorcerousRestorationUses',
+       'zealousPresenceUses',
+       'rageOfTheGodsUses',
+       'divineInterventionUses',
+         'wholenessofbodyUses',
+         'wildResurgenceReversedThisRest',
+         'indomitableUses',
+         'naturalRecoveryFreeCast',
+         'naturalRecoverySlots',
+         '_Star_Map_freeCastCount'
+   ]
 
 export function getLongRestResources() {
   return [...LONG_REST_RESOURCES]
@@ -127,11 +131,34 @@ export async function applyShortRest(playerStats, campaignName) {
     }
   }
 
-      // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
-  updates.activeBuffs = [];
-  updates.activeConditions = [];
+   // Natural Recovery: Druid Circle of the Land spell slot recovery on short rest
+   const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(
+     p => p.type === 'resource_restoration' && p.resourceKey === 'naturalRecoverySlots'
+   )
+   if (hasNaturalRecovery && playerStats.class?.name === 'Druid') {
+     const druidLevel = playerStats.level || 1
+     const maxSlotsToRecover = Math.floor(druidLevel / 2)
+     let slotsRecovered = 0
+     const slotLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+     for (const level of slotLevels) {
+       if (slotsRecovered >= maxSlotsToRecover) break
+       const slotKey = `spell_slots_level_${level}`
+       const max = playerStats.spellAbilities?.[slotKey] || 0
+       const current = Number(getRuntimeValue(name, slotKey) ?? max)
+       const available = max - current
+       if (available > 0) {
+         const toRecover = Math.min(available, maxSlotsToRecover - slotsRecovered)
+         updates[slotKey] = current + toRecover
+         slotsRecovered += toRecover
+       }
+     }
+   }
 
-  setRuntimeBatch(name, updates, campaignName)
+   // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
+   updates.activeBuffs = [];
+   updates.activeConditions = [];
+
+   setRuntimeBatch(name, updates, campaignName)
 
   clearAllExpirationEffects(name, campaignName)
 }
@@ -181,6 +208,15 @@ export async function applyLongRest(playerStats, campaignName) {
 
       // Single atomic write fires ONE SSE event with the complete final state
   setRuntimeBatch(name, charData, campaignName)
+
+   // Natural Recovery: reset free cast tracking on long rest
+   const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(
+     p => p.type === 'resource_restoration' && p.resourceKey === 'naturalRecoverySlots'
+   )
+   if (hasNaturalRecovery) {
+     charData.naturalRecoveryFreeCast = null
+     charData.naturalRecoverySlots = null
+   }
 
       // Handle Greater Divine Intervention Wish cooldown (2d4 long rests) — must run AFTER batch reset
   const wishCooldown = getRuntimeValue(name, '_divineInterventionWishCooldown', campaignName)

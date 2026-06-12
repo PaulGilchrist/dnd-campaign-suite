@@ -28,6 +28,16 @@ function getPostCastSelfHeals(playerStats) {
     return passives.filter(p => p.type === 'post_cast_self_heal');
 }
 
+function getPostCastAllyHeals(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    const activeBuffs = playerStats.activeBuffs || [];
+    const starryFormActive = activeBuffs.some(b => b.name === 'Starry Form' && b.constellation === 'Chalice');
+    if (!starryFormActive) {
+        return [];
+    }
+    return passives.filter(p => p.type === 'post_cast_ally_heal');
+}
+
 export function hasPostCastSelfHeal(playerStats) {
     return getPostCastSelfHeals(playerStats).length > 0;
 }
@@ -56,7 +66,11 @@ export async function triggerPostCastSelfHeals(spell, metaCtx, playerStats, camp
             continue;
         }
 
-        const expression = heal.healExpression || '0';
+        let expression = heal.healExpression || '0';
+        const isTwinkled = level >= 10;
+        if (isTwinkled) {
+            expression = expression.replace(/1d8/g, '2d8');
+        }
         const amount = evaluateAutoExpression(expression, playerStats, prof, level, slotLevel);
         if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
             continue;
@@ -73,6 +87,57 @@ export async function triggerPostCastSelfHeals(spell, metaCtx, playerStats, camp
         });
 
         results.push({ name: heal.name, amount, actualHeal });
+    }
+
+    return results.length > 0 ? results : null;
+}
+
+export async function triggerPostCastAllyHeals(spell, metaCtx, playerStats, campaignName, _mapName) {
+    if (!isHealingSpell(spell)) {
+        return null;
+    }
+
+    if (spell.level === 0) {
+        return null;
+    }
+
+    const allyHeals = getPostCastAllyHeals(playerStats);
+    if (allyHeals.length === 0) {
+        return null;
+    }
+
+    const results = [];
+    const prof = playerStats.proficiency || 0;
+    const level = playerStats.level || 1;
+    const slotLevel = metaCtx?.slotLevel || spell.level || 1;
+
+    for (const heal of allyHeals) {
+        if (heal.othersOnly && spell.range === 'Self') {
+            continue;
+        }
+
+        let expression = heal.healExpression || '0';
+        const isTwinkled = level >= 10;
+        if (isTwinkled) {
+            expression = expression.replace(/1d8/g, '2d8');
+        }
+        const amount = evaluateAutoExpression(expression, playerStats, prof, level, slotLevel);
+        if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) {
+            continue;
+        }
+
+        const targetName = heal.targetName || playerStats.name;
+        const { newHp, maxHp, actualHeal } = applyHealingDirectly(playerStats, targetName, amount, campaignName);
+
+        logHealingToSSE(campaignName, {
+            targetName,
+            sourceName: heal.name,
+            actualHeal,
+            newHp,
+            maxHp,
+        });
+
+        results.push({ name: heal.name, amount, actualHeal, targetName });
     }
 
     return results.length > 0 ? results : null;

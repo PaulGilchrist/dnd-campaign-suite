@@ -30,6 +30,15 @@ export const getProficiencies = (playerStats, skill = true, getProficiencyChoice
     const raceProficiencies = config.raceProficiencies(playerStats);
     proficiencies = [...new Set([...proficiencies, ...raceProficiencies])];
 
+    // Merge proficiency_choices from bonusSource (e.g., subclass/major choices like Battle Master's Student of War)
+    if (config.bonusSource?.proficiency_choices) {
+        config.bonusSource.proficiency_choices.forEach(pc => {
+            if (pc.from && pc.from.length > 0) {
+                proficiencies = [...new Set([...proficiencies, ...pc.from])];
+            }
+        });
+    }
+
     if (skill) {
         // Filter to only skill proficiencies and strip the 'Skill' prefix
         proficiencies = proficiencies

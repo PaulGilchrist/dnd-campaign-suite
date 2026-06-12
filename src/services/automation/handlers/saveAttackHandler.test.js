@@ -27,6 +27,10 @@ vi.mock('../../rules/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
 }));
 
+vi.mock('../../rules/expirations.js', () => ({
+  addExpiration: vi.fn(),
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle, isExhausted } from './saveAttackHandler.js';
@@ -679,7 +683,7 @@ describe('saveAttackHandler.handle - Damage Roll', () => {
     expect(result.payload.contextConfig.saveType).toBe('WIS');
   });
 
-  it('sets dcSuccess to 0.5 when shape is cone', async () => {
+  it('sets dcSuccess to "half" when shape is cone', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ damage: '2d6', shape: 'cone' });
 
@@ -688,10 +692,10 @@ describe('saveAttackHandler.handle - Damage Roll', () => {
 
     const result = await handle(action, ps, campaignName, null);
 
-    expect(result.payload.contextConfig.dcSuccess).toBe(0.5);
+    expect(result.payload.contextConfig.dcSuccess).toBe('half');
   });
 
-  it('sets dcSuccess to 0 when shape is not cone', async () => {
+  it('sets dcSuccess to "none" when shape is not cone', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ damage: '2d6', shape: 'sphere' });
 
@@ -700,10 +704,10 @@ describe('saveAttackHandler.handle - Damage Roll', () => {
 
     const result = await handle(action, ps, campaignName, null);
 
-    expect(result.payload.contextConfig.dcSuccess).toBe(0);
+    expect(result.payload.contextConfig.dcSuccess).toBe('none');
   });
 
-  it('sets dcSuccess to 0 when shape is missing', async () => {
+  it('sets dcSuccess to "none" when shape is missing', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ damage: '2d6' });
 
@@ -712,7 +716,7 @@ describe('saveAttackHandler.handle - Damage Roll', () => {
 
     const result = await handle(action, ps, campaignName, null);
 
-    expect(result.payload.contextConfig.dcSuccess).toBe(0);
+    expect(result.payload.contextConfig.dcSuccess).toBe('none');
   });
 
   it('includes attackerName in contextConfig', async () => {
@@ -977,5 +981,228 @@ describe('saveAttackHandler.handle - Edge Cases', () => {
     const result = await handle(action, ps, campaignName, 'TestMap');
 
     expect(result.payload.attackerPos).toBeNull();
+  });
+});
+
+// ── Tests: handle - Wild Shape resource cost ─────────────────────
+
+describe('saveAttackHandler.handle - Wild Shape resource cost', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  function makeDruidStats(wildShapeUses = 3) {
+    return {
+      name: 'TestDruid',
+      level: 14,
+      proficiency: 5,
+      class: {
+        class_levels: [
+          { level: 1 }, { level: 2 }, { level: 3 }, { level: 4 }, { level: 5 },
+          { level: 6 }, { level: 7 }, { level: 8 }, { level: 9 }, { level: 10 },
+          { level: 11 }, { level: 12 }, { level: 13 }, { level: 14, wild_shape: 4 }
+        ],
+      },
+      abilities: [
+        { name: 'WIS', modifier: 3 },
+        { name: 'CON', modifier: 2 },
+      ],
+      ...({ _wildShapeUses: wildShapeUses }),
+    };
+  }
+
+  it('returns error popup when wild_shape uses are 0', async () => {
+    const ps = makeDruidStats(0);
+    const action = makeAction({
+      resourceCost: 'wild_shape',
+      damage: '2d6',
+      shape: 'emanation',
+    });
+
+    runtimeState.getRuntimeValue.mockReturnValue(0);
+
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.description).toContain('Not enough Wild Shape uses remaining');
+    expect(result.payload.description).toContain('1 use');
+  });
+
+  it('expend 1 wild_shape use and proceed to damage roll', async () => {
+    const ps = makeDruidStats(3);
+    const action = makeAction({
+      resourceCost: 'wild_shape',
+      damage: '2d6',
+      shape: 'emanation',
+    });
+
+    runtimeState.getRuntimeValue.mockReturnValue(3);
+    savePrompt.buildSaveDc.mockReturnValue(14);
+    diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [3, 4], modifier: 0 });
+
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'TestDruid',
+      'wildShapeUses',
+      2,
+      campaignName,
+    );
+    expect(result.type).toBe('roll');
+  });
+
+  it('expend 2 wild_shape uses when doubleEmanation is true', async () => {
+    const ps = makeDruidStats(3);
+    const action = makeAction({
+      resourceCost: 'wild_shape',
+      damage: '2d6',
+      shape: 'emanation',
+      doubleEmanation: true,
+    });
+
+    runtimeState.getRuntimeValue.mockReturnValue(3);
+    savePrompt.buildSaveDc.mockReturnValue(14);
+    diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [3, 4], modifier: 0 });
+
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'TestDruid',
+      'wildShapeUses',
+      1,
+      campaignName,
+    );
+    expect(result.type).toBe('roll');
+  });
+
+  it('returns error when not enough wild_shape for doubleEmanation (only 1 left)', async () => {
+    const ps = makeDruidStats(1);
+    const action = makeAction({
+      resourceCost: 'wild_shape',
+      damage: '2d6',
+      shape: 'emanation',
+      doubleEmanation: true,
+    });
+
+    runtimeState.getRuntimeValue.mockReturnValue(1);
+
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Not enough Wild Shape uses remaining');
+    expect(result.payload.description).toContain('2 uses');
+  });
+
+  it('normalize pushEffect to effect for push-based effects', async () => {
+    const ps = makeDruidStats(3);
+    const action = makeAction({
+      resourceCost: 'wild_shape',
+      damage: 'WIS modifier d6',
+      shape: 'emanation',
+      pushEffect: 'push',
+      effectValue: '15_ft',
+    });
+
+    runtimeState.getRuntimeValue.mockReturnValue(3);
+    savePrompt.buildSaveDc.mockReturnValue(14);
+    diceRoller.rollExpression.mockReturnValue({ total: 8, rolls: [5, 3], modifier: 0 });
+
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(result.type).toBe('roll');
+    expect(result.payload.contextConfig.damageType).toBe('');
+  });
+
+  it('uses WIS save DC when saveDc is ability and saveAbility is WIS', async () => {
+    const ps = makeDruidStats(3);
+    const action = makeAction({
+      resourceCost: 'wild_shape',
+      damage: 'WIS modifier d6',
+      shape: 'emanation',
+      saveDc: 'ability',
+      saveAbility: 'WIS',
+      saveType: 'CON',
+    });
+
+    runtimeState.getRuntimeValue.mockReturnValue(3);
+    savePrompt.buildSaveDc.mockReturnValue(16);
+    diceRoller.rollExpression.mockReturnValue({ total: 8, rolls: [5, 3], modifier: 0 });
+
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(savePrompt.buildSaveDc).toHaveBeenCalled();
+    expect(result.payload.contextConfig.saveDc).toBe(16);
+    expect(result.payload.contextConfig.saveType).toBe('CON');
+  });
+
+  it('sets up duration expiration for 1_minute duration with emanation shape', async () => {
+    const ps = makeDruidStats(3);
+    const action = makeAction({
+      resourceCost: 'wild_shape',
+      damage: '2d6',
+      shape: 'emanation',
+      duration: '1_minute',
+    });
+
+    runtimeState.getRuntimeValue.mockReturnValue(3);
+    savePrompt.buildSaveDc.mockReturnValue(14);
+    diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [3, 4], modifier: 0 });
+
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(result.type).toBe('roll');
+  });
+});
+
+// ── Tests: isExhausted - Wild Shape ──────────────────────────────
+
+describe('saveAttackHandler.isExhausted - Wild Shape', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  function makeDruidStats(wildShapeUses = 3) {
+    return {
+      name: 'TestDruid',
+      level: 14,
+      proficiency: 5,
+      class: {
+        class_levels: [
+          { level: 1 }, { level: 2 }, { level: 3 }, { level: 4 }, { level: 5 },
+          { level: 6 }, { level: 7 }, { level: 8 }, { level: 9 }, { level: 10 },
+          { level: 11 }, { level: 12 }, { level: 13 }, { level: 14, wild_shape: 4 }
+        ],
+      },
+      abilities: [],
+      ...({ _wildShapeUses: wildShapeUses }),
+    };
+  }
+
+  it('returns false when wild_shape charges are available', () => {
+    const action = makeAction({ resourceCost: 'wild_shape' });
+    const ps = makeDruidStats(3);
+
+    runtimeState.getRuntimeValue.mockReturnValue(3);
+
+    expect(isExhausted(action, ps, campaignName)).toBe(false);
+  });
+
+  it('returns true when wild_shape charges are 0', () => {
+    const action = makeAction({ resourceCost: 'wild_shape' });
+    const ps = makeDruidStats(0);
+
+    runtimeState.getRuntimeValue.mockReturnValue(0);
+
+    expect(isExhausted(action, ps, campaignName)).toBe(true);
+  });
+
+  it('returns false when storedCharges is null (defaults to max)', () => {
+    const action = makeAction({ resourceCost: 'wild_shape' });
+    const ps = makeDruidStats(4);
+
+    runtimeState.getRuntimeValue.mockReturnValue(null);
+
+    expect(isExhausted(action, ps, campaignName)).toBe(false);
   });
 });

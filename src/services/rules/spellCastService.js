@@ -2,7 +2,7 @@ import { rollExpression } from '../dice/diceRoller.js';
 import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet, rangeToFeet } from './rangeValidation.js';
 import { isInnateSorceryActive, getActiveBuffs } from '../combat/buffService.js';
 import { triggerPostCastRiderSaves } from './postCastRiderService.js';
-import { triggerPostCastSelfHeals } from './postCastHealService.js';
+import { triggerPostCastSelfHeals, triggerPostCastAllyHeals } from './postCastHealService.js';
 import { setRuntimeValue, getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { applyHealingToTarget } from './applyHealing.js';
 import { getCombatContext } from './damageUtils.js';
@@ -89,6 +89,9 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     });
     triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast self-heal failed:', e);
+    });
+    triggerPostCastAllyHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+        console.error('[spellCast] Post-cast ally-heal failed:', e);
     });
 }
 

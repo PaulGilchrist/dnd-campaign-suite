@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { collectAutomationFromFeatures, processFeatureAutomation } from './automationCollector.js'
+import { collectAutomationFromFeatures, processFeatureAutomation, collectTurnStartEffects } from './automationCollector.js'
 
 describe('collectAutomationFromFeatures', () => {
   it('returns empty result when features is null', () => {
@@ -704,4 +704,109 @@ describe('processFeatureAutomation', () => {
     expect(actionNames).toContain('Action Reaction')
     expect(actionNames).toContain('Action Special')
   })
+})
+
+describe('collectAutomationFromFeatures – nature_sanctuary types', () => {
+    it('categorizes nature_sanctuary as an action', () => {
+        const features = [{ name: "Nature's Sanctuary", automation: { type: 'nature_sanctuary' } }]
+        const result = collectAutomationFromFeatures(features, {})
+        expect(result.actions.length).toBe(1)
+        expect(result.actions[0].name).toBe("Nature's Sanctuary")
+        expect(result.actions[0].type).toBe('nature_sanctuary')
+    })
+
+    it('categorizes nature_sanctuary_move as a bonus action', () => {
+        const features = [{ name: "Nature's Sanctuary (Move)", automation: { type: 'nature_sanctuary_move' } }]
+        const result = collectAutomationFromFeatures(features, {})
+        expect(result.bonusActions.length).toBe(1)
+        expect(result.bonusActions[0].name).toBe("Nature's Sanctuary (Move)")
+        expect(result.bonusActions[0].type).toBe('nature_sanctuary_move')
+    })
+})
+
+describe('collectTurnStartEffects', () => {
+    it('returns empty array when features is null', () => {
+        const result = collectTurnStartEffects(null)
+        expect(result).toEqual([])
+    })
+
+    it('returns empty array when features is undefined', () => {
+        const result = collectTurnStartEffects(undefined)
+        expect(result).toEqual([])
+    })
+
+    it('returns empty array when features is empty', () => {
+        const result = collectTurnStartEffects([])
+        expect(result).toEqual([])
+    })
+
+    it('returns empty array when features have no automation', () => {
+        const features = [{ name: 'Test Feature', description: 'test' }]
+        const result = collectTurnStartEffects(features)
+        expect(result).toEqual([])
+    })
+
+    it('collects heroic_inspiration_turn_start effect', () => {
+        const features = [
+            {
+                name: 'Heroic Warrior',
+                automation: {
+                    type: 'passive_rule',
+                    effect: 'heroic_inspiration_turn_start',
+                    casting_time: 'passive'
+                }
+            }
+        ]
+        const result = collectTurnStartEffects(features)
+        expect(result).toHaveLength(1)
+        expect(result[0]).toEqual({
+            type: 'heroic_inspiration',
+            name: 'Heroic Warrior'
+        })
+    })
+
+    it('ignores other passive_rule effects', () => {
+        const features = [
+            {
+                name: 'Superior Critical',
+                automation: {
+                    type: 'passive_rule',
+                    effect: 'critical_range',
+                    criticalRange: '18-20'
+                }
+            },
+            {
+                name: 'Heroic Warrior',
+                automation: {
+                    type: 'passive_rule',
+                    effect: 'heroic_inspiration_turn_start'
+                }
+            }
+        ]
+        const result = collectTurnStartEffects(features)
+        expect(result).toHaveLength(1)
+        expect(result[0].type).toBe('heroic_inspiration')
+    })
+
+    it('handles array of automations', () => {
+        const features = [
+            {
+                name: 'Mixed Feature',
+                automation: [
+                    {
+                        type: 'passive_rule',
+                        effect: 'heroic_inspiration_turn_start'
+                    },
+                    {
+                        type: 'passive_rule',
+                        effect: 'critical_range',
+                        criticalRange: '19-20'
+                    }
+                ]
+            }
+        ]
+        const result = collectTurnStartEffects(features)
+        expect(result).toHaveLength(1)
+        expect(result[0].type).toBe('heroic_inspiration')
+    })
 })

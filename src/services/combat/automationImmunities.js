@@ -4,12 +4,17 @@ export function getConditionImmunities(features) {
 
     features.forEach(feature => {
         if (!feature?.automation) return
-        const auto = feature.automation
-        if (auto.type === 'passive_immunity') {
-            immunities.push(auto.conditionImmunity)
-        }
-        if (auto.type === 'condition_immunity_while_active') {
-            immunities.push(...auto.immunities)
+        const automations = Array.isArray(feature.automation) ? feature.automation : [feature.automation]
+        for (const auto of automations) {
+            if (auto.type === 'passive_immunity') {
+                immunities.push(auto.conditionImmunity)
+            }
+            if (auto.type === 'condition_immunity_while_active') {
+                immunities.push(...auto.immunities)
+            }
+            if (auto.type === 'land_resistance' && auto.conditionImmunity) {
+                immunities.push(auto.conditionImmunity)
+            }
         }
     })
 
@@ -22,13 +27,15 @@ export function getConditionalImmunities(features) {
 
     features.forEach(feature => {
         if (!feature?.automation) return
-        const auto = feature.automation
-        if (auto.type === 'condition_immunity_while_active') {
-            result.push({
-                name: feature.name,
-                immunities: auto.immunities || [],
-                requiresActive: auto.requiresActive || '',
-            })
+        const automations = Array.isArray(feature.automation) ? feature.automation : [feature.automation]
+        for (const auto of automations) {
+            if (auto.type === 'condition_immunity_while_active') {
+                result.push({
+                    name: feature.name,
+                    immunities: auto.immunities || [],
+                    requiresActive: auto.requiresActive || '',
+                })
+            }
         }
     })
 
@@ -48,30 +55,39 @@ export function playerIsImmuneToCondition({
 
     for (const feature of allFeatures) {
         if (!feature?.automation) continue
-        const auto = feature.automation
-
-        if (auto.type === 'passive_immunity') {
-            const immunityStr = String(auto.conditionImmunity || '').toLowerCase()
-            const tokens = immunityStr.split(/[\s,]+/).filter(Boolean)
-            if (tokens.some(t => t === lowerCondition || immunityStr.includes(lowerCondition))) {
-                return true
+        const automations = Array.isArray(feature.automation) ? feature.automation : [feature.automation]
+        for (const auto of automations) {
+            if (auto.type === 'passive_immunity') {
+                const immunityStr = String(auto.conditionImmunity || '').toLowerCase()
+                const tokens = immunityStr.split(/[\s,]+/).filter(Boolean)
+                if (tokens.some(t => t === lowerCondition || immunityStr.includes(lowerCondition))) {
+                    return true
+                }
             }
-        }
 
-        if (auto.type === 'condition_immunity_while_active') {
-            const immunities = (auto.immunities || []).map(i => String(i).toLowerCase())
-            if (!immunities.includes(lowerCondition)) continue
+            if (auto.type === 'land_resistance' && auto.conditionImmunity) {
+                const immunityStr = String(auto.conditionImmunity || '').toLowerCase()
+                const tokens = immunityStr.split(/[\s,]+/).filter(Boolean)
+                if (tokens.some(t => t === lowerCondition || immunityStr.includes(lowerCondition))) {
+                    return true
+                }
+            }
 
-            const requiresActive = auto.requiresActive || ''
-            if (!requiresActive) return true
+            if (auto.type === 'condition_immunity_while_active') {
+                const immunities = (auto.immunities || []).map(i => String(i).toLowerCase())
+                if (!immunities.includes(lowerCondition)) continue
 
-            const activeBuffs = (getRuntimeValue && campaignName)
-                ? (getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [])
-                : []
-            const isActive = Array.isArray(activeBuffs) && activeBuffs.some(
-                b => String(b.name).toLowerCase() === requiresActive.toLowerCase()
-            )
-            if (isActive) return true
+                const requiresActive = auto.requiresActive || ''
+                if (!requiresActive) return true
+
+                const activeBuffs = (getRuntimeValue && campaignName)
+                    ? (getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [])
+                    : []
+                const isActive = Array.isArray(activeBuffs) && activeBuffs.some(
+                    b => String(b.name).toLowerCase() === requiresActive.toLowerCase()
+                )
+                if (isActive) return true
+            }
         }
     }
 

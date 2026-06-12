@@ -29,6 +29,7 @@ vi.mock('./postCastRiderService.js', () => ({
 
 vi.mock('./postCastHealService.js', () => ({
   triggerPostCastSelfHeals: vi.fn().mockResolvedValue(undefined),
+  triggerPostCastAllyHeals: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ── Imports (Vite returns mocked versions) ─────────────────────

@@ -596,6 +596,54 @@ describe('Fighter', () => {
     render(<CharClassFeatures playerStats={psiStats} />);
     expect(screen.getByText(/Energy Dice/)).toBeInTheDocument();
     expect(screen.getByText(/d8/)).toBeInTheDocument();
+      });
+
+  it('renders superiority dice and die type for Battle Master at level 5', () => {
+    const bmStats = {
+          ...mockStats,
+        class: {
+               ...mockStats.class,
+            major: { name: 'Battle Master' },
+            subclass: { name: 'Battle Master' },
+            class_levels: Array(5).fill({ extra_attacks: 1, second_wind: 2, weapon_mastery: 'Slashing' }),
+             },
+          };
+    render(<CharClassFeatures playerStats={bmStats} />);
+    expect(screen.getByText(/Superiority Dice/)).toBeInTheDocument();
+    expect(screen.getByText(/Superiority Die:/)).toBeInTheDocument();
+    expect(screen.getByText(/d8/)).toBeInTheDocument();
+     });
+
+  it('renders d10 superiority die for Battle Master at level 10', () => {
+    const bmStats10 = {
+          ...mockStats,
+        level: 10,
+        class: {
+               ...mockStats.class,
+            major: { name: 'Battle Master' },
+            subclass: { name: 'Battle Master' },
+            class_levels: Array(10).fill({ extra_attacks: 1, second_wind: 2, weapon_mastery: 'Slashing' }),
+             },
+          };
+    render(<CharClassFeatures playerStats={bmStats10} />);
+    expect(screen.getByText(/Superiority Die:/)).toBeInTheDocument();
+    expect(screen.getByText(/d10/)).toBeInTheDocument();
+     });
+
+  it('renders d12 superiority die for Battle Master at level 18', () => {
+    const bmStats18 = {
+          ...mockStats,
+        level: 18,
+        class: {
+               ...mockStats.class,
+            major: { name: 'Battle Master' },
+            subclass: { name: 'Battle Master' },
+            class_levels: Array(18).fill({ extra_attacks: 1, second_wind: 2, weapon_mastery: 'Slashing' }),
+             },
+          };
+    render(<CharClassFeatures playerStats={bmStats18} />);
+    expect(screen.getByText(/Superiority Die:/)).toBeInTheDocument();
+    expect(screen.getByText(/d12/)).toBeInTheDocument();
      });
 });
 

@@ -37,6 +37,13 @@ import { handle as handleCountercharm } from './handlers/countercharmHandler.js'
 import { handle as handleFontOfInspiration } from './handlers/fontOfInspirationHandler.js';
 import { handle as handleMultiTarget } from './handlers/multiTargetHandler.js';
 import { handle as handleDivineOrder } from './handlers/divineOrderHandler.js';
+import { handle as handleNaturesSanctuary, handleMove as handleNaturesSanctuaryMove } from './handlers/naturesSanctuaryHandler.js';
+import { handle as handleStarryForm } from './handlers/starryFormHandler.js';
+import { handle as handleCosmicOmen } from './handlers/cosmicOmenHandler.js';
+import { handle as handleTwinklingConstellation } from './handlers/twinklingConstellationHandler.js';
+import { handle as handleTacticalMind } from './handlers/tacticalMindHandler.js';
+import { handle as handleCombatSuperiority } from './handlers/combatSuperiorityHandler.js';
+import { handle as handleKnowEnemy } from './handlers/knowEnemyHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -86,6 +93,15 @@ const HANDLER_MAP = {
         font_of_inspiration: handleFontOfInspiration,
         multi_target_spread: handleMultiTarget,
         divine_order: handleDivineOrder,
+        nature_sanctuary: handleNaturesSanctuary,
+        nature_sanctuary_move: handleNaturesSanctuaryMove,
+        moonlight_step_rider: handleGenericPopup,
+        starry_form: handleStarryForm,
+        cosmic_omen: handleCosmicOmen,
+        twinkling_constellations: handleTwinklingConstellation,
+        tactical_mind: handleTacticalMind,
+        combat_superiority: handleCombatSuperiority,
+        know_enemy: handleKnowEnemy,
 };
 
 export async function executeHandler(action, playerStats, campaignName, mapName) {

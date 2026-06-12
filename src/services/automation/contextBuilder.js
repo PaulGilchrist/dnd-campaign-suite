@@ -124,6 +124,15 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
 
+        // Compute critical range from passives (e.g., Improved Critical, Superior Critical)
+        let criticalRange = '';
+        const passives = playerStats.automation?.passives || [];
+        for (const passive of passives) {
+            if (passive.type === 'passive_rule' && passive.effect === 'critical_range' && passive.criticalRange) {
+                criticalRange = passive.criticalRange;
+            }
+        }
+
         return {
             damageType: attack.damageType,
             resistanceNotice,
@@ -137,6 +146,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             autoDamageName: attack.name,
             ramActive,
             isMelee,
+            criticalRange,
            };
        });
 }
@@ -281,12 +291,29 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
 
                 if (isRanged && !base.isAutoMiss && targetPos) {
                     const walls = mapData?.walls || new Set();
-                    const coverResult = computeCover(
+                    let coverResult = computeCover(
                          { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
                           { gridX: targetPos.gridX, gridY: targetPos.gridY },
                         walls,
                         mapData?.placedItems || [],
                       );
+
+                    // Check Nature's Sanctuary half cover (15-ft cube = 3x3 grid centered on placement)
+                    const sanctuaryActive = getRuntimeValue(playerStats.name, 'naturesSanctuaryActive', campaignName);
+                    if (sanctuaryActive) {
+                        const sanctuaryX = Number(getRuntimeValue(playerStats.name, 'naturesSanctuaryCubeX', campaignName) || 0);
+                        const sanctuaryY = Number(getRuntimeValue(playerStats.name, 'naturesSanctuaryCubeY', campaignName) || 0);
+                        const cubeHalfSize = 1; // 15ft cube = 3 cells wide, half-size = 1 cell from center
+                        if (sanctuaryX > 0 && sanctuaryY > 0) {
+                            const dx = Math.abs(targetPos.gridX - sanctuaryX);
+                            const dy = Math.abs(targetPos.gridY - sanctuaryY);
+                            const inCube = dx <= cubeHalfSize && dy <= cubeHalfSize;
+                            if (inCube && coverResult.acBonus < 2) {
+                                coverResult = { level: 'half', acBonus: 2 };
+                            }
+                        }
+                    }
+
                     if (coverResult.level === 'full') {
                         base.isAutoMiss = true;
                         base.coverReason = 'Target has full cover';

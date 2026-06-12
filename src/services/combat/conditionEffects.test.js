@@ -387,4 +387,43 @@ describe('saveModifierApplies with unknown conditions', () => {
     expect(effects.saveAdvantageCount).toBe(0)
     expect(effects.saveAdvantage).toContain('poisoned')
   })
+
+  describe('shape_shift condition', () => {
+    it('applies advantage on CON saves when shapeShiftActive is true', () => {
+      const saveModifiers = [{
+        source: 'Increased Toughness',
+        target: 'saving_throw',
+        condition: 'shape_shift',
+        effect: 'advantage',
+        abilities: ['CON']
+      }]
+      const effects = computeConditionEffects([], saveModifiers, [], false, true)
+      expect(effects.saveAdvantageCount).toBe(0)
+      expect(effects.saveAdvantageAbilities).toContain('CON')
+    })
+
+    it('does not apply advantage when shapeShiftActive is false', () => {
+      const saveModifiers = [{
+        source: 'Increased Toughness',
+        target: 'saving_throw',
+        condition: 'shape_shift',
+        effect: 'advantage',
+        abilities: ['CON']
+      }]
+      const effects = computeConditionEffects([], saveModifiers, [], false, false)
+      expect(effects.saveAdvantageCount).toBe(0)
+      expect(effects.saveAdvantageAbilities).toBeUndefined()
+    })
+
+    it('applies advantage to all abilities when no abilities specified and shapeShiftActive', () => {
+      const saveModifiers = [{
+        source: 'Shape Shift Bonus',
+        target: 'saving_throw',
+        condition: 'shape_shift',
+        effect: 'advantage'
+      }]
+      const effects = computeConditionEffects([], saveModifiers, [], false, true)
+      expect(effects.saveAdvantageCount).toBe(1)
+    })
+  })
 })

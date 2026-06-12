@@ -83,6 +83,16 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const flyBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.effect === 'fly_speed_equals_walk_speed') : null;
     const flyBuffActive = !!flyBuff;
     const flyBuffName = flyBuff?.name || '';
+
+    // Circle Forms AC override: 13 + WIS modifier when shape_shift is active for Circle of the Moon
+    const isMoonDruid = playerStats.class?.major?.name === 'Moon' || playerStats.class?.subclass?.name === 'Moon';
+    const shapeShiftActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shape_shift');
+    let circleFormsACOverride = null;
+    if (isMoonDruid && shapeShiftActive) {
+        const wis = playerStats.abilities.find(a => a.name === 'Wisdom');
+        const wisMod = wis?.bonus ?? 0;
+        circleFormsACOverride = 13 + wisMod;
+    }
     let speed = playerStats.race.subrace && playerStats.race.subrace.speed ? playerStats.race.subrace.speed : playerStats.race.speed;
     if (playerStats.class.name === 'Monk') {
         const { classRules: cr } = rulesFactory.getRules(playerStats);
@@ -113,6 +123,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     speed = Math.max(0, speed - (5 * exhaustionLevel));
     if (conditionEffects?.speedZero) speed = 0;
     if (conditionEffects?.speedHalved) speed = Math.floor(speed / 2);
+    if (conditionEffects?.speedReduction) speed = Math.max(0, speed - conditionEffects.speedReduction);
     const auraSpeedBonus = auraComboEffects?.speedBonus || 0;
     const auraSpeedSource = auraComboEffects?.speedSource || null;
     const totalSpeed = speed + auraSpeedBonus;
@@ -133,6 +144,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     let iceWalkActive = false;
     activeBuffs.forEach(buff => {
         if (buff.effect === 'fly_speed_equals_walk_speed' || buff.flySpeed) flySpeed = speed;
+        if (buff.effect === 'fly_speed_20_hover') flySpeed = 20;
         if (buff.effect === 'speed_boost' && buff.speedBonus) buffSpeedBonus += buff.speedBonus;
         if (buff.effect === 'ice_walk') iceWalkActive = true;
     });
@@ -140,6 +152,14 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     if (elementalMovementPassive) {
         flySpeed = speed;
         swimSpeed = speed;
+    }
+    const aquaticAffinityPassive = (playerStats.automation?.passives || []).find(p => p.effect === 'aquatic_affinity');
+    if (aquaticAffinityPassive && swimSpeed === null) {
+        swimSpeed = speed;
+    }
+    const stormbornPassive = (playerStats.automation?.passives || []).find(p => p.effect === 'fly_speed_equals_walk_speed');
+    if (stormbornPassive && flySpeed === null) {
+        flySpeed = speed;
     }
     const totalSpeedWithBuff = totalSpeed + buffSpeedBonus;
 
@@ -200,7 +220,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
             </div>
             <div className='summaryGrid'>
                 <div>
-                    <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{playerStats.armorClass}</div>
+                    <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{circleFormsACOverride ?? playerStats.armorClass}</div>
                     <CharHitPoints playerStats={playerStats} campaignName={campaignName}></CharHitPoints>
                       <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeedWithBuff}{playerStats.climbSpeed ? `, climb ${playerStats.climbSpeed}` : ''}{playerStats.swimSpeed ? `, swim ${playerStats.swimSpeed}` : ''}{swimSpeed !== null ? `, swim ${swimSpeed}` : ''}{flySpeed !== null ? `, fly ${flySpeed + auraSpeedBonus}` : ''}{iceWalkActive ? ', ice walk' : ''}</span> ft.{auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}<br />
                     <CharGold playerStats={playerStats} campaignName={campaignName}></CharGold>

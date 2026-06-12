@@ -99,6 +99,7 @@ describe('buildAttackInfo – passive_buff', () => {
             resistances: [],
             options: [],
             extraMastery: [],
+            replaceMastery: [],
             grantsFlySpeed: false,
             grantsSwimSpeed: false,
             hasAutomation: true,

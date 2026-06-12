@@ -287,6 +287,58 @@ describe('applyShortRest', () => {
     const data = setRuntimeBatch.mock.calls[0][1]
     expect(data.bardicInspirationUses).toBeUndefined()
   })
+
+  it('recovers spell slots for Druid with Natural Recovery on short rest', () => {
+    const playerStats = {
+      name: 'Druid',
+      hitPoints: 30,
+      level: 10,
+      class: { name: 'Druid' },
+      spellAbilities: {
+        spell_slots_level_1: 4,
+        spell_slots_level_2: 3,
+        spell_slots_level_3: 2,
+      },
+      automation: {
+        passives: [{ type: 'resource_restoration', resourceKey: 'naturalRecoverySlots' }],
+      },
+    }
+    getRuntimeValue
+      .mockReturnValueOnce(20) // currentHitPoints
+      .mockReturnValueOnce(2)   // spell_slots_level_1 (4 max, 2 used)
+      .mockReturnValueOnce(1)   // spell_slots_level_2 (3 max, 2 used)
+      .mockReturnValueOnce(0)   // spell_slots_level_3 (2 max, 2 used)
+
+    applyShortRest(playerStats, 'Campaign1')
+
+    const data = setRuntimeBatch.mock.calls[0][1]
+    // Druid level 10 → floor(10/2) = 5 slot levels to recover
+    // Level 1: 2 available, Level 2: 2 available, Level 3: 1 available (limited by remaining) = 5 total
+    expect(data.spell_slots_level_1).toBe(4)
+    expect(data.spell_slots_level_2).toBe(3)
+    expect(data.spell_slots_level_3).toBe(1)
+  })
+
+  it('resets Natural Recovery free cast on long rest', () => {
+    const playerStats = {
+      name: 'Druid',
+      hitPoints: 50,
+      level: 10,
+      class: { name: 'Druid' },
+      spellAbilities: {
+        spell_slots_level_1: 4,
+      },
+      automation: {
+        passives: [{ type: 'resource_restoration', resourceKey: 'naturalRecoverySlots' }],
+      },
+    }
+    getRuntimeValue.mockReturnValue(null)
+    applyLongRest(playerStats, 'Campaign1')
+
+    const data = setRuntimeBatch.mock.calls[0][1]
+    expect(data.naturalRecoveryFreeCast).toBeNull()
+    expect(data.naturalRecoverySlots).toBeNull()
+  })
 })
 
 describe('applyLongRest', () => {
@@ -498,5 +550,15 @@ describe('getShortRestResourceLabels', () => {
   it('returns empty array for undefined playerStats', () => {
     const labels = getShortRestResourceLabels(undefined)
     expect(labels).toEqual([])
+    })
+
+  it('includes Natural Recovery for Druid Circle of the Land', () => {
+    const labels = getShortRestResourceLabels({ class: { name: 'Druid', subclass: { name: 'Circle of the Land' } } })
+    expect(labels).toContain('Natural Recovery (Spell Slots)')
+    })
+
+  it('excludes Natural Recovery for Druid without Circle of the Land', () => {
+    const labels = getShortRestResourceLabels({ class: { name: 'Druid', subclass: { name: 'Moon' } } })
+    expect(labels).not.toContain('Natural Recovery (Spell Slots)')
     })
 })

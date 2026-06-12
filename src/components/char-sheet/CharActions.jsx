@@ -21,6 +21,7 @@ import HealingPoolModal from './HealingPoolModal.jsx'
 import HandOfHealingModal from './HandOfHealingModal.jsx'
 import FontOfMagicModal from './FontOfMagicModal.jsx'
 import ResourcePoolModal from './ResourcePoolModal.jsx'
+import WildCompanionModal from './WildCompanionModal.jsx'
 import SetConditionModal from './SetConditionModal.jsx'
 import DivineSparkModal from './DivineSparkModal.jsx'
 import DivineInterventionModal from './DivineInterventionModal.jsx'
@@ -30,8 +31,12 @@ import WeaponMasteryModal from './WeaponMasteryModal.jsx'
 import CombatStanceModal from './CombatStanceModal.jsx'
 import TeleportModal from './TeleportModal.jsx'
 import HealingIllusionModal from './HealingIllusionModal.jsx'
+import SaveAttackHealModal from './SaveAttackHealModal.jsx'
+import MoonlightStepResourceModal from './MoonlightStepResourceModal.jsx'
+import ConstellationSelectionModal from './ConstellationSelectionModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
+import { applyConstellationOption } from '../../services/automation/handlers/starryFormHandler.js';
 import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/divineInterventionHandler.js';
 import { getClassFeatures } from '../../services/character/classFeatures.js';
 import { addEntry } from '../../services/ui/logService.js';
@@ -59,6 +64,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [handOfHealingModal, setHandOfHealingModal] = useState(null);
     const [fontOfMagicModal, setFontOfMagicModal] = useState(null);
     const [resourcePoolModal, setResourcePoolModal] = useState(null);
+    const [wildCompanionModal, setWildCompanionModal] = useState(null);
     const [setConditionModal, setSetConditionModal] = useState(null);
     const [attackRiderModal, setAttackRiderModal] = useState(null);
     const [openHandTechniqueModal, setOpenHandTechniqueModal] = useState(null);
@@ -66,9 +72,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [combatStanceModal, setCombatStanceModal] = useState(null);
     const [teleportModal, setTeleportModal] = useState(null);
     const [healingIllusionModal, setHealingIllusionModal] = useState(null);
+    const [saveAttackHealModal, setSaveAttackHealModal] = useState(null);
     const [divineSparkModal, setDivineSparkModal] = useState(null);
     const [divineInterventionModal, setDivineInterventionModal] = useState(null);
     const [divineInterventionAction, setDivineInterventionAction] = useState(null);
+    const [moonlightStepResourceModal, setMoonlightStepResourceModal] = useState(null);
+    const [starryFormConstellationModal, setStarryFormConstellationModal] = useState(null);
+    const [twinklingConstellationModal, setTwinklingConstellationModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
     const [featureChoice, setFeatureChoice] = useState(null);
@@ -172,6 +182,15 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     context.metamagicHeighten = autoDamage.metamagicHeighten;
                 }
                 rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
+            }
+            // Remarkable Athlete: after critical hit, enable movement without opportunity attacks
+            if (isCrit) {
+                const hasRemarkableAthlete = (playerStats.automation?.passives || []).some(
+                    p => p.type === 'auto_effect' && p.effect === 'remarkable_athlete_movement'
+                );
+                if (hasRemarkableAthlete) {
+                    setRuntimeValue(playerStats.name, 'remarkableAthleteNoOA', Date.now(), campaignName);
+                }
             }
         },
     });
@@ -549,6 +568,23 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setFeatureChoice(null);
     };
 
+    const handleConstellationSelect = async (payload, optionName) => {
+        const { action, playerStats: ps, campaignName: cn } = payload;
+        const isTwinkled = ps.level >= 10;
+        let result;
+        if (isTwinkled) {
+            const { applyConstellationOption: twinklingApply } = await import('../../services/automation/handlers/twinklingConstellationHandler.js');
+            result = await twinklingApply(action, ps, cn, optionName);
+        } else {
+            result = await applyConstellationOption(action, ps, cn, optionName);
+        }
+        if (result) {
+            setPopupHtml(result.payload);
+        }
+        setStarryFormConstellationModal(null);
+        setTwinklingConstellationModal(null);
+    };
+
     const handleAttackClick = React.useCallback((attack) => {
         if (cannotAct) return;
          buildCtx(attack).then(ctx => {
@@ -649,17 +685,22 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'handOfHealing': setHandOfHealingModal(result.payload); break;
                     case 'fontOfMagic': setFontOfMagicModal(true); break;
                     case 'resourcePool': setResourcePoolModal(result.payload); break;
+                    case 'wildCompanion': setWildCompanionModal(result.payload); break;
                     case 'setCondition': setSetConditionModal(result.payload); break;
                     case 'attackRider': setAttackRiderModal(result.payload); break;
                     case 'openHandTechnique': setOpenHandTechniqueModal(result.payload); break;
                     case 'combatStance': setCombatStanceModal(result.payload); break;
                     case 'teleport': setTeleportModal(result.payload); break;
                     case 'healingIllusion': setHealingIllusionModal(result.payload); break;
+                    case 'saveAttackHeal': setSaveAttackHealModal(result.payload); break;
                     case 'divineSpark': setDivineSparkModal(result.payload); break;
                     case 'divineIntervention':
                         setDivineInterventionAction(action);
                         setDivineInterventionModal(result.payload);
                         break;
+                    case 'moonlightStepResource': setMoonlightStepResourceModal(result.payload); break;
+                    case 'starryFormConstellation': setStarryFormConstellationModal(result.payload); break;
+                    case 'twinklingConstellation': setTwinklingConstellationModal(result.payload); break;
                  }
                 break;
             case 'roll':
@@ -904,6 +945,21 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         onClose={() => setResourcePoolModal(null)}
                     />
                 )}
+                {moonlightStepResourceModal && (
+                    <MoonlightStepResourceModal
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        automation={moonlightStepResourceModal.automation}
+                        onClose={() => setMoonlightStepResourceModal(null)}
+                    />
+                )}
+                {wildCompanionModal && (
+                    <WildCompanionModal
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        onClose={() => setWildCompanionModal(null)}
+                    />
+                )}
                 {setConditionModal && (
                     <SetConditionModal
                         {...setConditionModal}
@@ -948,6 +1004,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <HealingIllusionModal
                         {...healingIllusionModal}
                         onClose={() => { setHealingIllusionModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
+                    />
+                )}
+                {saveAttackHealModal && (
+                    <SaveAttackHealModal
+                        {...saveAttackHealModal}
+                        onClose={() => setSaveAttackHealModal(null)}
                     />
                 )}
                 {divineSparkModal && (
@@ -1047,6 +1109,26 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             </div>
                         </div>
                     </div>
+                )}
+                {starryFormConstellationModal && (
+                    <ConstellationSelectionModal
+                        action={starryFormConstellationModal.payload.action}
+                        playerStats={starryFormConstellationModal.payload.playerStats}
+                        campaignName={starryFormConstellationModal.payload.campaignName}
+                        isTwinkled={false}
+                        onConfirm={(option) => handleConstellationSelect(starryFormConstellationModal.payload, option)}
+                        onClose={() => setStarryFormConstellationModal(null)}
+                    />
+                )}
+                {twinklingConstellationModal && (
+                    <ConstellationSelectionModal
+                        action={twinklingConstellationModal.payload.action}
+                        playerStats={twinklingConstellationModal.payload.playerStats}
+                        campaignName={twinklingConstellationModal.payload.campaignName}
+                        isTwinkled={true}
+                        onConfirm={(option) => handleConstellationSelect(twinklingConstellationModal.payload, option)}
+                        onClose={() => setTwinklingConstellationModal(null)}
+                    />
                 )}
                 {selectedActionSpell && (
                     <Popup onClickOrKeyDown={() => setSelectedActionSpell(null)}>

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, onReroll }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, onReroll, tacticalMind, tacticalMindBonus }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
+    const [tacticalUsed, setTacticalUsed] = useState(false);
+    const [tacticalResult, setTacticalResult] = useState(null);
 
     const isD20 = type === 'd20';
 
@@ -32,6 +34,13 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
     const appliesReplace = (strSaveReplace && rollType === 'save') || (strCheckReplace && (rollType === 'check' || rollType === 'skill'));
     const finalDisplayTotal = appliesReplace && displayTotal < (strScore || 10) ? strScore : displayTotal;
     const showCrit = isCrit || isAutoCrit || (isD20 && displayRoll === 20);
+
+    const handleTacticalMind = () => {
+        const tacticalBonus = tacticalMindBonus || 0;
+        const newTotal = finalRoll + bonus + modifier + tacticalBonus;
+        setTacticalResult({ bonus: tacticalBonus, total: newTotal });
+        setTacticalUsed(true);
+    };
 
     const saveAbilityLabel = saveType ? saveType.toUpperCase() : '';
 
@@ -176,9 +185,23 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
               </div>
             )}
 
+            {tacticalMind && !tacticalUsed && (rollType === 'check' || rollType === 'skill') && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={handleTacticalMind} type="button">
+                  <i className="fa-solid fa-hand"></i> Tactical Mind{tacticalMindBonus ? ` (+${tacticalMindBonus})` : ''}
+                </button>
+              </div>
+            )}
+
             {rerollUsed && rerollResult !== null && (
               <div className="dice-roll-reroll-result">
                 <i className="fa-solid fa-rotate"></i> Rerolled: {rerollResult.roll} + {rerollResult.total - rerollResult.roll} = <strong>{rerollResult.total}</strong>
+              </div>
+            )}
+
+            {tacticalUsed && tacticalResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-hand"></i> Tactical Mind: +{tacticalResult.bonus} = <strong>{tacticalResult.total}</strong>
               </div>
             )}
 

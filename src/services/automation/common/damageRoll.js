@@ -27,11 +27,48 @@ export function rollDamageForAction(auto, options = {}) {
      };
 }
 
+import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
+
 export async function buildAttackContextForDamage(attackContext, playerName, campaignName, mapName) {
     const cs = await getCombatContext(campaignName);
     const target = cs ? getTargetFromAttacker(cs, playerName) : null;
     const targetName = target?.name || (cs ? getAttackerTargetName(cs, playerName) : undefined);
-    const resistanceNotice = target ? getResistanceNotice([attackContext.damageType], target.resistances, target.immunities, target.name) : null;
+    let resistanceNotice = target ? getResistanceNotice([attackContext.damageType], target.resistances, target.immunities, target.name) : null;
+
+    // Check Nature's Sanctuary resistance for allies in the cube
+    if (!resistanceNotice && targetName && mapName && campaignName) {
+        const sanctuaryActive = getRuntimeValue(playerName, 'naturesSanctuaryActive', campaignName);
+        if (sanctuaryActive) {
+            const sanctuaryX = Number(getRuntimeValue(playerName, 'naturesSanctuaryCubeX', campaignName) || 0);
+            const sanctuaryY = Number(getRuntimeValue(playerName, 'naturesSanctuaryCubeY', campaignName) || 0);
+            if (sanctuaryX > 0 && sanctuaryY > 0 && targetName) {
+                // Check if target is in the sanctuary cube (3x3 grid centered on placement)
+                const mapData = await mapsService.loadMapData(campaignName, mapName);
+                const targetPlayer = mapData?.players?.find(p => p.name === targetName);
+                const targetNpc = mapData?.placedItems?.find(i => i.name === targetName || i.name?.startsWith(targetName + ' '));
+                let targetGridPos = null;
+                if (targetPlayer) {
+                    targetGridPos = { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY };
+                } else if (targetNpc) {
+                    targetGridPos = { gridX: targetNpc.gridX, gridY: targetNpc.gridY };
+                }
+                if (targetGridPos) {
+                    const dx = Math.abs(targetGridPos.gridX - sanctuaryX);
+                    const dy = Math.abs(targetGridPos.gridY - sanctuaryY);
+                    if (dx <= 1 && dy <= 1) {
+                        // Target is in the sanctuary cube - check if attacker has land resistance
+                        const landResistance = getRuntimeValue(playerName, 'naturesSanctuaryResistance', campaignName);
+                        if (landResistance) {
+                            const lowerDamageType = attackContext.damageType.toLowerCase();
+                            if (lowerDamageType === landResistance.toLowerCase()) {
+                                resistanceNotice = `${targetName} resists ${attackContext.damageType} (Nature's Sanctuary)`;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     if (!mapName) {
         return {

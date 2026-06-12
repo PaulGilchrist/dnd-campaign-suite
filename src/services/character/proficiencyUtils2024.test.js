@@ -169,5 +169,124 @@ describe('proficiencyUtils2024', () => {
       expect(getProficiencyChoiceCount(playerStats, true)).toBe(0);
       expect(getProficiencyChoiceCount(playerStats, false)).toBe(0);
     });
+
+    it('should count skill proficiency choices from class.major.proficiency_choices', () => {
+      const playerStats = {
+        class: {
+          skill_proficiency_choices: 'Choose 2: Acrobatics, Athletics',
+          major: {
+            proficiency_choices: [
+              { choose: 1, from: ['Skill: History', 'Skill: Insight', 'Skill: Perception'] }
+            ]
+          }
+        },
+        race: {},
+      };
+
+      const result = getProficiencyChoiceCount(playerStats, true);
+
+      expect(result).toBe(3); // 2 from class + 1 from major
+    });
+
+    it('should count tool proficiency choices from class.major.proficiency_choices when skills=false', () => {
+      const playerStats = {
+        class: {
+          major: {
+            proficiency_choices: [
+              { choose: 1, from: ['Tool: Alchemist Supplies', 'Tool: Brewer Supplies'] }
+            ]
+          }
+        },
+        race: {},
+      };
+
+      const result = getProficiencyChoiceCount(playerStats, false);
+
+      expect(result).toBe(1);
+    });
+
+    it('should NOT count tool choices when skills=true', () => {
+      const playerStats = {
+        class: {
+          major: {
+            proficiency_choices: [
+              { choose: 1, from: ['Tool: Alchemist Supplies', 'Tool: Brewer Supplies'] }
+            ]
+          }
+        },
+        race: {},
+      };
+
+      const result = getProficiencyChoiceCount(playerStats, true);
+
+      expect(result).toBe(0);
+    });
+
+    it('should NOT count skill choices when skills=false', () => {
+      const playerStats = {
+        class: {
+          major: {
+            proficiency_choices: [
+              { choose: 1, from: ['Skill: Acrobatics', 'Skill: Athletics'] }
+            ]
+          }
+        },
+        race: {},
+      };
+
+      const result = getProficiencyChoiceCount(playerStats, false);
+
+      expect(result).toBe(0);
+    });
+
+    it('should combine class choices and major choices for skills', () => {
+      const playerStats = {
+        class: {
+          skill_proficiency_choices: 'Choose 2: Acrobatics, Athletics, Perception',
+          major: {
+            proficiency_choices: [
+              { choose: 1, from: ['Skill: History', 'Skill: Insight'] }
+            ]
+          }
+        },
+        race: {},
+      };
+
+      const result = getProficiencyChoiceCount(playerStats, true);
+
+      expect(result).toBe(3); // 2 from class + 1 from major
+    });
+
+    it('should handle major with no proficiency_choices', () => {
+      const playerStats = {
+        class: {
+          skill_proficiency_choices: 'Choose 1 skill',
+          major: {}
+        },
+        race: {},
+      };
+
+      const result = getProficiencyChoiceCount(playerStats, true);
+
+      expect(result).toBe(1);
+    });
+
+    it('should handle Student of War with both tool and skill choices', () => {
+      const playerStats = {
+        class: {
+          skill_proficiency_choices: 'Choose 2: Acrobatics, Animal Handling, Athletics',
+          major: {
+            proficiency_choices: [
+              { choose: 1, from: ['Tool: Alchemist Supplies', 'Tool: Brewer Supplies'] },
+              { choose: 1, from: ['Skill: History', 'Skill: Insight'] }
+            ]
+          }
+        },
+        race: {},
+      };
+
+      expect(getProficiencyChoiceCount(playerStats, true)).toBe(3); // 2 class + 1 major skill
+      expect(getProficiencyChoiceCount(playerStats, false)).toBe(1); // 1 major tool
+    });
   });
 });

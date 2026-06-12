@@ -1,7 +1,10 @@
 import { rollD20 } from '../dice/diceRoller.js'
 
-function rollConcentrationSave(saveBonus, dc) {
-  const roll = rollD20()
+function rollConcentrationSave(saveBonus, dc, dragonConstellationActive) {
+  let roll = rollD20()
+  if (dragonConstellationActive && roll <= 9) {
+    roll = 10
+  }
   const total = roll + saveBonus
   const success = total >= dc
   return { success, roll, total }

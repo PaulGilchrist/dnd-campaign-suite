@@ -41,7 +41,7 @@ vi.mock('../../services/combat/conditionUtils.js', () => ({
 vi.mock('../../services/npcs/npcsService.js', () => ({ loadNPCs: vi.fn(() => Promise.resolve({ npcs: [] })) }));
 vi.mock('../../services/encounters/npcStatBlockUtils.js', () => ({ npcToMonsterFormat: vi.fn(() => null), npcHasStatBlock: vi.fn(() => true) }));
 vi.mock('../../services/maps/mapsService.js', () => ({ loadMapData: vi.fn(() => Promise.resolve(null)) }));
-vi.mock('../../services/rules/expirations.js', () => ({ expireStaleEffects: vi.fn() }));
+vi.mock('../../services/rules/expirations.js', () => ({ expireStaleEffects: vi.fn(), applyTurnStartEffects: vi.fn() }));
 vi.mock('../../services/encounters/combatData.js', () => ({ loadCombatSummary: vi.fn(() => Promise.resolve(null)), getCombatSummary: vi.fn(() => null), getActiveCreatureName: vi.fn(() => null) }));
 vi.mock('../../services/combat/unbreakableMajesty.js', () => ({ clearPerRoundMajestyTrackers: vi.fn() }));
 vi.mock('../../services/encounters/initiativeService.js', () => ({

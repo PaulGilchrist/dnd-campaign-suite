@@ -8,9 +8,12 @@ export function getPassiveBuffs(features, playerStats) {
 
     features.forEach(feature => {
         if (!feature?.automation) return
-        const info = buildAttackInfo(feature, playerStats)
-        if (info && (info.type === 'passive_buff' || info.type === 'passive_rule' || info.type === 'passive_immunity')) {
-            buffs.push(info)
+        const automations = Array.isArray(feature.automation) ? feature.automation : [feature.automation]
+        for (const auto of automations) {
+            const info = buildAttackInfo({ ...feature, automation: auto }, playerStats)
+            if (info && (info.type === 'passive_buff' || info.type === 'passive_rule' || info.type === 'passive_immunity')) {
+                buffs.push(info)
+            }
         }
     })
 
@@ -21,6 +24,8 @@ export function getPassiveBuffs(features, playerStats) {
  * Collect available weapon mastery properties for a given weapon.
  * Combines the weapon's base mastery with any extra mastery from features
  * (e.g., Battering Roots grants Push/Topple in addition to the weapon's own mastery).
+ * If a feature has replaceMastery (e.g., Tactical Master), the weapon's base mastery
+ * is replaced with the replacement list instead of being used directly.
  * @param {string} weaponName - Name of the weapon (may include magic prefix)
  * @param {Object} playerStats - PlayerStats object with equipment + automation.passives
  * @returns {{ baseMastery: string|null, extraMasteries: string[] }}
@@ -28,14 +33,23 @@ export function getPassiveBuffs(features, playerStats) {
 export function collectWeaponMastery(weaponName, playerStats) {
     const { baseName } = parseMagicItemName(weaponName);
     const weapon = playerStats.equipment?.find(item => item.name === baseName);
-    const baseMastery = weapon?.mastery || null;
+    let baseMastery = weapon?.mastery || null;
 
     const extraMasteries = [];
+    let replaceMastery = null;
     const passives = playerStats.automation?.passives || [];
     for (const passive of passives) {
         if (passive.extraMastery && Array.isArray(passive.extraMastery)) {
             extraMasteries.push(...passive.extraMastery);
         }
+        if (passive.replaceMastery && Array.isArray(passive.replaceMastery)) {
+            replaceMastery = passive.replaceMastery;
+        }
+    }
+
+    if (replaceMastery) {
+        baseMastery = null;
+        extraMasteries.push(...replaceMastery);
     }
 
     return {
@@ -61,4 +75,9 @@ export function resolveHealingBonuses(playerStats, prof, level, slotLevel) {
 export function hasHealingMaximization(playerStats) {
     const passives = playerStats.automation?.passives || [];
     return passives.some(p => p.type === 'passive_rule' && p.effect === 'maximize_healing_dice');
+}
+
+export function hasTacticalShift(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p => p.type === 'passive_rule' && p.effect === 'tactical_shift_no_oa');
 }

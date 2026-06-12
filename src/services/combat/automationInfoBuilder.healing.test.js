@@ -55,6 +55,8 @@ describe('buildAttackInfo – free_spell', () => {
             name: 'Test Feature',
             spell: '',
             uses: 1,
+            uses_expression: '',
+            usesMax: 1,
             recharge: 'long_rest',
             action: 'action',
             duration: '',

@@ -162,6 +162,10 @@ const ClericFeatures = function ClericFeatures({ playerStats, campaignName }) {
 const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
     const druidFeatures = getClassFeatures(playerStats);
     const multiMinuteBadges = useActiveBuffs(playerStats, campaignName);
+    const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(
+        p => p.type === 'resource_restoration' && p.resourceKey === 'naturalRecoverySlots'
+    );
+    const naturalRecoveryFreeCast = getRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast');
     if (playerStats.level < 2) return null;
     return (
            <div data-testid="char-class-druid">
@@ -170,6 +174,21 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
                <div><b>Wild Shape Max Challenge Rating: </b>{druidFeatures?.maxWildShapeChallengeRating}</div>
                {druidFeatures?.beastKnownForms > 0 && <div><b>Beast Forms Known: </b>{druidFeatures.beastKnownForms}</div>}
                <div><b>Wild Shape Limitations: </b>{druidFeatures.wildShapeLimitations}</div>
+               {hasNaturalRecovery && (
+                   <div>
+                       <div><b>Natural Recovery:</b></div>
+                       {naturalRecoveryFreeCast ? (
+                           <div className="automation-badge"><i className="fa-solid fa-check"></i> Free cast used</div>
+                       ) : (
+                           <button className="char-btn char-btn-sm" onClick={() => {
+                               const circleSpells = (playerStats.spellAbilities?.spells || []).filter(s => s.level >= 1);
+                               if (circleSpells.length > 0) {
+                                   setRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast', circleSpells.map(s => s.name), campaignName);
+                               }
+                           }}>Grant Free Cast (1/Long Rest)</button>
+                       )}
+                   </div>
+               )}
 
            </div>
         );
@@ -190,6 +209,8 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName }) 
 
     const superiorityDiceMax = !isBattleMaster ? 0 : (playerStats.rules === '2024' ? 4 : (playerStats.level >= 15 ? 6 : (playerStats.level >= 7 ? 5 : 4)));
 
+    const superiorityDieType = !isBattleMaster ? 0 : (playerStats.level >= 18 ? 12 : (playerStats.level >= 10 ? 10 : 8));
+
     return (
           <div data-testid="char-class-fighter">
               <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles?.join(', ') || 'N/A'}</div>
@@ -205,7 +226,10 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName }) 
                   </div>
               )}
               {isBattleMaster && (
+                  <>
                   <TrackedResourceInput label="Superiority Dice" resourceKey="superiorityDice" playerName={playerStats.name} getMax={() => superiorityDiceMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                  <div><b>Superiority Die: </b>d{superiorityDieType}</div>
+                  </>
                )}
           </div>
       );

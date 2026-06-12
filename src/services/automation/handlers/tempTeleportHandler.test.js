@@ -233,4 +233,91 @@ describe('tempTeleportHandler', () => {
       expect(result).toBe(false);
     });
   });
+
+  describe('moonlight_step_teleport', () => {
+    it('should return teleport modal for moonlight_step_teleport effect', async () => {
+      const ps = makePlayerStats({
+        abilities: [{ name: 'Wisdom', score: 16, bonus: 3 }],
+      });
+      const action = makeAction({ effect: 'moonlight_step_teleport', distance: '30 ft' });
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('teleport');
+    });
+
+    it('should return popup when no uses remaining for moonlight_step_teleport', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
+      const ps = makePlayerStats({
+        name: 'MoonDruid',
+        abilities: [{ name: 'Wisdom', score: 16 }],
+      });
+      const action = {
+        name: 'Moonlight Step',
+        automation: {
+          type: 'temp_buff',
+          effect: 'moonlight_step_teleport',
+          distance: '30 ft',
+        },
+      };
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('no uses remaining');
+    });
+
+    it('should decrement moonlightStepUses on confirm for moonlight_step_teleport', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation((target, key, _camp) => {
+        if (key === 'moonlightStepUses') return 2;
+        return undefined;
+      });
+      const ps = makePlayerStats({
+        name: 'MoonDruid',
+        abilities: [{ name: 'Wisdom', score: 16 }],
+      });
+      const action = {
+        name: 'Moonlight Step',
+        automation: {
+          type: 'temp_buff',
+          effect: 'moonlight_step_teleport',
+          distance: '30 ft',
+        },
+      };
+
+      await confirmTeleport(action, ps, campaignName, false);
+
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'MoonDruid',
+        'moonlightStepUses',
+        1,
+        campaignName,
+      );
+    });
+
+    it('should set next_attack_advantage for moonlight_step_teleport', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation((target, key, _camp) => {
+        if (key === 'moonlightStepUses') return 2;
+        if (key === 'targetEffects') return [];
+        return undefined;
+      });
+      const ps = makePlayerStats({
+        name: 'MoonDruid',
+        abilities: [{ name: 'Wisdom', score: 16 }],
+      });
+      const action = {
+        name: 'Moonlight Step',
+        automation: {
+          type: 'temp_buff',
+          effect: 'moonlight_step_teleport',
+          distance: '30 ft',
+        },
+      };
+
+      const result = await confirmTeleport(action, ps, campaignName, false);
+
+      expect(result.payload.description).toContain('Teleported 30 ft');
+    });
+  });
 });

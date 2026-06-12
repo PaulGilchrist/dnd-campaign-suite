@@ -2863,7 +2863,14 @@
                         "name": "Wild Companion",
                         "description": "You can summon a nature spirit that assumes an animal form to aid you. As a Action, you can expend a spell slot or a use of Wild Shape to cast the Find Familiar spell without Material components. When you cast the spell in this way, the familiar is Fey and disappears when you finish a Long Rest.",
                         "level": 2,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "free_spell",
+                            "spell": "Find Familiar",
+                            "action": "action",
+                            "casting_time": "1 action",
+                            "resourceCost": "wild_companion"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -3374,7 +3381,11 @@
                         "name": "Beast Spells",
                         "description": "While using Wild Shape, you can cast spells in Beast form, except for any spell that has a Material component with a cost specified or that consumes its Material component.",
                         "level": 18,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "beast_spells"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -3492,22 +3503,85 @@
                     {
                         "name": "Land's Aid",
                         "description": "As a Action, expend a use of Wild Shape and choose a point within 60 feet. Creatures in a 10-foot-radius Sphere make a Constitution saving throw, taking 2d6 Necrotic damage on a failed save or half on success. One creature regains 2d6 Hit Points. Damage and healing increase by 1d6 at Druid levels 10 (3d6) and 14 (4d6).",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "save_attack",
+                            "damage": "2d6",
+                            "damageType": "Necrotic",
+                            "saveType": "CON",
+                            "saveDc": "ability",
+                            "saveAbility": "WIS",
+                            "shape": "sphere",
+                            "range": "60_ft",
+                            "radius": "10_ft",
+                            "healExpression": "2d6",
+                            "healScaling": {
+                                "10": "3d6",
+                                "14": "4d6"
+                            },
+                            "scaling": {
+                                "10": "3d6",
+                                "14": "4d6"
+                            },
+                            "dcSuccess": "half",
+                            "resourceKey": "wildShapeUses",
+                            "casting_time": "1 action"
+                        }
                     },
                     {
                         "name": "Natural Recovery",
                         "description": "You can cast one level 1+ prepared spell from Circle Spells without expending a spell slot, once per Long Rest. When you finish a Short Rest, you can recover expended spell slots with combined levels equal to or less than half your Druid level.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "resource_restoration",
+                            "trigger": "short_rest",
+                            "restore_expression": "druid_level / 2",
+                            "resourceKey": "naturalRecoverySlots",
+                            "uses_max": 1,
+                            "casting_time": "passive",
+                            "restoreType": "spell_slots"
+                        }
                     },
                     {
                         "name": "Nature's Ward",
                         "description": "Immune to Poisoned condition. Resistance to a damage type based on land choice: Arid=Fire, Polar=Cold, Temperate=Lightning, Tropical=Poison.",
-                        "level": 10
+                        "level": 10,
+                        "automation": {
+                            "type": "land_resistance",
+                            "conditionImmunity": "poisoned",
+                            "landMappings": {
+                                "arid": "Fire",
+                                "polar": "Cold",
+                                "temperate": "Lightning",
+                                "tropical": "Poison"
+                            },
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Nature's Sanctuary",
                         "description": "As a Action, expend Wild Shape to cause spectral trees and vines to appear in a 15-foot Cube within 120 feet. Lasts 1 minute. You and allies have Half Cover; allies gain current Nature's Ward Resistance. As a Bonus Action, move the Cube up to 60 feet.",
-                        "level": 14
+                        "level": 14,
+                        "automation": {
+                            "type": "nature_sanctuary",
+                            "range": "120_ft",
+                            "cubeSize": 15,
+                            "duration": "1_minute",
+                            "moveRange": 60,
+                            "movesPerDuration": 1,
+                            "resourceCost": "wild_shape",
+                            "casting_time": "1 action"
+                        }
+                    },
+                    {
+                        "name": "Nature's Sanctuary (Move)",
+                        "description": "As a Bonus Action, move the spectral cube up to 60 feet.",
+                        "level": 14,
+                        "automation": {
+                            "type": "nature_sanctuary_move",
+                            "moveRange": 60,
+                            "casting_time": "1 bonus action"
+                        }
                     }
                 ],
                 "spells": [
@@ -3617,7 +3691,14 @@
                     {
                         "name": "Circle Forms",
                         "description": "Challenge Rating equals Druid level divided by 3 (round down). AC equals 13 + Wisdom modifier if higher than Beast's AC. Temporary Hit Points equal to three times your Druid level.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "passive_buff",
+                            "effect": "circle_forms_active",
+                            "requiresActive": "shape_shift",
+                            "bonusExpression": "3 * druid_level",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Circle of the Moon Spells",
@@ -3627,17 +3708,80 @@
                     {
                         "name": "Improved Circle Forms",
                         "description": "Lunar Radiance - attacks can deal Radiant damage. Increased Toughness - add Wisdom modifier to Constitution saving throws.",
-                        "level": 6
+                        "level": 6,
+                        "automation": [
+                            {
+                                "type": "damage_bonus",
+                                "damageExpression": "1d10",
+                                "damageType": "Radiant",
+                                "trigger": "weapon_or_beast_form_attack_hit",
+                                "oncePerTurn": true,
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "conditional_advantage",
+                                "target": "saving_throw",
+                                "condition": "shape_shift",
+                                "effect": "advantage",
+                                "abilities": ["CON"],
+                                "casting_time": "passive"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Increased Toughness",
+                        "description": "Add Wisdom modifier to Constitution saving throws.",
+                        "level": 6,
+                        "automation": {
+                            "type": "conditional_advantage",
+                            "target": "saving_throw",
+                            "condition": "shape_shift",
+                            "effect": "advantage",
+                            "abilities": ["CON"],
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Moonlight Step",
                         "description": "As a Bonus Action, teleport up to 30 feet and have Advantage on the next attack roll. Uses equal to Wisdom modifier. Can restore uses by expending level 2+ spell slot.",
-                        "level": 10
+                        "level": 10,
+                        "automation": [
+                            {
+                                "type": "temp_buff",
+                                "effect": "moonlight_step_teleport",
+                                "distance": "30 ft",
+                                "casting_time": "1 bonus action"
+                            },
+                            {
+                                "type": "resource_pool",
+                                "resource": "Moonlight Step",
+                                "uses_expression": "WIS modifier",
+                                "recharge_long_rest": "all",
+                                "conversion": "spell_slot_to_moonlight_step",
+                                "conversionRate": "level_2_plus",
+                                "casting_time": "passive"
+                            }
+                        ]
                     },
                     {
                         "name": "Lunar Form",
                         "description": "Improved Lunar Radiance - extra 2d10 Radiant damage once per turn. Shared Moonlight - teleport one willing creature when using Moonlight Step.",
-                        "level": 14
+                        "level": 14,
+                        "automation": [
+                            {
+                                "type": "damage_bonus",
+                                "damageExpression": "2d10",
+                                "damageType": "Radiant",
+                                "trigger": "weapon_or_beast_form_attack_hit",
+                                "oncePerTurn": true,
+                                "upgrades": "Improved Circle Forms",
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "moonlight_step_rider",
+                                "casting_time": "passive"
+                            }
+                        ]
                     }
                 ],
                 "spells": [
@@ -3680,22 +3824,91 @@
                     {
                         "name": "Wrath of the Sea",
                         "description": "As a Bonus Action, expend Wild Shape to manifest a 5-foot Emanation of ocean spray for 10 minutes. As a Bonus Action, choose creatures in the Emanation to make Constitution saving throw or take Cold damage (Wisdom modifier d6) and be pushed up to 15 feet.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "save_attack",
+                            "action": "bonus_action",
+                            "saveType": "CON",
+                            "saveDc": "ability",
+                            "saveAbility": "WIS",
+                            "damage": "WIS modifier d6",
+                            "damageType": "Cold",
+                            "shape": "emanation",
+                            "range": "5_ft",
+                            "effect": "push",
+                            "effectValue": "15_ft",
+                            "resourceCost": "wild_shape",
+                            "duration": "1_minute",
+                            "casting_time": "1 bonus action"
+                        }
                     },
                     {
                         "name": "Aquatic Affinity",
                         "description": "Emanation size increases to 10 feet. Gain Swim Speed equal to your Speed.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "passive_buff",
+                            "effect": "aquatic_affinity",
+                            "grantsSwimSpeed": true,
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Stormborn",
                         "description": "Gain Fly Speed equal to your Speed. Resistance to Cold, Lightning, and Thunder damage.",
-                        "level": 10
+                        "level": 10,
+                        "automation": [
+                            {
+                                "type": "passive_buff",
+                                "effect": "fly_speed_equals_walk_speed",
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "resistance",
+                                "damageTypes": ["Cold", "Lightning", "Thunder"],
+                                "casting_time": "passive"
+                            }
+                        ]
                     },
                     {
                         "name": "Oceanic Gift",
                         "description": "Manifest Emanation around one willing creature within 60 feet. Can also manifest around both yourself and the creature by expending two uses of Wild Shape.",
-                        "level": 14
+                        "level": 14,
+                        "automation": [
+                            {
+                                "type": "save_attack",
+                                "action": "bonus_action",
+                                "saveType": "CON",
+                                "saveDc": "ability",
+                                "saveAbility": "WIS",
+                                "damage": "WIS modifier d6",
+                                "damageType": "Cold",
+                                "shape": "emanation",
+                                "range": "60_ft",
+                                "pushEffect": "push",
+                                "effectValue": "15_ft",
+                                "resourceCost": "wild_shape",
+                                "duration": "1_minute",
+                                "casting_time": "1 bonus action"
+                            },
+                            {
+                                "type": "save_attack",
+                                "action": "bonus_action",
+                                "saveType": "CON",
+                                "saveDc": "ability",
+                                "saveAbility": "WIS",
+                                "damage": "WIS modifier d6",
+                                "damageType": "Cold",
+                                "shape": "emanation",
+                                "range": "60_ft",
+                                "pushEffect": "push",
+                                "effectValue": "15_ft",
+                                "resourceCost": "wild_shape",
+                                "doubleEmanation": true,
+                                "duration": "1_minute",
+                                "casting_time": "1 bonus action"
+                            }
+                        ]
                     }
                 ],
                 "spells": [
@@ -3753,27 +3966,66 @@
                     {
                         "name": "Star Map",
                         "description": "You've created a star chart as a Spellcasting Focus. While holding it, you have Guidance and Guiding Bolt prepared, and can cast Guiding Bolt without expending a spell slot (Wisdom modifier times, minimum once). STAR MAP: 1d6: 1=scroll, 2=stone tablet, 3=owlbear hide, 4=ebony maps, 5=crystal, 6=glass disk.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "free_spell",
+                            "spell": [
+                                "Guidance",
+                                "Guiding Bolt"
+                            ],
+                            "uses_expression": "WIS modifier_min_1",
+                            "casting_time": "1 action"
+                        }
                     },
                     {
                         "name": "Starry Form",
                         "description": "As a Bonus Action, expend Wild Shape to take on a starry form for 10 minutes. Choose a constellation: Archer - ranged spell attack hurling luminous arrow (1d8 + Wisdom Radiant damage). Chalice - when you cast a healing spell, another creature within 30 feet regains 1d8 + Wisdom Hit Points. Dragon - treat d20 rolls of 9 or lower on Concentration checks/saves as 10.",
-                        "level": 3
+                        "level": 3,
+                        "automation": [
+                            {
+                                "type": "starry_form",
+                                "effect": "starry_form",
+                                "duration": "1_minute",
+                                "resourceKey": "starryFormUses",
+                                "casting_time": "1 bonus action"
+                            },
+                            {
+                                "type": "post_cast_ally_heal",
+                                "healExpression": "1d8 + WIS modifier",
+                                "range": "30_ft",
+                                "casting_time": "passive"
+                            }
+                        ]
                     },
                     {
                         "name": "Cosmic Omen",
                         "description": "After Long Rest, roll on Star Map. Even = Weal (add 1d6 to allied D20 tests). Odd = Woe (subtract 1d6 from enemy D20 tests). Uses equal to Wisdom modifier.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "cosmic_omen",
+                            "uses_expression": "WIS modifier",
+                            "recharge": "long_rest",
+                            "casting_time": "1 action"
+                        }
                     },
                     {
                         "name": "Twinkling Constellations",
                         "description": "Archer and Chalice become 2d8. Dragon gains Fly Speed 20 feet (hover). Can change constellation at start of each turn.",
-                        "level": 10
+                        "level": 10,
+                        "automation": {
+                            "type": "twinkling_constellations",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Full of Stars",
                         "description": "Partially incorporeal - Resistance to Bludgeoning, Piercing, and Slashing damage.",
-                        "level": 14
+                        "level": 14,
+                        "automation": {
+                            "type": "resistance",
+                            "damageTypes": ["Bludgeoning", "Piercing", "Slashing"],
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spells": [
@@ -3877,7 +4129,15 @@
                         "name": "Tactical Mind",
                         "description": "You have a mind for tactics on and off the battlefield. When you fail an ability check, you can expend a use of your Second Wind to push yourself toward success. Rather than regaining Hit Points, you roll 1d10 and add the number rolled to the ability check, potentially turning it into a success. If the check still fails, this use of Second Wind isn't expended.",
                         "level": 2,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "tactical_mind",
+                            "trigger": "failed_ability_check",
+                            "target": "ability_check",
+                            "bonusExpression": "1d10",
+                            "resourceCost": "second_wind",
+                            "casting_time": "passive"
+                        }
                     }
                 ]
             },
@@ -3958,7 +4218,11 @@
                         "name": "Tactical Shift",
                         "description": "Whenever you activate your Second Wind with a Bonus Action, you can move up to half your Speed without provoking Opportunity Attacks.",
                         "level": 5,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "tactical_shift_no_oa"
+                        }
                     }
                 ],
                 "energy": {
@@ -4092,7 +4356,17 @@
                         "name": "Tactical Master",
                         "description": "When you attack with a weapon whose mastery property you can use, you can replace that property with the Push, Sap, or Slow property for that attack.",
                         "level": 9,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_buff",
+                            "effect": "replace_mastery",
+                            "replaceMastery": [
+                                "Push",
+                                "Sap",
+                                "Slow"
+                            ],
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "energy": {
@@ -4226,7 +4500,14 @@
                         "name": "Studied Attacks",
                         "description": "You study your opponents and learn from each attack you make. If you make an attack roll against a creature and miss, you have Advantage on your next attack roll against that creature before the end of your next turn.",
                         "level": 13,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "auto_effect",
+                            "trigger": "miss",
+                            "effect": "next_attack_advantage",
+                            "duration": "until_start_of_next_turn",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "energy": {
@@ -4486,32 +4767,100 @@
                     {
                         "name": "Combat Superiority",
                         "description": "You learn maneuvers fueled by Superiority Dice (d8s). You have four Superiority Dice. You learn three maneuvers of your choice. You learn two additional maneuvers at levels 7, 10, and 15. Each time you learn new maneuvers, you can also replace one maneuver you know with a different one. Saving Throw DC = 8 + Strength/Dexterity modifier + Proficiency Bonus.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "combat_superiority",
+                            "saveType": "WIS",
+                            "saveAbility": "STR",
+                            "saveDc": "ability",
+                            "dieExpression": "superiority_die",
+                            "uses_max": 4,
+                            "recharge": "short_rest",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Student of War",
                         "description": "Gain proficiency with one type of Artisan's Tools and one skill of your choice from Fighter skills.",
-                        "level": 3
+                        "level": 3,
+                        "proficiency_choices": [
+                            {
+                                "choose": 1,
+                                "from": [
+                                    "Tool: Alchemist's Supplies",
+                                    "Tool: Brewer's Supplies",
+                                    "Tool: Calligrapher's Supplies",
+                                    "Tool: Carpenter's Tools",
+                                    "Tool: Cartographer's Tools",
+                                    "Tool: Cobbler's Tools",
+                                    "Tool: Cook's utensils",
+                                    "Tool: Glassblower's Tools",
+                                    "Tool: Jeweler's Tools",
+                                    "Tool: Leatherworker's Tools",
+                                    "Tool: Mason's Tools",
+                                    "Tool: Painter's Supplies",
+                                    "Tool: Potter's Tools",
+                                    "Tool: Smith's Tools",
+                                    "Tool: Tinker's Tools",
+                                    "Tool: Weaver's Tools",
+                                    "Tool: Woodcarver's Tools"
+                                ]
+                            },
+                            {
+                                "choose": 1,
+                                "from": [
+                                    "Skill: Acrobatics",
+                                    "Skill: Animal Handling",
+                                    "Skill: Athletics",
+                                    "Skill: History",
+                                    "Skill: Insight",
+                                    "Skill: Intimidation",
+                                    "Skill: Persuasion",
+                                    "Skill: Perception",
+                                    "Skill: Survival"
+                                ]
+                            }
+                        ]
                     },
                     {
                         "name": "Know Your Enemy",
                         "description": "As a Bonus Action, discern strengths and weaknesses of a creature within 30 feet (know Immunities, Resistances, Vulnerabilities). Restore use by expending one Superiority Die.",
-                        "level": 7
+                        "level": 7,
+                        "automation": {
+                            "type": "know_enemy",
+                            "range": "30_ft",
+                            "uses_max": 4
+                        }
                     },
                     {
                         "name": "Improved Combat Superiority",
                         "description": "Superiority Die becomes d10.",
-                        "level": 10
+                        "level": 10,
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "superiority_die_scaling",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Relentless",
                         "description": "Once per turn, when you use a maneuver, roll 1d8 and use the number instead of expending a Superiority Die.",
-                        "level": 15
+                        "level": 15,
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "relentless",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Ultimate Combat Superiority",
                         "description": "Superiority Die becomes d12.",
-                        "level": 18
+                        "level": 18,
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "superiority_die_scaling",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spells": []
@@ -4524,12 +4873,40 @@
                     {
                         "name": "Improved Critical",
                         "description": "Critical Hit on 19-20.",
-                        "level": 3
+                        "level": 3,
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "critical_range",
+                            "criticalRange": "19-20",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Remarkable Athlete",
                         "description": "Advantage on Initiative and Strength (Athletics) checks. After Critical Hit, move up to half Speed without Opportunity Attacks.",
-                        "level": 3
+                        "level": 3,
+                        "automation": [
+                            {
+                                "type": "passive_rule",
+                                "effect": "initiative_advantage",
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "conditional_advantage",
+                                "target": "ability_check",
+                                "condition": "remarkable_athlete_athletics",
+                                "effect": "advantage",
+                                "abilities": ["STR"],
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "auto_effect",
+                                "trigger": "crit_hit",
+                                "effect": "remarkable_athlete_movement",
+                                "casting_time": "passive"
+                            }
+                        ]
                     },
                     {
                         "name": "Additional Fighting Style",
@@ -4539,12 +4916,25 @@
                     {
                         "name": "Heroic Warrior",
                         "description": "Give yourself Heroic Inspiration at start of turn if you don't have it.",
-                        "level": 10
+                        "level": 10,
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "heroic_inspiration_turn_start",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Superior Critical",
                         "description": "Critical Hit on 18-20.",
-                        "level": 15
+                        "level": 15,
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "critical_range",
+                            "criticalRange": "18-20",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Survivor",

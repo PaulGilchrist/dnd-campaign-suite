@@ -8,10 +8,11 @@ const CONDITIONS_THAT_SPEED_ZERO = new Set([
 
 const CONDITION_KEYWORDS = new Set(['charmed', 'frightened', 'poison', 'magic'])
 
-function saveModifierApplies(modifier, saveType, abilityName, isRaging = false) {
+function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, shapeShiftActive = false) {
   if (modifier.effect === 'replacement') return true;
   if (modifier.target !== 'saving_throw' && modifier.target !== 'save') return false;
   if (modifier.condition === 'raging') return isRaging;
+  if (modifier.condition === 'shape_shift') return shapeShiftActive;
   if (modifier.condition === 'charmed' && saveType === 'charmed') return true;
   if (modifier.condition === 'frightened' && saveType === 'frightened') return true;
   if (modifier.condition === 'poison' && saveType === 'poison') return true;
@@ -28,10 +29,29 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false) 
   return true;
 }
 
-function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging = false) {
+function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging = false, shapeShiftActive = false) {
   if (!modifiers || modifiers.length === 0) return;
   for (const mod of modifiers) {
-    if (!saveModifierApplies(mod, saveType, abilityName, isRaging)) continue;
+    if (!saveModifierApplies(mod, saveType, abilityName, isRaging, shapeShiftActive)) continue;
+    if (mod.target === 'ability_check' || mod.target === 'check') {
+      if (mod.effect === 'advantage') {
+        if (mod.abilities && mod.abilities.length > 0) {
+          // Per-ability check advantage (e.g., Remarkable Athlete for STR)
+          const abbr = abilityName ? abilityName.substring(0, 3).toUpperCase() : null;
+          if (!abbr || mod.abilities.includes(abbr)) {
+            effects.abilityCheckAdvantage = true;
+            effects.abilityCheckAdvantageAbilities = [...new Set([
+              ...(effects.abilityCheckAdvantageAbilities || []),
+              ...mod.abilities
+            ])];
+          }
+        } else {
+          effects.abilityCheckAdvantage = true;
+        }
+      }
+    } else if (mod.target !== 'saving_throw' && mod.target !== 'save') {
+      continue;
+    }
     if (mod.effect === 'advantage') {
       if (mod.abilities && mod.abilities.length > 0 && !abilityName) {
         effects.saveAdvantageAbilities = [...new Set([
@@ -41,39 +61,43 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
       } else {
         effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
       }
-     } else if (mod.effect === 'disadvantage') {
+    } else if (mod.effect === 'disadvantage') {
       effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
-       } else if (mod.effect === 'reroll') {
-        effects.autoReroll = true;
-        effects.autoRerollCondition = mod.condition;
-        if (mod.bonusExpression) {
-          effects.autoRerollBonus = mod.bonusExpression;
+    } else if (mod.effect === 'reroll') {
+      effects.autoReroll = true;
+      effects.autoRerollCondition = mod.condition;
+      if (mod.bonusExpression) {
+        effects.autoRerollBonus = mod.bonusExpression;
+      }
+    } else if (mod.effect === 'replacement') {
+      if (mod.saveType === 'STR') {
+        if (mod.target === 'saving_throw' || mod.target === 'save') {
+          effects.strSaveReplace = true;
         }
-        } else if (mod.effect === 'replacement') {
-         if (mod.saveType === 'STR') {
-           if (mod.target === 'saving_throw' || mod.target === 'save') {
-             effects.strSaveReplace = true;
-           }
-           if (mod.target === 'ability_check' || mod.target === 'check' || !mod.target) {
-             effects.strCheckReplace = true;
-           }
-         }
-
-       }
-     }
+        if (mod.target === 'ability_check' || mod.target === 'check' || !mod.target) {
+          effects.strCheckReplace = true;
+        }
+      }
+    } else if (mod.effect === 'tactical_mind') {
+      effects.tacticalMind = true;
+      effects.tacticalMindBonus = mod.bonusExpression || '';
+    }
+  }
 }
 
-function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false) {
+function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false, shapeShiftActive = false) {
   const effects = {
     attackAdvantageCount: 0,
     attackDisadvantageCount: 0,
     abilityCheckDisadvantage: false,
     abilityCheckAdvantage: false,
+    abilityCheckAdvantageAbilities: null,
     abilityCheckAdvantageSkill: null,
     autoFailSaves: [],
     saveDisadvantage: [],
     cannotAct: false,
     speedZero: false,
+    speedReduction: 0,
     concentrationBroken: false,
     targetAdvantageCount: 0,
     targetDisadvantageCount: 0,
@@ -90,10 +114,14 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     autoRerollBonus: null,
     strSaveReplace: false,
     strCheckReplace: false,
+    tacticalMind: false,
+    tacticalMindBonus: null,
     riderSaveDisadvantage: false,
     riderAttackBonus: 0,
     riderCannotOpportunityAttack: false,
     riderNoReactions: false,
+    pushEffect: false,
+    pushDistance: null,
    }
 
   const conditionSet = new Set(conditions)
@@ -122,7 +150,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
   const activeSaveModifiers = isIncapacitated
     ? saveModifiers.filter(mod => mod.condition !== 'visible_effect')
     : saveModifiers;
-  applySaveModifiers(effects, activeSaveModifiers, null, null, isRaging);
+  applySaveModifiers(effects, activeSaveModifiers, null, null, isRaging, shapeShiftActive);
 
   for (const key of conditionSet) {
     switch (key) {
@@ -226,6 +254,15 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     }
     if (te.effect === 'no_reactions') {
       effects.riderNoReactions = true;
+    }
+    if (te.effect === 'speed_reduction') {
+      effects.speedReduction = (effects.speedReduction || 0) + (te.value || 10);
+    }
+    if (te.effect === 'push') {
+      effects.pushEffect = true;
+      if (!effects.pushDistance) {
+        effects.pushDistance = te.value || 10;
+      }
     }
   }
 

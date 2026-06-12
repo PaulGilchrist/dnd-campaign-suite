@@ -142,6 +142,22 @@ const rulesFactory = {
             ])];
         }
 
+        // Resolve land_resistance automation (Circle of the Land Nature's Ward)
+        const landResistances = (playerStats.automation?.passives || [])
+            .filter(p => p.type === 'land_resistance')
+            .flatMap(p => {
+                const mappings = p.landMappings || {};
+                const classData = playerStats.class || {};
+                const landType = (classData.major?.type || classData.subclass?.type || '').toLowerCase().trim();
+                return mappings[landType] ? [mappings[landType]] : [];
+            });
+        if (landResistances.length) {
+            playerStats.resistances = [...new Set([
+                ...(playerStats.resistances || []),
+                ...landResistances
+            ])];
+        }
+
         playerStats._trackedResources = computeTrackedResources(playerStats);
 
         return playerStats;

@@ -5,6 +5,20 @@ import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary } from '
 
 const KEY = 'pendingExpirations';
 
+export function applyTurnStartEffects(activeName, playerStats, campaignName) {
+    if (!activeName || !playerStats) return;
+
+    const turnStartEffects = playerStats.turnStartEffects || [];
+    for (const effect of turnStartEffects) {
+        if (effect.type === 'heroic_inspiration') {
+            const currentInspiration = getRuntimeValue(activeName, 'hasInspiration') || false;
+            if (!currentInspiration) {
+                setRuntimeValue(activeName, 'hasInspiration', true, campaignName);
+            }
+        }
+    }
+}
+
 export function addExpiration(attackerName, targetName, effects, campaignName, rounds) {
     const list = getRuntimeValue(attackerName, KEY) || [];
     const currentRound = getCurrentCombatRound();
@@ -126,6 +140,19 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 break;
             }
 
+            case 'fly_speed_20_hover': {
+                const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                if (Array.isArray(buffs)) {
+                    setRuntimeValue(
+                        targetName,
+                        'activeBuffs',
+                        buffs.filter(b => b.effect !== 'fly_speed_20_hover'),
+                        campaignName
+                    );
+                }
+                break;
+            }
+
             case 'ice_walk': {
                 const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
                 if (Array.isArray(buffs)) {
@@ -180,9 +207,22 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 setRuntimeValue(targetName, 'inspiringMovementGranted', null, campaignName);
                 break;
 
+            case 'remove_natures_sanctuary':
+                setRuntimeValue(targetName, 'naturesSanctuaryActive', null, campaignName);
+                setRuntimeValue(targetName, 'naturesSanctuaryMoves', null, campaignName);
+                setRuntimeValue(targetName, 'naturesSanctuaryCubeX', null, campaignName);
+                setRuntimeValue(targetName, 'naturesSanctuaryCubeY', null, campaignName);
+                setRuntimeValue(targetName, 'naturesSanctuaryRange', null, campaignName);
+                setRuntimeValue(targetName, 'naturesSanctuaryResistance', null, campaignName);
+                break;
+
             case 'unbreakable_majesty':
                 setRuntimeValue(targetName, 'unbreakableMajestyActive', null, campaignName);
                 setRuntimeValue(targetName, 'unbreakableMajestySaveDc', null, campaignName);
+                break;
+
+            case 'remove_cosmic_omen':
+                setRuntimeValue(targetName, 'cosmicOmenEffect', null, campaignName);
                 break;
 
             case 'condition':

@@ -173,7 +173,30 @@ function extractFeatSpells(featData) {
 function getSubclassSpells(classData, subclassName, charLevel) {
   const spells = [];
 
-  if (!classData || !classData.subclasses || !subclassName) {
+  if (!classData || !subclassName) {
+    return spells;
+  }
+
+  // 2024 majors format: {name, level} - used by Druid circles
+  if (classData.majors) {
+    const major = classData.majors.find(
+      m => m.name === subclassName || m.index === subclassName.toLowerCase()
+    );
+    if (major && major.spells) {
+      major.spells.forEach(entry => {
+        const spellName = entry.name || (entry.spell && entry.spell.name);
+        if (!spellName) return;
+        const spellLevel = entry.level || 1;
+        if (charLevel >= spellLevel) {
+          spells.push(spellName);
+        }
+      });
+    }
+    return spells;
+  }
+
+  // 5e subclasses format: {spell: {name}, prerequisites: [{type: 'level', name: '...'}]}
+  if (!classData.subclasses) {
     return spells;
   }
 

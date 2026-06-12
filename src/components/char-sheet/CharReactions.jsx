@@ -7,7 +7,7 @@
        import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
        import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
        import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js'
-       import { hasAutomation } from '../../services/combat/automationService.js'
+        import { hasAutomation, hasTacticalShift } from '../../services/combat/automationService.js'
         import { getCombatContext, getTargetFromAttacker } from '../../services/rules/damageUtils.js'
         import { useRuntimeValue, getRuntimeValue } from '../../hooks/useRuntimeState.js'
        import { executeHandler } from '../../services/automation/index.js'
@@ -72,7 +72,8 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                 const target = getTargetFromAttacker(cs, playerStats.name);
                 if (target) {
                     const targetNoOA = getRuntimeValue(target.name, 'inspiringMovementNoOA');
-                    if (targetNoOA) {
+                    const targetHasTacticalShift = hasTacticalShift(target);
+                    if (targetNoOA || targetHasTacticalShift) {
                         const html = `<b>Opportunity Attack</b><br/>${target.name} is protected by Inspiring Movement and cannot be targeted by Opportunity Attacks right now.`;
                         setPopupHtml(html);
                         return;

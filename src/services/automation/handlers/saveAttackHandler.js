@@ -4,6 +4,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState
 import * as mapsService from '../../maps/mapsService.js';
 import { getCombatContext } from '../../rules/damageUtils.js';
 import { rangeToFeet } from '../../rules/rangeValidation.js';
+import { addExpiration } from '../../rules/expirations.js';
 
 const AREA_SHAPES = new Set(['emanation', 'cone', 'line', 'sphere', 'cube', 'cylinder', 'square', 'circle', 'wall', 'cage', 'floor', 'area']);
 
@@ -11,6 +12,18 @@ function isAreaShape(shape) {
     if (!shape) return false;
     const lower = shape.toLowerCase();
     return AREA_SHAPES.has(lower) || AREA_SHAPES.has(lower.split('_')[0]);
+}
+
+function getEmanationRange(auto, playerStats, playerName, campaignName) {
+    const baseRange = rangeToFeet(auto.shape);
+    if (baseRange && baseRange > 0) return baseRange;
+    const fallback = auto.shape?.includes('emanation_30ft') ? 30 : 10;
+    const aquaticAffinityRange = getRuntimeValue(playerName, 'aquaticAffinityEmanationRange', campaignName);
+    if (aquaticAffinityRange != null) {
+        const parsed = parseInt(aquaticAffinityRange, 10);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return fallback;
 }
 
 function parseDurationRounds(duration) {
@@ -32,6 +45,13 @@ export function isExhausted(action, playerStats, campaignName) {
         const maxCharges = classLevel?.channel_divinity || classLevel?.class_specific?.channel_divinity_charges || 2;
         const currentCharges = storedCharges != null ? Number(storedCharges) : maxCharges;
         return currentCharges <= 0;
+    }
+
+    if (auto.resourceCost === 'wild_shape') {
+        const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
+        const currentWS = getRuntimeValue(playerStats.name, 'wildShapeUses', campaignName);
+        const resolvedWS = currentWS != null ? Number(currentWS) : maxWS;
+        return resolvedWS <= 0;
     }
 
     if (auto.uses === undefined && auto.usesMax === undefined) return false;
@@ -69,6 +89,11 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }
     }
 
+    // Normalize pushEffect to effect for push-based effects
+    if (auto.pushEffect && !auto.effect) {
+        auto.effect = auto.pushEffect;
+    }
+
     if (auto.resourceCost === 'channel_divinity') {
         const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
         const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
@@ -89,6 +114,35 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
         const newCharges = currentCharges - 1;
         await setRuntimeValue(playerStats.name, 'channelDivinityCharges', newCharges, campaignName);
+    } else if (auto.resourceCost === 'wild_shape') {
+        const maxWS = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.wild_shape || 0;
+        const currentWS = getRuntimeValue(playerStats.name, 'wildShapeUses', campaignName);
+        const resolvedWS = currentWS != null ? Number(currentWS) : maxWS;
+        const cost = auto.doubleEmanation ? 2 : 1;
+
+        if (resolvedWS < cost) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: `${action.name}: Not enough Wild Shape uses remaining. ${cost} use${cost > 1 ? 's' : ''} required.`,
+                    automation: auto,
+                },
+            };
+        }
+
+        await setRuntimeValue(playerStats.name, 'wildShapeUses', resolvedWS - cost, campaignName);
+
+        // Set up duration expiration for area effects
+        if (auto.duration && isAreaShape(auto.shape)) {
+            const durationRounds = parseDurationRounds(auto.duration);
+            if (durationRounds) {
+                addExpiration(playerStats.name, playerStats.name, [
+                    { type: 'remove_active_buff', buffName: action.name }
+                ], campaignName, durationRounds);
+            }
+        }
     } else {
         const maxUses = auto.usesMax ?? auto.uses ?? 1;
 
@@ -111,8 +165,50 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }
     }
 
-    const dcSuccess = auto.shape === 'cone' ? 0.5 : 0;
+    const dcSuccess = auto.dcSuccess !== undefined && auto.dcSuccess !== null
+        ? auto.dcSuccess
+        : (auto.shape === 'cone' ? 0.5 : 0);
+
     const saveDcValue = buildSaveDc(auto, playerStats);
+
+    // Handle save_attack with healing expression — use a modal for area + healing
+    if (auto.healExpression && isAreaShape(auto.shape)) {
+        const cs = await getCombatContext(campaignName);
+
+        let attackerPos = null;
+        let mapData = null;
+        if (mapName) {
+            try {
+                mapData = await mapsService.loadMapData(campaignName, mapName);
+                const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
+                if (attackerPlayer) {
+                    attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
+                 }
+                } catch { /* positions unavailable */ }
+         }
+
+        const rangeFeet = getEmanationRange(auto, playerStats, playerStats.name, campaignName);
+
+        return {
+            type: 'modal',
+            modalName: 'saveAttackHeal',
+            payload: {
+                combatSummary: cs,
+                attackerName: playerStats.name,
+                attackerPos,
+                saveDc: saveDcValue,
+                campaignName,
+                mapData,
+                featureName: action.name,
+                saveType: auto.saveType || 'CON',
+                rangeFeet,
+                damageExpression: auto.damage || '',
+                damageType: auto.damageType || '',
+                healExpression: auto.healExpression,
+                dcSuccess: dcSuccess === 0 ? 'none' : (dcSuccess === 0.5 ? 'half' : dcSuccess),
+            },
+        };
+    }
 
     if (auto.conditionInflicted && !auto.damage) {
         if (isAreaShape(auto.shape)) {
@@ -130,7 +226,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                    } catch { /* positions unavailable */ }
              }
 
-            const rangeFeet = rangeToFeet(auto.shape) || (auto.shape?.includes('emanation_30ft') ? 30 : 30);
+             const rangeFeet = getEmanationRange(auto, playerStats, playerStats.name, campaignName);
 
             return {
                 type: 'modal',
@@ -187,6 +283,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
         notes.push(getRiderDescription(auto.effect, auto.effectValue));
     }
 
+    const dcSuccessDisplay = dcSuccess === 0 ? 'none' : (dcSuccess === 0.5 ? 'half' : dcSuccess);
+
     return {
         type: 'roll',
         payload: {
@@ -201,7 +299,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 damageType: auto.damageType || '',
                 saveDc: saveDcValue,
                 saveType: auto.saveType || 'DEX',
-                dcSuccess,
+                dcSuccess: dcSuccessDisplay,
                 attackerName: playerStats.name,
                 conditionInflicted: auto.conditionInflicted || null,
                 shape: auto.shape || '',
