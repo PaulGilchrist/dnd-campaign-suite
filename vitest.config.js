@@ -46,6 +46,6 @@ export default defineConfig({
             ],
         },
         include: ['src/**/*.{test,spec}.{js,jsx}'],
-        exclude: ['node_modules', 'dist', '.git']
+        exclude: ['node_modules', 'dist', '.git', '**/*.test.helpers.js']
     },
 });
