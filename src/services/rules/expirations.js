@@ -1,4 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { evaluateAutoExpression } from '../combat/automationExpressions.js';
 import utils from '../ui/utils.js';
 import storage from '../ui/storage.js';
 import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary } from '../encounters/combatData.js';
@@ -39,6 +40,15 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
         }
         if (effect.type === 'flurry_healing_harm') {
             applyFlurryHealingHarmTurnStart(activeName, playerStats, effect, campaignName);
+        }
+        if (effect.type === 'holy_nimbus_radiant_damage') {
+            applyHolyNimbusRadiantDamage(activeName, playerStats, effect, campaignName);
+        }
+        if (effect.type === 'living_legend_turn_start') {
+            setRuntimeValue(activeName, 'unerringStrikeUsed', false, campaignName);
+        }
+        if (effect.type === 'elder_champion_regeneration') {
+            applyElderChampionRegeneration(activeName, playerStats, effect, campaignName);
         }
     }
 }
@@ -102,6 +112,78 @@ async function applyFlurryHealingHarmTurnStart(activeName, playerStats, effect, 
     }
 
     await setRuntimeValue(activeName, 'flurryHealingHarmUses', uses, campaignName);
+}
+
+async function applyHolyNimbusRadiantDamage(activeName, playerStats, effect, campaignName) {
+    const holyNimbusActive = getRuntimeValue(activeName, 'holyNimbusActive', campaignName);
+    if (!holyNimbusActive) return;
+
+    const combatSummary = getCombatSummary();
+    if (!combatSummary) return;
+
+    const creatures = combatSummary.creatures || [];
+    const damageExpression = effect.damageExpression || 'CHA modifier + proficiency_bonus';
+
+    const prof = playerStats.proficiency || 0;
+    const chaMod = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
+
+    let expr = damageExpression
+        .replace(/proficiency_bonus/gi, prof)
+        .replace(/CHA modifier/gi, chaMod);
+
+    let damage;
+    try {
+        damage = new Function(`"use strict"; return (${expr})`)();
+    } catch {
+        damage = prof + chaMod;
+    }
+
+    if (typeof damage !== 'number' || isNaN(damage) || damage <= 0) return;
+
+    for (const creature of creatures) {
+        const creatureName = utils.getName(creature.name);
+        if (creatureName === utils.getName(activeName)) continue;
+
+        const creatureType = creature.type || '';
+        if (creatureType !== 'fiend' && creatureType !== 'undead') continue;
+
+        try {
+            const currentHp = creature.hit_points?.current ?? creature.currentHp ?? 0;
+            const newHp = Math.max(0, currentHp - damage);
+            creature.hit_points = creature.hit_points || {};
+            creature.hit_points.current = newHp;
+            if (creature.currentHp != null) {
+                creature.currentHp = newHp;
+            }
+
+            await addEntry(campaignName, {
+                type: 'damage',
+                characterName: activeName,
+                targetName: creatureName,
+                damageType: 'radiant',
+                damageAmount: damage,
+                description: `Holy Nimbus radiant damage: ${damage} radiant to ${creatureName}`,
+                timestamp: Date.now(),
+            }).catch(() => {});
+        } catch { /* ignore per-creature errors */ }
+    }
+
+    storage.set('combatSummary', combatSummary, campaignName);
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+}
+
+async function applyElderChampionRegeneration(activeName, playerStats, effect, campaignName) {
+    const elderChampionActive = getRuntimeValue(activeName, 'elderChampionActive', campaignName);
+    if (!elderChampionActive) return;
+
+    const healAmount = effect.healExpression ? evaluateAutoExpression(effect.healExpression, playerStats) : 10;
+    if (typeof healAmount !== 'number' || isNaN(healAmount) || healAmount <= 0) return;
+
+    const maxHp = getRuntimeValue(activeName, 'hitPoints', campaignName) ?? playerStats.hitPoints ?? 100;
+    const currentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName) ?? getRuntimeValue(activeName, 'hitPoints', campaignName) ?? maxHp;
+    const newHp = Math.min(maxHp, currentHp + healAmount);
+
+    await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
 }
 
 export function addExpiration(attackerName, targetName, effects, campaignName, rounds) {
@@ -277,6 +359,20 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 break;
             }
 
+            case 'peerless_athlete_end': {
+                setRuntimeValue(targetName, 'peerlessAthleteActive', false, campaignName);
+                const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                if (Array.isArray(buffs)) {
+                    setRuntimeValue(
+                        targetName,
+                        'activeBuffs',
+                        buffs.filter(b => b.effect !== 'peerless_athlete'),
+                        campaignName
+                    );
+                }
+                break;
+            }
+
             case 'remove_bardic_inspiration': {
                 setRuntimeValue(targetName, 'bardicInspirationDie', null, campaignName);
                 setRuntimeValue(targetName, 'bardicInspirationGrantedBy', null, campaignName);
@@ -319,6 +415,17 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 removeActiveCondition(targetName, effect.condition, campaignName);
                 removeNpcCondition(targetName, effect.condition, campaignName);
                 break;
+
+            case 'avenging_angel_aura': {
+                const auraTargets = getRuntimeValue(attackerName, 'avengingAngelAuraTargets', campaignName) || [];
+                setRuntimeValue(
+                    attackerName,
+                    'avengingAngelAuraTargets',
+                    auraTargets.filter(t => t !== targetName),
+                    campaignName
+                );
+                break;
+            }
 
             default:
                 break;

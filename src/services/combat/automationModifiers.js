@@ -42,6 +42,22 @@ export function collectSaveModifiers(features) {
                     oncePerRage: !!auto.oncePerRage,
                 })
             }
+            if (auto.type === 'living_legend') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'saving_throw',
+                    condition: 'living_legend_active',
+                    effect: 'reroll',
+                    bonusExpression: '',
+                })
+                modifiers.push({
+                    source: feature.name,
+                    target: 'ability_check',
+                    condition: 'living_legend_active',
+                    effect: 'advantage',
+                    abilities: ['CHA'],
+                })
+            }
             if (auto.type === 'conditional_replacement') {
                 modifiers.push({
                     source: feature.name,
@@ -59,6 +75,14 @@ export function collectSaveModifiers(features) {
                     condition: auto.condition || '',
                     effect: 'tactical_mind',
                     bonusExpression: auto.bonusExpression || '',
+                })
+            }
+            if (auto.type === 'elder_champion') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'saving_throw',
+                    condition: 'elder_champion_active',
+                    effect: 'disadvantage',
                 })
             }
         }

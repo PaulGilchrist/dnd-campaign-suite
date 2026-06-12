@@ -884,3 +884,194 @@ describe('applyDamageToTarget — buff resistance merging', () => {
       expect(getRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'activeBuffs', 'TestCampaign');
     });
   });
+
+describe('applyDamageToTarget — Undying Sentinel', () => {
+    function createPaladinWithUndyingSentinel(name, level) {
+      return createPlayerCreature(name, {
+        level: level || 15,
+        computedStats: {
+          name: name,
+          level: level || 15,
+          hitPoints: { max: 150 },
+          class: {
+            name: 'Paladin',
+            class_levels: [{ level: level || 15 }],
+          },
+          allFeatures: [
+            { name: 'Undying Sentinel' },
+            { name: 'Other Feature' },
+          ],
+        },
+      });
+    }
+
+    function createPlayerCharacterWithComputed(name, computedExtra = {}) {
+      return {
+        name,
+        computedStats: {
+          resistances: [],
+          immunities: [],
+          level: computedExtra.level || 1,
+          hitPoints: computedExtra.hitPoints || { max: 10 },
+          class: computedExtra.class || { name: 'Fighter', class_levels: [{ level: 1 }] },
+          allFeatures: computedExtra.allFeatures || [],
+          ...computedExtra,
+        },
+        ...computedExtra,
+      };
+    }
+
+    beforeEach(() => {
+      getRuntimeValue.mockClear();
+      getRuntimeValue.mockImplementation(() => undefined);
+      setRuntimeValue.mockClear();
+    });
+
+    it('triggers Undying Sentinel when player drops to 0 HP', () => {
+      const paladin = createPaladinWithUndyingSentinel('GloryPaladin', 15);
+      const cs = makeCombatSummary([paladin]);
+
+      // Set current HP to 10, so 10 damage drops to 0
+      getRuntimeValue.mockImplementation((charName, key) => {
+        if (charName === 'GloryPaladin' && key === 'currentHitPoints') return 10;
+        if (charName === 'GloryPaladin' && key === 'hitPoints') return 150;
+        return undefined;
+      });
+
+      const result = applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], 'TestCampaign', [createPlayerCharacterWithComputed('GloryPaladin', {
+        level: 15,
+        hitPoints: { max: 150 },
+        class: { name: 'Paladin', class_levels: [{ level: 15 }] },
+        allFeatures: [{ name: 'Undying Sentinel' }, { name: 'Other Feature' }],
+      })]);
+
+      // Should have triggered Undying Sentinel: 1 + (15 * 3) = 46 HP
+      expect(result.newHp).toBe(46);
+      expect(result.finalDamage).toBe(0);
+      expect(result.intercepted).toBe(true);
+    });
+
+    it('does not trigger if feature not present', () => {
+      const fighter = createPlayerCreature('Fighter', {
+        level: 15,
+        computedStats: {
+          name: 'Fighter',
+          level: 15,
+          hitPoints: { max: 120 },
+          class: { name: 'Fighter', class_levels: [{ level: 15 }] },
+          allFeatures: [{ name: 'Extra Attack' }],
+        },
+      });
+      const cs = makeCombatSummary([fighter]);
+
+      getRuntimeValue.mockImplementation((charName, key) => {
+        if (charName === 'Fighter' && key === 'currentHitPoints') return 5;
+        if (charName === 'Fighter' && key === 'hitPoints') return 120;
+        return undefined;
+      });
+
+      const result = applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], 'TestCampaign', [createPlayerCharacterWithComputed('Fighter', {
+        level: 15,
+        hitPoints: { max: 120 },
+        class: { name: 'Fighter', class_levels: [{ level: 15 }] },
+        allFeatures: [{ name: 'Extra Attack' }],
+      })]);
+
+      expect(result.finalDamage).toBe(5);
+      expect(result.newHp).toBe(0);
+    });
+
+    it('does not trigger if already used this long rest', () => {
+      const paladin = createPaladinWithUndyingSentinel('GloryPaladin', 15);
+      const cs = makeCombatSummary([paladin]);
+
+      getRuntimeValue.mockImplementation((charName, key, _campaignName) => {
+        if (charName === 'GloryPaladin' && key === 'currentHitPoints') return 10;
+        if (charName === 'GloryPaladin' && key === 'hitPoints') return 150;
+        if (charName === 'GloryPaladin' && key === 'undyingSentinelUsed') return true;
+        return undefined;
+      });
+
+      const result = applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], 'TestCampaign', [createPlayerCharacterWithComputed('GloryPaladin', {
+        level: 15,
+        hitPoints: { max: 150 },
+        class: { name: 'Paladin', class_levels: [{ level: 15 }] },
+        allFeatures: [{ name: 'Undying Sentinel' }, { name: 'Other Feature' }],
+      })]);
+
+      expect(result.finalDamage).toBe(10);
+      expect(result.newHp).toBe(0);
+    });
+
+    it('scales healing with paladin level', () => {
+      const paladin = createPaladinWithUndyingSentinel('GloryPaladin', 20);
+      const cs = makeCombatSummary([paladin]);
+
+      getRuntimeValue.mockImplementation((charName, key) => {
+        if (charName === 'GloryPaladin' && key === 'currentHitPoints') return 5;
+        if (charName === 'GloryPaladin' && key === 'hitPoints') return 200;
+        return undefined;
+      });
+
+      const result = applyDamageToTarget(cs, 'GloryPaladin', 5, ['Slashing'], 'TestCampaign', [createPlayerCharacterWithComputed('GloryPaladin', {
+        level: 20,
+        hitPoints: { max: 200 },
+        class: { name: 'Paladin', class_levels: [{ level: 20 }] },
+        allFeatures: [{ name: 'Undying Sentinel' }, { name: 'Other Feature' }],
+      })]);
+
+      // 1 + (20 * 3) = 61 HP
+      expect(result.newHp).toBe(61);
+      expect(result.finalDamage).toBe(0);
+    });
+
+    it('resets death saves when triggering', () => {
+      const paladin = createPaladinWithUndyingSentinel('GloryPaladin', 15);
+      const cs = makeCombatSummary([paladin]);
+
+      getRuntimeValue.mockImplementation((charName, key) => {
+        if (charName === 'GloryPaladin' && key === 'currentHitPoints') return 10;
+        if (charName === 'GloryPaladin' && key === 'hitPoints') return 150;
+        return undefined;
+      });
+
+      applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], 'TestCampaign', [createPlayerCharacterWithComputed('GloryPaladin', {
+        level: 15,
+        hitPoints: { max: 150 },
+        class: { name: 'Paladin', class_levels: [{ level: 15 }] },
+        allFeatures: [{ name: 'Undying Sentinel' }, { name: 'Other Feature' }],
+      })]);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'deathSaves', [false, false, false], 'TestCampaign');
+      expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'deathFailures', [false, false, false], 'TestCampaign');
+    });
+
+    it('marks feature as used', () => {
+      const paladin = createPaladinWithUndyingSentinel('GloryPaladin', 15);
+      const cs = makeCombatSummary([paladin]);
+
+      getRuntimeValue.mockImplementation((charName, key) => {
+        if (charName === 'GloryPaladin' && key === 'currentHitPoints') return 10;
+        if (charName === 'GloryPaladin' && key === 'hitPoints') return 150;
+        return undefined;
+      });
+
+      applyDamageToTarget(cs, 'GloryPaladin', 10, ['Slashing'], 'TestCampaign', [createPlayerCharacterWithComputed('GloryPaladin', {
+        level: 15,
+        hitPoints: { max: 150 },
+        class: { name: 'Paladin', class_levels: [{ level: 15 }] },
+        allFeatures: [{ name: 'Undying Sentinel' }, { name: 'Other Feature' }],
+      })]);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'undyingSentinelUsed', true, 'TestCampaign');
+    });
+
+    it('does not trigger for NPCs', () => {
+      const goblin = createNpcCreature('Goblin', 10, 10);
+      const cs = makeCombatSummary([goblin]);
+
+      applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign');
+
+      expect(goblin.currentHp).toBe(0);
+    });
+});

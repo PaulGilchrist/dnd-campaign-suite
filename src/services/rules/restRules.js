@@ -232,6 +232,9 @@ export async function applyLongRest(playerStats, campaignName) {
 
    clearAllExpirationEffects(name, campaignName)
 
-   // Reset Uncanny Metabolism tracking on long rest
-   setRuntimeValue(name, 'uncannyMetabolismUsed', false, campaignName, true)
+    // Reset Uncanny Metabolism tracking on long rest
+    setRuntimeValue(name, 'uncannyMetabolismUsed', false, campaignName, true)
+
+    // Reset Undying Sentinel (Oath of Glory level 15) on long rest
+    setRuntimeValue(name, 'undyingSentinelUsed', false, campaignName, true)
 }

@@ -23,6 +23,8 @@ import {
     hasAttackerTriggeredMajesty,
     markAttackerTriggeredMajesty,
 } from '../services/combat/unbreakableMajesty.js';
+import { MELEE_REACH_FEET } from '../services/combat/baseCombatActions.js';
+import { getCombatContext } from '../services/rules/damageUtils.js';
 
 function dispatchUnbreakableMajestySave(campaignName, defenderName, attackerName, saveDc, promptId) {
     sendSavePrompt(campaignName, {
@@ -226,10 +228,23 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         throw new Error(`[AC] Target "${target.name}" has no AC defined.`);
       }
 
-      const effectiveAc = target ? targetAc + coverAcBonus : undefined;
-      let hit = isAutoMiss ? false : (target ? (r1 + bonus >= effectiveAc) : undefined);
-      const targetName = target?.name || context?.targetName;
-      const attackerName = context?.attackerName || characterName;
+       const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) : undefined;
+       let hit = isAutoMiss ? false : (target ? (r1 + bonus >= effectiveAc) : undefined);
+       const targetName = target?.name || context?.targetName;
+       const attackerName = context?.attackerName || characterName;
+
+       // Unerring Strike (Living Legend): once per turn, missed weapon attacks hit automatically
+       if (!hit && !isAutoMiss && rollType === 'attack' && context?.isWeaponAttack) {
+           const livingLegendActive = getRuntimeValue(characterName, 'livingLegendActive', campaignName);
+           if (livingLegendActive) {
+               const unerringStrikeUsed = getRuntimeValue(characterName, 'unerringStrikeUsed', campaignName);
+               if (!unerringStrikeUsed) {
+                   hit = true;
+                   isAutoMiss = false;
+                   await setRuntimeValue(characterName, 'unerringStrikeUsed', true, campaignName);
+               }
+           }
+       }
 
       if (hit && target) {
           const majActive = isUnbreakableMajestyActive(target.name, campaignName);
@@ -327,31 +342,32 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
            coverAcBonus: context?.coverAcBonus,
            coverReason: context?.coverReason,
               });
-       setPopupHtml({
-          type: 'd20',
-          rollType,
-          name,
-          rolls: [r1, r2],
-          bonus,
-          targetName,
-          targetAc,
-          hit,
-          isAutoMiss,
-          rangeReason: context?.rangeReason,
-          resistanceNotice: context?.resistanceNotice,
-          coverLevel: context?.coverLevel,
-          coverAcBonus: context?.coverAcBonus,
-          coverReason: context?.coverReason,
-         forcedMode: context?.forcedMode,
-         isAutoCrit: context?.isAutoCrit,
-         isCrit,
-         autoDamage,
-          autoReroll: context?.autoReroll,
-          autoRerollBonus: context?.autoRerollBonus,
-          strSaveReplace: context?.strSaveReplace,
-          strScore: context?.strScore,
-          strCheckReplace: context?.strCheckReplace,
-        });
+        setPopupHtml({
+           type: 'd20',
+           rollType,
+           name,
+           rolls: [r1, r2],
+           bonus,
+           targetName,
+           targetAc,
+           hit,
+           isAutoMiss,
+           rangeReason: context?.rangeReason,
+           resistanceNotice: context?.resistanceNotice,
+           coverLevel: context?.coverLevel,
+           coverAcBonus: context?.coverAcBonus,
+           coverReason: context?.coverReason,
+          forcedMode: context?.forcedMode,
+          isAutoCrit: context?.isAutoCrit,
+          isCrit,
+          autoDamage,
+           autoReroll: context?.autoReroll,
+           autoRerollBonus: context?.autoRerollBonus,
+           strSaveReplace: context?.strSaveReplace,
+           strScore: context?.strScore,
+           strCheckReplace: context?.strCheckReplace,
+           gloriousDefenseBonus: context?.gloriousDefenseBonus || 0,
+         });
 
      if (rollType === 'attack') {
          setRuntimeValue(characterName, 'lastAttackRoll', {
@@ -924,7 +940,78 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         }, campaignName);
         }
 
-  async function quickRollPlayerSave(promptId, targetName, saveType, saveDc) {
+   async function triggerGloriousDefenseCounterAttack() {
+        const playerName = characterName;
+        const chaBonus = 0;
+
+        const usesKey = 'gloriousDefenseUses';
+        const usesMax = Math.max(1, chaBonus);
+        const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? usesMax);
+
+        if (currentUses <= 0) {
+            setPopupHtml({
+                type: 'd20',
+                rollType: 'attack',
+                name: 'Glorious Defense',
+                rolls: [],
+                bonus: 0,
+                targetName: null,
+                targetAc: null,
+                hit: undefined,
+                isAutoMiss: false,
+                forcedMode: undefined,
+                isCrit: false,
+                isAutoCrit: false,
+                gloriousDefenseBonus: 0,
+                popupMessage: `${characterName} has no uses remaining for Glorious Defense. Recharges on a Long Rest.`,
+            });
+            return;
+        }
+
+        await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
+
+        const cs = await getCombatContext(campaignName);
+        const target = cs ? getTargetFromAttacker(cs, playerName) : null;
+        const targetName = target?.name || null;
+
+        const combatSummary = await loadCombatSummary(campaignName);
+        const playerCreature = combatSummary?.creatures?.find(c => c.type === 'player' && c.name === playerName);
+        const attacks = playerCreature?.attacks || [];
+        const meleeAttacks = attacks.filter(a => a.range === MELEE_REACH_FEET);
+        const attack = meleeAttacks.length > 0 ? meleeAttacks[0] : attacks[0];
+
+        if (!attack) {
+            await setRuntimeValue(playerName, usesKey, currentUses, campaignName);
+            setPopupHtml({
+                type: 'd20',
+                rollType: 'attack',
+                name: 'Glorious Defense',
+                rolls: [],
+                bonus: 0,
+                targetName: null,
+                targetAc: null,
+                hit: undefined,
+                isAutoMiss: false,
+                forcedMode: undefined,
+                isCrit: false,
+                isAutoCrit: false,
+                gloriousDefenseBonus: 0,
+                popupMessage: `${characterName} has no melee attack available.`,
+            });
+            return;
+        }
+
+        logEntry({
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: 'Glorious Defense',
+            description: `${playerName} used Glorious Defense counter-attack against ${targetName || 'attacker'}.`,
+        }).catch(() => {});
+
+        logAndShow(attack.name, attack.hitBonus, 'attack', { targetName, forcedMode: undefined });
+    }
+
+   async function quickRollPlayerSave(promptId, targetName, saveType, saveDc) {
     const pending = pendingSaves[promptId];
     if (!pending) return;
 
@@ -1006,7 +1093,8 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
     rollSkillCheck: (name, bonus, context) => logAndShow(name, bonus, 'skill', context),
      rollInitiative: (initBonus, context) => logAndShow('Initiative', initBonus, 'initiative', context),
        rollAttack: (name, hitBonus, context) => logAndShow(name, hitBonus, 'attack', context),
-   rollDamage: (name, formula, total, rolls, modifier, context) => logDamageAndShow(name, formula, total, rolls, modifier, context),
-   quickRollPlayerSave,
-        };
+    rollDamage: (name, formula, total, rolls, modifier, context) => logDamageAndShow(name, formula, total, rolls, modifier, context),
+    quickRollPlayerSave,
+    triggerGloriousDefenseCounterAttack,
+         };
        }

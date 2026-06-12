@@ -108,6 +108,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         });
       }
     }
+
   }
 
   const wasAlive = oldHp > 0;
@@ -123,6 +124,12 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
   let combatSummaryChanged = false;
   if (creature.type === 'player') {
     if (wasAlive && isNowUnconscious) {
+      // Check for Undying Sentinel (Oath of Glory level 15)
+      const undyingResult = checkUndyingSentinel(creature, playerComputed, campaignName);
+      if (undyingResult.intercepted) {
+        return undyingResult;
+      }
+
       const promptId = utils.guid();
       sendDeathSavePrompt(campaignName, {
         promptId,
@@ -148,30 +155,41 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         const activeBuffs = getRuntimeValue(creature.name, 'activeBuffs') || [];
         return activeBuffs.some(b => b.name === 'Starry Form' && b.constellation === 'Dragon');
       })();
-      const { success, roll, total } = rollConcentrationSave(saveBonus, creature.concentration.dc, dragonConstellationActive);
-      if (!success) {
-        const spellName = creature.concentration.spell;
-        const dc = creature.concentration.dc;
-        creature.concentration = null;
-        npcConcentrationBroken = true;
-        postLogEntry(campaignName, {
-          type: 'concentration-broken',
-          characterName: creature.name,
-          spellName,
-          roll,
-          total,
-          dc,
-        });
-      } else {
-        postLogEntry(campaignName, {
-          type: 'concentration-save',
-          characterName: creature.name,
-          spellName: creature.concentration.spell,
-          roll,
-          total,
-          dc: creature.concentration.dc,
-          success: true,
-        });
+      const relentlessHunterActive = (() => {
+        const allCharacters = (characters || []);
+        const player = allCharacters.find(c => c.name === creature.name || c.name.startsWith(creature.name + ' '));
+        const computed = player?.computedStats || player;
+        if (!computed || computed.class?.name !== 'Ranger') return false;
+        const classLevels = computed.class?.class_levels || [];
+        const currentLevel = classLevels.find(cl => cl.level === (player?.level || 1));
+        return (currentLevel?.level || 0) >= 13;
+      })();
+      if (!relentlessHunterActive) {
+        const { success, roll, total } = rollConcentrationSave(saveBonus, creature.concentration.dc, dragonConstellationActive);
+        if (!success) {
+          const spellName = creature.concentration.spell;
+          const dc = creature.concentration.dc;
+          creature.concentration = null;
+          npcConcentrationBroken = true;
+          postLogEntry(campaignName, {
+            type: 'concentration-broken',
+            characterName: creature.name,
+            spellName,
+            roll,
+            total,
+            dc,
+          });
+        } else {
+          postLogEntry(campaignName, {
+            type: 'concentration-save',
+            characterName: creature.name,
+            spellName: creature.concentration.spell,
+            roll,
+            total,
+            dc: creature.concentration.dc,
+            success: true,
+          });
+        }
       }
     }
   }
@@ -220,4 +238,73 @@ function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
      }
 
   postLogEntry(campaignName, entry);
+}
+
+function checkUndyingSentinel(creature, playerComputed, campaignName) {
+    const allFeatures = playerComputed?.allFeatures || [];
+    let hasUndyingSentinel = false;
+
+    for (const feature of allFeatures) {
+        if (feature?.name === 'Undying Sentinel') {
+            hasUndyingSentinel = true;
+            break;
+        }
+    }
+
+    if (!hasUndyingSentinel) {
+        return { intercepted: false };
+    }
+
+    // Check if already used this long rest
+    const alreadyUsed = getRuntimeValue(creature.name, 'undyingSentinelUsed', campaignName);
+    if (alreadyUsed) {
+        return { intercepted: false };
+    }
+
+    // Undying Sentinel triggers: set HP to 1 + (3 x paladin level)
+    const paladinClassLevel = playerComputed?.class?.class_levels?.find(cl => cl.level === playerComputed.level);
+    const paladinLevel = paladinClassLevel?.level || playerComputed.level;
+    const healAmount = paladinLevel * 3;
+    const maxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName) ?? playerComputed?.hitPoints?.max ?? 100;
+    const newHp = Math.min(1 + healAmount, maxHp);
+
+    // Set the runtime HP value
+    setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
+
+    // Mark as used
+    setRuntimeValue(creature.name, 'undyingSentinelUsed', true, campaignName);
+
+    // Reset death saves since the character is back above 0 HP
+    setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
+    setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
+
+    // Remove unconscious condition
+    const conditions = getRuntimeValue(creature.name, 'activeConditions', campaignName) || [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'unconscious');
+    setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
+
+    // Update the creature in combat summary
+    if (creature.type === 'player') {
+        creature.currentHp = newHp;
+    }
+
+    // Log the healing
+    postLogEntry(campaignName, {
+        type: 'heal',
+        targetName: creature.name,
+        delta: newHp,
+        currentHp: newHp,
+        maxHp: maxHp,
+        isHealing: true,
+        isUnconscious: false,
+        abilityName: 'Undying Sentinel',
+    });
+
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+
+    return {
+        intercepted: true,
+        finalDamage: 0,
+        newHp,
+    };
 }

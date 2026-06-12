@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, onReroll, tacticalMind, tacticalMindBonus }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
@@ -120,10 +120,18 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
 
             {showCrit && <div className="dice-roll-crit">{isAutoCrit ? 'AUTO-CRIT (target condition)' : 'Critical Hit!'} — damage dice doubled</div>}
              {targetName && hit !== undefined && !isSaveDamageType && (
-                <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
-                  {isAutoMiss ? `✗ AUTO-MISS (${coverReason || rangeReason || 'out of range'})` : (hit ? `✓ HIT (${displayTotal} vs AC ${targetAc ?? '—'})` : `✗ MISS (${displayTotal} vs AC ${targetAc ?? '—'})`)}
-                </div>
-              )}
+                 <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
+                   {isAutoMiss ? `✗ AUTO-MISS (${coverReason || rangeReason || 'out of range'})` : (hit ? `✓ HIT (${displayTotal} vs AC ${targetAc ?? '—'})` : `✗ MISS (${displayTotal} vs AC ${targetAc ?? '—'})`)}
+                 </div>
+               )}
+
+             {targetName && gloriousDefenseBonus > 0 && onCounterAttack && !hit && !isAutoMiss && (
+                 <div className="dice-roll-glorious-defense">
+                     <button className="dice-roll-reroll-btn" onClick={onCounterAttack} type="button">
+                         <i className="fa-solid fa-swords"></i> Glorious Defense Counter-Attack
+                     </button>
+                 </div>
+             )}
 
             {coverAcBonus > 0 && (
               <div className="dice-roll-cover">

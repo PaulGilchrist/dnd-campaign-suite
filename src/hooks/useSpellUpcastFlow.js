@@ -20,15 +20,16 @@ export function useSpellUpcastFlow(playerStats, campaignName) {
   const buildUpcastLevels = React.useCallback((spell) => {
     const slotDmg = spell.damage?.damage_at_slot_level;
     if (!slotDmg) return [];
+    const isFoeSlayer = spell.name === "Hunter's Mark" && playerStats.class?.name === 'Ranger' && playerStats.level >= 20;
     return Object.keys(slotDmg)
       .map(Number)
       .sort((a, b) => a - b)
       .map(level => ({
         level,
-        formula: slotDmg[level],
+        formula: isFoeSlayer ? String(slotDmg[level]).replace('1d6', '1d10') : slotDmg[level],
         availableSlots: getAvailableSlotCount(level),
       }));
-  }, [getAvailableSlotCount]);
+  }, [getAvailableSlotCount, playerStats.class?.name, playerStats.level]);
 
   const gateUpcast = React.useCallback((spell, afterUpcast, deductSlot = true) => {
     if (!isUpcastable(spell)) return false;

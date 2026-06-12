@@ -19,6 +19,20 @@ import './CharActions.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 const bonusActionCastingTimes = ['1 bonus action', '1 Bonus Action', 'bonus action', 'Bonus Action'];
+const actionCastingTimes = ['1 action', '1 Action', 'action', 'Action'];
+
+function isElderChampionActive(playerName, campaignName) {
+    try {
+        const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+        const activeBuffs = Array.isArray(stored) ? stored : [];
+        return activeBuffs.some(b => b.name === 'Elder Champion');
+    } catch { return false; }
+}
+
+function isActionSpell(castingTime) {
+    const ct = castingTime || '';
+    return actionCastingTimes.includes(ct);
+}
 
 function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, onAttackClick, onDamageClick, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo }) {
     const [popupHtml, setPopupHtml] = useState(null);
@@ -84,11 +98,14 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const bonusActionAttacks = playerStats.attacks.filter((attack) => attack.type === 'Bonus Action');
     const attackNames = new Set((playerStats.attacks || []).map(a => a.name));
-    const bonusActionSpells = playerStats.spellAbilities?.spells?.filter(spell =>
-        bonusActionCastingTimes.includes(spell.casting_time) &&
-         (spell.prepared === 'Always' || spell.prepared === 'Prepared') &&
-         !attackNames.has(spell.name)
-     ) || [];
+    const elderActive = isElderChampionActive(playerStats.name, campaignName);
+    const bonusActionSpells = playerStats.spellAbilities?.spells?.filter(spell => {
+        const isBonusAction = bonusActionCastingTimes.includes(spell.casting_time);
+        const isActionSpellSwift = elderActive && isActionSpell(spell.casting_time);
+        return (isBonusAction || isActionSpellSwift) &&
+          (spell.prepared === 'Always' || spell.prepared === 'Prepared') &&
+          !attackNames.has(spell.name)
+     }) || [];
     const hasBonusActions = playerStats.bonusActions.length > 0;
     const hasBonusContent = bonusActionSpells.length > 0 || bonusActionAttacks.length > 0 || hasBonusActions;
 

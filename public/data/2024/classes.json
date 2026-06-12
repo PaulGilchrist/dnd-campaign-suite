@@ -6823,12 +6823,39 @@
                     {
                         "name": "Smite of Protection",
                         "description": "Whenever you cast Divine Smite, you and your allies have Half Cover while in your Aura of Protection until start of next turn.",
-                        "level": 15
+                        "level": 15,
+                        "automation": {
+                            "type": "post_cast_smite_cover",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Holy Nimbus",
                         "description": "Bonus Action to imbue Aura of Protection with holy power for 10 minutes. Holy Ward: Advantage on saving throws by Fiends/Undead. Radiant Damage: enemies in aura take Radiant damage (Charisma modifier + Proficiency Bonus) when they start turn. Sunlight: aura filled with Bright Light that is sunlight.",
-                        "level": 20
+                        "level": 20,
+                        "automation": [
+                            {
+                                "type": "holy_nimbus",
+                                "duration": "10_minutes",
+                                "casting_time": "1_bonus_action",
+                                "resourceCost": "channel_divinity"
+                            },
+                            {
+                                "type": "passive_rule",
+                                "effect": "holy_nimbus_radiant_damage",
+                                "damageExpression": "CHA modifier + proficiency_bonus",
+                                "range": "10_ft",
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "passive_buff",
+                                "target": "allies_in_range",
+                                "range_expression": "10_ft",
+                                "effect": "sunlight_aura",
+                                "distance": "10_ft",
+                                "casting_time": "passive"
+                            }
+                        ]
                     }
                 ],
                 "spells": [
@@ -6882,12 +6909,46 @@
                     {
                         "name": "Inspiring Smite",
                         "description": "Immediately after casting Divine Smite, expend Channel Divinity and distribute Temporary Hit Points (2d8 + Paladin level) among creatures within 30 feet.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "post_cast_inspiring_smite",
+                            "range": "30 ft",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Peerless Athlete",
                         "description": "Bonus Action, expend Channel Divinity. For 1 hour: Advantage on Strength (Athletics) and Dexterity (Acrobatics) checks, Long/High Jump distance +10 feet.",
-                        "level": 3
+                        "level": 3,
+                        "automation": [
+                            {
+                                "type": "peerless_athlete",
+                                "duration": "1_hour",
+                                "casting_time": "1_bonus_action",
+                                "resourceCost": "channel_divinity"
+                            },
+                            {
+                                "type": "conditional_advantage",
+                                "target": "ability_check",
+                                "condition": "peerless_athlete",
+                                "effect": "advantage",
+                                "abilities": ["STR"],
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "conditional_advantage",
+                                "target": "ability_check",
+                                "condition": "peerless_athlete",
+                                "effect": "advantage",
+                                "abilities": ["DEX"],
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "auto_effect",
+                                "effect": "peerless_athlete_jump",
+                                "casting_time": "passive"
+                            }
+                        ]
                     },
                     {
                         "name": "Aura of Alacrity",
@@ -6905,12 +6966,27 @@
                     {
                         "name": "Glorious Defense",
                         "description": "When you or ally within 10 feet is hit by attack, take Reaction to grant bonus to AC (Charisma modifier, minimum +1). If attack misses, make one weapon attack against attacker. Uses = Charisma modifier (minimum once).",
-                        "level": 15
+                        "level": 15,
+                        "automation": {
+                            "type": "glorious_defense",
+                            "effect": "ac_bonus",
+                            "range": "10_ft",
+                            "casting_time": "1 reaction"
+                        }
                     },
                     {
                         "name": "Living Legend",
                         "description": "Bonus Action for 10 minutes. Charismatic: Advantage on all Charisma checks. Saving Throw Reroll: Reaction to reroll failed save. Unerring Strike: once per turn, cause missed weapon attack to hit.",
-                        "level": 20
+                        "level": 20,
+                        "automation": {
+                            "type": "living_legend",
+                            "casting_time": "1 bonus action",
+                            "duration": "10_minutes",
+                            "unerring_strike_trigger": "attack_miss",
+                            "unerring_strike_once_per_turn": true,
+                            "save_reroll_target": "saving_throw",
+                            "charisma_check_advantage": true
+                        }
                     }
                 ],
                 "spells": [
@@ -6995,12 +7071,21 @@
                     {
                         "name": "Undying Sentinel",
                         "description": "When reduced to 0 HP but not killed, drop to 1 HP and regain 3x Paladin level Hit Points. Can't be aged magically, cease visibly aging. Once per Long Rest.",
-                        "level": 15
+                        "level": 15,
+                        "automation": {
+                            "type": "passive_immunity",
+                            "conditionImmunity": "aged"
+                        }
                     },
                     {
                         "name": "Elder Champion",
                         "description": "As a Bonus Action you can imbue your Aura of Protection with primal power, granting the benefits below for 1 minute or until you end them (no action required). Once you use this feature, you can't use it again until you finish a Long Rest. You can also restore your use of it by expoending a level 5 spell slot (no action required). <b>Diminish Defiance</b>: Enemies in aura have Disadvantage on saving throws against your spells and Channel Divinity options. <b>Regeneration</b>: At the start of each of your turns, you regain 10 HP. <b>Swift Spells</b>: Whenever you cast a spell that has a casting time of an action, you can cast it using a Bonus Action instead.",
-                        "level": 20
+                        "level": 20,
+                        "automation": {
+                            "type": "elder_champion",
+                            "duration": "1_minute",
+                            "casting_time": "1 bonus action"
+                        }
                     }
                 ],
                 "spells": [
@@ -7054,22 +7139,48 @@
                     {
                         "name": "Vow of Enmity",
                         "description": "Take Attack action, expend Channel Divinity to utter vow against creature within 30 feet. Advantage on attack rolls against the creature for 1 minute or until used again. Transfer to different creature if target drops to 0 HP.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "temp_buff",
+                            "effect": "vow_of_enmity",
+                            "duration": "1_minute",
+                            "resourceCost": "channel_divinity",
+                            "casting_time": "1 bonus action"
+                        }
                     },
                     {
                         "name": "Relentless Avenger",
                         "description": "When you hit a creature with an Opportunity Attack, reduce creature's Speed to 0 until end of current turn. Move up to half Speed as part of same Reaction.",
-                        "level": 7
+                        "level": 7,
+                        "automation": {
+                            "type": "relentless_avenger",
+                            "duration": "until_end_of_current_turn"
+                        }
                     },
                     {
                         "name": "Soul of Vengeance",
                         "description": "Immediately after a creature under Vow of Enmity hits or misses with an attack, take Reaction to make melee attack against that creature if within range.",
-                        "level": 15
+                        "level": 15,
+                        "automation": {
+                            "type": "soul_of_vengeance",
+                            "trigger": "after_vow_of_enmity_target_attacks"
+                        }
                     },
                     {
                         "name": "Avenging Angel",
                         "description": "Bonus Action for 10 minutes. Flight: spectral wings, Fly Speed 60 feet, hover. Frightful Aura: enemies in Aura of Protection make Wisdom save or be Frightened for 1 minute or until taking damage. Attack rolls against Frightened creature have Advantage.",
-                        "level": 20
+                        "level": 20,
+                        "automation": {
+                            "type": "avenging_angel",
+                            "effect": "avenging_angel",
+                            "duration": "10_minutes",
+                            "action": "bonus_action",
+                            "flySpeed": 60,
+                            "hover": true,
+                            "auraRange": "aura_of_protection",
+                            "saveType": "WIS",
+                            "saveDc": "ability"
+                        }
                     }
                 ],
                 "spells": [
@@ -7154,7 +7265,25 @@
                         "name": "Favored Enemy",
                         "description": "You always have the Hunter's Mark spell prepared. You can cast it twice without expending a spell slot, and you regain all expended uses when you finish a Long Rest. The number of times you can cast the spell without a spell slot increases when you reach certain Ranger levels, as shown in the Favored Enemy column of the Ranger Features table.",
                         "level": 1,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": [
+                            {
+                                "type": "passive_rule",
+                                "effect": "always_prepared_spells",
+                                "spells": ["Hunter's Mark"],
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "free_spell",
+                                "spell": "Hunter's Mark",
+                                "uses_expression": "favored_enemy_min_1",
+                                "recharge": "long_rest",
+                                "concentration": true,
+                                "noConcentration": false,
+                                "action": "bonus_action",
+                                "casting_time": "1 bonus action"
+                            }
+                        ]
                     },
                     {
                         "name": "Weapon Mastery",
@@ -7539,7 +7668,12 @@
                         "name": "Precise Hunter",
                         "description": "You have Advantage on attack rolls against the creature currently marked by your Hunter's Mark.",
                         "level": 17,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "precise_hunter",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -7608,7 +7742,12 @@
                         "name": "Foe Slayer",
                         "description": "The damage die of your Hunter's Mark is a d10 rather than a d6.",
                         "level": 20,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "foe_slayer",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -7631,22 +7770,122 @@
                     {
                         "name": "Primal Companion",
                         "description": "Magically summon a primal beast. Choose stat block: Beast of the Land (Medium, AC 13+Wis, HP 5+5xRanger level, Speed 40 ft climb, Beast's Strike 1d8+2+Wis Bludgeoning/Piercing/Slashing), Beast of the Sea (Medium, AC 13+Wis, HP 5+5xRanger level, Speed 5 ft swim 60 ft, Beast's Strike 1d6+2+Wis Bludgeoning/Piercing + Grappled), or Beast of the Sky (Small, AC 13+Wis, HP 4+4xRanger level, Speed 10 ft fly 60 ft, Beast's Strike 1d4+3+Wis Slashing). The beast is Friendly to you and your allies. In combat, acts during your turn. Dodge action unless you take Bonus Action to command it. You can sacrifice one of your attacks to command Beast's Strike. Restoring: Action, touch dead beast (within 1 hour), expend spell slot, beast returns after 1 minute with all HP restored.",
-                        "level": 3
+                        "level": 3,
+                        "automation": [
+                            {
+                                "type": "primal_companion_summon",
+                                "action": "bonus_action",
+                                "casting_time": "1 bonus action",
+                                "companionTypes": [
+                                    {
+                                        "name": "Beast of the Land",
+                                        "size": "Medium",
+                                        "acFormula": "13 + WIS modifier",
+                                        "hpBase": 5,
+                                        "hpPerLevel": 5,
+                                        "speed": "40 ft",
+                                        "specialSpeed": "climb 40 ft",
+                                        "attacks": [
+                                            {
+                                                "name": "Beast's Strike",
+                                                "damageDice": "1d8",
+                                                "damageFlat": "2 + WIS modifier",
+                                                "damageType": "Bludgeoning/Piercing/Slashing"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "Beast of the Sea",
+                                        "size": "Medium",
+                                        "acFormula": "13 + WIS modifier",
+                                        "hpBase": 5,
+                                        "hpPerLevel": 5,
+                                        "speed": "5 ft",
+                                        "specialSpeed": "swim 60 ft",
+                                        "attacks": [
+                                            {
+                                                "name": "Beast's Strike",
+                                                "damageDice": "1d6",
+                                                "damageFlat": "2 + WIS modifier",
+                                                "damageType": "Bludgeoning/Piercing",
+                                                "onHit": "grappled"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "Beast of the Sky",
+                                        "size": "Small",
+                                        "acFormula": "13 + WIS modifier",
+                                        "hpBase": 4,
+                                        "hpPerLevel": 4,
+                                        "speed": "10 ft",
+                                        "specialSpeed": "fly 60 ft",
+                                        "attacks": [
+                                            {
+                                                "name": "Beast's Strike",
+                                                "damageDice": "1d4",
+                                                "damageFlat": "3 + WIS modifier",
+                                                "damageType": "Slashing"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "primal_companion_dodge",
+                                "effect": "companion_dodge_default",
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "primal_companion_command",
+                                "action": "action",
+                                "casting_time": "1 action",
+                                "commandType": "beasts_strike"
+                            },
+                            {
+                                "type": "primal_companion_restore",
+                                "action": "action",
+                                "casting_time": "1 action",
+                                "range": "5 ft",
+                                "spellSlotCost": true
+                            },
+                            {
+                                "type": "evasion",
+                                "saveType": "DEX",
+                                "shareable": false,
+                                "casting_time": "passive"
+                            }
+                        ]
                     },
                     {
                         "name": "Exceptional Training",
                         "description": "When commanding Primal Companion to take an action, also command it to take Dash, Disengage, Dodge, or Help action using its Bonus Action. It can deal Force damage or its normal damage type.",
-                        "level": 7
+                        "level": 7,
+                        "automation": {
+                            "type": "primal_companion_bonus_action_command",
+                            "casting_time": "1 bonus action",
+                            "commandActions": ["Dash", "Disengage", "Dodge", "Help"],
+                            "forceDamageOption": true
+                        }
                     },
                     {
                         "name": "Bestial Fury",
                         "description": "When commanding Primal Companion to take Beast's Strike, the beast can use it twice. First time each turn it hits a creature under Hunter's Mark, deals extra Force damage equal to the bonus damage of that spell.",
-                        "level": 11
+                        "level": 11,
+                        "automation": {
+                            "type": "primal_companion_double_strike",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Share Spells",
                         "description": "When you cast a spell targeting yourself, you can also affect your Primal Companion beast if within 30 feet.",
-                        "level": 15
+                        "level": 15,
+                        "automation": {
+                            "type": "primal_companion_spell_share",
+                            "range": "30_ft",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spells": []

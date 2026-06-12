@@ -180,6 +180,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         if (buff.effect === 'fly_speed_equals_walk_speed' || buff.flySpeed) flySpeed = speed;
         if (buff.effect === 'fly_speed_20_hover') flySpeed = 20;
         if (buff.effect === 'telekinetic_leap') flySpeed = buff.flySpeed;
+        if (buff.effect === 'avenging_angel_flight') flySpeed = buff.flySpeed || 60;
         if (buff.effect === 'speed_boost' && buff.speedBonus) buffSpeedBonus += buff.speedBonus;
         if (buff.effect === 'ice_walk') iceWalkActive = true;
     });

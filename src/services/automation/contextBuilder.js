@@ -9,6 +9,8 @@ import { getWolfAdvantageAgainst } from '../combat/wolfAuraUtils.js';
 import { getDuplicityAdvantageAgainst } from '../combat/duplicityAuraUtils.js';
 import { getLionDisadvantageAgainst } from '../combat/lionAuraUtils.js';
 import { getCoronaSaveDisadvantage } from '../combat/coronaAuraUtils.js';
+import { hasAuraOfProtection } from '../combat/auraOfProtection.js';
+import { isActive as isAvengingAngelActive, isAuraTarget } from '../automation/handlers/avengingAngelHandler.js';
 
 export function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects) {
     const playerName = playerStats.name;
@@ -75,6 +77,23 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             const cha = playerStats.abilities?.find(a => a.name === 'Charisma');
             const chaMod = Math.max(1, cha?.bonus || 0);
             sacredWeaponBonus = chaMod;
+        }
+
+        // Vow of Enmity: Advantage on attack rolls against the vowed creature
+        const vowOfEnmityActive = activeBuffs.some(b => b.effect === 'vow_of_enmity');
+        if (vowOfEnmityActive && targetName) {
+            const vowTarget = getRuntimeValue(playerName, 'vowOfEnmityTarget', campaignName);
+            if (vowTarget && targetName === vowTarget && forcedMode === undefined) {
+                forcedMode = 'advantage';
+            }
+        }
+
+        // Avenging Angel: Advantage on attack rolls against Frightened creatures in the aura
+        const avengingAngelActive = isAvengingAngelActive(playerName, campaignName);
+        if (avengingAngelActive && targetName && forcedMode === undefined) {
+            if (isAuraTarget(playerName, targetName, campaignName)) {
+                forcedMode = 'advantage';
+            }
         }
 
         const autoDamageFormula = stanceDamageBonus > 0
@@ -147,6 +166,13 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
 
+        // Compute Glorious Defense AC bonus (on the attacker when they are the Paladin being attacked)
+        let gloriousDefenseBonus = 0;
+        const gloriousDefenseActive = getRuntimeValue(playerName, 'gloriousDefenseActive', campaignName);
+        if (gloriousDefenseActive) {
+            gloriousDefenseBonus = Number(getRuntimeValue(playerName, 'gloriousDefenseBonus', campaignName) || 1);
+        }
+
         return {
             damageType: attack.damageType,
             resistanceNotice,
@@ -160,10 +186,12 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             autoDamageName: attack.name,
             ramActive,
             isMelee,
+            isWeaponAttack: attack.isWeaponAttack !== false,
             criticalRange,
             hitBonus: effectiveHitBonus,
             hitBonusFormula,
             sacredWeaponBonus,
+            gloriousDefenseBonus,
         };
        });
 }
@@ -340,6 +368,32 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                         }
                     }
 
+                    // Check Smite of Protection half cover (allies within Aura of Protection range)
+                    const smiteCoverActive = getRuntimeValue(playerStats.name, 'smiteOfProtectionActive', campaignName);
+                    if (smiteCoverActive && coverResult.acBonus < 2) {
+                        const auraSource = getAuraSourceForSmiteCover(playerStats, mapData);
+                        if (auraSource) {
+                            const inAura = checkInAuraOfProtectionSync(auraSource, base.targetName, mapData, playerStats);
+                            if (inAura) {
+                                coverResult = { level: 'half', acBonus: 2 };
+                            }
+                        }
+                    }
+
+                    // Check Glorious Defense AC bonus (target Paladin has active buff)
+                    const gloriousDefenseActive = getRuntimeValue(base.targetName, 'gloriousDefenseActive', campaignName);
+                    if (gloriousDefenseActive && coverResult.acBonus < 2) {
+                        const targetChar = mapData?.players?.find(p => p.name === base.targetName);
+                        const attackerPlayer = mapData?.players?.find(p => p.name === playerStats.name);
+                        if (targetChar && attackerPlayer) {
+                            const dist = getDistanceFeet(attackerPlayer, targetChar);
+                            if (dist <= 10) {
+                                const gloriousDefenseBonus = Number(getRuntimeValue(base.targetName, 'gloriousDefenseBonus', campaignName) || 1);
+                                coverResult.acBonus = Math.max(coverResult.acBonus, gloriousDefenseBonus);
+                            }
+                        }
+                    }
+
                     if (coverResult.level === 'full') {
                         base.isAutoMiss = true;
                         base.coverReason = 'Target has full cover';
@@ -366,8 +420,29 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                       }
                   }
 
-                return base;
-              });
-           })
-          .catch(() => basePromise);
+                 return base;
+               });
+            })
+           .catch(() => basePromise);
+}
+
+function getAuraSourceForSmiteCover(playerStats, mapData) {
+    if (!mapData?.players?.length) return null;
+    return mapData.players.find(p => hasAuraOfProtection(playerStats) && p.name === playerStats.name) || null;
+}
+
+function checkInAuraOfProtectionSync(auraSource, targetName, mapData, playerStats) {
+    if (!mapData?.players?.length) return true;
+
+    const sourcePlayer = auraSource;
+    if (!sourcePlayer) return true;
+
+    const targetPlayer = mapData.players.find(p => p.name === targetName);
+    if (!targetPlayer) return true;
+
+    const dist = getDistanceFeet(sourcePlayer, targetPlayer);
+    if (dist == null) return true;
+
+    const auraRange = hasAuraOfProtection(playerStats) ? 30 : 10;
+    return dist <= auraRange;
 }

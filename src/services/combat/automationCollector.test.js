@@ -722,6 +722,15 @@ describe('collectAutomationFromFeatures – nature_sanctuary types', () => {
         expect(result.bonusActions[0].name).toBe("Nature's Sanctuary (Move)")
         expect(result.bonusActions[0].type).toBe('nature_sanctuary_move')
     })
+
+    it('categorizes elder_champion as a special action', () => {
+        const features = [{ name: 'Elder Champion', automation: { type: 'elder_champion', duration: '1_minute', casting_time: '1 bonus action' } }]
+        const result = collectAutomationFromFeatures(features, {})
+        expect(result.specialActions.length).toBe(1)
+        expect(result.specialActions[0].name).toBe('Elder Champion')
+        expect(result.specialActions[0].type).toBe('elder_champion')
+        expect(result.specialActions[0].duration).toBe('1_minute')
+    })
 })
 
 describe('collectTurnStartEffects', () => {
@@ -869,5 +878,23 @@ describe('collectTurnStartEffects', () => {
         ]
         const result = collectTurnStartEffects(features)
         expect(result).toHaveLength(0)
+    })
+
+    it('collects elder_champion turn start regeneration effect', () => {
+        const features = [
+            {
+                name: 'Elder Champion',
+                automation: {
+                    type: 'elder_champion',
+                    duration: '1_minute',
+                    casting_time: '1 bonus action'
+                }
+            }
+        ]
+        const result = collectTurnStartEffects(features)
+        expect(result).toHaveLength(1)
+        expect(result[0].type).toBe('elder_champion_regeneration')
+        expect(result[0].name).toBe('Elder Champion')
+        expect(result[0].healExpression).toBe('10')
     })
 })

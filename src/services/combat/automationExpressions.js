@@ -70,6 +70,7 @@ function resolveDiceExpression(expression, playerStats, slotLevel) {
     const superiorityDie = getSuperiorityDieSize(playerStats)
     const psionicEnergyDie = getPsionicEnergyDieSize(playerStats)
     const martialArtsDie = playerStats?.class?.class_levels?.find(cl => cl.level === playerStats.level)?.martial_arts_die || 4
+    const favoredEnemy = playerStats?.class?.class_levels?.find(cl => cl.level === playerStats.level)?.favored_enemy || 0
     let expr = expression
         .replace(/bardic_inspiration_die/g, bardicDie)
         .replace(/proficiency_bonus_d4/g, `${Math.max(1, prof)}d4`)
@@ -90,6 +91,7 @@ function resolveDiceExpression(expression, playerStats, slotLevel) {
         .replace(/superiority_die/g, superiorityDie)
         .replace(/psionic_energy_die/g, psionicEnergyDie)
         .replace(/martial_arts_die/g, martialArtsDie)
+        .replace(/favored_enemy/gi, favoredEnemy)
         .replace(/level/gi, level)
         .replace(/spell_slot_level/g, slotLevel)
     const abilities = playerStats?.abilities || {}

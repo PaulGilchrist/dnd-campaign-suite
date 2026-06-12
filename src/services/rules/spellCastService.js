@@ -3,6 +3,8 @@ import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet, rangeT
 import { isInnateSorceryActive, getActiveBuffs } from '../combat/buffService.js';
 import { triggerPostCastRiderSaves } from './postCastRiderService.js';
 import { triggerPostCastSelfHeals, triggerPostCastAllyHeals } from './postCastHealService.js';
+import { triggerSmiteOfProtection } from './smiteOfProtectionService.js';
+import { triggerInspiringSmite } from './inspiringSmiteService.js';
 import { setRuntimeValue, getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { applyHealingToTarget } from './applyHealing.js';
 import { getCombatContext } from './damageUtils.js';
@@ -92,6 +94,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     });
     triggerPostCastAllyHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast ally-heal failed:', e);
+    });
+    triggerSmiteOfProtection(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+        console.error('[spellCast] Smite of Protection trigger failed:', e);
+    });
+    triggerInspiringSmite(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+        console.error('[spellCast] Inspiring Smite trigger failed:', e);
     });
 }
 

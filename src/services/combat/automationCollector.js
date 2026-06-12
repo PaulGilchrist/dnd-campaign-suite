@@ -38,6 +38,33 @@ export function collectTurnStartEffects(features) {
                     usesExpression: auto.usesExpression || 'WIS modifier minimum 1',
                 })
             }
+            if (auto?.type === 'holy_nimbus') {
+                effects.push({
+                    type: 'holy_nimbus_radiant_damage',
+                    name: feature.name,
+                    damageExpression: 'CHA modifier + proficiency_bonus',
+                    range: '10_ft',
+                })
+            }
+            if (auto?.type === 'living_legend') {
+                effects.push({
+                    type: 'living_legend_turn_start',
+                    name: feature.name,
+                })
+            }
+            if (auto?.type === 'elder_champion') {
+                effects.push({
+                    type: 'elder_champion_regeneration',
+                    name: feature.name,
+                    healExpression: '10',
+                })
+            }
+            if (auto?.type === 'precise_hunter') {
+                effects.push({
+                    type: 'precise_hunter',
+                    name: feature.name,
+                })
+            }
         }
     })
 
@@ -141,6 +168,8 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'post_cast_rider':
             case 'post_cast_self_heal':
             case 'post_cast_ally_heal':
+            case 'post_cast_smite_cover':
+            case 'post_cast_inspiring_smite':
             case 'multi_target_spread':
             case 'jack_of_all_trades':
             case 'divine_order':
@@ -226,12 +255,61 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 }
                 break
             case 'telekinetic_thrust':
+            case 'glorious_defense':
+            case 'relentless_avenger':
+            case 'soul_of_vengeance':
                 result.reactions.push(info)
+                break
+            case 'living_legend':
+                result.specialActions.push(info)
                 break
             case 'shadow_step_rider':
                 result.passives.push(info)
                 break
             case 'cloak_of_shadows':
+                result.specialActions.push(info)
+                break
+            case 'holy_nimbus':
+                result.specialActions.push(info)
+                break
+            case 'avenging_angel':
+                result.specialActions.push(info)
+                break
+            case 'primal_companion_summon':
+                if (info.action === 'bonus_action') {
+                    result.bonusActions.push(info)
+                } else {
+                    result.actions.push(info)
+                }
+                break
+            case 'primal_companion_command':
+                result.actions.push(info)
+                break
+            case 'primal_companion_restore':
+                result.actions.push(info)
+                break
+            case 'primal_companion_bonus_action_command':
+                result.bonusActions.push(info)
+                break
+            case 'primal_companion_double_strike':
+                result.passives.push(info)
+                break
+            case 'primal_companion_double_strike_damage':
+                result.passives.push(info)
+                break
+            case 'primal_companion_spell_share':
+                result.passives.push(info)
+                break
+            case 'primal_companion_dodge':
+                result.passives.push(info)
+                break
+            case 'holy_nimbus_radiant_damage':
+                result.passives.push(info)
+                break
+            case 'elder_champion':
+                result.specialActions.push(info)
+                break
+            case 'peerless_athlete':
                 result.specialActions.push(info)
                 break
             default:

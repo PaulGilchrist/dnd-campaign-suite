@@ -78,6 +78,7 @@ export const reactions = [
     "Opportunity Attack",
     "Riposte",
     "Shield Block",
+    "Soul of Vengeance",
     "Thieves' Cant"
 ];
 

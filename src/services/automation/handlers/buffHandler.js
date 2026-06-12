@@ -1,5 +1,6 @@
 import { toggleBuff } from '../common/buffToggle.js';
 import { handle as handleTeleport } from './tempTeleportHandler.js';
+import { handle as handleVowOfEnmity } from './vowOfEnmityHandler.js';
 import { getTargetFromAttacker } from '../../rules/damageUtils.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 import { evaluateAutoExpression } from '../../combat/automationService.js';
@@ -10,6 +11,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     if (auto?.effect === 'teleport_on_rage' || auto?.effect === 'teleport_swap_with_illusion' || auto?.effect === 'shadow_step_teleport' || auto?.effect === 'moonlight_step_teleport') {
         return handleTeleport(action, playerStats, campaignName, _mapName);
+    }
+
+    if (auto?.effect === 'vow_of_enmity') {
+        return handleVowOfEnmity(action, playerStats, campaignName, _mapName);
     }
 
     let targetName = playerStats.name;

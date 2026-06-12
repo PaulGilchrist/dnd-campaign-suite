@@ -183,10 +183,17 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     };
 
     const handleDamageRoll = (formula, spellName, spell) => {
+      let finalFormula = formula;
+      if (spellName === "Hunter's Mark" && playerStats.class?.name === 'Ranger' && playerStats.level >= 20) {
+        finalFormula = finalFormula.replace('1d6', '1d10');
+      }
       const afterUpcast = (modifiedSpell) => {
-        const upcastFormula = modifiedSpell.damage?.damage_at_slot_level?.[modifiedSpell.level]
+        let upcastFormula = modifiedSpell.damage?.damage_at_slot_level?.[modifiedSpell.level]
           || modifiedSpell.damage?.damage_at_character_level?.[modifiedSpell.level]
-          || formula;
+          || finalFormula;
+        if (spellName === "Hunter's Mark" && playerStats.class?.name === 'Ranger' && playerStats.level >= 20) {
+          upcastFormula = upcastFormula.replace('1d6', '1d10');
+        }
         executeDamageRoll(upcastFormula, modifiedSpell.name || spellName, modifiedSpell);
       };
 
@@ -367,12 +374,14 @@ return (
                             const dmgObj = slotDmg && Object.keys(slotDmg).length ? slotDmg : charDmg;
                             if (dmgObj) {
                                 const isCantrip = spell.level === 0;
+                                let damageDisplay = isCantrip ? dmgObj[Math.max(...Object.keys(dmgObj).map(Number).filter(l => l <= playerStats.level))] || dmgObj[Object.keys(dmgObj)[0]] : dmgObj[Object.keys(dmgObj)[0]];
+                                if (spell.name === "Hunter's Mark" && playerStats.class?.name === 'Ranger' && playerStats.level >= 20) {
+                                    damageDisplay = damageDisplay.replace('1d6', '1d10');
+                                }
                                 if (isCantrip) {
-                                    const lvls = Object.keys(dmgObj).map(Number).filter(l => l <= playerStats.level);
-                                    const bestLevel = lvls.length > 0 ? Math.max(...lvls) : Object.keys(dmgObj)[0];
-                                    effect = `${dmgObj[bestLevel]} ${spell.damage.damage_type}`;
+                                    effect = `${damageDisplay} ${spell.damage.damage_type}`;
                                 } else {
-                                    effect = `${dmgObj[Object.keys(dmgObj)[0]]} ${spell.damage.damage_type}`;
+                                    effect = `${damageDisplay} ${spell.damage.damage_type}`;
                                 }
                                 if (spell.dc) {
                                     const saveLabel = spell.dc.dc_success === 'half' ? 'half' : 'negates';

@@ -529,7 +529,19 @@ function buildAttackInfo(feature, playerStats) {
                 grantsFlySpeed: !!auto.grantsFlySpeed,
                 grantsSwimSpeed: !!auto.grantsSwimSpeed,
                 hasAutomation: true
-            }
+            };
+        }
+
+        case 'holy_nimbus_radiant_damage': {
+            return {
+                type: 'passive_rule',
+                name: feature.name,
+                effect: 'holy_nimbus_radiant_damage',
+                damageExpression: auto.damageExpression || '',
+                range: auto.range || '',
+                casting_time: auto.casting_time || '',
+                hasAutomation: true
+            };
         }
 
         case 'passive_immunity': {
@@ -1174,12 +1186,215 @@ function buildAttackInfo(feature, playerStats) {
             };
         }
 
+        case 'post_cast_smite_cover': {
+            return {
+                type: 'post_cast_smite_cover',
+                name: feature.name,
+                casting_time: auto.casting_time || 'passive',
+                hasAutomation: true
+            };
+        }
+
+        case 'post_cast_inspiring_smite': {
+            return {
+                type: 'post_cast_inspiring_smite',
+                name: feature.name,
+                range: auto.range || '30 ft',
+                casting_time: auto.casting_time || 'passive',
+                hasAutomation: true
+            };
+        }
+
+        case 'holy_nimbus': {
+            return {
+                type: 'holy_nimbus',
+                name: feature.name,
+                duration: auto.duration || '10_minutes',
+                casting_time: auto.casting_time || '1_bonus_action',
+                resourceCost: auto.resourceCost || '',
+                hasAutomation: true
+            };
+        }
+
         case 'cloak_of_shadows': {
             return {
                 type: 'cloak_of_shadows',
                 name: feature.name,
                 effect: auto.effect || '',
                 duration: auto.duration || '1_minute',
+                hasAutomation: true
+            };
+        }
+
+        case 'peerless_athlete': {
+            return {
+                type: 'peerless_athlete',
+                name: feature.name,
+                duration: auto.duration || '1_hour',
+                casting_time: auto.casting_time || '1_bonus_action',
+                resourceCost: auto.resourceCost || 'channel_divinity',
+                hasAutomation: true
+            };
+        }
+
+        case 'glorious_defense': {
+            const chaBonus = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
+            const acBonus = Math.max(1, chaBonus);
+            const usesMax = Math.max(1, chaBonus);
+            return {
+                type: 'glorious_defense',
+                name: feature.name,
+                acBonusExpression: `Math.max(1, CHA modifier)`,
+                acBonus: acBonus,
+                usesMax: usesMax,
+                range: auto.range || '10_ft',
+                trigger: auto.trigger || '',
+                casting_time: auto.casting_time || '1 reaction',
+                hasAutomation: true
+            };
+        }
+
+        case 'living_legend': {
+            return {
+                type: 'living_legend',
+                name: feature.name,
+                duration: auto.duration || '10_minutes',
+                casting_time: auto.casting_time || '1 bonus action',
+                unerringStrikeTrigger: auto.unerring_strike_trigger || 'attack_miss',
+                unerringStrikeOncePerTurn: !!auto.unerring_strike_once_per_turn,
+                saveRerollTarget: auto.save_reroll_target || 'saving_throw',
+                charismaCheckAdvantage: !!auto.charisma_check_advantage,
+                hasAutomation: true
+            };
+        }
+
+        case 'elder_champion': {
+            return {
+                type: 'elder_champion',
+                name: feature.name,
+                duration: auto.duration || '1_minute',
+                casting_time: auto.casting_time || '1 bonus action',
+                hasAutomation: true
+            };
+        }
+
+        case 'relentless_avenger': {
+            return {
+                type: 'relentless_avenger',
+                name: feature.name,
+                trigger: auto.trigger || 'after_opportunity_attack_hit',
+                duration: auto.duration || 'until_end_of_current_turn',
+                hasAutomation: true
+            };
+        }
+
+        case 'soul_of_vengeance': {
+            return {
+                type: 'soul_of_vengeance',
+                name: feature.name,
+                trigger: auto.trigger || 'after_vow_of_enmity_target_attacks',
+                hasAutomation: true
+            };
+        }
+
+        case 'avenging_angel': {
+            return {
+                type: 'temp_buff',
+                name: feature.name,
+                effect: auto.effect || 'avenging_angel',
+                duration: auto.duration || '10_minutes',
+                action: auto.action || 'bonus_action',
+                flySpeed: auto.flySpeed || 60,
+                hover: !!auto.hover,
+                auraRange: auto.auraRange || 'aura_of_protection',
+                saveType: auto.saveType || 'WIS',
+                saveDc: auto.saveDc || 'ability',
+                hasAutomation: true
+            };
+        }
+
+        case 'primal_companion_summon': {
+            return {
+                type: 'primal_companion_summon',
+                name: feature.name,
+                action: auto.action || 'bonus_action',
+                companionTypes: auto.companionTypes || [],
+                casting_time: auto.casting_time || '1 bonus action',
+                hasAutomation: true
+            };
+        }
+
+        case 'primal_companion_dodge': {
+            return {
+                type: 'primal_companion_dodge',
+                name: feature.name,
+                effect: auto.effect || 'companion_dodge_default',
+                casting_time: auto.casting_time || 'passive',
+                hasAutomation: true
+            };
+        }
+
+        case 'primal_companion_command': {
+            return {
+                type: 'primal_companion_command',
+                name: feature.name,
+                action: auto.action || 'action',
+                commandType: auto.commandType || 'beasts_strike',
+                casting_time: auto.casting_time || '1 action',
+                hasAutomation: true
+            };
+        }
+
+        case 'primal_companion_restore': {
+            return {
+                type: 'primal_companion_restore',
+                name: feature.name,
+                action: auto.action || 'action',
+                range: auto.range || '5_ft',
+                spellSlotCost: !!auto.spellSlotCost,
+                casting_time: auto.casting_time || '1 action',
+                hasAutomation: true
+            };
+        }
+
+        case 'primal_companion_bonus_action_command': {
+            return {
+                type: 'primal_companion_bonus_action_command',
+                name: feature.name,
+                commandActions: auto.commandActions || [],
+                forceDamageOption: !!auto.forceDamageOption,
+                casting_time: auto.casting_time || '1 bonus action',
+                hasAutomation: true
+            };
+        }
+
+        case 'primal_companion_double_strike': {
+            return {
+                type: 'primal_companion_double_strike',
+                name: feature.name,
+                casting_time: auto.casting_time || 'passive',
+                hasAutomation: true
+            };
+        }
+
+        case 'primal_companion_double_strike_damage': {
+            return {
+                type: 'damage_bonus',
+                name: feature.name,
+                trigger: 'companion_beasts_strike_hit',
+                damageExpression: auto.damageExpression || '',
+                damageType: auto.damageType || '',
+                oncePerTurn: !!auto.oncePerTurn,
+                hasAutomation: true
+            };
+        }
+
+        case 'primal_companion_spell_share': {
+            return {
+                type: 'primal_companion_spell_share',
+                name: feature.name,
+                range: auto.range || '30_ft',
+                casting_time: auto.casting_time || 'passive',
                 hasAutomation: true
             };
         }

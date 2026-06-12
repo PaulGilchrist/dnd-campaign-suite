@@ -61,6 +61,7 @@ export const actions = [
 
 export const bonusActions = [
     "Channel Divinity: Vow of Enmity",
+    "Vow of Enmity",
     "Combat Wild Shape (Wild Companion)",
     "Combat Wild Shape",
     "Cunning Action",
@@ -82,7 +83,6 @@ export const reactions = [
     "Entropic Ward",
     "Instinctive Charm",
     "Projected Ward",
-    "Soul of Vengeance",
     "Wrath of the Storm"
 ];
 

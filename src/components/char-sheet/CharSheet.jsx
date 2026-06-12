@@ -186,7 +186,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const myTargetEffects = allTargetEffects.filter(te => te.target === (playerSummary?.name));
     const isRaging = Array.isArray(activeBuffs) && activeBuffs.some(b => b.damageBonusExpression);
     const shapeShiftActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shape_shift');
-    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive);
+    const isPeerlessAthlete = getRuntimeValue(playerStats?.name, 'peerlessAthleteActive', campaignName);
+    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive, isPeerlessAthlete);
     if (playerStats) {
         const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
         if (speedHalvedTime) conditionEffects.speedHalved = true;
@@ -236,6 +237,19 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     if (cloakOfShadowsActive) {
         conditionEffects.attackAdvantageCount = (conditionEffects.attackAdvantageCount || 0) + 1;
         conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
+    }
+
+    // Holy Nimbus: Holy Ward grants advantage on saving throws against Fiends/Undead
+    if (playerStats) {
+        const holyNimbusActive = getRuntimeValue(playerStats.name, 'holyNimbusActive', campaignName);
+        if (holyNimbusActive) {
+            conditionEffects.saveAdvantageCount = (conditionEffects.saveAdvantageCount || 0) + 1;
+        }
+    }
+
+    // Precise Hunter: Advantage on attack rolls against Hunter's Mark target (level 17+ Ranger)
+    if (playerStats && playerStats.class?.name === 'Ranger' && playerStats.level >= 17) {
+        conditionEffects.attackAdvantageCount = (conditionEffects.attackAdvantageCount || 0) + 1;
     }
 
     const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))

@@ -38,6 +38,8 @@ import ArcaneChargeModal from './ArcaneChargeModal.jsx'
 import WarMagicCantripModal from './WarMagicCantripModal.jsx'
 import WarMagicSpellModal from './WarMagicSpellModal.jsx'
 import SacredWeaponModal from './SacredWeaponModal.jsx'
+import ElderChampionRestoreModal from './ElderChampionRestoreModal.jsx'
+import PrimalCompanionBonusActionModal from './PrimalCompanionBonusActionModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { applyConstellationOption } from '../../services/automation/handlers/starryFormHandler.js';
@@ -57,6 +59,14 @@ import './CharActions.css'
 import { isEqual } from 'lodash';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
+
+function isElderChampionActive(playerName, campaignName) {
+    try {
+        const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+        const activeBuffs = Array.isArray(stored) ? stored : [];
+        return activeBuffs.some(b => b.name === 'Elder Champion');
+    } catch { return false; }
+}
 
 const areEqual = (prevProps, nextProps) => isEqual(prevProps.playerStats, nextProps.playerStats) && prevProps.conditionAttackMode === nextProps.conditionAttackMode && prevProps.exhaustionPenalty === nextProps.exhaustionPenalty && prevProps.cannotAct === nextProps.cannotAct;
 
@@ -87,6 +97,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [warMagicCantripModal, setWarMagicCantripModal] = useState(null);
     const [warMagicSpellModal, setWarMagicSpellModal] = useState(null);
     const [sacredWeaponModal, setSacredWeaponModal] = useState(null);
+    const [elderChampionRestoreModal, setElderChampionRestoreModal] = useState(null);
+    const [primalCompanionBonusActionModal, setPrimalCompanionBonusActionModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
     const [featureChoice, setFeatureChoice] = useState(null);
@@ -190,7 +202,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             window.removeEventListener('initiative-rolled', handleInitiativeRolled);
          };
      }, [playerStats, campaignName]);
-    const { popupHtml, setPopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
+    const { popupHtml, setPopupHtml, rollAttack, rollDamage, quickRollPlayerSave, triggerGloriousDefenseCounterAttack } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
         autoDamageRoll: (autoDamage, isCrit) => {
             const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
@@ -724,6 +736,15 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setTwinklingConstellationModal(null);
     };
 
+    const handleElderChampionRestore = async (payload) => {
+        const { action, playerStats: ps, campaignName: cn } = payload;
+        const { handleRestore } = await import('../../services/automation/handlers/elderChampionHandler.js');
+        const result = await handleRestore(action, ps, cn);
+        if (result) {
+            setPopupHtml(result.payload);
+        }
+    };
+
     const handleAttackClick = React.useCallback((attack) => {
         if (cannotAct) return;
          buildCtx(attack).then(ctx => {
@@ -857,6 +878,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'warMagicCantrip': setWarMagicCantripModal(result.payload); break;
                     case 'warMagicSpell': setWarMagicSpellModal(result.payload); break;
                     case 'sacredWeaponDamageType': setSacredWeaponModal(result.payload); break;
+                    case 'elderChampionRestore': setElderChampionRestoreModal(result.payload); break;
+                    case 'primalCompanionBonusActionCommand': setPrimalCompanionBonusActionModal(result.payload); break;
                  }
                 break;
             case 'roll':
@@ -937,12 +960,15 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const actionCastingTimes = ['1 action', '1 Action', 'action', 'Action'];
     const actionAttackNames = new Set(playerStats.attacks?.filter(a => a.type === 'Action').map(a => a.name) || []);
-    const actionSpells = playerStats.spellAbilities?.spells?.filter(spell =>
-        actionCastingTimes.includes(spell.casting_time) &&
-        (spell.prepared === 'Always' || spell.prepared === 'Prepared') &&
+    const elderChampionActive = isElderChampionActive(playerStats.name, campaignName);
+    const actionSpells = playerStats.spellAbilities?.spells?.filter(spell => {
+        const isAction = actionCastingTimes.includes(spell.casting_time);
+        if (!isAction) return false;
+        if (elderChampionActive) return false;
+        return (spell.prepared === 'Always' || spell.prepared === 'Prepared') &&
         !actionAttackNames.has(spell.name) &&
         spell.damage
-    ) || [];
+    }) || [];
     const actionSpellNames = actionSpells.reduce((acc, spell) => { acc[spell.name] = spell; return acc; }, {});
 
     const handleActionSpellClick = (spellName) => {
@@ -1059,7 +1085,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                         }}
                                         onClose={() => setPopupHtml && setPopupHtml(null)}
                                     /> :
-                                    <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} />}
+                                    <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} onCounterAttack={popupHtml.gloriousDefenseBonus > 0 && !popupHtml.hit && popupHtml.targetName ? triggerGloriousDefenseCounterAttack : undefined} />}
                     </Popup>
                 )}
                 {healingPoolModal && (
@@ -1207,6 +1233,24 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <SacredWeaponModal
                         {...sacredWeaponModal}
                         onClose={() => setSacredWeaponModal(null)}
+                    />
+                )}
+                {elderChampionRestoreModal && (
+                    <ElderChampionRestoreModal
+                        action={elderChampionRestoreModal.payload.action}
+                        playerStats={elderChampionRestoreModal.payload.playerStats}
+                        campaignName={elderChampionRestoreModal.payload.campaignName}
+                        onConfirm={() => {
+                            handleElderChampionRestore(elderChampionRestoreModal.payload);
+                            setElderChampionRestoreModal(null);
+                        }}
+                        onClose={() => setElderChampionRestoreModal(null)}
+                    />
+                )}
+                {primalCompanionBonusActionModal && (
+                    <PrimalCompanionBonusActionModal
+                        {...primalCompanionBonusActionModal}
+                        onClose={() => setPrimalCompanionBonusActionModal(null)}
                     />
                 )}
                 {divineFuryChoice && (

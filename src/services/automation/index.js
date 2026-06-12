@@ -61,6 +61,19 @@ import { handle as handleSuperiorDefense } from './handlers/superiorDefenseHandl
 import { handle as handleHandOfUltimateMercy } from './handlers/handOfUltimateMercyHandler.js';
 import { handle as handleCloakOfShadows } from './handlers/cloakOfShadowsHandler.js';
 import { handle as handleSacredWeapon } from './handlers/sacredWeaponHandler.js';
+import { handle as handleSmiteOfProtection } from './handlers/smiteOfProtectionHandler.js';
+import { handle as handleHolyNimbus } from './handlers/holyNimbusHandler.js';
+import { handle as handleInspiringSmite } from './handlers/inspiringSmiteHandler.js';
+import { handle as handlePeerlessAthlete } from './handlers/peerlessAthleteHandler.js';
+import { handle as handleGloriousDefense } from './handlers/gloriousDefenseHandler.js';
+import { handle as handleLivingLegend } from './handlers/livingLegendHandler.js';
+import { handle as handleUndyingSentinel } from './handlers/undyingSentinelHandler.js';
+import { handle as handleElderChampion } from './handlers/elderChampionHandler.js';
+import { handle as handleVowOfEnmity } from './handlers/vowOfEnmityHandler.js';
+import { handle as handleRelentlessAvenger } from './handlers/relentlessAvengerHandler.js';
+import { handle as handleSoulOfVengeance } from './handlers/soulOfVengeanceHandler.js';
+import { handle as handleAvengingAngel } from './handlers/avengingAngelHandler.js';
+import { handle as handlePrimalCompanionSummon, handleCommand as handlePrimalCompanionCommand, handleRestore as handlePrimalCompanionRestore, handleBonusActionCommand as handlePrimalCompanionBonusActionCommand, applyBonusActionCommand as applyPrimalCompanionBonusActionCommand } from './handlers/primalCompanionHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -137,6 +150,26 @@ const HANDLER_MAP = {
         hand_of_ultimate_mercy: handleHandOfUltimateMercy,
         cloak_of_shadows: handleCloakOfShadows,
         sacred_weapon: handleSacredWeapon,
+        post_cast_smite_cover: handleSmiteOfProtection,
+        holy_nimbus: handleHolyNimbus,
+        post_cast_inspiring_smite: handleInspiringSmite,
+        peerless_athlete: handlePeerlessAthlete,
+        glorious_defense: handleGloriousDefense,
+        living_legend: handleLivingLegend,
+        undying_sentinel: handleUndyingSentinel,
+        elder_champion: handleElderChampion,
+        vow_of_enmity: handleVowOfEnmity,
+        relentless_avenger: handleRelentlessAvenger,
+        soul_of_vengeance: handleSoulOfVengeance,
+        avenging_angel: handleAvengingAngel,
+        primal_companion_summon: handlePrimalCompanionSummon,
+        primal_companion_command: handlePrimalCompanionCommand,
+        primal_companion_restore: handlePrimalCompanionRestore,
+        primal_companion_bonus_action_command: handlePrimalCompanionBonusActionCommand,
+        primal_companion_bonus_action_command_apply: applyPrimalCompanionBonusActionCommand,
+        primal_companion_double_strike: handleGenericPopup,
+        primal_companion_spell_share: handleGenericPopup,
+        primal_companion_dodge: handleGenericPopup,
 };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
