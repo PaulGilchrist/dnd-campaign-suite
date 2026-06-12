@@ -367,15 +367,25 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
          }, campaignName);
      }
 
-     if (rollType === 'check' || rollType === 'skill') {
-         setRuntimeValue(characterName, 'lastAbilityCheck', {
-             d20: r1,
-             bonus,
-             checkName: name,
-             targetName,
-             timestamp: Date.now(),
-         }, campaignName);
-     }
+      if (rollType === 'check' || rollType === 'skill') {
+          setRuntimeValue(characterName, 'lastAbilityCheck', {
+              d20: r1,
+              bonus,
+              checkName: name,
+              targetName,
+              timestamp: Date.now(),
+          }, campaignName);
+      }
+
+      if (rollType === 'save') {
+          setRuntimeValue(characterName, 'lastSaveRoll', {
+              d20: r1,
+              bonus,
+              saveType: context?.saveType || null,
+              targetName,
+              timestamp: Date.now(),
+          }, campaignName);
+      }
 
     if (rollType === 'initiative') {
         const firstName = utils.getName(characterName);
@@ -395,8 +405,9 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                 storage.set('combatSummary', combatSummary, campaignName);
               }
           }
-         clearAllExpirationEffects(characterName, campaignName);
-         window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + totalBonus } }));
+          clearAllExpirationEffects(characterName, campaignName);
+          setRuntimeValue(characterName, 'uncannyMetabolismUsed', false, campaignName);
+          window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + totalBonus } }));
         }
      }
 

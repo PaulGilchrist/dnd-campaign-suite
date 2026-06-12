@@ -57,6 +57,10 @@ import { handle as handleGuardedMind } from './handlers/guardedMindHandler.js';
 import { handle as handleBulwarkOfForce } from './handlers/bulwarkOfForceHandler.js';
 import { handle as handleConcentrationBonusAttack } from './handlers/concentrationBonusAttackHandler.js';
 import { handle as handleDamageTypeModifier } from './handlers/damageTypeModifierHandler.js';
+import { handle as handleSuperiorDefense } from './handlers/superiorDefenseHandler.js';
+import { handle as handleHandOfUltimateMercy } from './handlers/handOfUltimateMercyHandler.js';
+import { handle as handleCloakOfShadows } from './handlers/cloakOfShadowsHandler.js';
+import { handle as handleSacredWeapon } from './handlers/sacredWeaponHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -109,6 +113,7 @@ const HANDLER_MAP = {
         nature_sanctuary: handleNaturesSanctuary,
         nature_sanctuary_move: handleNaturesSanctuaryMove,
         moonlight_step_rider: handleGenericPopup,
+        shadow_step_rider: handleGenericPopup,
         starry_form: handleStarryForm,
         cosmic_omen: handleCosmicOmen,
         twinkling_constellations: handleTwinklingConstellation,
@@ -128,8 +133,11 @@ const HANDLER_MAP = {
         bulwark_of_force: handleBulwarkOfForce,
         concentration_bonus_attack: handleConcentrationBonusAttack,
         damage_type_modifier: handleDamageTypeModifier,
+        superior_defense: handleSuperiorDefense,
+        hand_of_ultimate_mercy: handleHandOfUltimateMercy,
+        cloak_of_shadows: handleCloakOfShadows,
+        sacred_weapon: handleSacredWeapon,
 };
-
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
 

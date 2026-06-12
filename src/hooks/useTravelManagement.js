@@ -15,6 +15,7 @@ import {
 } from '../services/campaign/randomEventService.js';
 import { generateEncounterSuggestions } from '../services/encounters/encounterGenerator.js';
 import { getRuntimeValue, setRuntimeValue } from './useRuntimeState.js';
+import { hasSelfRestoration } from '../services/combat/automationService.js';
 
 const MODES = {
   INACTIVE: 'inactive',
@@ -217,6 +218,8 @@ export default function useTravelManagement({
   const addExhaustionToAll = useCallback(() => {
     characters.forEach(char => {
       const name = char.name || char;
+      const hasSR = hasSelfRestoration(char.computedStats || char);
+      if (hasSR) return;
       const current = getRuntimeValue(name, 'exhaustionLevel');
       const level = typeof current === 'number' ? current : 0;
       if (level < EXHAUSTION_LEVELS) {

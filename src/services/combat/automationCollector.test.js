@@ -809,4 +809,65 @@ describe('collectTurnStartEffects', () => {
         expect(result).toHaveLength(1)
         expect(result[0].type).toBe('heroic_inspiration')
     })
+
+    it('collects end_of_turn_condition_removal effect', () => {
+        const features = [
+            {
+                name: 'Self-Restoration',
+                automation: [
+                    { type: 'passive_immunity', conditionImmunity: 'charmed frightened poisoned' },
+                    {
+                        type: 'passive_rule',
+                        effect: 'end_of_turn_condition_removal',
+                        conditions: ['charmed', 'frightened', 'poisoned']
+                    }
+                ]
+            }
+        ]
+        const result = collectTurnStartEffects(features)
+        expect(result).toHaveLength(1)
+        expect(result[0]).toEqual({
+            type: 'condition_removal',
+            name: 'Self-Restoration',
+            conditions: ['charmed', 'frightened', 'poisoned']
+        })
+    })
+
+    it('collects both heroic_inspiration and condition_removal from array automation', () => {
+        const features = [
+            {
+                name: 'Mixed Feature',
+                automation: [
+                    {
+                        type: 'passive_rule',
+                        effect: 'heroic_inspiration_turn_start'
+                    },
+                    {
+                        type: 'passive_rule',
+                        effect: 'end_of_turn_condition_removal',
+                        conditions: ['charmed', 'frightened']
+                    }
+                ]
+            }
+        ]
+        const result = collectTurnStartEffects(features)
+        expect(result).toHaveLength(2)
+        expect(result[0].type).toBe('heroic_inspiration')
+        expect(result[1].type).toBe('condition_removal')
+    })
+
+    it('skips end_of_turn_condition_removal when conditions array is empty', () => {
+        const features = [
+            {
+                name: 'Empty Conditions',
+                automation: {
+                    type: 'passive_rule',
+                    effect: 'end_of_turn_condition_removal',
+                    conditions: []
+                }
+            }
+        ]
+        const result = collectTurnStartEffects(features)
+        expect(result).toHaveLength(0)
+    })
 })

@@ -60,6 +60,14 @@ export function getLastAbilityCheck(characterName) {
   return getRuntimeValue(characterName, 'lastAbilityCheck');
 }
 
+export function saveLastSaveRoll(characterName, event, campaignName) {
+  setRuntimeValue(characterName, 'lastSaveRoll', event, campaignName);
+}
+
+export function getLastSaveRoll(characterName) {
+  return getRuntimeValue(characterName, 'lastSaveRoll');
+}
+
 export function logMetamagicUse(campaignName, characterName, spellName, options, spCost) {
   const remaining = getCurrentSorceryPoints(characterName);
   const entry = {

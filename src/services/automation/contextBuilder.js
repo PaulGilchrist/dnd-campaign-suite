@@ -68,9 +68,23 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
 
+        // Sacred Weapon: Add Charisma modifier to attack rolls (minimum +1) for melee attacks
+        let sacredWeaponBonus = 0;
+        const sacredWeaponActive = activeBuffs.some(b => b.effect === 'sacred_weapon');
+        if (sacredWeaponActive && (isMelee || attack.weaponType === 'melee')) {
+            const cha = playerStats.abilities?.find(a => a.name === 'Charisma');
+            const chaMod = Math.max(1, cha?.bonus || 0);
+            sacredWeaponBonus = chaMod;
+        }
+
         const autoDamageFormula = stanceDamageBonus > 0
             ? `${attack.damage}+${stanceDamageBonus}`
             : attack.damage;
+
+        const effectiveHitBonus = attack.hitBonus + sacredWeaponBonus;
+        const hitBonusFormula = sacredWeaponBonus > 0
+            ? `${attack.hitBonusFormula} + Charisma Bonus (${sacredWeaponBonus})`
+            : attack.hitBonusFormula;
 
         const isMelee = attack.weaponType === 'melee' || attack.weaponType === 'unarmed';
 
@@ -147,7 +161,10 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             ramActive,
             isMelee,
             criticalRange,
-           };
+            hitBonus: effectiveHitBonus,
+            hitBonusFormula,
+            sacredWeaponBonus,
+        };
        });
 }
 

@@ -206,6 +206,11 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             conditionEffects.autoReroll = false;
             conditionEffects.autoRerollBonus = null;
         }
+        const disciplinedSurvivorUsed = getRuntimeValue(playerStats.name, 'disciplinedSurvivorUsed', campaignName);
+        if (disciplinedSurvivorUsed && conditionEffects.autoReroll) {
+            conditionEffects.autoReroll = false;
+            conditionEffects.autoRerollBonus = null;
+        }
     }
     // Reckless Attack: enemies have Advantage on attack rolls against you
     if (Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'advantage_attacks_disadvantage_against')) {
@@ -226,6 +231,13 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         conditionEffects.saveAdvantageCount = (conditionEffects.saveAdvantageCount || 0) + 1;
     }
 
+    // Cloak of Shadows: Invisibility grants attack advantage and target disadvantage
+    const cloakOfShadowsActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'cloak_of_shadows');
+    if (cloakOfShadowsActive) {
+        conditionEffects.attackAdvantageCount = (conditionEffects.attackAdvantageCount || 0) + 1;
+        conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
+    }
+
     const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
     const conditionAttackMode = getNetAttackMode(conditionEffects.attackAdvantageCount, conditionEffects.attackDisadvantageCount)
 
@@ -233,6 +245,13 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         if (playerStats) {
             if (conditionEffects.autoRerollCondition === 'raging') {
                 setRuntimeValue(playerStats.name, 'fanaticalFocusUsed', true, campaignName);
+            } else if (conditionEffects.autoRerollCondition === 'disciplined_survivor') {
+                const currentFocus = Number(getRuntimeValue(playerStats.name, 'focusPoints', campaignName) ?? playerStats.focusPoints);
+                if (currentFocus <= 0) {
+                    return;
+                }
+                setRuntimeValue(playerStats.name, 'focusPoints', currentFocus - 1, campaignName);
+                setRuntimeValue(playerStats.name, 'disciplinedSurvivorUsed', true, campaignName);
             } else {
                 const current = Number(getRuntimeValue(playerStats.name, 'indomitableUses', campaignName) ?? 0);
                 setRuntimeValue(playerStats.name, 'indomitableUses', current + 1, campaignName);

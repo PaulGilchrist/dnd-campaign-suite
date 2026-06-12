@@ -9,8 +9,17 @@ export async function getAbilities(playerStats) {
         if ((newAbility.name === 'Strength' || newAbility.name === 'Constitution') && playerStats.class.name === 'Barbarian' && playerStats.level > 19) {
             newAbility.totalScore = Math.min(newAbility.totalScore + 4, 25);
         }
+        if (newAbility.name === 'Dexterity' && playerStats.class.name === 'Monk' && playerStats.level > 19) {
+            newAbility.totalScore = Math.min(newAbility.totalScore + 4, 25);
+        }
+        if (newAbility.name === 'Wisdom' && playerStats.class.name === 'Monk' && playerStats.level > 19) {
+            newAbility.totalScore = Math.min(newAbility.totalScore + 4, 25);
+        }
         newAbility.bonus = Math.floor((newAbility.totalScore - 10) / 2);
-        newAbility.proficient = playerStats.class.saving_throw_proficiencies ? playerStats.class.saving_throw_proficiencies.includes(newAbility.name) : false;
+        const classSaves = playerStats.class.saving_throw_proficiencies || [];
+        const featureSaves = playerStats.saveProficiencies || [];
+        const allSaveProfs = featureSaves.length > 0 ? featureSaves : classSaves;
+        newAbility.proficient = allSaveProfs.includes(newAbility.name);
         newAbility.save = newAbility.proficient ? newAbility.bonus + proficiency : newAbility.bonus;
         newAbility.skills = skills.filter(skill => skill.ability === newAbility.name);
         newAbility.skills = newAbility.skills.map((skill) => {

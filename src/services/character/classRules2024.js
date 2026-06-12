@@ -150,17 +150,27 @@ const classRules = {
                     // 2024 Rules: Process class and major features
              const classLevels = playerStats.class?.class_levels?.filter(classLevel => classLevel.level <= playerStats.level) || [];
 
-              // When level >= 10, Heightened versions replace base versions
-             const isHeightened = playerStats.level >= 10;
-             const replacedByHeightened = isHeightened ? ['Flurry of Blows', 'Patient Defense', 'Step of the Wind'] : [];
+               // When level >= 10, Heightened versions replace base versions
+              const isHeightened = playerStats.level >= 10;
+              const replacedByHeightened = isHeightened ? ['Flurry of Blows', 'Patient Defense', 'Step of the Wind'] : [];
 
-             let features = classRules.addFeatures(classLevels);
-             if (replacedByHeightened.length > 0) {
-                 const toFilter = new Set(replacedByHeightened);
-                 Object.keys(features).forEach(cat => {
-                     features[cat] = features[cat].filter(f => !toFilter.has(f.name));
-                  });
-              }
+              // Deflect Energy (level 13) replaces Deflect Attacks (all damage types)
+              const isDeflectEnergyAvailable = playerStats.level >= 13;
+              const replacedByDeflectEnergy = isDeflectEnergyAvailable ? ['Deflect Attacks'] : [];
+
+              let features = classRules.addFeatures(classLevels);
+              if (replacedByHeightened.length > 0) {
+                  const toFilter = new Set(replacedByHeightened);
+                  Object.keys(features).forEach(cat => {
+                      features[cat] = features[cat].filter(f => !toFilter.has(f.name));
+                   });
+               }
+              if (replacedByDeflectEnergy.length > 0) {
+                  const toFilter = new Set(replacedByDeflectEnergy);
+                  Object.keys(features).forEach(cat => {
+                      features[cat] = features[cat].filter(f => !toFilter.has(f.name));
+                   });
+               }
 
              if (playerStats.class.major) {
                          // 2024 majors have features directly with level property, not class_levels

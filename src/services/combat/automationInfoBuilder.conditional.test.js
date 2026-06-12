@@ -91,6 +91,11 @@ describe('buildAttackInfo – passive_rule', () => {
             riderSave: null,
             primalKnowledge: [],
             casting_time: '',
+            cost: 0,
+            resource: '',
+            resistanceTypes: [],
+            duration: '',
+            endsOnCondition: '',
             hasAutomation: true,
         })
     })

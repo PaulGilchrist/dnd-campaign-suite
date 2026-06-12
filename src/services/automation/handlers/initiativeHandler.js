@@ -198,6 +198,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
     setRuntimeValue(playerStats.name, resourceKey, currentUses - 1, campaignName);
+    setRuntimeValue(playerStats.name, 'uncannyMetabolismUsed', true, campaignName);
 
     return {
         type: 'popup',

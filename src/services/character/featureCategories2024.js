@@ -43,6 +43,7 @@ export const actions = [
     "Hex",
     "Improved War Magic",
     "Precise Hunter",
+    "Sacred Weapon",
     "Signature Spells",
     "Sneak Attack",
     "Spell Mastery",

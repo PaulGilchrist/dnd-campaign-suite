@@ -93,3 +93,18 @@ export function playerIsImmuneToCondition({
 
     return false
 }
+
+export function hasSelfRestoration(playerStats) {
+    if (!playerStats) return false
+    const allFeatures = playerStats.allFeatures || []
+    for (const feature of allFeatures) {
+        if (!feature?.automation) continue
+        const automations = Array.isArray(feature.automation) ? feature.automation : [feature.automation]
+        for (const auto of automations) {
+            if (auto.type === 'passive_rule' && auto.effect === 'end_of_turn_condition_removal') {
+                return true
+            }
+        }
+    }
+    return false
+}

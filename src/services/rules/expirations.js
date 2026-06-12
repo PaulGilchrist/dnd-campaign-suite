@@ -2,6 +2,13 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js
 import utils from '../ui/utils.js';
 import storage from '../ui/storage.js';
 import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary } from '../encounters/combatData.js';
+import { addEntry } from '../ui/logService.js';
+
+const ALL_DAMAGES_EXCEPT_FORCE = [
+    'acid', 'bludgeoning', 'cold', 'fire', 'lightning',
+    'piercing', 'poison', 'slashing', 'thunder',
+    'necrotic', 'psychic', 'radiant'
+];
 
 const KEY = 'pendingExpirations';
 
@@ -16,7 +23,85 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
                 setRuntimeValue(activeName, 'hasInspiration', true, campaignName);
             }
         }
+        if (effect.type === 'condition_removal') {
+            const conditions = getRuntimeValue(activeName, 'activeConditions') || [];
+            const removalConditions = new Set(effect.conditions.map(c => c.toLowerCase()));
+            const filtered = conditions.filter(c => {
+                const condName = String(c).toLowerCase();
+                return !removalConditions.has(condName);
+            });
+            if (filtered.length !== conditions.length) {
+                setRuntimeValue(activeName, 'activeConditions', filtered, campaignName);
+            }
+        }
+        if (effect.type === 'superior_defense') {
+            applySuperiorDefenseTurnStart(activeName, playerStats, effect, campaignName);
+        }
+        if (effect.type === 'flurry_healing_harm') {
+            applyFlurryHealingHarmTurnStart(activeName, playerStats, effect, campaignName);
+        }
     }
+}
+
+async function applySuperiorDefenseTurnStart(activeName, playerStats, effect, campaignName) {
+    const conditions = getRuntimeValue(activeName, 'activeConditions') || [];
+    const isIncapacitated = conditions.some(c => String(c).toLowerCase() === 'incapacitated');
+    if (isIncapacitated) {
+        return;
+    }
+
+    const stored = getRuntimeValue(activeName, 'activeBuffs', campaignName);
+    const activeBuffs = Array.isArray(stored) ? stored : [];
+    if (activeBuffs.some(b => b.name === 'Superior Defense')) {
+        return;
+    }
+
+    const cost = effect.cost || 3;
+    const maxFocus = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.focus_points || 0;
+    const currentFocus = Number(getRuntimeValue(activeName, 'focusPoints', campaignName) ?? maxFocus);
+
+    if (currentFocus < cost) {
+        return;
+    }
+
+    await setRuntimeValue(activeName, 'focusPoints', currentFocus - cost, campaignName);
+
+    const buff = {
+        name: 'Superior Defense',
+        effect: 'damage_resistance',
+        duration: '1_minute',
+        resistanceTypes: ALL_DAMAGES_EXCEPT_FORCE,
+    };
+
+    const newBuffs = [...activeBuffs, buff];
+    setRuntimeValue(activeName, 'activeBuffs', newBuffs, campaignName);
+
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: activeName,
+        abilityName: 'Superior Defense',
+        description: `${activeName} activated Superior Defense at start of turn. Resistance to all damage except Force.`,
+    }).catch(() => {});
+}
+
+async function applyFlurryHealingHarmTurnStart(activeName, playerStats, effect, campaignName) {
+    const expressions = {
+        'WIS modifier minimum 1': 'Math.max(1, WIS modifier)',
+    };
+    const expr = expressions[effect.usesExpression] || effect.usesExpression;
+    const resolvedExpr = expr.replace(/WIS modifier/gi, playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0);
+
+    let uses;
+    try {
+        uses = new Function(`"use strict"; return (${resolvedExpr})`)();
+    } catch {
+        uses = 1;
+    }
+    if (typeof uses !== 'number' || isNaN(uses) || uses < 1) {
+        uses = 1;
+    }
+
+    await setRuntimeValue(activeName, 'flurryHealingHarmUses', uses, campaignName);
 }
 
 export function addExpiration(attackerName, targetName, effects, campaignName, rounds) {

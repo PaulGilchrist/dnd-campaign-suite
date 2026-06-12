@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
-  getConditionImmunities,
-  getConditionalImmunities,
-  playerIsImmuneToCondition,
-} from './automationImmunities.js'
+   getConditionImmunities,
+   getConditionalImmunities,
+   playerIsImmuneToCondition,
+   hasSelfRestoration,
+ } from './automationImmunities.js'
 
 describe('getConditionImmunities', () => {
   it('returns empty array when features is null', () => {
@@ -544,5 +545,75 @@ describe('playerIsImmuneToCondition', () => {
       },
     ])
     expect(playerIsImmuneToCondition({ conditionKey: 'death', playerStats: stats })).toBe(true)
+  })
+})
+
+describe('hasSelfRestoration', () => {
+  const createPlayerStats = (features) => ({
+    name: 'Test Character',
+    allFeatures: features,
+  })
+
+  it('returns false when playerStats is null', () => {
+    expect(hasSelfRestoration(null)).toBe(false)
+  })
+
+  it('returns false when playerStats is undefined', () => {
+    expect(hasSelfRestoration(undefined)).toBe(false)
+  })
+
+  it('returns false when playerStats has no allFeatures', () => {
+    expect(hasSelfRestoration({})).toBe(false)
+  })
+
+  it('returns false when allFeatures is empty', () => {
+    expect(hasSelfRestoration({ allFeatures: [] })).toBe(false)
+  })
+
+  it('returns false when features have no automation', () => {
+    expect(hasSelfRestoration({ allFeatures: [{ name: 'Some Feature' }] })).toBe(false)
+  })
+
+  it('returns false when automation is not end_of_turn_condition_removal', () => {
+    const stats = createPlayerStats([
+      {
+        name: 'Dwarven Resilience',
+        automation: { type: 'passive_immunity', conditionImmunity: 'poison' },
+      },
+    ])
+    expect(hasSelfRestoration(stats)).toBe(false)
+  })
+
+  it('returns true when feature has end_of_turn_condition_removal passive_rule', () => {
+    const stats = createPlayerStats([
+      {
+        name: 'Self-Restoration',
+        automation: [
+          { type: 'passive_immunity', conditionImmunity: 'charmed frightened poisoned' },
+          { type: 'passive_rule', effect: 'end_of_turn_condition_removal', conditions: ['charmed', 'frightened', 'poisoned'] },
+        ],
+      },
+    ])
+    expect(hasSelfRestoration(stats)).toBe(true)
+  })
+
+  it('returns true when end_of_turn_condition_removal is a single automation object', () => {
+    const stats = createPlayerStats([
+      {
+        name: 'Self-Restoration',
+        automation: { type: 'passive_rule', effect: 'end_of_turn_condition_removal', conditions: ['charmed', 'frightened', 'poisoned'] },
+      },
+    ])
+    expect(hasSelfRestoration(stats)).toBe(true)
+  })
+
+  it('returns false for other passive_rule effects', () => {
+    const stats = createPlayerStats([
+      {
+        name: 'Bonus Healing',
+        automation: { type: 'passive_rule', effect: 'bonus_healing', bonusExpression: '2d6' },
+      },
+    ])
+    expect(hasSelfRestoration(stats)).toBe(false)
   })
 })

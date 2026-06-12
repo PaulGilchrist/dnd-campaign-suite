@@ -14,6 +14,30 @@ export function collectTurnStartEffects(features) {
                     name: feature.name,
                 })
             }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'end_of_turn_condition_removal') {
+                const conditions = (auto.conditions || []).map(c => c.toLowerCase())
+                if (conditions.length > 0) {
+                    effects.push({
+                        type: 'condition_removal',
+                        name: feature.name,
+                        conditions,
+                    })
+                }
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'superior_defense') {
+                effects.push({
+                    type: 'superior_defense',
+                    name: feature.name,
+                    cost: auto.cost || 3,
+                })
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'flurry_healing_harm') {
+                effects.push({
+                    type: 'flurry_healing_harm',
+                    name: feature.name,
+                    usesExpression: auto.usesExpression || 'WIS modifier minimum 1',
+                })
+            }
         }
     })
 
@@ -104,7 +128,6 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'passive_buff':
             case 'passive_immunity':
             case 'condition_immunity_while_active':
-            case 'passive_rule':
             case 'resistance':
             case 'land_resistance':
             case 'auto_effect':
@@ -126,6 +149,16 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 result.passives.push(info)
                 if (info.type === 'passive_rule' && info.effect === 'primal_knowledge' && info.primalKnowledge.length > 0) {
                     result.primalKnowledge.push(...info.primalKnowledge)
+                }
+                break
+            case 'passive_rule':
+                if (info.effect === 'superior_defense') {
+                    result.specialActions.push(info)
+                } else {
+                    result.passives.push(info)
+                    if (info.effect === 'primal_knowledge' && info.primalKnowledge.length > 0) {
+                        result.primalKnowledge.push(...info.primalKnowledge)
+                    }
                 }
                 break
             case 'starry_form':
@@ -194,6 +227,12 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break
             case 'telekinetic_thrust':
                 result.reactions.push(info)
+                break
+            case 'shadow_step_rider':
+                result.passives.push(info)
+                break
+            case 'cloak_of_shadows':
+                result.specialActions.push(info)
                 break
             default:
                 result.specialActions.push(info)

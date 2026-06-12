@@ -13,16 +13,22 @@ function getRuntimeUsesKey(featureName) {
 
 async function consumeResourceCost(auto, playerStats, campaignName, actionName) {
     if (auto.resourceCost === 'focus_point') {
-        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-        const maxFocus = classLevel?.focus_points || 0;
-        const currentFocus = Number(getRuntimeValue(playerStats.name, 'focusPoints', campaignName) ?? maxFocus);
+        const isHandOfHarm = actionName === 'Hand of Harm';
+        const hasFlurryHealingHarm = playerStats.characterAdvancement?.some(f => f.name === "Flurry of Healing and Harm");
+        const skipFP = isHandOfHarm && hasFlurryHealingHarm;
 
-        if (currentFocus <= 0) {
-            return { ok: false, message: 'No Focus Points remaining.' };
+        if (!skipFP) {
+            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+            const maxFocus = classLevel?.focus_points || 0;
+            const currentFocus = Number(getRuntimeValue(playerStats.name, 'focusPoints', campaignName) ?? maxFocus);
+
+            if (currentFocus <= 0) {
+                return { ok: false, message: 'No Focus Points remaining.' };
+            }
+
+            await setRuntimeValue(playerStats.name, 'focusPoints', currentFocus - 1, campaignName);
+            return { ok: true };
         }
-
-        await setRuntimeValue(playerStats.name, 'focusPoints', currentFocus - 1, campaignName);
-        return { ok: true };
     }
 
     if (auto.uses_expression) {

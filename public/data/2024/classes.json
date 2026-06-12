@@ -5526,7 +5526,13 @@
                         "name": "Acrobatic Movement",
                         "description": "While not wearing armor or wielding a Shield, you can move along vertical surfaces and across liquids without falling.",
                         "level": 9,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_buff",
+                            "effect": "acrobatic_movement",
+                            "condition": "no_armor_no_shield",
+                            "casting_time": "passive"
+                        }
                     }
                 ]
             },
@@ -5593,7 +5599,18 @@
                         "name": "Self-Restoration",
                         "description": "Remove Charmed, Frightened, or Poisoned condition from yourself at end of each turn. Forgoing food and drink doesn't give Exhaustion.",
                         "level": 10,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": [
+                            {
+                                "type": "passive_immunity",
+                                "conditionImmunity": "charmed frightened poisoned"
+                            },
+                            {
+                                "type": "passive_rule",
+                                "effect": "end_of_turn_condition_removal",
+                                "conditions": ["charmed", "frightened", "poisoned"]
+                            }
+                        ]
                     }
                 ]
             },
@@ -5641,7 +5658,21 @@
                         "name": "Deflect Energy",
                         "description": "Now use Deflect Attacks against any damage type, not just Bludgeoning, Piercing, or Slashing.",
                         "level": 13,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "damage_reduction",
+                            "reductionExpression": "1d10 + DEX modifier + monk level",
+                            "trigger": "any_damage",
+                            "reaction": true,
+                            "redirect": true,
+                            "redirectCost": {
+                                "resource": "focus_points",
+                                "amount": 1
+                            },
+                            "redirectDamage": "2 * martial_arts_die + DEX modifier",
+                            "redirectSave": "DEX",
+                            "casting_time": "1 reaction"
+                        }
                     }
                 ]
             },
@@ -5657,7 +5688,14 @@
                         "name": "Disciplined Survivor",
                         "description": "Proficiency in all saving throws. When you fail a saving throw, expend 1 Focus Point to reroll it.",
                         "level": 14,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "auto_reroll",
+                            "trigger": "failed_saving_throw",
+                            "target": "saving_throw",
+                            "resourceCost": "focus_points",
+                            "casting_time": "passive"
+                        }
                     }
                 ]
             },
@@ -5673,7 +5711,14 @@
                         "name": "Perfect Focus",
                         "description": "When you roll initiative and don't use Uncanny Metabolism, regain expended Focus Points until you have 4 if you have 3 or fewer.",
                         "level": 15,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "perfect_focus",
+                            "trigger": "roll_initiative",
+                            "focusPointsTarget": 4,
+                            "focusPointsThreshold": 3
+                        }
                     }
                 ]
             },
@@ -5721,7 +5766,16 @@
                         "name": "Superior Defense",
                         "description": "At start of your turn, expend 3 Focus Points for Resistance to all damage except Force for 1 minute or until Incapacitated.",
                         "level": 18,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "superior_defense",
+                            "cost": 3,
+                            "resource": "focus_point",
+                            "resistanceTypes": "all_except_force",
+                            "duration": "1_minute",
+                            "endsOnCondition": "incapacitated"
+                        }
                     }
                 ]
             },
@@ -5831,12 +5885,32 @@
                     {
                         "name": "Flurry of Healing and Harm",
                         "description": "When using Flurry of Blows, replace each Unarmed Strike with Hand of Healing without expending Focus Points. When making Unarmed Strike with Flurry and dealing damage, use Hand of Harm without expending Focus Point. Uses equal to Wisdom modifier (minimum once).",
-                        "level": 11
+                        "level": 11,
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "flurry_healing_harm",
+                            "usesExpression": "WIS modifier minimum 1",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Hand of Ultimate Mercy",
                         "description": "Action, touch corpse of creature that died within 24 hours, expend 5 Focus Points. Creature returns to life with 4d10 + Wisdom modifier Hit Points. Conditions removed: Blinded, Deafened, Paralyzed, Poisoned, Stunned.",
-                        "level": 17
+                        "level": 17,
+                        "automation": {
+                            "type": "hand_of_ultimate_mercy",
+                            "healExpression": "4d10 + WIS modifier",
+                            "resourceCost": "focus_point",
+                            "resourceCostAmount": 5,
+                            "cureConditions": [
+                                "Blinded",
+                                "Deafened",
+                                "Paralyzed",
+                                "Poisoned",
+                                "Stunned"
+                            ],
+                            "casting_time": "1 action"
+                        }
                     }
                 ],
                 "spells": [],
@@ -5903,7 +5977,12 @@
                     {
                         "name": "Cloak of Shadows",
                         "description": "Action in Dim Light or Darkness, expend 3 Focus Points for 1 minute. Invisibility. Partially Incorporeal - move through occupied spaces. Shadow Flurry - use Flurry of Blows without expending Focus Points.",
-                        "level": 17
+                        "level": 17,
+                        "automation": {
+                            "type": "cloak_of_shadows",
+                            "action": "action",
+                            "duration": "1_minute"
+                        }
                     }
                 ],
                 "spells": [
@@ -6292,7 +6371,14 @@
                         "name": "Faithful Steed",
                         "description": "You always have the Find Steed spell prepared. You can also cast the spell once without expending a spell slot, and you regain the ability to do so when you finish a Long Rest.",
                         "level": 5,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "free_spell",
+                            "spell": "Find Steed",
+                            "uses": 1,
+                            "recharge": "long_rest",
+                            "casting_time": "1 action"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -6709,7 +6795,18 @@
                     {
                         "name": "Sacred Weapon",
                         "description": "Expend one use of Channel Divinity to imbue one Melee weapon with positive energy for 10 minutes. Add Charisma modifier to attack rolls (minimum +1). Hit deals normal damage type or Radiant damage. Weapon emits Bright Light in 20-foot radius and Dim Light 20 feet beyond.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "temp_buff",
+                            "effect": "sacred_weapon",
+                            "duration": "10_minutes",
+                            "resourceCost": "channel_divinity",
+                            "options": [
+                                { "name": "Normal Damage Type", "damageType": "normal" },
+                                { "name": "Radiant Damage", "damageType": "Radiant" }
+                            ],
+                            "casting_time": "1_action"
+                        }
                     },
                     {
                         "name": "Aura of Devotion",

@@ -32,10 +32,11 @@ export function collectSaveModifiers(features) {
                 }
             }
             if (auto.type === 'auto_reroll') {
+                const condition = auto.condition || (feature.name === 'Disciplined Survivor' ? 'disciplined_survivor' : '');
                 modifiers.push({
                     source: feature.name,
                     target: auto.target,
-                    condition: auto.condition,
+                    condition,
                     effect: 'reroll',
                     bonusExpression: auto.bonusExpression || '',
                     oncePerRage: !!auto.oncePerRage,

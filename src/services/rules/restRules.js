@@ -218,17 +218,20 @@ export async function applyLongRest(playerStats, campaignName) {
      charData.naturalRecoverySlots = null
    }
 
-      // Handle Greater Divine Intervention Wish cooldown (2d4 long rests) — must run AFTER batch reset
-  const wishCooldown = getRuntimeValue(name, '_divineInterventionWishCooldown', campaignName)
-  if (wishCooldown != null && Number(wishCooldown) > 0) {
-    const newCooldown = Number(wishCooldown) - 1
-    if (newCooldown <= 0) {
-      setRuntimeValue(name, '_divineInterventionWishCooldown', 0, campaignName, true)
-    } else {
-      setRuntimeValue(name, '_divineInterventionWishCooldown', newCooldown, campaignName, true)
-      setRuntimeValue(name, 'divineInterventionUses', -1, campaignName, true)
-    }
-  }
+   // Handle Greater Divine Intervention Wish cooldown (2d4 long rests) — must run AFTER batch reset
+   const wishCooldown = getRuntimeValue(name, '_divineInterventionWishCooldown', campaignName)
+   if (wishCooldown != null && Number(wishCooldown) > 0) {
+     const newCooldown = Number(wishCooldown) - 1
+     if (newCooldown <= 0) {
+       setRuntimeValue(name, '_divineInterventionWishCooldown', 0, campaignName, true)
+     } else {
+       setRuntimeValue(name, '_divineInterventionWishCooldown', newCooldown, campaignName, true)
+       setRuntimeValue(name, 'divineInterventionUses', -1, campaignName, true)
+     }
+   }
 
-  clearAllExpirationEffects(name, campaignName)
+   clearAllExpirationEffects(name, campaignName)
+
+   // Reset Uncanny Metabolism tracking on long rest
+   setRuntimeValue(name, 'uncannyMetabolismUsed', false, campaignName, true)
 }

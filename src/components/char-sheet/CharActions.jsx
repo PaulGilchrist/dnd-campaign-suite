@@ -37,6 +37,7 @@ import ConstellationSelectionModal from './ConstellationSelectionModal.jsx'
 import ArcaneChargeModal from './ArcaneChargeModal.jsx'
 import WarMagicCantripModal from './WarMagicCantripModal.jsx'
 import WarMagicSpellModal from './WarMagicSpellModal.jsx'
+import SacredWeaponModal from './SacredWeaponModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { applyConstellationOption } from '../../services/automation/handlers/starryFormHandler.js';
@@ -85,6 +86,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [arcaneChargeModal, setArcaneChargeModal] = useState(null);
     const [warMagicCantripModal, setWarMagicCantripModal] = useState(null);
     const [warMagicSpellModal, setWarMagicSpellModal] = useState(null);
+    const [sacredWeaponModal, setSacredWeaponModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
     const [featureChoice, setFeatureChoice] = useState(null);
@@ -111,9 +113,15 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
             const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
 
-            // Recover Focus Points (Monk Uncanny Metabolism)
+            // Check for Perfect Focus (Monk level 15)
+            const hasPerfectFocus = (playerStats.automation?.passives ?? []).some(p => p.type === 'passive_rule' && p.effect === 'perfect_focus');
+
+            // Check if Uncanny Metabolism was used this initiative
+            const uncannyMetabolismUsed = getRuntimeValue(playerStats.name, 'uncannyMetabolismUsed', campaignName) === true;
+
+            // Recover Focus Points (Monk Uncanny Metabolism passive)
             const hasFocusPointsAction = playerStats.actions?.some(a => a.automation?.type === 'initiative_action' && a.automation?.effect !== 'wild_shape_regen_on_initiative');
-            if (hasFocusPointsAction) {
+            if (hasFocusPointsAction && !hasPerfectFocus) {
                 const maxFP = classLevel?.focus_points || getRuntimeValue(playerStats.name, 'focusPoints', campaignName) || 0;
                 if (maxFP > 0) {
                     const currentFP = Number(getRuntimeValue(playerStats.name, 'focusPoints', campaignName) ?? 0);
@@ -122,6 +130,20 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                      }
                 }
              }
+
+            // Perfect Focus: recover to 4 if ≤ 3 and Uncanny Metabolism not used
+            if (hasPerfectFocus && !uncannyMetabolismUsed) {
+                const focusPointsTarget = 4;
+                const focusPointsThreshold = 3;
+                const maxFP = classLevel?.focus_points || 0;
+                const currentFP = Number(getRuntimeValue(playerStats.name, 'focusPoints', campaignName) ?? 0);
+                if (currentFP <= focusPointsThreshold && currentFP < maxFP) {
+                    const newFP = Math.min(focusPointsTarget, maxFP);
+                    if (newFP > currentFP) {
+                        setRuntimeValue(playerStats.name, 'focusPoints', newFP, campaignName);
+                    }
+                }
+            }
 
             // Recover Wild Shape use on initiative (Archdruid Evergreen Wild Shape)
             const hasEvergreen = playerStats.actions?.some(a => a.automation?.type === 'initiative_action' && a.automation?.effect === 'wild_shape_regen_on_initiative');
@@ -512,6 +534,18 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }
         }
 
+        // Apply Sacred Weapon damage type modification for melee attacks
+        if ((attack.weaponType === 'melee' || attack.weaponType === 'unarmed') && playerStats.automation?.passives) {
+            const sacredWeaponBuff = (playerStats.automation.passives || []).find(p => p.name === 'Sacred Weapon' && p.effect === 'sacred_weapon');
+            if (sacredWeaponBuff) {
+                const storedBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
+                const swBuff = storedBuffs.find(b => b.name === 'Sacred Weapon' && b.effect === 'sacred_weapon');
+                if (swBuff?.damageTypeChoice) {
+                    attack.damageType = swBuff.damageTypeChoice;
+                }
+            }
+        }
+
         // Check for weapon mastery properties to activate on hit
         if (attack.weaponType === 'melee') {
             const available = collectWeaponMastery(attack.name, playerStats);
@@ -693,7 +727,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const handleAttackClick = React.useCallback((attack) => {
         if (cannotAct) return;
          buildCtx(attack).then(ctx => {
-             rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, ctx);
+             const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
+             rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
           }).catch(() => { });
       }, [cannotAct, buildCtx, rollAttack, exhaustionPenalty]);
 
@@ -722,8 +757,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const MONK_KI_FEATURES = ['Flurry of Blows', 'Patient Defense', 'Step of the Wind', 'Heightened Flurry of Blows', 'Heightened Patient Defense', 'Heightened Step of the Wind', 'Hand of Healing', 'Stunning Strike'];
 
+    const HAS_FLURRY_HEALING_HARM = playerStats.characterAdvancement?.some(f => f.name === "Flurry of Healing and Harm");
+
     async function handleAutomationAction(action) {
         if (cannotAct) return;
+
+        const playerName = playerStats.name;
+        const activeBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
+        const cloakActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'cloak_of_shadows');
 
          const auto = action.automation;
         if (auto?.type === 'spell_modifier' && action.name === 'Metamagic') {
@@ -751,18 +792,24 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }
         }
 
-         // Spend 1 focus point for monk Ki features before dispatching
-        if (MONK_KI_FEATURES.includes(action.name)) {
-            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-            const maxFP = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
-            const storedFP = getRuntimeValue(playerStats.name, 'focusPoints', campaignName);
-            const currentFP = storedFP != null ? Number(storedFP) : (playerStats._trackedResources?.focusPoints?.current ?? maxFP);
-            if (currentFP <= 0) {
-                setPopupHtml(`<b>${action.name}</b><br/>No ${playerStats.rules === '2024' ? "Focus Points" : 'ki points'} remaining.`);
-                return;
-             }
-            await setRuntimeValue(playerStats.name, 'focusPoints', currentFP - 1, campaignName);
-            window.dispatchEvent(new CustomEvent('focus-points-updated'));
+          // Spend 1 focus point for monk Ki features before dispatching
+          // Skip FP cost for Hand of Healing and Flurry of Blows when Flurry of Healing and Harm is active
+          // Skip FP cost for Flurry of Blows when Cloak of Shadows (Shadow Flurry) is active
+          if (MONK_KI_FEATURES.includes(action.name)) {
+              const skipFP = (HAS_FLURRY_HEALING_HARM && (action.name === 'Hand of Healing' || action.name === 'Flurry of Blows'))
+                || (cloakActive && action.name === 'Flurry of Blows');
+              if (!skipFP) {
+                 const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+                 const maxFP = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
+                 const storedFP = getRuntimeValue(playerStats.name, 'focusPoints', campaignName);
+                 const currentFP = storedFP != null ? Number(storedFP) : (playerStats._trackedResources?.focusPoints?.current ?? maxFP);
+                 if (currentFP <= 0) {
+                     setPopupHtml(`<b>${action.name}</b><br/>No ${playerStats.rules === '2024' ? "Focus Points" : 'ki points'} remaining.`);
+                     return;
+                  }
+                 await setRuntimeValue(playerStats.name, 'focusPoints', currentFP - 1, campaignName);
+                 window.dispatchEvent(new CustomEvent('focus-points-updated'));
+              }
          }
 
         // Check trigger conditions for gated actions
@@ -809,6 +856,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'arcaneCharge': setArcaneChargeModal(result.payload); break;
                     case 'warMagicCantrip': setWarMagicCantripModal(result.payload); break;
                     case 'warMagicSpell': setWarMagicSpellModal(result.payload); break;
+                    case 'sacredWeaponDamageType': setSacredWeaponModal(result.payload); break;
                  }
                 break;
             case 'roll':
@@ -1153,6 +1201,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <WarMagicSpellModal
                         {...warMagicSpellModal}
                         onClose={() => setWarMagicSpellModal(null)}
+                    />
+                )}
+                {sacredWeaponModal && (
+                    <SacredWeaponModal
+                        {...sacredWeaponModal}
+                        onClose={() => setSacredWeaponModal(null)}
                     />
                 )}
                 {divineFuryChoice && (

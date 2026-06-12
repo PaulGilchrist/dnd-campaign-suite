@@ -1,10 +1,11 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
-import { getLastAttackRoll, getLastAbilityCheck } from '../../../hooks/useMetamagic.js';
+import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../hooks/useMetamagic.js';
 import { automationInfoPopup } from '../../shared/popupResponse.js';
 import { getCombatContext } from '../../rules/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../rules/rangeValidation.js';
 import { resolveMapPositions } from '../common/targetResolver.js';
+import { getClassFeatures } from '../../../services/character/classFeatures.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -97,6 +98,39 @@ function handleAbilityCheck(action, playerStats, _campaignName, bonus, creatureN
     };
 }
 
+function handleSaveRoll(action, playerStats, campaignName, bonus) {
+    const auto = action.automation;
+    const targetName = playerStats.name;
+    const saveEvent = getLastSaveRoll(targetName);
+    if (!saveEvent || isStale(saveEvent)) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `No recent saving throw found for ${targetName}. This feature can only be used shortly after a saving throw.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const { d20, bonus: saveBonus, saveType } = saveEvent;
+    const originalTotal = d20 + saveBonus;
+    const modifiedD20 = d20 + bonus;
+    const modifiedTotal = modifiedD20 + saveBonus;
+
+    const saveLabel = saveType ? saveType.toUpperCase() : 'Save';
+    const description = `<b>${action.name}</b><br/>` +
+        `Bonus: +${bonus}<br/>` +
+        `${saveLabel}: d20(${d20}) + ${saveBonus} = ${originalTotal}` +
+        ` → Modified: d20(${modifiedD20}) + ${saveBonus} = <b>${modifiedTotal}</b>`;
+
+    return {
+        type: 'popup',
+        payload: { type: 'automation_info', name: action.name, description, automation: auto },
+    };
+}
+
 async function consumeResourceCost(auto, playerStats, campaignName) {
     if (auto.resourceCost === 'channel_divinity') {
         const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
@@ -117,6 +151,25 @@ async function consumeResourceCost(auto, playerStats, campaignName) {
         }
 
         await setRuntimeValue(playerStats.name, 'channelDivinityCharges', currentCharges - 1, campaignName);
+    }
+    else if (auto.resourceCost === 'focus_points') {
+        const classLevel = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1];
+        const maxFocus = classLevel?.focus_points || getClassFeatures(playerStats)?.maxFocusPoints || 0;
+        const currentFocus = Number(getRuntimeValue(playerStats.name, 'focusPoints', campaignName) ?? maxFocus);
+
+        if (currentFocus <= 0) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: playerStats.name,
+                    description: 'No Focus Points remaining.',
+                    automation: auto,
+                },
+            };
+        }
+
+        await setRuntimeValue(playerStats.name, 'focusPoints', currentFocus - 1, campaignName);
     }
     return null;
 }
@@ -153,6 +206,38 @@ function getBardicDieSize(playerStats) {
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
+
+    if (auto.target === 'saving_throw') {
+        const costError = await consumeResourceCost(auto, playerStats, campaignName);
+        if (costError) return costError;
+
+        const saveEvent = getLastSaveRoll(playerName);
+        const saveFresh = saveEvent && !isStale(saveEvent);
+
+        if (!saveFresh) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: `No recent saving throw found for ${playerName}. This feature can only be used shortly after a saving throw.`,
+                    automation: auto,
+                },
+            };
+        }
+
+        const result = handleSaveRoll(action, playerStats, campaignName, 0);
+
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: `${playerName} used ${action.name} to reroll a saving throw.`,
+            timestamp: Date.now(),
+        }).catch(() => {});
+
+        return result;
+    }
 
     const bardicDieSize = getBardicDieSize(playerStats);
 

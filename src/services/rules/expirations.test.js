@@ -1338,4 +1338,99 @@ describe('applyTurnStartEffects', () => {
       'TestCampaign'
     );
   });
+
+  it('removes conditions at turn start when condition_removal effect is present', () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (prop === 'activeConditions') return ['charmed', 'poisoned', 'blinded'];
+      return null;
+    });
+
+    applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{
+        type: 'condition_removal',
+        name: 'Self-Restoration',
+        conditions: ['charmed', 'frightened', 'poisoned']
+      }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'TestCharacter',
+      'activeConditions',
+      ['blinded'],
+      'TestCampaign'
+    );
+  });
+
+  it('does not call setRuntimeValue when no matching conditions to remove', () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (prop === 'activeConditions') return ['blinded', 'grappled'];
+      return null;
+    });
+
+    applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{
+        type: 'condition_removal',
+        name: 'Self-Restoration',
+        conditions: ['charmed', 'frightened', 'poisoned']
+      }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('handles case-insensitive condition matching', () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (prop === 'activeConditions') return ['CHARMED', 'Poisoned', 'Blinded'];
+      return null;
+    });
+
+    applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{
+        type: 'condition_removal',
+        name: 'Self-Restoration',
+        conditions: ['charmed', 'frightened', 'poisoned']
+      }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'TestCharacter',
+      'activeConditions',
+      ['Blinded'],
+      'TestCampaign'
+    );
+  });
+
+  it('handles empty activeConditions array', () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (prop === 'activeConditions') return [];
+      return null;
+    });
+
+    applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{
+        type: 'condition_removal',
+        name: 'Self-Restoration',
+        conditions: ['charmed', 'frightened', 'poisoned']
+      }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('handles null activeConditions', () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (prop === 'activeConditions') return null;
+      return null;
+    });
+
+    applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{
+        type: 'condition_removal',
+        name: 'Self-Restoration',
+        conditions: ['charmed', 'frightened', 'poisoned']
+      }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
 });

@@ -577,6 +577,11 @@ function buildAttackInfo(feature, playerStats) {
                 riderSave: auto.riderSave || null,
                 primalKnowledge: auto.skills || [],
                 casting_time: auto.casting_time || '',
+                cost: auto.cost || 0,
+                resource: auto.resource || '',
+                resistanceTypes: auto.resistanceTypes || [],
+                duration: auto.duration || '',
+                endsOnCondition: auto.endsOnCondition || '',
                 hasAutomation: true
             }
         }
@@ -1144,6 +1149,37 @@ function buildAttackInfo(feature, playerStats) {
                 weaponAttack: !!auto.weaponAttack,
                 concentrationSpell: auto.concentrationSpell || '',
                 casting_time: auto.casting_time || '1 bonus action',
+                hasAutomation: true
+            };
+        }
+
+        case 'shadow_step_rider': {
+            return {
+                type: 'shadow_step_rider',
+                name: feature.name,
+                hasAutomation: true
+            };
+        }
+
+        case 'sacred_weapon': {
+            return {
+                type: 'temp_buff',
+                name: feature.name,
+                effect: 'sacred_weapon',
+                duration: auto.duration || '10_minutes',
+                resourceCost: auto.resourceCost || '',
+                options: auto.options || [],
+                casting_time: auto.casting_time || '',
+                hasAutomation: true
+            };
+        }
+
+        case 'cloak_of_shadows': {
+            return {
+                type: 'cloak_of_shadows',
+                name: feature.name,
+                effect: auto.effect || '',
+                duration: auto.duration || '1_minute',
                 hasAutomation: true
             };
         }
