@@ -468,7 +468,16 @@ const rules = {
 
         playerStats.abilities = await rules.getAbilities(playerStats, playerSummary);
         playerStats.hitPoints = rules.getHitPoints(playerStats, playerSummary);
-        playerStats.initiative = playerStats.abilities.find((ability) => ability.name === 'Dexterity').bonus;
+        const dexAbility = playerStats.abilities.find((ability) => ability.name === 'Dexterity');
+        playerStats.initiative = dexAbility.bonus;
+        // Add Dread Ambush initiative bonus (WIS modifier) for Gloom Stalkers
+        const dreadAmbushPassive = (playerStats.automation?.passives ?? []).find(
+            p => p.type === 'passive_rule' && p.effect === 'dread_ambush_initiative'
+        );
+        if (dreadAmbushPassive) {
+            const wisAbility = playerStats.abilities.find((ability) => ability.name === 'Wisdom');
+            playerStats.initiative += (wisAbility?.bonus || 0);
+        }
         playerStats.initiativeAdvantage = (playerStats.automation?.passives ?? []).some(
             p => p.type === 'passive_rule' && p.effect === 'initiative_advantage'
         );

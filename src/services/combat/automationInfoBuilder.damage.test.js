@@ -108,6 +108,9 @@ describe('buildAttackInfo – damage_bonus', () => {
             tempHpExpression: '',
             upgrades: '',
             rangeBonusCantrip: '',
+            uses_expression: '',
+            usesMax: 0,
+            recharge: '',
             hasAutomation: true,
         })
     })

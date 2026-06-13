@@ -97,7 +97,7 @@ export function getSpellAbilities(allSpells, playerStats) {
                         }
                     });
                 }
-                if (feature.type === 'free_spell' && feature.spell) {
+                if ((feature.type === 'free_spell' || feature.type === 'fey_reinforcements') && feature.spell) {
                     const spellNames = Array.isArray(feature.spell) ? feature.spell : [feature.spell];
                     spellNames.forEach(spellName => {
                         if (!spellAbilities.spells.find(s => s.name === spellName)) {

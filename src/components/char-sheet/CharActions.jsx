@@ -40,6 +40,7 @@ import WarMagicSpellModal from './WarMagicSpellModal.jsx'
 import SacredWeaponModal from './SacredWeaponModal.jsx'
 import ElderChampionRestoreModal from './ElderChampionRestoreModal.jsx'
 import PrimalCompanionBonusActionModal from './PrimalCompanionBonusActionModal.jsx'
+import MistyWandererModal from './MistyWandererModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { applyConstellationOption } from '../../services/automation/handlers/starryFormHandler.js';
@@ -99,6 +100,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [sacredWeaponModal, setSacredWeaponModal] = useState(null);
     const [elderChampionRestoreModal, setElderChampionRestoreModal] = useState(null);
     const [primalCompanionBonusActionModal, setPrimalCompanionBonusActionModal] = useState(null);
+    const [mistyWandererModal, setMistyWandererModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
     const [featureChoice, setFeatureChoice] = useState(null);
@@ -447,6 +449,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
                 const currentRound = getCurrentCombatRound();
                 if (bonus.oncePerTurn && usedRound === currentRound) continue;
+                // Check uses-based recharge (e.g., Dread Ambush: uses = WIS modifier, long rest)
+                if (bonus.uses_expression && bonus.recharge) {
+                    const usesKey = `_${bonus.name.replace(/\s+/g, '_')}_uses`;
+                    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? bonus.usesMax);
+                    if (currentUses <= 0) continue;
+                }
                 const bonusResult = rollExpression(bonus.damageExpression);
                 if (bonusResult) {
                     const damageType = bonus.damageType || '';
@@ -472,6 +480,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 }
                 if (bonus.oncePerTurn) {
                     setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+                }
+                // Decrement uses for uses-based features
+                if (bonus.uses_expression && bonus.recharge) {
+                    const usesKey = `_${bonus.name.replace(/\s+/g, '_')}_uses`;
+                    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? bonus.usesMax);
+                    if (currentUses > 0) {
+                        setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+                    }
                 }
             }
         }
@@ -880,6 +896,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'sacredWeaponDamageType': setSacredWeaponModal(result.payload); break;
                     case 'elderChampionRestore': setElderChampionRestoreModal(result.payload); break;
                     case 'primalCompanionBonusActionCommand': setPrimalCompanionBonusActionModal(result.payload); break;
+                    case 'mistyWanderer': setMistyWandererModal(result.payload); break;
                  }
                 break;
             case 'roll':
@@ -1251,6 +1268,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <PrimalCompanionBonusActionModal
                         {...primalCompanionBonusActionModal}
                         onClose={() => setPrimalCompanionBonusActionModal(null)}
+                    />
+                )}
+                {mistyWandererModal && (
+                    <MistyWandererModal
+                        {...mistyWandererModal}
+                        onClose={() => setMistyWandererModal(null)}
                     />
                 )}
                 {divineFuryChoice && (

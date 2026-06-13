@@ -38,6 +38,13 @@ export function collectTurnStartEffects(features) {
                     usesExpression: auto.usesExpression || 'WIS modifier minimum 1',
                 })
             }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'dread_ambush_speed') {
+                effects.push({
+                    type: 'dread_ambush_speed',
+                    name: feature.name,
+                    bonusExpression: auto.bonusExpression || '10',
+                })
+            }
             if (auto?.type === 'holy_nimbus') {
                 effects.push({
                     type: 'holy_nimbus_radiant_damage',
@@ -106,6 +113,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'bonus_action_attack':
             case 'reaction_bonus':
             case 'free_spell':
+            case 'fey_reinforcements':
             case 'divine_intervention':
             case 'bardic_inspiration_offense':
                 if (info.action === 'bonus_action') {
@@ -308,6 +316,16 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break
             case 'elder_champion':
                 result.specialActions.push(info)
+                break
+            case 'reaction_save':
+                result.reactions.push(info)
+                break
+            case 'misty_wanderer':
+                if (info.casting_time === '1 bonus action' || info.casting_time === 'bonus_action') {
+                    result.bonusActions.push(info)
+                } else {
+                    result.actions.push(info)
+                }
                 break
             case 'peerless_athlete':
                 result.specialActions.push(info)

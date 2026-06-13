@@ -267,6 +267,12 @@ function buildAttackInfo(feature, playerStats) {
                     }
                 }
             }
+            let usesMax = 0;
+            if (auto.uses_expression) {
+                usesMax = evaluateAutoExpression(auto.uses_expression, playerStats) || 1;
+            } else if (auto.uses) {
+                usesMax = auto.uses;
+            }
             return {
                 type: 'damage_bonus',
                 name: feature.name,
@@ -282,6 +288,9 @@ function buildAttackInfo(feature, playerStats) {
                 tempHpExpression: auto.tempHpExpression || '',
                 upgrades: auto.upgrades || '',
                 rangeBonusCantrip: auto.rangeBonusCantrip || '',
+                uses_expression: auto.uses_expression || '',
+                usesMax,
+                recharge: auto.recharge || '',
                 hasAutomation: true
             }
         }
@@ -436,6 +445,26 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'fey_reinforcements': {
+            let usesMax = auto.uses || 1;
+            if (auto.uses_expression) {
+                usesMax = evaluateAutoExpression(auto.uses_expression, playerStats) || 1;
+            }
+            return {
+                type: 'fey_reinforcements',
+                name: feature.name,
+                spell: auto.spell || '',
+                uses: auto.uses || 1,
+                uses_expression: auto.uses_expression || '',
+                usesMax,
+                recharge: auto.recharge || 'long_rest',
+                action: auto.action || 'action',
+                duration: auto.duration || '',
+                casting_time: auto.casting_time || '',
+                hasAutomation: true
+            }
+        }
+
         case 'healing': {
             const healAmount = auto.healExpression
                 ? evaluateAutoExpression(auto.healExpression, playerStats, prof, level)
@@ -578,6 +607,15 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'otherworldly_glamour': {
+            return {
+                type: 'passive_buff',
+                name: feature.name,
+                effect: 'otherworldly_glamour',
+                hasAutomation: true
+            }
+        }
+
         case 'passive_rule': {
             return {
                 type: 'passive_rule',
@@ -594,6 +632,17 @@ function buildAttackInfo(feature, playerStats) {
                 resistanceTypes: auto.resistanceTypes || [],
                 duration: auto.duration || '',
                 endsOnCondition: auto.endsOnCondition || '',
+                hasAutomation: true
+            }
+        }
+
+        case 'misty_wanderer': {
+            return {
+                type: 'misty_wanderer',
+                name: feature.name,
+                trigger: auto.trigger || '',
+                range: auto.range || '5_ft',
+                casting_time: auto.casting_time || 'passive',
                 hasAutomation: true
             }
         }
@@ -1395,6 +1444,23 @@ function buildAttackInfo(feature, playerStats) {
                 name: feature.name,
                 range: auto.range || '30_ft',
                 casting_time: auto.casting_time || 'passive',
+                hasAutomation: true
+            };
+        }
+
+        case 'reaction_save': {
+            return {
+                type: 'reaction_save',
+                name: feature.name,
+                trigger: auto.trigger || '',
+                saveType: auto.saveType || 'WIS',
+                saveDc: auto.saveDc || 'ability',
+                saveAbility: auto.saveAbility || 'CHA',
+                condition: auto.condition || '',
+                duration: auto.duration || '',
+                range: auto.range || '120_ft',
+                casting_time: auto.casting_time || '1 reaction',
+                target: auto.target || 'different_creature',
                 hasAutomation: true
             };
         }

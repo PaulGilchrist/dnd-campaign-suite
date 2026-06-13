@@ -73,13 +73,24 @@ export async function handleCommand(action, playerStats, campaignName) {
         };
     }
 
+    let description = `${action.name}: Commanded ${companionType} to use Beast's Strike.`;
+
+    const allFeatures = [
+        ...(playerStats?.class?.class_levels || []).flatMap(cl => (cl.features || [])),
+        ...(playerStats?.class?.subclass?.class_levels || []).flatMap(cl => (cl.features || [])),
+    ];
+    const hasBestialFury = allFeatures.some(f => f.name === 'Bestial Fury');
+    if (hasBestialFury) {
+        description += ' Bestial Fury: beast attacks twice!';
+    }
+
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: action.name,
             automationType: auto.type,
-            description: `${action.name}: Commanded ${companionType} to use Beast's Strike.`,
+            description: description,
             automation: auto,
         },
     };

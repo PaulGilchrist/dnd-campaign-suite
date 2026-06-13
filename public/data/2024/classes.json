@@ -3028,33 +3028,6 @@
                         "name": "Elemental Fury",
                         "description": "The might of the elements flows through you. You gain one of the following options of your choice. Potent Spellcasting. Add your Wisdom modifier to the damage you deal with any Druid cantrip. Primal Strike. Once on each of your turns when you hit a creature with an attack roll using a weapon or a Beast form's attack in Wild Shape, you can cause the target to take an extra 1d8 Cold, Fire, Lightning, or Thunder damage (choose when you hit).",
                         "automation": {
-                            "type": "choice_bundle",
-                            "selectionType": "single",
-                            "options": [
-                                {
-                                    "name": "Potent Spellcasting",
-                                    "automation": {
-                                        "type": "damage_modifier",
-                                        "trigger": "cantrip_damage",
-                                        "modifierExpression": "wisdomMod"
-                                    }
-                                },
-                                {
-                                    "name": "Primal Strike",
-                                    "automation": {
-                                        "type": "damage_bonus",
-                                        "trigger": "weapon_or_beast_form_attack_hit",
-                                        "damageExpression": "1d8",
-                                        "damageType": "Cold|Fire|Lightning|Thunder",
-                                        "oncePerTurn": true,
-                                        "userChoice": true
-                                    }
-                                }
-                            ]
-                        },
-                        "level": 7,
-                        "type": "class_feature",
-                        "automation": {
                             "type": "damage_bonus",
                             "trigger": "weapon_or_beast_form_attack_hit",
                             "damageExpression": "1d8",
@@ -3065,7 +3038,9 @@
                                 "Primal Strike"
                             ],
                             "casting_time": "passive"
-                        }
+                        },
+                        "level": 7,
+                        "type": "class_feature"
                     }
                 ],
                 "spellcasting": {
@@ -3723,7 +3698,9 @@
                                 "target": "saving_throw",
                                 "condition": "shape_shift",
                                 "effect": "advantage",
-                                "abilities": ["CON"],
+                                "abilities": [
+                                    "CON"
+                                ],
                                 "casting_time": "passive"
                             }
                         ]
@@ -3737,7 +3714,9 @@
                             "target": "saving_throw",
                             "condition": "shape_shift",
                             "effect": "advantage",
-                            "abilities": ["CON"],
+                            "abilities": [
+                                "CON"
+                            ],
                             "casting_time": "passive"
                         }
                     },
@@ -3865,7 +3844,11 @@
                             },
                             {
                                 "type": "resistance",
-                                "damageTypes": ["Cold", "Lightning", "Thunder"],
+                                "damageTypes": [
+                                    "Cold",
+                                    "Lightning",
+                                    "Thunder"
+                                ],
                                 "casting_time": "passive"
                             }
                         ]
@@ -4023,7 +4006,11 @@
                         "level": 14,
                         "automation": {
                             "type": "resistance",
-                            "damageTypes": ["Bludgeoning", "Piercing", "Slashing"],
+                            "damageTypes": [
+                                "Bludgeoning",
+                                "Piercing",
+                                "Slashing"
+                            ],
                             "casting_time": "passive"
                         }
                     }
@@ -4179,7 +4166,7 @@
                 "weapon_mastery": 4,
                 "features": [
                     {
-                    "name": "Ability Score Improvement",
+                        "name": "Ability Score Improvement",
                         "description": "You gain the Ability Score Improvement feat. You gain this feature again at Fighter levels 6, 8, 12, 14, and 16.",
                         "level": 5,
                         "type": "class_feature"
@@ -4897,7 +4884,9 @@
                                 "target": "ability_check",
                                 "condition": "remarkable_athlete_athletics",
                                 "effect": "advantage",
-                                "abilities": ["STR"],
+                                "abilities": [
+                                    "STR"
+                                ],
                                 "casting_time": "passive"
                             },
                             {
@@ -5165,7 +5154,9 @@
                         "automation": [
                             {
                                 "type": "resistance",
-                                "damageTypes": ["Psychic"]
+                                "damageTypes": [
+                                    "Psychic"
+                                ]
                             },
                             {
                                 "type": "guarded_mind",
@@ -5193,7 +5184,9 @@
                             {
                                 "type": "passive_rule",
                                 "effect": "always_prepared_spells",
-                                "spells": ["Telekinesis"],
+                                "spells": [
+                                    "Telekinesis"
+                                ],
                                 "casting_time": "passive"
                             },
                             {
@@ -5468,10 +5461,18 @@
                         "automation": {
                             "type": "damage_type_modifier",
                             "trigger": "unarmed_strike_hit",
-                            "weaponTypes": ["unarmed"],
+                            "weaponTypes": [
+                                "unarmed"
+                            ],
                             "options": [
-                                { "name": "Force", "damageType": "Force" },
-                                { "name": "Bludgeoning", "damageType": "Bludgeoning" }
+                                {
+                                    "name": "Force",
+                                    "damageType": "Force"
+                                },
+                                {
+                                    "name": "Bludgeoning",
+                                    "damageType": "Bludgeoning"
+                                }
                             ],
                             "casting_time": "passive"
                         }
@@ -5608,7 +5609,11 @@
                             {
                                 "type": "passive_rule",
                                 "effect": "end_of_turn_condition_removal",
-                                "conditions": ["charmed", "frightened", "poisoned"]
+                                "conditions": [
+                                    "charmed",
+                                    "frightened",
+                                    "poisoned"
+                                ]
                             }
                         ]
                     }
@@ -6802,8 +6807,14 @@
                             "duration": "10_minutes",
                             "resourceCost": "channel_divinity",
                             "options": [
-                                { "name": "Normal Damage Type", "damageType": "normal" },
-                                { "name": "Radiant Damage", "damageType": "Radiant" }
+                                {
+                                    "name": "Normal Damage Type",
+                                    "damageType": "normal"
+                                },
+                                {
+                                    "name": "Radiant Damage",
+                                    "damageType": "Radiant"
+                                }
                             ],
                             "casting_time": "1_action"
                         }
@@ -6932,7 +6943,9 @@
                                 "target": "ability_check",
                                 "condition": "peerless_athlete",
                                 "effect": "advantage",
-                                "abilities": ["STR"],
+                                "abilities": [
+                                    "STR"
+                                ],
                                 "casting_time": "passive"
                             },
                             {
@@ -6940,7 +6953,9 @@
                                 "target": "ability_check",
                                 "condition": "peerless_athlete",
                                 "effect": "advantage",
-                                "abilities": ["DEX"],
+                                "abilities": [
+                                    "DEX"
+                                ],
                                 "casting_time": "passive"
                             },
                             {
@@ -7270,7 +7285,9 @@
                             {
                                 "type": "passive_rule",
                                 "effect": "always_prepared_spells",
-                                "spells": ["Hunter's Mark"],
+                                "spells": [
+                                    "Hunter's Mark"
+                                ],
                                 "casting_time": "passive"
                             },
                             {
@@ -7864,7 +7881,12 @@
                         "automation": {
                             "type": "primal_companion_bonus_action_command",
                             "casting_time": "1 bonus action",
-                            "commandActions": ["Dash", "Disengage", "Dodge", "Help"],
+                            "commandActions": [
+                                "Dash",
+                                "Disengage",
+                                "Dodge",
+                                "Help"
+                            ],
                             "forceDamageOption": true
                         }
                     },
@@ -7872,10 +7894,19 @@
                         "name": "Bestial Fury",
                         "description": "When commanding Primal Companion to take Beast's Strike, the beast can use it twice. First time each turn it hits a creature under Hunter's Mark, deals extra Force damage equal to the bonus damage of that spell.",
                         "level": 11,
-                        "automation": {
-                            "type": "primal_companion_double_strike",
-                            "casting_time": "passive"
-                        }
+                        "automation": [
+                            {
+                                "type": "primal_companion_double_strike",
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "primal_companion_double_strike_damage",
+                                "trigger": "companion_beasts_strike_hit",
+                                "damageExpression": "1d6",
+                                "damageType": "Force",
+                                "oncePerTurn": true
+                            }
+                        ]
                     },
                     {
                         "name": "Share Spells",
@@ -7898,27 +7929,94 @@
                     {
                         "name": "Dreadful Strikes",
                         "description": "When you hit with a weapon, deal extra 1d4 Psychic damage (increases to 1d6 at Ranger level 11). Extra damage can only be taken once per turn.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "damage_bonus",
+                            "trigger": "weapon_attack_hit",
+                            "damageExpression": "1d4",
+                            "damageType": "Psychic",
+                            "oncePerTurn": true,
+                            "scaling": {
+                                "11": "1d6"
+                            }
+                        }
                     },
                     {
                         "name": "Otherworldly Glamour",
                         "description": "Bonus to Charisma checks = Wisdom modifier (minimum +1). Gain proficiency in Deception, Performance, or Persuasion.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "otherworldly_glamour",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Beguiling Twist",
                         "description": "Advantage on saving throws to avoid/end Charmed or Frightened. When you or creature within 120 feet succeeds on save vs Charmed/Frightened, take Reaction to force different creature within 120 feet to make Wisdom save (your spell save DC) or be Charmed/Frightened for 1 minute.",
-                        "level": 7
+                        "level": 7,
+                        "automation": [
+                            {
+                                "type": "conditional_advantage",
+                                "target": "saving_throw",
+                                "condition": "charmed",
+                                "effect": "advantage"
+                            },
+                            {
+                                "type": "conditional_advantage",
+                                "target": "saving_throw",
+                                "condition": "frightened",
+                                "effect": "advantage"
+                            },
+                            {
+                                "type": "reaction_save",
+                                "trigger": "save_success_charmed_frightened",
+                                "saveType": "WIS",
+                                "saveDc": "spell_save_dc",
+                                "condition": "charmed_frightened",
+                                "duration": "1_minute",
+                                "range": "120_ft",
+                                "casting_time": "1 reaction",
+                                "target": "different_creature"
+                            }
+                        ]
                     },
                     {
                         "name": "Fey Reinforcements",
                         "description": "Cast Summon Fey without Material component. Cast it once without spell slot, regain on Long Rest. Can modify it to not require Concentration (duration becomes 1 minute).",
-                        "level": 11
+                        "level": 11,
+                        "automation": {
+                            "type": "fey_reinforcements",
+                            "spell": "Summon Fey",
+                            "uses_expression": "1",
+                            "usesMax": 1,
+                            "recharge": "long_rest",
+                            "action": "action",
+                            "duration": "Concentration, up to 1 hour",
+                            "casting_time": "1 action"
+                        }
                     },
                     {
                         "name": "Misty Wanderer",
                         "description": "Cast Misty Step without spell slot, uses = Wisdom modifier (minimum once). When casting Misty Step, bring one willing creature within 5 feet to an unoccupied space within 5 feet of your destination.",
-                        "level": 15
+                        "level": 15,
+                        "automation": [
+                            {
+                                "type": "free_spell",
+                                "spell": "Misty Step",
+                                "uses_expression": "WIS modifier_min_1",
+                                "recharge": "long_rest",
+                                "casting_time": "1 bonus action",
+                                "hasAutomation": true
+                            },
+                            {
+                                "type": "misty_wanderer",
+                                "uses_expression": "WIS modifier_min_1",
+                                "recharge": "long_rest",
+                                "range": "5_ft",
+                                "casting_time": "1 bonus action",
+                                "hasAutomation": true
+                            }
+                        ]
                     }
                 ],
                 "spells": [
@@ -7942,6 +8040,17 @@
                         "name": "Mislead",
                         "level": 17
                     }
+                ],
+                "bonus_skill_proficiencies": 1,
+                "skill_proficiencies_choices": [
+                    {
+                        "choose": 1,
+                        "from": [
+                            "Skill: Deception",
+                            "Skill: Performance",
+                            "Skill: Persuasion"
+                        ]
+                    }
                 ]
             },
             {
@@ -7952,7 +8061,33 @@
                     {
                         "name": "Dread Ambush",
                         "description": "Ambusher's Leap: at start of first turn of each combat, Speed +10 until end of that turn. Dreadful Strike: when you hit with a weapon, deal extra 2d6 Psychic damage (uses = Wisdom modifier, minimum once, regain on Long Rest). Initiative Bonus: add Wisdom modifier to Initiative roll.",
-                        "level": 3
+                        "level": 3,
+                        "automation": [
+                            {
+                                "type": "passive_rule",
+                                "effect": "dread_ambush_speed",
+                                "casting_time": "passive",
+                                "bonusExpression": "10"
+                            },
+                            {
+                                "type": "damage_bonus",
+                                "trigger": "weapon_attack_hit",
+                                "damageExpression": "2d6",
+                                "damageType": "Psychic",
+                                "oncePerTurn": true,
+                                "uses_expression": "WIS modifier_min_1",
+                                "recharge": "long_rest",
+                                "scaling": {
+                                    "11": "2d8"
+                                },
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "passive_rule",
+                                "effect": "dread_ambush_initiative",
+                                "casting_time": "passive"
+                            }
+                        ]
                     },
                     {
                         "name": "Umbral Sight",

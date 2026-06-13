@@ -79,11 +79,17 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
              }
            }
            const ctx = forcedMode ? { forcedMode } : undefined
-          if (conditionEffects?.strCheckReplace) {
-            const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
-            return { ...ctx, strCheckReplace: true, strScore: strAbility?.totalScore || 10 }
-          }
-          if (conditionEffects?.tacticalMind) {
+           if (conditionEffects?.strCheckReplace) {
+             const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
+             return { ...ctx, strCheckReplace: true, strScore: strAbility?.totalScore || 10 }
+           }
+           if (conditionEffects?.wisCheckReplace) {
+             const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
+             const wisMod = wisAbility?.bonus || 0;
+             const minBonus = Math.max(1, wisMod);
+             return { ...ctx, wisCheckReplace: true, wisCheckMinBonus: minBonus }
+           }
+           if (conditionEffects?.tacticalMind) {
             return { ...ctx, tacticalMind: true, tacticalMindBonus: conditionEffects.tacticalMindBonus || null }
           }
           return ctx

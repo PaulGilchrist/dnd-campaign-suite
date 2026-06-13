@@ -85,6 +85,15 @@ export function collectSaveModifiers(features) {
                     effect: 'disadvantage',
                 })
             }
+            if (auto.type === 'otherworldly_glamour') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'ability_check',
+                    condition: 'otherworldly_glamour',
+                    effect: 'wis_replacement',
+                    abilities: ['CHA'],
+                })
+            }
         }
     })
 

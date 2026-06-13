@@ -50,6 +50,9 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
         if (effect.type === 'elder_champion_regeneration') {
             applyElderChampionRegeneration(activeName, playerStats, effect, campaignName);
         }
+        if (effect.type === 'dread_ambush_speed') {
+            applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, campaignName);
+        }
     }
 }
 
@@ -184,6 +187,30 @@ async function applyElderChampionRegeneration(activeName, playerStats, effect, c
     const newHp = Math.min(maxHp, currentHp + healAmount);
 
     await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
+}
+
+async function applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, campaignName) {
+    const combatData = getCombatSummary();
+    if (!combatData) return;
+    
+    const currentRound = combatData.round || 1;
+    if (currentRound !== 1) return;
+    
+    const isActive = getRuntimeValue(activeName, 'dreadAmbushSpeedActive', campaignName);
+    if (isActive) return;
+    
+    await setRuntimeValue(activeName, 'dreadAmbushSpeedActive', true, campaignName);
+    
+    const bonus = parseInt(effect.bonusExpression, 10) || 10;
+    
+    const activeBuffs = getRuntimeValue(activeName, 'activeBuffs', campaignName) || [];
+    const newBuffs = [...activeBuffs, {
+        name: "Dread Ambush",
+        effect: 'speed_boost',
+        duration: 'until_end_of_turn',
+        speedBonus: bonus,
+    }];
+    await setRuntimeValue(activeName, 'activeBuffs', newBuffs, campaignName);
 }
 
 export function addExpiration(attackerName, targetName, effects, campaignName, rounds) {

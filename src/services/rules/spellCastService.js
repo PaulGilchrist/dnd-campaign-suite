@@ -5,6 +5,7 @@ import { triggerPostCastRiderSaves } from './postCastRiderService.js';
 import { triggerPostCastSelfHeals, triggerPostCastAllyHeals } from './postCastHealService.js';
 import { triggerSmiteOfProtection } from './smiteOfProtectionService.js';
 import { triggerInspiringSmite } from './inspiringSmiteService.js';
+import { triggerPrimalCompanionSpellShare } from './primalCompanionSpellShareService.js';
 import { setRuntimeValue, getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { applyHealingToTarget } from './applyHealing.js';
 import { getCombatContext } from './damageUtils.js';
@@ -100,6 +101,9 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     });
     triggerInspiringSmite(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Inspiring Smite trigger failed:', e);
+    });
+    triggerPrimalCompanionSpellShare(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+        console.error('[spellCast] Primal companion spell share failed:', e);
     });
 }
 

@@ -363,9 +363,11 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           autoDamage,
            autoReroll: context?.autoReroll,
            autoRerollBonus: context?.autoRerollBonus,
-           strSaveReplace: context?.strSaveReplace,
-           strScore: context?.strScore,
-           strCheckReplace: context?.strCheckReplace,
+            strSaveReplace: context?.strSaveReplace,
+            strScore: context?.strScore,
+            strCheckReplace: context?.strCheckReplace,
+            wisCheckReplace: context?.wisCheckReplace,
+            wisCheckMinBonus: context?.wisCheckMinBonus,
            gloriousDefenseBonus: context?.gloriousDefenseBonus || 0,
          });
 

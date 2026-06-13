@@ -74,6 +74,10 @@ import { handle as handleRelentlessAvenger } from './handlers/relentlessAvengerH
 import { handle as handleSoulOfVengeance } from './handlers/soulOfVengeanceHandler.js';
 import { handle as handleAvengingAngel } from './handlers/avengingAngelHandler.js';
 import { handle as handlePrimalCompanionSummon, handleCommand as handlePrimalCompanionCommand, handleRestore as handlePrimalCompanionRestore, handleBonusActionCommand as handlePrimalCompanionBonusActionCommand, applyBonusActionCommand as applyPrimalCompanionBonusActionCommand } from './handlers/primalCompanionHandler.js';
+import { handle as handlePrimalCompanionSpellShare, applySpellShare as applyPrimalCompanionSpellShare } from './handlers/primalCompanionSpellShareHandler.js';
+import { handle as handleBeguilingTwist } from './handlers/beguilingTwistHandler.js';
+import { handle as handleFeyReinforcements, confirmFeyReinforcement as handleFeyReinforcementsConfirm } from './handlers/feyReinforcementsHandler.js';
+import { handle as handleMistyWanderer, confirmMistyWanderer as handleMistyWandererConfirm } from './handlers/mistyWandererHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -168,8 +172,14 @@ const HANDLER_MAP = {
         primal_companion_bonus_action_command: handlePrimalCompanionBonusActionCommand,
         primal_companion_bonus_action_command_apply: applyPrimalCompanionBonusActionCommand,
         primal_companion_double_strike: handleGenericPopup,
-        primal_companion_spell_share: handleGenericPopup,
+        primal_companion_spell_share: handlePrimalCompanionSpellShare,
+        primal_companion_spell_share_apply: applyPrimalCompanionSpellShare,
         primal_companion_dodge: handleGenericPopup,
+        reaction_save: handleBeguilingTwist,
+        fey_reinforcements: handleFeyReinforcements,
+        fey_reinforcements_confirm: handleFeyReinforcementsConfirm,
+        misty_wanderer: handleMistyWanderer,
+        misty_wanderer_confirm: handleMistyWandererConfirm,
 };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;

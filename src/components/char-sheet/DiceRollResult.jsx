@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
@@ -33,6 +33,8 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
     const displayTotal = rerollResult !== null ? rerollResult.total : originalTotal;
     const appliesReplace = (strSaveReplace && rollType === 'save') || (strCheckReplace && (rollType === 'check' || rollType === 'skill'));
     const finalDisplayTotal = appliesReplace && displayTotal < (strScore || 10) ? strScore : displayTotal;
+    const wisBonus = wisCheckReplace ? (wisCheckMinBonus || 1) : bonus;
+    const wisDisplayTotal = wisCheckReplace && (rollType === 'check' || rollType === 'skill') ? finalRoll + wisBonus + modifier : displayTotal;
     const showCrit = isCrit || isAutoCrit || (isD20 && displayRoll === 20);
 
     const handleTacticalMind = () => {
@@ -65,7 +67,7 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                 }`}></i>
                 {name}
             </div>
-            <div className="dice-roll-total">{finalDisplayTotal}</div>
+            <div className="dice-roll-total">{wisCheckReplace && (rollType === 'check' || rollType === 'skill') ? wisDisplayTotal : finalDisplayTotal}</div>
             <div className="dice-roll-breakdown">
                 {formula ? `${formula}: ` : type === 'd20' ? 'd20 ' : ''}
                 {rerollResult !== null ? (

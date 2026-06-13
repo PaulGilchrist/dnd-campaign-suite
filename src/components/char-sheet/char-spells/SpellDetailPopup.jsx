@@ -12,7 +12,7 @@ function isFreeCastAuthorized(playerName, spellName, playerStats) {
 
   const actions = playerStats?.automation?.actions || [];
   for (const entry of actions) {
-    if (entry.type !== 'free_spell') continue;
+        if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements') continue;
     const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
     if (!spells.includes(spellName)) continue;
 
@@ -83,7 +83,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     if (freeCastAuthorized) {
       const actions = playerStats?.automation?.actions || [];
       for (const entry of actions) {
-        if (entry.type !== 'free_spell') continue;
+    if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements') continue;
         const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
         if (!spells.includes(spell.name)) continue;
 

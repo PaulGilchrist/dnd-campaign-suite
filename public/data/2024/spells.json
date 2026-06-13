@@ -13008,6 +13008,39 @@
         "cantrip_scaling": {}
     },
     {
+        "index": "summon-fey",
+        "name": "Summon Fey",
+        "description": [
+            "<p>You call forth a fey spirit. It manifests in an unoccupied space that you can see within range and uses the Fey Spirit stat block. When you cast the spell, choose Trickster, Warrior, or Guide.</p>"
+        ],
+        "range": "90 feet",
+        "components": [
+            "V",
+            "S",
+            "M"
+        ],
+        "material": "a tiny entangling vine worth 200+ GP",
+        "ritual": false,
+        "duration": "Concentration, up to 1 hour",
+        "concentration": true,
+        "casting_time": "Action",
+        "level": 4,
+        "attack_type": null,
+        "damage": null,
+        "school": "Conjuration",
+        "classes": [
+            "Ranger"
+        ],
+        "subclasses": [
+            "Fey Wanderer"
+        ],
+        "area_of_effect": null,
+        "saving_throw": null,
+        "status_effects": [],
+        "spell_list_order": 4,
+        "cantrip_scaling": {}
+    },
+    {
         "index": "sunbeam",
         "name": "Sunbeam",
         "description": [

@@ -86,6 +86,9 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
     } else if (mod.effect === 'tactical_mind') {
       effects.tacticalMind = true;
       effects.tacticalMindBonus = mod.bonusExpression || '';
+    } else if (mod.effect === 'wis_replacement') {
+      effects.wisCheckReplace = true;
+      effects.wisCheckReplaceAbilities = mod.abilities || ['CHA'];
     }
   }
 }
@@ -119,6 +122,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     autoRerollBonus: null,
     strSaveReplace: false,
     strCheckReplace: false,
+    wisCheckReplace: false,
     tacticalMind: false,
     tacticalMindBonus: null,
     riderSaveDisadvantage: false,
