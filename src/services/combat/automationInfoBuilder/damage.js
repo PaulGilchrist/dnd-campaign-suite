@@ -1,0 +1,138 @@
+import { evaluateAutoExpression } from '../automationExpressions.js'
+
+export const damageHandlers = {
+    'damage_bonus': (feature, playerStats) => {
+        const auto = feature.automation
+        let resolvedExpr = auto.damageExpression || '';
+        if (auto.scaling) {
+            const entries = Object.entries(auto.scaling)
+                .map(([k, v]) => ({ level: parseInt(k, 10), expr: String(v) }))
+                .filter(e => !isNaN(e.level))
+                .sort((a, b) => a.level - b.level);
+            for (const entry of entries) {
+                if (playerStats.level >= entry.level) {
+                    resolvedExpr = entry.expr;
+                }
+            }
+        }
+        let usesMax = 0;
+        if (auto.uses_expression) {
+            usesMax = evaluateAutoExpression(auto.uses_expression, playerStats) || 1;
+        } else if (auto.uses) {
+            usesMax = auto.uses;
+        }
+        return {
+            type: 'damage_bonus',
+            name: feature.name,
+            trigger: auto.trigger || '',
+            damageExpression: resolvedExpr,
+            damageType: auto.damageType || '',
+            maxDamage: auto.maxDamage || '',
+            extraVs: auto.extraVs || null,
+            extraDamage: auto.extraDamage || '',
+            resourceType: auto.resourceType || 'spell_slot',
+            oncePerTurn: !!auto.oncePerTurn,
+            options: auto.options || [],
+            tempHpExpression: auto.tempHpExpression || '',
+            upgrades: auto.upgrades || '',
+            rangeBonusCantrip: auto.rangeBonusCantrip || '',
+            uses_expression: auto.uses_expression || '',
+            usesMax,
+            recharge: auto.recharge || '',
+            hasAutomation: true
+        }
+    },
+
+    'damage_modifier': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'damage_modifier',
+            name: feature.name,
+            trigger: auto.trigger || '',
+            modifierExpression: auto.modifierExpression || '',
+            hasAutomation: true
+        }
+    },
+
+    'damage_type_modifier': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'damage_type_modifier',
+            name: feature.name,
+            trigger: auto.trigger || '',
+            weaponTypes: auto.weaponTypes || [],
+            options: auto.options || [],
+            hasAutomation: true
+        }
+    },
+
+    'damage_type_choice': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'damage_type_choice',
+            name: feature.name,
+            damageTypes: auto.damageTypes || [],
+            effect: auto.effect || '',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
+    'damage_reduction': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'damage_reduction',
+            name: feature.name,
+            reductionExpression: auto.reductionExpression || '',
+            trigger: auto.trigger || '',
+            reaction: auto.reaction || false,
+            redirect: auto.redirect || false,
+            redirectCost: auto.redirectCost || null,
+            redirectDamage: auto.redirectDamage || '',
+            redirectSave: auto.redirectSave || 'DEX',
+            cost: auto.cost || null,
+            hasAutomation: true
+        }
+    },
+
+    'damage_aura': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'damage_aura',
+            name: feature.name,
+            damageType: auto.damageType || '',
+            damageExpression: auto.damageExpression || '',
+            range: auto.range || '10_ft',
+            duration: auto.duration || '1_minute',
+            recharge: auto.recharge || 'long_rest',
+            hasAutomation: true
+        }
+    },
+
+    'psionic_strike': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'psionic_strike',
+            name: feature.name,
+            resource: auto.resource || 'psionicEnergy',
+            damageExpression: auto.damageExpression || '',
+            damageType: auto.damageType || 'Force',
+            oncePerTurn: !!auto.oncePerTurn,
+            trigger: auto.trigger || 'after_attack_hit',
+            hasAutomation: true
+        }
+    },
+
+    'primal_companion_double_strike_damage': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'damage_bonus',
+            name: feature.name,
+            trigger: 'companion_beasts_strike_hit',
+            damageExpression: auto.damageExpression || '',
+            damageType: auto.damageType || '',
+            oncePerTurn: !!auto.oncePerTurn,
+            hasAutomation: true
+        }
+    }
+}
