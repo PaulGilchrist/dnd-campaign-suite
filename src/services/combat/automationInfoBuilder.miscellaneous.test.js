@@ -147,3 +147,30 @@ describe('buildAttackInfo – damage_type_modifier', () => {
         expect(result.hasAutomation).toBe(true)
     })
 })
+
+describe('buildAttackInfo – memorize_spell', () => {
+    beforeEach(() => vi.clearAllMocks())
+
+    it('returns correct structure with defaults', () => {
+        const feature = { ...BASE_FEATURE, automation: { type: 'memorize_spell' } }
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result).toEqual({
+            type: 'memorize_spell',
+            name: 'Test Feature',
+            casting_time: 'passive',
+            hasAutomation: true,
+        })
+    })
+
+    it('includes custom casting_time when provided', () => {
+        const feature = {
+            ...BASE_FEATURE,
+            automation: {
+                type: 'memorize_spell',
+                casting_time: '1 action',
+            },
+        }
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.casting_time).toBe('1 action')
+    })
+})

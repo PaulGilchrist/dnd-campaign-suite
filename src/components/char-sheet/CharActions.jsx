@@ -9,7 +9,7 @@ import { parseMagicItemName } from '../../services/rules/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
-import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
+import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../services/dice/diceRoller.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { computeFeatRangeEffects } from '../../services/character/featRangeService.js';
 import { hasAutomation } from '../../services/combat/automationService.js'
@@ -47,6 +47,8 @@ import FiendishResilienceModal from './FiendishResilienceModal.jsx'
 import DragonCompanionModal from './DragonCompanionModal.jsx'
 import WildMagicDoubleRollModal from './WildMagicDoubleRollModal.jsx'
 import WildMagicTamedModal from './WildMagicTamedModal.jsx'
+import SoulstitchSpellsModal from './SoulstitchSpellsModal.jsx'
+import IllusoryRealityModal from './IllusoryRealityModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/divineInterventionHandler.js';
@@ -55,12 +57,18 @@ import { addEntry } from '../../services/ui/logService.js';
 import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
 import { executeSpellCast } from '../../services/rules/spellCastService.js'
 import { getTargetFromAttacker, getCombatContext } from '../../services/rules/damageUtils.js';
+import { loadCombatSummary } from '../../services/encounters/combatData.js';
+import { applyDamageToTarget } from '../../services/rules/applyDamage.js';
 import { getNearestPlacedItem } from '../../services/rules/rangeValidation.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
 import { buildEmpoweredSpellState, executeEmpoweredReroll, getEmpoweredSpellDescription } from '../../services/rules/empoweredSpellService.js';
+import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/postCastRiderService.js';
 import { useActionSpellMetamagic } from '../../hooks/useActionSpellMetamagic.js';
 import useCharActionModals from './useCharActionModals.js';
+import DivinationSavantModal from './DivinationSavantModal.jsx';
+import IllusionSavantModal from './IllusionSavantModal.jsx';
+import ThirdEyeModal from './ThirdEyeModal.jsx';
 import useInitiativeEffects from './useInitiativeEffects.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';
@@ -96,9 +104,27 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const { popupHtml, setPopupHtml, rollAttack, rollDamage, quickRollPlayerSave, triggerGloriousDefenseCounterAttack } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
-        autoDamageRoll: (autoDamage, isCrit) => {
-            const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
-            if (result) {
+        autoDamageRoll: async (autoDamage, isCrit) => {
+            let autoFormula = autoDamage.formula;
+            const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);
+            const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
+            const spellSchool = (autoDamage.spellSchool || '').toLowerCase();
+            const isEvocation = spellSchool === 'evocation';
+            const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
+            if (shouldApplyEmpoweredEvoc) {
+                autoFormula = `${autoFormula} + ${empEvocIntMod}[Empowered Evocation]`;
+            }
+            const isOverchannel = autoDamage.overchannelActive;
+            const overchannelUseCount = autoDamage.overchannelUseCount || 0;
+            const overchannelSpellLevel = autoDamage.overchannelSpellLevel || 1;
+
+            let overchannelResult;
+            if (isOverchannel) {
+                overchannelResult = rollExpressionMaximized(autoFormula);
+            } else {
+                overchannelResult = isCrit ? rollExpressionDoubled(autoFormula) : rollExpression(autoFormula);
+            }
+            if (overchannelResult) {
                 const context = {
                     damageType: autoDamage.damageType,
                     targetName: autoDamage.targetName,
@@ -113,7 +139,47 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 if (autoDamage.metamagicHeighten) {
                     context.metamagicHeighten = autoDamage.metamagicHeighten;
                 }
-                rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
+                rollDamage(autoDamage.name, autoFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
+
+                if (isOverchannel && overchannelUseCount > 1) {
+                    const dicePerLevel = 2 + (overchannelUseCount - 1);
+                    const totalDice = dicePerLevel * overchannelSpellLevel;
+                    const necroticFormula = `${totalDice}d12`;
+                    const necroticResult = rollExpression(necroticFormula);
+                    if (necroticResult) {
+                        const combatSummary = await loadCombatSummary(campaignName);
+                        const applyResult = applyDamageToTarget(combatSummary, playerStats.name, necroticResult.total, ['Necrotic'], campaignName, null, true, playerStats.name);
+                        addEntry(campaignName, {
+                            type: 'roll',
+                            characterName: playerStats.name,
+                            rollType: 'overchannel-damage',
+                            name: 'Overchannel',
+                            formula: necroticFormula,
+                            rolls: necroticResult.rolls,
+                            total: necroticResult.total,
+                            modifier: necroticResult.modifier,
+                            damageType: 'Necrotic',
+                            targetName: playerStats.name,
+                            finalDamage: applyResult?.finalDamage,
+                            note: 'Overchannel self-damage (ignores resistance/immunity)',
+                        }).catch(() => {});
+                    }
+                    const usesKey = '_Overchannel_uses';
+                    const restKey = '_Overchannel_restTimestamp';
+                    const now = Date.now();
+                    const lastRestTimestamp = getRuntimeValue(playerStats.name, restKey, campaignName);
+                    let currentUses;
+                    if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
+                        currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
+                    } else if (!lastRestTimestamp) {
+                        currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
+                    } else {
+                        currentUses = 1;
+                    }
+                    if (currentUses > 0) {
+                        await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+                    }
+                }
             }
             // Remarkable Athlete: after critical hit, enable movement without opportunity attacks
             if (isCrit) {
@@ -181,6 +247,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         dragonCompanionModal, setDragonCompanionModal,
         wildMagicDoubleRollModal, setWildMagicDoubleRollModal,
         wildMagicTamedModal, setWildMagicTamedModal,
+        divinationSavantModal, setDivinationSavantModal,
+        illusionSavantModal, setIllusionSavantModal,
+        thirdEyeModal, setThirdEyeModal,
+        soulstitchSpellsModal, setSoulstitchSpellsModal,
+        illusoryRealityModal, setIllusoryRealityModal,
         divineFuryChoice,
         damageTypeChoice,
         featureChoice, setFeatureChoice,
@@ -383,6 +454,21 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'wildMagicTamed':
                         setWildMagicTamedModal(result.payload);
                         break;
+                    case 'divinationSavant':
+                        setDivinationSavantModal(result.payload);
+                        break;
+                    case 'illusionSavant':
+                        setIllusionSavantModal(result.payload);
+                        break;
+                    case 'thirdEye':
+                        setThirdEyeModal(result.payload);
+                        break;
+                    case 'soulstitchSpells':
+                        setSoulstitchSpellsModal(result.payload);
+                        break;
+                    case 'illusoryReality':
+                        setIllusoryRealityModal(result.payload);
+                        break;
                     case 'defensiveTactics': {
                         const actionData = result.payload?.action;
                         const defensiveChoice = getRuntimeValue(playerStats.name, '_Defensive_Tactics_choice', campaignName);
@@ -459,6 +545,26 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             });
         }
     }, [divineInterventionAction, playerStats, campaignName, rollAttack, rollDamage, mapName, setPopupHtml, setDivineInterventionModal, setDivineInterventionAction]);
+
+    const handleDivinationSavantConfirm = React.useCallback(async (spell1, spell2) => {
+        if (!divinationSavantModal) return;
+        const { onDivinationSavantSelected } = await import('../../services/automation/handlers/divinationSavantHandler.js');
+        const result = await onDivinationSavantSelected(divinationSavantModal.payload.action, playerStats, campaignName, spell1, spell2);
+        setDivinationSavantModal(null);
+        if (result && result.type === 'popup') {
+            setPopupHtml(result.payload);
+        }
+    }, [divinationSavantModal, playerStats, campaignName, setPopupHtml, setDivinationSavantModal]);
+
+    const handleIllusionSavantConfirm = React.useCallback(async (spell1, spell2) => {
+        if (!illusionSavantModal) return;
+        const { onIllusionSavantSelected } = await import('../../services/automation/handlers/illusionSavantHandler.js');
+        const result = await onIllusionSavantSelected(illusionSavantModal.payload.action, playerStats, campaignName, spell1, spell2);
+        setIllusionSavantModal(null);
+        if (result && result.type === 'popup') {
+            setPopupHtml(result.payload);
+        }
+    }, [illusionSavantModal, playerStats, campaignName, setPopupHtml, setIllusionSavantModal]);
 
     const getWeaponMastery = (weaponName) => {
         if (playerStats.rules !== '2024') {
@@ -848,6 +954,41 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <WildMagicTamedModal
                         {...wildMagicTamedModal}
                         onClose={() => setWildMagicTamedModal(null)}
+                    />
+                )}
+                {divinationSavantModal && (
+                    <DivinationSavantModal
+                        payload={divinationSavantModal.payload}
+                        onConfirm={handleDivinationSavantConfirm}
+                        onClose={() => setDivinationSavantModal(null)}
+                    />
+                )}
+                {illusionSavantModal && (
+                    <IllusionSavantModal
+                        payload={illusionSavantModal.payload}
+                        onConfirm={handleIllusionSavantConfirm}
+                        onClose={() => setIllusionSavantModal(null)}
+                    />
+                )}
+                {thirdEyeModal && (
+                    <ThirdEyeModal
+                        action={thirdEyeModal.action}
+                        playerStats={thirdEyeModal.playerStats}
+                        campaignName={thirdEyeModal.campaignName}
+                        onClose={() => setThirdEyeModal(null)}
+                    />
+                )}
+                {soulstitchSpellsModal && (
+                    <SoulstitchSpellsModal
+                        {...soulstitchSpellsModal}
+                        mapName={mapName}
+                        onClose={() => setSoulstitchSpellsModal(null)}
+                    />
+                )}
+                {illusoryRealityModal && (
+                    <IllusoryRealityModal
+                        {...illusoryRealityModal}
+                        onClose={() => setIllusoryRealityModal(null)}
                     />
                 )}
                 {divineFuryChoice && (

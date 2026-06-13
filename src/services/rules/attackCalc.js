@@ -175,6 +175,7 @@ export function buildSpellAttacks(playerSpells, allSpells, spellAbilities, playe
             damageType: spell.damage.damage_type,
             range: spell.range,
             type: spell.casting_time,
+            school: spell.school || null,
          };
 
         // Only include spells cast as an Action or Bonus Action in the attacks list

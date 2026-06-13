@@ -104,9 +104,10 @@ function createPlayerCharacter(name, extra = {}) {
  */
 function stubPlayerRuntime(currentHp, conditions = []) {
   getRuntimeValue
-    .mockReturnValueOnce([])                  // activeBuffs
-    .mockReturnValueOnce(currentHp)           // currentHitPoints
-    .mockReturnValueOnce(conditions);         // activeConditions
+    .mockReturnValueOnce([])                        // activeBuffs
+    .mockReturnValueOnce(undefined)                 // arcaneWardActive (ward not active)
+    .mockReturnValueOnce(currentHp)                 // currentHitPoints
+    .mockReturnValueOnce(conditions);               // activeConditions
 }
 
 // ── Tests ───────────────────────────────────────────────────────

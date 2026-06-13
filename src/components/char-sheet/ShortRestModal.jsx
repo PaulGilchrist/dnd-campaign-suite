@@ -8,6 +8,7 @@ import { getClassFeatures } from '../../services/character/classFeatures.js'
 import { evaluateAutoExpression } from '../../services/combat/automationService.js'
 import { getCombatContext } from '../../services/rules/damageUtils.js'
 import { applyHealingToTarget } from '../../services/rules/applyHealing.js'
+import { loadSpellData } from '../../services/ui/dataLoader.js'
 
 function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const [remainingHitDice, setRemainingHitDice] = React.useState(() => {
@@ -35,6 +36,42 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const arcaneRecoveryAvailable = !!arcaneRecovery && arcaneRecoveryCur !== null && arcaneRecoveryCur !== 0;
     const arcaneRecoveryMaxSlots = isWizard ? Math.ceil(playerStats.level / 2) : 0;
     const [arcaneRecoveryRequested, setArcaneRecoveryRequested] = React.useState(false);
+
+    const hasMemorizeSpell = isWizard && (playerStats.automation?.passives ?? []).find(
+        a => a.type === 'memorize_spell'
+    );
+    const [memorizeSpellMode, setMemorizeSpellMode] = React.useState(false);
+    const [memorizeSpellFrom, setMemorizeSpellFrom] = React.useState(null);
+    const [memorizeSpellTo, setMemorizeSpellTo] = React.useState(null);
+    const [allSpellbookSpells, setAllSpellbookSpells] = React.useState([]);
+
+    React.useEffect(() => {
+        if (hasMemorizeSpell) {
+            loadSpellData('wizard_spells', playerStats).then(spells => {
+                setAllSpellbookSpells(spells || []);
+            }).catch(() => setAllSpellbookSpells([]));
+        }
+    }, [hasMemorizeSpell, playerStats]);
+
+    const preparedSpells = React.useMemo(() => {
+        const stored = getRuntimeValue(playerStats.name, 'preparedSpells', campaignName);
+        if (Array.isArray(stored)) {
+            return stored;
+        }
+        const spells = playerStats.spellAbilities?.spells || [];
+        return spells.filter(s => s.prepared === 'Prepared').map(s => s.name);
+    }, [playerStats.spellAbilities?.spells, playerStats.name, campaignName]);
+
+    const memorizeSpellAvailable = hasMemorizeSpell && !memorizeSpellMode && preparedSpells.length > 0;
+
+    const memorizeSpellFromOptions = React.useMemo(() => {
+        return allSpellbookSpells.filter(s => preparedSpells.includes(s.name) && s.level >= 1);
+    }, [allSpellbookSpells, preparedSpells]);
+
+    const memorizeSpellToOptions = React.useMemo(() => {
+        const preparedSet = new Set(preparedSpells);
+        return allSpellbookSpells.filter(s => s.level >= 1 && !preparedSet.has(s.name));
+    }, [allSpellbookSpells, preparedSpells]);
 
     const hasFontOfInspiration = (playerStats.automation?.passives ?? []).some(p => p.type === 'font_of_inspiration');
     const bardicInspirationMax = (() => { const charisma = playerStats.abilities?.find(a => a.name === 'Charisma'); return charisma?.bonus || 0; })();
@@ -250,21 +287,78 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                        </div>
                    )}
 
-                   {arcaneRecovery && (arcaneRecoveryAvailable || arcaneRecoveryRequested) && (
-                       <div className="short-rest-section">
-                           <h4>Arcane Recovery</h4>
-                           <p>Regain expended Wizard spell slots up to level {arcaneRecoveryMaxSlots}. No slots level 6+.</p>
-                           <div className="short-rest-dice-row">
-                               {arcaneRecoveryRequested ? (
-                                   <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Arcane Recovery applied</span>
-                                 ) : (
-                                   <button className="char-btn" onClick={() => setArcaneRecoveryRequested(true)} disabled={!arcaneRecoveryAvailable}>
-                                       <i className="fas fa-book-open"></i> Recover Spell Slots
-                                   </button>
-                                 )}
-                           </div>
-                       </div>
-                   )}
+                    {arcaneRecovery && (arcaneRecoveryAvailable || arcaneRecoveryRequested) && (
+                        <div className="short-rest-section">
+                            <h4>Arcane Recovery</h4>
+                            <p>Regain expended Wizard spell slots up to level {arcaneRecoveryMaxSlots}. No slots level 6+.</p>
+                            <div className="short-rest-dice-row">
+                                {arcaneRecoveryRequested ? (
+                                    <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Arcane Recovery applied</span>
+                                  ) : (
+                                    <button className="char-btn" onClick={() => setArcaneRecoveryRequested(true)} disabled={!arcaneRecoveryAvailable}>
+                                        <i className="fas fa-book-open"></i> Recover Spell Slots
+                                    </button>
+                                  )}
+                            </div>
+                        </div>
+                    )}
+
+                    {hasMemorizeSpell && (memorizeSpellAvailable || memorizeSpellMode) && (
+                        <div className="short-rest-section">
+                            <h4>Memorize Spell</h4>
+                            <p>Replace one prepared level 1+ spell with another from your spellbook.</p>
+                            <div className="short-rest-dice-row">
+                                {!memorizeSpellMode ? (
+                                    <button className="char-btn" onClick={() => setMemorizeSpellMode(true)}>
+                                        <i className="fas fa-book-journal-whills"></i> Swap Prepared Spell
+                                    </button>
+                                  ) : (
+                                    <div>
+                                        <div style={{ marginBottom: '8px' }}>
+                                            <label>Remove prepared spell: </label>
+                                            <select className="char-btn" value={memorizeSpellFrom || ''} onChange={e => setMemorizeSpellFrom(e.target.value)}>
+                                                <option value="">-- Select spell to remove --</option>
+                                                {memorizeSpellFromOptions.map(s => (
+                                                    <option key={s.name} value={s.name}>{s.name} (level {s.level})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div style={{ marginBottom: '8px' }}>
+                                            <label>Add from spellbook: </label>
+                                            <select className="char-btn" value={memorizeSpellTo || ''} onChange={e => setMemorizeSpellTo(e.target.value)}>
+                                                <option value="">-- Select spell to add --</option>
+                                                {memorizeSpellToOptions.map(s => (
+                                                    <option key={s.name} value={s.name}>{s.name} (level {s.level})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="short-rest-dice-row">
+                                            <button className="char-btn" onClick={() => {
+                                                if (!memorizeSpellFrom || !memorizeSpellTo) return;
+                                                const newPrepared = preparedSpells.filter(n => n !== memorizeSpellFrom);
+                                                if (!newPrepared.includes(memorizeSpellTo)) {
+                                                    newPrepared.push(memorizeSpellTo);
+                                                }
+                                                setRuntimeValue(playerStats.name, 'preparedSpells', newPrepared, campaignName);
+                                                setMemorizeSpellMode(false);
+                                                setMemorizeSpellFrom(null);
+                                                setMemorizeSpellTo(null);
+                                            }} disabled={!memorizeSpellFrom || !memorizeSpellTo}>
+                                                <i className="fas fa-check"></i> Swap Spell
+                                            </button>
+                                            <button className="char-btn" onClick={() => {
+                                                setMemorizeSpellMode(false);
+                                                setMemorizeSpellFrom(null);
+                                                setMemorizeSpellTo(null);
+                                            }}>
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                  )}
+                            </div>
+                        </div>
+                    )}
 
                 <div className="short-rest-actions">
                     <button className="char-btn" onClick={handleComplete}>

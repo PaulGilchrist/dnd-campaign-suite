@@ -357,8 +357,15 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                 const isRanged = numericRange > 8;
                 const feats = featRangeEffects || { ignoresMeleeDisadvantage: false, ignoresLongRangeDisadvantage: false, rangeMultiplier: 1, spellRangeBonus: 0 };
 
+                // Improved Illusions: only apply range bonus to Illusion spells with range 10+ feet
+                const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
+                const isIllusionSpell = attack.school && attack.school.toLowerCase() === 'illusion';
+                const effectiveRangeBonus = (hasImprovedIllusions && isIllusionSpell && numericRange >= 10)
+                    ? (feats.spellRangeBonus || 0) + 60
+                    : feats.spellRangeBonus || 0;
+
                 if (targetPos) {
-                    const effectiveRange = isRanged ? numericRange + (feats.spellRangeBonus || 0) : attack.range;
+                    const effectiveRange = isRanged ? numericRange + effectiveRangeBonus : attack.range;
                     const distanceFt = getDistanceFeet(
                          { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
                         targetPos

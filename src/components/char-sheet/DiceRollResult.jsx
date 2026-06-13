@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, isPotentCantrip }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
@@ -211,6 +211,12 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                 ) : (
                   <span><strong>{finalDamage}</strong> damage applied to <strong>{targetName}</strong>{targetCurrentHp !== undefined ? ` — HP: ${targetCurrentHp + finalDamage} → ${targetCurrentHp}` : ''}</span>
                 )}
+              </div>
+            )}
+
+            {isPotentCantrip && (
+              <div className="dice-roll-potent-cantrip">
+                <i className="fa-solid fa-wand-magic-sparkles"></i> Potent Cantrip: half damage on miss
               </div>
             )}
 

@@ -1,6 +1,7 @@
 import { getLevelAfterLongRest } from '../combat/exhaustionRules.js'
 import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../hooks/useRuntimeState.js'
 import { clearAllExpirationEffects } from './expirations.js'
+import { rollD20 } from '../../services/dice/diceRoller.js'
 
 export function getHitDieSize(playerStats) {
   const hitDieStr = playerStats?.class?.hit_point_die || playerStats?.class?.hit_die;
@@ -85,16 +86,18 @@ export const LONG_REST_RESOURCES = [
          'wholenessofbodyUses',
          'wildResurgenceReversedThisRest',
          'indomitableUses',
-         'naturalRecoveryFreeCast',
-         'naturalRecoverySlots',
+          'naturalRecoveryFreeCast',
+          'naturalRecoverySlots',
+          '_Signature_Spells_freeCastCount',
            '_Star_Map_freeCastCount',
            '_Dragon_Companion_freeCastCount',
             '_Contact_Patron_freeCastCount',
             '_Mystic_Arcanum_freeCastCount',
             '_Mystic_Arcanum_(level_7_spell)_freeCastCount',
             '_Mystic_Arcanum_(level_8_spell)_freeCastCount',
-            '_Mystic_Arcanum_(level_9_spell)_freeCastCount',
-           'magicalCunningUsed'
+             '_Mystic_Arcanum_(level_9_spell)_freeCastCount',
+            'magicalCunningUsed',
+             '_Phantasmal_Creatures_freeCastCount'
     ]
 
 export function getLongRestResources() {
@@ -182,6 +185,56 @@ export async function applyShortRest(playerStats, campaignName) {
           const toRecover = Math.min(available, maxSlotsToRecover - slotsRecovered)
           updates[slotKey] = current + toRecover
           slotsRecovered += toRecover
+        }
+      }
+    }
+
+    // Signature Spells: Reset free cast count on short or long rest
+    const hasSignatureSpells = (playerStats.automation?.actions ?? []).some(
+      a => a.type === 'signature_spells'
+    )
+    if (hasSignatureSpells) {
+      updates._Signature_Spells_freeCastCount = null
+    }
+
+    // Divination Savant: Reset free cast tracking on short or long rest
+    const hasDivinationSavant = (playerStats.automation?.passives ?? []).some(
+      p => p.type === 'passive_rule' && p.effect === 'divination_savant'
+    )
+    if (hasDivinationSavant) {
+      const divSelection = getRuntimeValue(name, '_Divination_Savant_selection', campaignName)
+      if (divSelection && Array.isArray(divSelection)) {
+        for (const spell of divSelection) {
+          const usedKey = `_Divination_Savant_${spell.replace(/\s+/g, '_')}_used`
+          updates[usedKey] = null
+        }
+      }
+    }
+
+    // Evocation Savant: Reset free cast tracking on short or long rest
+    const hasEvocationSavant = (playerStats.automation?.passives ?? []).some(
+      p => p.type === 'passive_rule' && p.effect === 'evocation_savant'
+    )
+    if (hasEvocationSavant) {
+      const evocSelection = getRuntimeValue(name, '_Evocation_Savant_selection', campaignName)
+      if (evocSelection && Array.isArray(evocSelection)) {
+        for (const spell of evocSelection) {
+          const usedKey = `_Evocation_Savant_${spell.replace(/\s+/g, '_')}_used`
+          updates[usedKey] = null
+        }
+      }
+    }
+
+    // Illusion Savant: Reset free cast tracking on short or long rest
+    const hasIllusionSavant = (playerStats.automation?.passives ?? []).some(
+      p => p.type === 'passive_rule' && p.effect === 'illusion_savant'
+    )
+    if (hasIllusionSavant) {
+      const illusionSelection = getRuntimeValue(name, '_Illusion_Savant_selection', campaignName)
+      if (illusionSelection && Array.isArray(illusionSelection)) {
+        for (const spell of illusionSelection) {
+          const usedKey = `_Illusion_Savant_${spell.replace(/\s+/g, '_')}_used`
+          updates[usedKey] = null
         }
       }
     }
@@ -297,10 +350,13 @@ export async function applyLongRest(playerStats, campaignName) {
     // Reset Uncanny Metabolism tracking on long rest
     setRuntimeValue(name, 'uncannyMetabolismUsed', false, campaignName, true)
 
-     // Reset Undying Sentinel (Oath of Glory level 15) on long rest
-     setRuntimeValue(name, 'undyingSentinelUsed', false, campaignName, true)
+    // Reset Undying Sentinel (Oath of Glory level 15) on long rest
+    setRuntimeValue(name, 'undyingSentinelUsed', false, campaignName, true)
 
-     // Celestial Resilience: Grant temp HP on long rest for Celestial Patron
+    // Reset Signature Spells on long rest
+    setRuntimeValue(name, '_Signature_Spells_freeCastCount', null, campaignName, true)
+
+    // Celestial Resilience: Grant temp HP on long rest for Celestial Patron
      if (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron') {
        const features = playerStats.characterAdvancement || []
        const feature = features.find(f => f.name === 'Celestial Resilience')
@@ -315,8 +371,35 @@ export async function applyLongRest(playerStats, campaignName) {
        }
      }
 
-     // Reset Bastion of Law ward on long rest
+      // Reset Bastion of Law ward on long rest
     setRuntimeValue(name, 'bastionOfLawActive', false, campaignName, true)
     setRuntimeValue(name, 'bastionOfLawWardDice', [], campaignName, true)
     setRuntimeValue(name, 'bastionOfLawWardTarget', null, campaignName, true)
+
+    // Reset Arcane Ward on long rest
+    setRuntimeValue(name, 'arcaneWardActive', false, campaignName, true)
+    setRuntimeValue(name, 'arcaneWardHp', 0, campaignName, true)
+    setRuntimeValue(name, 'arcaneWardMax', 0, campaignName, true)
+
+    // Refresh Portent dice on long rest
+    const hasPortent = (playerStats.automation?.specialActions ?? []).some(
+      a => a.type === 'portent' || a.name === 'Portent'
+    )
+    if (hasPortent) {
+      const maxDice = playerStats.level >= 14 ? 3 : 2
+      const dice = []
+      for (let i = 0; i < maxDice; i++) {
+        dice.push(rollD20())
+      }
+      setRuntimeValue(name, 'portentDice', JSON.stringify(dice), campaignName, true)
+    }
+
+    // Reset Phantasmal Creatures free cast on long rest
+    const hasPhantasmalCreatures = (playerStats.automation?.passives ?? []).some(
+      p => p.type === 'phantasmal_creatures'
+    )
+    if (hasPhantasmalCreatures) {
+      setRuntimeValue(name, '_Phantasmal_Creatures_freeCastCount', null, campaignName, true)
+      setRuntimeValue(name, '_phantasmalCreatures_list', [], campaignName, true)
+    }
 }

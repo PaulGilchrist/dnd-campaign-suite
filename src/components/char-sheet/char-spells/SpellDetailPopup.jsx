@@ -3,7 +3,7 @@ import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
 import { getActiveBuffs } from '../../../services/combat/buffService.js'
 
-function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats) {
+function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, campaignName) {
   const raw = getRuntimeValue(playerName, '_War_God_s_Blessing_freeCast');
   if (raw && Array.isArray(raw) && raw.includes(spellName)) return true;
 
@@ -12,6 +12,39 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats) {
 
   const bewitchingFreeCast = getRuntimeValue(playerName, '_Bewitching_Magic_freeCast');
   if (bewitchingFreeCast && spellName === 'Misty Step') return true;
+
+  // Spell Mastery: check runtime state for player-chosen mastery spells
+  const masteryLevel1 = getRuntimeValue(playerName, '_Spell_Mastery_level1', campaignName);
+  const masteryLevel2 = getRuntimeValue(playerName, '_Spell_Mastery_level2', campaignName);
+  if (spellName === masteryLevel1 && spellLevel === 1) return true;
+  if (spellName === masteryLevel2 && spellLevel === 2) return true;
+
+  // Signature Spells: check runtime state for player-chosen signature spells
+  const sigSpells = getRuntimeValue(playerName, '_Signature_Spells_selection', campaignName);
+  if (Array.isArray(sigSpells) && sigSpells.includes(spellName) && spellLevel === 3) {
+    const usedKey = `_Signature_Spells_${spellName.replace(/\s+/g, '_')}_used`;
+    const used = getRuntimeValue(playerName, usedKey, campaignName);
+    if (!used) return true;
+  }
+
+  // Divination Savant: check runtime state for player-chosen Divination spells
+  const divSpells = getRuntimeValue(playerName, '_Divination_Savant_selection', campaignName);
+  if (Array.isArray(divSpells) && divSpells.includes(spellName)) {
+    const usedKey = `_Divination_Savant_${spellName.replace(/\s+/g, '_')}_used`;
+    const used = getRuntimeValue(playerName, usedKey, campaignName);
+    if (!used) return true;
+  }
+
+  // Phantasmal Creatures: check runtime state for free cast of Summon Beast or Summon Fey
+  const hasPhantasmalCreatures = playerStats?.automation?.passives?.some(p => p.type === 'phantasmal_creatures');
+  if (hasPhantasmalCreatures) {
+    const summonBeast = ['Summon Beast', 'Summon Fey'];
+    if (summonBeast.includes(spellName)) {
+      const freeCastCountKey = `_Phantasmal_Creatures_freeCastCount`;
+      const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? 1);
+      if (count > 0) return true;
+    }
+  }
 
   const actions = playerStats?.automation?.actions || [];
   for (const entry of actions) {
@@ -54,19 +87,27 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
   const charDmg = spell.damage?.damage_at_character_level;
   const isUpcastable = !isCantrip && slotDmg && Object.keys(slotDmg).length > 1;
 
-  const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spell.name, spell.level, playerStats);
+  const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spell.name, spell.level, playerStats, campaignName);
   const hasAnySlots = isCantrip || freeCastAuthorized || upcastLevels.some(l => l.availableSlots > 0);
 
   const isWarlock = playerStats.class?.name === 'Warlock';
   const hasPsychicSpells = playerStats.automation?.passives?.some(p => p.type === 'psychic_spells');
+  const hasSpellBreaker = playerStats.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'spell_breaker');
+  const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
   const hasDamage = !!spell.damage;
   const isEnchantmentOrIllusion = () => {
     const school = (spell.school || '').toLowerCase();
     return school === 'enchantment' || school === 'illusion';
   };
+  const isIllusionSpell = () => {
+    const school = (spell.school || '').toLowerCase();
+    return school === 'illusion';
+  };
   const canChangeDamageType = isWarlock && hasPsychicSpells && hasDamage;
+  const isDispelMagicAsBonusAction = hasSpellBreaker && spell.name === 'Dispel Magic';
   const [usePsychicDamage, setUsePsychicDamage] = useState(false);
   const [noVSComponents] = useState(isWarlock && hasPsychicSpells && isEnchantmentOrIllusion());
+  const [noVComponents] = useState(hasImprovedIllusions && isIllusionSpell());
 
   const [selectedUpcastLvl, setSelectedUpcastLvl] = useState(() => {
     const firstAvailable = upcastLevels.find(l => l.availableSlots > 0);
@@ -104,42 +145,63 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
       return;
     }
     if (freeCastAuthorized) {
-      const actions = playerStats?.automation?.actions || [];
-      for (const entry of actions) {
-        if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'dragon_companion') continue;
+      // Spell Mastery: mark as used (at-will, so no tracking needed beyond the cast)
+      const masteryLevel1 = getRuntimeValue(playerStats.name, '_Spell_Mastery_level1', campaignName);
+      const masteryLevel2 = getRuntimeValue(playerStats.name, '_Spell_Mastery_level2', campaignName);
+      if (spell.name === masteryLevel1 || spell.name === masteryLevel2) {
+        // At-will casting, no tracking needed
+      } else {
+        const actions = playerStats?.automation?.actions || [];
+        for (const entry of actions) {
+          if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'dragon_companion') continue;
 
-        // Counter-based free casts — match by spell level, not name
-        // Must stay in sync with isFreeCastAuthorized logic above
-        if (entry.uses_expression && entry.usesMax) {
-          const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
-          const levelMatch = spellField ? spellField.match(/level (\d+)/) : null;
-          const featureLevel = levelMatch ? parseInt(levelMatch[1], 10) : null;
-          if (featureLevel !== null && featureLevel === spell.level) {
-            const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-            const count = Number(getRuntimeValue(playerStats.name, freeCastCountKey) ?? entry.usesMax);
-            if (count > 0) {
-              setRuntimeValue(playerStats.name, freeCastCountKey, count - 1, campaignName);
+          // Counter-based free casts — match by spell level, not name
+          // Must stay in sync with isFreeCastAuthorized logic above
+          if (entry.uses_expression && entry.usesMax) {
+            const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
+            const levelMatch = spellField ? spellField.match(/level (\d+)/) : null;
+            const featureLevel = levelMatch ? parseInt(levelMatch[1], 10) : null;
+            if (featureLevel !== null && featureLevel === spell.level) {
+              const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+              const count = Number(getRuntimeValue(playerStats.name, freeCastCountKey) ?? entry.usesMax);
+              if (count > 0) {
+                setRuntimeValue(playerStats.name, freeCastCountKey, count - 1, campaignName);
+              }
+              break;
             }
+            continue;
+          }
+
+          const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
+          if (!spells.includes(spell.name)) continue;
+
+          if (entry.perSpellTracking) {
+            const usedKey = `_${entry.name.replace(/\s+/g, '_')}_${spell.name.replace(/\s+/g, '_')}_used`;
+            setRuntimeValue(playerStats.name, usedKey, true, campaignName);
             break;
           }
-          continue;
+        }
+        const nrFreeCast = getRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast');
+        if (nrFreeCast && Array.isArray(nrFreeCast) && nrFreeCast.includes(spell.name)) {
+          setRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast', null, campaignName);
+        }
+        if (getRuntimeValue(playerStats.name, '_Bewitching_Magic_freeCast') && spell.name === 'Misty Step') {
+          setRuntimeValue(playerStats.name, '_Bewitching_Magic_freeCast', null, campaignName);
         }
 
-        const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
-        if (!spells.includes(spell.name)) continue;
-
-        if (entry.perSpellTracking) {
-          const usedKey = `_${entry.name.replace(/\s+/g, '_')}_${spell.name.replace(/\s+/g, '_')}_used`;
+        // Signature Spells: mark as used
+        const sigSpells = getRuntimeValue(playerStats.name, '_Signature_Spells_selection', campaignName);
+        if (Array.isArray(sigSpells) && sigSpells.includes(spell.name) && spell.level === 3) {
+          const usedKey = `_Signature_Spells_${spell.name.replace(/\s+/g, '_')}_used`;
           setRuntimeValue(playerStats.name, usedKey, true, campaignName);
-          break;
         }
-      }
-      const nrFreeCast = getRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast');
-      if (nrFreeCast && Array.isArray(nrFreeCast) && nrFreeCast.includes(spell.name)) {
-        setRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast', null, campaignName);
-      }
-      if (getRuntimeValue(playerStats.name, '_Bewitching_Magic_freeCast') && spell.name === 'Misty Step') {
-        setRuntimeValue(playerStats.name, '_Bewitching_Magic_freeCast', null, campaignName);
+
+        // Divination Savant: mark as used
+        const divSpells = getRuntimeValue(playerStats.name, '_Divination_Savant_selection', campaignName);
+        if (Array.isArray(divSpells) && divSpells.includes(spell.name)) {
+          const divUsedKey = `_Divination_Savant_${spell.name.replace(/\s+/g, '_')}_used`;
+          setRuntimeValue(playerStats.name, divUsedKey, true, campaignName);
+        }
       }
     } else {
       const spellSlotKey = `spell_slots_level_${spell.level}`;
@@ -150,9 +212,31 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
         setRuntimeValue(playerStats.name, spellSlotKey, availableSlots - 1, campaignName);
       }
     }
-    const modifiedSpell = canChangeDamageType && usePsychicDamage
-      ? { ...spell, _psychicSpellsOverride: true }
-      : spell;
+    const modifiedSpell = (() => {
+      let s = { ...spell };
+      if (canChangeDamageType && usePsychicDamage) {
+        s._psychicSpellsOverride = true;
+      }
+      if (isDispelMagicAsBonusAction && s.casting_time === '1 action') {
+        s.casting_time = '1 bonus action';
+      }
+      // Phantasmal Creatures: change school to Illusion and mark HP halving
+      const hasPhantasmalCreatures = playerStats.automation?.passives?.some(p => p.type === 'phantasmal_creatures');
+      const summonBeastOrFey = ['Summon Beast', 'Summon Fey'];
+      if (hasPhantasmalCreatures && freeCastAuthorized && summonBeastOrFey.includes(spell.name)) {
+        s.school = 'Illusion';
+        s._phantasmalCreatures = true;
+        // Track which summon creature names to halve HP for
+        const summonCreatureName = spell.name === 'Summon Beast' ? 'Bestial Spirit' : 'Fey Spirit';
+        const existingCreatures = getRuntimeValue(playerStats.name, '_phantasmalCreatures_list');
+        const creatureList = Array.isArray(existingCreatures) ? existingCreatures : [];
+        if (!creatureList.includes(summonCreatureName)) {
+          creatureList.push(summonCreatureName);
+          setRuntimeValue(playerStats.name, '_phantasmalCreatures_list', creatureList, campaignName);
+        }
+      }
+      return s;
+    })();
     onCast(modifiedSpell);
   };
 
@@ -226,6 +310,11 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
         {noVSComponents && (
           <div className="spell-detail-free-cast">
             <i className="fa-solid fa-ghost"></i> No Verbal or Somatic components (Psychic Spells)
+          </div>
+        )}
+        {noVComponents && (
+          <div className="spell-detail-free-cast">
+            <i className="fa-solid fa-ghost"></i> No Verbal components (Improved Illusions)
           </div>
         )}
         <div className="spell-detail-actions">

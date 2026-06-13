@@ -112,5 +112,9 @@ export const characterAdvancement = [
     "Slippery Mind",
     "Skillful",
     "Student of War",
-    "Versatile"
+    "Versatile",
+    "Abjuration Savant",
+    "Divination Savant",
+    "Evocation Savant",
+    "Spell Breaker"
 ];

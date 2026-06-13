@@ -2,6 +2,14 @@ import { hitTestOverlay } from '../../models/SpellOverlay.js';
 import { rollSaveForCreature, computeDamageAfterSave, applyDamageToTarget } from './applyDamage.js';
 import { sendSavePrompt } from '../combat/savePromptService.js';
 import utils from '../ui/utils.js';
+import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
+
+function hasSoulstitchProtection(targetName, attackerName, campaignName) {
+    if (!attackerName) return false;
+    const key = `_${attackerName.replace(/\s+/g, '_')}_Soulstitch_Spells_active`;
+    const stored = getRuntimeValue(attackerName, key, campaignName);
+    return Array.isArray(stored) && stored.includes(targetName);
+}
 
 export function getAffectedCreatures(overlay, players, placedItems, combatSummary) {
   if (!overlay || !combatSummary?.creatures) return [];
@@ -32,16 +40,18 @@ export function processAoeNpcs(combatSummary, affected, rawDamage, damageType, s
   for (const { creature } of affected) {
     if (creature.type !== 'npc') continue;
     const saveResult = rollSaveForCreature(creature, saveType, saveDc);
-    const finalDamage = computeDamageAfterSave(rawDamage, saveResult.success, dcSuccess);
+    const isSoulstitchProtected = hasSoulstitchProtection(creature.name, attackerName, campaignName);
+    const finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterSave(rawDamage, saveResult.success, dcSuccess);
     const applyResult = applyDamageToTarget(combatSummary, creature.name, finalDamage, [damageType], campaignName, null, false, attackerName);
     results.push({
       creatureName: creature.name,
-      saveSuccess: saveResult.success,
+      saveSuccess: isSoulstitchProtected ? true : saveResult.success,
       saveRoll: saveResult.roll,
       saveBonus: saveResult.bonus,
       finalDamage: applyResult?.finalDamage ?? finalDamage,
       newHp: applyResult?.newHp,
       damageReduced: applyResult?.damageReduced,
+      soulstitchProtected: isSoulstitchProtected,
     });
   }
   return results;

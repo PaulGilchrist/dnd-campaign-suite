@@ -168,5 +168,27 @@ export const spellHandlers = {
             casting_time: auto.casting_time || '1 bonus action',
             hasAutomation: true
         }
+    },
+
+    'signature_spells': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'signature_spells',
+            name: feature.name,
+            action: auto.action || 'action',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
+    'overchannel': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'overchannel',
+            name: feature.name,
+            effect: 'overchannel',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
     }
 }

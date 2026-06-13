@@ -209,57 +209,67 @@ export async function getExpertiseLimits(formData) {
       if (feature.feature_specific?.expertise) {
         totalCount += feature.feature_specific.expertise.count || 0;
        }
-       // Also check if the feature name contains "Expertise"
-      else if (feature.name && feature.name.includes('Expertise')) {
-         // Parse the description for count
-        const match = feature.description?.match(/choose\s+(\d+)/i);
-        if (match) {
-          totalCount += parseInt(match[1], 10);
-         } else {
-          // Default to 2 if not specified
-          totalCount += 2;
-         }
-       }
+        // Also check if the feature name contains "Expertise"
+       else if (feature.name && feature.name.includes('Expertise')) {
+          // Parse the description for count
+         const match = feature.description?.match(/choose\s+(\d+)/i);
+         if (match) {
+           totalCount += parseInt(match[1], 10);
+          } else {
+           // Default to 2 if not specified
+           totalCount += 2;
+          }
+        }
+        // Check for Scholar feature (Wizard 2024) which grants 1 expertise
+       else if (feature.name === 'Scholar' && feature.description?.includes('Expertise')) {
+         totalCount += 1;
+        }
      }
    }
 
-   // Also check subclass/majors features for 2024
-  if (ruleset === '2024' && classData.majors) {
-    const subclass = formData.class?.subclass?.name;
-    if (subclass) {
-      const subclassData = classData.majors.find(m => m.name === subclass);
-      if (subclassData?.features) {
-        for (const feature of subclassData.features) {
-          if (feature.level <= level && feature.name?.includes('Expertise')) {
-            const match = feature.description?.match(/choose\s+(\d+)/i);
-            if (match) {
-              totalCount += parseInt(match[1], 10);
-             }
-           }
-         }
-       }
-     }
-   }
+    // Also check subclass/majors features for 2024
+   if (ruleset === '2024' && classData.majors) {
+     const subclass = formData.class?.subclass?.name;
+     if (subclass) {
+       const subclassData = classData.majors.find(m => m.name === subclass);
+       if (subclassData?.features) {
+         for (const feature of subclassData.features) {
+           if (feature.level <= level) {
+             if (feature.name?.includes('Expertise')) {
+               const match = feature.description?.match(/choose\s+(\d+)/i);
+               if (match) {
+                 totalCount += parseInt(match[1], 10);
+                }
+              } else if (feature.name === 'Scholar' && feature.description?.includes('Expertise')) {
+               totalCount += 1;
+              }
+            }
+          }
+        }
+      }
+    }
 
-   // For 5e, also check subclasses
-  if (ruleset === '5e' && classData.subclasses) {
-    const subclass = formData.class?.subclass?.name;
-    if (subclass) {
-      const subclassData = classData.subclasses.find(s => s.name === subclass);
-      if (subclassData?.class_levels) {
-        for (const classLevel of subclassData.class_levels) {
-          if (classLevel.level <= level) {
-            const features = classLevel.features || [];
-            for (const feature of features) {
-              if (feature.name?.includes('Expertise')) {
-                const match = feature.description?.match(/choose\s+(\d+)/i);
-                if (match) {
-                  totalCount += parseInt(match[1], 10);
-                 }
-               }
-             }
-           }
-         }
+    // For 5e, also check subclasses
+   if (ruleset === '5e' && classData.subclasses) {
+     const subclass = formData.class?.subclass?.name;
+     if (subclass) {
+       const subclassData = classData.subclasses.find(s => s.name === subclass);
+       if (subclassData?.class_levels) {
+         for (const classLevel of subclassData.class_levels) {
+           if (classLevel.level <= level) {
+             const features = classLevel.features || [];
+             for (const feature of features) {
+               if (feature.name?.includes('Expertise')) {
+                 const match = feature.description?.match(/choose\s+(\d+)/i);
+                 if (match) {
+                   totalCount += parseInt(match[1], 10);
+                  }
+                } else if (feature.name === 'Scholar' && feature.description?.includes('Expertise')) {
+                 totalCount += 1;
+                }
+              }
+            }
+          }
        }
      }
    }

@@ -463,6 +463,31 @@ export const miscHandlers = {
         }
     },
 
+    'memorize_spell': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'memorize_spell',
+            name: feature.name,
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
+    'spell_breaker': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'passive_rule',
+            name: feature.name,
+            effect: 'spell_breaker',
+            alwaysPreparedSpells: auto.alwaysPreparedSpells || [],
+            bonusActionSpells: auto.bonusActionSpells || [],
+            dispelAbilityCheckBonus: auto.dispelAbilityCheckBonus || '',
+            slotRetentionSpells: auto.slotRetentionSpells || [],
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
     'create_thrall': (feature, playerStats) => {
         const auto = feature.automation
         let usesMax = auto.uses || 1;
@@ -480,6 +505,74 @@ export const miscHandlers = {
             action: auto.action || 'action',
             casting_time: auto.casting_time || '1 action',
             hasAutomation: true
+        }
+    },
+
+    'portent': (feature, playerStats) => {
+        const auto = feature.automation
+        const maxDice = (playerStats.level >= 14) ? 3 : 2;
+        return {
+            type: 'portent',
+            name: feature.name,
+            effect: auto.effect || '',
+            maxDice,
+            hasAutomation: true
+        }
+    },
+
+    'third_eye': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'bonus_action_choice',
+            name: feature.name,
+            options: [
+                { name: 'Darkvision (120 feet)', description: 'You gain Darkvision out to a range of 120 feet.' },
+                { name: 'Greater Comprehension', description: 'You can read any language.' },
+                { name: 'See Invisibility', description: 'You can see invisible creatures and objects within 10 feet of you that are within line of sight.' },
+            ],
+            action: 'bonus_action',
+            casting_time: '1 bonus action',
+            duration: auto.duration || 'short_or_long_rest',
+            hasAutomation: true
+        }
+    },
+
+    'improved_illusions': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'improved_illusions',
+            name: feature.name,
+            effect: 'improved_illusions',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
+    'phantasmal_creatures': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'phantasmal_creatures',
+            name: feature.name,
+            effect: 'phantasmal_creatures',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true,
+            alwaysPreparedSpells: auto.alwaysPreparedSpells || [],
+            freeCastSpells: auto.freeCastSpells || [],
+            usesMax: auto.usesMax || 1,
+            recharge: auto.recharge || 'long_rest',
+            halvesHp: auto.halvesHp || false,
+        }
+    },
+
+    'illusory_reality': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'illusory_reality',
+            name: feature.name,
+            effect: 'illusory_reality',
+            casting_time: auto.casting_time || '1 bonus_action',
+            objectDuration: auto.objectDuration || '1 minute',
+            hasAutomation: true,
         }
     }
 }

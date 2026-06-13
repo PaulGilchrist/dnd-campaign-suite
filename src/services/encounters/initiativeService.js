@@ -1,6 +1,7 @@
 import { rollD20 } from '../dice/diceRoller.js'
 import { getMonsterData } from '../npcs/monsterUtils.js'
 import { getMonsterSaveBonuses } from './encounterToInitiative.js'
+import { getRuntimeValue } from '../../hooks/useRuntimeState.js'
 
 function parseInitBonus(monster) {
     const initStr = monster.initiative_details
@@ -117,8 +118,23 @@ async function applyNpcMonsterData(combatSummary, creatureIndex, monster, campai
     creature.resistances = monster.damage_resistances || []
     creature.immunities = monster.damage_immunities || []
     creature.initiativeBonus = monster.initiative_details ? parseInt(monster.initiative_details) || 0 : 0
-    creature.maxHp = monster.hit_points || 10
-    creature.currentHp = monster.hit_points || 10
+    let hp = monster.hit_points || 10
+    // Phantasmal Creatures: halve HP for Bestial Spirit and Fey Spirit when summoned via the feature
+    // Check all player creatures for phantasmal tracking
+    const isPhantasmalSummon = ['Bestial Spirit', 'Fey Spirit'].includes(creature.name)
+    if (isPhantasmalSummon) {
+        for (const pc of combatSummary.creatures) {
+            if (pc.type === 'player') {
+                const phantasmalList = getRuntimeValue(pc.name, '_phantasmalCreatures_list')
+                if (phantasmalList && Array.isArray(phantasmalList) && phantasmalList.includes(creature.name)) {
+                    hp = Math.floor(hp / 2)
+                    break
+                }
+            }
+        }
+    }
+    creature.maxHp = hp
+    creature.currentHp = hp
     creature.saveBonuses = getMonsterSaveBonuses(monster)
     const matchedNpc = campaignNpcs.find(n => n.name?.toLowerCase() === creature.name.toLowerCase())
     if (matchedNpc?.imagePath) {

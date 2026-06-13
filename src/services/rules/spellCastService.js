@@ -1,7 +1,7 @@
 import { rollExpression } from '../dice/diceRoller.js';
 import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet, rangeToFeet } from './rangeValidation.js';
 import { isInnateSorceryActive, getActiveBuffs } from '../combat/buffService.js';
-import { triggerPostCastRiderSaves, triggerSpellThief, triggerBewitchingMagic } from './postCastRiderService.js';
+import { triggerPostCastRiderSaves, triggerSpellThief, triggerBewitchingMagic, triggerSoulstitchSpells, hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from './postCastRiderService.js';
 import { triggerPostCastSelfHeals, triggerPostCastAllyHeals } from './postCastHealService.js';
 import { triggerSmiteOfProtection } from './smiteOfProtectionService.js';
 import { triggerInspiringSmite } from './inspiringSmiteService.js';
@@ -9,8 +9,10 @@ import { triggerPrimalCompanionSpellShare } from './primalCompanionSpellShareSer
 import { triggerWildMagicSurge } from './wildMagicSurgeService.js';
 import { setRuntimeValue, getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { applyHealingToTarget } from './applyHealing.js';
-import { getCombatContext } from './damageUtils.js';
+import { getCombatContext } from '../rules/damageUtils.js';
 import { postLogEntry } from '../shared/logPoster.js';
+import { executeHandler } from '../automation/index.js';
+import { rollExpressionMaximized } from '../dice/diceRoller.js';
 
 function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     if (spell.name !== 'Hex') return;
@@ -97,39 +99,88 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
      }
    }
 
-   const magicalAmbush = (playerStats.automation?.passives || []).some(
-     p => p.type === 'passive_rule' && p.effect === 'magical_ambush'
-   );
-   const casterConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) || [];
-   const hasInvisible = magicalAmbush && casterConditions.some(c => String(c).toLowerCase() === 'invisible');
+    const magicalAmbush = (playerStats.automation?.passives || []).some(
+      p => p.type === 'passive_rule' && p.effect === 'magical_ambush'
+    );
+    const casterConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) || [];
+    const hasInvisible = magicalAmbush && casterConditions.some(c => String(c).toLowerCase() === 'invisible');
 
-   if (spell.dc) {
-     const target = await getTargetInfo();
-     const context = {
-       targetName: target?.name,
-       attackerName: playerStats.name,
-        ...rollContext,
-       saveDc: playerStats.spellAbilities.saveDc + (innateSorceryActive ? 1 : 0),
-       saveType: spell.dc.dc_type,
-       dcSuccess: spell.dc.dc_success,
-       metamagicHeighten: hasInvisible,
-     };
-    const result = rollExpression(formula);
-    if (result) {
-      rollDamage(spell.name, formula, result.total, result.rolls, result.modifier, context);
+    const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);
+    const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
+    const spellSchool = (spell.school || '').toLowerCase();
+    const isEvocation = spellSchool === 'evocation';
+    const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && spell.damage && empEvocIntMod > 0;
+
+    let empEvocFormula = formula;
+    if (shouldApplyEmpoweredEvoc) {
+        empEvocFormula = `${formula} + ${empEvocIntMod}[Empowered Evocation]`;
+    }
+
+    // Overchannel: maximize damage for Wizard spells (slot levels 1-5) that deal damage
+    let overchannelFormula = empEvocFormula;
+    let overchannelActive = false;
+    let overchannelUseCount = 0;
+    const overchannelPassives = (playerStats.automation?.passives || []).filter(
+        p => p.type === 'overchannel'
+    );
+    if (overchannelPassives.length > 0) {
+        const spellLevel = metaCtx?.slotLevel || spell.level;
+        const hasDamage = !!spell.damage;
+        const isSlotLevelValid = spellLevel >= 1 && spellLevel <= 5;
+        const usesKey = '_Overchannel_uses';
+        const restKey = '_Overchannel_restTimestamp';
+        const now = Date.now();
+        const lastRestTimestamp = getRuntimeValue(playerStats.name, restKey, campaignName);
+        let currentMaxUses = 1;
+        if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
+            currentMaxUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
+        } else if (!lastRestTimestamp) {
+            currentMaxUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
+        }
+        if (hasDamage && isSlotLevelValid && currentMaxUses > 0) {
+            overchannelActive = true;
+            overchannelUseCount = currentMaxUses;
+            overchannelFormula = `${empEvocFormula}[Overchannel Maximize]`;
+        }
+    }
+
+      if (spell.dc) {
+       const target = await getTargetInfo();
+       const context = {
+         targetName: target?.name,
+         attackerName: playerStats.name,
+          ...rollContext,
+         saveDc: playerStats.spellAbilities.saveDc + (innateSorceryActive ? 1 : 0),
+         saveType: spell.dc.dc_type,
+         dcSuccess: spell.dc.dc_success,
+         metamagicHeighten: hasInvisible,
+         isCantrip: spell.level === 0,
+       };
+     let overchannelResult;
+     if (overchannelActive) {
+         overchannelResult = rollExpressionMaximized(empEvocFormula);
+     } else {
+         overchannelResult = rollExpression(empEvocFormula);
      }
-      } else {
-     const rollCtx = innateSorceryActive && !rollContext.forcedMode ? { ...rollContext, forcedMode: 'advantage' } : rollContext;
-     const attackCtx = {
-       autoDamageFormula: formula,
-       autoDamageName: spell.name,
-        ...rollCtx,
-        };
-     if (hasInvisible) {
-       attackCtx.metamagicHeighten = true;
-     }
-     rollAttack(spell.name, playerStats.spellAbilities.toHit, attackCtx);
+     if (overchannelResult) {
+       rollDamage(spell.name, empEvocFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
       }
+        } else {
+       const rollCtx = innateSorceryActive && !rollContext.forcedMode ? { ...rollContext, forcedMode: 'advantage' } : rollContext;
+        const attackCtx = {
+          autoDamageFormula: overchannelFormula,
+          autoDamageName: spell.name,
+          overchannelActive,
+          overchannelUseCount,
+          overchannelSpellLevel: metaCtx?.slotLevel || spell.level,
+           ...rollCtx,
+           isCantrip: spell.level === 0,
+           };
+       if (hasInvisible) {
+         attackCtx.metamagicHeighten = true;
+       }
+       rollAttack(spell.name, playerStats.spellAbilities.toHit, attackCtx);
+        }
 
     triggerPostCastRiderSaves(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast rider save failed:', e);
@@ -162,6 +213,45 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     triggerBewitchingMagic(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Bewitching Magic trigger failed:', e);
     });
+
+    triggerSoulstitchSpells(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+        console.error('[spellCast] Soulstitch Spells trigger failed:', e);
+    });
+
+    triggerExpertDivination(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+        console.error('[spellCast] Expert Divination trigger failed:', e);
+    });
+
+    triggerSpellBreakerSlotRetention(spell, metaCtx, playerStats, campaignName).catch(e => {
+        console.error('[spellCast] Spell Breaker slot retention trigger failed:', e);
+    });
+}
+
+async function triggerSpellBreakerSlotRetention(spell, metaCtx, playerStats, campaignName) {
+    const passives = playerStats.automation?.passives || [];
+    const spellBreaker = passives.find(p => p.type === 'passive_rule' && p.effect === 'spell_breaker');
+    if (!spellBreaker) return;
+
+    const retentionSpells = spellBreaker.slotRetentionSpells || [];
+    if (!retentionSpells.includes(spell.name)) return;
+
+    const slotKey = `spell_slots_level_${spell.level}`;
+    const currentSlots = getRuntimeValue(playerStats.name, slotKey);
+    if (currentSlots == null || currentSlots < 0) return;
+
+    const checkFailed = metaCtx?.saveSuccess === false || metaCtx?.abilityCheckSuccess === false;
+    if (!checkFailed) return;
+
+    setRuntimeValue(playerStats.name, slotKey, currentSlots + 1, campaignName);
+}
+
+
+
+export function refundSpellBreakerSlot(playerName, spellLevel, campaignName) {
+    const slotKey = `spell_slots_level_${spellLevel}`;
+    const currentSlots = getRuntimeValue(playerName, slotKey);
+    if (currentSlots == null || currentSlots < 0) return;
+    setRuntimeValue(playerName, slotKey, currentSlots + 1, campaignName);
 }
 
 async function applyPowerWordHealToTarget(targetName, playerStats, campaignName) {
@@ -209,4 +299,51 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName)
         sourceName: playerStats.name,
         note: 'Power Word Heal',
     });
+}
+
+const DIVINATION_SCHOOL = 'Divination';
+
+function usesSpellSlot(spell, metaCtx) {
+    return metaCtx?.slotLevel > 0 || spell.level > 0;
+}
+
+async function triggerExpertDivination(spell, metaCtx, playerStats, campaignName, mapName) {
+    if (!usesSpellSlot(spell, metaCtx)) {
+        return null;
+    }
+
+    const school = (spell.school || '').toLowerCase();
+    if (school !== DIVINATION_SCHOOL) {
+        return null;
+    }
+
+    const spellSlotLevel = metaCtx?.slotLevel || spell.level;
+    if (!spellSlotLevel || spellSlotLevel < 2) {
+        return null;
+    }
+
+    // Check if player has Expert Divination feature
+    const passives = playerStats.automation?.passives || [];
+    const hasExpertDivination = passives.some(p => p.name === 'Expert Divination' && p.type === 'expert_divination');
+    if (!hasExpertDivination) {
+        return null;
+    }
+
+    const action = {
+        name: 'Expert Divination',
+        automation: {
+            type: 'expert_divination',
+            casting_time: 'passive',
+        },
+        spell,
+        spellSlotLevel,
+    };
+
+    try {
+        const result = await executeHandler(action, playerStats, campaignName, mapName);
+        return result;
+    } catch (e) {
+        console.error('[spellCast] Expert Divination trigger failed:', e);
+        return null;
+    }
 }

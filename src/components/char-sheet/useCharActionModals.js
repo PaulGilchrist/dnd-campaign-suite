@@ -46,6 +46,11 @@ export default function useCharActionModals({
     const [dragonCompanionModal, setDragonCompanionModal] = useState(null);
     const [wildMagicDoubleRollModal, setWildMagicDoubleRollModal] = useState(null);
     const [wildMagicTamedModal, setWildMagicTamedModal] = useState(null);
+    const [divinationSavantModal, setDivinationSavantModal] = useState(null);
+    const [illusionSavantModal, setIllusionSavantModal] = useState(null);
+    const [thirdEyeModal, setThirdEyeModal] = useState(null);
+    const [soulstitchSpellsModal, setSoulstitchSpellsModal] = useState(null);
+    const [illusoryRealityModal, setIllusoryRealityModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
     const [featureChoice, setFeatureChoice] = useState(null);
@@ -857,6 +862,11 @@ export default function useCharActionModals({
         dragonCompanionModal, setDragonCompanionModal,
         wildMagicDoubleRollModal, setWildMagicDoubleRollModal,
         wildMagicTamedModal, setWildMagicTamedModal,
+        divinationSavantModal, setDivinationSavantModal,
+        illusionSavantModal, setIllusionSavantModal,
+        thirdEyeModal, setThirdEyeModal,
+        soulstitchSpellsModal, setSoulstitchSpellsModal,
+        illusoryRealityModal, setIllusoryRealityModal,
         divineFuryChoice, setDivineFuryChoice,
         damageTypeChoice, setDamageTypeChoice,
         featureChoice, setFeatureChoice,

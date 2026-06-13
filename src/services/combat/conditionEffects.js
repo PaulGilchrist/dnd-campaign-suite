@@ -16,6 +16,9 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
   if (modifier.effect === 'd20_floor_10') return true;
   if (modifier.effect === 'no_advantage_against') return true;
   if (modifier.effect === 'dark_ones_look') return true;
+  if (modifier.effect === 'portent') return true;
+  if (modifier.effect === 'potent_cantrip') return true;
+  if (modifier.effect === 'soulstitch_spells') return true;
   if (modifier.target !== 'saving_throw' && modifier.target !== 'save') return false;
   if (modifier.condition === 'raging') return isRaging;
   if (modifier.condition === 'shape_shift') return shapeShiftActive;
@@ -136,6 +139,25 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
     else if (mod.effect === 'dark_ones_look') {
       effects.darkOnesLook = true;
     }
+    else if (mod.effect === 'portent') {
+      effects.portent = true;
+    }
+    else if (mod.effect === 'improved_illusions') {
+      effects.improvedIllusions = true;
+    }
+    else if (mod.effect === 'illusory_reality') {
+      effects.illusoryReality = true;
+    }
+    else if (mod.effect === 'potent_cantrip') {
+      effects.potentCantrip = true;
+    }
+    else if (mod.effect === 'soulstitch_spells') {
+      effects.soulstitchSpells = true;
+    }
+    else if (mod.effect === 'spell_breaker_dispel_bonus') {
+      effects.spellBreakerDispelBonus = true;
+      effects.spellBreakerDispelBonusExpression = mod.bonusExpression || '';
+    }
   }
 }
 
@@ -179,6 +201,13 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     d20Floor10: false,
     noAdvantageAgainst: false,
     darkOnesLook: false,
+    portent: false,
+    potentCantrip: false,
+    soulstitchSpells: false,
+    spellBreakerDispelBonus: false,
+    spellBreakerDispelBonusExpression: null,
+    improvedIllusions: false,
+    illusoryReality: false,
     riderSaveDisadvantage: false,
     riderAttackBonus: 0,
     damageDoubled: false,

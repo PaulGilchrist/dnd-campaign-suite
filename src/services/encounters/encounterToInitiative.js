@@ -3,6 +3,7 @@ import storage from '../ui/storage.js';
 import { cloneDeep } from 'lodash';
 import { rollD20 } from '../dice/diceRoller.js';
 import { postLogEntry } from '../shared/logPoster.js';
+import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 
 export function getMonsterSaveBonuses(monster) {
   const map = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
@@ -71,7 +72,18 @@ export async function expandMonstersToCreatures(selectedMonsters, characters, _c
     selectedMonsters.forEach(monster => {
       const baseName = monster.name || 'Unnamed';
       const qty = monster.qty || 1;
-      const npcHp = monster.hit_points || 10;
+      let npcHp = monster.hit_points || 10;
+      // Phantasmal Creatures: halve HP for Bestial Spirit and Fey Spirit
+      const isPhantasmalSummon = ['Bestial Spirit', 'Fey Spirit'].includes(baseName);
+      if (isPhantasmalSummon) {
+        for (const character of characters) {
+          const phantasmalList = getRuntimeValue(character.name, '_phantasmalCreatures_list');
+          if (phantasmalList && Array.isArray(phantasmalList) && phantasmalList.includes(baseName)) {
+            npcHp = Math.floor(npcHp / 2);
+            break;
+          }
+        }
+      }
       for (let i = 0; i < qty; i++) {
           const name = qty === 1 ? baseName : `${baseName} ${i + 1}`;
           const rollResult = rollNpcInitiative(monster);

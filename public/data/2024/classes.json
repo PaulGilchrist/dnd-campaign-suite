@@ -11998,7 +11998,11 @@
             "name": "Memorize Spell",
             "description": "Whenever you finish a Short Rest, you can study your spellbook and replace one of the level 1+ Wizard spells you have prepared with another level 1+ spell from the book.",
             "level": 5,
-            "type": "class_feature"
+            "type": "class_feature",
+            "automation": {
+              "type": "memorize_spell",
+              "casting_time": "passive"
+            }
           }
         ],
         "spellcasting": {
@@ -12333,7 +12337,14 @@
             "name": "Spell Mastery",
             "description": "You have achieved such mastery over certain spells that you can cast them at will. Choose a level 1 and a level 2 spell in your spellbook that have a casting time of an action. You always have those spells prepared, and you can cast them at their lowest level without expending a spell slot. To cast either spell at a higher level, you must expend a spell slot.",
             "level": 18,
-            "type": "class_feature"
+            "type": "class_feature",
+            "automation": {
+              "type": "free_spell",
+              "spell": ["Spell Mastery 1", "Spell Mastery 2"],
+              "perSpellTracking": true,
+              "casting_time": "passive",
+              "action": "action"
+            }
           }
         ],
         "spellcasting": {
@@ -12391,7 +12402,12 @@
             "name": "Signature Spells",
             "description": "Choose two level 3 spells in your spellbook as your signature spells. You always have these spells prepared, and you can cast each of them once at level 3 without expending a spell slot. When you do so, you can't cast them in this way again until you finish a Short or Long Rest. To cast either spell at a higher level, you must expend a spell slot.",
             "level": 20,
-            "type": "class_feature"
+            "type": "class_feature",
+            "automation": {
+              "type": "signature_spells",
+              "casting_time": "passive",
+              "action": "action"
+            }
           }
         ],
         "spellcasting": {
@@ -12422,27 +12438,71 @@
           {
             "name": "Abjuration Savant",
             "description": "Choose two Wizard spells from the Abjuration school (no higher than level 2), add to spellbook for free. Whenever you gain access to a new level of spell slots, add one Abjuration school spell to spellbook for free.",
-            "level": 3
+            "level": 3,
+            "automation": {
+              "type": "passive_rule",
+              "effect": "abjuration_savant",
+              "casting_time": "passive"
+            }
           },
           {
             "name": "Arcane Ward",
             "description": "When you cast an Abjuration spell with a spell slot, create a magical ward on yourself lasting until Long Rest. Ward HP = 2x Wizard level + Intelligence modifier. Ward takes damage instead of you. Ward regains HP = 2x spell slot level when you cast Abjuration spell with spell slot, or as Bonus Action expend spell slot.",
-            "level": 3
+            "level": 3,
+            "automation": {
+              "type": "passive_rule",
+              "effect": "arcane_ward",
+              "wardHpExpression": "(2 * wizard_level) + int_mod",
+              "wardRestoreExpression": "2 * spell_slot_level",
+              "wardTrigger": "abjuration_spell_cast",
+              "wardDuration": "long_rest",
+              "bonusActionRestore": true
+            }
           },
           {
             "name": "Projected Ward",
             "description": "When a creature you can see within 30 feet takes damage, take Reaction to cause Arcane Ward to absorb damage. If ward reduced to 0 HP, warded creature takes remaining damage.",
-            "level": 6
+            "level": 6,
+            "automation": {
+              "type": "passive_rule",
+              "effect": "projected_ward",
+              "wardTrigger": "ally_damage_taken",
+              "range": 30,
+              "reaction": true
+            }
           },
           {
             "name": "Spell Breaker",
             "description": "Always have Counterspell and Dispel Magic prepared. Cast Dispel Magic as Bonus Action, add Proficiency Bonus to ability check. When you cast either with spell slot, slot isn't expended if spell fails to stop a spell.",
-            "level": 10
+            "level": 10,
+            "automation": {
+              "type": "passive_rule",
+              "effect": "spell_breaker",
+              "alwaysPreparedSpells": ["Counterspell", "Dispel Magic"],
+              "bonusActionSpells": ["Dispel Magic"],
+              "dispelAbilityCheckBonus": "proficiency_bonus",
+              "slotRetentionSpells": ["Counterspell", "Dispel Magic"]
+            }
           },
           {
             "name": "Spell Resistance",
             "description": "Advantage on saving throws against spells. Resistance to damage of spells.",
-            "level": 14
+            "level": 14,
+            "automation": [
+              {
+                "type": "conditional_advantage",
+                "target": "saving_throw",
+                "condition": "",
+                "effect": "advantage",
+                "casting_time": "passive"
+              },
+              {
+                "type": "passive_immunity",
+                "damage_resistance": [
+                  "Spell"
+                ]
+              }
+            ]
           }
         ],
         "spells": []
@@ -12455,27 +12515,51 @@
           {
             "name": "Divination Savant",
             "description": "Choose two Wizard spells from Divination school (no higher than level 2), add to spellbook for free. Whenever you gain access to a new level of spell slots, add one Divination school spell to spellbook for free.",
-            "level": 3
+            "level": 3,
+            "automation": {
+              "type": "passive_rule",
+              "effect": "divination_savant",
+              "casting_time": "passive"
+            }
           },
           {
             "name": "Portent",
             "description": "Whenever you finish a Long Rest, roll two d20s and record numbers. Replace any d20 Test made by you or creature you can see with one of these foretelling rolls. Choose before the roll, only once per turn. Each foretelling roll can be used only once.",
-            "level": 3
+            "level": 3,
+            "automation": {
+              "type": "portent",
+              "effect": "portent",
+              "casting_time": "passive"
+            }
           },
           {
             "name": "Expert Divination",
             "description": "When you cast a Divination spell using a level 2+ spell slot, you regain one expended spell slot. The slot must be lower than the slot you expended and can't be higher than level 5.",
-            "level": 6
+            "level": 6,
+            "automation": {
+              "type": "expert_divination",
+              "casting_time": "passive"
+            }
           },
           {
             "name": "The Third Eye",
             "description": "Bonus Action, choose one benefit until start of Short or Long Rest: Darkvision (120 feet), Greater Comprehension (read any language), See Invisibility (cast without spell slot).",
-            "level": 10
+            "level": 10,
+            "automation": {
+              "type": "third_eye",
+              "casting_time": "1 bonus action",
+              "duration": "short_or_long_rest"
+            }
           },
           {
             "name": "Greater Portent",
             "description": "Roll three d20s for Portent feature rather than two.",
-            "level": 14
+            "level": 14,
+            "automation": {
+              "type": "portent",
+              "effect": "portent",
+              "casting_time": "passive"
+            }
           }
         ],
         "spells": []
@@ -12488,27 +12572,48 @@
           {
             "name": "Evocation Savant",
             "description": "Choose two Wizard spells from Evocation school (no higher than level 2), add to spellbook for free. Whenever you gain access to a new level of spell slots, add one Evocation school spell to spellbook for free.",
-            "level": 3
+            "level": 3,
+            "automation": {
+              "type": "passive_rule",
+              "effect": "evocation_savant",
+              "casting_time": "passive"
+            }
           },
           {
             "name": "Potent Cantrip",
             "description": "When you cast a cantrip at a creature and miss with attack roll or target succeeds on saving throw, the target takes half the cantrip's damage (if any) but suffers no additional effect.",
-            "level": 3
+            "level": 3,
+            "automation": {
+              "type": "potent_cantrip",
+              "casting_time": "passive"
+            }
           },
           {
             "name": "Soulstitch Spells",
             "description": "When you cast an Evocation spell that affects other creatures you can see, choose a number equal to 1 + spell's level. Chosen creatures automatically succeed on saving throws, and take no damage if they would normally take half damage on a successful save.",
-            "level": 6
+            "level": 6,
+            "automation": {
+              "type": "soulstitch_spells",
+              "casting_time": "passive"
+            }
           },
           {
             "name": "Empowered Evocation",
             "description": "Whenever you cast a Wizard spell from Evocation school, add your Intelligence modifier to one damage roll of that spell.",
-            "level": 10
+            "level": 10,
+            "automation": {
+              "type": "empowered_evocation",
+              "casting_time": "passive"
+            }
           },
           {
             "name": "Overchannel",
             "description": "When you cast a Wizard spell with spell slot of levels 1-5 that deals damage, you can deal maximum damage with that spell on the turn you cast it. First time: no adverse effect. If used again before Long Rest, take 2d12 Necrotic damage per level of spell slot immediately after casting. This damage ignores Resistance and Immunity. Each additional use increases Necrotic damage per spell level by 1d12.",
-            "level": 14
+            "level": 14,
+            "automation": {
+              "type": "overchannel",
+              "casting_time": "passive"
+            }
           }
         ],
         "spells": []
@@ -12521,27 +12626,62 @@
           {
             "name": "Illusion Savant",
             "description": "Choose two Wizard spells from Illusion school (no higher than level 2), add to spellbook for free. Whenever you gain access to a new level of spell slots, add one Illusion school spell to spellbook for free.",
-            "level": 3
+            "level": 3,
+            "automation": {
+              "type": "passive_rule",
+              "effect": "illusion_savant",
+              "casting_time": "passive"
+            }
           },
           {
             "name": "Improved Illusions",
             "description": "Cast Illusion spells without Verbal components. If an Illusion spell has range of 10+ feet, range increases by 60 feet. You know Minor Illusion cantrip. If already know it, learn a different Wizard cantrip. Can create both sound and image with single casting of Minor Illusion, and cast as Bonus Action.",
-            "level": 3
+            "level": 3,
+            "automation": {
+              "type": "improved_illusions",
+              "effect": "improved_illusions",
+              "casting_time": "passive"
+            }
           },
           {
             "name": "Phantasmal Creatures",
             "description": "Always have Summon Beast and Summon Fey prepared. Whenever you cast either spell, you can change its school to Illusion (summoned creature appears spectral). Cast Illusion version of each without spell slot, but casting without slot halves creature's HP. Once per Long Rest.",
-            "level": 6
+            "level": 6,
+            "automation": {
+              "type": "phantasmal_creatures",
+              "casting_time": "passive",
+              "alwaysPreparedSpells": ["Summon Beast", "Summon Fey"],
+              "freeCastSpells": ["Summon Beast", "Summon Fey"],
+              "usesMax": 1,
+              "recharge": "long_rest",
+              "halvesHp": true
+            }
           },
           {
             "name": "Illusory Self",
             "description": "When a creature hits you with an attack roll, take Reaction to interpose an illusory duplicate between attacker and yourself. Attack automatically misses, then illusion dissipates. Once per Short or Long Rest (or expend level 2+ spell slot to restore).",
-            "level": 10
+            "level": 10,
+            "automation": {
+              "type": "illusory_self",
+              "trigger": "attack_hit",
+              "casting_time": "1 reaction",
+              "uses": 1,
+              "recharge": "short_or_long_rest",
+              "spellSlotRestore": {
+                "minLevel": 2
+              }
+            }
           },
           {
             "name": "Illusory Reality",
             "description": "When you cast an Illusion spell with a spell slot, choose one inanimate, nonmagical object that is part of the illusion and make it real. Bonus Action while spell is ongoing. Object remains real for 1 minute, can't deal damage or give any conditions.",
-            "level": 14
+            "level": 14,
+            "automation": {
+              "type": "illusory_reality",
+              "effect": "illusory_reality",
+              "casting_time": "1 bonus_action",
+              "objectDuration": "1 minute"
+            }
           }
         ],
         "spells": []

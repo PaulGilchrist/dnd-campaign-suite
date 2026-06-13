@@ -1,5 +1,6 @@
 import { rollExpression } from '../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../../services/rules/postCastRiderService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -77,12 +78,15 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }
 
             if (availableSpells.length === 0) {
+                const rechargeText = auto.recharge === 'short_or_long_rest'
+                    ? 'Finish a Short or Long Rest to regain them.'
+                    : 'Finish a Long Rest to regain them.';
                 return {
                     type: 'popup',
                     payload: {
                         type: 'automation_info',
                         name: action.name,
-                        description: 'All spells from this feature have been used. Finish a Long Rest to regain them.',
+                        description: `All spells from this feature have been used. ${rechargeText}`,
                         automation: auto,
                     },
                 };
@@ -122,8 +126,16 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     if (spellData?.damage) {
         const slotDmg = spellData.damage.damage_at_slot_level;
-        const formula = slotDmg?.[Object.keys(slotDmg)[0]];
+        let formula = slotDmg?.[Object.keys(slotDmg)[0]];
         if (formula) {
+            const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);
+            const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
+            const spellSchool = (spellData.school || '').toLowerCase();
+            const isEvocation = spellSchool === 'evocation';
+            const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
+            if (shouldApplyEmpoweredEvoc) {
+                formula = `${formula} + ${empEvocIntMod}[Empowered Evocation]`;
+            }
             const result = rollExpression(formula);
             if (result) {
                 return {

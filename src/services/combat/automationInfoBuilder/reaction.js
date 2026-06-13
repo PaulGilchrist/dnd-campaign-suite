@@ -166,5 +166,19 @@ export const reactionHandlers = {
             casting_time: auto.casting_time || '1 reaction',
             hasAutomation: true
         }
+    },
+
+    'illusory_self': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'illusory_self',
+            name: feature.name,
+            trigger: auto.trigger || 'attack_hit',
+            uses: auto.uses || 1,
+            recharge: auto.recharge || 'short_or_long_rest',
+            spellSlotRestore: auto.spellSlotRestore || null,
+            casting_time: auto.casting_time || '1 reaction',
+            hasAutomation: true
+        }
     }
 }

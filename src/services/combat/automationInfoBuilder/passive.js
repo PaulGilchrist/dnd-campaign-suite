@@ -97,5 +97,38 @@ export const passiveHandlers = {
             casting_time: auto.casting_time || 'passive',
             hasAutomation: true
         }
+    },
+
+    'potent_cantrip': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'potent_cantrip',
+            name: feature.name,
+            effect: 'potent_cantrip',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
+    'soulstitch_spells': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'soulstitch_spells',
+            name: feature.name,
+            effect: 'soulstitch_spells',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
+    'empowered_evocation': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'empowered_evocation',
+            name: feature.name,
+            effect: 'empowered_evocation',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
     }
 }

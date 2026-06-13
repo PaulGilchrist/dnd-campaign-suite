@@ -117,6 +117,76 @@ export async function triggerPostCastRiderSaves(spell, metaCtx, playerStats, cam
     return results.length > 0 ? results : null;
 }
 
+const EVOCATION_SCHOOL = 'Evocation';
+
+export function getSoulstitchFeatures(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.filter(p => p.type === 'soulstitch_spells');
+}
+
+export function hasSoulstitchSpells(playerStats) {
+    return getSoulstitchFeatures(playerStats).length > 0;
+}
+
+export async function triggerSoulstitchSpells(spell, metaCtx, playerStats, campaignName, mapName) {
+    if (!hasSoulstitchSpells(playerStats)) {
+        return null;
+    }
+
+    const school = (spell.school || '').toLowerCase();
+    if (school !== EVOCATION_SCHOOL) {
+        return null;
+    }
+
+    // Only applies to spells with saves
+    if (!spell.dc) {
+        return null;
+    }
+
+    const soulstitchFeatures = getSoulstitchFeatures(playerStats);
+    if (soulstitchFeatures.length === 0) {
+        return null;
+    }
+
+    const feature = soulstitchFeatures[0];
+    const spellSlotLevel = metaCtx?.slotLevel || spell.level || 0;
+
+    const action = {
+        name: feature.name,
+        automation: {
+            type: 'soulstitch_spells',
+            casting_time: 'passive',
+        },
+        spell,
+        spellSlotLevel,
+    };
+
+    try {
+        const result = await executeHandler(action, playerStats, campaignName, mapName);
+        if (result) {
+            return result;
+        }
+    } catch (e) {
+        console.error(`[soulstitch] Failed to execute ${feature.name}:`, e);
+    }
+
+    return null;
+}
+
+export function getEmpoweredEvocationFeatures(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.filter(p => p.type === 'empowered_evocation');
+}
+
+export function hasEmpoweredEvocation(playerStats) {
+    return getEmpoweredEvocationFeatures(playerStats).length > 0;
+}
+
+export function getEmpoweredEvocationIntModifier(playerStats) {
+    const intAbility = playerStats.abilities.find(a => a.name === 'Intelligence');
+    return intAbility?.bonus || 0;
+}
+
 export async function triggerSpellThief(spell, metaCtx, playerStats, campaignName, mapName) {
     if (!usesSpellSlot(spell, metaCtx)) {
         return null;

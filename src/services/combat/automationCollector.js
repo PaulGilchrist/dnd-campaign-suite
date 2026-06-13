@@ -128,6 +128,80 @@ export function collectTurnStartEffects(features) {
                     attunementLimit: auto.attunementLimit || 4,
                 })
             }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'abjuration_savant') {
+                effects.push({
+                    type: 'abjuration_savant',
+                    name: feature.name,
+                })
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'divination_savant') {
+                effects.push({
+                    type: 'divination_savant',
+                    name: feature.name,
+                })
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'evocation_savant') {
+                effects.push({
+                    type: 'evocation_savant',
+                    name: feature.name,
+                })
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'illusion_savant') {
+                effects.push({
+                    type: 'illusion_savant',
+                    name: feature.name,
+                })
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'improved_illusions') {
+                effects.push({
+                    type: 'improved_illusions',
+                    name: feature.name,
+                })
+            }
+            if (auto?.type === 'third_eye') {
+                effects.push({
+                    type: 'third_eye',
+                    name: feature.name,
+                    duration: auto.duration || 'short_or_long_rest',
+                })
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'arcane_ward') {
+                effects.push({
+                    type: 'arcane_ward',
+                    name: feature.name,
+                    wardHpExpression: auto.wardHpExpression || '',
+                    wardRestoreExpression: auto.wardRestoreExpression || '',
+                    bonusActionRestore: !!auto.bonusActionRestore,
+                })
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'projected_ward') {
+                effects.push({
+                    type: 'projected_ward',
+                    name: feature.name,
+                    range: auto.range || 30,
+                    reaction: true,
+                })
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'spell_breaker') {
+                effects.push({
+                    type: 'spell_breaker',
+                    name: feature.name,
+                    alwaysPreparedSpells: auto.alwaysPreparedSpells || [],
+                    bonusActionSpells: auto.bonusActionSpells || [],
+                    dispelAbilityCheckBonus: auto.dispelAbilityCheckBonus || '',
+                    slotRetentionSpells: auto.slotRetentionSpells || [],
+                })
+            }
+            if (auto?.type === 'phantasmal_creatures') {
+                effects.push({
+                    type: 'phantasmal_creatures',
+                    name: feature.name,
+                    alwaysPreparedSpells: auto.alwaysPreparedSpells || [],
+                    freeCastSpells: auto.freeCastSpells || [],
+                    usesMax: auto.usesMax || 1,
+                    halvesHp: auto.halvesHp || false,
+                })
+            }
         }
     })
 
@@ -436,6 +510,16 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'searing_vengeance':
                 result.reactions.push(info)
                 break
+            case 'illusory_self':
+                result.reactions.push(info)
+                break
+            case 'illusory_reality':
+                if (info.casting_time === '1 bonus_action' || info.casting_time === 'bonus_action' || info.casting_time === '1 bonus action') {
+                    result.bonusActions.push(info)
+                } else {
+                    result.actions.push(info)
+                }
+                break
             case 'dark_ones_blessing':
                 result.passives.push(info)
                 break
@@ -540,6 +624,60 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'create_thrall_temp_hp':
                 result.passives.push(info)
                 break
+            case 'memorize_spell':
+                result.specialActions.push(info);
+                break;
+            case 'signature_spells':
+                result.actions.push(info);
+                break;
+            case 'abjuration_savant':
+                result.passives.push(info);
+                break;
+            case 'divination_savant':
+                result.passives.push(info);
+                break;
+            case 'evocation_savant':
+                result.passives.push(info);
+                break;
+            case 'illusion_savant':
+                result.passives.push(info);
+                break;
+            case 'arcane_ward':
+                result.passives.push(info);
+                break;
+            case 'projected_ward':
+                result.reactions.push(info);
+                break;
+            case 'spell_breaker':
+                result.passives.push(info);
+                break;
+            case 'portent':
+                result.specialActions.push(info)
+                break
+            case 'expert_divination':
+                result.passives.push(info)
+                break
+            case 'potent_cantrip':
+                result.passives.push(info)
+                break
+            case 'soulstitch_spells':
+                result.passives.push(info)
+                break
+            case 'empowered_evocation':
+                result.passives.push(info)
+                break
+            case 'improved_illusions':
+                result.passives.push(info)
+                break
+            case 'overchannel':
+                result.passives.push(info)
+                break
+            case 'third_eye':
+                result.bonusActions.push(info);
+                break;
+            case 'phantasmal_creatures':
+                result.passives.push(info);
+                break;
             default:
                 result.specialActions.push(info)
                 break;

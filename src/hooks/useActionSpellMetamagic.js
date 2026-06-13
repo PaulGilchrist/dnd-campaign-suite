@@ -4,6 +4,7 @@ import { addEntry } from '../services/ui/logService.js'
 import { rollExpression, rollExpressionDoubled } from '../services/dice/diceRoller.js'
 import { isPsionicSpell, hasPsionicSorcery } from '../services/rules/metamagicRules.js'
 import { getRuntimeValue } from './useRuntimeState.js'
+import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../services/rules/postCastRiderService.js'
 
 export function useActionSpellMetamagic({
     playerStats,
@@ -37,6 +38,24 @@ export function useActionSpellMetamagic({
         return {
             formula: `${formula} + ${chaMod}[${affinityType}]`,
             total: total + chaMod,
+            rolls: [...rolls],
+            modifier,
+        };
+    };
+
+    const applyEmpoweredEvocation = (attack, formula, total, rolls, modifier) => {
+        const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);
+        if (!hasEmpoweredEvoc) return { formula, total, rolls, modifier };
+
+        const spellSchool = (attack.school || '').toLowerCase();
+        if (spellSchool !== 'evocation') return { formula, total, rolls, modifier };
+
+        const intMod = getEmpoweredEvocationIntModifier(playerStats);
+        if (intMod <= 0) return { formula, total, rolls, modifier };
+
+        return {
+            formula: `${formula} + ${intMod}[Empowered Evocation]`,
+            total: total + intMod,
             rolls: [...rolls],
             modifier,
         };
@@ -123,7 +142,8 @@ export function useActionSpellMetamagic({
             const rawResult = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
             if (!rawResult) return;
 
-            const { formula, total, rolls, modifier } = applyElementalAffinity(attack, attack.damage, rawResult.total, rawResult.rolls, rawResult.modifier);
+            const affResult = applyElementalAffinity(attack, attack.damage, rawResult.total, rawResult.rolls, rawResult.modifier);
+            const { formula, total, rolls, modifier } = applyEmpoweredEvocation(attack, affResult.formula, affResult.total, affResult.rolls, affResult.modifier);
 
             if (!mapName) {
                 rollDamage(attack.name, formula, total, rolls, modifier, buildCtxSync(attack));
@@ -153,7 +173,8 @@ export function useActionSpellMetamagic({
                 const rawR = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
                 if (!rawR) return;
 
-                const { formula, total, rolls, modifier } = applyElementalAffinity(attack, attack.damage, rawR.total, rawR.rolls, rawR.modifier);
+                const affR = applyElementalAffinity(attack, attack.damage, rawR.total, rawR.rolls, rawR.modifier);
+                const { formula, total, rolls, modifier } = applyEmpoweredEvocation(attack, affR.formula, affR.total, affR.rolls, affR.modifier);
 
                 if (!mapName) {
                     rollDamage(attack.name, formula, total, rolls, modifier, { ...buildCtxSync(attack), ...metaCtx });
@@ -231,11 +252,12 @@ export function useActionSpellMetamagic({
                 if (wasCrit && setPopupHtml) setPopupHtml(null);
                 const r = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
                 if (!r) return;
+                const { formula, total, rolls, modifier } = applyEmpoweredEvocation(attack, attack.damage, r.total, r.rolls, r.modifier);
                 if (!mapName) {
-                    rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, { ...buildCtxSync(attack), ...metaCtx });
+                    rollDamage(attack.name, formula, total, rolls, modifier, { ...buildCtxSync(attack), ...metaCtx });
                 } else {
                     buildCtx(attack).then(ctx => {
-                        rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, { ...ctx, ...metaCtx });
+                        rollDamage(attack.name, formula, total, rolls, modifier, { ...ctx, ...metaCtx });
                     }).catch(() => {});
                 }
             },

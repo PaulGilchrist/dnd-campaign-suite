@@ -392,6 +392,28 @@ const WarlockFeatures = function WarlockFeatures({ playerStats }) {
 /* ─── Wizard ─── */
 const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
     const wizardFeatures = getClassFeatures(playerStats);
+    const hasPortent = (playerStats.automation?.specialActions ?? []).some(
+        a => a.type === 'portent' || a.name === 'Portent'
+    );
+    const [portentDice, setPortentDiceState] = React.useState([]);
+    const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+    const thirdEyeBuff = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'The Third Eye') || null) : null;
+    const THIRD_EYE_EFFECTS = {
+        'darkvision_120': 'Darkvision 120 ft.',
+        'greater_comprehension': 'Greater Comprehension',
+        'see_invisibility': 'See Invisibility',
+    };
+
+    React.useEffect(() => {
+        try {
+            const stored = getRuntimeValue(playerStats.name, 'portentDice', campaignName);
+            if (stored) {
+                const parsed = typeof stored === 'string' ? JSON.parse(stored) : stored;
+                if (Array.isArray(parsed)) setPortentDiceState(parsed);
+            }
+        } catch { /* ignore */ }
+    }, [playerStats.name, campaignName]);
+
     if ((wizardFeatures?.showWizardFeatures ?? true) === false) return null;
     return (
          <div data-testid="char-class-wizard">
@@ -401,6 +423,23 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
                      <i className="fas fa-book-open"></i> Arcane Recovery
                  </button>
              </div>
+              {hasPortent && (
+                  <div>
+                      <div><b>Portent Dice:</b></div>
+                      <div className="portent-dice-display">
+                          {portentDice.length > 0
+                              ? portentDice.map((die, i) => (
+                                  <span key={i} className="portent-die">{die}</span>
+                              ))
+                              : <span className="automation-badge">No dice remaining</span>
+                          }
+                      </div>
+                      <span className="automation-badge">{portentDice.length} remaining (refreshes on Long Rest)</span>
+                  </div>
+              )}
+              {thirdEyeBuff && (
+                  <span className="automation-badge">The Third Eye: {THIRD_EYE_EFFECTS[thirdEyeBuff.effect] || 'Active'}</span>
+              )}
          </div>
     );
 };

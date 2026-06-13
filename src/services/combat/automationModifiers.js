@@ -182,6 +182,47 @@ export function collectSaveModifiers(features) {
                     effect: 'disadvantage',
                 })
             }
+            if (auto.type === 'potent_cantrip') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'saving_throw',
+                    condition: '',
+                    effect: 'potent_cantrip',
+                })
+            }
+            if (auto.type === 'soulstitch_spells') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'saving_throw',
+                    condition: '',
+                    effect: 'soulstitch_spells',
+                })
+            }
+            if (auto.type === 'empowered_evocation') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'damage',
+                    condition: '',
+                    effect: 'empowered_evocation',
+                })
+            }
+            if (auto.type === 'overchannel') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'damage',
+                    condition: '',
+                    effect: 'overchannel',
+                })
+            }
+            if (auto.type === 'passive_rule' && auto.effect === 'spell_breaker') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'ability_check',
+                    condition: '',
+                    effect: 'spell_breaker_dispel_bonus',
+                    bonusExpression: auto.dispelAbilityCheckBonus || 'proficiency_bonus',
+                })
+            }
             if (auto.type === 'conditional_disadvantage') {
                 const abilities = auto.abilities || (auto.saveType ? [auto.saveType.toUpperCase()] : []);
                 const target = auto.target || 'attack_roll';
@@ -202,6 +243,30 @@ export function collectSaveModifiers(features) {
                         abilities
                     })
                 }
+            }
+            if (auto.type === 'portent') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'd20',
+                    condition: '',
+                    effect: 'portent',
+                })
+            }
+            if (auto.type === 'improved_illusions') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'spell_component',
+                    condition: '',
+                    effect: 'improved_illusions',
+                })
+            }
+            if (auto.type === 'illusory_reality') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'spell_component',
+                    condition: '',
+                    effect: 'illusory_reality',
+                })
             }
         }
     })

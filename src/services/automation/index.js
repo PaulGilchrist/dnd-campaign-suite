@@ -118,6 +118,21 @@ import { handle as handleClairvoyantCombatant } from './handlers/clairvoyantComb
 import { handle as handlePsychicSpells } from './handlers/psychicSpellsHandler.js';
 import { handle as handleCreateThrall } from './handlers/createThrallHandler.js';
 import { handle as handleCreateThrallTempHp } from './handlers/createThrallTempHpHandler.js';
+import { handle as handleSpellMastery } from './handlers/spellMasteryHandler.js';
+import { handle as handleSignatureSpells } from './handlers/signatureSpellsHandler.js';
+import { handle as handleAbjurationSavant } from './handlers/abjurationSavantHandler.js';
+import { handle as handleDivinationSavant } from './handlers/divinationSavantHandler.js';
+import { handle as handleEvocationSavant } from './handlers/evocationSavantHandler.js';
+import { handle as handleIllusionSavant } from './handlers/illusionSavantHandler.js';
+import { handle as handleArcaneWard } from './handlers/arcaneWardHandler.js';
+import { handle as handlePortent } from './handlers/portentHandler.js';
+import { handle as handleExpertDivination } from './handlers/expertDivinationHandler.js';
+import { handle as handleThirdEye } from './handlers/thirdEyeHandler.js';
+import { handle as handleSoulstitchSpells } from './handlers/soulstitchSpellsHandler.js';
+import { handle as handleOverchannel } from './handlers/overchannelHandler.js';
+import { handle as handlePhantasmalCreatures, confirmPhantasmalCreatures as handlePhantasmalCreaturesConfirm } from './handlers/phantasmalCreaturesHandler.js';
+import { handle as handleIllusorySelf } from './handlers/illusorySelfHandler.js';
+import { handle as handleIllusoryReality, confirmIllusoryReality as handleIllusoryRealityConfirm } from './handlers/illusoryRealityHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -152,6 +167,8 @@ const HANDLER_MAP = {
     reaction_damage: handleReactionDamage,
     reaction_debuff: handleReactionDebuff,
     damage_reduction: handleDamageReduction,
+    arcane_ward: handleArcaneWard,
+    projected_ward: handleArcaneWard,
     open_hand_technique: handleOpenHandTechnique,
     reaction_save_heal: handleReactionSaveHeal,
     mastery_rider: handleWeaponMastery,
@@ -267,6 +284,24 @@ const HANDLER_MAP = {
                 psychic_spells: handlePsychicSpells,
                 create_thrall: handleCreateThrall,
                 create_thrall_temp_hp: handleCreateThrallTempHp,
+                memorize_spell: handleGenericPopup,
+                abjuration_savant: handleAbjurationSavant,
+                divination_savant: handleDivinationSavant,
+                evocation_savant: handleEvocationSavant,
+                illusion_savant: handleIllusionSavant,
+                spell_mastery: handleSpellMastery,
+                signature_spells: handleSignatureSpells,
+                spell_breaker: handleGenericPopup,
+                portent: handlePortent,
+                 expert_divination: handleExpertDivination,
+                 third_eye: handleThirdEye,
+                  soulstitch_spells: handleSoulstitchSpells,
+                   overchannel: handleOverchannel,
+                   phantasmal_creatures: handlePhantasmalCreatures,
+                    phantasmal_creatures_confirm: handlePhantasmalCreaturesConfirm,
+                     illusory_self: handleIllusorySelf,
+                     illusory_reality: handleIllusoryReality,
+                     illusory_reality_confirm: handleIllusoryRealityConfirm,
 };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;

@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 import useDiceRoll from './useDiceRoll.js';
-import { rollD20 } from '../services/dice/diceRoller.js';
+import { rollD20, rollExpression } from '../services/dice/diceRoller.js';
 import utils from '../services/ui/utils.js';
 import storage from '../services/ui/storage.js';
 import { getTargetFromAttacker } from '../services/rules/damageUtils.js';
@@ -25,6 +25,7 @@ import {
 } from '../services/combat/unbreakableMajesty.js';
 import { MELEE_REACH_FEET } from '../services/combat/baseCombatActions.js';
 import { getCombatContext } from '../services/rules/damageUtils.js';
+import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../services/rules/postCastRiderService.js';
 
 function dispatchUnbreakableMajestySave(campaignName, defenderName, attackerName, saveDc, promptId) {
     sendSavePrompt(campaignName, {
@@ -43,6 +44,23 @@ function readAoeContext(campaignName) {
   } catch {
     return null;
   }
+}
+
+function hasPotentCantrip(playerStats) {
+    if (!playerStats) return false;
+    const passives = playerStats?.automation?.passives || [];
+    return passives.some(p => p.type === 'potent_cantrip');
+}
+
+function getSoulstitchProtectedCreatures(playerName, campaignName) {
+    const key = `_${playerName.replace(/\s+/g, '_')}_Soulstitch_Spells_active`;
+    const stored = getRuntimeValue(playerName, key, campaignName);
+    return Array.isArray(stored) ? stored : [];
+}
+
+function hasSoulstitchProtection(targetName, playerName, campaignName) {
+    const protectedList = getSoulstitchProtectedCreatures(playerName, campaignName);
+    return protectedList.includes(targetName);
 }
 
 export default function useLoggedDiceRoll(characterName, campaignName, options = {}) {
@@ -68,6 +86,10 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       const targetChar = (charactersRef.current || []).find(c => c.name === e.detail.targetName);
       const targetConditions = getRuntimeValue(e.detail.targetName, 'activeConditions', pending.campaignName) || [];
       const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
+
+      // Soulstitch Spells: chosen creatures auto-succeed and take no damage
+      const isSoulstitchProtected = hasSoulstitchProtection(e.detail.targetName, characterName, pending.campaignName);
+
       const ownEvasion = targetChar?.computedStats?.evasionEffects;
       const hasOwnEvasion = !isIncapacitated && pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === saveTypeUpper);
       const hasSharedEvasion = !hasOwnEvasion && !isIncapacitated && pending.dcSuccess === 'half' &&
@@ -77,7 +99,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           return ev?.some(ef => ef.saveType === saveTypeUpper && ef.shareable && ef.shareRange >= 5);
         });
       const hasEvasion = hasOwnEvasion || hasSharedEvasion;
-      const finalDamage = computeDamageAfterEvasion(
+      const finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterEvasion(
         e.detail.rawDamage, e.detail.success, e.detail.dcSuccess, hasEvasion
       );
       const pendingTargetName = pending.targetName;
@@ -90,32 +112,75 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
          combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, null, false, pending.attackerName || characterName
           );
 
-      logEntry({
-        type: 'roll',
-        characterName: pending.attackerName || characterName,
-        rollType: 'save-damage',
-        name: pending.name,
-        formula: pending.formula,
-        rolls: pending.rolls,
-        total: pending.rawDamage,
-        modifier: pending.modifier,
-        damageType: pending.damageType,
-        targetName: e.detail.targetName,
-        saveType: e.detail.saveType,
-        saveDc: e.detail.saveDc,
-        dcSuccess: e.detail.dcSuccess,
-        saveResult: e.detail.success ? 'success' : 'failure',
-        saveRoll: e.detail.roll,
-        saveBonus: e.detail.saveBonus,
-        saveRawRolls: e.detail.rawRolls,
-        mode: pending.metamagicHeighten ? 'disadvantage' : 'normal',
-        bonusDetail: e.detail.bonusDetail,
-        finalDamage: applyResult?.finalDamage ?? finalDamage,
-        isAoe: pending.isAoe || false,
-        aoeAffectedCount: pending.isAoe ? (e.detail.aoeAffectedCount || null) : null,
-      });
+       logEntry({
+         type: 'roll',
+         characterName: pending.attackerName || characterName,
+         rollType: 'save-damage',
+         name: pending.name,
+         formula: pending.formula,
+         rolls: pending.rolls,
+         total: pending.rawDamage,
+         modifier: pending.modifier,
+         damageType: pending.damageType,
+         targetName: e.detail.targetName,
+         saveType: e.detail.saveType,
+         saveDc: e.detail.saveDc,
+         dcSuccess: e.detail.dcSuccess,
+         saveResult: isSoulstitchProtected ? 'soulstitch_auto_success' : (e.detail.success ? 'success' : 'failure'),
+         saveRoll: e.detail.roll,
+         saveBonus: e.detail.saveBonus,
+         saveRawRolls: e.detail.rawRolls,
+         mode: pending.metamagicHeighten ? 'disadvantage' : 'normal',
+         bonusDetail: e.detail.bonusDetail,
+         finalDamage: applyResult?.finalDamage ?? finalDamage,
+         isAoe: pending.isAoe || false,
+         aoeAffectedCount: pending.isAoe ? (e.detail.aoeAffectedCount || null) : null,
+         soulstitchProtected: isSoulstitchProtected,
+        });
 
-      delete window.__pendingSaves[e.detail.promptId];
+       // Overchannel self-damage (2nd+ use before Long Rest)
+       if (pending.overchannelActive && pending.overchannelUseCount > 1) {
+           const overchannelSpellLevel = pending.overchannelSpellLevel || 1;
+           const dicePerLevel = 2 + (pending.overchannelUseCount - 1);
+           const totalDice = dicePerLevel * overchannelSpellLevel;
+           const necroticFormula = `${totalDice}d12`;
+           const necroticResult = rollExpression(necroticFormula);
+           if (necroticResult) {
+               const casterCombatSummary = getCombatSummary();
+               const casterApplyResult = applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, null, true, characterName);
+               logEntry({
+                   type: 'roll',
+                   characterName,
+                   rollType: 'overchannel-damage',
+                   name: 'Overchannel',
+                   formula: necroticFormula,
+                   rolls: necroticResult.rolls,
+                   total: necroticResult.total,
+                   modifier: necroticResult.modifier,
+                   damageType: 'Necrotic',
+                   targetName: characterName,
+                   finalDamage: casterApplyResult?.finalDamage,
+                   note: 'Overchannel self-damage (ignores resistance/immunity)',
+               });
+           }
+           const usesKey = '_Overchannel_uses';
+           const restKey = '_Overchannel_restTimestamp';
+           const now = Date.now();
+           const lastRestTimestamp = getRuntimeValue(characterName, restKey, campaignName);
+           let currentUses;
+           if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
+               currentUses = Number(getRuntimeValue(characterName, usesKey, campaignName) ?? 1);
+           } else if (!lastRestTimestamp) {
+               currentUses = Number(getRuntimeValue(characterName, usesKey, campaignName) ?? 1);
+           } else {
+               currentUses = 1;
+           }
+           if (currentUses > 0) {
+               setRuntimeValue(characterName, usesKey, currentUses - 1, campaignName);
+           }
+       }
+
+       delete window.__pendingSaves[e.detail.promptId];
 
       pending.setPopupHtml({
         type: 'save-damage',
@@ -309,18 +374,22 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
        }
        const isCrit = !isAutoMiss && (r1 === 20 || context?.isAutoCrit || rollsInCriticalRange) && hit;
 
-      const autoDamage = hit && context?.autoDamageFormula ? {
-        name: context.autoDamageName || name,
-        formula: context.autoDamageFormula,
-        damageType: context.damageType,
-        targetName: targetName,
-        attackerName: context.attackerName || characterName,
-        saveDc: context.saveDc,
-        saveType: context.saveType,
-        dcSuccess: context.dcSuccess,
-        metamagicTwinTarget: context.metamagicTwinTarget,
-        metamagicHeighten: context.metamagicHeighten,
-       } : undefined;
+        const autoDamage = hit && context?.autoDamageFormula ? {
+          name: context.autoDamageName || name,
+          formula: context.autoDamageFormula,
+          damageType: context.damageType,
+          targetName: targetName,
+          attackerName: context.attackerName || characterName,
+          saveDc: context.saveDc,
+          saveType: context.saveType,
+          dcSuccess: context.dcSuccess,
+          metamagicTwinTarget: context.metamagicTwinTarget,
+          metamagicHeighten: context.metamagicHeighten,
+          isCantrip: context.isCantrip,
+          overchannelActive: context.overchannelActive,
+          overchannelUseCount: context.overchannelUseCount,
+          overchannelSpellLevel: context.overchannelSpellLevel,
+         } : undefined;
 
      logEntry({
         type: 'roll',
@@ -390,34 +459,91 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
               timestamp: Date.now(),
           }, campaignName);
 
-          // Soulknife Homing Strikes (level 9+): if Psychic Blade misses, add psionic energy die
-          const ps = context?.playerStats;
-          const isSoulknife = ps?.class?.name === 'Rogue' && ps?.class?.major?.name === 'Soulknife';
-          const hasSoulBlades = isSoulknife && ps?.level >= 9;
-          const isPsychicBlade = context?.isPsychicBlade === true;
-          if (hasSoulBlades && isPsychicBlade && hit === false && !isAutoMiss) {
-              const classLevel = ps?.class?.class_levels?.find(cl => cl.level === ps?.level);
-              const psionicDieSize = classLevel?.energy?.energy_die || 6;
-              const psionicBonus = Math.floor(Math.random() * psionicDieSize) + 1;
-              const newTotal = effectiveD20 + bonus + psionicBonus;
-              const newHit = targetAc ? (newTotal >= targetAc) : null;
-              if (newHit === true) {
-                  // Update the stored attack roll with the homing strike bonus
-                  setRuntimeValue(characterName, 'lastAttackRoll', {
-                      d20: effectiveD20,
-                      bonus: bonus + psionicBonus,
-                      targetName,
-                      targetAc,
-                      hit: true,
-                      isCrit: false,
-                      effectiveAc,
-                      coverAcBonus,
-                      timestamp: Date.now(),
-                      homingStrikesBonus: psionicBonus,
-                  }, campaignName);
-              }
-          }
-      }
+           // Soulknife Homing Strikes (level 9+): if Psychic Blade misses, add psionic energy die
+           const ps = context?.playerStats;
+           const isSoulknife = ps?.class?.name === 'Rogue' && ps?.class?.major?.name === 'Soulknife';
+           const hasSoulBlades = isSoulknife && ps?.level >= 9;
+           const isPsychicBlade = context?.isPsychicBlade === true;
+           if (hasSoulBlades && isPsychicBlade && hit === false && !isAutoMiss) {
+               const classLevel = ps?.class?.class_levels?.find(cl => cl.level === ps?.level);
+               const psionicDieSize = classLevel?.energy?.energy_die || 6;
+               const psionicBonus = Math.floor(Math.random() * psionicDieSize) + 1;
+               const newTotal = effectiveD20 + bonus + psionicBonus;
+               const newHit = targetAc ? (newTotal >= targetAc) : null;
+               if (newHit === true) {
+                   // Update the stored attack roll with the homing strike bonus
+                   setRuntimeValue(characterName, 'lastAttackRoll', {
+                       d20: effectiveD20,
+                       bonus: bonus + psionicBonus,
+                       targetName,
+                       targetAc,
+                       hit: true,
+                       isCrit: false,
+                       effectiveAc,
+                       coverAcBonus,
+                       timestamp: Date.now(),
+                       homingStrikesBonus: psionicBonus,
+                   }, campaignName);
+               }
+           }
+
+            // Potent Cantrip: on miss, deal half damage for cantrips
+            const potentPlayerStats = context?.playerStats;
+            const hasPotentCantripFlag = hasPotentCantrip(potentPlayerStats);
+            if (hasPotentCantripFlag && !hit && !isAutoMiss && autoDamage) {
+                let potentFormula = autoDamage.formula;
+                const hasEmpoweredEvoc = hasEmpoweredEvocation(potentPlayerStats);
+                const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(potentPlayerStats) : 0;
+                const spellSchool = (autoDamage.spellSchool || '').toLowerCase();
+                const isEvocation = spellSchool === 'evocation';
+                const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
+                if (shouldApplyEmpoweredEvoc) {
+                    potentFormula = `${potentFormula} + ${empEvocIntMod}[Empowered Evocation]`;
+                }
+                const damageResult = rollExpression(potentFormula);
+                if (damageResult) {
+                    const halfDamage = Math.floor(damageResult.total / 2);
+                    const combatSummary2 = await loadCombatSummary(campaignName);
+                    const applyResult = applyDamageToTarget(combatSummary2, targetName, halfDamage, [autoDamage.damageType], campaignName, null, false, autoDamage.attackerName || characterName);
+                    const missTargetMaxHp = target?.type === 'player'
+                        ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
+                        : target?.maxHp ?? 0;
+                    logEntry({
+                        type: 'roll',
+                        characterName,
+                        rollType: 'cantrip-miss-half-damage',
+                        name,
+                        formula: potentFormula,
+                        rolls: damageResult.rolls,
+                        total: halfDamage,
+                        modifier: damageResult.modifier,
+                        damageType: autoDamage.damageType,
+                        targetName: autoDamage.targetName,
+                        isPotentCantrip: true,
+                    });
+                    setPopupHtml({
+                        type: 'save-damage',
+                        name,
+                        formula: potentFormula,
+                        rolls: damageResult.rolls,
+                        bonus: damageResult.modifier,
+                        modifier: damageResult.modifier,
+                        damageType: autoDamage.damageType,
+                        targetName: autoDamage.targetName,
+                        targetCurrentHp: applyResult?.newHp,
+                        targetMaxHp: missTargetMaxHp,
+                        saveDc: autoDamage.saveDc,
+                        saveType: autoDamage.saveType,
+                        dcSuccess: 'half',
+                        saveResult: { success: true, roll: 1, total: 0, bonus: 0 },
+                        finalDamage: applyResult?.finalDamage,
+                        damageApplied: true,
+                        damageReduced: applyResult?.damageReduced,
+                       isPotentCantrip: true,
+                   });
+               }
+           }
+       }
 
        if (rollType === 'check' || rollType === 'skill') {
            const effectiveD20 = context?.reliableTalent && r1 <= 9 ? 10 : r1;
@@ -509,26 +635,52 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                  return { creatureName: creature.name, finalDamage: applyResult?.finalDamage, newHp: applyResult?.newHp, damageReduced: applyResult?.damageReduced, saveSuccess: null };
                 });
           const playerAffected = affected.filter(a => a.creature.type === 'player');
-          if (playerAffected.length && saveDc && saveType) {
-            const playerPrompts = sendAoePlayerSaves(playerAffected, total, damageType, saveDc, saveType, dcSuccess, campaignName, name, attackerName || characterName, rolls, formula);
+          const casterName = attackerName || characterName;
+          // Filter out soulstitch-protected players from save prompts
+          const playersNeedingSave = playerAffected.filter(a => !hasSoulstitchProtection(a.creature.name, casterName, campaignName));
+          const soulstitchProtectedPlayers = playerAffected.filter(a => hasSoulstitchProtection(a.creature.name, casterName, campaignName));
+
+          // Process soulstitch-protected players immediately (auto-succeed, no damage)
+          for (const pp of soulstitchProtectedPlayers) {
+            const creature = pp.creature;
+            const applyResult = applyDamageToTarget(combatSummary, creature.name, 0, [damageType], campaignName, null, false, casterName);
+            npcResults.push({
+              creatureName: creature.name,
+              saveSuccess: true,
+              saveRoll: null,
+              saveBonus: null,
+              finalDamage: 0,
+              newHp: applyResult?.newHp,
+              damageReduced: true,
+              soulstitchProtected: true,
+            });
+          }
+
+          if (playersNeedingSave.length && saveDc && saveType) {
+            const playerPrompts = sendAoePlayerSaves(playersNeedingSave, total, damageType, saveDc, saveType, dcSuccess, campaignName, name, casterName, rolls, formula);
             for (const pp of playerPrompts) {
               pendingSaves[pp.promptId] = {
-                targetName: pp.targetName, rawDamage: total, saveDc, saveType, dcSuccess,
-                damageType, attackerName: attackerName || characterName,
-                name, formula, modifier, rolls, campaignName, setPopupHtml, isAoe: true,
-               };
+                 targetName: pp.targetName, rawDamage: total, saveDc, saveType, dcSuccess,
+                 damageType, attackerName: attackerName || characterName,
+                 name, formula, modifier, rolls, campaignName, setPopupHtml, isAoe: true,
+                 isCantrip: context?.isCantrip || false,
+                 overchannelActive: context?.overchannelActive || false,
+                 overchannelUseCount: context?.overchannelUseCount || 0,
+                 overchannelSpellLevel: context?.overchannelSpellLevel || 1,
+                };
               }
             }
           const overlayLabel = overlay.label || overlay.shape || 'AoE';
           const npcResultRows = npcResults.map(r => {
+            const soulstitchNote = r.soulstitchProtected ? ' <em>(Soulstitch)</em>' : '';
             const saveInfo = r.saveSuccess === null ? '' : (r.saveSuccess
-               ? `<span class="aoe-save-success">SAVE ${r.saveRoll}+${r.saveBonus} PASS</span>`
+               ? `<span class="aoe-save-success">SAVE ${r.saveRoll !== null ? r.saveRoll + '+' + r.saveBonus : 'auto'} PASS</span>`
                : `<span class="aoe-save-fail">SAVE ${r.saveRoll}+${r.saveBonus} FAIL</span>`);
             const reduced = r.damageReduced ? ' <em>(reduced)</em>' : '';
-            return `<div class="aoe-result-row"><strong>${r.creatureName}</strong>: ${r.finalDamage} dmg${reduced} → ${r.newHp !== undefined ? `HP ${r.newHp}` : ''} ${saveInfo}</div>`;
+            return `<div class="aoe-result-row"><strong>${r.creatureName}</strong>: ${r.finalDamage} dmg${reduced} → ${r.newHp !== undefined ? `HP ${r.newHp}` : ''} ${saveInfo}${soulstitchNote}</div>`;
            }).join('');
-          const pendingList = playerAffected.length
-             ? `<div class="aoe-pending"><i class="fa-solid fa-spinner fa-spin"></i> Waiting for saves: ${playerAffected.map(a => a.creature.name).join(', ')}</div>`
+          const pendingList = playersNeedingSave.length
+             ? `<div class="aoe-pending"><i class="fa-solid fa-spinner fa-spin"></i> Waiting for saves: ${playersNeedingSave.map(a => a.creature.name).join(', ')}</div>`
              : '';
           const html = `<div class="aoe-summary"><h3><i class="fa-solid fa-wand-magic-sparkles"></i> ${overlayLabel} — ${name}</h3><div class="aoe-damage-info">${formula}: <strong>${total}</strong> ${damageType || 'untyped'}${saveDc ? ` — ${saveType ? saveType.toUpperCase() : ''} save DC ${saveDc}` : ''}</div><div class="aoe-results">${npcResultRows || '<em>No creatures affected</em>'}</div>${pendingList}</div>`;
           logEntry({
@@ -542,21 +694,70 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             npcResults: npcResults.map(r => r.creatureName),
             saveType, saveDc, dcSuccess,
            });
-          setPopupHtml(html);
-         }
-        return;
-       }
+           setPopupHtml(html);
+
+           // Overchannel self-damage for AoE (2nd+ use before Long Rest)
+           if (context?.overchannelActive && context?.overchannelUseCount > 1) {
+               const overchannelSpellLevel = context?.overchannelSpellLevel || 1;
+               const dicePerLevel = 2 + (context.overchannelUseCount - 1);
+               const totalDice = dicePerLevel * overchannelSpellLevel;
+               const necroticFormula = `${totalDice}d12`;
+               const necroticResult = rollExpression(necroticFormula);
+               if (necroticResult) {
+                   const casterCombatSummary = await loadCombatSummary(campaignName);
+                   const casterApplyResult = applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, null, true, characterName);
+                   logEntry({
+                       type: 'roll',
+                       characterName,
+                       rollType: 'overchannel-damage',
+                       name: 'Overchannel',
+                       formula: necroticFormula,
+                       rolls: necroticResult.rolls,
+                       total: necroticResult.total,
+                       modifier: necroticResult.modifier,
+                       damageType: 'Necrotic',
+                       targetName: characterName,
+                       finalDamage: casterApplyResult?.finalDamage,
+                       note: 'Overchannel self-damage (ignores resistance/immunity)',
+                   });
+               }
+               const usesKey = '_Overchannel_uses';
+               const restKey = '_Overchannel_restTimestamp';
+               const now = Date.now();
+               const lastRestTimestamp = getRuntimeValue(characterName, restKey, campaignName);
+               let currentUses;
+               if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
+                   currentUses = Number(getRuntimeValue(characterName, usesKey, campaignName) ?? 1);
+               } else if (!lastRestTimestamp) {
+                   currentUses = Number(getRuntimeValue(characterName, usesKey, campaignName) ?? 1);
+               } else {
+                   currentUses = 1;
+               }
+               if (currentUses > 0) {
+                   await setRuntimeValue(characterName, usesKey, currentUses - 1, campaignName);
+               }
+           }
+
+          }
+         return;
+        }
 
       const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
       const targetMaxHp = target?.type === 'player'
         ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
         : target?.maxHp ?? 0;
 
-       if (saveDc && saveType && target) {
-         if (target.type === 'npc') {
-           const disadvantage = context?.metamagicHeighten || false;
+        if (saveDc && saveType && target) {
+          if (target.type === 'npc') {
+            const disadvantage = context?.metamagicHeighten || false;
+            const isSoulstitchProtected = hasSoulstitchProtection(target.name, characterName, campaignName);
             const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage);
-            const finalDamage = computeDamageAfterSave(total, saveResult.success, dcSuccess);
+            let finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterSave(total, saveResult.success, dcSuccess);
+            const isCantripFlag = context?.isCantrip || false;
+            const hasPotentFlag = hasPotentCantrip(context?.playerStats);
+            if (!isSoulstitchProtected && hasPotentFlag && isCantripFlag && saveResult.success && dcSuccess === 'none') {
+              finalDamage = Math.floor(total / 2);
+            }
             const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, null, false, characterName);
 
             logEntry({
@@ -572,12 +773,13 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
               targetName: target.name,
               saveType,
               saveDc,
-              saveResult: saveResult.success ? 'success' : 'failure',
+              saveResult: isSoulstitchProtected ? 'soulstitch_auto_success' : (saveResult.success ? 'success' : 'failure'),
               saveRoll: saveResult.roll,
               saveBonus: saveResult.bonus,
               saveRawRolls: saveResult.rawRolls,
               mode: disadvantage ? 'disadvantage' : 'normal',
               finalDamage: applyResult?.finalDamage ?? total,
+              soulstitchProtected: isSoulstitchProtected,
             });
 
             setPopupHtml({
@@ -598,7 +800,34 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             finalDamage: applyResult?.finalDamage,
             damageApplied: true,
             damageReduced: applyResult?.damageReduced,
-           });
+            });
+
+            // Overchannel self-damage (2nd+ use before Long Rest)
+            if (context?.overchannelActive && context?.overchannelUseCount > 1) {
+                const overchannelSpellLevel = context?.overchannelSpellLevel || 1;
+                const dicePerLevel = 2 + (context.overchannelUseCount - 1);
+                const totalDice = dicePerLevel * overchannelSpellLevel;
+                const necroticFormula = `${totalDice}d12`;
+                const necroticResult = rollExpression(necroticFormula);
+                if (necroticResult) {
+                    const casterCombatSummary = await loadCombatSummary(campaignName);
+                    const casterApplyResult = applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, null, true, characterName);
+                    logEntry({
+                        type: 'roll',
+                        characterName,
+                        rollType: 'overchannel-damage',
+                        name: 'Overchannel',
+                        formula: necroticFormula,
+                        rolls: necroticResult.rolls,
+                        total: necroticResult.total,
+                        modifier: necroticResult.modifier,
+                        damageType: 'Necrotic',
+                        targetName: characterName,
+                        finalDamage: casterApplyResult?.finalDamage,
+                        note: 'Overchannel self-damage (ignores resistance/immunity)',
+                    });
+                }
+            }
 
           if (context?.metamagicHeighten || context?.metamagicCareful || context?.metamagicTwinTarget) {
             saveLastDamageEvent(characterName, {
@@ -621,8 +850,11 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             const twinTarget = combatSummary?.creatures?.find(c => c.name === context.metamagicTwinTarget);
             if (twinTarget && twinTarget.name !== target.name) {
               const twinDisadvantage = context?.metamagicHeighten || false;
-              const twinSaveResult = rollSaveForCreature(twinTarget, saveType, saveDc, twinDisadvantage);
-              const twinFinalDamage = computeDamageAfterSave(total, twinSaveResult.success, dcSuccess);
+               const twinSaveResult = rollSaveForCreature(twinTarget, saveType, saveDc, twinDisadvantage);
+               let twinFinalDamage = computeDamageAfterSave(total, twinSaveResult.success, dcSuccess);
+               if (hasPotentFlag && isCantripFlag && twinSaveResult.success && dcSuccess === 'none') {
+                 twinFinalDamage = Math.floor(total / 2);
+               }
                const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName, null, false, characterName);
               logEntry({
                 type: 'roll',
@@ -661,7 +893,10 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             if (multiTarget && multiTarget.name !== target.name) {
               if (saveType && saveDc) {
                 const multiSaveResult = rollSaveForCreature(multiTarget, saveType, saveDc, false);
-                const multiFinalDamage = computeDamageAfterSave(total, multiSaveResult.success, dcSuccess);
+                let multiFinalDamage = computeDamageAfterSave(total, multiSaveResult.success, dcSuccess);
+                if (hasPotentFlag && isCantripFlag && multiSaveResult.success && dcSuccess === 'none') {
+                  multiFinalDamage = Math.floor(total / 2);
+                }
                 const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, multiFinalDamage, [damageType], campaignName, null);
                 logEntry({
                   type: 'roll',
@@ -822,11 +1057,15 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             return;
           }
           const promptId = utils.guid();
-          pendingSaves[promptId] = {
-            targetName: target.name, rawDamage: total, saveDc, saveType, dcSuccess,
-            damageType, attackerName: attackerName || characterName, name, formula, modifier, rolls, campaignName, setPopupHtml,
-            metamagicHeighten: context?.metamagicHeighten || false,
-           };
+           pendingSaves[promptId] = {
+              targetName: target.name, rawDamage: total, saveDc, saveType, dcSuccess,
+              damageType, attackerName: attackerName || characterName, name, formula, modifier, rolls, campaignName, setPopupHtml,
+              metamagicHeighten: context?.metamagicHeighten || false,
+              isCantrip: context?.isCantrip || false,
+              overchannelActive: context?.overchannelActive || false,
+              overchannelUseCount: context?.overchannelUseCount || 0,
+              overchannelSpellLevel: context?.overchannelSpellLevel || 1,
+             };
 
           sendSavePrompt(campaignName, {
             promptId,
@@ -860,26 +1099,69 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             mode: context?.metamagicHeighten ? 'disadvantage' : 'normal',
            });
 
-          setPopupHtml({
-            type: 'save-damage',
-            name,
-            formula,
-            rolls,
-            bonus: 0,
-            modifier,
-            damageType,
-            targetName: target.name,
-            saveDc,
-            saveType,
-            dcSuccess,
-            waitingForPlayerSave: true,
-            promptId,
-            rawDamage: total,
-            attackerName: attackerName || characterName,
-           });
-          return;
-          }
-        }
+           setPopupHtml({
+             type: 'save-damage',
+             name,
+             formula,
+             rolls,
+             bonus: 0,
+             modifier,
+             damageType,
+             targetName: target.name,
+             saveDc,
+             saveType,
+             dcSuccess,
+             waitingForPlayerSave: true,
+             promptId,
+             rawDamage: total,
+             attackerName: attackerName || characterName,
+            });
+
+            // Overchannel self-damage (2nd+ use before Long Rest) - apply immediately
+            if (context?.overchannelActive && context?.overchannelUseCount > 1) {
+                const overchannelSpellLevel = context?.overchannelSpellLevel || 1;
+                const dicePerLevel = 2 + (context.overchannelUseCount - 1);
+                const totalDice = dicePerLevel * overchannelSpellLevel;
+                const necroticFormula = `${totalDice}d12`;
+                const necroticResult = rollExpression(necroticFormula);
+                if (necroticResult) {
+                    const casterCombatSummary = await loadCombatSummary(campaignName);
+                    const casterApplyResult = applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, null, true, characterName);
+                    logEntry({
+                        type: 'roll',
+                        characterName,
+                        rollType: 'overchannel-damage',
+                        name: 'Overchannel',
+                        formula: necroticFormula,
+                        rolls: necroticResult.rolls,
+                        total: necroticResult.total,
+                        modifier: necroticResult.modifier,
+                        damageType: 'Necrotic',
+                        targetName: characterName,
+                        finalDamage: casterApplyResult?.finalDamage,
+                        note: 'Overchannel self-damage (ignores resistance/immunity)',
+                    });
+                }
+                const usesKey = '_Overchannel_uses';
+                const restKey = '_Overchannel_restTimestamp';
+                const now = Date.now();
+                const lastRestTimestamp = getRuntimeValue(characterName, restKey, campaignName);
+                let currentUses;
+                if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
+                    currentUses = Number(getRuntimeValue(characterName, usesKey, campaignName) ?? 1);
+                } else if (!lastRestTimestamp) {
+                    currentUses = Number(getRuntimeValue(characterName, usesKey, campaignName) ?? 1);
+                } else {
+                    currentUses = 1;
+                }
+                if (currentUses > 0) {
+                    await setRuntimeValue(characterName, usesKey, currentUses - 1, campaignName);
+                }
+            }
+
+           return;
+           }
+         }
 
       let applyResult = null;
       if (target) {
@@ -995,7 +1277,49 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                  finalDamage: applyResult?.finalDamage,
                });
 
-       const popupData = {
+       // Overchannel self-damage (2nd+ use before Long Rest)
+       if (context?.overchannelActive && context?.overchannelUseCount > 1) {
+           const overchannelSpellLevel = context?.overchannelSpellLevel || 1;
+           const dicePerLevel = 2 + (context.overchannelUseCount - 1);
+           const totalDice = dicePerLevel * overchannelSpellLevel;
+           const necroticFormula = `${totalDice}d12`;
+           const necroticResult = rollExpression(necroticFormula);
+           if (necroticResult) {
+               const casterCombatSummary = await loadCombatSummary(campaignName);
+               const casterApplyResult = applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, null, true, characterName);
+               logEntry({
+                   type: 'roll',
+                   characterName,
+                   rollType: 'overchannel-damage',
+                   name: 'Overchannel',
+                   formula: necroticFormula,
+                   rolls: necroticResult.rolls,
+                   total: necroticResult.total,
+                   modifier: necroticResult.modifier,
+                   damageType: 'Necrotic',
+                   targetName: characterName,
+                   finalDamage: casterApplyResult?.finalDamage,
+                   note: 'Overchannel self-damage (ignores resistance/immunity)',
+               });
+           }
+           const usesKey = '_Overchannel_uses';
+           const restKey = '_Overchannel_restTimestamp';
+           const now = Date.now();
+           const lastRestTimestamp = getRuntimeValue(characterName, restKey, campaignName);
+           let currentUses;
+           if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
+               currentUses = Number(getRuntimeValue(characterName, usesKey, campaignName) ?? 1);
+           } else if (!lastRestTimestamp) {
+               currentUses = Number(getRuntimeValue(characterName, usesKey, campaignName) ?? 1);
+           } else {
+               currentUses = 1;
+           }
+           if (currentUses > 0) {
+               await setRuntimeValue(characterName, usesKey, currentUses - 1, campaignName);
+           }
+       }
+
+        const popupData = {
          type: 'damage',
          name,
          formula,
@@ -1185,7 +1509,12 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         return ev?.some(ef => ef.saveType === saveTypeUpper && ef.shareable && ef.shareRange >= 5);
       });
     const hasEvasion = hasOwnEvasion || hasSharedEvasion;
-    const finalDamage = computeDamageAfterEvasion(pending.rawDamage, saveResult.success, pending.dcSuccess, hasEvasion);
+    let finalDamage = computeDamageAfterEvasion(pending.rawDamage, saveResult.success, pending.dcSuccess, hasEvasion);
+    const isCantripFlag = pending.isCantrip || false;
+    const hasPotentFlag = hasPotentCantrip(pending.context?.playerStats);
+    if (hasPotentFlag && isCantripFlag && saveResult.success && pending.dcSuccess === 'none') {
+      finalDamage = Math.floor(pending.rawDamage / 2);
+    }
     const applyResult = applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName, null, false, pending.attackerName || characterName);
 
     delete pendingSaves[promptId];

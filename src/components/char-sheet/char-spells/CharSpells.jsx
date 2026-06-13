@@ -9,9 +9,10 @@ import MetamagicPopup from '../MetamagicPopup.jsx'
 import SpellDetailPopup from './SpellDetailPopup.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
 import MultiTargetPopup from '../MultiTargetPopup.jsx'
-import { rollExpression, rollExpressionDoubled } from '../../../services/dice/diceRoller.js';
+import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../../services/dice/diceRoller.js';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../services/rules/damageUtils.js';
+import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../../hooks/useMetamagic.js'
 import { useSpellMetamagicFlow } from '../../../hooks/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../../hooks/useSpellUpcastFlow.js'
@@ -20,8 +21,11 @@ import { executeSpellCast } from '../../../services/rules/spellCastService.js'
 import * as mapsService from '../../../services/maps/mapsService.js';
 import { getNearestPlacedItem } from '../../../services/rules/rangeValidation.js';
 import { isInnateSorceryActive } from '../../../services/combat/buffService.js';
-import { useRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { useRuntimeValue, setRuntimeValue, getRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { addEntry } from '../../../services/ui/logService.js';
+import { applyDamageToTarget } from '../../../services/rules/applyDamage.js';
 import { isPsionicSpell, hasPsionicSorcery } from '../../../services/rules/metamagicRules.js';
+import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../../services/rules/postCastRiderService.js';
 import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, characters }) {
@@ -31,8 +35,26 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
      const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
         autoDamageRoll: (autoDamage, isCrit) => {
-          const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
-          if (result) {
+          let autoFormula = autoDamage.formula;
+          const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);
+          const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
+          const spellSchool = (autoDamage.spellSchool || '').toLowerCase();
+          const isEvocation = spellSchool === 'evocation';
+          const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
+          if (shouldApplyEmpoweredEvoc) {
+            autoFormula = `${autoFormula} + ${empEvocIntMod}[Empowered Evocation]`;
+          }
+          const isOverchannel = autoDamage.overchannelActive;
+          const overchannelUseCount = autoDamage.overchannelUseCount || 0;
+          const overchannelSpellLevel = autoDamage.overchannelSpellLevel || 1;
+
+          let overchannelResult;
+          if (isOverchannel) {
+              overchannelResult = rollExpressionMaximized(autoFormula);
+          } else {
+              overchannelResult = isCrit ? rollExpressionDoubled(autoFormula) : rollExpression(autoFormula);
+          }
+          if (overchannelResult) {
             const context = {
               damageType: autoDamage.damageType,
               targetName: autoDamage.targetName,
@@ -49,7 +71,47 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
             if (autoDamage.metamagicHeighten) {
               context.metamagicHeighten = autoDamage.metamagicHeighten;
             }
-            rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
+            rollDamage(autoDamage.name, autoFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
+
+            if (isOverchannel && overchannelUseCount > 1) {
+                const dicePerLevel = 2 + (overchannelUseCount - 1);
+                const totalDice = dicePerLevel * overchannelSpellLevel;
+                const necroticFormula = `${totalDice}d12`;
+                const necroticResult = rollExpression(necroticFormula);
+                if (necroticResult) {
+                    const combatSummary = getCombatSummary() || { creatures: [] };
+                    const applyResult = applyDamageToTarget(combatSummary, playerStats.name, necroticResult.total, ['Necrotic'], campaignName, null, true, playerStats.name);
+                    addEntry(campaignName, {
+                        type: 'roll',
+                        characterName: playerStats.name,
+                        rollType: 'overchannel-damage',
+                        name: 'Overchannel',
+                        formula: necroticFormula,
+                        rolls: necroticResult.rolls,
+                        total: necroticResult.total,
+                        modifier: necroticResult.modifier,
+                        damageType: 'Necrotic',
+                        targetName: playerStats.name,
+                        finalDamage: applyResult?.finalDamage,
+                        note: 'Overchannel self-damage (ignores resistance/immunity)',
+                    }).catch(() => {});
+                }
+                const usesKey = '_Overchannel_uses';
+                const restKey = '_Overchannel_restTimestamp';
+                const now = Date.now();
+                const lastRestTimestamp = getRuntimeValue(playerStats.name, restKey, campaignName);
+                let currentUses;
+                if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
+                    currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
+                } else if (!lastRestTimestamp) {
+                    currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
+                } else {
+                    currentUses = 1;
+                }
+                if (currentUses > 0) {
+                    setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+                }
+            }
             }
             // Remarkable Athlete: after critical hit, enable movement without opportunity attacks
             if (isCrit) {
@@ -167,7 +229,16 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const executeDamageRoll = (formula, spellName, spell) => {
         const wasCrit = dicePopupHtml?.isCrit;
         if (wasCrit && setDicePopupHtml) setDicePopupHtml(null);
-        const result = wasCrit ? rollExpressionDoubled(formula) : rollExpression(formula);
+        const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);
+        const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
+        const spellSchool = (spell.school || '').toLowerCase();
+        const isEvocation = spellSchool === 'evocation';
+        const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
+        let empEvocFormula = formula;
+        if (shouldApplyEmpoweredEvoc) {
+            empEvocFormula = `${formula} + ${empEvocIntMod}[Empowered Evocation]`;
+        }
+        const result = wasCrit ? rollExpressionDoubled(empEvocFormula) : rollExpression(empEvocFormula);
         if (result) {
             const doDamage = async (metaCtx) => {
                 const target = await getTargetInfo();
@@ -195,7 +266,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                     context.saveType = spell.dc.dc_type;
                     context.dcSuccess = spell.dc.dc_success;
                  }
-                rollDamage(spellName, formula, result.total, result.rolls, result.modifier, context);
+                rollDamage(spellName, empEvocFormula, result.total, result.rolls, result.modifier, context);
             };
             if (isSorcerer) {
                 const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));

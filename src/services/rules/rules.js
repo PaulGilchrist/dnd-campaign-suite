@@ -8,6 +8,7 @@ import { parseMagicItemName } from './attackCalc.js';
 import * as proficiencyUtils from '../character/proficiencyUtils.js';
 import * as proficiencyUtils2024 from '../character/proficiencyUtils2024.js';
 import { getAbilities as getAbilities5e, getHitPoints as getHitPoints5e } from './abilityCalc.js';
+import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { getAbilities as getAbilities2024, getHitPoints as getHitPoints2024 } from './abilityCalc2024.js';
 import { getSpellAbilities as getSpellAbilities5e } from './spellCalc.js';
 import { getSpellAbilities as getSpellAbilities2024 } from './spellCalc2024.js';
@@ -38,6 +39,34 @@ function getRulesType(playerStats, playerSummary) {
 
 function is2024(playerStats, playerSummary) {
     return getRulesType(playerStats, playerSummary) === '2024';
+}
+
+/**
+ * Apply The Third Eye darkvision enhancement from active buffs.
+ * Sets Darkvision to 120 ft if the Third Eye buff with darkvision_120 effect is active.
+ */
+function applyThirdEyeDarkvision(playerStats, senses, campaignName) {
+    const stored = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+    const activeBuffs = Array.isArray(stored) ? stored : [];
+    const thirdEyeBuff = activeBuffs.find(b => b.name === 'The Third Eye' && b.effect === 'darkvision_120');
+    if (!thirdEyeBuff) return senses;
+
+    const darkvisionIndex = senses.findIndex(s => s.name === 'Darkvision');
+    if (darkvisionIndex !== -1) {
+        const currentFeet = extractDarkvisionFeet(senses[darkvisionIndex].value);
+        if (currentFeet >= 120) return senses;
+        senses[darkvisionIndex] = { ...senses[darkvisionIndex], value: '120 ft.' };
+    } else {
+        senses.push({ name: 'Darkvision', value: '120 ft.' });
+    }
+
+    return senses;
+}
+
+function extractDarkvisionFeet(value) {
+    if (!value) return 0;
+    const match = String(value).match(/(\d+)\s*ft/i);
+    return match ? parseInt(match[1], 10) : 0;
 }
 
 /**
@@ -565,16 +594,20 @@ const rules = {
             }
         });
 
-         // 2024-specific: senses set later (override), 5e-specific: immunities/resistances
-         if (is2024(playerStats, playerSummary)) {
-             playerStats.senses = rr.getSenses(playerStats);
-             // Apply Umbral Sight darkvision enhancement for Gloom Stalkers
-             playerStats.senses = applyUmbralSightDarkvision(playerStats, playerStats.senses);
-          } else {
-             playerStats.immunities = rr.getImmunities(playerSummary);
-             playerStats.resistances = rr.getResistances(playerSummary);
-             playerStats.senses = rr.getSenses(playerStats);
-          }
+          // 2024-specific: senses set later (override), 5e-specific: immunities/resistances
+          if (is2024(playerStats, playerSummary)) {
+              playerStats.senses = rr.getSenses(playerStats);
+              // Apply Umbral Sight darkvision enhancement for Gloom Stalkers
+              playerStats.senses = applyUmbralSightDarkvision(playerStats, playerStats.senses);
+              // Apply The Third Eye darkvision enhancement from active buffs
+              playerStats.senses = applyThirdEyeDarkvision(playerStats, playerStats.senses, playerSummary.campaignName);
+           } else {
+              playerStats.immunities = rr.getImmunities(playerSummary);
+              playerStats.resistances = rr.getResistances(playerSummary);
+              playerStats.senses = rr.getSenses(playerStats);
+              // Apply The Third Eye darkvision enhancement from active buffs (5e)
+              playerStats.senses = applyThirdEyeDarkvision(playerStats, playerStats.senses, playerSummary.campaignName);
+           }
 
         return playerStats;
      }

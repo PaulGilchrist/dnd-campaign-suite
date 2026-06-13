@@ -1,6 +1,7 @@
 import classRules from '../character/classRules2024.js';
+import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 
-export function getSpellAbilities(allSpells, playerStats) {
+export function getSpellAbilities(allSpells, playerStats, playerSummary) {
     let spellAbilities = null;
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     let spellcasting = classLevel?.spellcasting;
@@ -114,7 +115,92 @@ export function getSpellAbilities(allSpells, playerStats) {
                         }
                     });
                 }
+                if (feature.type === 'passive_rule' && feature.effect === 'spell_breaker' && feature.alwaysPreparedSpells) {
+                    feature.alwaysPreparedSpells.forEach(spellName => {
+                        const knownSpell = spellAbilities.spells.find(s => s.name === spellName);
+                        if (!knownSpell) {
+                            spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+                        }
+                    });
+                }
             });
+
+            // Spell Mastery: read runtime state for player-chosen spells
+            const campaignName = playerSummary?.campaignName;
+            const level1Spell = getRuntimeValue(playerStats.name, '_Spell_Mastery_level1', campaignName);
+            const level2Spell = getRuntimeValue(playerStats.name, '_Spell_Mastery_level2', campaignName);
+            if (level1Spell && !spellAbilities.spells.find(s => s.name === level1Spell)) {
+                spellAbilities.spells.push({ name: level1Spell, prepared: 'Always' });
+            }
+            if (level2Spell && !spellAbilities.spells.find(s => s.name === level2Spell)) {
+                spellAbilities.spells.push({ name: level2Spell, prepared: 'Always' });
+            }
+
+            // Abjuration Savant: read runtime state for player-chosen Abjuration spells
+            const abjurationSavantSelection = getRuntimeValue(playerStats.name, '_Abjuration_Savant_selection', campaignName);
+            if (abjurationSavantSelection) {
+                const abjurationSpells = Array.isArray(abjurationSavantSelection) ? abjurationSavantSelection : [];
+                for (const spellName of abjurationSpells) {
+                    if (!spellAbilities.spells.find(s => s.name === spellName)) {
+                        spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+                    }
+                }
+            }
+
+            // Divination Savant: read runtime state for player-chosen Divination spells
+            const divinationSavantSelection = getRuntimeValue(playerStats.name, '_Divination_Savant_selection', campaignName);
+            if (divinationSavantSelection) {
+                const divinationSpells = Array.isArray(divinationSavantSelection) ? divinationSpells : [];
+                for (const spellName of divinationSpells) {
+                    if (!spellAbilities.spells.find(s => s.name === spellName)) {
+                        spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+                    }
+                }
+            }
+
+            // Illusion Savant: read runtime state for player-chosen Illusion spells
+            const illusionSavantSelection = getRuntimeValue(playerStats.name, '_Illusion_Savant_selection', campaignName);
+            if (illusionSavantSelection) {
+                const illusionSpells = Array.isArray(illusionSavantSelection) ? illusionSavantSelection : [];
+                for (const spellName of illusionSpells) {
+                    if (!spellAbilities.spells.find(s => s.name === spellName)) {
+                        spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+                    }
+                }
+            }
+
+            // Phantasmal Creatures: always prepare Summon Beast and Summon Fey
+            const hasPhantasmalCreatures = playerStats.automation?.passives?.some(p => p.type === 'phantasmal_creatures');
+            if (hasPhantasmalCreatures) {
+                const pcPassive = playerStats.automation.passives.find(p => p.type === 'phantasmal_creatures');
+                const alwaysPrepared = pcPassive?.alwaysPreparedSpells || [];
+                for (const spellName of alwaysPrepared) {
+                    if (!spellAbilities.spells.find(s => s.name === spellName)) {
+                        spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+                    }
+                }
+            }
+
+            // Improved Illusions: grant Minor Illusion cantrip to Illusionist subclass
+            const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
+            if (hasImprovedIllusions && allSpells) {
+                const minorIllusion = spellAbilities.spells.find(s => s.name === 'Minor Illusion');
+                if (!minorIllusion) {
+                    const minorIllusionDetail = allSpells.find(s => s.name === 'Minor Illusion');
+                    if (minorIllusionDetail) {
+                        spellAbilities.spells.push({ ...minorIllusionDetail, prepared: 'Always' });
+                    }
+                } else if (minorIllusion.casting_time !== '1 bonus action' && minorIllusion.casting_time !== 'Bonus Action') {
+                    // Override casting time to Bonus Action for Improved Illusions
+                    const minorIllusionDetail = allSpells.find(s => s.name === 'Minor Illusion');
+                    if (minorIllusionDetail) {
+                        const idx = spellAbilities.spells.findIndex(s => s.name === 'Minor Illusion');
+                        if (idx >= 0) {
+                            spellAbilities.spells[idx] = { ...minorIllusionDetail, prepared: 'Always', casting_time: '1 bonus action' };
+                        }
+                    }
+                }
+            }
 
             // Ritual Adept: add all ritual-tagged spells from the spellbook that aren't already known
             const ritualSpellsPassives = playerStats.automation.ritualSpells || [];

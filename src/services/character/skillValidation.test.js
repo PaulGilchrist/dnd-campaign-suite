@@ -337,7 +337,95 @@ describe('skillValidation', () => {
             expect(result.allowed).toBe(true);
             expect(result.count).toBe(2);
     });
-         });
+
+        it('should detect Scholar feature for Wizard 2024', async () => {
+            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+                class_levels: [
+                    { level: 1, features: [] },
+                    { level: 2, features: [
+                        { name: 'Scholar', description: 'By studying magic, you also specialized in another field of study. Choose one of the following skills in which you have proficiency: Arcana, History, Investigation, Medicine, Nature, or Religion. You have Expertise in the chosen skill.', level: 2, type: 'class_feature' }
+                    ]}
+                ]
+            });
+
+            const result = await getExpertiseLimits({
+                rules: '2024',
+                class: { name: 'Wizard' },
+                level: 2
+            });
+
+            expect(result.allowed).toBe(true);
+            expect(result.count).toBe(1);
+        });
+
+        it('should not count Scholar if level is too low', async () => {
+            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+                class_levels: [
+                    { level: 1, features: [] },
+                    { level: 2, features: [
+                        { name: 'Scholar', description: 'By studying magic, you also specialized in another field of study. Choose one of the following skills in which you have proficiency: Arcana, History, Investigation, Medicine, Nature, or Religion. You have Expertise in the chosen skill.', level: 2, type: 'class_feature' }
+                    ]}
+                ]
+            });
+
+            const result = await getExpertiseLimits({
+                rules: '2024',
+                class: { name: 'Wizard' },
+                level: 1
+            });
+
+            expect(result.allowed).toBe(false);
+            expect(result.count).toBe(0);
+        });
+
+        it('should handle Scholar feature in 2024 subclass/major', async () => {
+            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+                class_levels: [{ level: 1, features: [] }],
+                majors: [
+                    {
+                        name: 'School of Evocation',
+                        features: [
+                            { level: 2, name: 'Scholar', description: 'By studying magic, you also specialized in another field of study. Choose one of the following skills in which you have proficiency: Arcana, History, Investigation, Medicine, Nature, or Religion. You have Expertise in the chosen skill.' }
+                        ]
+                    }
+                ]
+            });
+
+            const result = await getExpertiseLimits({
+                rules: '2024',
+                class: { name: 'Wizard', subclass: { name: 'School of Evocation' } },
+                level: 2
+            });
+
+            expect(result.allowed).toBe(true);
+            expect(result.count).toBe(1);
+        });
+
+        it('should handle Scholar feature in 5e subclass', async () => {
+            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+                class_levels: [{ level: 1, features: [] }],
+                subclasses: [
+                    {
+                        name: 'Lore',
+                        class_levels: [
+                            { level: 2, features: [
+                                { name: 'Scholar', description: 'By studying magic, you also specialized in another field of study. Choose one of the following skills in which you have proficiency: Arcana, History, Investigation, Medicine, Nature, or Religion. You have Expertise in the chosen skill.' }
+                            ]}
+                        ]
+                    }
+                ]
+            });
+
+            const result = await getExpertiseLimits({
+                rules: '5e',
+                class: { name: 'Wizard', subclass: { name: 'Lore' } },
+                level: 2
+            });
+
+            expect(result.allowed).toBe(true);
+            expect(result.count).toBe(1);
+        });
+    });
 
     describe('validateSkills', () => {
         it('should return warning when too many skills selected', async () => {

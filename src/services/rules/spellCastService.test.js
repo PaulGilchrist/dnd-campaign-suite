@@ -25,10 +25,13 @@ vi.mock('../combat/buffService.js', () => ({
 }));
 
 vi.mock('./postCastRiderService.js', () => ({
-  triggerPostCastRiderSaves: vi.fn().mockResolvedValue(undefined),
-  triggerSpellThief: vi.fn().mockResolvedValue(undefined),
-  triggerBewitchingMagic: vi.fn().mockResolvedValue(undefined),
-}));
+   triggerPostCastRiderSaves: vi.fn().mockResolvedValue(undefined),
+   triggerSpellThief: vi.fn().mockResolvedValue(undefined),
+   triggerBewitchingMagic: vi.fn().mockResolvedValue(undefined),
+   triggerSoulstitchSpells: vi.fn().mockResolvedValue(undefined),
+   hasEmpoweredEvocation: vi.fn().mockReturnValue(false),
+   getEmpoweredEvocationIntModifier: vi.fn().mockReturnValue(0),
+ }));
 
 vi.mock('./postCastHealService.js', () => ({
   triggerPostCastSelfHeals: vi.fn().mockResolvedValue(undefined),

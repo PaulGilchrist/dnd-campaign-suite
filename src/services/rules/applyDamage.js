@@ -85,30 +85,51 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
    }
     const finalDamage = computeDamageAfterResistances(rawDamage, damageTypes || [], resistances, immunities, ignoreResistance);
 
-   // Save damage event under target's key for reaction features
+    // Arcane Ward / Projected Ward: absorb damage before it hits HP
+    let wardDamage = finalDamage;
+    let wardAbsorbed = 0;
+    if (isPlayer) {
+        const wardActive = getRuntimeValue(creature.name, 'arcaneWardActive', campaignName);
+        if (wardActive) {
+            const wardHp = Number(getRuntimeValue(creature.name, 'arcaneWardHp', campaignName) ?? 0);
+            if (wardHp > 0) {
+                wardAbsorbed = Math.min(wardDamage, wardHp);
+                const newWardHp = wardHp - wardAbsorbed;
+                setRuntimeValue(creature.name, 'arcaneWardHp', newWardHp, campaignName);
+                wardDamage -= wardAbsorbed;
+
+                // If ward reaches 0, check for Projected Ward (absorbs for nearby allies too)
+                if (newWardHp <= 0) {
+                    // Ward is depleted — remaining damage will hit the target
+                }
+            }
+        }
+    }
+
+    // Save damage event under target's key for reaction features
+    if (isPlayer) {
+        saveDamageEventForTarget(creature.name, rawDamage, damageTypes || [], campaignName);
+    }
+
+    let oldHp, newHp;
    if (isPlayer) {
-       saveDamageEventForTarget(creature.name, rawDamage, damageTypes || [], campaignName);
+     oldHp = getRuntimeValue(creature.name, 'currentHitPoints') ?? 0;
+     newHp = Math.max(0, oldHp - wardDamage);
+     setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
+   } else {
+     oldHp = creature.currentHp;
+     newHp = Math.max(0, oldHp - wardDamage);
+     creature.currentHp = newHp;
    }
 
-   let oldHp, newHp;
-  if (isPlayer) {
-    oldHp = getRuntimeValue(creature.name, 'currentHitPoints') ?? 0;
-    newHp = Math.max(0, oldHp - finalDamage);
-    setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
-  } else {
-    oldHp = creature.currentHp;
-    newHp = Math.max(0, oldHp - finalDamage);
-    creature.currentHp = newHp;
-  }
-
-  if (finalDamage > 0) {
+   if (wardDamage > 0) {
     // Thought Shield: reflect Psychic damage back to the attacker
     if (isPlayer && attackerName && attackerName !== creature.name) {
       const hasThoughtShield = playerComputed?.characterAdvancement?.some(f => f.name === 'Thought Shield');
       if (hasThoughtShield && damageTypes?.some(d => d.toLowerCase() === 'psychic')) {
         const attackerCreature = combatSummary.creatures.find(c => c.name === attackerName);
         if (attackerCreature && attackerCreature.currentHp > 0) {
-          const reflectedDamage = finalDamage;
+          const reflectedDamage = wardDamage;
           attackerCreature.currentHp = Math.max(0, attackerCreature.currentHp - reflectedDamage);
           postLogEntry(campaignName, {
             type: 'hp_change',

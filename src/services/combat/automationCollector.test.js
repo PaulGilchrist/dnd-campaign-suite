@@ -922,3 +922,23 @@ describe('collectTurnStartEffects', () => {
         expect(result[0].name).toBe('Umbral Sight')
     })
 })
+
+describe('collectAutomationFromFeatures – memorize_spell', () => {
+    it('places memorize_spell in specialActions', () => {
+        const features = [
+            {
+                name: 'Memorize Spell',
+                automation: {
+                    type: 'memorize_spell',
+                    casting_time: 'passive'
+                }
+            }
+        ]
+        const result = collectAutomationFromFeatures(features, {})
+        expect(result.specialActions).toHaveLength(1)
+        expect(result.specialActions[0].type).toBe('memorize_spell')
+        expect(result.specialActions[0].name).toBe('Memorize Spell')
+        expect(result.specialActions[0].casting_time).toBe('passive')
+        expect(result.specialActions[0].hasAutomation).toBe(true)
+    })
+})
