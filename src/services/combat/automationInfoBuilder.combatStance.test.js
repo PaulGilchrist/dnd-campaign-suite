@@ -138,6 +138,7 @@ describe('buildAttackInfo – conditional_disadvantage', () => {
             target: 'attack_roll',
             condition: '',
             effect: 'disadvantage',
+            abilities: [],
             hasAutomation: true,
         })
     })

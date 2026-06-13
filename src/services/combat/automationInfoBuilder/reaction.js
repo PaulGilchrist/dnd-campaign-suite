@@ -144,5 +144,27 @@ export const reactionHandlers = {
             casting_time: auto.casting_time || '1 reaction',
             hasAutomation: true
         }
+    },
+
+    'searing_vengeance': (feature, _playerStats) => {
+        const auto = feature.automation
+        const usesMax = auto.uses ?? 1
+        return {
+            type: 'searing_vengeance',
+            name: feature.name,
+            healExpression: auto.healExpression || '',
+            damageExpression: auto.damageExpression || '',
+            damageType: auto.damageType || 'Radiant',
+            range: auto.range || '30_ft',
+            condition: auto.condition || 'blinded',
+            conditionDuration: auto.conditionDuration || 'until_end_of_current_turn',
+            trigger: auto.trigger || 'death_save_by_ally_or_self',
+            allyRange: auto.allyRange || '60_ft',
+            uses: auto.uses ?? 1,
+            usesMax,
+            recharge: auto.recharge || 'long_rest',
+            casting_time: auto.casting_time || '1 reaction',
+            hasAutomation: true
+        }
     }
 }

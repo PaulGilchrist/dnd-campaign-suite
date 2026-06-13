@@ -27,6 +27,15 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const restorationCur = getRuntimeValue(playerStats.name, 'sorcerousRestorationUses');
     const restorationAvailable = !!sorcRestoration && restorationCur !== 0;
 
+    const isWizard = playerStats?.class?.name === 'Wizard';
+    const arcaneRecovery = isWizard && (playerStats.automation?.passives ?? []).find(
+        a => a.type === 'resource_restoration' && a.resourceKey === 'arcaneRecoveryLevels'
+    );
+    const arcaneRecoveryCur = getRuntimeValue(playerStats.name, 'arcaneRecoveryLevels');
+    const arcaneRecoveryAvailable = !!arcaneRecovery && arcaneRecoveryCur !== null && arcaneRecoveryCur !== 0;
+    const arcaneRecoveryMaxSlots = isWizard ? Math.ceil(playerStats.level / 2) : 0;
+    const [arcaneRecoveryRequested, setArcaneRecoveryRequested] = React.useState(false);
+
     const hasFontOfInspiration = (playerStats.automation?.passives ?? []).some(p => p.type === 'font_of_inspiration');
     const bardicInspirationMax = (() => { const charisma = playerStats.abilities?.find(a => a.name === 'Charisma'); return charisma?.bonus || 0; })();
     const bardicInspirationCur = getRuntimeValue(playerStats.name, 'bardicInspirationUses');
@@ -117,6 +126,24 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
 
         if (hasFontOfInspiration && fontOfInspirationAvailable && fontOfInspirationRequested) {
             setRuntimeValue(playerStats.name, 'bardicInspirationUses', bardicInspirationMax, campaignName);
+            }
+
+        if (arcaneRecovery && arcaneRecoveryAvailable && arcaneRecoveryRequested) {
+            const maxSlotsToRecover = Math.ceil(playerStats.level / 2);
+            let slotsRecovered = 0;
+            for (const level of [1, 2, 3, 4, 5]) {
+                if (slotsRecovered >= maxSlotsToRecover) break;
+                const slotKey = `spell_slots_level_${level}`;
+                const max = playerStats.spellAbilities?.[slotKey] || 0;
+                const current = Number(getRuntimeValue(playerStats.name, slotKey) ?? max);
+                const available = max - current;
+                if (available > 0) {
+                    const toRecover = Math.min(available, maxSlotsToRecover - slotsRecovered);
+                    setRuntimeValue(playerStats.name, slotKey, current + toRecover, campaignName);
+                    slotsRecovered += toRecover;
+                }
+            }
+            setRuntimeValue(playerStats.name, 'arcaneRecoveryLevels', null, campaignName);
             }
 
         clearAllExpirationEffects(playerStats.name, campaignName);
@@ -212,16 +239,32 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                         </div>
                     )}
 
-                     {resourceLabels.length > 0 && (
-                      <div className="short-rest-section">
-                          <h4>Resources Restored</h4>
-                          <ul>
-                              {resourceLabels.map(label => (
-                                  <li key={label}>{label}</li>
-                                 ))}
-                          </ul>
-                      </div>
-                  )}
+                      {resourceLabels.length > 0 && (
+                       <div className="short-rest-section">
+                           <h4>Resources Restored</h4>
+                           <ul>
+                               {resourceLabels.map(label => (
+                                   <li key={label}>{label}</li>
+                                  ))}
+                           </ul>
+                       </div>
+                   )}
+
+                   {arcaneRecovery && (arcaneRecoveryAvailable || arcaneRecoveryRequested) && (
+                       <div className="short-rest-section">
+                           <h4>Arcane Recovery</h4>
+                           <p>Regain expended Wizard spell slots up to level {arcaneRecoveryMaxSlots}. No slots level 6+.</p>
+                           <div className="short-rest-dice-row">
+                               {arcaneRecoveryRequested ? (
+                                   <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Arcane Recovery applied</span>
+                                 ) : (
+                                   <button className="char-btn" onClick={() => setArcaneRecoveryRequested(true)} disabled={!arcaneRecoveryAvailable}>
+                                       <i className="fas fa-book-open"></i> Recover Spell Slots
+                                   </button>
+                                 )}
+                           </div>
+                       </div>
+                   )}
 
                 <div className="short-rest-actions">
                     <button className="char-btn" onClick={handleComplete}>

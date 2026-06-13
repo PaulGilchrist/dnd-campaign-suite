@@ -839,5 +839,110 @@ describe('spellCalc2024', () => {
 
       expect(result.spells).toHaveLength(0);
     });
+
+    it('should add ritual-tagged spells from spellbook when Ritual Adept passive is present', () => {
+      const allSpells = [
+        { name: 'Fire Bolt', level: 0, ritual: false, casting_time: '1 action' },
+        { name: 'Alarm', level: 1, ritual: true, casting_time: '1 minute or Ritual', classes: ['Ranger', 'Wizard'] },
+        { name: 'Find Familiar', level: 1, ritual: true, casting_time: '1 action', classes: ['Wizard'] },
+        { name: 'Detect Magic', level: 1, ritual: true, casting_time: '1 action', classes: ['Bard', 'Cleric'] },
+      ];
+      const playerStats = {
+        level: 1,
+        class: {
+          name: 'Wizard',
+          class_levels: [{
+            level: 1,
+            spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } },
+           }],
+          spell_casting_ability: 'Intelligence',
+         },
+        abilities: [
+           { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0, bonus: 1 },
+         ],
+        spells: ['Fire Bolt'],
+        proficiency: 2,
+        automation: {
+          ritualSpells: [
+            { type: 'passive_rule', effect: 'ritual_spells', name: 'Ritual Adept', hasAutomation: true }
+          ]
+        },
+       };
+
+      const result = getSpellAbilities(allSpells, playerStats);
+
+      const spellNames = result.spells.map(s => s.name);
+      // Fire Bolt is in the known list
+      expect(spellNames).toContain('Fire Bolt');
+      // All ritual-tagged spells should be added
+      expect(spellNames).toContain('Alarm');
+      expect(spellNames).toContain('Find Familiar');
+      expect(spellNames).toContain('Detect Magic');
+      // Non-ritual spells not in known list should NOT be added
+      expect(result.spells.find(s => s.name === 'Fire Bolt')).toBeTruthy();
+    });
+
+    it('should not duplicate ritual spells already in the known list', () => {
+      const allSpells = [
+        { name: 'Alarm', level: 1, ritual: true, casting_time: '1 minute or Ritual', classes: ['Wizard'] },
+      ];
+      const playerStats = {
+        level: 1,
+        class: {
+          name: 'Wizard',
+          class_levels: [{
+            level: 1,
+            spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } },
+           }],
+          spell_casting_ability: 'Intelligence',
+         },
+        abilities: [
+           { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0, bonus: 1 },
+         ],
+        spells: ['Alarm'],
+        proficiency: 2,
+        automation: {
+          ritualSpells: [
+            { type: 'passive_rule', effect: 'ritual_spells', name: 'Ritual Adept', hasAutomation: true }
+          ]
+        },
+       };
+
+      const result = getSpellAbilities(allSpells, playerStats);
+
+      const alarmCount = result.spells.filter(s => s.name === 'Alarm').length;
+      expect(alarmCount).toBe(1);
+    });
+
+    it('should not add ritual spells when Ritual Adept is not present', () => {
+      const allSpells = [
+        { name: 'Fire Bolt', level: 0, ritual: false, casting_time: '1 action' },
+        { name: 'Alarm', level: 1, ritual: true, casting_time: '1 minute or Ritual', classes: ['Wizard'] },
+      ];
+      const playerStats = {
+        level: 1,
+        class: {
+          name: 'Wizard',
+          class_levels: [{
+            level: 1,
+            spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } },
+           }],
+          spell_casting_ability: 'Intelligence',
+         },
+        abilities: [
+           { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0, bonus: 1 },
+         ],
+        spells: ['Fire Bolt'],
+        proficiency: 2,
+        automation: {
+          ritualSpells: []
+        },
+       };
+
+      const result = getSpellAbilities(allSpells, playerStats);
+
+      const spellNames = result.spells.map(s => s.name);
+      expect(spellNames).not.toContain('Alarm');
+    });
    });
 });

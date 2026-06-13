@@ -488,7 +488,7 @@ describe('getClassFeatures', () => {
       const result = getClassFeatures(playerStats);
 
       expect(result.showWizardFeatures).toBe(false);
-      expect(result.arcaneRecoveryLevels).toBeUndefined();
+      expect(result.arcaneRecoveryLevels).toBe(0);
     });
   });
 

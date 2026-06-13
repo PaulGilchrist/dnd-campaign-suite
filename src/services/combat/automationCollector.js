@@ -57,6 +57,13 @@ export function collectTurnStartEffects(features) {
                     name: feature.name,
                 })
             }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'create_thrall_temp_hp') {
+                effects.push({
+                    type: 'create_thrall_temp_hp',
+                    name: feature.name,
+                    tempHpExpression: auto.tempHpExpression || 'warlock level + CHA modifier',
+                })
+            }
             if (auto?.type === 'passive_rule' && auto?.effect === 'mage_hand_legerdemain') {
                 effects.push({
                     type: 'mage_hand_legerdemain',
@@ -96,6 +103,12 @@ export function collectTurnStartEffects(features) {
                     healExpression: '10',
                 })
             }
+            if (auto?.type === 'radiant_soul') {
+                effects.push({
+                    type: 'radiant_soul_turn_start',
+                    name: feature.name,
+                })
+            }
             if (auto?.type === 'precise_hunter') {
                 effects.push({
                     type: 'precise_hunter',
@@ -130,7 +143,8 @@ export function collectAutomationFromFeatures(features, playerStats) {
         passives: [],
         autoEffects: [],
         saveModifiers: [],
-        primalKnowledge: []
+        primalKnowledge: [],
+        ritualSpells: []
     }
 
     if (!features) return result
@@ -177,6 +191,12 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 result.actions.push(info)
                 break
             case 'reaction_damage':
+                if (auto.trigger === 'psychic_damage_received') {
+                    result.passives.push(info)
+                } else {
+                    result.reactions.push(info)
+                }
+                break
             case 'countercharm':
             case 'damage_reduction':
             case 'psionic_strike':
@@ -218,6 +238,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'land_resistance':
             case 'psionic_sorcery':
             case 'psionic_spells_list':
+            case 'psychic_spells':
             case 'auto_effect': {
                 if (auto.effect === 'psychic_teleportation') {
                     result.bonusActions.push(info)
@@ -253,6 +274,8 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'passive_rule':
                 if (info.effect === 'superior_defense') {
                     result.specialActions.push(info)
+                } else if (info.effect === 'ritual_spells') {
+                    result.ritualSpells.push(info)
                 } else {
                     result.passives.push(info)
                     if (info.effect === 'primal_knowledge' && info.primalKnowledge.length > 0) {
@@ -398,6 +421,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'steps_of_the_fey':
                 result.bonusActions.push(info)
                 break
+            case 'celestial_resilience':
+                result.specialActions.push(info)
+                break
             case 'shadowy_dodge':
                 result.reactions.push(info)
                 break
@@ -406,6 +432,15 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break
             case 'beguiling_defenses':
                 result.reactions.push(info)
+                break
+            case 'searing_vengeance':
+                result.reactions.push(info)
+                break
+            case 'dark_ones_blessing':
+                result.passives.push(info)
+                break
+            case 'dark_ones_look':
+                result.passives.push(info)
                 break
             case 'hunter_prey':
                 result.passives.push(info)
@@ -484,11 +519,26 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'damage_type_choice':
                 result.passives.push(info)
                 break
+            case 'radiant_soul':
+                result.passives.push(info)
+                break
             case 'dragon_wings':
                 result.specialActions.push(info)
                 break
             case 'dragon_companion':
                 result.actions.push(info)
+                break
+            case 'hurl_through_hell':
+                result.passives.push(info)
+                break
+            case 'clairvoyant_combatant':
+                result.specialActions.push(info)
+                break
+            case 'create_thrall':
+                result.actions.push(info)
+                break
+            case 'create_thrall_temp_hp':
+                result.passives.push(info)
                 break
             default:
                 result.specialActions.push(info)

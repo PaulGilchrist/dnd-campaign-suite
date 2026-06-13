@@ -33,6 +33,7 @@ describe('healingPoolHandler.handle', () => {
                 resourceCost: '',
                 bloodiedOnly: false,
                 restoringTouchConditions: [],
+                maxDicePerUse: '',
             },
         });
     });
@@ -70,6 +71,7 @@ describe('healingPoolHandler.handle', () => {
             resourceCost: 'channel_divinity',
             bloodiedOnly: true,
             restoringTouchConditions: [],
+            maxDicePerUse: '',
         });
     });
 

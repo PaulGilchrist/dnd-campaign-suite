@@ -27,10 +27,13 @@ export const healingHandlers = {
         const level = playerStats.level || 1
         const baseExpression = auto.poolExpression || ''
         const resolvedExpression = resolveHealingPoolExpression(baseExpression, auto.scaling, playerStats)
+        const explicitDicePool = auto.isDicePool === true
         const diceMatch = resolvedExpression.match(/^(\d+)d(\d+)$/i)
-        const isDicePool = !!diceMatch
+        const isDicePool = explicitDicePool || !!diceMatch
         const pool = isDicePool
-            ? parseInt(diceMatch[1], 10)
+            ? (explicitDicePool
+                ? evaluateAutoExpression(resolvedExpression, playerStats, prof, level)
+                : parseInt(diceMatch[1], 10))
             : (resolvedExpression ? evaluateAutoExpression(resolvedExpression, playerStats, prof, level) : 0)
         return {
             type: 'healing_pool',
@@ -38,7 +41,7 @@ export const healingHandlers = {
             pool,
             poolExpression: resolvedExpression,
             isDicePool,
-            dieType: isDicePool ? parseInt(diceMatch[2], 10) : null,
+            dieType: explicitDicePool ? (auto.dieType || 6) : (isDicePool ? parseInt(diceMatch[2], 10) : null),
             action: auto.action || 'action',
             recharge: auto.recharge || 'long_rest',
             alsoCures: auto.alsoCures || [],
@@ -46,6 +49,7 @@ export const healingHandlers = {
             range: auto.range || '',
             resourceCost: auto.resourceCost || '',
             resourceKey: feature.name.toLowerCase().replace(/\s+/g, '') + 'Pool',
+            maxDicePerUse: auto.maxDicePerUse || '',
             hasAutomation: true
         }
     },

@@ -610,9 +610,9 @@ describe('getShortRestResourceLabels', () => {
     expect(labels).toEqual([])
     })
 
-  it('returns empty array for Wizard', () => {
+  it('returns Arcane Recovery label for Wizard', () => {
     const labels = getShortRestResourceLabels({ class: { name: 'Wizard' } })
-    expect(labels).toEqual([])
+    expect(labels).toEqual(['Arcane Recovery (Spell Slots)'])
     })
 
   it('returns empty array when class is missing', () => {

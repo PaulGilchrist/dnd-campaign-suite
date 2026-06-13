@@ -175,6 +175,7 @@ describe('buildAttackInfo – healing_pool', () => {
             range: '',
             resourceCost: '',
             resourceKey: 'testfeaturePool',
+            maxDicePerUse: '',
             hasAutomation: true,
         })
     })

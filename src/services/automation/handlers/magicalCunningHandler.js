@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
-import { getAbilityModifier } from '../../shared/abilityLookup.js';
+import { grantCelestialResilience } from './celestialResilienceHandler.js';
 
 const MAGICAL_CUNNING_KEY = 'magicalCunningUsed';
 
@@ -112,23 +112,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     await setRuntimeValue(playerName, MAGICAL_CUNNING_KEY, true, campaignName);
 
     // Apply Celestial Resilience if the warlock has the Celestial Patron
-    const isCelestial = playerStats.class?.major?.name === 'Celestial Patron'
-        || playerStats.class?.subclass?.name === 'Celestial Patron';
-
     let celestText = '';
-    if (isCelestial) {
-        const warlockLevel = playerStats.level || 0;
-        const chaMod = getAbilityModifier(playerStats.abilities, 'Charisma');
-        const selfTempHp = warlockLevel + chaMod;
-        const allyTempHp = Math.floor(warlockLevel / 2) + chaMod;
-
-        // Grant self temp HP
-        const existingTempHp = Number(getRuntimeValue(playerName, 'tempHp', campaignName) || 0);
-        await setRuntimeValue(playerName, 'tempHp', existingTempHp + selfTempHp, campaignName);
-
-        celestText = `<br/>Celestial Resilience: You gain ${selfTempHp} temporary hit points.`;
-        if (allyTempHp > 0) {
-            celestText += ` Up to 5 creatures you can see may gain ${allyTempHp} temporary hit points.`;
+    const celestialResult = await grantCelestialResilience(playerStats, campaignName, 'magical_cunning');
+    if (celestialResult) {
+        celestText = `<br/>Celestial Resilience: ${celestialResult.message}`;
+        if (celestialResult.allyTempHp && celestialResult.allyTempHp > 0) {
+            celestText += ` Up to ${celestialResult.maxAllies} creatures you can see may gain ${celestialResult.allyTempHp} temporary hit points.`;
         }
     }
 

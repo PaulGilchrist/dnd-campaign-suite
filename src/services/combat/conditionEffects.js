@@ -15,6 +15,7 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
   if (modifier.effect === 'restore_balance') return true;
   if (modifier.effect === 'd20_floor_10') return true;
   if (modifier.effect === 'no_advantage_against') return true;
+  if (modifier.effect === 'dark_ones_look') return true;
   if (modifier.target !== 'saving_throw' && modifier.target !== 'save') return false;
   if (modifier.condition === 'raging') return isRaging;
   if (modifier.condition === 'shape_shift') return shapeShiftActive;
@@ -88,7 +89,14 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
         effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
       }
     } else if (mod.effect === 'disadvantage') {
-      effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
+      if (mod.abilities && mod.abilities.length > 0 && !abilityName) {
+        effects.saveDisadvantageAbilities = [...new Set([
+          ...(effects.saveDisadvantageAbilities || []),
+          ...mod.abilities
+        ])];
+      } else {
+        effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
+      }
     } else if (mod.effect === 'reroll') {
       effects.autoReroll = true;
       effects.autoRerollCondition = mod.condition;
@@ -125,6 +133,9 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
     else if (mod.effect === 'no_advantage_against') {
       effects.noAdvantageAgainst = true;
     }
+    else if (mod.effect === 'dark_ones_look') {
+      effects.darkOnesLook = true;
+    }
   }
 }
 
@@ -152,6 +163,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     saveAdvantage: [],
     saveAdvantageCount: 0,
     saveDisadvantageCount: 0,
+    saveDisadvantageAbilities: null,
     autoReroll: false,
     autoRerollCondition: null,
     autoRerollBonus: null,
@@ -166,6 +178,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     restoreBalance: false,
     d20Floor10: false,
     noAdvantageAgainst: false,
+    darkOnesLook: false,
     riderSaveDisadvantage: false,
     riderAttackBonus: 0,
     damageDoubled: false,
@@ -179,6 +192,8 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     conditionToApply: null,
     conditionDuration: null,
     repeatingSave: false,
+    hexSaveDisadvantage: false,
+    hexSaveDisadvantageAbility: null,
    }
 
   const conditionSet = new Set(conditions)
@@ -370,6 +385,30 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     // Handle direct condition application (no save required, e.g., Withdraw noOAs)
     if (te.effect === 'no_opportunity_attacks' && !te.saveType) {
       effects.riderCannotOpportunityAttack = true;
+    }
+    // Handle Hurl Through Hell — incapacitated condition with save
+    if (te.effect === 'incapacitated' && te.saveType) {
+      effects.saveType = te.saveType;
+      effects.saveDc = te.saveDc;
+      effects.saveAbility = te.saveAbility;
+      effects.conditionToApply = 'incapacitated';
+      effects.conditionDuration = te.duration || 'until_end_of_next_turn';
+      effects.hurlThroughHell = true;
+    }
+    // Handle Clairvoyant Combatant — target has Disadvantage on attacks against you, you have Advantage on attacks against target
+    if (te.effect === 'clairvoyant_combatant') {
+      if (te.attackerAdvantage) {
+        effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
+      }
+      if (te.defenderDisadvantage) {
+        effects.attackDisadvantageCount = (effects.attackDisadvantageCount || 0) + 1;
+      }
+    }
+    // Handle Eldritch Hex — target has Disadvantage on saves of chosen ability
+    if (te.effect === 'hex_save_disadvantage') {
+      effects.hexSaveDisadvantage = true;
+      effects.hexSaveDisadvantageAbility = te.ability || null;
+      effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
     }
   }
 

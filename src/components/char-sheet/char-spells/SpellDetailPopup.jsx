@@ -57,6 +57,17 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
   const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spell.name, spell.level, playerStats);
   const hasAnySlots = isCantrip || freeCastAuthorized || upcastLevels.some(l => l.availableSlots > 0);
 
+  const isWarlock = playerStats.class?.name === 'Warlock';
+  const hasPsychicSpells = playerStats.automation?.passives?.some(p => p.type === 'psychic_spells');
+  const hasDamage = !!spell.damage;
+  const isEnchantmentOrIllusion = () => {
+    const school = (spell.school || '').toLowerCase();
+    return school === 'enchantment' || school === 'illusion';
+  };
+  const canChangeDamageType = isWarlock && hasPsychicSpells && hasDamage;
+  const [usePsychicDamage, setUsePsychicDamage] = useState(false);
+  const [noVSComponents] = useState(isWarlock && hasPsychicSpells && isEnchantmentOrIllusion());
+
   const [selectedUpcastLvl, setSelectedUpcastLvl] = useState(() => {
     const firstAvailable = upcastLevels.find(l => l.availableSlots > 0);
     return firstAvailable ? String(firstAvailable.level) : String(upcastLevels[0]?.level || spell.level);
@@ -139,7 +150,10 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
         setRuntimeValue(playerStats.name, spellSlotKey, availableSlots - 1, campaignName);
       }
     }
-    onCast(spell);
+    const modifiedSpell = canChangeDamageType && usePsychicDamage
+      ? { ...spell, _psychicSpellsOverride: true }
+      : spell;
+    onCast(modifiedSpell);
   };
 
   const isRaging = getActiveBuffs(playerStats.name, campaignName).some(b => b.name === 'Rage');
@@ -195,6 +209,23 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
                 </label>
               );
             })}
+          </div>
+        )}
+        {canChangeDamageType && (
+          <div className="spell-detail-upcast">
+            <label>
+              <input
+                type="checkbox"
+                checked={usePsychicDamage}
+                onChange={() => setUsePsychicDamage(!usePsychicDamage)}
+              />
+              <span>Change damage type to Psychic</span>
+            </label>
+          </div>
+        )}
+        {noVSComponents && (
+          <div className="spell-detail-free-cast">
+            <i className="fa-solid fa-ghost"></i> No Verbal or Somatic components (Psychic Spells)
           </div>
         )}
         <div className="spell-detail-actions">

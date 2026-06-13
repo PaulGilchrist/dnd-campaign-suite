@@ -115,6 +115,18 @@ export function getSpellAbilities(allSpells, playerStats) {
                     });
                 }
             });
+
+            // Ritual Adept: add all ritual-tagged spells from the spellbook that aren't already known
+            const ritualSpellsPassives = playerStats.automation.ritualSpells || [];
+            if (ritualSpellsPassives.length > 0 && allSpells) {
+                ritualSpellsPassives.forEach(_ritualFeature => {
+                    allSpells.forEach(spellDetail => {
+                        if (spellDetail.ritual && !spellAbilities.spells.find(s => s.name === spellDetail.name)) {
+                            spellAbilities.spells.push({ ...spellDetail, prepared: 'Always' });
+                        }
+                    });
+                });
+            }
         }
 
         if (spellAbilities.spells.length > 0) {

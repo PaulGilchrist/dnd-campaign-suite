@@ -12,6 +12,38 @@ import { applyHealingToTarget } from './applyHealing.js';
 import { getCombatContext } from './damageUtils.js';
 import { postLogEntry } from '../shared/logPoster.js';
 
+function applyEldritchHex(spell, playerStats, campaignName, targetName) {
+    if (spell.name !== 'Hex') return;
+
+    const passives = playerStats.automation?.passives || [];
+    const hasEldritchHex = passives.some(p => p.name === 'Eldritch Hex' && p.type === 'conditional_disadvantage');
+    if (!hasEldritchHex) return;
+
+    if (!targetName) return;
+
+    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+    const effects = Array.isArray(storedEffects) ? storedEffects : [];
+
+    const existingHexIndex = effects.findIndex(
+        te => te.target === targetName && te.effect === 'hex_save_disadvantage' && te.source === playerStats.name
+    );
+
+    const hexEffect = {
+        target: targetName,
+        effect: 'hex_save_disadvantage',
+        source: playerStats.name,
+        duration: 'hex_duration',
+    };
+
+    if (existingHexIndex >= 0) {
+        effects[existingHexIndex] = hexEffect;
+    } else {
+        effects.push(hexEffect);
+    }
+
+    setRuntimeValue(campaignName, 'targetEffects', effects, campaignName);
+}
+
 export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName }) {
     if (getActiveBuffs(playerStats.name, campaignName).some(b => b.blocksSpellcasting)) {
         console.warn(`[spellCast] ${playerStats.name} cannot cast spells (blocked by active buff)`);
@@ -102,6 +134,10 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     triggerPostCastRiderSaves(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast rider save failed:', e);
     });
+
+    const hexTarget = metaCtx?.targetName || (await getTargetInfo())?.name;
+    applyEldritchHex(spell, playerStats, campaignName, hexTarget);
+
     triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast self-heal failed:', e);
     });

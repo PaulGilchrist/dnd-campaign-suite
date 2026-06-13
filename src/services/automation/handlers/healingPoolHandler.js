@@ -21,6 +21,7 @@ export async function handle(action, playerStats, _campaignName, _mapName) {
             resourceCost: auto.resourceCost || '',
             bloodiedOnly: !!auto.bloodiedOnly,
             restoringTouchConditions: restoringTouchData?.automation?.cureConditions || [],
+            maxDicePerUse: auto.maxDicePerUse || '',
             },
           };
   }

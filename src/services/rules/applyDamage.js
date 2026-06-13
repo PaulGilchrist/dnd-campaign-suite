@@ -102,6 +102,30 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
   }
 
   if (finalDamage > 0) {
+    // Thought Shield: reflect Psychic damage back to the attacker
+    if (isPlayer && attackerName && attackerName !== creature.name) {
+      const hasThoughtShield = playerComputed?.characterAdvancement?.some(f => f.name === 'Thought Shield');
+      if (hasThoughtShield && damageTypes?.some(d => d.toLowerCase() === 'psychic')) {
+        const attackerCreature = combatSummary.creatures.find(c => c.name === attackerName);
+        if (attackerCreature && attackerCreature.currentHp > 0) {
+          const reflectedDamage = finalDamage;
+          attackerCreature.currentHp = Math.max(0, attackerCreature.currentHp - reflectedDamage);
+          postLogEntry(campaignName, {
+            type: 'hp_change',
+            targetName: attackerName,
+            delta: -reflectedDamage,
+            currentHp: attackerCreature.currentHp,
+            maxHp: attackerCreature.maxHp,
+            isHealing: false,
+            isUnconscious: attackerCreature.currentHp <= 0,
+            abilityName: "Thought Shield",
+          });
+          if (attackerCreature.concentration && reflectedDamage > 0) {
+            attackerCreature.concentration.dc = Math.max(10, Math.floor(reflectedDamage / 2));
+          }
+        }
+      }
+    }
     if (isPlayer) {
       const conditions = getRuntimeValue(creature.name, 'activeConditions') || [];
       if (conditions.some(c => String(c).toLowerCase() === 'frightened')) {
@@ -161,14 +185,39 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
 
   }
 
-  const wasAlive = oldHp > 0;
-  const isNowUnconscious = newHp <= 0;
+   const wasAlive = oldHp > 0;
+   const isNowUnconscious = newHp <= 0;
 
-  if (creature.concentration && finalDamage > 0) {
-    creature.concentration.dc = Math.max(10, Math.floor(finalDamage / 2));
-  }
+   if (creature.concentration && finalDamage > 0) {
+     creature.concentration.dc = Math.max(10, Math.floor(finalDamage / 2));
+   }
 
-  logDamageApplication(creature, finalDamage, oldHp, newHp, campaignName);
+    if (!isPlayer && wasAlive && isNowUnconscious && finalDamage > 0) {
+      const allCharacters = characters || [];
+      for (const charStats of allCharacters) {
+        const computed = charStats?.computedStats || charStats;
+        if (!computed) continue;
+        const isFiendPatron = computed.class?.subclass?.name === 'Fiend Patron';
+        if (!isFiendPatron) continue;
+        const features = computed.characterAdvancement || [];
+        const feature = features.find(f => f.name === "Dark One's Blessing");
+        if (!feature || !feature.automation) continue;
+        const chaMod = (() => {
+          const cha = computed.abilities?.find(a => a.name === 'Charisma');
+          return cha ? Math.floor((cha.score - 10) / 2) : 0;
+        })();
+        const warlockLevel = (() => {
+          const cl = (computed.class?.class_levels || []).find(c => c.level === computed.level);
+          return cl ? cl.level : computed.level;
+        })();
+        let amount = chaMod + warlockLevel;
+        amount = Math.max(1, amount);
+        const existingTempHp = Number(getRuntimeValue(charStats.name, 'tempHp', campaignName) || 0);
+        setRuntimeValue(charStats.name, 'tempHp', existingTempHp + amount, campaignName);
+      }
+    }
+
+   logDamageApplication(creature, finalDamage, oldHp, newHp, campaignName);
 
   let npcConcentrationBroken = false;
   let combatSummaryChanged = false;

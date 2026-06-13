@@ -27,7 +27,7 @@ describe('collectAutomationFromFeatures', () => {
 
   it('returns empty result object when features is undefined', () => {
     const result = collectAutomationFromFeatures(undefined, playerStats)
-    expect(Object.keys(result)).toHaveLength(8)
+    expect(Object.keys(result)).toHaveLength(9)
   })
 
   it('skips features without automation property', () => {

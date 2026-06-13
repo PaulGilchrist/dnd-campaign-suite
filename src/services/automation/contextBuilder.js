@@ -108,6 +108,15 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
 
+        // Clairvoyant Combatant: Advantage on attack rolls against the bonded creature (on failed save)
+        const clairvoyantActive = activeBuffs.some(b => b.effect === 'clairvoyant_combatant');
+        if (clairvoyantActive && targetName) {
+            const clairvoyantTarget = getRuntimeValue(playerName, 'clairvoyantCombatantTarget', campaignName);
+            if (clairvoyantTarget && targetName === clairvoyantTarget && forcedMode === undefined) {
+                forcedMode = 'advantage';
+            }
+        }
+
         // Avenging Angel: Advantage on attack rolls against Frightened creatures in the aura
         const avengingAngelActive = isAvengingAngelActive(playerName, campaignName);
         if (avengingAngelActive && targetName && forcedMode === undefined) {

@@ -22,6 +22,7 @@ export const conditionalHandlers = {
             target: auto.target || 'attack_roll',
             condition: auto.condition || '',
             effect: auto.effect || 'disadvantage',
+            abilities: auto.abilities || [],
             hasAutomation: true
         }
     },

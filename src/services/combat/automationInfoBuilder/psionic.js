@@ -1,4 +1,16 @@
 export const psionicHandlers = {
+    'psychic_spells': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'psychic_spells',
+            name: feature.name,
+            damageType: auto.damageType || 'Psychic',
+            componentReduction: auto.componentReduction || [],
+            spellSchools: auto.spellSchools || [],
+            hasAutomation: true
+        }
+    },
+
     'psionic_sorcery': (feature, _playerStats) => {
         const auto = feature.automation
         return {

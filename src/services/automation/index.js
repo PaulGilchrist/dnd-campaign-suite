@@ -108,6 +108,16 @@ import { handle as handleContactPatron } from './handlers/contactPatronHandler.j
 import { handle as handleBeguilingDefenses } from './handlers/beguilingDefensesHandler.js';
 import { handle as handleBewitchingMagic } from './handlers/bewitchingMagicHandler.js';
 import { handle as handleStepsOfTheFey } from './handlers/stepsOfTheFeyHandler.js';
+import { handle as handleCelestialResilience } from './handlers/celestialResilienceHandler.js';
+import { handle as handleSearingVengeance } from './handlers/searingVengeanceHandler.js';
+import { handle as handleDarkOnesBlessing } from './handlers/darkOnesBlessingHandler.js';
+import { handle as handleDarkOnesLook } from './handlers/darkOnesLookHandler.js';
+import { handle as handleFiendishResilience } from './handlers/fiendishResilienceHandler.js';
+import { handle as handleHurlThroughHell } from './handlers/hurlThroughHellHandler.js';
+import { handle as handleClairvoyantCombatant } from './handlers/clairvoyantCombatantHandler.js';
+import { handle as handlePsychicSpells } from './handlers/psychicSpellsHandler.js';
+import { handle as handleCreateThrall } from './handlers/createThrallHandler.js';
+import { handle as handleCreateThrallTempHp } from './handlers/createThrallTempHpHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -246,7 +256,17 @@ const HANDLER_MAP = {
             wild_magic_double_roll_selected: onDoubleRollSelected,
             magical_cunning: handleMagicalCunning,
             contact_patron: handleContactPatron,
-            steps_of_the_fey: handleStepsOfTheFey,
+             steps_of_the_fey: handleStepsOfTheFey,
+             celestial_resilience: handleCelestialResilience,
+            searing_vengeance: handleSearingVengeance,
+            dark_ones_blessing: handleDarkOnesBlessing,
+             dark_ones_look: handleDarkOnesLook,
+              fiendish_resilience: handleFiendishResilience,
+                hurl_through_hell: handleHurlThroughHell,
+                clairvoyant_combatant: handleClairvoyantCombatant,
+                psychic_spells: handlePsychicSpells,
+                create_thrall: handleCreateThrall,
+                create_thrall_temp_hp: handleCreateThrallTempHp,
 };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;

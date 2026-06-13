@@ -2,7 +2,7 @@
   {
     "index": "barbarian",
     "name": "Barbarian",
-    "class_description": "<p><b>A fierce warrior of primal rage.</b></p><p>Barbarians are mighty warriors who are powered by primal forces of the multiverse that manifest as a Rage. More than a mere emotion\u2014and not limited to anger\u2014this Rage is an incarnation of a predator's ferocity, a storm's fury, and a sea's turmoil. Some Barbarians personify their Rage as a fierce spirit or revered forebear. Others see it as a connection to the pain and anguish of the world, as an impersonal tangle of wild magic, or as an expression of their own deepest self. For every Barbarian, their Rage is a power that fuels not just battle prowess, but also uncanny reflexes and heightened senses. Barbarians often serve as protectors and leaders in their communities. They charge headlong into danger so those under their protection don't have to. Their courage in the face of danger makes Barbarians perfectly suited for adventure.</p>",
+    "class_description": "<p><b>A fierce warrior of primal rage.</b></p><p>Barbarians are mighty warriors who are powered by primal forces of the multiverse that manifest as a Rage. More than a mere emotion—and not limited to anger—this Rage is an incarnation of a predator's ferocity, a storm's fury, and a sea's turmoil. Some Barbarians personify their Rage as a fierce spirit or revered forebear. Others see it as a connection to the pain and anguish of the world, as an impersonal tangle of wild magic, or as an expression of their own deepest self. For every Barbarian, their Rage is a power that fuels not just battle prowess, but also uncanny reflexes and heightened senses. Barbarians often serve as protectors and leaders in their communities. They charge headlong into danger so those under their protection don't have to. Their courage in the face of danger makes Barbarians perfectly suited for adventure.</p>",
     "primary_ability": "Strength",
     "hit_point_die": "12",
     "weapon_proficiencies": "Simple and Martial weapons",
@@ -4039,7 +4039,7 @@
   {
     "index": "fighter",
     "name": "Fighter",
-    "class_description": "<p><b>Fighters rule the battlefields.</b></p><p>Questing knights, loyal champions, elite soldiers, and hardened mercenaries\u2014as Fighters, they all share an unparalleled prowess with weapons and armor. And they are well acquainted with death, both meeting it out and defying it. Fighters master various weapon techniques, and a well-equipped Fighter always has the right tool at hand for any combat situation. Likewise, a Fighter is adept with every form of armor. Beyond that basic degree of familiarity, each Fighter specializes in certain styles of combat. Some concentrate on archery, some on fighting with two weapons at once, and some on augmenting their martial skills with magic. This combination of broad ability and extensive specialization makes Fighters superior combatants.</p>",
+    "class_description": "<p><b>Fighters rule the battlefields.</b></p><p>Questing knights, loyal champions, elite soldiers, and hardened mercenaries—as Fighters, they all share an unparalleled prowess with weapons and armor. And they are well acquainted with death, both meeting it out and defying it. Fighters master various weapon techniques, and a well-equipped Fighter always has the right tool at hand for any combat situation. Likewise, a Fighter is adept with every form of armor. Beyond that basic degree of familiarity, each Fighter specializes in certain styles of combat. Some concentrate on archery, some on fighting with two weapons at once, and some on augmenting their martial skills with magic. This combination of broad ability and extensive specialization makes Fighters superior combatants.</p>",
     "primary_ability": "Strength or Dexterity",
     "hit_point_die": "10",
     "skill_proficiencies": "Choose 2: Acrobatics, Animal Handling, Athletics, History, Insight, Intimidation, Persuasion, Perception, or Survival",
@@ -9361,7 +9361,7 @@
               "options": [
                 {
                   "name": "Sleight of Hand",
-                  "description": "Make a Dexterity (Sleight of Hand) check \u2014 pick pocket, palming, hiding small objects, etc."
+                  "description": "Make a Dexterity (Sleight of Hand) check — pick pocket, palming, hiding small objects, etc."
                 },
                 {
                   "name": "Thieves' Tools",
@@ -9369,7 +9369,7 @@
                 },
                 {
                   "name": "Use an Object",
-                  "description": "Use an object \u2014 Utilize action for magic items, or Action for normal objects"
+                  "description": "Use an object — Utilize action for magic items, or Action for normal objects"
                 }
               ],
               "casting_time": "1 bonus action",
@@ -10256,7 +10256,7 @@
       {
         "name": "Clockwork Sorcery",
         "subtitle": "Channel Cosmic Forces of Order",
-        "description": "The cosmic force of order has suffused you with magic. That power arises from Mechanus or a realm like it\u2014a plane of existence shaped entirely by clockwork efficiency.",
+        "description": "The cosmic force of order has suffused you with magic. That power arises from Mechanus or a realm like it—a plane of existence shaped entirely by clockwork efficiency.",
         "features": [
           {
             "name": "Clockwork Spells",
@@ -11418,22 +11418,75 @@
           {
             "name": "Healing Light",
             "description": "Pool of d6s (number = 1 + Warlock level). Bonus Action to heal yourself or creature within 60 feet, expending dice (max = Charisma modifier). Roll dice, restore HP equal to total. Regain all on Long Rest.",
-            "level": 3
+            "level": 3,
+            "type": "class_feature",
+            "automation": {
+              "type": "healing_pool",
+              "poolExpression": "1 + warlock level",
+              "isDicePool": true,
+              "dieType": 6,
+              "action": "bonus_action",
+              "recharge": "long_rest",
+              "range": "60_ft",
+              "casting_time": "1 bonus action"
+            }
           },
           {
             "name": "Radiant Soul",
             "description": "Resistance to Radiant damage. Once per turn, when a spell you cast deals Radiant or Fire damage, add Charisma modifier to that spell's damage against one of the spell's targets.",
-            "level": 6
+            "level": 6,
+            "automation": [
+              {
+                "type": "resistance",
+                "damageTypes": [
+                  "Radiant"
+                ],
+                "casting_time": "passive"
+              },
+              {
+                "type": "radiant_soul",
+                "damageTypes": [
+                  "Radiant",
+                  "Fire"
+                ],
+                "damageExpression": "CHA modifier",
+                "oncePerTurn": true,
+                "casting_time": "passive"
+              }
+            ]
           },
           {
             "name": "Celestial Resilience",
             "description": "Gain Temporary Hit Points equal to Warlock level + Charisma modifier when you use Magical Cunning or finish a Short or Long Rest. Up to 5 creatures you can see gain half your Warlock level + Charisma modifier Temporary Hit Points.",
-            "level": 10
+            "level": 10,
+            "automation": {
+              "type": "celestial_resilience",
+              "tempHpExpression": "warlock level + CHA modifier",
+              "allyTempHpExpression": "floor(warlock level / 2) + CHA modifier",
+              "maxAllies": 5,
+              "range": "60_ft",
+              "casting_time": "passive"
+            }
           },
           {
             "name": "Searing Vengeance",
             "description": "When you or ally within 60 feet is about to make a Death Saving Throw, unleash radiant energy. Creature regains HP equal to half its Hit Point maximum, ends Pending condition. Each creature within 30 feet takes 2d8 + Charisma modifier Radiant damage and has Blinded condition until end of current turn. Once per Long Rest.",
-            "level": 14
+            "level": 14,
+            "automation": {
+              "type": "searing_vengeance",
+              "healExpression": "floor(target_max_hp / 2)",
+              "damageExpression": "2d8 + CHA modifier",
+              "damageType": "Radiant",
+              "range": "30_ft",
+              "condition": "blinded",
+              "conditionDuration": "until_end_of_current_turn",
+              "uses": 1,
+              "usesMax": 1,
+              "recharge": "long_rest",
+              "casting_time": "1 reaction",
+              "trigger": "death_save_by_ally_or_self",
+              "allyRange": "60_ft"
+            }
           }
         ],
         "spells": [
@@ -11495,22 +11548,63 @@
           {
             "name": "Dark One's Blessing",
             "description": "When you reduce an enemy to 0 Hit Points, gain Temporary Hit Points equal to Charisma modifier + Warlock level (minimum 1). Also gain this benefit if someone else reduces an enemy within 10 feet of you to 0 Hit Points.",
-            "level": 3
+            "level": 3,
+            "automation": {
+              "type": "dark_ones_blessing",
+              "tempHpExpression": "CHA modifier + warlock level",
+              "range": "10_ft"
+            }
           },
           {
             "name": "Dark One's Own Look",
             "description": "When you make an ability check or saving throw, add 1d10 to your roll after seeing the roll but before any effects occur. Uses = Charisma modifier (minimum once). Regain on Long Rest.",
-            "level": 6
+            "level": 6,
+            "automation": {
+              "type": "dark_ones_look",
+              "diceExpression": "1d10"
+            }
           },
           {
             "name": "Fiendish Resilience",
             "description": "Choose one damage type (other than Force) when you finish a Short or Long Rest. Resistance to that type until you choose a different one.",
-            "level": 10
+            "level": 10,
+            "automation": {
+              "type": "damage_type_choice",
+              "damageTypes": [
+                "Acid",
+                "Bludgeoning",
+                "Cold",
+                "Fire",
+                "Lightning",
+                "Necrotic",
+                "Piercing",
+                "Poison",
+                "Psychic",
+                "Radiant",
+                "Slashing",
+                "Thunder"
+              ],
+              "effect": "fiendish_resilience",
+              "casting_time": "passive"
+            }
           },
           {
             "name": "Hurl Through Hell",
             "description": "Once per turn when you hit with an attack roll, target makes Charisma save or disappears and takes 8d10 Psychic damage (if not a Fiend), has Incapacitated condition until end of next turn, then returns to space it previously occupied. Once per Long Rest (or expend Pact Magic spell slot to restore).",
-            "level": 14
+            "level": 14,
+            "type": "class_feature",
+            "automation": {
+              "type": "hurl_through_hell",
+              "damageExpression": "8d10",
+              "damageType": "Psychic",
+              "saveType": "CHA",
+              "saveDc": "ability",
+              "saveAbility": "CHA",
+              "oncePerTurn": true,
+              "uses": 1,
+              "pactMagicRecharge": true,
+              "casting_time": "passive"
+            }
           }
         ],
         "spells": [
@@ -11559,37 +11653,136 @@
       {
         "name": "Great Old One Patron",
         "subtitle": "Unearth Forbidden Lore of Ineffable Being",
-        "description": "Your pact binds you to an unspeakable being from the Far Realm or an elder god\u2014a being such as Tharizdun, the Chained God; Zargon, the Returner; Hadar, the Dark Hunger; or Great Cthulhu. Or you might involve several entities without yoking yourself to one. The motives of these beings are incomprehensible, and the Great Old One might be indifferent to your existence.",
+        "description": "Your pact binds you to an unspeakable being from the Far Realm or an elder god—a being such as Tharizdun, the Chained God; Zargon, the Returner; Hadar, the Dark Hunger; or Great Cthulhu. Or you might involve several entities without yoking yourself to one. The motives of these beings are incomprehensible, and the Great Old One might be indifferent to your existence.",
         "features": [
           {
             "name": "Awakened Mind",
             "description": "Bonus Action, choose one creature within 30 feet. Communicate telepathically while within a number of miles equal to Charisma modifier (minimum 1 mile). Duration: minutes equal to Warlock level.",
-            "level": 3
+            "level": 3,
+            "automation": {
+              "type": "temp_buff",
+              "effect": "telepathic_speech",
+              "duration": "warlock_level_minutes",
+              "action": "bonus_action",
+              "casting_time": "1 bonus action",
+              "range": "30 ft"
+            }
           },
           {
             "name": "Psychic Spells",
             "description": "When you cast a Warlock spell that deals damage, you can change its damage type to Psychic. When you cast a Warlock spell that is an Enchantment or Illusion, you can do so without Verbal or Somatic components.",
-            "level": 3
+            "level": 3,
+            "automation": {
+              "type": "psychic_spells",
+              "damageType": "Psychic",
+              "componentReduction": [
+                "V",
+                "S"
+              ],
+              "spellSchools": [
+                "enchantment",
+                "illusion"
+              ]
+            }
           },
           {
             "name": "Clairvoyant Combatant",
             "description": "When you form a telepathic bond with a creature using Awakened Mind, force that creature to make Wisdom save. On failed save, creature has Disadvantage on attack rolls against you, and you have Advantage on attack rolls against that creature for the duration. Once per Short or Long Rest (or expend Pact Magic spell slot to restore).",
-            "level": 6
+            "level": 6,
+            "type": "class_feature",
+            "automation": {
+              "type": "clairvoyant_combatant",
+              "saveType": "WIS",
+              "saveDc": "ability",
+              "saveAbility": "CHA",
+              "duration": "1_minute",
+              "casting_time": "1 bonus action",
+              "pactMagicRecharge": true,
+              "uses": 1
+            }
           },
           {
             "name": "Eldritch Hex",
             "description": "Always have Hex spell prepared. When you cast Hex and choose an ability, the target also has Disadvantage on saving throws of the chosen ability for the duration.",
-            "level": 10
+            "level": 10,
+            "automation": [
+              {
+                "type": "passive_rule",
+                "effect": "always_prepared_spells",
+                "spells": [
+                  "Hex"
+                ],
+                "casting_time": "passive"
+              },
+              {
+                "type": "conditional_disadvantage",
+                "target": "saving_throw",
+                "abilities": [
+                  "STR",
+                  "DEX",
+                  "CON",
+                  "INT",
+                  "WIS",
+                  "CHA"
+                ],
+                "casting_time": "passive"
+              }
+            ]
           },
           {
             "name": "Thought Shield",
             "description": "Your thoughts can't be read by telepathy or other means unless you allow it. Resistance to Psychic damage. Whenever a creature deals Psychic damage to you, that creature takes the same amount of damage that you take.",
-            "level": 10
+            "level": 10,
+            "automation": [
+              {
+                "type": "passive_immunity",
+                "damage_resistance": [
+                  "Psychic"
+                ],
+                "casting_time": "passive"
+              },
+              {
+                "type": "reaction_damage",
+                "trigger": "psychic_damage_received",
+                "damageExpression": "RAW damage",
+                "damageType": "Psychic",
+                "range": "5_ft",
+                "casting_time": "1 reaction"
+              }
+            ]
           },
           {
             "name": "Create Thrall",
             "description": "When you cast Summon Aberration, you can modify it so that it doesn't require Concentration. Duration becomes 1 minute. When summoned, the Aberration has Temporary Hit Points equal to Warlock level + Charisma modifier. First time each turn the Aberration hits a creature under Hex, deals extra Psychic damage equal to the bonus damage of that spell.",
-            "level": 14
+            "level": 14,
+            "automation": [
+              {
+                "type": "create_thrall",
+                "spell": "Summon Aberration",
+                "uses_expression": "CHA modifier_min_1",
+                "recharge": "long_rest",
+                "casting_time": "1 action",
+                "tempHpExpression": "warlock level + CHA modifier"
+              },
+              {
+                "type": "passive_rule",
+                "effect": "create_thrall_temp_hp",
+                "tempHpExpression": "warlock level + CHA modifier",
+                "casting_time": "passive"
+              },
+              {
+                "type": "attack_rider",
+                "trigger": "companion_aberration_hit",
+                "options": [
+                  "Hex damage bonus"
+                ],
+                "chooseOne": true,
+                "damageExpression": "1d6",
+                "damageType": "Psychic",
+                "oncePerTurn": true,
+                "casting_time": "passive"
+              }
+            ]
           }
         ],
         "spells": [
@@ -11667,13 +11860,29 @@
             "name": "Ritual Adept",
             "description": "You can cast any spell as a Ritual if that spell has the Ritual tag and the spell is in your spellbook. You needn't have the spell prepared, but you must read from the book to cast a spell in this way.",
             "level": 1,
-            "type": "class_feature"
+            "type": "class_feature",
+            "automation": {
+              "type": "passive_rule",
+              "effect": "ritual_spells",
+              "casting_time": "passive"
+            }
           },
           {
             "name": "Arcane Recovery",
             "description": "You can regain some of your magical energy by studying your spellbook. When you finish a Short Rest, you can choose expended spell slots to recover. The spell slots can have a combined level equal to no more than half your Wizard level (round up), and none of the slots can be level 6 or higher. Once you use this feature, you can't do so again until you finish a Long Rest.",
             "level": 1,
-            "type": "class_feature"
+            "type": "class_feature",
+            "automation": {
+              "type": "resource_restoration",
+              "trigger": "short_rest",
+              "restore_expression": "Math.ceil(level / 2)",
+              "resourceKey": "arcaneRecoveryLevels",
+              "uses_max": 1,
+              "casting_time": "passive",
+              "recharge": "long_rest",
+              "restoreType": "spell_slots",
+              "maxSlotLevel": 5
+            }
           }
         ],
         "spellcasting": {
@@ -11689,6 +11898,9 @@
           "spell_slots_level_8": 0,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 1
         }
       },
       {
@@ -11715,6 +11927,9 @@
           "spell_slots_level_8": 0,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 1
         }
       },
       {
@@ -11741,6 +11956,9 @@
           "spell_slots_level_8": 0,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 2
         }
       },
       {
@@ -11767,6 +11985,9 @@
           "spell_slots_level_8": 0,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 2
         }
       },
       {
@@ -11793,6 +12014,9 @@
           "spell_slots_level_8": 0,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 3
         }
       },
       {
@@ -11819,6 +12043,9 @@
           "spell_slots_level_8": 0,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 3
         }
       },
       {
@@ -11838,6 +12065,9 @@
           "spell_slots_level_8": 0,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 4
         }
       },
       {
@@ -11864,6 +12094,9 @@
           "spell_slots_level_8": 0,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 4
         }
       },
       {
@@ -11883,6 +12116,9 @@
           "spell_slots_level_8": 0,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 5
         }
       },
       {
@@ -11909,6 +12145,9 @@
           "spell_slots_level_8": 0,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 5
         }
       },
       {
@@ -11928,6 +12167,9 @@
           "spell_slots_level_8": 0,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 6
         }
       },
       {
@@ -11954,6 +12196,9 @@
           "spell_slots_level_8": 0,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 6
         }
       },
       {
@@ -11973,6 +12218,9 @@
           "spell_slots_level_8": 0,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 7
         }
       },
       {
@@ -11999,6 +12247,9 @@
           "spell_slots_level_8": 0,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 7
         }
       },
       {
@@ -12018,6 +12269,9 @@
           "spell_slots_level_8": 1,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 8
         }
       },
       {
@@ -12044,6 +12298,9 @@
           "spell_slots_level_8": 1,
           "spell_slots_level_9": 0,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 8
         }
       },
       {
@@ -12063,6 +12320,9 @@
           "spell_slots_level_8": 1,
           "spell_slots_level_9": 1,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 9
         }
       },
       {
@@ -12089,6 +12349,9 @@
           "spell_slots_level_8": 1,
           "spell_slots_level_9": 1,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 9
         }
       },
       {
@@ -12115,6 +12378,9 @@
           "spell_slots_level_8": 1,
           "spell_slots_level_9": 1,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 10
         }
       },
       {
@@ -12141,6 +12407,9 @@
           "spell_slots_level_8": 1,
           "spell_slots_level_9": 1,
           "spell_type": "prepared"
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 10
         }
       }
     ],
@@ -12148,7 +12417,7 @@
       {
         "name": "Abjurer",
         "subtitle": "Shield Companions and Banish Foes",
-        "description": "Your study of magic is focused on spells that block, banish, or protect\u2014ending harmful effects, banishing evil influences, and protecting the weak.",
+        "description": "Your study of magic is focused on spells that block, banish, or protect—ending harmful effects, banishing evil influences, and protecting the weak.",
         "features": [
           {
             "name": "Abjuration Savant",

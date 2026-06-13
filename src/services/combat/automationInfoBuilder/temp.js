@@ -162,5 +162,16 @@ export const tempHandlers = {
             casting_time: auto.casting_time || '1 bonus action',
             hasAutomation: true
         }
+    },
+
+    'dark_ones_blessing': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'dark_ones_blessing',
+            name: feature.name,
+            tempHpExpression: auto.tempHpExpression || '',
+            range: auto.range || '10_ft',
+            hasAutomation: true
+        }
     }
 }

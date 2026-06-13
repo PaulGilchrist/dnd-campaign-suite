@@ -179,6 +179,15 @@ const rulesFactory = {
             ])];
         }
 
+        // Resolve Fiendish Resilience damage type resistance (2024 Warlock Fiend Patron)
+        const fiendishResilienceType = getRuntimeValue(playerStats.name, '_Fiendish_Resilience_chosenType', playerSummary.campaignName);
+        if (fiendishResilienceType) {
+            playerStats.resistances = [...new Set([
+                ...(playerStats.resistances || []),
+                fiendishResilienceType
+            ])];
+        }
+
         playerStats._trackedResources = computeTrackedResources(playerStats);
 
         return playerStats;

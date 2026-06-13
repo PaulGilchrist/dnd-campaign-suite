@@ -21,7 +21,8 @@ const SHORT_REST_RESOURCE_LABELS = [
     { key: 'focusPoints', label: 'Focus Points', classes: ['Monk'] },
     { key: 'psionicEnergy', label: 'Psionic Energy', classes: ['Fighter'], subclasses: ['Psi Warrior'] },
     { key: 'superiorityDice', label: 'Superiority Dice', classes: ['Fighter'], subclasses: ['Battle Master'] },
-    { key: 'naturalRecoverySlots', label: 'Natural Recovery (Spell Slots)', classes: ['Druid'], subclasses: ['Circle of the Land'] }
+    { key: 'naturalRecoverySlots', label: 'Natural Recovery (Spell Slots)', classes: ['Druid'], subclasses: ['Circle of the Land'] },
+    { key: 'arcaneRecoveryLevels', label: 'Arcane Recovery (Spell Slots)', classes: ['Wizard'] }
 ];
 
 export function getShortRestResourceLabels(playerStats) {
@@ -161,6 +162,30 @@ export async function applyShortRest(playerStats, campaignName) {
       }
     }
 
+    // Arcane Recovery: Wizard spell slot recovery on short rest
+    const hasArcaneRecovery = (playerStats.automation?.passives ?? []).some(
+      p => p.type === 'resource_restoration' && p.resourceKey === 'arcaneRecoveryLevels'
+    )
+    if (hasArcaneRecovery && playerStats.class?.name === 'Wizard') {
+      const wizardLevel = playerStats.level || 1
+      const maxSlotsToRecover = Math.ceil(wizardLevel / 2)
+      let slotsRecovered = 0
+      // Only recover slots level 5 and lower (no level 6+)
+      const slotLevels = [1, 2, 3, 4, 5]
+      for (const level of slotLevels) {
+        if (slotsRecovered >= maxSlotsToRecover) break
+        const slotKey = `spell_slots_level_${level}`
+        const max = playerStats.spellAbilities?.[slotKey] || 0
+        const current = Number(getRuntimeValue(name, slotKey) ?? max)
+        const available = max - current
+        if (available > 0) {
+          const toRecover = Math.min(available, maxSlotsToRecover - slotsRecovered)
+          updates[slotKey] = current + toRecover
+          slotsRecovered += toRecover
+        }
+      }
+    }
+
     // Pact Magic: Warlock spell slot recovery on short rest
     if (playerStats.class?.name === 'Warlock') {
       const slotLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -175,6 +200,21 @@ export async function applyShortRest(playerStats, campaignName) {
         }
       }
     }
+
+   // Celestial Resilience: Grant temp HP on short rest for Celestial Patron
+   if (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron') {
+     const features = playerStats.characterAdvancement || []
+     const feature = features.find(f => f.name === 'Celestial Resilience')
+     if (feature) {
+       const warlockLevel = playerStats.level || 0
+       const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
+       const selfTempHp = warlockLevel + chaMod
+       if (selfTempHp > 0) {
+         const existingTempHp = Number(getRuntimeValue(name, 'tempHp', campaignName) || 0)
+         updates.tempHp = existingTempHp + selfTempHp
+       }
+     }
+   }
 
    // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
    updates.activeBuffs = [];
@@ -257,10 +297,25 @@ export async function applyLongRest(playerStats, campaignName) {
     // Reset Uncanny Metabolism tracking on long rest
     setRuntimeValue(name, 'uncannyMetabolismUsed', false, campaignName, true)
 
-    // Reset Undying Sentinel (Oath of Glory level 15) on long rest
-    setRuntimeValue(name, 'undyingSentinelUsed', false, campaignName, true)
+     // Reset Undying Sentinel (Oath of Glory level 15) on long rest
+     setRuntimeValue(name, 'undyingSentinelUsed', false, campaignName, true)
 
-    // Reset Bastion of Law ward on long rest
+     // Celestial Resilience: Grant temp HP on long rest for Celestial Patron
+     if (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron') {
+       const features = playerStats.characterAdvancement || []
+       const feature = features.find(f => f.name === 'Celestial Resilience')
+       if (feature) {
+         const warlockLevel = playerStats.level || 0
+         const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
+         const selfTempHp = warlockLevel + chaMod
+         if (selfTempHp > 0) {
+           const existingTempHp = Number(getRuntimeValue(name, 'tempHp', campaignName) || 0)
+           setRuntimeValue(name, 'tempHp', existingTempHp + selfTempHp, campaignName, true)
+         }
+       }
+     }
+
+     // Reset Bastion of Law ward on long rest
     setRuntimeValue(name, 'bastionOfLawActive', false, campaignName, true)
     setRuntimeValue(name, 'bastionOfLawWardDice', [], campaignName, true)
     setRuntimeValue(name, 'bastionOfLawWardTarget', null, campaignName, true)

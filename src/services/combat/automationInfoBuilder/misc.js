@@ -391,5 +391,95 @@ export const miscHandlers = {
             casting_time: auto.casting_time || 'passive',
             hasAutomation: true
         }
+    },
+
+    'radiant_soul': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'radiant_soul',
+            name: feature.name,
+            damageTypes: auto.damageTypes || [],
+            damageExpression: auto.damageExpression || '',
+            oncePerTurn: !!auto.oncePerTurn,
+            hasAutomation: true
+        }
+    },
+
+    'celestial_resilience': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'celestial_resilience',
+            name: feature.name,
+            tempHpExpression: auto.tempHpExpression || '',
+            allyTempHpExpression: auto.allyTempHpExpression || '',
+            maxAllies: auto.maxAllies || 5,
+            range: auto.range || '60_ft',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
+    'dark_ones_look': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'dark_ones_look',
+            name: feature.name,
+            diceExpression: auto.diceExpression || '1d10',
+            hasAutomation: true
+        }
+    },
+
+    'hurl_through_hell': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'hurl_through_hell',
+            name: feature.name,
+            damageExpression: auto.damageExpression || '',
+            damageType: auto.damageType || '',
+            saveType: auto.saveType || 'CHA',
+            saveDc: auto.saveDc || 'ability',
+            saveAbility: auto.saveAbility || 'CHA',
+            oncePerTurn: !!auto.oncePerTurn,
+            uses: auto.uses || 1,
+            pactMagicRecharge: !!auto.pactMagicRecharge,
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
+    'clairvoyant_combatant': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'clairvoyant_combatant',
+            name: feature.name,
+            saveType: auto.saveType || 'WIS',
+            saveDc: auto.saveDc || 'ability',
+            saveAbility: auto.saveAbility || 'CHA',
+            duration: auto.duration || '1_minute',
+            uses: auto.uses || 1,
+            pactMagicRecharge: !!auto.pactMagicRecharge,
+            casting_time: auto.casting_time || '1 bonus action',
+            hasAutomation: true
+        }
+    },
+
+    'create_thrall': (feature, playerStats) => {
+        const auto = feature.automation
+        let usesMax = auto.uses || 1;
+        if (auto.uses_expression) {
+            usesMax = evaluateAutoExpression(auto.uses_expression, playerStats) || 1;
+        }
+        return {
+            type: 'create_thrall',
+            name: feature.name,
+            spell: auto.spell || '',
+            uses: auto.uses || 1,
+            uses_expression: auto.uses_expression || '',
+            usesMax,
+            recharge: auto.recharge || 'long_rest',
+            action: auto.action || 'action',
+            casting_time: auto.casting_time || '1 action',
+            hasAutomation: true
+        }
     }
 }

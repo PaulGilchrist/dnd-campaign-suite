@@ -75,5 +75,27 @@ export const passiveHandlers = {
             effect: 'otherworldly_glamour',
             hasAutomation: true
         }
+    },
+
+    'create_thrall_temp_hp': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'create_thrall_temp_hp',
+            name: feature.name,
+            tempHpExpression: auto.tempHpExpression || '',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
+    'ritual_spells': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'passive_rule',
+            name: feature.name,
+            effect: 'ritual_spells',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
     }
 }

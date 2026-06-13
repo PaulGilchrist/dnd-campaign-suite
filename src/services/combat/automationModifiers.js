@@ -160,6 +160,49 @@ export function collectSaveModifiers(features) {
                     effect: 'd20_floor_10',
                 })
             }
+            if (auto.type === 'dark_ones_look') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'saving_throw',
+                    condition: '',
+                    effect: 'dark_ones_look',
+                })
+                modifiers.push({
+                    source: feature.name,
+                    target: 'ability_check',
+                    condition: '',
+                    effect: 'dark_ones_look',
+                })
+            }
+            if (auto.type === 'clairvoyant_combatant') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'attack_roll',
+                    condition: 'clairvoyant_combatant_active',
+                    effect: 'disadvantage',
+                })
+            }
+            if (auto.type === 'conditional_disadvantage') {
+                const abilities = auto.abilities || (auto.saveType ? [auto.saveType.toUpperCase()] : []);
+                const target = auto.target || 'attack_roll';
+                if (target === 'saving_throw' || target === 'save') {
+                    modifiers.push({
+                        source: feature.name,
+                        target: 'saving_throw',
+                        condition: auto.condition,
+                        effect: 'disadvantage',
+                        abilities
+                    })
+                } else {
+                    modifiers.push({
+                        source: feature.name,
+                        target: target,
+                        condition: auto.condition,
+                        effect: 'disadvantage',
+                        abilities
+                    })
+                }
+            }
         }
     })
 

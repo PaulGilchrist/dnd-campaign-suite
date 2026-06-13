@@ -42,6 +42,7 @@ export default function useCharActionModals({
     const [revelationInFleshModal, setRevelationInFleshModal] = useState(null);
     const [bastionOfLawModal, setBastionOfLawModal] = useState(null);
     const [elementalAffinityModal, setElementalAffinityModal] = useState(null);
+    const [fiendishResilienceModal, setFiendishResilienceModal] = useState(null);
     const [dragonCompanionModal, setDragonCompanionModal] = useState(null);
     const [wildMagicDoubleRollModal, setWildMagicDoubleRollModal] = useState(null);
     const [wildMagicTamedModal, setWildMagicTamedModal] = useState(null);
@@ -852,6 +853,7 @@ export default function useCharActionModals({
         revelationInFleshModal, setRevelationInFleshModal,
         bastionOfLawModal, setBastionOfLawModal,
         elementalAffinityModal, setElementalAffinityModal,
+        fiendishResilienceModal, setFiendishResilienceModal,
         dragonCompanionModal, setDragonCompanionModal,
         wildMagicDoubleRollModal, setWildMagicDoubleRollModal,
         wildMagicTamedModal, setWildMagicTamedModal,

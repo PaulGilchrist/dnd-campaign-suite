@@ -171,10 +171,20 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         if (result) {
             const doDamage = async (metaCtx) => {
                 const target = await getTargetInfo();
+                const isWarlock = playerStats.class?.name === 'Warlock';
+                const hasPsychicSpells = playerStats.automation?.passives?.some(p => p.type === 'psychic_spells');
+                const isEnchantmentOrIllusion = () => {
+                    const school = (spell.school || '').toLowerCase();
+                    return school === 'enchantment' || school === 'illusion';
+                };
+                const componentReduction = isWarlock && hasPsychicSpells && isEnchantmentOrIllusion();
+                const psychicOverride = spell._psychicSpellsOverride && isWarlock && hasPsychicSpells && !!spell.damage;
                 const context = {
                     targetName: target?.name,
                     attackerName: playerStats.name,
                     damageType: spell.damage?.damage_type || '',
+                    psychicSpellsOverride: psychicOverride,
+                    psychicSpellsNoVS: componentReduction,
                     ...metaCtx,
                 };
                 if (spell.dc) {

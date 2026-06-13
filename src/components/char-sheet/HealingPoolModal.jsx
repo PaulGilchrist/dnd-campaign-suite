@@ -31,7 +31,7 @@ function conditionLabel(name) {
     return name;
 }
 
-function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay On Hands', poolMax: poolMaxProp = 0, _poolExpression, isDicePool = false, dieType = null, resourceKey: resourceKeyProp, alsoCures, cureCost, restoringTouchConditions, bloodiedOnly = false, onClose }) {
+function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay On Hands', poolMax: poolMaxProp = 0, _poolExpression, isDicePool = false, dieType = null, resourceKey: resourceKeyProp, alsoCures, cureCost, restoringTouchConditions, bloodiedOnly = false, maxDicePerUse: maxDicePerUseProp = '', onClose }) {
     const layOnHandsPoolMax = 5 * (playerStats.level || 1);
     const effectivePoolMax = isDicePool ? poolMaxProp : layOnHandsPoolMax;
     const effectiveResourceKey = isDicePool ? (resourceKeyProp || featureName.toLowerCase().replace(/\s+/g, '') + 'Pool') : 'layOnHandsPool';
@@ -51,6 +51,12 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     const [selectedConditions, setSelectedConditions] = React.useState([]);
     const [combatSummary, setCombatSummary] = React.useState(null);
     const [loading, setLoading] = React.useState(true);
+
+    const chaMod = (() => {
+        const chaScore = playerStats.abilities?.CHA || 10;
+        return Math.floor((chaScore - 1) / 2);
+    })();
+    const effectiveMaxDicePerUse = maxDicePerUseProp ? chaMod : Infinity;
 
     const safePool = Number(poolRemaining) || 0;
     const safeMax = Number(poolMaxFromHook) || 0;
@@ -164,7 +170,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
     };
 
     const applyDiceHeal = () => {
-        const diceToRoll = Math.max(1, Math.min(rollCount, safePool));
+        const diceToRoll = Math.max(1, Math.min(rollCount, safePool, effectiveMaxDicePerUse));
         if (diceToRoll <= 0 || safePool <= 0) return;
 
         const faces = [];
@@ -213,7 +219,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
             }]);
         }
 
-        setRollCount(Math.min(rollCount, newPool));
+        setRollCount(Math.min(Math.min(rollCount, newPool), effectiveMaxDicePerUse));
     };
 
     const applyCure = (condition) => {
@@ -347,18 +353,18 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
 
                 {isDicePool && (
                     <div className="short-rest-section">
-                        <h4>Roll Dice — {targetName} ({targetCurrentHp} / {targetMaxHp} HP){bloodiedOnly && <span className="bloodied-badge"> (Bloodied only)</span>}</h4>
+                        <h4>Roll Dice — {targetName} ({targetCurrentHp} / {targetMaxHp} HP){bloodiedOnly && <span className="bloodied-badge"> (Bloodied only)</span>}{effectiveMaxDicePerUse < Infinity && <span className="bloodied-badge"> (Max {effectiveMaxDicePerUse} dice)</span>}</h4>
                         <div className="short-rest-dice-row">
                             <label>
                                 Dice:
                                 <input
                                     type="number"
                                     min="1"
-                                    max={safePool}
-                                    value={Math.max(1, Math.min(rollCount, safePool))}
+                                    max={Math.min(safePool, effectiveMaxDicePerUse)}
+                                    value={Math.max(1, Math.min(rollCount, safePool, effectiveMaxDicePerUse))}
                                     onChange={(e) => {
                                         const raw = Number(e.target.value);
-                                        setRollCount(raw >= 1 ? Math.min(raw, safePool) : 1);
+                                        setRollCount(raw >= 1 ? Math.min(Math.min(raw, safePool), effectiveMaxDicePerUse) : 1);
                                     }}
                                     style={{ width: '62px', marginLeft: '6px' }}
                                 />

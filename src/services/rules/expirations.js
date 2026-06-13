@@ -50,6 +50,10 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
         if (effect.type === 'elder_champion_regeneration') {
             applyElderChampionRegeneration(activeName, playerStats, effect, campaignName);
         }
+        if (effect.type === 'radiant_soul_turn_start') {
+            const key = `_radiantSoul_${activeName.replace(/\s+/g, '_')}_oncePerTurn`;
+            setRuntimeValue(activeName, key, false, campaignName);
+        }
         if (effect.type === 'dread_ambush_speed') {
             applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, campaignName);
         }

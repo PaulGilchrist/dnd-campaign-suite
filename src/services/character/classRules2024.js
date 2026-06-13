@@ -345,11 +345,14 @@ const classRules = {
                 invocations: playerStats.class?.invocations || []
             };
         },
-         getWizardFeatures() {
-             return {
-                 showWizardFeatures: false
-             };
-         },
+         getWizardFeatures(playerStats) {
+              const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+              const arcaneRecoveryLevels = classLevel?.class_specific?.arcane_recovery_levels || 0;
+              return {
+                  showWizardFeatures: false,
+                  arcaneRecoveryLevels
+              };
+          },
          getMonkFeatures(playerStats) {
              const martialArtsDie = this.getMartialArtsDie(playerStats);
              const unarmoredMovementIncrease = this.getUnarmoredMovementIncrease(playerStats);

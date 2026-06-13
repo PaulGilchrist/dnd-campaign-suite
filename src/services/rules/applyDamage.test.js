@@ -1074,4 +1074,321 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
 
       expect(goblin.currentHp).toBe(0);
     });
+
+    describe('Dark One\'s Blessing', () => {
+      function createFiendWarlock(name, level, chaScore, warlockLevel) {
+        return {
+          name,
+          computedStats: {
+            resistances: [],
+            immunities: [],
+            level: level,
+            hitPoints: { max: 20 },
+            class: {
+              name: 'Warlock',
+              class_levels: [{ level: warlockLevel || level }],
+              subclass: { name: 'Fiend Patron' },
+            },
+            abilities: [{ name: 'Charisma', score: chaScore }],
+            characterAdvancement: [{
+              name: "Dark One's Blessing",
+              automation: {
+                type: 'dark_ones_blessing',
+                tempHpExpression: 'CHA modifier + warlock level',
+              },
+            }],
+          },
+        };
+      }
+
+      beforeEach(() => {
+        getRuntimeValue.mockClear();
+        getRuntimeValue.mockImplementation(() => undefined);
+        setRuntimeValue.mockClear();
+      });
+
+      it('grants temp HP to Fiend Patron when enemy reduced to 0 HP', () => {
+        const goblin = createNpcCreature('Goblin', 6, 6);
+        const cs = makeCombatSummary([goblin]);
+        const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
+
+        applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock]);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock', 'tempHp', 8, 'TestCampaign');
+      });
+
+      it('uses minimum of 1 when CHA modifier + warlock level is 0 or negative', () => {
+        const goblin = createNpcCreature('Goblin', 3, 3);
+        const cs = makeCombatSummary([goblin]);
+        const warlock = createFiendWarlock('FiendWarlock', 1, 8, 1);
+
+        applyDamageToTarget(cs, 'Goblin', 5, ['Slashing'], 'TestCampaign', [warlock]);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock', 'tempHp', 1, 'TestCampaign');
+      });
+
+      it('does not grant temp HP to non-Fiend Patron warlocks', () => {
+        const goblin = createNpcCreature('Goblin', 5, 5);
+        const cs = makeCombatSummary([goblin]);
+        const warlock = {
+          name: 'OtherWarlock',
+          computedStats: {
+            resistances: [],
+            immunities: [],
+            level: 5,
+            class: {
+              name: 'Warlock',
+              class_levels: [{ level: 5 }],
+              subclass: { name: 'Great Old One Patron' },
+            },
+            characterAdvancement: [{
+              name: "Dark One's Blessing",
+              automation: { type: 'dark_ones_blessing' },
+            }],
+          },
+        };
+
+        applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock]);
+
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+      });
+
+      it('does not grant temp HP when feature is missing', () => {
+        const goblin = createNpcCreature('Goblin', 5, 5);
+        const cs = makeCombatSummary([goblin]);
+        const warlock = {
+          name: 'NoFeatureWarlock',
+          computedStats: {
+            resistances: [],
+            immunities: [],
+            level: 5,
+            class: {
+              name: 'Warlock',
+              class_levels: [{ level: 5 }],
+              subclass: { name: 'Fiend Patron' },
+            },
+            characterAdvancement: [],
+          },
+        };
+
+        applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock]);
+
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+      });
+
+      it('does not grant temp HP when no automation on feature', () => {
+        const goblin = createNpcCreature('Goblin', 5, 5);
+        const cs = makeCombatSummary([goblin]);
+        const warlock = {
+          name: 'NoAutomationWarlock',
+          computedStats: {
+            resistances: [],
+            immunities: [],
+            level: 5,
+            class: {
+              name: 'Warlock',
+              class_levels: [{ level: 5 }],
+              subclass: { name: 'Fiend Patron' },
+            },
+            characterAdvancement: [{
+              name: "Dark One's Blessing",
+              automation: null,
+            }],
+          },
+        };
+
+        applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock]);
+
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+      });
+
+      it('does not grant temp HP when damage is 0 (creature was immune)', () => {
+        const skeleton = createNpcCreature('Skeleton', 10, 10, { immunities: ['necrotic'] });
+        const cs = makeCombatSummary([skeleton]);
+        const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
+
+        applyDamageToTarget(cs, 'Skeleton', 15, ['Necrotic'], 'TestCampaign', [warlock]);
+
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+      });
+
+      it('does not grant temp HP when creature was already at 0 HP', () => {
+        const goblin = createNpcCreature('Goblin', 3, 0);
+        const cs = makeCombatSummary([goblin]);
+        const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
+
+        applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock]);
+
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(goblin.currentHp).toBe(0);
+      });
+
+      it('adds to existing temp HP', () => {
+        const goblin = createNpcCreature('Goblin', 6, 6);
+        const cs = makeCombatSummary([goblin]);
+        const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
+
+        getRuntimeValue.mockImplementation((charName, key) => {
+          if (charName === 'FiendWarlock' && key === 'tempHp') return 5;
+          return undefined;
+        });
+
+        applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock]);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock', 'tempHp', 13, 'TestCampaign');
+      });
+    });
+
+    describe('Thought Shield — Psychic damage reflection', () => {
+      function createPlayerWithThoughtShield(name, _hp) {
+        return {
+          name,
+          computedStats: {
+            resistances: ['psychic'],
+            immunities: [],
+            level: 10,
+            class: { name: 'Warlock', class_levels: [{ level: 10 }] },
+            characterAdvancement: [{ name: 'Thought Shield' }],
+          },
+        };
+      }
+
+      it('reflects psychic damage back to the attacker', () => {
+        const goblin = createNpcCreature('Goblin', 10, 10);
+        const warlockCreature = createPlayerCreature('Warlock');
+        const cs = makeCombatSummary([goblin, warlockCreature]);
+        const warlock = createPlayerWithThoughtShield('Warlock', 20);
+
+        getRuntimeValue.mockImplementation((charName, key) => {
+          if (charName === 'Warlock' && key === 'currentHitPoints') return 20;
+          return [];
+        });
+
+        applyDamageToTarget(cs, 'Warlock', 10, ['Psychic'], 'TestCampaign', [warlock], false, 'Goblin');
+
+        // 10 psychic damage → resistance halves to 5 → reflect 5
+        expect(goblin.currentHp).toBe(5);
+      });
+
+      it('does not reflect non-psychic damage', () => {
+        const goblin = createNpcCreature('Goblin', 10, 10);
+        const cs = makeCombatSummary([goblin]);
+        const warlock = createPlayerWithThoughtShield('Warlock', 20);
+
+        getRuntimeValue.mockImplementation((charName, key) => {
+          if (charName === 'Warlock' && key === 'currentHitPoints') return 20;
+          return [];
+        });
+
+        applyDamageToTarget(cs, 'Warlock', 10, ['Fire'], 'TestCampaign', [warlock], false, 'Goblin');
+
+        expect(goblin.currentHp).toBe(10);
+      });
+
+      it('does not reflect when player has no Thought Shield', () => {
+        const goblin = createNpcCreature('Goblin', 10, 10);
+        const cs = makeCombatSummary([goblin]);
+        const fighter = {
+          name: 'Fighter',
+          computedStats: {
+            resistances: [],
+            immunities: [],
+            level: 10,
+            class: { name: 'Fighter', class_levels: [{ level: 10 }] },
+            characterAdvancement: [],
+          },
+        };
+
+        getRuntimeValue.mockImplementation((charName, key) => {
+          if (charName === 'Fighter' && key === 'currentHitPoints') return 20;
+          return [];
+        });
+
+        applyDamageToTarget(cs, 'Fighter', 10, ['Psychic'], 'TestCampaign', [fighter], false, 'Goblin');
+
+        expect(goblin.currentHp).toBe(10);
+      });
+
+      it('does not reflect when attackerName is null', () => {
+        const goblin = createNpcCreature('Goblin', 10, 10);
+        const warlockCreature = createPlayerCreature('Warlock');
+        const cs = makeCombatSummary([goblin, warlockCreature]);
+        const warlock = createPlayerWithThoughtShield('Warlock', 20);
+
+        getRuntimeValue.mockImplementation((charName, key) => {
+          if (charName === 'Warlock' && key === 'currentHitPoints') return 20;
+          return [];
+        });
+
+        const result = applyDamageToTarget(cs, 'Warlock', 10, ['Psychic'], 'TestCampaign', [warlock], false, null);
+
+        expect(result).not.toBeNull();
+      });
+
+      it('does not reflect when attacker is the player themselves', () => {
+        const warlock = createPlayerWithThoughtShield('Warlock', 20);
+        const cs = makeCombatSummary([
+          createNpcCreature('Warlock', 20, 20),
+          createNpcCreature('Goblin', 10, 10),
+        ]);
+
+        getRuntimeValue.mockImplementation((charName, key) => {
+          if (charName === 'Warlock' && key === 'currentHitPoints') return 20;
+          return [];
+        });
+
+        applyDamageToTarget(cs, 'Warlock', 10, ['Psychic'], 'TestCampaign', [warlock], false, 'Warlock');
+
+        expect(cs.creatures[1].currentHp).toBe(10);
+      });
+
+      it('does not reflect when attacker is already dead', () => {
+        const deadGoblin = createNpcCreature('Goblin', 5, 0);
+        const cs = makeCombatSummary([deadGoblin]);
+        const warlock = createPlayerWithThoughtShield('Warlock', 20);
+
+        getRuntimeValue.mockImplementation((charName, key) => {
+          if (charName === 'Warlock' && key === 'currentHitPoints') return 20;
+          return [];
+        });
+
+        applyDamageToTarget(cs, 'Warlock', 10, ['Psychic'], 'TestCampaign', [warlock], false, 'Goblin');
+
+        expect(deadGoblin.currentHp).toBe(0);
+      });
+
+      it('reflects the final (resistance-reduced) damage amount', () => {
+        const goblin = createNpcCreature('Goblin', 8, 8);
+        const warlockCreature = createPlayerCreature('Warlock');
+        const cs = makeCombatSummary([goblin, warlockCreature]);
+        const warlock = createPlayerWithThoughtShield('Warlock', 20);
+
+        getRuntimeValue.mockImplementation((charName, key) => {
+          if (charName === 'Warlock' && key === 'currentHitPoints') return 20;
+          return [];
+        });
+
+        applyDamageToTarget(cs, 'Warlock', 10, ['Psychic'], 'TestCampaign', [warlock], false, 'Goblin');
+
+        // 10 psychic damage → resistance halves to 5 → reflect 5
+        expect(goblin.currentHp).toBe(3);
+      });
+
+      it('triggers concentration check on attacker when reflected damage is dealt', () => {
+        const goblin = createNpcCreature('Goblin', 10, 10, {
+          concentration: { spell: 'Burning Hands', dc: 10 },
+        });
+        const cs = makeCombatSummary([goblin]);
+        const warlock = createPlayerWithThoughtShield('Warlock', 20);
+
+        getRuntimeValue.mockImplementation((charName, key) => {
+          if (charName === 'Warlock' && key === 'currentHitPoints') return 20;
+          return [];
+        });
+
+        applyDamageToTarget(cs, 'Warlock', 10, ['Psychic'], 'TestCampaign', [warlock], false, 'Goblin');
+
+        expect(goblin.concentration.dc).toBe(10);
+      });
+    });
 });

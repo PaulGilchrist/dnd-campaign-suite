@@ -43,6 +43,7 @@ import MistyWandererModal from './MistyWandererModal.jsx'
 import BonusActionChoiceModal from './BonusActionChoiceModal.jsx'
 import RevelationInFleshModal from './RevelationInFleshModal.jsx'
 import ElementalAffinityModal from './ElementalAffinityModal.jsx'
+import FiendishResilienceModal from './FiendishResilienceModal.jsx'
 import DragonCompanionModal from './DragonCompanionModal.jsx'
 import WildMagicDoubleRollModal from './WildMagicDoubleRollModal.jsx'
 import WildMagicTamedModal from './WildMagicTamedModal.jsx'
@@ -176,6 +177,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         revelationInFleshModal, setRevelationInFleshModal,
         bastionOfLawModal, setBastionOfLawModal,
         elementalAffinityModal, setElementalAffinityModal,
+        fiendishResilienceModal, setFiendishResilienceModal,
         dragonCompanionModal, setDragonCompanionModal,
         wildMagicDoubleRollModal, setWildMagicDoubleRollModal,
         wildMagicTamedModal, setWildMagicTamedModal,
@@ -363,6 +365,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         const affAction = affPayload?.action;
                         const affTypes = affPayload?.damageTypes || ['Acid', 'Cold', 'Fire', 'Lightning', 'Poison'];
                         setElementalAffinityModal({ action: affAction, playerStats, campaignName, damageTypes: affTypes, existingType: affPayload?.existingType });
+                        break;
+                    }
+                    case 'fiendishResilience': {
+                        const frPayload = result.payload;
+                        const frAction = frPayload?.action;
+                        const frTypes = frPayload?.damageTypes || ['Acid', 'Bludgeoning', 'Cold', 'Fire', 'Lightning', 'Necrotic', 'Piercing', 'Poison', 'Psychic', 'Radiant', 'Slashing', 'Thunder'];
+                        setFiendishResilienceModal({ action: frAction, playerStats, campaignName, damageTypes: frTypes, existingType: frPayload?.existingType });
                         break;
                     }
                     case 'dragonCompanion':
@@ -613,6 +622,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         cureCost={healingPoolModal.cureCost}
                         bloodiedOnly={healingPoolModal.bloodiedOnly}
                         restoringTouchConditions={healingPoolModal.restoringTouchConditions}
+                        maxDicePerUse={healingPoolModal.maxDicePerUse}
                         onClose={() => setHealingPoolModal(null)}
                     />
                 )}
@@ -814,6 +824,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <ElementalAffinityModal
                         {...elementalAffinityModal}
                         onClose={() => setElementalAffinityModal(null)}
+                    />
+                )}
+                {fiendishResilienceModal && (
+                    <FiendishResilienceModal
+                        {...fiendishResilienceModal}
+                        onClose={() => setFiendishResilienceModal(null)}
                     />
                 )}
                 {dragonCompanionModal && (
