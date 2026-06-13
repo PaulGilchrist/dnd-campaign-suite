@@ -319,6 +319,79 @@ describe('applyShortRest', () => {
     expect(data.spell_slots_level_3).toBe(1)
   })
 
+  it('restores all Warlock Pact Magic spell slots on short rest', () => {
+    const playerStats = {
+      name: 'Warlock',
+      hitPoints: 30,
+      level: 5,
+      class: { name: 'Warlock' },
+      spellAbilities: {
+        spell_slots_level_3: 2,
+        spell_slots_level_1: 0,
+        spell_slots_level_2: 0,
+        spell_slots_level_4: 0,
+        spell_slots_level_5: 0,
+      },
+    }
+    getRuntimeValue
+      .mockReturnValueOnce(20) // currentHitPoints
+      .mockReturnValueOnce(1)   // spell_slots_level_3 (2 max, 1 used)
+
+    applyShortRest(playerStats, 'Campaign1')
+
+    const data = setRuntimeBatch.mock.calls[0][1]
+    expect(data.spell_slots_level_3).toBe(2)
+  })
+
+  it('restores all Warlock spell slots across all levels on short rest', () => {
+    const playerStats = {
+      name: 'Warlock',
+      hitPoints: 30,
+      level: 11,
+      class: { name: 'Warlock' },
+      spellAbilities: {
+        spell_slots_level_5: 3,
+        spell_slots_level_1: 0,
+        spell_slots_level_2: 0,
+        spell_slots_level_3: 0,
+        spell_slots_level_4: 0,
+        spell_slots_level_6: 0,
+        spell_slots_level_7: 0,
+        spell_slots_level_8: 0,
+        spell_slots_level_9: 0,
+      },
+    }
+    getRuntimeValue
+      .mockReturnValueOnce(20) // currentHitPoints
+      .mockReturnValueOnce(3)   // spell_slots_level_5 (already full, no update needed)
+
+    applyShortRest(playerStats, 'Campaign1')
+
+    const data = setRuntimeBatch.mock.calls[0][1]
+    // Since spell_slots_level_5 is already at max (3), it should not be updated
+    expect(data.spell_slots_level_5).toBeUndefined()
+  })
+
+  it('does not restore spell slots for non-Warlock on short rest', () => {
+    const playerStats = {
+      name: 'Wizard',
+      hitPoints: 30,
+      level: 5,
+      class: { name: 'Wizard' },
+      spellAbilities: {
+        spell_slots_level_1: 4,
+        spell_slots_level_2: 3,
+      },
+    }
+    getRuntimeValue.mockReturnValueOnce(20)
+
+    applyShortRest(playerStats, 'Campaign1')
+
+    const data = setRuntimeBatch.mock.calls[0][1]
+    expect(data.spell_slots_level_1).toBeUndefined()
+    expect(data.spell_slots_level_2).toBeUndefined()
+  })
+
   it('resets Natural Recovery free cast on long rest', () => {
     const playerStats = {
       name: 'Druid',

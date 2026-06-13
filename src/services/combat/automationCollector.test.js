@@ -130,10 +130,10 @@ describe('collectAutomationFromFeatures', () => {
     expect(result.bonusActions.length).toBe(1)
   })
 
-  it('categorizes reaction_bonus as action (falls through default for action type)', () => {
+  it('categorizes reaction_bonus as reaction', () => {
     const features = [{ name: 'Reaction Bonus', automation: { type: 'reaction_bonus' } }]
     const result = collectAutomationFromFeatures(features, {})
-    expect(result.actions.length).toBe(1)
+    expect(result.reactions.length).toBe(1)
   })
 
   it('categorizes free_spell as action', () => {

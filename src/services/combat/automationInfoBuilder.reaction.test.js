@@ -113,6 +113,7 @@ describe('buildAttackInfo – reaction_bonus', () => {
             saveType: '',
             saveDc: '',
             duration: '',
+            casting_time: '1 reaction',
             hasAutomation: true,
         })
     })

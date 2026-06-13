@@ -215,6 +215,8 @@ function buildAttackInfo(feature, playerStats) {
                 condition: auto.condition || '',
                 effect: auto.effect || 'advantage',
                 abilities: auto.abilities || [],
+                uses: auto.uses || null,
+                recharge: auto.recharge || 'long_rest',
                 hasAutomation: true
             }
         }
@@ -726,6 +728,7 @@ function buildAttackInfo(feature, playerStats) {
                 saveType: auto.saveType || '',
                 saveDc: auto.saveDc || '',
                 duration: auto.duration || '',
+                casting_time: auto.casting_time || '1 reaction',
                 hasAutomation: true
             }
         }
@@ -1803,7 +1806,54 @@ function buildAttackInfo(feature, playerStats) {
             };
         }
 
-        default:
+        case 'wild_magic_surge': {
+            return {
+                type: 'wild_magic_surge',
+                name: feature.name,
+                trigger: auto.trigger || '',
+                oncePerTurn: auto.oncePerTurn || false,
+                hasAutomation: true
+            };
+        }
+
+        case 'wild_magic_tamed': {
+            return {
+                type: 'wild_magic_tamed',
+                name: feature.name,
+                trigger: auto.trigger || '',
+                recharge: auto.recharge || 'long_rest',
+                uses: auto.uses || 1,
+                hasAutomation: true
+            };
+        }
+
+        case 'feats_of_chaos': {
+            return {
+                type: 'conditional_advantage',
+                name: feature.name,
+                target: auto.target || 'd20',
+                condition: auto.condition || 'feats_of_chaos_active',
+                effect: 'advantage',
+                abilities: auto.abilities || [],
+                hasAutomation: true
+            };
+        }
+
+            case 'contact_patron': {
+                return {
+                    type: 'contact_patron',
+                    name: feature.name,
+                    spell: auto.spell || '',
+                    uses: auto.uses || 1,
+                    uses_expression: auto.uses_expression || '',
+                    recharge: auto.recharge || 'long_rest',
+                    action: auto.action || 'action',
+                    casting_time: auto.casting_time || '',
+                    hasAutomation: true
+                }
+            }
+
+            default:
             return null
     }
 }

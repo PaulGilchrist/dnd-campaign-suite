@@ -3,6 +3,17 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState
 import { addExpiration } from '../../rules/expirations.js';
 import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../../rules/rangeValidation.js';
+import { rollExpression } from '../../dice/diceRoller.js';
+import { spendSorceryPoints, getCurrentSorceryPoints } from '../../../hooks/useMetamagic.js';
+import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../hooks/useMetamagic.js';
+import { getClassFeatures } from '../../../services/character/classFeatures.js';
+
+const EVENT_STALENESS_MS = 60000;
+
+function isStale(event) {
+    if (!event?.timestamp) return true;
+    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
+}
 
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
@@ -11,7 +22,147 @@ export async function handle(action, playerStats, campaignName, mapName) {
         return handleUnbreakableMajesty(action, playerStats, campaignName);
     }
 
+    if (auto.effect === 'bonus_or_penalty_choice') {
+        return handleBendFate(action, playerStats, campaignName, mapName);
+    }
+
     return handleInspiringMovement(action, playerStats, campaignName, mapName);
+}
+
+async function handleBendFate(action, playerStats, campaignName, mapName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const featureName = action.name || 'Bend Fate';
+
+    const featureMaxSP = playerStats.automation?.specialActions?.find(a => a.name === 'Sorcery Points')?.uses || 0;
+    const maxSP = featureMaxSP || (getClassFeatures(playerStats)?.maxSorceryPoints || 0);
+    const currentSP = getCurrentSorceryPoints(playerName, maxSP);
+
+    if (currentSP < 1) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `No Sorcery Points available. ${featureName} requires 1 Sorcery Point.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const targetInfo = await resolveTarget(campaignName, playerName);
+    if (!targetInfo?.target) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${featureName} requires selecting a creature in combat.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const targetName = targetInfo.target.name;
+
+    if (targetName === playerName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${featureName} can only be used on another creature, not yourself.`,
+                automation: auto,
+            },
+        };
+    }
+
+    if (mapName) {
+        const positions = await resolveMapPositions(campaignName, mapName, playerName);
+        if (positions?.attackerPos && positions?.targetPos) {
+            const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
+            if (dist == null) {
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: featureName,
+                        description: `Could not determine distance to ${targetName}. Ensure both creatures are placed on the map.`,
+                        automation: auto,
+                    },
+                };
+            }
+        }
+    }
+
+    const attackEvent = getLastAttackRoll(targetName);
+    const abilityEvent = getLastAbilityCheck(targetName);
+    const saveEvent = getLastSaveRoll(targetName);
+
+    const attackFresh = attackEvent && !isStale(attackEvent);
+    const abilityFresh = abilityEvent && !isStale(abilityEvent);
+    const saveFresh = saveEvent && !isStale(saveEvent);
+
+    if (!attackFresh && !abilityFresh && !saveFresh) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `No recent D20 test found for ${targetName}. ${featureName} can only be used shortly after another creature rolls a d20.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const d4Roll = rollExpression('1d4');
+    if (!d4Roll) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `Roll failed.`,
+                automation: auto,
+            },
+        };
+    }
+
+    spendSorceryPoints(playerName, 1, campaignName);
+
+    let rollDescription = '';
+    if (attackFresh) {
+        const { d20, bonus, targetName: atkTarget, hit } = attackEvent;
+        const ac = atkTarget;
+        rollDescription = `Attack roll on ${targetName}: d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${ac != null ? ac : '—'} → ${hit ? 'HIT' : 'MISS'}`;
+    } else if (abilityFresh) {
+        const { d20, bonus, checkName } = abilityEvent;
+        rollDescription = `${checkName} by ${targetName}: d20(${d20}) + ${bonus} = ${d20 + bonus}`;
+    } else {
+        const { d20, bonus, saveType } = saveEvent;
+        const saveLabel = saveType ? saveType.toUpperCase() : 'Save';
+        rollDescription = `${saveLabel} by ${targetName}: d20(${d20}) + ${bonus} = ${d20 + bonus}`;
+    }
+
+    const description = `<b>${featureName}</b><br/>Target: ${targetName}<br/>Rolled 1d4: <b>${d4Roll.total}</b><br/>Choose to apply <b>+${d4Roll.total}</b> (bonus) or <b>-${d4Roll.total}</b> (penalty) to the d20 roll.<br/><br/>${rollDescription}`;
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: featureName,
+        description: `${playerName} used ${featureName} on ${targetName}. Rolled 1d4: ${d4Roll.total}. Applied as bonus/penalty.`,
+        timestamp: Date.now(),
+    }).catch(() => {});
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            description,
+            automation: auto,
+        },
+    };
 }
 
 async function handleUnbreakableMajesty(action, playerStats, campaignName) {

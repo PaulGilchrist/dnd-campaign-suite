@@ -101,6 +101,8 @@ describe('buildAttackInfo – conditional_advantage', () => {
             condition: '',
             effect: 'advantage',
             abilities: [],
+            uses: null,
+            recharge: 'long_rest',
             hasAutomation: true,
         })
     })

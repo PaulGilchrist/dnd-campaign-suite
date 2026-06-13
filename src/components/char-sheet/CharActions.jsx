@@ -46,6 +46,8 @@ import BonusActionChoiceModal from './BonusActionChoiceModal.jsx'
 import RevelationInFleshModal from './RevelationInFleshModal.jsx'
 import ElementalAffinityModal from './ElementalAffinityModal.jsx'
 import DragonCompanionModal from './DragonCompanionModal.jsx'
+import WildMagicDoubleRollModal from './WildMagicDoubleRollModal.jsx'
+import WildMagicTamedModal from './WildMagicTamedModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { applyConstellationOption } from '../../services/automation/handlers/starryFormHandler.js';
@@ -112,6 +114,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [bastionOfLawModal, setBastionOfLawModal] = useState(null);
     const [elementalAffinityModal, setElementalAffinityModal] = useState(null);
     const [dragonCompanionModal, setDragonCompanionModal] = useState(null);
+    const [wildMagicDoubleRollModal, setWildMagicDoubleRollModal] = useState(null);
+    const [wildMagicTamedModal, setWildMagicTamedModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
     const [featureChoice, setFeatureChoice] = useState(null);
@@ -1247,6 +1251,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'dragonCompanion':
                         setDragonCompanionModal(result.payload);
                         break;
+                    case 'wildMagicDoubleRoll':
+                        setWildMagicDoubleRollModal(result.payload);
+                        break;
+                    case 'wildMagicTamed':
+                        setWildMagicTamedModal(result.payload);
+                        break;
                     case 'defensiveTactics': {
                         const actionData = result.payload?.action;
                         const defensiveChoice = getRuntimeValue(playerStats.name, '_Defensive_Tactics_choice', campaignName);
@@ -1693,6 +1703,18 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <DragonCompanionModal
                         {...dragonCompanionModal}
                         onClose={() => setDragonCompanionModal(null)}
+                    />
+                )}
+                {wildMagicDoubleRollModal && (
+                    <WildMagicDoubleRollModal
+                        {...wildMagicDoubleRollModal}
+                        onClose={() => setWildMagicDoubleRollModal(null)}
+                    />
+                )}
+                {wildMagicTamedModal && (
+                    <WildMagicTamedModal
+                        {...wildMagicTamedModal}
+                        onClose={() => setWildMagicTamedModal(null)}
                     />
                 )}
                 {divineFuryChoice && (

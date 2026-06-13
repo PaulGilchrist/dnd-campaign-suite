@@ -86,8 +86,10 @@ export const LONG_REST_RESOURCES = [
          'indomitableUses',
          'naturalRecoveryFreeCast',
          'naturalRecoverySlots',
-          '_Star_Map_freeCastCount',
-          '_Dragon_Companion_freeCastCount'
+           '_Star_Map_freeCastCount',
+           '_Dragon_Companion_freeCastCount',
+           '_Contact_Patron_freeCastCount',
+           'magicalCunningUsed'
     ]
 
 export function getLongRestResources() {
@@ -132,28 +134,43 @@ export async function applyShortRest(playerStats, campaignName) {
     }
   }
 
-   // Natural Recovery: Druid Circle of the Land spell slot recovery on short rest
-   const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(
-     p => p.type === 'resource_restoration' && p.resourceKey === 'naturalRecoverySlots'
-   )
-   if (hasNaturalRecovery && playerStats.class?.name === 'Druid') {
-     const druidLevel = playerStats.level || 1
-     const maxSlotsToRecover = Math.floor(druidLevel / 2)
-     let slotsRecovered = 0
-     const slotLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-     for (const level of slotLevels) {
-       if (slotsRecovered >= maxSlotsToRecover) break
-       const slotKey = `spell_slots_level_${level}`
-       const max = playerStats.spellAbilities?.[slotKey] || 0
-       const current = Number(getRuntimeValue(name, slotKey) ?? max)
-       const available = max - current
-       if (available > 0) {
-         const toRecover = Math.min(available, maxSlotsToRecover - slotsRecovered)
-         updates[slotKey] = current + toRecover
-         slotsRecovered += toRecover
-       }
-     }
-   }
+    // Natural Recovery: Druid Circle of the Land spell slot recovery on short rest
+    const hasNaturalRecovery = (playerStats.automation?.passives ?? []).some(
+      p => p.type === 'resource_restoration' && p.resourceKey === 'naturalRecoverySlots'
+    )
+    if (hasNaturalRecovery && playerStats.class?.name === 'Druid') {
+      const druidLevel = playerStats.level || 1
+      const maxSlotsToRecover = Math.floor(druidLevel / 2)
+      let slotsRecovered = 0
+      const slotLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+      for (const level of slotLevels) {
+        if (slotsRecovered >= maxSlotsToRecover) break
+        const slotKey = `spell_slots_level_${level}`
+        const max = playerStats.spellAbilities?.[slotKey] || 0
+        const current = Number(getRuntimeValue(name, slotKey) ?? max)
+        const available = max - current
+        if (available > 0) {
+          const toRecover = Math.min(available, maxSlotsToRecover - slotsRecovered)
+          updates[slotKey] = current + toRecover
+          slotsRecovered += toRecover
+        }
+      }
+    }
+
+    // Pact Magic: Warlock spell slot recovery on short rest
+    if (playerStats.class?.name === 'Warlock') {
+      const slotLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+      for (const level of slotLevels) {
+        const slotKey = `spell_slots_level_${level}`
+        const max = playerStats.spellAbilities?.[slotKey] || 0
+        if (max > 0) {
+          const current = Number(getRuntimeValue(name, slotKey) ?? max)
+          if (current < max) {
+            updates[slotKey] = max
+          }
+        }
+      }
+    }
 
    // Clear active buffs and conditions as part of the atomic batch so SSE echo carries correct final state
    updates.activeBuffs = [];

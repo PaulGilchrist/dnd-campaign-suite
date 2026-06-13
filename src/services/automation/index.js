@@ -101,6 +101,9 @@ import { handle as handleClockworkCavalcade } from './handlers/clockworkCavalcad
 import { handle as handleElementalAffinity } from './handlers/elementalAffinityHandler.js';
 import { handle as handleDragonWings } from './handlers/dragonWingsHandler.js';
 import { handle as handleDragonCompanion, confirmDragonCompanion as handleDragonCompanionConfirm } from './handlers/dragonCompanionHandler.js';
+import { handle as handleWildMagicSurge, handleTamedSurge as handleWildMagicTamed, handleFeatsOfChaos as handleFeatsOfChaosAdvantage, onFeatsOfChaosActivate as onFeatsOfChaosActivate, onFeatsOfChaosConsume as onFeatsOfChaosConsume, onTamedSurgeSelected as onWildMagicTamedSelected, onDoubleRollSelected } from './handlers/wildMagicSurgeHandler.js';
+import { handle as handleMagicalCunning } from './handlers/magicalCunningHandler.js';
+import { handle as handleContactPatron } from './handlers/contactPatronHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -224,9 +227,18 @@ const HANDLER_MAP = {
          transe_of_order: handleTranseOfOrder,
           clockwork_cavalcade: handleClockworkCavalcade,
           elemental_affinity: handleElementalAffinity,
-           dragon_wings: handleDragonWings,
-           dragon_companion: handleDragonCompanion,
-           dragon_companion_confirm: handleDragonCompanionConfirm,
+            dragon_wings: handleDragonWings,
+            dragon_companion: handleDragonCompanion,
+            dragon_companion_confirm: handleDragonCompanionConfirm,
+            wild_magic_surge: handleWildMagicSurge,
+            wild_magic_tamed: handleWildMagicTamed,
+            feats_of_chaos: handleFeatsOfChaosAdvantage,
+            feats_of_chaos_activate: onFeatsOfChaosActivate,
+            feats_of_chaos_consume: onFeatsOfChaosConsume,
+            wild_magic_tamed_selected: onWildMagicTamedSelected,
+            wild_magic_double_roll_selected: onDoubleRollSelected,
+            magical_cunning: handleMagicalCunning,
+            contact_patron: handleContactPatron,
 };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;

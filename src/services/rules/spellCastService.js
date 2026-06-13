@@ -6,6 +6,7 @@ import { triggerPostCastSelfHeals, triggerPostCastAllyHeals } from './postCastHe
 import { triggerSmiteOfProtection } from './smiteOfProtectionService.js';
 import { triggerInspiringSmite } from './inspiringSmiteService.js';
 import { triggerPrimalCompanionSpellShare } from './primalCompanionSpellShareService.js';
+import { triggerWildMagicSurge } from './wildMagicSurgeService.js';
 import { setRuntimeValue, getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { applyHealingToTarget } from './applyHealing.js';
 import { getCombatContext } from './damageUtils.js';
@@ -118,6 +119,9 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     });
     triggerSpellThief(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Spell Thief failed:', e);
+    });
+    triggerWildMagicSurge(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+        console.error('[spellCast] Wild Magic Surge trigger failed:', e);
     });
 }
 

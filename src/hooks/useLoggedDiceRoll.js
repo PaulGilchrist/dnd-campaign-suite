@@ -774,6 +774,53 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             });
             return;
           }
+          const hasContactPatron = (context?.playerStats?.automation?.passives || []).some(
+            p => p.type === 'passive_rule' && p.effect === 'contact_patron_auto_save'
+          );
+          if (hasContactPatron && name === 'Contact Other Plane' && target.name === characterName) {
+            const successfulSave = computeDamageAfterSave(total, true, dcSuccess);
+            const applyResult = applyDamageToTarget(combatSummary, target.name, successfulSave, [damageType], campaignName, null, false, characterName);
+            logEntry({
+              type: 'roll',
+              characterName,
+              rollType: 'save-damage',
+              name,
+              formula,
+              rolls,
+              total,
+              modifier,
+              damageType,
+              targetName: target.name,
+              saveType,
+              saveDc,
+              saveResult: 'success',
+              saveRoll: 20,
+              saveBonus: 0,
+              finalDamage: successfulSave,
+              note: 'Contact Patron: automatically succeed on saving throw',
+            });
+            setPopupHtml({
+              type: 'save-damage',
+              name,
+              formula,
+              rolls,
+              bonus: 0,
+              modifier,
+              damageType,
+              targetName: target.name,
+              targetCurrentHp: applyResult?.newHp,
+              targetMaxHp,
+              saveDc,
+              saveType,
+              dcSuccess,
+              saveResult: { success: true, roll: 20, total: saveDc, bonus: 0 },
+              finalDamage: successfulSave,
+              damageApplied: true,
+              damageReduced: false,
+              contactPatron: true,
+            });
+            return;
+          }
           const promptId = utils.guid();
           pendingSaves[promptId] = {
             targetName: target.name, rawDamage: total, saveDc, saveType, dcSuccess,

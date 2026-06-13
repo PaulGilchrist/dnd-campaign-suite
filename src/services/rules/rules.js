@@ -457,6 +457,7 @@ const rules = {
         const { classRules: cr, raceRules: rr } = rules.getSubModules(playerStats, playerSummary);
 
         playerStats.class = cr.getClass(allClasses, playerSummary);
+        playerStats.wildMagicSurgeTable = playerStats.class?.wild_magic_surge_table || null;
         playerStats.race = rr.getRace(allRaces, playerSummary);
         playerStats.inventory.magicItems = rules.getMagicItems(allMagicItems, playerSummary, playerStats);
 

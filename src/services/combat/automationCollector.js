@@ -154,7 +154,6 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'bardic_inspiration':
             case 'bonus_attacks':
             case 'bonus_action_attack':
-            case 'reaction_bonus':
             case 'free_spell':
             case 'fey_reinforcements':
             case 'divine_intervention':
@@ -184,6 +183,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'reaction_debuff':
             case 'bardic_inspiration_defense':
             case 'reaction_save_heal':
+            case 'reaction_bonus':
                 result.reactions.push(info)
                 break
             case 'nature_sanctuary_move':
@@ -372,6 +372,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'primal_companion_dodge':
                 result.passives.push(info)
                 break
+            case 'magical_cunning':
+                result.actions.push(info)
+                break
             case 'holy_nimbus_radiant_damage':
                 result.passives.push(info)
                 break
@@ -464,6 +467,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 } else {
                     result.actions.push(info)
                 }
+                break
+            case 'contact_patron':
+                result.actions.push(info)
                 break
             case 'damage_type_choice':
                 result.passives.push(info)
