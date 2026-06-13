@@ -88,7 +88,11 @@ export const LONG_REST_RESOURCES = [
          'naturalRecoverySlots',
            '_Star_Map_freeCastCount',
            '_Dragon_Companion_freeCastCount',
-           '_Contact_Patron_freeCastCount',
+            '_Contact_Patron_freeCastCount',
+            '_Mystic_Arcanum_freeCastCount',
+            '_Mystic_Arcanum_(level_7_spell)_freeCastCount',
+            '_Mystic_Arcanum_(level_8_spell)_freeCastCount',
+            '_Mystic_Arcanum_(level_9_spell)_freeCastCount',
            'magicalCunningUsed'
     ]
 

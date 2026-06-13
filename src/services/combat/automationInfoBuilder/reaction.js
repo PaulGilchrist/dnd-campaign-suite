@@ -124,5 +124,25 @@ export const reactionHandlers = {
             casting_time: auto.casting_time || '1 reaction',
             hasAutomation: true
         }
+    },
+
+    'beguiling_defenses': (feature, playerStats) => {
+        const auto = feature.automation
+        const prof = playerStats.proficiency || 0
+        return {
+            type: 'beguiling_defenses',
+            name: feature.name,
+            saveType: auto.saveType || 'WIS',
+            saveDc: auto.saveDc === 'ability'
+                ? getSaveDc(playerStats, auto.saveAbility || 'CHA', prof)
+                : auto.saveDc || null,
+            saveAbility: auto.saveAbility || 'CHA',
+            damageType: auto.damageType || 'Psychic',
+            uses: auto.uses || 1,
+            recharge: auto.recharge || 'long_rest',
+            pactMagicRecharge: auto.pactMagicRecharge || false,
+            casting_time: auto.casting_time || '1 reaction',
+            hasAutomation: true
+        }
     }
 }

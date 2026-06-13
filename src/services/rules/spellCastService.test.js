@@ -27,6 +27,7 @@ vi.mock('../combat/buffService.js', () => ({
 vi.mock('./postCastRiderService.js', () => ({
   triggerPostCastRiderSaves: vi.fn().mockResolvedValue(undefined),
   triggerSpellThief: vi.fn().mockResolvedValue(undefined),
+  triggerBewitchingMagic: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('./postCastHealService.js', () => ({

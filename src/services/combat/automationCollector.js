@@ -233,6 +233,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'evasion':
             case 'conditional_disadvantage':
             case 'mastery_rider':
+            case 'bewitching_magic':
             case 'post_cast_rider':
             case 'post_cast_self_heal':
             case 'post_cast_ally_heal':
@@ -394,7 +395,16 @@ export function collectAutomationFromFeatures(features, playerStats) {
                     result.actions.push(info)
                 }
                 break
+            case 'steps_of_the_fey':
+                result.bonusActions.push(info)
+                break
             case 'shadowy_dodge':
+                result.reactions.push(info)
+                break
+            case 'misty_escape':
+                result.reactions.push(info)
+                break
+            case 'beguiling_defenses':
                 result.reactions.push(info)
                 break
             case 'hunter_prey':

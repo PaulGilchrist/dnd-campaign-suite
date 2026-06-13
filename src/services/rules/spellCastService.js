@@ -1,7 +1,7 @@
 import { rollExpression } from '../dice/diceRoller.js';
 import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet, rangeToFeet } from './rangeValidation.js';
 import { isInnateSorceryActive, getActiveBuffs } from '../combat/buffService.js';
-import { triggerPostCastRiderSaves, triggerSpellThief } from './postCastRiderService.js';
+import { triggerPostCastRiderSaves, triggerSpellThief, triggerBewitchingMagic } from './postCastRiderService.js';
 import { triggerPostCastSelfHeals, triggerPostCastAllyHeals } from './postCastHealService.js';
 import { triggerSmiteOfProtection } from './smiteOfProtectionService.js';
 import { triggerInspiringSmite } from './inspiringSmiteService.js';
@@ -122,6 +122,9 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     });
     triggerWildMagicSurge(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Wild Magic Surge trigger failed:', e);
+    });
+    triggerBewitchingMagic(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+        console.error('[spellCast] Bewitching Magic trigger failed:', e);
     });
 }
 

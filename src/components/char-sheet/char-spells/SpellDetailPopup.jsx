@@ -3,25 +3,37 @@ import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
 import { getActiveBuffs } from '../../../services/combat/buffService.js'
 
-function isFreeCastAuthorized(playerName, spellName, playerStats) {
+function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats) {
   const raw = getRuntimeValue(playerName, '_War_God_s_Blessing_freeCast');
   if (raw && Array.isArray(raw) && raw.includes(spellName)) return true;
 
   const naturalRecoveryFreeCast = getRuntimeValue(playerName, 'naturalRecoveryFreeCast');
   if (naturalRecoveryFreeCast && Array.isArray(naturalRecoveryFreeCast) && naturalRecoveryFreeCast.includes(spellName)) return true;
 
+  const bewitchingFreeCast = getRuntimeValue(playerName, '_Bewitching_Magic_freeCast');
+  if (bewitchingFreeCast && spellName === 'Misty Step') return true;
+
   const actions = playerStats?.automation?.actions || [];
   for (const entry of actions) {
-        if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'dragon_companion') continue;
+    if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'dragon_companion') continue;
+
+    // Counter-based free casts (uses_expression + usesMax) — match by spell level, not name
+    // This handles features like Mystic Arcanum where the spell field is a descriptive placeholder
+    // (e.g. "a level 9 Warlock spell (your choice)") that never matches a real spell name.
+    if (entry.uses_expression && entry.usesMax) {
+      const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
+      const levelMatch = spellField ? spellField.match(/level (\d+)/) : null;
+      const featureLevel = levelMatch ? parseInt(levelMatch[1], 10) : null;
+      if (featureLevel !== null && featureLevel === spellLevel) {
+        const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+        const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
+        if (count > 0) return true;
+      }
+      continue;
+    }
+
     const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
     if (!spells.includes(spellName)) continue;
-
-    // Counter-based free casts (uses_expression)
-    if (entry.uses_expression && entry.usesMax) {
-      const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-      const count = Number(getRuntimeValue(playerName, freeCastCountKey) ?? entry.usesMax);
-      return count > 0;
-    }
 
     if (entry.perSpellTracking) {
       const freeKey = `_${entry.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_freeCast`;
@@ -42,7 +54,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
   const charDmg = spell.damage?.damage_at_character_level;
   const isUpcastable = !isCantrip && slotDmg && Object.keys(slotDmg).length > 1;
 
-  const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spell.name, playerStats);
+  const freeCastAuthorized = isFreeCastAuthorized(playerStats.name, spell.name, spell.level, playerStats);
   const hasAnySlots = isCantrip || freeCastAuthorized || upcastLevels.some(l => l.availableSlots > 0);
 
   const [selectedUpcastLvl, setSelectedUpcastLvl] = useState(() => {
@@ -83,19 +95,27 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     if (freeCastAuthorized) {
       const actions = playerStats?.automation?.actions || [];
       for (const entry of actions) {
-    if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'dragon_companion') continue;
+        if (entry.type !== 'free_spell' && entry.type !== 'fey_reinforcements' && entry.type !== 'dragon_companion') continue;
+
+        // Counter-based free casts — match by spell level, not name
+        // Must stay in sync with isFreeCastAuthorized logic above
+        if (entry.uses_expression && entry.usesMax) {
+          const spellField = Array.isArray(entry.spell) ? entry.spell[0] : entry.spell;
+          const levelMatch = spellField ? spellField.match(/level (\d+)/) : null;
+          const featureLevel = levelMatch ? parseInt(levelMatch[1], 10) : null;
+          if (featureLevel !== null && featureLevel === spell.level) {
+            const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
+            const count = Number(getRuntimeValue(playerStats.name, freeCastCountKey) ?? entry.usesMax);
+            if (count > 0) {
+              setRuntimeValue(playerStats.name, freeCastCountKey, count - 1, campaignName);
+            }
+            break;
+          }
+          continue;
+        }
+
         const spells = Array.isArray(entry.spell) ? entry.spell : [entry.spell];
         if (!spells.includes(spell.name)) continue;
-
-        // Counter-based free casts (uses_expression)
-        if (entry.uses_expression && entry.usesMax) {
-          const freeCastCountKey = `_${entry.name.replace(/\s+/g, '_')}_freeCastCount`;
-          const count = Number(getRuntimeValue(playerStats.name, freeCastCountKey) ?? entry.usesMax);
-          if (count > 0) {
-            setRuntimeValue(playerStats.name, freeCastCountKey, count - 1, campaignName);
-          }
-          break;
-        }
 
         if (entry.perSpellTracking) {
           const usedKey = `_${entry.name.replace(/\s+/g, '_')}_${spell.name.replace(/\s+/g, '_')}_used`;
@@ -106,6 +126,9 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
       const nrFreeCast = getRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast');
       if (nrFreeCast && Array.isArray(nrFreeCast) && nrFreeCast.includes(spell.name)) {
         setRuntimeValue(playerStats.name, 'naturalRecoveryFreeCast', null, campaignName);
+      }
+      if (getRuntimeValue(playerStats.name, '_Bewitching_Magic_freeCast') && spell.name === 'Misty Step') {
+        setRuntimeValue(playerStats.name, '_Bewitching_Magic_freeCast', null, campaignName);
       }
     } else {
       const spellSlotKey = `spell_slots_level_${spell.level}`;

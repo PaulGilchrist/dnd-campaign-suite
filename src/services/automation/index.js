@@ -79,6 +79,7 @@ import { handle as handleBeguilingTwist } from './handlers/beguilingTwistHandler
 import { handle as handleFeyReinforcements, confirmFeyReinforcement as handleFeyReinforcementsConfirm } from './handlers/feyReinforcementsHandler.js';
 import { handle as handleMistyWanderer, confirmMistyWanderer as handleMistyWandererConfirm } from './handlers/mistyWandererHandler.js';
 import { handle as handleShadowyDodge } from './handlers/shadowyDodgeHandler.js';
+import { handle as handleMistyEscape } from './handlers/mistyEscapeHandler.js';
 import { handle as handleHunterPrey } from './handlers/hunterPreyHandler.js';
 import { handle as handleDefensiveTactics } from './handlers/defensiveTacticsHandler.js';
 import { handle as handleSuperiorHunterPrey } from './handlers/superiorHunterPreyHandler.js';
@@ -104,6 +105,9 @@ import { handle as handleDragonCompanion, confirmDragonCompanion as handleDragon
 import { handle as handleWildMagicSurge, handleTamedSurge as handleWildMagicTamed, handleFeatsOfChaos as handleFeatsOfChaosAdvantage, onFeatsOfChaosActivate as onFeatsOfChaosActivate, onFeatsOfChaosConsume as onFeatsOfChaosConsume, onTamedSurgeSelected as onWildMagicTamedSelected, onDoubleRollSelected } from './handlers/wildMagicSurgeHandler.js';
 import { handle as handleMagicalCunning } from './handlers/magicalCunningHandler.js';
 import { handle as handleContactPatron } from './handlers/contactPatronHandler.js';
+import { handle as handleBeguilingDefenses } from './handlers/beguilingDefensesHandler.js';
+import { handle as handleBewitchingMagic } from './handlers/bewitchingMagicHandler.js';
+import { handle as handleStepsOfTheFey } from './handlers/stepsOfTheFeyHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -207,6 +211,9 @@ const HANDLER_MAP = {
         misty_wanderer: handleMistyWanderer,
         misty_wanderer_confirm: handleMistyWandererConfirm,
         shadowy_dodge: handleShadowyDodge,
+        misty_escape: handleMistyEscape,
+        beguiling_defenses: handleBeguilingDefenses,
+        bewitching_magic: handleBewitchingMagic,
         hunter_prey: handleHunterPrey,
         defensive_tactics: handleDefensiveTactics,
         superior_hunter_prey: handleSuperiorHunterPrey,
@@ -239,6 +246,7 @@ const HANDLER_MAP = {
             wild_magic_double_roll_selected: onDoubleRollSelected,
             magical_cunning: handleMagicalCunning,
             contact_patron: handleContactPatron,
+            steps_of_the_fey: handleStepsOfTheFey,
 };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;

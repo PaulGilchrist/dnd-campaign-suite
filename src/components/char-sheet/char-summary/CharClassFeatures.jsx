@@ -378,9 +378,6 @@ const WarlockFeatures = function WarlockFeatures({ playerStats }) {
                  <div><b>Invocations: </b>{[...warlockFeatures.invocations].sort().join(', ')}</div>
              )}
              {warlockFeatures?.pactBoon && <div><b>Pact Boon: </b>{warlockFeatures.pactBoon}</div>}
-             {warlockFeatures?.arcanums && Array.isArray(warlockFeatures.arcanums) && warlockFeatures.arcanums.length > 0 && (
-                 <div><b>Eldritch Invocations List: </b>{warlockFeatures.arcanums.join(', ')}</div>
-             )}
              <div className="automation-actions">
                  {warlockFeatures?.pactBoon && (
                      <button className="automation-btn" title={`Pact Boon: ${warlockFeatures.pactBoon}`}>

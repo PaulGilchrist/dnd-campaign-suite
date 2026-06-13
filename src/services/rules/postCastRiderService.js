@@ -177,3 +177,49 @@ export async function triggerSpellThief(spell, metaCtx, playerStats, campaignNam
 
     return results.length > 0 ? results : null;
 }
+
+export function getBewitchingMagicFeatures(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.filter(p => p.type === 'bewitching_magic');
+}
+
+export async function triggerBewitchingMagic(spell, metaCtx, playerStats, campaignName, mapName) {
+    if (!isEnchantmentOrIllusion(spell)) {
+        return null;
+    }
+
+    if (!usesSpellSlot(spell, metaCtx)) {
+        return null;
+    }
+
+    if (spell.casting_time !== '1 action') {
+        return null;
+    }
+
+    const bewitchingFeatures = getBewitchingMagicFeatures(playerStats);
+    if (bewitchingFeatures.length === 0) {
+        return null;
+    }
+
+    const results = [];
+    for (const feature of bewitchingFeatures) {
+        const action = {
+            name: feature.name,
+            automation: {
+                type: 'bewitching_magic',
+                casting_time: 'passive',
+            },
+        };
+
+        try {
+            const result = await executeHandler(action, playerStats, campaignName, mapName);
+            if (result) {
+                results.push(result);
+            }
+        } catch (e) {
+            console.error(`[bewitchingMagic] Failed to execute ${feature.name}:`, e);
+        }
+    }
+
+    return results.length > 0 ? results : null;
+}

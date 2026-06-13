@@ -397,7 +397,7 @@ describe('getClassFeatures', () => {
   });
 
   describe('Warlock Features (2024)', () => {
-    it('should return eldritch invocations with hasArcanum false', () => {
+    it('should return eldritch invocations with hasArcanum false for low level', () => {
       const playerStats = {
         rules: '2024',
         class: {
@@ -406,7 +406,6 @@ describe('getClassFeatures', () => {
             { level: 1 },
             { level: 2, eldritch_invocations: 2 }
           ],
-          eldritchInvocations: [{ name: 'Agonizing Blast' }],
           pactBoon: { name: 'Pact of the Blade' },
           invocations: [{ name: 'Agonizing Blast' }]
         },
@@ -418,9 +417,35 @@ describe('getClassFeatures', () => {
       expect(result.invocationsKnown).toBe(2);
       expect(result.hasArcanum).toBe(false);
       expect(result.arcanumLevels).toBeNull();
-      expect(result.arcanums).toEqual([{ name: 'Agonizing Blast' }]);
+      expect(result.arcanums).toEqual([]);
       expect(result.pactBoon).toEqual({ name: 'Pact of the Blade' });
       expect(result.invocations).toEqual([{ name: 'Agonizing Blast' }]);
+    });
+
+    it('should return arcanum data for high level 2024 Warlock', () => {
+      const playerStats = {
+        rules: '2024',
+        class: {
+          name: 'Warlock',
+          class_levels: Array.from({ length: 13 }, (_, i) => {
+            const level = i + 1;
+            return level === 13 ? { level, eldritch_invocations: 8 } : { level };
+          }),
+          arcanums: ['Crown of Stars'],
+          pactBoon: { name: 'Pact of the Blade' },
+          invocations: ['Agonizing Blast']
+        },
+        level: 13
+      };
+
+      const result = getClassFeatures(playerStats);
+
+      expect(result.invocationsKnown).toBe(8);
+      expect(result.hasArcanum).toBe(true);
+      expect(result.arcanumLevels).toEqual({ level6: 1, level7: 1, level8: 0, level9: 0 });
+      expect(result.arcanums).toEqual(['Crown of Stars']);
+      expect(result.pactBoon).toEqual({ name: 'Pact of the Blade' });
+      expect(result.invocations).toEqual(['Agonizing Blast']);
     });
   });
 

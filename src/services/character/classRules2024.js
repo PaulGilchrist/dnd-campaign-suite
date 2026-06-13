@@ -329,11 +329,18 @@ const classRules = {
          },
         getWarlockFeatures(playerStats) {
             const invocationsKnown = this.getEldritchInvocations(playerStats);
+            const hasArcanum = playerStats.level > 10;
+            const arcanumLevels = hasArcanum ? {
+                level6: playerStats.level >= 11 ? 1 : 0,
+                level7: playerStats.level >= 13 ? 1 : 0,
+                level8: playerStats.level >= 15 ? 1 : 0,
+                level9: playerStats.level >= 17 ? 1 : 0
+            } : null;
             return {
                 invocationsKnown,
-                hasArcanum: false,
-                arcanumLevels: null,
-                arcanums: playerStats.class?.eldritchInvocations || [],
+                hasArcanum,
+                arcanumLevels,
+                arcanums: playerStats.class?.arcanums || [],
                 pactBoon: playerStats.class?.pactBoon || null,
                 invocations: playerStats.class?.invocations || []
             };

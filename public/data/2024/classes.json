@@ -10992,7 +10992,16 @@
             "name": "Mystic Arcanum",
             "description": "Your patron grants you a magical secret called an arcanum. Choose one level 6 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. You gain another Warlock spell of your choice that can be cast in this way when you reach Warlock levels 13 (level 7 spell), 15 (level 8 spell), and 17 (level 9 spell). You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
             "level": 11,
-            "type": "class_feature"
+            "type": "class_feature",
+            "automation": {
+              "type": "free_spell",
+              "spell": "a level 6 Warlock spell (your choice)",
+              "uses_expression": "1",
+              "usesMax": 1,
+              "recharge": "long_rest",
+              "action": "action",
+              "casting_time": "1 action"
+            }
           }
         ],
         "spellcasting": {
@@ -11048,7 +11057,16 @@
             "name": "Mystic Arcanum (level 7 spell)",
             "description": "Your patron grants you a magical secret called an arcanum. Choose one level 7 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
             "level": 13,
-            "type": "class_feature"
+            "type": "class_feature",
+            "automation": {
+              "type": "free_spell",
+              "spell": "a level 7 Warlock spell (your choice)",
+              "uses_expression": "1",
+              "usesMax": 1,
+              "recharge": "long_rest",
+              "action": "action",
+              "casting_time": "1 action"
+            }
           }
         ],
         "spellcasting": {
@@ -11097,7 +11115,16 @@
             "name": "Mystic Arcanum (level 8 spell)",
             "description": "Your patron grants you a magical secret called an arcanum. Choose one level 8 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
             "level": 15,
-            "type": "class_feature"
+            "type": "class_feature",
+            "automation": {
+              "type": "free_spell",
+              "spell": "a level 8 Warlock spell (your choice)",
+              "uses_expression": "1",
+              "usesMax": 1,
+              "recharge": "long_rest",
+              "action": "action",
+              "casting_time": "1 action"
+            }
           }
         ],
         "spellcasting": {
@@ -11153,7 +11180,16 @@
             "name": "Mystic Arcanum (level 9 spell)",
             "description": "Your patron grants you a magical secret called an arcanum. Choose one level 9 Warlock spell as this arcanum. You can cast your arcanum spell once without expending a spell slot, and you must finish a Long Rest before you can cast it in this way again. You regain all uses of your Mystic Arcanum when you finish a Long Rest. Whenever you gain a Warlock level, you can replace one of your arcanum spells with another Warlock spell of the same level.",
             "level": 17,
-            "type": "class_feature"
+            "type": "class_feature",
+            "automation": {
+              "type": "free_spell",
+              "spell": "a level 9 Warlock spell (your choice)",
+              "uses_expression": "1",
+              "usesMax": 1,
+              "recharge": "long_rest",
+              "action": "action",
+              "casting_time": "1 action"
+            }
           }
         ],
         "spellcasting": {
@@ -11234,7 +11270,7 @@
             "automation": {
               "type": "magical_cunning",
               "eldritchMaster": true,
-              "casting_time": "1 action",
+              "casting_time": "passive",
               "description": "When you use your Magical Cunning feature, you regain all your expended Pact Magic spell slots."
             }
           }
@@ -11265,22 +11301,66 @@
           {
             "name": "Steps of the Fey",
             "description": "Cast Misty Step without spell slot, uses = Charisma modifier (minimum once), regain on Long Rest. Additional effects: Refreshing Step (gain 1d10 Temporary Hit Points after teleport), Taunting Step (creatures within 5 feet of space you left make Wisdom save or have Disadvantage on attack rolls against others).",
-            "level": 3
+            "level": 3,
+            "automation": {
+              "type": "steps_of_the_fey",
+              "spell": "Misty Step",
+              "uses_expression": "CHA modifier_min_1",
+              "recharge": "long_rest",
+              "casting_time": "1 bonus action",
+              "saveAbility": "CHA",
+              "saveDc": "ability"
+            }
           },
           {
             "name": "Misty Escape",
             "description": "Cast Misty Step as Reaction in response to taking damage. Additional effects: Disappearing Step (have Invisible condition until start of next turn or after attacking/dealing damage/casting spell), Dreadful Step (creatures within 5 feet of space you left or appear in make Wisdom save or take 2d10 Psychic damage).",
-            "level": 6
+            "level": 6,
+            "automation": {
+              "type": "misty_escape",
+              "spell": "Misty Step",
+              "saveType": "WIS",
+              "saveDc": "ability",
+              "saveAbility": "CHA",
+              "damageExpression": "2d10",
+              "damageType": "Psychic",
+              "condition": "invisible",
+              "casting_time": "1 reaction"
+            }
           },
           {
             "name": "Beguiling Defenses",
             "description": "Immune to Charmed condition. After a creature hits you with an attack roll, take Reaction to reduce damage by half and force attacker to make Wisdom save or take Psychic damage equal to damage you take. Once per Long Rest (or expend Pact Magic spell slot to restore).",
-            "level": 10
+            "level": 10,
+            "automation": [
+              {
+                "type": "passive_immunity",
+                "conditionImmunity": "charmed",
+                "casting_time": "passive"
+              },
+              {
+                "type": "beguiling_defenses",
+                "casting_time": "1 reaction",
+                "saveType": "WIS",
+                "saveDc": "ability",
+                "saveAbility": "CHA",
+                "damageType": "Psychic",
+                "uses": 1,
+                "recharge": "long_rest",
+                "pactMagicRecharge": true
+              }
+            ]
           },
           {
             "name": "Bewitching Magic",
             "description": "Immediately after casting an Enchantment or Illusion spell using an action and a spell slot, cast Misty Step as part of the same action without expending a spell slot.",
-            "level": 14
+            "level": 14,
+            "automation": [
+              {
+                "type": "bewitching_magic",
+                "casting_time": "passive"
+              }
+            ]
           }
         ],
         "spells": [

@@ -1,3 +1,5 @@
+import { evaluateAutoExpression } from '../automationExpressions.js'
+
 export const miscHandlers = {
     'auto_effect': (feature, _playerStats) => {
         const auto = feature.automation
@@ -67,6 +69,44 @@ export const miscHandlers = {
             trigger: auto.trigger || '',
             range: auto.range || '5_ft',
             casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
+    'misty_escape': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'misty_escape',
+            name: feature.name,
+            spell: auto.spell || 'Misty Step',
+            saveType: auto.saveType || 'WIS',
+            saveDc: auto.saveDc || 'ability',
+            saveAbility: auto.saveAbility || 'CHA',
+            damageExpression: auto.damageExpression || '',
+            damageType: auto.damageType || '',
+            condition: auto.condition || 'invisible',
+            casting_time: auto.casting_time || '1 reaction',
+            hasAutomation: true
+        }
+    },
+
+    'steps_of_the_fey': (feature, playerStats) => {
+        const auto = feature.automation
+        let usesMax = auto.uses || 1;
+        if (auto.uses_expression) {
+            usesMax = evaluateAutoExpression(auto.uses_expression, playerStats) || 1;
+        }
+        return {
+            type: 'steps_of_the_fey',
+            name: feature.name,
+            spell: auto.spell || 'Misty Step',
+            uses: auto.uses || 1,
+            uses_expression: auto.uses_expression || '',
+            usesMax,
+            recharge: auto.recharge || 'long_rest',
+            casting_time: auto.casting_time || '1 bonus action',
+            saveAbility: auto.saveAbility || 'CHA',
+            saveDc: auto.saveDc || 'ability',
             hasAutomation: true
         }
     },
@@ -339,6 +379,16 @@ export const miscHandlers = {
             name: feature.name,
             spellFilter: auto.spellFilter || [],
             range: auto.range || '10 ft',
+            hasAutomation: true
+        }
+    },
+
+    'bewitching_magic': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'bewitching_magic',
+            name: feature.name,
+            casting_time: auto.casting_time || 'passive',
             hasAutomation: true
         }
     }

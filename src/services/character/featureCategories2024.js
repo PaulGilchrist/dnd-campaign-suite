@@ -18,9 +18,7 @@ export const featuresToIgnore = [
     "Fighter Subclass",
     "Fighting Style",
     "Monk Subclass",
-    "Mystic Arcanum (level 7 spell)",
-    "Mystic Arcanum (level 8 spell)",
-    "Mystic Arcanum (level 9 spell)",
+
     "Paladin Subclass",
     "Rage",
     "Ranger Subclass",
@@ -72,6 +70,7 @@ export const bonusActions = [
 ];
 
 export const reactions = [
+    "Beguiling Defenses",
     "Bend Fate",
     "Countercharm",
     "Deflect Energy",
