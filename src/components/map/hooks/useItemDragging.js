@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { CELL_SIZE } from '../../../config/mapConfig';
+import { setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 export default function useItemDragging({
     svgRef,
@@ -10,6 +11,7 @@ export default function useItemDragging({
     gridCenterY,
     rulerMode,
     spellMode,
+    campaignName,
 }) {
     const [itemDragging, setItemDragging] = useState(null);
 
@@ -67,14 +69,22 @@ export default function useItemDragging({
         const clampedGridX = Math.max(0, Math.min(gridSize - 1, gridX));
         const clampedGridY = Math.max(0, Math.min(gridSize - 1, gridY));
 
-        setPlacedItems((prev) =>
-            prev.map((item) =>
+        setPlacedItems((prev) => {
+            const updatedItem = prev.find((item) => item.id === itemDragging.itemId);
+            if (updatedItem) {
+                const oldGridX = updatedItem.gridX;
+                const oldGridY = updatedItem.gridY;
+                if (campaignName && updatedItem.type === 'player' && (oldGridX !== clampedGridX || oldGridY !== clampedGridY)) {
+                    setRuntimeValue(updatedItem.name || updatedItem.id, 'steadyAimMovedThisTurn', true, campaignName);
+                }
+            }
+            return prev.map((item) =>
                 item.id === itemDragging.itemId
                     ? { ...item, gridX: clampedGridX, gridY: clampedGridY }
                     : item
-            )
-        );
-    }, [itemDragging, gridSize, setPlacedItems, svgRef]);
+            );
+        });
+    }, [itemDragging, gridSize, setPlacedItems, svgRef, campaignName]);
 
     const handleItemPointerUp = useCallback((e) => {
         if (!itemDragging) return;

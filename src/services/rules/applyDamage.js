@@ -6,6 +6,23 @@ import { sendDeathSavePrompt, sendConcentrationPrompt } from '../combat/saveProm
 import { rollConcentrationSave } from '../combat/concentrationRules.js';
 import { postLogEntry } from '../shared/logPoster.js';
 
+/**
+ * Save the last damage event under the target's key so reaction features
+ * (e.g., Superior Hunter's Defense) can find the most recent damage the
+ * target received via getLastDamageEvent(targetName).
+ */
+function saveDamageEventForTarget(targetName, rawDamage, damageTypes, campaignName) {
+    if (!targetName || !campaignName) return;
+    const damageType = damageTypes && damageTypes.length > 0 ? damageTypes[0] : 'untyped';
+    setRuntimeValue(targetName, 'lastMetamagicDamage', {
+        targetName,
+        rawDamage,
+        damageType,
+        damageTypes,
+        timestamp: Date.now(),
+    }, campaignName);
+}
+
 export function computeDamageAfterResistances(rawDamage, damageTypes, resistances, immunities) {
   if (!damageTypes || damageTypes.length === 0) throw new Error('computeDamageAfterResistances: damageTypes is required');
   for (const dt of damageTypes) {
@@ -66,9 +83,14 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
            }
        }
    }
-  const finalDamage = computeDamageAfterResistances(rawDamage, damageTypes || [], resistances, immunities);
+   const finalDamage = computeDamageAfterResistances(rawDamage, damageTypes || [], resistances, immunities);
 
-  let oldHp, newHp;
+   // Save damage event under target's key for reaction features
+   if (isPlayer) {
+       saveDamageEventForTarget(creature.name, rawDamage, damageTypes || [], campaignName);
+   }
+
+   let oldHp, newHp;
   if (isPlayer) {
     oldHp = getRuntimeValue(creature.name, 'currentHitPoints') ?? 0;
     newHp = Math.max(0, oldHp - finalDamage);

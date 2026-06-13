@@ -45,6 +45,24 @@ export function collectTurnStartEffects(features) {
                     bonusExpression: auto.bonusExpression || '10',
                 })
             }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'umbral_sight') {
+                effects.push({
+                    type: 'umbral_sight',
+                    name: feature.name,
+                })
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'roving_aim') {
+                effects.push({
+                    type: 'steady_aim_clear',
+                    name: feature.name,
+                })
+            }
+            if (auto?.type === 'steady_aim') {
+                effects.push({
+                    type: 'steady_aim_clear',
+                    name: feature.name,
+                })
+            }
             if (auto?.type === 'holy_nimbus') {
                 effects.push({
                     type: 'holy_nimbus_radiant_damage',
@@ -69,6 +87,12 @@ export function collectTurnStartEffects(features) {
             if (auto?.type === 'precise_hunter') {
                 effects.push({
                     type: 'precise_hunter',
+                    name: feature.name,
+                })
+            }
+            if (auto?.type === 'hunter_lore') {
+                effects.push({
+                    type: 'hunter_lore',
                     name: feature.name,
                 })
             }
@@ -123,7 +147,6 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 }
                 break
             case 'resource_pool':
-            case 'attack_rider':
             case 'open_hand_technique':
             case 'initiative_action':
             case 'spell_modifier':
@@ -159,6 +182,15 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'damage_aura':
             case 'combat_stance':
                 result.specialActions.push(info)
+                break
+            case 'attack_rider':
+                // attack_rider with options (chooseOne) is a passive that triggers on hit
+                if (info.chooseOne || info.maxEffects > 1) {
+                    result.passives.push(info)
+                } else {
+                    // Single-option attack_rider is an action
+                    result.actions.push(info)
+                }
                 break
             case 'passive_buff':
             case 'passive_immunity':
@@ -317,6 +349,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'elder_champion':
                 result.specialActions.push(info)
                 break
+            case 'umbral_sight':
+                result.passives.push(info)
+                break
             case 'reaction_save':
                 result.reactions.push(info)
                 break
@@ -327,8 +362,32 @@ export function collectAutomationFromFeatures(features, playerStats) {
                     result.actions.push(info)
                 }
                 break
+            case 'shadowy_dodge':
+                result.reactions.push(info)
+                break
+            case 'hunter_prey':
+                result.passives.push(info)
+                break
+            case 'defensive_tactics':
+                result.passives.push(info)
+                break
+            case 'superior_hunter_prey':
+                result.passives.push(info)
+                break
+            case 'superior_hunter_defense':
+                result.reactions.push(info)
+                break
+            case 'bonus_action_choice':
+                result.bonusActions.push(info)
+                break
+            case 'steady_aim':
+                result.bonusActions.push(info)
+                break
             case 'peerless_athlete':
                 result.specialActions.push(info)
+                break
+            case 'save_proficiency':
+                result.passives.push(info)
                 break
             default:
                 result.specialActions.push(info)

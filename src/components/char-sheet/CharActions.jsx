@@ -41,6 +41,7 @@ import SacredWeaponModal from './SacredWeaponModal.jsx'
 import ElderChampionRestoreModal from './ElderChampionRestoreModal.jsx'
 import PrimalCompanionBonusActionModal from './PrimalCompanionBonusActionModal.jsx'
 import MistyWandererModal from './MistyWandererModal.jsx'
+import BonusActionChoiceModal from './BonusActionChoiceModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { applyConstellationOption } from '../../services/automation/handlers/starryFormHandler.js';
@@ -53,7 +54,8 @@ import { getTargetFromAttacker, getCombatContext } from '../../services/rules/da
 import { getNearestPlacedItem } from '../../services/rules/rangeValidation.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
-import { getCurrentCombatRound } from '../../services/encounters/combatData.js';
+import { getCurrentCombatRound, loadCombatSummary } from '../../services/encounters/combatData.js';
+import { applyDamageToTarget } from '../../services/rules/applyDamage.js';
 import { buildEmpoweredSpellState, executeEmpoweredReroll, getEmpoweredSpellDescription } from '../../services/rules/empoweredSpellService.js';
 import { useActionSpellMetamagic } from '../../hooks/useActionSpellMetamagic.js';
 import './CharActions.css'
@@ -101,6 +103,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [elderChampionRestoreModal, setElderChampionRestoreModal] = useState(null);
     const [primalCompanionBonusActionModal, setPrimalCompanionBonusActionModal] = useState(null);
     const [mistyWandererModal, setMistyWandererModal] = useState(null);
+    const [bonusActionChoiceModal, setBonusActionChoiceModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
     const [featureChoice, setFeatureChoice] = useState(null);
@@ -304,8 +307,27 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         }).catch(() => { });
     };
 
-    const handleDamageClick = async (attack) => {
-        const wasCrit = popupHtml?.isCrit;
+     const handleDamageClick = async (attack) => {
+         // Handle Sudden Strike: clear the pending flag for this attack
+         const isBonusActionAttack = attack.type === 'Bonus Action';
+         if (isBonusActionAttack) {
+             const pendingSudden = getRuntimeValue(playerStats.name, 'pendingSuddenStrike', campaignName);
+             if (pendingSudden) {
+                 setRuntimeValue(playerStats.name, 'pendingSuddenStrike', null, campaignName);
+             }
+         }
+
+         // Handle Horde Breaker: mark as used for this round
+         if (attack.name === 'Horde Breaker' && isBonusActionAttack) {
+             const hunterPreyChoice = getRuntimeValue(playerStats.name, "_Hunter's Prey_choice", campaignName);
+             if (hunterPreyChoice === 'Horde Breaker') {
+                 const usedKey = '_Hunters_Prey_HordeBreaker_UsedRound';
+                 const currentRound = getCurrentCombatRound();
+                 setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+             }
+         }
+
+         const wasCrit = popupHtml?.isCrit;
         if (wasCrit && setPopupHtml) setPopupHtml(null);
         const result = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
         if (!result) return;
@@ -431,11 +453,15 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
         // Apply weapon_attack_hit damage bonus automations (e.g. Divine Strike, Primal Strike)
         if (playerStats.automation?.actions) {
+            const allAutomation = [
+                ...(playerStats.automation.actions || []),
+                ...(playerStats.automation.passives || []),
+            ];
             const weaponHitBonuses = playerStats.automation.actions.filter(
                 a => a.type === 'damage_bonus' && (a.trigger === 'weapon_attack_hit' || a.trigger === 'weapon_or_beast_form_attack_hit')
             );
             // Deduplicate: skip features that are upgraded by a higher-level feature
-            const upgradedNames = new Set(weaponHitBonuses.filter(b => b.upgrades).map(b => b.upgrades));
+            const upgradedNames = new Set(allAutomation.filter(b => b.upgrades).map(b => b.upgrades));
             const filteredBonuses = weaponHitBonuses.filter(b => !upgradedNames.has(b.name));
             for (const bonus of filteredBonuses) {
                 const optionKey = `_${bonus.name.replace(/\s+/g, '_')}_option`;
@@ -492,6 +518,102 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }
         }
 
+        // Apply Hunter's Prey: Colossus Slayer (extra 1d8 to creature below max HP, once per turn)
+        const hunterPreyChoice = getRuntimeValue(playerStats.name, "_Hunter's_Prey_choice", campaignName);
+        if (hunterPreyChoice === 'Colossus Slayer') {
+            const cs = await getCombatContext(campaignName);
+            const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+            const targetName = target?.name || null;
+            if (target && targetName) {
+                const currentHp = target.currentHp;
+                const maxHp = target.maxHp;
+                if (currentHp != null && maxHp != null && currentHp < maxHp) {
+                    const usedKey = '_Hunters_Prey_Colossus_UsedRound';
+                    const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
+                    const currentRound = getCurrentCombatRound();
+                    if (usedRound !== currentRound) {
+                        const colossusResult = rollExpression('1d8');
+                        if (colossusResult) {
+                            formula += ` + 1d8[extra]`;
+                            total += colossusResult.total;
+                            rolls = [...rolls, ...colossusResult.rolls];
+                            setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Apply Superior Hunter's Prey: spread Hunter's Mark extra damage to a different creature within 30 feet
+        const hasSuperiorHunterPrey = (playerStats.automation?.passives || []).some(
+            p => p.type === 'superior_hunter_prey'
+        );
+        if (hasSuperiorHunterPrey) {
+            const cs = await getCombatContext(campaignName);
+            if (cs) {
+                const attacker = cs.creatures?.find(c => c.name === playerStats.name);
+                const isHmTarget = attacker?.concentration?.spell === "Hunter's Mark";
+                if (isHmTarget) {
+                    const superiorUsedKey = '_Superior_Hunters_Prey_UsedRound';
+                    const superiorUsedRound = getRuntimeValue(playerStats.name, superiorUsedKey, campaignName);
+                    const currentRound = getCurrentCombatRound();
+                    if (superiorUsedRound !== currentRound) {
+                        const superiorResult = rollExpression('1d6');
+                        if (superiorResult) {
+                            const spreadFormula = `1d6[Superior Hunters Prey]`;
+                            const spreadDamageType = 'Force';
+                            const primaryTargetName = cs ? getTargetFromAttacker(cs, playerStats.name)?.name : null;
+
+                            // Find a different creature within 30 feet of the first creature
+                            const spreadTargets = cs.creatures?.filter(c =>
+                                c.name !== primaryTargetName &&
+                                c.type === 'npc'
+                            ) || [];
+
+                            if (spreadTargets.length > 0) {
+                                // Apply to the first eligible target
+                                const spreadTarget = spreadTargets[0];
+                                const combatSummary = await loadCombatSummary(campaignName);
+                                const spreadApplyResult = combatSummary
+                                    ? applyDamageToTarget(combatSummary, spreadTarget.name, superiorResult.total, [spreadDamageType], campaignName, null)
+                                    : null;
+
+                                // Log the spread damage
+                                addEntry(campaignName, {
+                                    type: 'roll',
+                                    characterName: playerStats.name,
+                                    rollType: 'damage',
+                                    name: "Superior Hunter's Prey",
+                                    formula: spreadFormula,
+                                    rolls: superiorResult.rolls,
+                                    total: superiorResult.total,
+                                    modifier: 0,
+                                    damageType: spreadDamageType,
+                                    targetName: spreadTarget.name,
+                                    finalDamage: spreadApplyResult?.finalDamage,
+                                }).catch(() => {});
+
+                                // Update popup to include spread damage info
+                                if (spreadApplyResult) {
+                                    setPopupHtml(prev => ({
+                                        ...prev,
+                                        spreadTargetName: spreadTarget.name,
+                                        spreadFinalDamage: spreadApplyResult.finalDamage,
+                                        spreadTargetCurrentHp: spreadApplyResult.newHp,
+                                        spreadTargetMaxHp: spreadTarget.type === 'player'
+                                            ? (getRuntimeValue(spreadTarget.name, 'hitPoints') ?? 0)
+                                            : spreadTarget.maxHp,
+                                    }));
+                                }
+
+                                setRuntimeValue(playerStats.name, superiorUsedKey, currentRound, campaignName);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Apply attack_rider automations with weapon_attack_hit trigger (e.g. Eldritch Strike)
         if (playerStats.automation?.actions) {
             const eldritchStrikes = playerStats.automation.actions.filter(
@@ -524,6 +646,70 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
                     if (rider.oncePerTurn) {
                         setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+                    }
+                }
+            }
+        }
+
+        // Apply Stalker's Flurry attack_rider (Sudden Strike / Mass Fear)
+        const flurryPassives = [
+            ...(playerStats.automation?.passives || []),
+        ];
+        if (flurryPassives.length > 0) {
+            const stalkerFlurry = flurryPassives.find(
+                a => a.type === 'attack_rider' && a.trigger === 'weapon_attack_hit' && a.chooseOne && a.options?.length > 0 && a.name === "Stalker's Flurry"
+            );
+            if (stalkerFlurry) {
+                const usedKey = `_${stalkerFlurry.name.replace(/\s+/g, '_')}_usedRound`;
+                const currentRound = getCurrentCombatRound();
+                const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
+                if (stalkerFlurry.oncePerTurn && usedRound === currentRound) {
+                    // Already used this round
+                } else {
+                    const cs = await getCombatContext(campaignName);
+                    const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                    const targetName = target?.name || null;
+
+                    if (targetName) {
+                        const optionKey = `_${stalkerFlurry.name.replace(/\s+/g, '_')}_option`;
+                        const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+                        if (!chosenOption) {
+                            // Present choice modal
+                            setAttackRiderModal({
+                                action: stalkerFlurry,
+                                playerStats,
+                                campaignName,
+                                targetName,
+                            });
+                            return;
+                        } else {
+                            // Apply chosen option
+                            const option = stalkerFlurry.options.find(o => o.name === chosenOption);
+                            if (option) {
+                                if (option.effect === 'sudden_strike') {
+                                    setRuntimeValue(playerStats.name, 'pendingSuddenStrike', true, campaignName);
+                                } else if (option.effect === 'mass_fear') {
+                                    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                                    const newEffect = {
+                                        target: targetName,
+                                        source: stalkerFlurry.name,
+                                        option: option.name,
+                                        effect: 'mass_fear',
+                                        saveType: option.saveType || 'WIS',
+                                        saveDc: option.saveDc || 'ability',
+                                        saveAbility: option.saveAbility || 'WIS',
+                                        condition: option.condition || 'frightened',
+                                        duration: option.duration || 'until_start_of_next_turn',
+                                        range: option.range || '10_ft',
+                                    };
+                                    const updatedEffects = [...storedEffects, newEffect];
+                                    setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+                                }
+                            }
+                            if (stalkerFlurry.oncePerTurn) {
+                                setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+                            }
+                        }
                     }
                 }
             }
@@ -728,7 +914,10 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         const { action, optionKey } = featureChoice;
         setRuntimeValue(playerStats.name, optionKey, chosenOption, campaignName);
         setFeatureChoice(null);
-        setPopupHtml(`<b>${action.name}</b><br/>Option chosen: <b>${chosenOption}</b>. This choice can be changed by clicking the feature again.`);
+        const restMessage = (action.automation?.type === 'hunter_prey' || action.automation?.type === 'defensive_tactics')
+            ? 'This choice can be changed on a Short or Long Rest.'
+            : 'This choice can be changed by clicking the feature again.';
+        setPopupHtml(`<b>${action.name}</b><br/>Option chosen: <b>${chosenOption}</b>. ${restMessage}`);
     };
 
     const handleFeatureChoiceSkip = () => {
@@ -819,6 +1008,26 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }
         }
 
+        // Hunter's Prey: present choice between Colossus Slayer and Horde Breaker
+        if (auto?.type === 'hunter_prey') {
+            const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
+            const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+            if (!chosenOption) {
+                setFeatureChoice({ action, options: ['Colossus Slayer', 'Horde Breaker'], optionKey });
+                return;
+            }
+        }
+
+        // Defensive Tactics: present choice between Escape the Horde and Multiattack Defense
+        if (auto?.type === 'defensive_tactics') {
+            const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
+            const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+            if (!chosenOption) {
+                setFeatureChoice({ action, options: ['Escape the Horde', 'Multiattack Defense'], optionKey });
+                return;
+            }
+        }
+
         // For save_attack features with element options (e.g. Elemental Attunement)
         if (auto?.type === 'save_attack' && auto?.hasOptions && auto?.options?.length > 0) {
             const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
@@ -897,6 +1106,24 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'elderChampionRestore': setElderChampionRestoreModal(result.payload); break;
                     case 'primalCompanionBonusActionCommand': setPrimalCompanionBonusActionModal(result.payload); break;
                     case 'mistyWanderer': setMistyWandererModal(result.payload); break;
+                    case 'bonusActionChoice': setBonusActionChoiceModal(result.payload); break;
+                    case 'defensiveTactics': {
+                        const actionData = result.payload?.action;
+                        const defensiveChoice = getRuntimeValue(playerStats.name, '_Defensive_Tactics_choice', campaignName);
+                        if (!defensiveChoice) {
+                            const choicesHtml = `
+                                <b>Defensive Tactics</b><br/><br/>
+                                Choose one option:<br/><br/>
+                                <b>Escape the Horde</b><br/>
+                                Opportunity Attacks have Disadvantage against you.<br/><br/>
+                                <b>Multiattack Defense</b><br/>
+                                When a creature hits you with an attack roll, that creature has Disadvantage on all other attack rolls against you this turn.<br/><br/>
+                                To set your choice, use the Defensive Tactics button below or set the runtime value manually.
+                            `;
+                            setPopupHtml({ type: 'automation_info', name: actionData?.name || 'Defensive Tactics', description: choicesHtml });
+                        }
+                        break;
+                    }
                  }
                 break;
             case 'roll':
@@ -1274,6 +1501,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <MistyWandererModal
                         {...mistyWandererModal}
                         onClose={() => setMistyWandererModal(null)}
+                    />
+                )}
+                {bonusActionChoiceModal && (
+                    <BonusActionChoiceModal
+                        {...bonusActionChoiceModal}
+                        onClose={() => setBonusActionChoiceModal(null)}
                     />
                 )}
                 {divineFuryChoice && (

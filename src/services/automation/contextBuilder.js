@@ -20,6 +20,26 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         const targetName = target?.name || (cs ? getAttackerTargetName(cs, playerName) : undefined);
         const resistanceNotice = target ? getResistanceNotice([attack.damageType], target.resistances, target.immunities, target.name) : null;
 
+        // Hunter's Lore: reveal full IRV info for Hunter's Mark target
+        let hunterLoreNotice = null;
+        const lorePassives = playerStats.automation?.passives || [];
+        const hasHunterLore = lorePassives.some(p => p.type === 'passive_rule' && p.effect === 'hunter_lore');
+        if (hasHunterLore && target) {
+            const irvParts = [];
+            if (target.vulnerabilities?.length > 0) {
+                irvParts.push(`Vulnerabilities: ${target.vulnerabilities.join(', ')}`);
+            }
+            if (target.resistances?.length > 0) {
+                irvParts.push(`Resistances: ${target.resistances.join(', ')}`);
+            }
+            if (target.immunities?.length > 0) {
+                irvParts.push(`Immunities: ${target.immunities.join(', ')}`);
+            }
+            if (irvParts.length > 0) {
+                hunterLoreNotice = irvParts.join('\n');
+            }
+        }
+
        // Check for Stunning Strike save advantage (consumed on use)
         let hasSaveAdvantage = false;
         if (targetName) {
@@ -176,6 +196,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         return {
             damageType: attack.damageType,
             resistanceNotice,
+            hunterLoreNotice,
             targetName,
             saveDc: attack.saveDc + innateSorceryBonus.saveDcBonus,
             saveType: attack.saveType,

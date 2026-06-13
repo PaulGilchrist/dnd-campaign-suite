@@ -3,8 +3,9 @@ import { describe, it, expect } from 'vitest'
 import {
   collectSaveModifiers,
   getEvasionEffects,
+  getAllSaveProficiencies,
 } from './automationService.js'
-import { makeFeature } from './automationService.fixtures.js'
+import { makeFeature, makePlayerStats } from './automationService.fixtures.js'
 
 // ── collectSaveModifiers ──────────────────────────────────────────
 describe('collectSaveModifiers', () => {
@@ -113,5 +114,81 @@ describe('getEvasionEffects', () => {
     ]
     const result = getEvasionEffects(features)
     expect(result).toHaveLength(2)
+  })
+})
+
+// ── getAllSaveProficiencies with save_proficiency ─────────────────
+describe('getAllSaveProficiencies', () => {
+  it('returns empty array when no save_proficiency features', () => {
+    const features = [makeFeature({ type: 'damage_bonus' })]
+    const result = getAllSaveProficiencies(features)
+    expect(result).toEqual([])
+  })
+
+  it('grants the primary save proficiency', () => {
+    const features = [
+      makeFeature(
+        { type: 'save_proficiency', saveType: 'Wisdom', fallbackTypes: ['Intelligence', 'Charisma'] },
+        'Iron Mind',
+      ),
+    ]
+    const result = getAllSaveProficiencies(features)
+    expect(result).toEqual(['Wisdom'])
+  })
+
+  it('falls back to first available fallback when primary already has proficiency', () => {
+    const playerStats = makePlayerStats({
+      class: { name: 'Ranger', saving_throw_proficiencies: ['Dexterity', 'Intelligence'] },
+    })
+    const features = [
+      makeFeature(
+        { type: 'save_proficiency', saveType: 'Wisdom', fallbackTypes: ['Intelligence', 'Charisma'] },
+        'Iron Mind',
+      ),
+    ]
+    // Character doesn't have WIS, so gets WIS
+    const result = getAllSaveProficiencies(features, playerStats)
+    expect(result).toEqual(['Wisdom'])
+  })
+
+  it('falls back to fallback when primary save already in class saves', () => {
+    const playerStats = makePlayerStats({
+      class: { name: 'Ranger', saving_throw_proficiencies: ['Dexterity', 'Wisdom'] },
+    })
+    const features = [
+      makeFeature(
+        { type: 'save_proficiency', saveType: 'Wisdom', fallbackTypes: ['Intelligence', 'Charisma'] },
+        'Iron Mind',
+      ),
+    ]
+    // Character already has WIS from class, so falls back to INT
+    const result = getAllSaveProficiencies(features, playerStats)
+    expect(result).toEqual(['Intelligence'])
+  })
+
+  it('falls through fallbacks until finding one not already proficient', () => {
+    const playerStats = makePlayerStats({
+      class: { name: 'Ranger', saving_throw_proficiencies: ['Dexterity', 'Wisdom', 'Intelligence'] },
+    })
+    const features = [
+      makeFeature(
+        { type: 'save_proficiency', saveType: 'Wisdom', fallbackTypes: ['Intelligence', 'Charisma'] },
+        'Iron Mind',
+      ),
+    ]
+    // WIS and INT already have proficiency, falls to CHA
+    const result = getAllSaveProficiencies(features, playerStats)
+    expect(result).toEqual(['Charisma'])
+  })
+
+  it('handles case-insensitive save type normalization', () => {
+    const features = [
+      makeFeature(
+        { type: 'save_proficiency', saveType: 'wisdom', fallbackTypes: ['intelligence', 'charisma'] },
+        'Iron Mind',
+      ),
+    ]
+    const result = getAllSaveProficiencies(features)
+    expect(result).toEqual(['Wisdom'])
   })
 })

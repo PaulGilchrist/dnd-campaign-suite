@@ -40,7 +40,7 @@ export function getAutomationInfo(feature, playerStats) {
     return null
 }
 
-export function getAllSaveProficiencies(features) {
+export function getAllSaveProficiencies(features, playerStats) {
     const allSaves = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
     if (!features) return allSaves
     const result = new Set()
@@ -53,7 +53,31 @@ export function getAllSaveProficiencies(features) {
                     result.add(save)
                 }
             }
+            if (auto.type === 'save_proficiency') {
+                const saveName = auto.saveType || ''
+                const fallbackTypes = auto.fallbackTypes || []
+                if (saveName) {
+                    // Normalize: capitalize first letter, lowercase rest
+                    const normalizedSave = saveName.charAt(0).toUpperCase() + saveName.slice(1).toLowerCase()
+                    // Check if character already has proficiency in this save
+                    const classSaves = playerStats?.class?.saving_throw_proficiencies || []
+                    const hasSave = result.has(normalizedSave) || classSaves.includes(normalizedSave)
+                    if (hasSave) {
+                        // Use fallback types in order
+                        for (const fallback of fallbackTypes) {
+                            const normalizedFallback = fallback.charAt(0).toUpperCase() + fallback.slice(1).toLowerCase()
+                            const hasFallback = result.has(normalizedFallback) || classSaves.includes(normalizedFallback)
+                            if (!hasFallback) {
+                                result.add(normalizedFallback)
+                                break
+                            }
+                        }
+                    } else {
+                        result.add(normalizedSave)
+                    }
+                }
+            }
         }
     })
-    return result.size > 0 ? allSaves : []
+    return Array.from(result)
 }

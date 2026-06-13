@@ -53,6 +53,21 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
         if (effect.type === 'dread_ambush_speed') {
             applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, campaignName);
         }
+        if (effect.type === 'umbral_sight') {
+            applyUmbralSightTurnStart(activeName, playerStats, effect, campaignName);
+        }
+        if (effect.type === 'steady_aim_clear') {
+            applySteadyAimClearTurnStart(activeName, playerStats, effect, campaignName);
+        }
+    }
+
+    // Clean up Multiattack Defense effects at start of each creature's turn
+    const allTargetEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+    if (allTargetEffects.length > 0) {
+        const cleaned = allTargetEffects.filter(te => te.effect !== 'multiattack_defense');
+        if (cleaned.length !== allTargetEffects.length) {
+            setRuntimeValue(campaignName, 'targetEffects', cleaned, campaignName);
+        }
     }
 }
 
@@ -211,6 +226,31 @@ async function applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, c
         speedBonus: bonus,
     }];
     await setRuntimeValue(activeName, 'activeBuffs', newBuffs, campaignName);
+}
+
+async function applyUmbralSightTurnStart(activeName, playerStats, effect, campaignName) {
+    const inDarkness = getRuntimeValue(activeName, 'umbralSightDarknessActive', campaignName);
+    const storedConditions = getRuntimeValue(activeName, 'activeConditions') || [];
+    const hasInvisible = storedConditions.some(c => String(c).toLowerCase() === 'invisible');
+
+    if (inDarkness && !hasInvisible) {
+        const newConditions = [...storedConditions, 'invisible'];
+        await setRuntimeValue(activeName, 'activeConditions', newConditions, campaignName);
+    } else if (!inDarkness && hasInvisible) {
+        const filtered = storedConditions.filter(c => String(c).toLowerCase() !== 'invisible');
+        await setRuntimeValue(activeName, 'activeConditions', filtered, campaignName);
+    }
+}
+
+async function applySteadyAimClearTurnStart(activeName, playerStats, effect, campaignName) {
+    // Clear speed_zero condition and movement flag at start of next turn
+    const storedConds = getRuntimeValue(activeName, 'activeConditions') || [];
+    const filtered = storedConds.filter(c => String(c).toLowerCase() !== 'speed_zero');
+    if (filtered.length !== storedConds.length) {
+        await setRuntimeValue(activeName, 'activeConditions', filtered, campaignName);
+    }
+    await setRuntimeValue(activeName, 'steadyAimMovedThisTurn', false, campaignName);
+    await setRuntimeValue(activeName, 'steadyAimSpeedZero', false, campaignName);
 }
 
 export function addExpiration(attackerName, targetName, effects, campaignName, rounds) {
@@ -442,6 +482,12 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 removeActiveCondition(targetName, effect.condition, campaignName);
                 removeNpcCondition(targetName, effect.condition, campaignName);
                 break;
+
+            case 'speed_zero': {
+                removeActiveCondition(targetName, 'speed_zero', campaignName);
+                removeNpcCondition(targetName, 'speed_zero', campaignName);
+                break;
+            }
 
             case 'avenging_angel_aura': {
                 const auraTargets = getRuntimeValue(attackerName, 'avengingAngelAuraTargets', campaignName) || [];

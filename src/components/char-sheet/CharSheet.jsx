@@ -252,6 +252,14 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         conditionEffects.attackAdvantageCount = (conditionEffects.attackAdvantageCount || 0) + 1;
     }
 
+    // Defensive Tactics: Escape the Horde — all attacks against you have Disadvantage
+    if (playerStats) {
+        const defensiveChoice = getRuntimeValue(playerStats.name, '_Defensive_Tactics_choice', campaignName);
+        if (defensiveChoice === 'Escape the Horde') {
+            conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
+        }
+    }
+
     const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
     const conditionAttackMode = getNetAttackMode(conditionEffects.attackAdvantageCount, conditionEffects.attackDisadvantageCount)
 

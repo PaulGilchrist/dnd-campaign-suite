@@ -337,23 +337,25 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           hit,
           isAutoMiss,
            rangeReason: context?.rangeReason,
-           resistanceNotice: context?.resistanceNotice,
-           coverLevel: context?.coverLevel,
-           coverAcBonus: context?.coverAcBonus,
-           coverReason: context?.coverReason,
-              });
-        setPopupHtml({
-           type: 'd20',
-           rollType,
-           name,
-           rolls: [r1, r2],
-           bonus,
-           targetName,
-           targetAc,
-           hit,
-           isAutoMiss,
-           rangeReason: context?.rangeReason,
-           resistanceNotice: context?.resistanceNotice,
+            resistanceNotice: context?.resistanceNotice,
+            hunterLoreNotice: context?.hunterLoreNotice,
+            coverLevel: context?.coverLevel,
+            coverAcBonus: context?.coverAcBonus,
+            coverReason: context?.coverReason,
+               });
+         setPopupHtml({
+            type: 'd20',
+            rollType,
+            name,
+            rolls: [r1, r2],
+            bonus,
+            targetName,
+            targetAc,
+            hit,
+            isAutoMiss,
+            rangeReason: context?.rangeReason,
+            resistanceNotice: context?.resistanceNotice,
+            hunterLoreNotice: context?.hunterLoreNotice,
            coverLevel: context?.coverLevel,
            coverAcBonus: context?.coverAcBonus,
            coverReason: context?.coverReason,
@@ -804,7 +806,26 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         applyResult = applyDamageToTarget(combatSummary, target.name, total, [damageType], campaignName, null);
        }
 
-      // Ram: apply Prone on melee hit from Power of the Wilds
+       // Multiattack Defense: when a creature hits the player, apply disadvantage to that attacker's subsequent attacks
+       if (target?.type === 'player' && applyResult && applyResult.finalDamage > 0) {
+           const attackerNameResolved = attackerName || characterName;
+           const defensiveChoice = getRuntimeValue(target.name, '_Defensive_Tactics_choice', campaignName);
+           if (defensiveChoice === 'Multiattack Defense') {
+               const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+               const newEffect = {
+                   target: target.name,
+                   source: 'Defensive Tactics',
+                   option: 'Multiattack Defense',
+                   effect: 'multiattack_defense',
+                   attacker: attackerNameResolved,
+                   duration: 'until_end_of_current_turn',
+               };
+               const updatedEffects = [...storedEffects, newEffect];
+               setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+           }
+       }
+
+       // Ram: apply Prone on melee hit from Power of the Wilds
       if (context?.ramActive && context?.isMelee && target && applyResult) {
         const isLargeOrSmaller = !target.size || ['Tiny', 'Small', 'Medium', 'Large'].includes(target.size);
         if (isLargeOrSmaller) {

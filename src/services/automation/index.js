@@ -78,6 +78,13 @@ import { handle as handlePrimalCompanionSpellShare, applySpellShare as applyPrim
 import { handle as handleBeguilingTwist } from './handlers/beguilingTwistHandler.js';
 import { handle as handleFeyReinforcements, confirmFeyReinforcement as handleFeyReinforcementsConfirm } from './handlers/feyReinforcementsHandler.js';
 import { handle as handleMistyWanderer, confirmMistyWanderer as handleMistyWandererConfirm } from './handlers/mistyWandererHandler.js';
+import { handle as handleShadowyDodge } from './handlers/shadowyDodgeHandler.js';
+import { handle as handleHunterPrey } from './handlers/hunterPreyHandler.js';
+import { handle as handleDefensiveTactics } from './handlers/defensiveTacticsHandler.js';
+import { handle as handleSuperiorHunterPrey } from './handlers/superiorHunterPreyHandler.js';
+import { handle as handleSuperiorHunterDefense } from './handlers/superiorHunterDefenseHandler.js';
+import { handle as handleBonusActionChoice } from './handlers/bonusActionChoiceHandler.js';
+import { handle as handleSteadyAim } from './handlers/steadyAimHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -180,6 +187,13 @@ const HANDLER_MAP = {
         fey_reinforcements_confirm: handleFeyReinforcementsConfirm,
         misty_wanderer: handleMistyWanderer,
         misty_wanderer_confirm: handleMistyWandererConfirm,
+        shadowy_dodge: handleShadowyDodge,
+        hunter_prey: handleHunterPrey,
+        defensive_tactics: handleDefensiveTactics,
+        superior_hunter_prey: handleSuperiorHunterPrey,
+        superior_hunter_defense: handleSuperiorHunterDefense,
+        bonus_action_choice: handleBonusActionChoice,
+        steady_aim: handleSteadyAim,
 };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;

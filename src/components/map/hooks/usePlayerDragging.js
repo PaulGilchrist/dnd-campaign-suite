@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { CELL_SIZE } from '../../../config/mapConfig';
+import { setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 export default function usePlayerDragging({
     svgRef,
@@ -10,6 +11,7 @@ export default function usePlayerDragging({
     gridCenterY,
     rulerMode,
     spellMode,
+    campaignName,
 }) {
     const [dragging, setDragging] = useState(null);
 
@@ -153,7 +155,16 @@ export default function usePlayerDragging({
 
         if (svg) svg.releasePointerCapture(e.pointerId);
         setDragging(null);
-    }, [dragging, mapData, gridSize, setMapData, svgRef]);
+
+        // Track movement for Steady Aim: if the player moved, mark them as having moved
+        if (campaignName && player) {
+            const oldGridX = player.gridX;
+            const oldGridY = player.gridY;
+            if (oldGridX !== targetX || oldGridY !== targetY) {
+                setRuntimeValue(player.name || player.id, 'steadyAimMovedThisTurn', true, campaignName);
+            }
+        }
+    }, [dragging, mapData, gridSize, setMapData, svgRef, campaignName]);
 
     const handlePointerLeave = useCallback((e) => {
         if (!dragging) return;

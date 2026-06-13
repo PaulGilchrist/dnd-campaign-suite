@@ -1433,4 +1433,106 @@ describe('applyTurnStartEffects', () => {
 
     expect(setRuntimeValue).not.toHaveBeenCalled();
   });
+
+  describe('umbral_sight', () => {
+    it('applies invisible condition when in darkness and not already invisible', async () => {
+      getRuntimeValue.mockImplementation((name, prop) => {
+        if (prop === 'umbralSightDarknessActive') return true;
+        if (prop === 'activeConditions') return ['fatigued'];
+        return null;
+      });
+
+      await applyTurnStartEffects('TestCharacter', {
+        turnStartEffects: [{
+          type: 'umbral_sight',
+          name: 'Umbral Sight',
+        }]
+      }, 'TestCampaign');
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCharacter',
+        'activeConditions',
+        ['fatigued', 'invisible'],
+        'TestCampaign'
+      );
+    });
+
+    it('removes invisible condition when not in darkness and currently invisible', async () => {
+      getRuntimeValue.mockImplementation((name, prop) => {
+        if (prop === 'umbralSightDarknessActive') return false;
+        if (prop === 'activeConditions') return ['fatigued', 'invisible'];
+        return null;
+      });
+
+      await applyTurnStartEffects('TestCharacter', {
+        turnStartEffects: [{
+          type: 'umbral_sight',
+          name: 'Umbral Sight',
+        }]
+      }, 'TestCampaign');
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCharacter',
+        'activeConditions',
+        ['fatigued'],
+        'TestCampaign'
+      );
+    });
+
+    it('does nothing when in darkness and already invisible', async () => {
+      getRuntimeValue.mockImplementation((name, prop) => {
+        if (prop === 'umbralSightDarknessActive') return true;
+        if (prop === 'activeConditions') return ['fatigued', 'invisible'];
+        return null;
+      });
+
+      await applyTurnStartEffects('TestCharacter', {
+        turnStartEffects: [{
+          type: 'umbral_sight',
+          name: 'Umbral Sight',
+        }]
+      }, 'TestCampaign');
+
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when not in darkness and not invisible', async () => {
+      getRuntimeValue.mockImplementation((name, prop) => {
+        if (prop === 'umbralSightDarknessActive') return false;
+        if (prop === 'activeConditions') return ['fatigued'];
+        return null;
+      });
+
+      await applyTurnStartEffects('TestCharacter', {
+        turnStartEffects: [{
+          type: 'umbral_sight',
+          name: 'Umbral Sight',
+        }]
+      }, 'TestCampaign');
+
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('handles null activeConditions', async () => {
+      getRuntimeValue.mockImplementation((name, prop) => {
+        if (prop === 'umbralSightDarknessActive') return true;
+        if (prop === 'activeConditions') return null;
+        return null;
+      });
+
+      await applyTurnStartEffects('TestCharacter', {
+        turnStartEffects: [{
+          type: 'umbral_sight',
+          name: 'Umbral Sight',
+        }]
+      }, 'TestCampaign');
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCharacter',
+        'activeConditions',
+        ['invisible'],
+        'TestCampaign'
+      );
+    });
+  });
 });

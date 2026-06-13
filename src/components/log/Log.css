@@ -418,6 +418,18 @@
     margin-top: 4px;
 }
 
+/* Hunter's Lore notice */
+.log-hunter-lore-notice {
+    width: 100%;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #4caf50;
+    background: rgba(76, 175, 80, 0.12);
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-top: 4px;
+}
+
 /* Condition entries */
 .log-condition {
     border-left: 3px solid #e74c3c;

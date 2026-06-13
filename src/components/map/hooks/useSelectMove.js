@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef } from 'react';
 import { TOOL_SELECT } from '../../../config/mapConfig';
+import { setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
-function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef }) {
+function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignName }) {
     const [selectionRect, setSelectionRect] = useState(null);
     const [selectedWalls, setSelectedWalls] = useState(new Set());
     const [selectedItems, setSelectedItems] = useState(new Set());
@@ -167,18 +168,25 @@ function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef }) {
                 }
 
                 setPlacedItems(prev =>
-                    prev.map(item =>
-                        curSelItems.has(item.id)
-                            ? { ...item, gridX: item.gridX + offset.dx, gridY: item.gridY + offset.dy }
-                            : item
-                    )
+                    prev.map(item => {
+                        if (curSelItems.has(item.id)) {
+                            const newGridX = item.gridX + offset.dx;
+                            const newGridY = item.gridY + offset.dy;
+                            // Track movement for Steady Aim
+                            if (campaignName && item.type === 'player' && (offset.dx !== 0 || offset.dy !== 0)) {
+                                setRuntimeValue(item.name || item.id, 'steadyAimMovedThisTurn', true, campaignName);
+                            }
+                            return { ...item, gridX: newGridX, gridY: newGridY };
+                        }
+                        return item;
+                    })
                 );
             }
             moveStartGrid.current = null;
             moveOffsetRef.current = null;
             setMoveOffset(null);
         }
-    }, [isLocalhost, svgRef]);
+    }, [isLocalhost, svgRef, campaignName]);
 
     return {
         selectionRect, selectedWalls, selectedItems, moveOffset,

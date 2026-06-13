@@ -78,8 +78,7 @@ export const reactions = [
     "Opportunity Attack",
     "Riposte",
     "Shield Block",
-    "Soul of Vengeance",
-    "Thieves' Cant"
+    "Soul of Vengeance"
 ];
 
 export const characterAdvancement = [
@@ -96,6 +95,7 @@ export const characterAdvancement = [
     "Fiendish Legacy",
     "Fiendish Legacies",
     "Keen Senses",
+    "Thieves' Cant",
     "Martial Arts",
     "Monastic Traditions",
     "Oath Spells",

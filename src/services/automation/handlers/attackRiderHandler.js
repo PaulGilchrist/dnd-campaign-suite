@@ -30,6 +30,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
+    // Single option — apply immediately
+    if (options.length === 1) {
+        const chosen = options[0];
+        const result = await applyRiderEffect(action, playerStats, campaignName, targetName, chosen);
+        return result;
+    }
+
     return {
         type: 'popup',
         payload: {
@@ -52,6 +59,34 @@ export async function applyRiderOption(action, playerStats, campaignName, target
 
     setRuntimeValue(playerStats.name, 'pendingRiderChoice', null, campaignName);
 
+    // Validate prerequisites and size limits before applying
+    for (const chosen of chosenOptions) {
+        const validation = validateCunningStrikeOption(chosen, targetName, playerStats);
+        if (!validation.valid) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: action.automation.type,
+                    description: `<b>${chosen.name}</b> cannot be used: ${validation.reason}`,
+                    automation: action.automation,
+                },
+            };
+        }
+    }
+
+    // Calculate total cost for Cunning Strike (Sneak Attack dice to forgo)
+    const totalCostD6 = chosenOptions.reduce((sum, opt) => {
+        const costMatch = opt.cost?.match(/^(\d+)d6$/);
+        return sum + (costMatch ? parseInt(costMatch[1], 10) : 0);
+    }, 0);
+
+    // Deduct Sneak Attack dice if Cunning Strike cost is specified
+    if (totalCostD6 > 0) {
+        await applyCunningStrikeCost(playerStats, campaignName, totalCostD6);
+    }
+
     const results = [];
     for (const chosen of chosenOptions) {
         const res = await applyRiderEffect(action, playerStats, campaignName, targetName, chosen);
@@ -69,8 +104,18 @@ export async function applyRiderOption(action, playerStats, campaignName, target
         if (opt.effect === 'next_attack_advantage') desc += ` — the next attack against ${targetName || 'target'} gains +${opt.value || '5'}`;
         if (opt.effect === 'push_15ft') desc += ' — target pushed 15 ft away';
         if (opt.effect === 'speed_reduction') desc += ' — target Speed reduced by 15 ft';
+        if (opt.effect === 'sudden_strike') desc += ' — make another attack against a different creature within 5 ft';
+        if (opt.effect === 'mass_fear') desc += ' — target and creatures within 10 ft make WIS save or be Frightened';
+        if (opt.effect === 'prone') desc += ' — target has Prone condition';
+        if (opt.effect === 'poisoned') desc += ' — target has Poisoned condition (1 min, repeating CON save)';
+        if (opt.effect === 'daze') desc += ' — target on next turn can only do one of: move, action, or Bonus Action';
+        if (opt.effect === 'unconscious') desc += ' — target has Unconscious condition (1 min, repeating CON save)';
+        if (opt.effect === 'blinded') desc += ' — target has Blinded condition (until end of its next turn)';
+        if (opt.effect === 'no_opportunity_attacks' && opt.movement) desc += ' — move up to half Speed without provoking Opportunity Attacks';
         return desc;
     });
+
+    const costNote = totalCostD6 > 0 ? `<br/><em>(Forgoing ${totalCostD6}d6 Sneak Attack damage dice)</em>` : '';
 
     return {
         type: 'popup',
@@ -78,7 +123,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
             type: 'automation_info',
             name: action.name,
             automationType: action.automation.type,
-            description: `Applied to ${targetName || 'target'}:<br/>• ${effectDescriptions.join('<br/>• ')}`,
+            description: `Applied to ${targetName || 'target'}:<br/>• ${effectDescriptions.join('<br/>• ')}${costNote}`,
             automation: action.automation,
         },
     };
@@ -98,6 +143,53 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
         };
     }
 
+    // Handle sudden_strike: record for bonus action attack
+    if (option.effect === 'sudden_strike') {
+        setRuntimeValue(playerStats.name, 'pendingSuddenStrike', true, campaignName);
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: action.automation.type,
+                description: `Sudden Strike enabled. Make a bonus action attack against a different creature within 5 ft of ${targetName}.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    // Handle mass_fear: apply Frightened condition via targetEffects
+    if (option.effect === 'mass_fear') {
+        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+        const newEffect = {
+            target: targetName,
+            source: action.name,
+            option: option.name,
+            effect: 'mass_fear',
+            saveType: option.saveType || 'WIS',
+            saveDc: option.saveDc || 'ability',
+            saveAbility: option.saveAbility || 'WIS',
+            condition: option.condition || 'frightened',
+            duration: option.duration || 'until_start_of_next_turn',
+            range: option.range || '10_ft',
+            noOpportunityAttacks: option.noOpportunityAttacks || false,
+        };
+        const updatedEffects = [...storedEffects, newEffect];
+        setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: action.automation.type,
+                description: `Mass Fear applied to ${targetName}. Target and creatures within 10 ft must make a Wisdom save or be Frightened until the start of your next turn.`,
+                automation: action.automation,
+            },
+        };
+    }
+
+    // Default: apply standard rider effect
     const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
     const newEffect = {
         target: targetName,
@@ -106,10 +198,43 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
         effect: option.effect,
         value: option.value || null,
         noOpportunityAttacks: option.noOpportunityAttacks || false,
-        duration: 'until_start_of_next_turn',
+        duration: option.duration || 'until_start_of_next_turn',
+        saveType: option.saveType || null,
+        saveDc: option.saveDc || null,
+        saveAbility: option.saveAbility || null,
+        condition: option.condition || null,
+        repeatingSave: !!option.repeatingSave,
+        requires: option.requires || null,
+        sizeLimit: option.sizeLimit || null,
+        movement: option.movement || null,
+        cost: option.cost || null,
+        ignoreResistance: !!option.ignoreResistance,
+        restoreCost: option.restoreCost || null,
     };
     const updatedEffects = [...storedEffects, newEffect];
     setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+
+    // Build description for Cunning Strike options
+    let desc = `${option.name} applied to ${targetName}`;
+    if (option.effect === 'poisoned') {
+        desc += ' — target must make a Constitution save or be Poisoned for 1 minute (repeats save at end of each turn)';
+    } else if (option.effect === 'prone') {
+        desc += ' — target must make a Dexterity save or gain the Prone condition';
+    } else if (option.effect === 'no_opportunity_attacks' && option.movement) {
+        desc += ' — move up to half Speed without provoking Opportunity Attacks';
+    } else if (option.effect === 'daze') {
+        desc += ' — target must make a Constitution save or on next turn can only do one of: move, action, or Bonus Action';
+    } else if (option.effect === 'unconscious') {
+        desc += ' — target must make a Constitution save or be Unconscious for 1 minute (repeats save at end of each turn)';
+    } else if (option.effect === 'blinded') {
+        desc += ' — target must make a Dexterity save or be Blinded until end of its next turn';
+    } else if (option.noOpportunityAttacks) {
+        desc += ' — target cannot make Opportunity Attacks until the start of your next turn';
+    } else if (option.effect === 'disadvantage_on_next_save') {
+        desc += ' — target has Disadvantage on the next saving throw it makes';
+    } else if (option.effect === 'next_attack_advantage') {
+        desc += ` — the next attack against ${targetName} gains +${option.value || '5'}`;
+    }
 
     return {
         type: 'popup',
@@ -117,8 +242,81 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
             type: 'automation_info',
             name: action.name,
             automationType: action.automation.type,
-            description: `${option.name} applied to ${targetName}${option.noOpportunityAttacks ? ' — target cannot make Opportunity Attacks until the start of your next turn.' : ''}${option.effect === 'disadvantage_on_next_save' ? ' — target has Disadvantage on the next saving throw it makes.' : ''}${option.effect === 'next_attack_advantage' ? ` — the next attack against ${targetName} gains +${option.value || '5'}.` : ''}`,
+            description: desc,
             automation: action.automation,
         },
     };
+}
+
+/**
+ * Validate a Cunning Strike option before applying it.
+ * Checks prerequisites (e.g., Poisoner's Kit) and size limits.
+ */
+function validateCunningStrikeOption(option, targetName, playerStats) {
+    // Check tool requirements (e.g., Poisoner's Kit for Poison option)
+    if (option.requires) {
+        const toolProficiencies = playerStats?.toolProficiencies || [];
+        const hasTool = toolProficiencies.some(p =>
+            p.toLowerCase().includes(option.requires.toLowerCase())
+        );
+        if (!hasTool) {
+            return {
+                valid: false,
+                reason: `Requires ${option.requires} which the character does not have proficiency in.`,
+            };
+        }
+    }
+
+    // Check size limit for Trip (Large or smaller)
+    if (option.sizeLimit === 'large_or_smaller' && targetName) {
+        const combatContext = getCombatContextSync(targetName);
+        if (combatContext) {
+            const sizeOrder = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
+            const targetSizeIndex = sizeOrder.indexOf(combatContext.size);
+            if (targetSizeIndex !== -1 && targetSizeIndex > sizeOrder.indexOf('Large')) {
+                return {
+                    valid: false,
+                    reason: `Target is ${combatContext.size} (too large for Trip — only Large or smaller affected).`,
+                };
+            }
+        }
+        // If we can't determine size from combat context, allow it (default assumption: target is valid size)
+    }
+
+    return { valid: true };
+}
+
+/**
+ * Synchronous helper to get target info from combat context.
+ * Uses the same logic as getTargetFromAttacker but synchronously.
+ */
+function getCombatContextSync(targetName) {
+    try {
+        const stored = localStorage.getItem(`combatContext`);
+        if (!stored) return null;
+        const cs = JSON.parse(stored);
+        if (!cs?.creatures) return null;
+        return cs.creatures.find(c => c.name === targetName) || null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Apply Cunning Strike cost by deducting Sneak Attack dice.
+ * The cost is specified as "Nd6" meaning N d6 dice to forgo.
+ * We track this in runtime state so the damage computation can account for it.
+ */
+async function applyCunningStrikeCost(playerStats, campaignName, costD6) {
+    // Track the Cunning Strike cost for this turn
+    const key = '_cunningStrikeCostUsed';
+    const currentCost = Number(getRuntimeValue(playerStats.name, key, campaignName) ?? 0);
+    await setRuntimeValue(playerStats.name, key, currentCost + costD6, campaignName);
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: 'Cunning Strike',
+        description: `Forgoing ${costD6}d6 Sneak Attack damage dice for Cunning Strike cost.`,
+    }).catch(() => {});
 }

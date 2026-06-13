@@ -40,6 +40,32 @@ function is2024(playerStats, playerSummary) {
     return getRulesType(playerStats, playerSummary) === '2024';
 }
 
+/**
+ * Apply Umbral Sight darkvision enhancement for Gloom Stalkers.
+ * Adds 60 feet to existing Darkvision range, or sets Darkvision to 60ft if not present.
+ */
+function applyUmbralSightDarkvision(playerStats, senses) {
+    const isGloomStalker = playerStats.class?.major?.name === 'Stalker';
+    if (!isGloomStalker) return senses;
+
+    const darkvisionIndex = senses.findIndex(s => s.name === 'Darkvision');
+    const extractDarkvisionFeet = (value) => {
+        if (!value) return 0;
+        const match = String(value).match(/(\d+)\s*ft/i);
+        return match ? parseInt(match[1], 10) : 0;
+    };
+
+    if (darkvisionIndex !== -1) {
+        const currentFeet = extractDarkvisionFeet(senses[darkvisionIndex].value);
+        const newFeet = currentFeet + 60;
+        senses[darkvisionIndex] = { ...senses[darkvisionIndex], value: `${newFeet} ft.` };
+    } else {
+        senses.push({ name: 'Darkvision', value: '60 ft.' });
+    }
+
+    return senses;
+}
+
 const rules = {
      // === SHARED METHODS (identical in both rulesets) ===
 
@@ -447,7 +473,7 @@ const rules = {
         playerStats.automationConditionImmunities = getConditionImmunities(allFeatures);
         playerStats.automationConditionalImmunities = getConditionalImmunities(allFeatures);
         playerStats.turnStartEffects = collectTurnStartEffects(allFeatures);
-        playerStats.saveProficiencies = getAllSaveProficiencies(allFeatures);
+        playerStats.saveProficiencies = getAllSaveProficiencies(allFeatures, playerStats);
           [playerStats.languagesAllowed, playerStats.languages] = rules.getLanguages(playerStats, playerSummary);
           [playerStats.proficienciesAllowed, playerStats.proficiencies] = rules.getProficiencies(playerStats, false, playerSummary);
           [playerStats.skillProficienciesAllowed, playerStats.skillProficiencies] = rules.getProficiencies(playerStats, true, playerSummary);
@@ -483,9 +509,37 @@ const rules = {
         );
          [playerStats.armorClass, playerStats.armorClassFormula] = rules.getArmorClass(allEquipment, playerStats, playerSummary);
         playerStats.spellAbilities = rules.getSpellAbilities(allSpells, playerStats, playerSummary);
-        playerStats.attacks = rules.getAttacks(allEquipment, allSpells, playerStats, playerSummary);
+         playerStats.attacks = rules.getAttacks(allEquipment, allSpells, playerStats, playerSummary);
 
-         // Apply feat features to special actions
+          // Add Hunter's Prey: Horde Breaker bonus action attack if the player has the Hunter class
+          // The actual choice (Colossus Slayer vs Horde Breaker) is checked at runtime in CharActions.jsx
+          const hasHunterPrey = (playerStats.automation?.passives || []).some(
+              p => p.type === 'hunter_prey' && p.name === "Hunter's Prey"
+          );
+          if (hasHunterPrey) {
+              const rangerFeatures = cr.getRangerFeatures(playerStats);
+              if (rangerFeatures.extraAttacks > 0) {
+                  // Build a proper melee attack entry for Horde Breaker bonus action
+                  const dex = playerStats.abilities.find(a => a.name === 'Dexterity');
+                  const str = playerStats.abilities.find(a => a.name === 'Strength');
+                  const abilityBonus = Math.max(str?.bonus || 0, dex?.bonus || 0);
+                  const abilityName = str?.bonus >= dex?.bonus ? 'Strength' : 'Dexterity';
+                  const prof = playerStats.proficiency || 0;
+                  playerStats.attacks.push({
+                      name: "Horde Breaker",
+                      damage: `1d4`,
+                      damageType: 'Slashing',
+                      hitBonus: abilityBonus + prof,
+                      hitBonusFormula: `To Hit Bonus = ${abilityName} Bonus (${abilityBonus}) + Proficiency (${prof})`,
+                      range: 5,
+                      type: 'Bonus Action',
+                      weaponType: 'melee',
+                      isHordeBreaker: true,
+                  });
+              }
+          }
+
+          // Apply feat features to special actions
         const existingActionNames = new Set(
             (playerStats.specialActions || []).map(a => a.name)
         );
@@ -503,13 +557,15 @@ const rules = {
         });
 
          // 2024-specific: senses set later (override), 5e-specific: immunities/resistances
-        if (is2024(playerStats, playerSummary)) {
-            playerStats.senses = rr.getSenses(playerStats);
-         } else {
-            playerStats.immunities = rr.getImmunities(playerSummary);
-            playerStats.resistances = rr.getResistances(playerSummary);
-            playerStats.senses = rr.getSenses(playerStats);
-         }
+         if (is2024(playerStats, playerSummary)) {
+             playerStats.senses = rr.getSenses(playerStats);
+             // Apply Umbral Sight darkvision enhancement for Gloom Stalkers
+             playerStats.senses = applyUmbralSightDarkvision(playerStats, playerStats.senses);
+          } else {
+             playerStats.immunities = rr.getImmunities(playerSummary);
+             playerStats.resistances = rr.getResistances(playerSummary);
+             playerStats.senses = rr.getSenses(playerStats);
+          }
 
         return playerStats;
      }

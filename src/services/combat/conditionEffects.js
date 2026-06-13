@@ -131,6 +131,12 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     riderNoReactions: false,
     pushEffect: false,
     pushDistance: null,
+    saveType: null,
+    saveDc: null,
+    saveAbility: null,
+    conditionToApply: null,
+    conditionDuration: null,
+    repeatingSave: false,
    }
 
   const conditionSet = new Set(conditions)
@@ -235,13 +241,21 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
         break
 
        case 'unconscious':
-        effects.cannotAct = true
-        effects.speedZero = true
-        effects.targetAdvantageCount++
-        effects.autoFailSaves.push('str', 'dex')
-        effects.autoCritWithin5ft = true
-        break
-      }
+         effects.cannotAct = true
+         effects.speedZero = true
+         effects.targetAdvantageCount++
+         effects.autoFailSaves.push('str', 'dex')
+         effects.autoCritWithin5ft = true
+         break
+
+       case 'dazed':
+         // Dazed: on next turn can only do one of: move OR action OR Bonus Action
+         // We represent this as partial incapacitation — no attack advantage for target,
+         // but the creature can still move. The UI will enforce the restriction.
+         effects.dazed = true
+         effects.targetAdvantageCount++
+         break
+       }
     }
 
   for (const te of targetEffects) {
@@ -257,6 +271,12 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     }
     if (te.effect === 'disadvantage_perception_checks') {
       effects.abilityCheckDisadvantage = true;
+    }
+    if (te.effect === 'escape_the_horde') {
+      effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
+    }
+    if (te.effect === 'multiattack_defense') {
+      effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
     }
     if (te.noOpportunityAttacks) {
       effects.riderCannotOpportunityAttack = true;
@@ -279,6 +299,28 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
         effects.pushDistance = te.value || 10;
       }
       effects.proneEffect = true;
+    }
+    // Handle Cunning Strike and similar save-based condition effects
+    if (te.saveType && te.condition) {
+      effects.saveType = te.saveType;
+      effects.saveDc = te.saveDc;
+      effects.saveAbility = te.saveAbility;
+      effects.conditionToApply = te.condition;
+      effects.conditionDuration = te.duration || 'until_start_of_next_turn';
+      effects.repeatingSave = !!te.repeatingSave;
+    }
+    // Handle mass_fear effect
+    if (te.effect === 'mass_fear') {
+      effects.saveType = te.saveType || 'WIS';
+      effects.saveDc = te.saveDc;
+      effects.saveAbility = te.saveAbility;
+      effects.conditionToApply = te.condition || 'frightened';
+      effects.conditionDuration = te.duration || 'until_start_of_next_turn';
+      effects.massFearRange = te.range || '10_ft';
+    }
+    // Handle direct condition application (no save required, e.g., Withdraw noOAs)
+    if (te.effect === 'no_opportunity_attacks' && !te.saveType) {
+      effects.riderCannotOpportunityAttack = true;
     }
   }
 

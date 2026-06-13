@@ -575,4 +575,48 @@ describe('abilityCalc2024', () => {
       expect(() => getHitPoints(playerStats)).toThrow();
     });
   });
+
+  describe('save proficiency merging', () => {
+    it('should merge class saves with feature saves', async () => {
+      const playerStats = {
+        level: 7,
+        abilities: [
+          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Constitution', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Wisdom', baseScore: 16, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
+        ],
+        class: {
+          saving_throw_proficiencies: ['Dexterity', 'Intelligence'],
+        },
+        saveProficiencies: ['Wisdom'],
+        skillProficiencies: [],
+        expertise: [],
+      };
+
+      const result = await getAbilities(playerStats);
+
+      // Dexterity: class save proficient
+      const dex = result.find(a => a.name === 'Dexterity');
+      expect(dex.proficient).toBe(true);
+      expect(dex.save).toBe(5); // +2 bonus + 3 proficiency (level 7)
+
+      // Intelligence: class save proficient
+      const int = result.find(a => a.name === 'Intelligence');
+      expect(int.proficient).toBe(true);
+      expect(int.save).toBe(3); // +0 bonus + 3 proficiency (level 7)
+
+      // Wisdom: feature save proficient (Iron Mind)
+      const wis = result.find(a => a.name === 'Wisdom');
+      expect(wis.proficient).toBe(true);
+      expect(wis.save).toBe(6); // +3 bonus + 3 proficiency (level 7)
+
+      // Strength: not proficient
+      const str = result.find(a => a.name === 'Strength');
+      expect(str.proficient).toBe(false);
+      expect(str.save).toBe(0);
+    });
+  });
 });

@@ -8730,7 +8730,16 @@
                         "name": "Cunning Action",
                         "level": 2,
                         "prerequisites": [],
-                        "description": "Your quick thinking and agility allow you to move and act quickly. You can take a bonus action on each of your turns in combat. This action can be used only to take the Dash, Disengage, or Hide action."
+                        "description": "Your quick thinking and agility allow you to move and act quickly. You can take a bonus action on each of your turns in combat. This action can be used only to take the Dash, Disengage, or Hide action.",
+                        "automation": {
+                            "type": "bonus_action_choice",
+                            "options": [
+                                { "name": "Dash", "description": "Double your movement speed until the end of the turn" },
+                                { "name": "Disengage", "description": "Your movement doesn't provoke opportunity attacks until the end of the turn" },
+                                { "name": "Hide", "description": "Attempt to hide from creatures until the end of the turn" }
+                            ],
+                            "casting_time": "1 bonus action"
+                        }
                     }
                 ],
                 "class_specific": {

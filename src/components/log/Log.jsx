@@ -115,6 +115,11 @@ function RollEntry({ entry }) {
         {entry.resistanceNotice && (
           <div className="log-resistance-notice">{entry.resistanceNotice}</div>
         )}
+        {entry.hunterLoreNotice && (
+          <div className="log-hunter-lore-notice">
+            <i className="fa-solid fa-eye"></i> {entry.hunterLoreNotice}
+          </div>
+        )}
       </div>
     </div>
   );

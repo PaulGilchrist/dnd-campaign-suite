@@ -106,7 +106,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
         selectedWallsRef, selectedItemsRef, selectStart, moveStartGrid,
         placedItemsRef, mapDataRef,
         handleSelectPointerDown, handleSelectPointerMove, handleSelectPointerUp,
-    } = useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef });
+    } = useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignName });
 
     const {
         rulerMode, setRulerMode,
@@ -174,11 +174,11 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     }, [handleMapSSEEvent, handleSpellOverlayEvent]);
 
     const { dragging, handlePointerDown, handlePointerMove, handlePointerUp } = usePlayerDragging({
-        svgRef, mapData, gridSize, panX, panY, setMapData, gridCenterX, gridCenterY, rulerMode, spellMode,
+        svgRef, mapData, gridSize, panX, panY, setMapData, gridCenterX, gridCenterY, rulerMode, spellMode, campaignName,
     });
 
     const { itemDragging, handleItemPointerDown, handleItemPointerMove, handleItemPointerUp: handleItemPointerUpHook, handleItemPointerLeave } = useItemDragging({
-        svgRef, placedItems, setPlacedItems, gridSize, gridCenterX, gridCenterY, rulerMode, spellMode,
+        svgRef, placedItems, setPlacedItems, gridSize, gridCenterX, gridCenterY, rulerMode, spellMode, campaignName,
     });
 
     const fog = useFogOfWar(mapData?.players, mapData?.walls, placedItems, gridSize);

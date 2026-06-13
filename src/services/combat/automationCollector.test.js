@@ -897,4 +897,21 @@ describe('collectTurnStartEffects', () => {
         expect(result[0].name).toBe('Elder Champion')
         expect(result[0].healExpression).toBe('10')
     })
+
+    it('collects umbral_sight turn start effect', () => {
+        const features = [
+            {
+                name: 'Umbral Sight',
+                automation: {
+                    type: 'passive_rule',
+                    effect: 'umbral_sight',
+                    casting_time: 'passive'
+                }
+            }
+        ]
+        const result = collectTurnStartEffects(features)
+        expect(result).toHaveLength(1)
+        expect(result[0].type).toBe('umbral_sight')
+        expect(result[0].name).toBe('Umbral Sight')
+    })
 })

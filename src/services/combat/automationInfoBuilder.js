@@ -616,6 +616,16 @@ function buildAttackInfo(feature, playerStats) {
             }
         }
 
+        case 'save_proficiency': {
+            return {
+                type: 'save_proficiency',
+                name: feature.name,
+                saveType: auto.saveType || '',
+                fallbackTypes: auto.fallbackTypes || [],
+                hasAutomation: true
+            }
+        }
+
         case 'passive_rule': {
             return {
                 type: 'passive_rule',
@@ -1327,6 +1337,16 @@ function buildAttackInfo(feature, playerStats) {
             };
         }
 
+        case 'umbral_sight': {
+            return {
+                type: 'passive_rule',
+                name: feature.name,
+                effect: 'umbral_sight',
+                casting_time: auto.casting_time || 'passive',
+                hasAutomation: true
+            };
+        }
+
         case 'relentless_avenger': {
             return {
                 type: 'relentless_avenger',
@@ -1461,6 +1481,73 @@ function buildAttackInfo(feature, playerStats) {
                 range: auto.range || '120_ft',
                 casting_time: auto.casting_time || '1 reaction',
                 target: auto.target || 'different_creature',
+                hasAutomation: true
+            };
+        }
+
+        case 'shadowy_dodge': {
+            return {
+                type: 'shadowy_dodge',
+                name: feature.name,
+                range: auto.range || '30_ft',
+                casting_time: auto.casting_time || '1 reaction',
+                hasAutomation: true
+            };
+        }
+
+        case 'hunter_prey': {
+            return {
+                type: 'hunter_prey',
+                name: feature.name,
+                casting_time: auto.casting_time || 'passive',
+                hasAutomation: true
+            };
+        }
+
+        case 'defensive_tactics': {
+            return {
+                type: 'defensive_tactics',
+                name: feature.name,
+                casting_time: auto.casting_time || 'passive',
+                hasAutomation: true
+            };
+        }
+
+        case 'superior_hunter_prey': {
+            return {
+                type: 'superior_hunter_prey',
+                name: feature.name,
+                casting_time: auto.casting_time || 'passive',
+                hasAutomation: true
+            };
+        }
+
+        case 'superior_hunter_defense': {
+            return {
+                type: 'superior_hunter_defense',
+                name: feature.name,
+                casting_time: auto.casting_time || '1 reaction',
+                hasAutomation: true
+            };
+        }
+
+        case 'bonus_action_choice': {
+            return {
+                type: 'bonus_action_choice',
+                name: feature.name,
+                options: auto.options || [],
+                action: auto.action || 'bonus_action',
+                casting_time: auto.casting_time || '1 bonus action',
+                hasAutomation: true
+            };
+        }
+
+        case 'steady_aim': {
+            return {
+                type: 'steady_aim',
+                name: feature.name,
+                duration: auto.duration || 'until_end_of_turn',
+                casting_time: auto.casting_time || '1 bonus action',
                 hasAutomation: true
             };
         }

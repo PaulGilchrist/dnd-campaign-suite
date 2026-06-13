@@ -824,4 +824,89 @@ describe('rules', () => {
       });
     });
   });
+
+  describe('applyUmbralSightDarkvision', () => {
+    it('should not add darkvision when Gloom Stalker has no existing darkvision (mock returns string array)', async () => {
+      const playerSummary = {
+        name: 'Test',
+        level: 3,
+        rules: '2024',
+        class: { name: 'Ranger', major: { name: 'Stalker' } },
+        race: { name: 'Human' },
+        abilities: [
+          { name: 'Wisdom', bonus: 2, skills: [{ name: 'Perception', bonus: 4 }] }
+        ],
+        inventory: { equipped: [], magicItems: [] },
+        skillProficiencies: [],
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: []
+      };
+
+      const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+      // Mock returns string format, so Umbral Sight won't find an object to enhance
+      expect(result.senses).toEqual(['Darkvision 60 ft.']);
+    });
+
+    it('should add 60ft to existing Darkvision for Gloom Stalker (object format)', async () => {
+      raceRules2024.getSenses.mockReturnValue([{ name: 'Darkvision', value: '60 ft.' }]);
+      classRules2024.getClass.mockReturnValue({
+        name: 'Ranger',
+        hit_die: 10,
+        saving_throws: ['Strength', 'Dexterity'],
+        class_levels: [{ level: 3, features: [] }],
+        major: { name: 'Stalker', features: [] }
+      });
+      const playerSummary = {
+        name: 'Test',
+        level: 3,
+        rules: '2024',
+        class: { name: 'Ranger', major: { name: 'Stalker' } },
+        race: { name: 'Human' },
+        abilities: [
+          { name: 'Wisdom', bonus: 2, skills: [{ name: 'Perception', bonus: 4 }] }
+        ],
+        inventory: { equipped: [], magicItems: [] },
+        skillProficiencies: [],
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: []
+      };
+
+      const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+      expect(result.senses).toContainEqual({ name: 'Darkvision', value: '120 ft.' });
+    });
+
+    it('should not modify darkvision for non-Gloom Stalkers', async () => {
+      raceRules2024.getSenses.mockReturnValue([{ name: 'Darkvision', value: '60 ft.' }]);
+      classRules2024.getClass.mockReturnValue({
+        name: 'Ranger',
+        hit_die: 10,
+        saving_throws: ['Strength', 'Dexterity'],
+        class_levels: [{ level: 3, features: [] }],
+        major: { name: 'Hunter', features: [] }
+      });
+      const playerSummary = {
+        name: 'Test',
+        level: 3,
+        rules: '2024',
+        class: { name: 'Ranger', major: { name: 'Hunter' } },
+        race: { name: 'Human' },
+        abilities: [
+          { name: 'Wisdom', bonus: 2, skills: [{ name: 'Perception', bonus: 4 }] }
+        ],
+        inventory: { equipped: [], magicItems: [] },
+        skillProficiencies: [],
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: []
+      };
+
+      const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
+      expect(result.senses).toContainEqual({ name: 'Darkvision', value: '60 ft.' });
+    });
+  });
 });

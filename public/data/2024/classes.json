@@ -8092,22 +8092,65 @@
                     {
                         "name": "Umbral Sight",
                         "description": "Darkvision 60 feet (or +60 feet if already have). While entirely in Darkness, have Invisible condition to any creature that relies on Darkvision.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "umbral_sight",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Iron Mind",
                         "description": "Proficiency in Wisdom saving throws (or Intelligence or Charisma if already have).",
-                        "level": 7
+                        "level": 7,
+                        "automation": {
+                            "type": "save_proficiency",
+                            "saveType": "Wisdom",
+                            "fallbackTypes": ["Intelligence", "Charisma"],
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Stalker's Flurry",
                         "description": "Dreadful Strike Psychic damage becomes 2d8. When using Dreadful Strike, can cause: Sudden Strike (make another attack against different creature within 5 feet of original target), or Mass Fear (target + creatures within 10 feet make Wisdom save or be Frightened until start of next turn).",
-                        "level": 11
+                        "level": 11,
+                        "automation": {
+                            "type": "attack_rider",
+                            "trigger": "weapon_attack_hit",
+                            "oncePerTurn": true,
+                            "chooseOne": true,
+                            "maxEffects": 1,
+                            "options": [
+                                {
+                                    "name": "Sudden Strike",
+                                    "effect": "sudden_strike",
+                                    "range": "5_ft"
+                                },
+                                {
+                                    "name": "Mass Fear",
+                                    "effect": "mass_fear",
+                                    "saveType": "WIS",
+                                    "saveDc": "spell_save_dc",
+                                    "saveAbility": "WIS",
+                                    "condition": "frightened",
+                                    "duration": "until_start_of_next_turn",
+                                    "range": "10_ft"
+                                }
+                            ],
+                            "casting_time": "passive",
+                            "upgrades": "Dread Ambush"
+                        }
                     },
                     {
                         "name": "Shadowy Dodge",
                         "description": "When a creature makes an attack roll against you, take Reaction to impose Disadvantage. Whether hit or miss, teleport up to 30 feet to unoccupied space you can see.",
-                        "level": 15
+                        "level": 15,
+                        "automation": {
+                            "type": "shadowy_dodge",
+                            "trigger": "after_attack_roll_against_you",
+                            "range": "30_ft",
+                            "casting_time": "1 reaction"
+                        }
                     }
                 ],
                 "spells": [
@@ -8141,27 +8184,48 @@
                     {
                         "name": "Hunter's Lore",
                         "description": "While a creature is marked by Hunter's Mark, know whether it has Immunities, Resistances, or Vulnerabilities.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "hunter_lore",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Hunter's Prey",
                         "description": "Choose one, can replace on Short/Long Rest: Colossus Slayer (extra 1d8 damage to creature missing HP, once per turn), or Horde Breaker (once per turn, make another attack with same weapon against different creature within 5 feet of original target and within weapon's range).",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "hunter_prey",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Defensive Tactics",
                         "description": "Choose one, can replace on Short/Long Rest: Escape the Horde (Opportunity Attacks have Disadvantage against you), or Multiattack Defense (when a creature hits you with an attack roll, that creature has Disadvantage on all other attack rolls against you this turn).",
-                        "level": 7
+                        "level": 7,
+                        "automation": {
+                            "type": "defensive_tactics",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Superior Hunter's Prey",
                         "description": "Once per turn when you deal damage to a creature marked by Hunter's Mark, also deal that spell's extra damage to a different creature within 30 feet of the first creature.",
-                        "level": 11
+                        "level": 11,
+                        "automation": {
+                            "type": "superior_hunter_prey",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Superior Hunter's Defense",
                         "description": "When you take damage, take Reaction to give yourself Resistance to that damage and any other damage of the same type until end of current turn.",
-                        "level": 15
+                        "level": 15,
+                        "automation": {
+                            "type": "superior_hunter_defense",
+                            "casting_time": "1 reaction"
+                        }
                     }
                 ],
                 "spells": []
@@ -8217,7 +8281,27 @@
                         "name": "Sneak Attack",
                         "description": "You know how to strike subtly and exploit a foe's distraction. Once per turn, you can deal an extra 1d6 damage to one creature you hit with an attack roll if you have Advantage on the roll and the attack uses a Finesse or a Ranged weapon. The extra damage's type is the same as the weapon's type. You don't need Advantage on the attack roll if at least one of your allies is within 5 feet of the target, the ally doesn't have the Incapacitated condition, and you don't have Disadvantage on the attack roll. The extra damage increases as you gain Rogue levels.",
                         "level": 1,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "attack_rider",
+                            "damageExpression": "1d6",
+                            "damageType": "same_as_weapon",
+                            "oncePerTurn": true,
+                            "chooseOne": false,
+                            "maxEffects": 1,
+                            "scaling": {
+                                "3": "2d6",
+                                "5": "3d6",
+                                "7": "4d6",
+                                "9": "5d6",
+                                "11": "6d6",
+                                "13": "7d6",
+                                "15": "8d6",
+                                "17": "9d6",
+                                "19": "10d6"
+                            },
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Thieves' Cant",
@@ -8258,7 +8342,16 @@
                         "name": "Cunning Action",
                         "description": "On your turn, you can take one of the following actions as a Bonus Action: Dash, Disengage, or Hide.",
                         "level": 2,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "bonus_action_choice",
+                            "options": [
+                                { "name": "Dash", "description": "Double your movement speed until the end of the turn" },
+                                { "name": "Disengage", "description": "Your movement doesn't provoke opportunity attacks until the end of the turn" },
+                                { "name": "Hide", "description": "Attempt to hide from creatures until the end of the turn" }
+                            ],
+                            "casting_time": "1 bonus action"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -8287,7 +8380,11 @@
                         "name": "Steady Aim",
                         "description": "As a Bonus Action, you give yourself Advantage on your next attack roll on the current turn. You can use this feature only if you haven't moved during this turn, and after you use it, your Speed is 0 until the end of the current turn.",
                         "level": 3,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "steady_aim",
+                            "duration": "until_end_of_turn"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -8343,7 +8440,45 @@
                         "name": "Cunning Strike",
                         "description": "When you deal Sneak Attack damage, you can add one of the following Cunning Strike effects (each has a die cost - number of Sneak Attack damage dice you must forgo): Poison (Cost: 1d6). Add toxin, target makes Constitution save or has Poisoned condition for 1 minute (repeats save each turn). Must have Poisoner's Kit. Trip (Cost: 1d6). Large or smaller target makes Dexterity save or has Prone condition. Withdraw (Cost: 1d6). Immediately after attack, move up to half Speed without provoking Opportunity Attacks.",
                         "level": 5,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "attack_rider",
+                            "oncePerTurn": true,
+                            "chooseOne": true,
+                            "maxEffects": 1,
+                            "options": [
+                                {
+                                    "name": "Poison",
+                                    "cost": "1d6",
+                                    "effect": "poison",
+                                    "saveType": "CON",
+                                    "saveDc": "ability",
+                                    "saveAbility": "DEX",
+                                    "condition": "poisoned",
+                                    "duration": "1_minute",
+                                    "repeatingSave": true,
+                                    "requires": "Poisoner's Kit"
+                                },
+                                {
+                                    "name": "Trip",
+                                    "cost": "1d6",
+                                    "effect": "prone",
+                                    "saveType": "DEX",
+                                    "saveDc": "ability",
+                                    "saveAbility": "DEX",
+                                    "condition": "prone",
+                                    "sizeLimit": "large_or_smaller"
+                                },
+                                {
+                                    "name": "Withdraw",
+                                    "cost": "1d6",
+                                    "effect": "no_opportunity_attacks",
+                                    "movement": "half_speed",
+                                    "noOAs": true
+                                }
+                            ],
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Uncanny Dodge",
@@ -8533,7 +8668,14 @@
                         "name": "Improved Cunning Strike",
                         "description": "You can use up to two Cunning Strike effects when you deal Sneak Attack damage, paying the die cost for each effect.",
                         "level": 11,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "attack_rider",
+                            "oncePerTurn": true,
+                            "chooseOne": true,
+                            "maxEffects": 2,
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -8617,7 +8759,46 @@
                         "name": "Devious Strikes",
                         "description": "New Cunning Strike options: Daze (Cost: 2d6). Target makes Constitution save or on next turn can only do one of: move or take action or Bonus Action. Knock Out (Cost: 6d6). Target makes Constitution save or has Unconscious condition for 1 minute (repeats save at end of each turn). Obscure (Cost: 3d6). Target makes Dexterity save or has Blinded condition until end of its next turn.",
                         "level": 14,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "attack_rider",
+                            "oncePerTurn": true,
+                            "chooseOne": true,
+                            "maxEffects": 2,
+                            "options": [
+                                {
+                                    "name": "Daze",
+                                    "cost": "2d6",
+                                    "effect": "daze",
+                                    "saveType": "CON",
+                                    "saveDc": "ability",
+                                    "saveAbility": "DEX",
+                                    "condition": "dazed"
+                                },
+                                {
+                                    "name": "Knock Out",
+                                    "cost": "6d6",
+                                    "effect": "unconscious",
+                                    "saveType": "CON",
+                                    "saveDc": "ability",
+                                    "saveAbility": "DEX",
+                                    "condition": "unconscious",
+                                    "duration": "1_minute",
+                                    "repeatingSave": true
+                                },
+                                {
+                                    "name": "Obscure",
+                                    "cost": "3d6",
+                                    "effect": "blinded",
+                                    "saveType": "DEX",
+                                    "saveDc": "ability",
+                                    "saveAbility": "DEX",
+                                    "condition": "blinded",
+                                    "duration": "until_end_of_next_turn"
+                                }
+                            ],
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -8860,7 +9041,15 @@
                     {
                         "name": "Assassinate",
                         "description": "Initiative: Advantage on Initiative rolls. Surprising Strikes: During first round of each combat, Advantage on attack rolls against any creature that hasn't taken a turn. If Sneak Attack hits any target during that round, target takes extra damage equal to your Rogue level.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "damage_bonus",
+                            "trigger": "first_round_sneak_attack_hit",
+                            "damageExpression": "rogue_level",
+                            "damageType": "Sneak Attack",
+                            "oncePerTurn": false,
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Assassin's Tools",
@@ -8870,17 +9059,41 @@
                     {
                         "name": "Infiltration Expertise",
                         "description": "Masterful Mimicry: unerringly mimic another person's speech, handwriting, or both if studied for 1 hour. Roving Aim: Speed not reduced to 0 by Steady Aim.",
-                        "level": 9
+                        "level": 9,
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "roving_aim"
+                        }
                     },
                     {
                         "name": "Envenom Weapons",
                         "description": "When using Poison option of Cunning Strike, target also takes 2d6 Poison damage on failed save. This damage ignores Resistance to Poison damage.",
-                        "level": 13
+                        "level": 13,
+                        "automation": {
+                            "type": "damage_bonus",
+                            "trigger": "cunning_strike_poison_save_fail",
+                            "damageExpression": "2d6",
+                            "damageType": "Poison",
+                            "oncePerTurn": false,
+                            "ignoreResistance": true,
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Death Strike",
                         "description": "When you hit with Sneak Attack on first round of combat, target makes Constitution save (DC 8 + Dex mod + Prof Bonus) or attack's damage is doubled.",
-                        "level": 17
+                        "level": 17,
+                        "automation": {
+                            "type": "attack_rider",
+                            "oncePerTurn": false,
+                            "chooseOne": false,
+                            "maxEffects": 1,
+                            "saveType": "CON",
+                            "saveDc": "ability",
+                            "saveAbility": "DEX",
+                            "trigger": "first_round_sneak_attack_hit",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spells": [],
@@ -8917,7 +9130,24 @@
                     {
                         "name": "Rend Mind",
                         "description": "When you use Psychic Blades to deal Sneak Attack damage, force target to make Wisdom save (DC 8 + Dex mod + Prof Bonus). On fail, target has Stunned condition for 1 minute (repeats save at end of each turn). Once per Long Rest (or expend 3 Psionic Energy Dice to restore).",
-                        "level": 17
+                        "level": 17,
+                        "automation": {
+                            "type": "attack_rider",
+                            "oncePerTurn": false,
+                            "chooseOne": false,
+                            "maxEffects": 1,
+                            "saveType": "WIS",
+                            "saveDc": "ability",
+                            "saveAbility": "DEX",
+                            "condition": "stunned",
+                            "duration": "1_minute",
+                            "repeatingSave": true,
+                            "trigger": "psychic_blade_sneak_attack_hit",
+                            "uses": "1",
+                            "recharge": "long_rest",
+                            "restoreCost": "3_psionic_energy",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spells": []

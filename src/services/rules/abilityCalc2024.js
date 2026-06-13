@@ -18,7 +18,7 @@ export async function getAbilities(playerStats) {
         newAbility.bonus = Math.floor((newAbility.totalScore - 10) / 2);
         const classSaves = playerStats.class.saving_throw_proficiencies || [];
         const featureSaves = playerStats.saveProficiencies || [];
-        const allSaveProfs = featureSaves.length > 0 ? featureSaves : classSaves;
+        const allSaveProfs = [...new Set([...classSaves, ...featureSaves])];
         newAbility.proficient = allSaveProfs.includes(newAbility.name);
         newAbility.save = newAbility.proficient ? newAbility.bonus + proficiency : newAbility.bonus;
         newAbility.skills = skills.filter(skill => skill.ability === newAbility.name);
