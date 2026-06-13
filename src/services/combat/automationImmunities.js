@@ -8,6 +8,9 @@ export function getConditionImmunities(features) {
         for (const auto of automations) {
             if (auto.type === 'passive_immunity') {
                 immunities.push(auto.conditionImmunity)
+                if (auto.damageResistance && auto.damageResistance.length > 0) {
+                    immunities.push(...auto.damageResistance.map(d => `damage:${d}`))
+                }
             }
             if (auto.type === 'condition_immunity_while_active') {
                 immunities.push(...auto.immunities)
@@ -62,6 +65,13 @@ export function playerIsImmuneToCondition({
                 const tokens = immunityStr.split(/[\s,]+/).filter(Boolean)
                 if (tokens.some(t => t === lowerCondition || immunityStr.includes(lowerCondition))) {
                     return true
+                }
+
+                if (auto.damageResistance && auto.damageResistance.length > 0) {
+                    const lowerDamage = lowerCondition.replace(/^damage:/, '')
+                    if (lowerDamage && auto.damageResistance.some(d => d.toLowerCase() === lowerDamage)) {
+                        return true
+                    }
                 }
             }
 

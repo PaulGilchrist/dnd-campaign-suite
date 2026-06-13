@@ -94,6 +94,72 @@ export function collectSaveModifiers(features) {
                     abilities: ['CHA'],
                 })
             }
+            if (auto.type === 'reliable_talent') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'ability_check',
+                    condition: '',
+                    effect: 'reliable_talent',
+                })
+            }
+            if (auto.type === 'second_storywork') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'ability_check',
+                    condition: '',
+                    effect: 'dex_jump',
+                })
+            }
+            if (auto.type === 'stroke_of_luck') {
+                modifiers.push({
+                    source: feature.name,
+                    target: auto.target || 'd20',
+                    condition: '',
+                    effect: 'stroke_of_luck',
+                })
+            }
+            if (auto.type === 'use_magic_device') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'ability_check',
+                    condition: '',
+                    effect: 'advantage',
+                    abilities: ['INT'],
+                })
+            }
+            if (auto.type === 'passive_immunity' && auto.saveAdvantage) {
+                for (const sa of auto.saveAdvantage) {
+                    modifiers.push({
+                        source: feature.name,
+                        target: 'saving_throw',
+                        condition: sa.condition || '',
+                        effect: 'advantage',
+                        saveType: sa.saveType || '',
+                    })
+                }
+            }
+            if (auto.type === 'restore_balance') {
+                modifiers.push({
+                    source: feature.name,
+                    target: auto.target || 'd20',
+                    condition: '',
+                    effect: 'restore_balance',
+                })
+            }
+            if (auto.type === 'transe_of_order') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'attack_roll',
+                    condition: 'transe_of_order_active',
+                    effect: 'no_advantage_against',
+                })
+                modifiers.push({
+                    source: feature.name,
+                    target: 'd20',
+                    condition: '',
+                    effect: 'd20_floor_10',
+                })
+            }
         }
     })
 

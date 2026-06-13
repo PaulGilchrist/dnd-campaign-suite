@@ -92,6 +92,7 @@ function resolveDiceExpression(expression, playerStats, slotLevel) {
         .replace(/psionic_energy_die/g, psionicEnergyDie)
         .replace(/martial_arts_die/g, martialArtsDie)
         .replace(/favored_enemy/gi, favoredEnemy)
+        .replace(/rogue_level/gi, level)
         .replace(/level/gi, level)
         .replace(/spell_slot_level/g, slotLevel)
     const abilities = playerStats?.abilities || {}

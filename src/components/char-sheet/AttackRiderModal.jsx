@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { applyRiderOption } from '../../services/automation/handlers/attackRiderHandler.js';
+import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import './CharSheet.css';
 
 function AttackRiderModal({ action, playerStats, campaignName, targetName, onClose }) {
@@ -7,10 +8,24 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
     const [selectedMulti, setSelectedMulti] = useState([]);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+    const [versatileTricksterTargets, setVersatileTricksterTargets] = useState(null);
+    const [vtSelected, setVtSelected] = useState(null);
+    const [vtApplied, setVtApplied] = useState(false);
+    const [vtResult, setVtResult] = useState(null);
 
     const options = action.automation?.options || [];
     const maxEffects = action.automation?.maxEffects || 1;
     const multiSelect = maxEffects > 1;
+
+    // Check for Versatile Trickster secondary targets after applying
+    useEffect(() => {
+        if (applied && result) {
+            const secondaryTargets = getRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', campaignName);
+            if (secondaryTargets && secondaryTargets.length > 0) {
+                setVersatileTricksterTargets(secondaryTargets);
+            }
+        }
+    }, [applied, result, playerStats.name, campaignName]);
 
     const handleApply = async () => {
         if (multiSelect) {
@@ -33,6 +48,72 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
             return [...prev, optName];
         });
     };
+
+    const handleVtApply = async () => {
+        if (!vtSelected) return;
+        const { applyVersatileTrickster } = await import('../../services/automation/handlers/versatileTricksterHandler.js');
+        const vtAction = getRuntimeValue(playerStats.name, 'versatileTricksterAction', campaignName);
+        const res = await applyVersatileTrickster(vtAction, playerStats, campaignName, vtSelected);
+        setVtResult(res);
+        setVtApplied(true);
+    };
+
+    // Versatile Trickster secondary target selection
+    if (versatileTricksterTargets && versatileTricksterTargets.length > 0) {
+        if (vtApplied && vtResult) {
+            return (
+                <div className="sp-overlay" onClick={onClose}>
+                    <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                        <div className="sp-header">
+                            <i className="fa-solid fa-bolt"></i> Versatile Trickster
+                        </div>
+                        <div className="sp-body" dangerouslySetInnerHTML={{ __html: vtResult.payload.description }}>
+                        </div>
+                        <div className="sp-actions">
+                            <button className="sp-roll-btn" onClick={onClose}>Done</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="sp-overlay" onClick={onClose}>
+                <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                    <div className="sp-header">
+                        <i className="fa-solid fa-bolt"></i> Versatile Trickster
+                    </div>
+                    <div className="sp-body">
+                        <p>
+                            Trip applied to <b>{targetName}</b>.
+                            Versatile Trickster allows you to also Trip another creature within 5 feet of the spectral hand:
+                        </p>
+                        <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                            {versatileTricksterTargets.map((target, i) => (
+                                <label key={i} style={{ display: 'block', padding: '8px 12px', margin: '4px 0', borderRadius: '6px', cursor: 'pointer', background: vtSelected === target.name ? 'rgba(255,255,255,0.15)' : 'transparent', border: vtSelected === target.name ? '1px solid var(--color-link)' : '1px solid transparent' }}>
+                                    <input
+                                        type="radio"
+                                        name="versatileTricksterTarget"
+                                        checked={vtSelected === target.name}
+                                        onChange={() => setVtSelected(target.name)}
+                                        style={{ marginRight: '8px' }}
+                                    />
+                                    <strong>{target.name}</strong>
+                                    {target.size && <span style={{ opacity: 0.8, marginLeft: '8px' }}>({target.size})</span>}
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="sp-actions">
+                        <button className="sp-roll-btn" onClick={handleVtApply} disabled={!vtSelected}>
+                            <i className="fa-solid fa-bolt"></i> Trip Secondary Target
+                        </button>
+                        <button className="sp-dismiss-btn" onClick={onClose}>Skip</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (applied && result) {
         return (

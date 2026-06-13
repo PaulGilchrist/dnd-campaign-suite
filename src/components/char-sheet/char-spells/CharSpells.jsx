@@ -21,6 +21,7 @@ import * as mapsService from '../../../services/maps/mapsService.js';
 import { getNearestPlacedItem } from '../../../services/rules/rangeValidation.js';
 import { isInnateSorceryActive } from '../../../services/combat/buffService.js';
 import { useRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { isPsionicSpell, hasPsionicSorcery } from '../../../services/rules/metamagicRules.js';
 import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, characters }) {
@@ -69,7 +70,20 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
       const pending = pendingSimpleMetamagic;
       setPendingSimpleMetamagic(null);
       if (!pending) return;
-      if (result?.totalCost > 0) spendSorceryPoints(playerStats.name, result.totalCost, campaignName, getMaxSorceryPoints(playerStats));
+
+      let totalMetamagicCost = result?.totalCost || 0;
+      let psionicCost = 0;
+      if (pending.isPsionic && !result?.options?.includes('Subtle Spell')) {
+        psionicCost = pending.psionicCost;
+      }
+      const totalCost = totalMetamagicCost + psionicCost;
+      if (totalCost > 0) spendSorceryPoints(playerStats.name, totalCost, campaignName, getMaxSorceryPoints(playerStats));
+
+      const metamagicOptions = result?.options || [];
+      if (psionicCost > 0 && !metamagicOptions.includes('Psionic Sorcery')) {
+        metamagicOptions.push('Psionic Sorcery');
+      }
+
       const metaCtx = {};
       if (result?.options) {
         if (result.options.includes('Heightened Spell')) metaCtx.metamagicHeighten = true;
@@ -77,6 +91,10 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         if (result.options.includes('Twinned Spell') && result.twinTarget) metaCtx.metamagicTwinTarget = result.twinTarget;
         if (result.options.includes('Distant Spell')) metaCtx.metamagicDistant = true;
       }
+      if (psionicCost > 0) {
+        metaCtx.psionicSpell = true;
+      }
+
       pending.action(metaCtx);
     }, [pendingSimpleMetamagic, playerStats, campaignName]);
 
@@ -171,10 +189,16 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
             };
             if (isSorcerer) {
                 const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
+                const spellLevel = spell.level || 0;
+                const isPsionic = isPsionicSpell(playerStats, spellName);
+                const hasPsionic = hasPsionicSorcery(playerStats);
                 setPendingSimpleMetamagic({
                     spellName,
+                    spellLevel,
                     action: doDamage,
                     _currentSP: currentSP,
+                    isPsionic: isPsionic && hasPsionic,
+                    psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
                 });
             } else {
                 doDamage({});
@@ -289,7 +313,7 @@ return (
                     {pendingMetamagic && (
                       <MetamagicPopup
                         spell={{ name: pendingMetamagic.spellName, level: pendingMetamagic.spellLevel || 0 }}
-                        playerStats={{ ...playerStats, _metamagicCurrentSP: pendingMetamagic._currentSP }}
+                        playerStats={{ ...playerStats, _metamagicCurrentSP: pendingMetamagic._currentSP, _isPsionicSpell: pendingMetamagic.isPsionic, _psionicCost: pendingMetamagic.psionicCost }}
                         campaignName={campaignName}
                         onConfirm={handleConfirm}
                         onSkip={handleSkip}
@@ -298,7 +322,7 @@ return (
                     {pendingSimpleMetamagic && (
                       <MetamagicPopup
                         spell={{ name: pendingSimpleMetamagic.spellName, level: pendingSimpleMetamagic.spellLevel || 0 }}
-                        playerStats={{ ...playerStats, _metamagicCurrentSP: pendingSimpleMetamagic._currentSP }}
+                        playerStats={{ ...playerStats, _metamagicCurrentSP: pendingSimpleMetamagic._currentSP, _isPsionicSpell: pendingSimpleMetamagic.isPsionic, _psionicCost: pendingSimpleMetamagic.psionicCost }}
                         campaignName={campaignName}
                         onConfirm={handleSimpleConfirm}
                         onSkip={handleSimpleSkip}

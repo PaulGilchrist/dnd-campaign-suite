@@ -28,6 +28,7 @@ import DivineInterventionModal from './DivineInterventionModal.jsx'
 import AttackRiderModal from './AttackRiderModal.jsx'
 import OpenHandTechniqueModal from './OpenHandTechniqueModal.jsx'
 import WeaponMasteryModal from './WeaponMasteryModal.jsx'
+import BastionOfLawModal from './BastionOfLawModal.jsx'
 import CombatStanceModal from './CombatStanceModal.jsx'
 import TeleportModal from './TeleportModal.jsx'
 import HealingIllusionModal from './HealingIllusionModal.jsx'
@@ -42,6 +43,9 @@ import ElderChampionRestoreModal from './ElderChampionRestoreModal.jsx'
 import PrimalCompanionBonusActionModal from './PrimalCompanionBonusActionModal.jsx'
 import MistyWandererModal from './MistyWandererModal.jsx'
 import BonusActionChoiceModal from './BonusActionChoiceModal.jsx'
+import RevelationInFleshModal from './RevelationInFleshModal.jsx'
+import ElementalAffinityModal from './ElementalAffinityModal.jsx'
+import DragonCompanionModal from './DragonCompanionModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { applyConstellationOption } from '../../services/automation/handlers/starryFormHandler.js';
@@ -104,6 +108,10 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [primalCompanionBonusActionModal, setPrimalCompanionBonusActionModal] = useState(null);
     const [mistyWandererModal, setMistyWandererModal] = useState(null);
     const [bonusActionChoiceModal, setBonusActionChoiceModal] = useState(null);
+    const [revelationInFleshModal, setRevelationInFleshModal] = useState(null);
+    const [bastionOfLawModal, setBastionOfLawModal] = useState(null);
+    const [elementalAffinityModal, setElementalAffinityModal] = useState(null);
+    const [dragonCompanionModal, setDragonCompanionModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
     const [featureChoice, setFeatureChoice] = useState(null);
@@ -518,6 +526,126 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }
         }
 
+        // Apply Assassinate first_round_sneak_attack_hit damage bonus (Rogue Assassin level 3)
+        if (playerStats.automation?.actions) {
+            const assassinateBonus = playerStats.automation.actions.find(
+                a => a.type === 'damage_bonus' && a.trigger === 'first_round_sneak_attack_hit'
+            );
+            if (assassinateBonus) {
+                const cs = await getCombatContext(campaignName);
+                const currentRound = getCurrentCombatRound();
+                if (cs && currentRound === 1) {
+                    const playerCreature = cs.creatures?.find(c => c.name === playerStats.name);
+                    if (!playerCreature || !playerCreature.hasActed) {
+                        const bonusResult = rollExpression(assassinateBonus.damageExpression);
+                        if (bonusResult) {
+                            const damageType = assassinateBonus.damageType || 'Sneak Attack';
+                            formula += ` + ${assassinateBonus.damageExpression}[${damageType}]`;
+                            total += bonusResult.total;
+                            rolls = [...rolls, ...bonusResult.rolls];
+                        }
+                    }
+                }
+            }
+
+            // Apply Stealth Attack cost deduction (Supreme Sneak)
+            const stealthAttackCost = getRuntimeValue(playerStats.name, 'stealthAttackCost', campaignName);
+            if (stealthAttackCost && stealthAttackCost > 0) {
+                const sneakAttack = playerStats.class?.class_levels?.[playerStats.level - 1]?.sneak_attack_num_d6 || 0;
+                const sneakAttackDice = sneakAttack || 0;
+                if (sneakAttackDice >= stealthAttackCost) {
+                    const costDice = stealthAttackCost;
+                    const currentDice = sneakAttackDice - costDice;
+                    const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+                    if (classLevel) {
+                        classLevel.sneak_attack_num_d6 = currentDice;
+                    }
+                    await setRuntimeValue(playerStats.name, 'stealthAttackCost', 0, campaignName);
+                }
+            }
+
+            // Apply Death Strike attack_rider (Rogue Assassin level 17) — forces CON save, doubles damage on fail
+            const deathStrike = playerStats.automation.actions.find(
+                a => a.type === 'attack_rider' && a.trigger === 'first_round_sneak_attack_hit' && a.saveType
+            );
+            if (deathStrike) {
+                const cs2 = await getCombatContext(campaignName);
+                const currentRound2 = getCurrentCombatRound();
+                if (cs2 && currentRound2 === 1) {
+                    const playerCreature2 = cs2.creatures?.find(c => c.name === playerStats.name);
+                    if (!playerCreature2 || !playerCreature2.hasActed) {
+                        const targetName2 = getTargetFromAttacker(cs2, playerStats.name)?.name || null;
+                        if (targetName2) {
+                            const prof = playerStats.proficiency || 0;
+                            const dexAbility = playerStats.abilities?.find(a => a.name === 'Dexterity');
+                            const dexMod = dexAbility?.bonus || 0;
+                            const saveDc = 8 + dexMod + prof;
+                            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                            const newEffect = {
+                                target: targetName2,
+                                source: deathStrike.name,
+                                effect: 'death_strike',
+                                saveType: 'CON',
+                                saveDc: saveDc,
+                                saveAbility: 'DEX',
+                                damageDoubled: deathStrike.damageDoubled || true,
+                            };
+                            const updatedEffects = [...storedEffects, newEffect];
+                            setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Apply Rend Mind attack_rider (Soulknife level 17) — forces WIS save, Stunned on fail
+            const rendMind = playerStats.automation.actions.find(
+                a => a.type === 'attack_rider' && a.trigger === 'psychic_blade_sneak_attack_hit' && a.saveType
+            );
+            if (rendMind) {
+                const rendMindUsedKey = '_RendMind_Used';
+                const rendMindUsed = getRuntimeValue(playerStats.name, rendMindUsedKey, campaignName);
+                if (rendMindUsed) {
+                    const lastLongRest = getRuntimeValue(playerStats.name, '_LastLongRest', campaignName);
+                    const currentLongRest = getRuntimeValue(playerStats.name, '_CurrentLongRest', campaignName);
+                    if (lastLongRest !== currentLongRest) {
+                        await setRuntimeValue(playerStats.name, rendMindUsedKey, false, campaignName);
+                    }
+                }
+                const rendMindActive = getRuntimeValue(playerStats.name, rendMindUsedKey, campaignName);
+                if (!rendMindActive) {
+                    const cs3 = await getCombatContext(campaignName);
+                    if (cs3) {
+                        const playerCreature3 = cs3.creatures?.find(c => c.name === playerStats.name);
+                        if (!playerCreature3 || !playerCreature3.hasActed) {
+                            const targetName3 = getTargetFromAttacker(cs3, playerStats.name)?.name || null;
+                            if (targetName3) {
+                                const prof = playerStats.proficiency || 0;
+                                const dexAbility = playerStats.abilities?.find(a => a.name === 'Dexterity');
+                                const dexMod = dexAbility?.bonus || 0;
+                                const saveDc = 8 + dexMod + prof;
+                                const storedEffects3 = getRuntimeValue(campaignName, 'targetEffects') || [];
+                                const newEffect3 = {
+                                    target: targetName3,
+                                    source: rendMind.name,
+                                    effect: rendMind.condition || 'stunned',
+                                    saveType: rendMind.saveType,
+                                    saveDc: saveDc,
+                                    saveAbility: rendMind.saveAbility || 'DEX',
+                                    condition: rendMind.condition || 'stunned',
+                                    duration: rendMind.duration || '1_minute',
+                                    repeatingSave: rendMind.repeatingSave || true,
+                                    restoreCost: rendMind.restoreCost || null,
+                                };
+                                const updatedEffects3 = [...storedEffects3, newEffect3];
+                                setRuntimeValue(campaignName, 'targetEffects', updatedEffects3, campaignName);
+                                await setRuntimeValue(playerStats.name, rendMindUsedKey, true, campaignName);
+                            }
+                        }
+                    }
+                }
+            }
+
         // Apply Hunter's Prey: Colossus Slayer (extra 1d8 to creature below max HP, once per turn)
         const hunterPreyChoice = getRuntimeValue(playerStats.name, "_Hunter's_Prey_choice", campaignName);
         if (hunterPreyChoice === 'Colossus Slayer') {
@@ -575,7 +703,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                 const spreadTarget = spreadTargets[0];
                                 const combatSummary = await loadCombatSummary(campaignName);
                                 const spreadApplyResult = combatSummary
-                                    ? applyDamageToTarget(combatSummary, spreadTarget.name, superiorResult.total, [spreadDamageType], campaignName, null)
+                                    ? applyDamageToTarget(combatSummary, spreadTarget.name, superiorResult.total, [spreadDamageType], campaignName, null, false, playerStats.name)
                                     : null;
 
                                 // Log the spread damage
@@ -1107,6 +1235,18 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'primalCompanionBonusActionCommand': setPrimalCompanionBonusActionModal(result.payload); break;
                     case 'mistyWanderer': setMistyWandererModal(result.payload); break;
                     case 'bonusActionChoice': setBonusActionChoiceModal(result.payload); break;
+                    case 'revelationInFlesh': setRevelationInFleshModal(result.payload); break;
+                    case 'bastionOfLaw': setBastionOfLawModal(result.payload); break;
+                    case 'elementalAffinity': {
+                        const affPayload = result.payload;
+                        const affAction = affPayload?.action;
+                        const affTypes = affPayload?.damageTypes || ['Acid', 'Cold', 'Fire', 'Lightning', 'Poison'];
+                        setElementalAffinityModal({ action: affAction, playerStats, campaignName, damageTypes: affTypes, existingType: affPayload?.existingType });
+                        break;
+                    }
+                    case 'dragonCompanion':
+                        setDragonCompanionModal(result.payload);
+                        break;
                     case 'defensiveTactics': {
                         const actionData = result.payload?.action;
                         const defensiveChoice = getRuntimeValue(playerStats.name, '_Defensive_Tactics_choice', campaignName);
@@ -1420,6 +1560,34 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         onClose={() => { setCombatStanceModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
                     />
                 )}
+                {revelationInFleshModal && (
+                    <RevelationInFleshModal
+                        {...revelationInFleshModal}
+                        onClose={() => { setRevelationInFleshModal(null); window.dispatchEvent(new CustomEvent('buffs-updated')); }}
+                    />
+                )}
+                {bastionOfLawModal && (
+                    <BastionOfLawModal
+                        {...bastionOfLawModal}
+                        campaignName={campaignName}
+                        onConfirm={async (spAmount, targetName, diceToSpend, clearWard) => {
+                            if (clearWard) {
+                                const action = { name: bastionOfLawModal.featureName, automation: bastionOfLawModal.auto };
+                                const { handleClearWard } = await import('../../services/automation/handlers/bastionOfLawHandler.js');
+                                return await handleClearWard(action, playerStats, campaignName);
+                            }
+                            if (diceToSpend !== undefined && diceToSpend !== null) {
+                                const action = { name: bastionOfLawModal.featureName, automation: bastionOfLawModal.auto };
+                                const { handleSpendDice } = await import('../../services/automation/handlers/bastionOfLawHandler.js');
+                                return await handleSpendDice(action, playerStats, campaignName, diceToSpend);
+                            }
+                            const action = { name: bastionOfLawModal.featureName, automation: bastionOfLawModal.auto };
+                            const { handleApply } = await import('../../services/automation/handlers/bastionOfLawHandler.js');
+                            return await handleApply(action, playerStats, campaignName, spAmount, targetName);
+                        }}
+                        onClose={() => setBastionOfLawModal(null)}
+                    />
+                )}
                 {teleportModal && (
                     <TeleportModal
                         {...teleportModal}
@@ -1507,6 +1675,24 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <BonusActionChoiceModal
                         {...bonusActionChoiceModal}
                         onClose={() => setBonusActionChoiceModal(null)}
+                    />
+                )}
+                {bastionOfLawModal && (
+                    <BastionOfLawModal
+                        {...bastionOfLawModal}
+                        onClose={() => setBastionOfLawModal(null)}
+                    />
+                )}
+                {elementalAffinityModal && (
+                    <ElementalAffinityModal
+                        {...elementalAffinityModal}
+                        onClose={() => setElementalAffinityModal(null)}
+                    />
+                )}
+                {dragonCompanionModal && (
+                    <DragonCompanionModal
+                        {...dragonCompanionModal}
+                        onClose={() => setDragonCompanionModal(null)}
                     />
                 )}
                 {divineFuryChoice && (

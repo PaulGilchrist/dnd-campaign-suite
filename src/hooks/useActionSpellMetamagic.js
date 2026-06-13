@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react'
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from './useMetamagic.js'
 import { addEntry } from '../services/ui/logService.js'
 import { rollExpression, rollExpressionDoubled } from '../services/dice/diceRoller.js'
+import { isPsionicSpell, hasPsionicSorcery } from '../services/rules/metamagicRules.js'
+import { getRuntimeValue } from './useRuntimeState.js'
 
 export function useActionSpellMetamagic({
     playerStats,
@@ -21,13 +23,43 @@ export function useActionSpellMetamagic({
     const [pendingActionMetamagic, setPendingActionMetamagic] = useState(null);
     const isBonusSorcerer = playerStats.class?.name === 'Sorcerer';
 
+    const applyElementalAffinity = (attack, formula, total, rolls, modifier) => {
+        const affinityType = getRuntimeValue(playerStats.name, '_Elemental_Affinity_chosenType', campaignName);
+        if (!affinityType || !attack.damageType) return { formula, total, rolls, modifier };
+
+        const damageType = String(attack.damageType).trim();
+        if (damageType.toLowerCase() !== affinityType.toLowerCase()) return { formula, total, rolls, modifier };
+
+        const chaAbility = playerStats.abilities.find(a => a.name === 'Charisma');
+        const chaMod = chaAbility?.bonus || 0;
+        if (chaMod <= 0) return { formula, total, rolls, modifier };
+
+        return {
+            formula: `${formula} + ${chaMod}[${affinityType}]`,
+            total: total + chaMod,
+            rolls: [...rolls],
+            modifier,
+        };
+    };
+
     const handleActionMetamagicConfirm = useCallback((result) => {
         const pending = pendingActionMetamagic;
         setPendingActionMetamagic(null);
         if (!pending) return;
 
-        if (result?.totalCost > 0) {
-            spendSorceryPoints(playerStats.name, result.totalCost, campaignName, getMaxSorceryPoints(playerStats));
+        let totalMetamagicCost = result?.totalCost || 0;
+        let psionicCost = 0;
+        if (pending.isPsionic && !result?.options?.includes('Subtle Spell')) {
+            psionicCost = pending.psionicCost;
+        }
+        const totalCost = totalMetamagicCost + psionicCost;
+        if (totalCost > 0) {
+            spendSorceryPoints(playerStats.name, totalCost, campaignName, getMaxSorceryPoints(playerStats));
+        }
+
+        const metamagicOptions = result?.options || [];
+        if (psionicCost > 0 && !metamagicOptions.includes('Psionic Sorcery')) {
+            metamagicOptions.push('Psionic Sorcery');
         }
 
         addEntry(campaignName, {
@@ -36,8 +68,8 @@ export function useActionSpellMetamagic({
             spellName: pending.spellName,
             spellLevel: pending.spellLevel || 0,
             castingTime: pending.castingTime || 'Action',
-            metamagic: result?.options || [],
-            spCost: result?.totalCost || 0,
+            metamagic: metamagicOptions,
+            spCost: totalCost,
             timestamp: Date.now(),
         });
 
@@ -47,6 +79,9 @@ export function useActionSpellMetamagic({
             if (result.options.includes('Careful Spell')) metaCtx.metamagicCareful = true;
             if (result.options.includes('Twinned Spell') && result.twinTarget) metaCtx.metamagicTwinTarget = result.twinTarget;
             if (result.options.includes('Distant Spell')) metaCtx.metamagicDistant = true;
+        }
+        if (psionicCost > 0) {
+            metaCtx.psionicSpell = true;
         }
 
         pending.action(metaCtx);
@@ -85,35 +120,46 @@ export function useActionSpellMetamagic({
             });
             const wasCrit = popupHtml?.isCrit;
             if (wasCrit && setPopupHtml) setPopupHtml(null);
-            const result = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
-            if (!result) return;
+            const rawResult = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
+            if (!rawResult) return;
+
+            const { formula, total, rolls, modifier } = applyElementalAffinity(attack, attack.damage, rawResult.total, rawResult.rolls, rawResult.modifier);
 
             if (!mapName) {
-                rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier, buildCtxSync(attack));
+                rollDamage(attack.name, formula, total, rolls, modifier, buildCtxSync(attack));
             } else {
                 buildCtx(attack).then(ctx => {
-                    rollDamage(attack.name, attack.damage, result.total, result.rolls, result.modifier, ctx);
+                    rollDamage(attack.name, formula, total, rolls, modifier, ctx);
                 }).catch(() => {});
             }
             return;
         }
 
+        const spellLevel = attack.spellLevel || 0;
         const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
+        const isPsionic = isPsionicSpell(playerStats, attack.name);
+        const hasPsionic = hasPsionicSorcery(playerStats);
+
         setPendingActionMetamagic({
             spellName: attack.name,
-            spellLevel: attack.spellLevel || 0,
+            spellLevel: spellLevel,
             castingTime: attack.castingTime || 'Action',
             _currentSP: currentSP,
+            isPsionic: isPsionic && hasPsionic,
+            psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
             action: (metaCtx) => {
                 const wasCrit = popupHtml?.isCrit;
                 if (wasCrit && setPopupHtml) setPopupHtml(null);
-                const r = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
-                if (!r) return;
+                const rawR = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
+                if (!rawR) return;
+
+                const { formula, total, rolls, modifier } = applyElementalAffinity(attack, attack.damage, rawR.total, rawR.rolls, rawR.modifier);
+
                 if (!mapName) {
-                    rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, { ...buildCtxSync(attack), ...metaCtx });
+                    rollDamage(attack.name, formula, total, rolls, modifier, { ...buildCtxSync(attack), ...metaCtx });
                 } else {
                     buildCtx(attack).then(ctx => {
-                        rollDamage(attack.name, attack.damage, r.total, r.rolls, r.modifier, { ...ctx, ...metaCtx });
+                        rollDamage(attack.name, formula, total, rolls, modifier, { ...ctx, ...metaCtx });
                     }).catch(() => {});
                 }
             },
@@ -132,12 +178,18 @@ export function useActionSpellMetamagic({
             return;
         }
 
+        const spellLevel = spell.level || 0;
         const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
+        const isPsionic = isPsionicSpell(playerStats, spell.name);
+        const hasPsionic = hasPsionicSorcery(playerStats);
+
         setPendingActionMetamagic({
             spellName: attack.name,
-            spellLevel: spell.level || 0,
+            spellLevel: spellLevel,
             castingTime: spell.casting_time || 'Action',
             _currentSP: currentSP,
+            isPsionic: isPsionic && hasPsionic,
+            psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
             action: (metaCtx) => {
                 if (!mapName) {
                     const ctx = buildCtxSync(attack);
@@ -162,12 +214,18 @@ export function useActionSpellMetamagic({
             return;
         }
 
+        const spellLevel = spell.level || 0;
         const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
+        const isPsionic = isPsionicSpell(playerStats, spell.name);
+        const hasPsionic = hasPsionicSorcery(playerStats);
+
         setPendingActionMetamagic({
             spellName: attack.name,
-            spellLevel: spell.level || 0,
+            spellLevel: spellLevel,
             castingTime: spell.casting_time || 'Action',
             _currentSP: currentSP,
+            isPsionic: isPsionic && hasPsionic,
+            psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
             action: (metaCtx) => {
                 const wasCrit = popupHtml?.isCrit;
                 if (wasCrit && setPopupHtml) setPopupHtml(null);

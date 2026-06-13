@@ -16,6 +16,7 @@ vi.mock('./rangeValidation.js', () => ({
 
 vi.mock('../../hooks/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
+  getRuntimeValue: vi.fn(),
 }));
 
 vi.mock('../combat/buffService.js', () => ({
@@ -25,6 +26,7 @@ vi.mock('../combat/buffService.js', () => ({
 
 vi.mock('./postCastRiderService.js', () => ({
   triggerPostCastRiderSaves: vi.fn().mockResolvedValue(undefined),
+  triggerSpellThief: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('./postCastHealService.js', () => ({

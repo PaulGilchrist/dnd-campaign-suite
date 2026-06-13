@@ -476,5 +476,17 @@ describe('collectSaveModifiers', () => {
       expect(result).toHaveLength(1)
       expect(result[0].source).toBe('Valid Feature')
     })
+
+    it('extracts reliable_talent ability_check modifier', () => {
+      const features = [{
+        name: 'Reliable Talent',
+        automation: { type: 'reliable_talent' }
+      }]
+      const result = collectSaveModifiers(features)
+      expect(result).toHaveLength(1)
+      expect(result[0].source).toBe('Reliable Talent')
+      expect(result[0].target).toBe('ability_check')
+      expect(result[0].effect).toBe('reliable_talent')
+    })
   })
 })

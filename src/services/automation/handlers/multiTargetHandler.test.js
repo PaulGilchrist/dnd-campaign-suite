@@ -590,7 +590,9 @@ describe('multiTargetHandler.applyMultiTarget', () => {
         20,
         ['cold'],
         campaignName,
-        null
+        null,
+        false,
+        ps.name
       );
       expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
         type: 'hp_change',
@@ -705,7 +707,9 @@ describe('multiTargetHandler.applyMultiTarget', () => {
         15,
         ['fire'],
         campaignName,
-        null
+        null,
+        false,
+        ps.name
       );
     });
 

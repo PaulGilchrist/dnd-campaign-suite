@@ -108,6 +108,7 @@ describe('MetamagicPopup', () => {
       options: ['Quickened Spell'],
       totalCost: 2,
       twinTarget: null,
+      psionicActive: false,
     });
   });
 

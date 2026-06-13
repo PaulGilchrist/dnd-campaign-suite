@@ -23,13 +23,13 @@ function saveDamageEventForTarget(targetName, rawDamage, damageTypes, campaignNa
     }, campaignName);
 }
 
-export function computeDamageAfterResistances(rawDamage, damageTypes, resistances, immunities) {
+export function computeDamageAfterResistances(rawDamage, damageTypes, resistances, immunities, ignoreResistance = false) {
   if (!damageTypes || damageTypes.length === 0) throw new Error('computeDamageAfterResistances: damageTypes is required');
   for (const dt of damageTypes) {
     if (!dt) throw new Error('computeDamageAfterResistances: each damageType must be a non-empty string');
     const lower = dt.toLowerCase();
     if (immunities?.some(i => i.toLowerCase() === lower)) return 0;
-    if (resistances?.some(r => r.toLowerCase() === lower)) return Math.floor(rawDamage / 2);
+    if (!ignoreResistance && resistances?.some(r => r.toLowerCase() === lower)) return Math.floor(rawDamage / 2);
    }
   return rawDamage;
 }
@@ -64,7 +64,7 @@ export function rollSaveForCreature(creature, saveType, saveDc, disadvantage = f
   return { roll: finalRoll, total, bonus, success, rawRolls: [roll1, roll2] };
 }
 
-export function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName, characters) {
+export function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName, characters, ignoreResistance = false, attackerName = null) {
   if (!combatSummary) return null;
   const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
@@ -83,7 +83,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
            }
        }
    }
-   const finalDamage = computeDamageAfterResistances(rawDamage, damageTypes || [], resistances, immunities);
+    const finalDamage = computeDamageAfterResistances(rawDamage, damageTypes || [], resistances, immunities, ignoreResistance);
 
    // Save damage event under target's key for reaction features
    if (isPlayer) {
@@ -128,6 +128,34 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
           reason: 'took damage',
           timestamp: Date.now(),
         });
+      }
+    }
+
+    if (attackerName && attackerName !== creature.name) {
+      const attackerBuffs = getRuntimeValue(attackerName, 'activeBuffs', campaignName);
+      const attackerBuffArray = Array.isArray(attackerBuffs) ? attackerBuffs : [];
+      if (attackerBuffArray.some(b => b.name === 'Psychic Veil')) {
+        const attackerConditions = getRuntimeValue(attackerName, 'activeConditions') || [];
+        const attackerCondArray = Array.isArray(attackerConditions) ? attackerConditions : [];
+        const filteredConditions = attackerCondArray.filter(c => String(c).toLowerCase() !== 'invisible');
+        if (filteredConditions.length !== attackerCondArray.length) {
+          setRuntimeValue(attackerName, 'activeConditions', filteredConditions, campaignName);
+        }
+        const filteredBuffs = attackerBuffArray.filter(b => b.name !== 'Psychic Veil');
+        if (filteredBuffs.length !== attackerBuffArray.length) {
+          setRuntimeValue(attackerName, 'activeBuffs', filteredBuffs, campaignName);
+        }
+      }
+      // Supreme Sneak: if Stealth Attack is active, don't remove Invisible condition
+      const stealthAttackCost = getRuntimeValue(attackerName, 'stealthAttackCost', campaignName);
+      if (stealthAttackCost && stealthAttackCost > 0) {
+        const attackerConditions = getRuntimeValue(attackerName, 'activeConditions') || [];
+        const attackerCondArray = Array.isArray(attackerConditions) ? attackerConditions : [];
+        const hasInvisible = attackerCondArray.some(c => String(c).toLowerCase() === 'invisible');
+        if (hasInvisible) {
+          // Preserve Invisible condition — don't remove it
+          // The stealthAttackCost will be cleared at start of next turn
+        }
       }
     }
 

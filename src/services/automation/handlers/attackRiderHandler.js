@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../rules/damageUtils.js';
+import { getDistanceFeet } from '../../rules/rangeValidation.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -88,9 +89,45 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     }
 
     const results = [];
+    let versatileTricksterSecondaryTarget = null;
+    let hasVersatileTrickster = false;
+
+    // Check if Versatile Trickster is available (Arcane Trickster level 13+)
+    const hasVersatileTricksterPassive = (playerStats.automation?.passives || []).some(
+        p => p.type === 'passive_rule' && p.effect === 'versatile_trickster'
+    );
+
     for (const chosen of chosenOptions) {
         const res = await applyRiderEffect(action, playerStats, campaignName, targetName, chosen);
         results.push(res);
+
+        // If Trip was applied and Versatile Trickster is available, find secondary targets
+        if (chosen.effect === 'prone' && hasVersatileTricksterPassive && targetName) {
+            hasVersatileTrickster = true;
+            const cs = await getCombatContext(campaignName);
+            if (cs?.creatures) {
+                const primaryTarget = cs.creatures.find(c => c.name === targetName);
+                if (primaryTarget?.position) {
+                    const secondaryTargets = cs.creatures
+                        .filter(c => c.name !== targetName && c.position)
+                        .map(c => ({
+                            creature: c,
+                            distance: getDistanceFeet(primaryTarget.position, c.position),
+                        }))
+                        .filter(t => t.distance !== null && t.distance <= 5);
+                    if (secondaryTargets.length > 0) {
+                        versatileTricksterSecondaryTarget = secondaryTargets.map(t => t.creature);
+                    }
+                }
+            }
+        }
+    }
+
+    // If Versatile Trickster found secondary Trip targets, set runtime value for modal to pick up
+    if (hasVersatileTrickster && versatileTricksterSecondaryTarget && versatileTricksterSecondaryTarget.length > 0) {
+        setRuntimeValue(playerStats.name, 'versatileTricksterSecondaryTargets', versatileTricksterSecondaryTarget, campaignName);
+        setRuntimeValue(playerStats.name, 'versatileTricksterPrimaryTarget', targetName, campaignName);
+        setRuntimeValue(playerStats.name, 'versatileTricksterAction', { type: 'versatile_trickster', automation: { type: 'versatile_trickster' } }, campaignName);
     }
 
     if (results.length === 1) {
@@ -177,6 +214,21 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
         const updatedEffects = [...storedEffects, newEffect];
         setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
 
+        const attackerBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+        const attackerBuffArray = Array.isArray(attackerBuffs) ? attackerBuffs : [];
+        if (attackerBuffArray.some(b => b.name === 'Psychic Veil')) {
+            const attackerConditions = getRuntimeValue(playerStats.name, 'activeConditions') || [];
+            const attackerCondArray = Array.isArray(attackerConditions) ? attackerConditions : [];
+            const filteredConditions = attackerCondArray.filter(c => String(c).toLowerCase() !== 'invisible');
+            if (filteredConditions.length !== attackerCondArray.length) {
+                setRuntimeValue(playerStats.name, 'activeConditions', filteredConditions, campaignName);
+            }
+            const filteredBuffs = attackerBuffArray.filter(b => b.name !== 'Psychic Veil');
+            if (filteredBuffs.length !== attackerBuffArray.length) {
+                setRuntimeValue(playerStats.name, 'activeBuffs', filteredBuffs, campaignName);
+            }
+        }
+
         return {
             type: 'popup',
             payload: {
@@ -210,9 +262,27 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
         cost: option.cost || null,
         ignoreResistance: !!option.ignoreResistance,
         restoreCost: option.restoreCost || null,
+        damageDoubled: option.damageDoubled || action.automation.damageDoubled || false,
     };
     const updatedEffects = [...storedEffects, newEffect];
     setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+
+    if (option.saveType) {
+        const attackerBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+        const attackerBuffArray = Array.isArray(attackerBuffs) ? attackerBuffs : [];
+        if (attackerBuffArray.some(b => b.name === 'Psychic Veil')) {
+            const attackerConditions = getRuntimeValue(playerStats.name, 'activeConditions') || [];
+            const attackerCondArray = Array.isArray(attackerConditions) ? attackerConditions : [];
+            const filteredConditions = attackerCondArray.filter(c => String(c).toLowerCase() !== 'invisible');
+            if (filteredConditions.length !== attackerCondArray.length) {
+                setRuntimeValue(playerStats.name, 'activeConditions', filteredConditions, campaignName);
+            }
+            const filteredBuffs = attackerBuffArray.filter(b => b.name !== 'Psychic Veil');
+            if (filteredBuffs.length !== attackerBuffArray.length) {
+                setRuntimeValue(playerStats.name, 'activeBuffs', filteredBuffs, campaignName);
+            }
+        }
+    }
 
     // Build description for Cunning Strike options
     let desc = `${option.name} applied to ${targetName}`;

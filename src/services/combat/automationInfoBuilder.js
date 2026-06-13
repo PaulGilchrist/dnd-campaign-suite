@@ -37,6 +37,11 @@ function buildAttackInfo(feature, playerStats) {
                 saveType: auto.saveType || null,
                 saveDc: auto.saveDc || null,
                 saveAbility: auto.saveAbility || null,
+                damageDoubled: !!auto.damageDoubled,
+                restoreCost: auto.restoreCost || null,
+                uses: auto.uses || null,
+                recharge: auto.recharge || 'long_rest',
+                casting_time: auto.casting_time || 'passive',
                 hasAutomation: true
             }
         }
@@ -91,6 +96,16 @@ function buildAttackInfo(feature, playerStats) {
                 casting_time: auto.casting_time || '',
                 bonusExpression: auto.bonusExpression || '',
                 oncePerRage: !!auto.oncePerRage,
+                hasAutomation: true
+            }
+        }
+
+        case 'restore_balance': {
+            return {
+                type: 'restore_balance',
+                name: feature.name,
+                target: auto.target || 'd20',
+                range: auto.range || '60_ft',
                 hasAutomation: true
             }
         }
@@ -386,6 +401,8 @@ function buildAttackInfo(feature, playerStats) {
                 uses: auto.uses || 1,
                 recharge: auto.recharge || 'short_rest',
                 oncePerTurn: !!auto.oncePerTurn,
+                oncePerCombat: !!auto.oncePerCombat,
+                firstRoundOnly: !!auto.firstRoundOnly,
                 resourceKey: feature.name.toLowerCase().replace(/\s+/g, '') + 'Uses',
                 hasAutomation: true
             }
@@ -579,6 +596,26 @@ function buildAttackInfo(feature, playerStats) {
                 name: feature.name,
                 target: auto.target || 'self',
                 conditionImmunity: auto.conditionImmunity || '',
+                damageResistance: auto.damage_resistance || [],
+                saveAdvantage: auto.save_advantage || [],
+                hasAutomation: true
+            }
+        }
+
+        case 'psionic_sorcery': {
+            return {
+                type: 'psionic_sorcery',
+                name: feature.name,
+                psionicSpells: auto.psionic_spells || [],
+                hasAutomation: true
+            }
+        }
+
+        case 'psionic_spells_list': {
+            return {
+                type: 'psionic_spells_list',
+                name: feature.name,
+                psionicSpells: auto.psionic_spells || [],
                 hasAutomation: true
             }
         }
@@ -1028,6 +1065,14 @@ function buildAttackInfo(feature, playerStats) {
         case 'jack_of_all_trades': {
             return {
                 type: 'jack_of_all_trades',
+                name: feature.name,
+                hasAutomation: true
+            }
+        }
+
+        case 'reliable_talent': {
+            return {
+                type: 'reliable_talent',
                 name: feature.name,
                 hasAutomation: true
             }
@@ -1548,6 +1593,212 @@ function buildAttackInfo(feature, playerStats) {
                 name: feature.name,
                 duration: auto.duration || 'until_end_of_turn',
                 casting_time: auto.casting_time || '1 bonus action',
+                hasAutomation: true
+            };
+        }
+
+        case 'mage_hand_control': {
+            return {
+                type: 'mage_hand_control',
+                name: feature.name,
+                range: auto.range || '30_ft',
+                action: auto.action || 'bonus_action',
+                casting_time: auto.casting_time || '1 bonus action',
+                hasAutomation: true
+            }
+        }
+
+        case 'stroke_of_luck': {
+            return {
+                type: 'stroke_of_luck',
+                name: feature.name,
+                target: auto.target || 'd20',
+                recharge: auto.recharge || 'short_or_long_rest',
+                hasAutomation: true
+            };
+        }
+
+        case 'spell_thief': {
+            return {
+                type: 'spell_thief',
+                name: feature.name,
+                saveType: auto.saveType || 'INT',
+                saveDc: auto.saveDc || 'ability',
+                saveAbility: auto.saveAbility || 'INT',
+                trigger: auto.trigger || 'spell_cast',
+                oncePerLongRest: !!auto.oncePerLongRest,
+                casting_time: auto.casting_time || '1 reaction',
+                hasAutomation: true
+            };
+        }
+
+        case 'stealth_attack': {
+            return {
+                type: 'stealth_attack',
+                name: feature.name,
+                cost: auto.cost || '1d6',
+                casting_time: auto.casting_time || 'passive',
+                hasAutomation: true
+            };
+        }
+
+        case 'fast_hands': {
+            return {
+                type: 'fast_hands',
+                name: feature.name,
+                options: auto.options || [],
+                casting_time: auto.casting_time || '1 bonus action',
+                hasAutomation: true
+            };
+        }
+
+        case 'supreme_sneak': {
+            return {
+                type: 'passive_rule',
+                name: feature.name,
+                effect: 'supreme_sneak',
+                casting_time: auto.casting_time || 'passive',
+                hasAutomation: true
+            };
+        }
+
+        case 'use_magic_device': {
+            return {
+                type: 'use_magic_device',
+                name: feature.name,
+                attunementLimit: auto.attunementLimit || 4,
+                chargeReroll: auto.chargeReroll || '1d6',
+                chargeRerollSuccess: auto.chargeRerollSuccess || 6,
+                scrollAbility: auto.scrollAbility || 'INT',
+                scrollCheckDC: auto.scrollCheckDC || '10 + spell_level',
+                scrollDisintegratesOnFail: !!auto.scrollDisintegratesOnFail,
+                casting_time: auto.casting_time || 'passive',
+                hasAutomation: true
+            };
+        }
+
+        case 'revelation_in_flesh': {
+            return {
+                type: 'revelation_in_flesh',
+                name: feature.name,
+                options: auto.options || [],
+                duration: auto.duration || '10_minutes',
+                action: auto.action || 'bonus_action',
+                casting_time: auto.casting_time || '1 bonus action',
+                hasAutomation: true
+            };
+        }
+
+        case 'warping_implosion': {
+            return {
+                type: 'save_attack',
+                name: feature.name,
+                action: auto.action || 'action',
+                damage: auto.damage || '',
+                damageType: auto.damageType || '',
+                saveType: auto.saveType || 'STR',
+                saveDc: auto.saveDc === 'ability'
+                    ? getSaveDc(playerStats, auto.saveAbility || 'CHA', prof)
+                    : auto.saveDc || 10,
+                saveAbility: auto.saveAbility || 'CHA',
+                shape: auto.shape || '',
+                range: auto.range || '',
+                conditionInflicted: auto.conditionInflicted || null,
+                duration: auto.duration || '',
+                uses: auto.uses ?? 1,
+                usesMax: auto.uses ?? 1,
+                recharge: auto.recharge || 'long_rest',
+                resourceCost: auto.resourceCost || '',
+                resourceKey: 'sorcery_points',
+                restoreCost: auto.restoreCost || null,
+                hasOptions: !!auto.hasOptions,
+                options: auto.options || [],
+                optionDetails: auto.optionDetails || {},
+                healExpression: null,
+                dcSuccess: auto.dcSuccess || null,
+                hasAutomation: true
+            };
+        }
+
+        case 'bastion_of_law': {
+            return {
+                type: 'bastion_of_law',
+                name: feature.name,
+                range: auto.range || '30_ft',
+                action: auto.action || 'action',
+                casting_time: auto.casting_time || '1 action',
+                resourceCost: auto.resourceCost || 'sorcery_points',
+                maxSP: auto.maxSP || 5,
+                minSP: auto.minSP || 1,
+                hasAutomation: true
+            };
+        }
+
+        case 'transe_of_order': {
+            return {
+                type: 'transe_of_order',
+                name: feature.name,
+                duration: auto.duration || '1_minute',
+                action: auto.action || 'bonus_action',
+                restoreCost: auto.restoreCost || 5,
+                hasAutomation: true
+            };
+        }
+
+        case 'clockwork_cavalcade': {
+            return {
+                type: 'clockwork_cavalcade',
+                name: feature.name,
+                action: auto.action || 'action',
+                range: auto.range || '30_ft_cube',
+                maxHeal: auto.maxHeal || 100,
+                restoreCost: auto.restoreCost || 7,
+                hasAutomation: true
+            };
+        }
+
+        case 'damage_type_choice': {
+            return {
+                type: 'damage_type_choice',
+                name: feature.name,
+                damageTypes: auto.damageTypes || [],
+                effect: auto.effect || '',
+                casting_time: auto.casting_time || 'passive',
+                hasAutomation: true
+            };
+        }
+
+        case 'dragon_wings': {
+            return {
+                type: 'dragon_wings',
+                name: feature.name,
+                action: auto.action || 'bonus_action',
+                duration: auto.duration || '1_hour',
+                flySpeed: auto.flySpeed || 60,
+                hover: auto.hover || false,
+                uses: auto.uses ?? 1,
+                recharge: auto.recharge || 'long_rest',
+                resourceCost: auto.resourceCost || '',
+                restoreCost: auto.restoreCost || 3,
+                hasAutomation: true
+            };
+        }
+
+        case 'dragon_companion': {
+            let usesMax = auto.uses || 1;
+            if (auto.uses_expression) {
+                usesMax = evaluateAutoExpression(auto.uses_expression, playerStats) || 1;
+            }
+            return {
+                type: 'dragon_companion',
+                name: feature.name,
+                spell: auto.spell || '',
+                uses: auto.uses || 1,
+                uses_expression: auto.uses_expression || '',
+                usesMax,
+                recharge: auto.recharge || 'long_rest',
+                action: auto.action || 'action',
+                noConcentration: false,
                 hasAutomation: true
             };
         }

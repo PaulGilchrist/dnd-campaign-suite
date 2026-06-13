@@ -27,13 +27,13 @@ export function getAffectedCreatures(overlay, players, placedItems, combatSummar
   return affected;
 }
 
-export function processAoeNpcs(combatSummary, affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName) {
+export function processAoeNpcs(combatSummary, affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName) {
   const results = [];
   for (const { creature } of affected) {
     if (creature.type !== 'npc') continue;
     const saveResult = rollSaveForCreature(creature, saveType, saveDc);
     const finalDamage = computeDamageAfterSave(rawDamage, saveResult.success, dcSuccess);
-    const applyResult = applyDamageToTarget(combatSummary, creature.name, finalDamage, [damageType], campaignName, null);
+    const applyResult = applyDamageToTarget(combatSummary, creature.name, finalDamage, [damageType], campaignName, null, false, attackerName);
     results.push({
       creatureName: creature.name,
       saveSuccess: saveResult.success,

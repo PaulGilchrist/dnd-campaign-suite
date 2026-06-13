@@ -221,7 +221,7 @@ describe('processAoeNpcs', () => {
 
   it('returns empty array for no affected creatures', () => {
     const cs = makeCombatSummary([]);
-    const result = processAoeNpcs(cs, [], 6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign');
+    const result = processAoeNpcs(cs, [], 6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', 'TestHero');
     expect(result).toEqual([]);
   });
 
@@ -304,10 +304,10 @@ describe('processAoeNpcs', () => {
     applyDamageToTarget.mockReturnValue({ finalDamage: 5, newHp: 15 });
 
     const cs = makeCombatSummary([npc]);
-    processAoeNpcs(cs, [{ creature: npc }], 5, 'Acid', 13, 'strength', 'half', 'MyCampaign');
+    processAoeNpcs(cs, [{ creature: npc }], 5, 'Acid', 13, 'strength', 'half', 'MyCampaign', 'TestHero');
 
     expect(applyDamageToTarget).toHaveBeenCalledWith(
-        cs, 'Troll', 5, ['Acid'], 'MyCampaign', null
+        cs, 'Troll', 5, ['Acid'], 'MyCampaign', null, false, 'TestHero'
         // rawDamage goes through computeDamageAfterSave first, then to applyDamageToTarget
     );
   });
@@ -367,7 +367,7 @@ describe('processAoeNpcs', () => {
     applyDamageToTarget.mockReturnValue({ finalDamage: 6, newHp: 14 });
 
     const cs = makeCombatSummary([npc]);
-    processAoeNpcs(cs, [{ creature: npc }], 6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign');
+    processAoeNpcs(cs, [{ creature: npc }], 6, 'Fire', 15, 'dexterity', 'half', 'TestCampaign', 'TestHero');
 
     expect(rollSaveForCreature).toHaveBeenCalledWith(npc, 'dexterity', 15);
   });

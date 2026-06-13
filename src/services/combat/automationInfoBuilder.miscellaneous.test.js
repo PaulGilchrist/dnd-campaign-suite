@@ -77,6 +77,20 @@ describe('buildAttackInfo – jack_of_all_trades', () => {
     })
 })
 
+describe('buildAttackInfo – reliable_talent', () => {
+    beforeEach(() => vi.clearAllMocks())
+
+    it('returns correct structure', () => {
+        const feature = { ...BASE_FEATURE, automation: { type: 'reliable_talent' } }
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result).toEqual({
+            type: 'reliable_talent',
+            name: 'Test Feature',
+            hasAutomation: true,
+        })
+    })
+})
+
 describe('buildAttackInfo – divine_order', () => {
     beforeEach(() => vi.clearAllMocks())
 

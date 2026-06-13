@@ -326,22 +326,30 @@ const rules = {
          }
 
           // 2024: College of Dance unarmored defense (AC = 10 + DEX + CHA, no armor or shield)
-         if (is2024(playerStats, playerSummary)) {
-             if (playerStats.class.subclass && playerStats.class.subclass.name === 'College of Dance' && !armorName && !shield) {
-                 const danceAc = 10 + dexterity.bonus + charisma.bonus;
-                 if (danceAc > armorClass) {
-                     armorClass = danceAc;
-                     contributions = [`Unarmored AC (10) + Dexterity Bonus (${dexterity.bonus}) + Charisma Bonus (${charisma.bonus})`];
-                  }
-              }
-              if (playerStats.class.name === 'Barbarian' && !armorName) {
-                 const barbarianAc = 10 + dexterity.bonus + constitution.bonus;
-                 if (barbarianAc > armorClass) {
-                     armorClass = barbarianAc;
-                     contributions = [`Unarmored AC (10) + Dexterity Bonus (${dexterity.bonus}) + Constitution Bonus (${constitution.bonus})`];
-                  }
-              }
-          }
+          // 2024: Draconic Sorcery unarmored defense (AC = 10 + DEX + CHA, no armor)
+          if (is2024(playerStats, playerSummary)) {
+              if (playerStats.class.subclass && playerStats.class.subclass.name === 'College of Dance' && !armorName && !shield) {
+                  const danceAc = 10 + dexterity.bonus + charisma.bonus;
+                  if (danceAc > armorClass) {
+                      armorClass = danceAc;
+                      contributions = [`Unarmored AC (10) + Dexterity Bonus (${dexterity.bonus}) + Charisma Bonus (${charisma.bonus})`];
+                   }
+               }
+               if (playerStats.class.major && playerStats.class.major.name === 'Draconic Sorcery' && !armorName) {
+                  const draconicAc = 10 + dexterity.bonus + charisma.bonus;
+                  if (draconicAc > armorClass) {
+                      armorClass = draconicAc;
+                      contributions = [`Unarmored AC (10) + Dexterity Bonus (${dexterity.bonus}) + Charisma Bonus (${charisma.bonus})`];
+                   }
+               }
+               if (playerStats.class.name === 'Barbarian' && !armorName) {
+                  const barbarianAc = 10 + dexterity.bonus + constitution.bonus;
+                  if (barbarianAc > armorClass) {
+                      armorClass = barbarianAc;
+                      contributions = [`Unarmored AC (10) + Dexterity Bonus (${dexterity.bonus}) + Constitution Bonus (${constitution.bonus})`];
+                   }
+               }
+           }
 
         return [armorClass, contributions.join(' + ')];
      },

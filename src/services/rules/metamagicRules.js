@@ -128,3 +128,24 @@ export function computeMetamagicCost(selectedOptionNames, optionsList, stats, pl
     return { totalCost, waivedName: null };
  }
 
+export function getPsionicSpellsList(playerStats) {
+    const passives = playerStats?.automation?.passives || [];
+    for (const passive of passives) {
+        if (passive.type === 'psionic_spells_list' && Array.isArray(passive.psionicSpells)) {
+            return passive.psionicSpells;
+        }
+    }
+    return [];
+}
+
+export function isPsionicSpell(playerStats, spellName) {
+    if (!spellName) return false;
+    const psionicSpells = getPsionicSpellsList(playerStats);
+    return psionicSpells.includes(spellName);
+}
+
+export function hasPsionicSorcery(playerStats) {
+    const passives = playerStats?.automation?.passives || [];
+    return passives.some(p => p.type === 'psionic_sorcery');
+}
+

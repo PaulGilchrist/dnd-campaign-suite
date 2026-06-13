@@ -372,6 +372,13 @@ describe('collectAutomationFromFeatures', () => {
     expect(result.passives.length).toBe(1)
   })
 
+  it('categorizes reliable_talent as passive', () => {
+    const features = [{ name: 'Reliable Talent', automation: { type: 'reliable_talent' } }]
+    const result = collectAutomationFromFeatures(features, {})
+    expect(result.passives.length).toBe(1)
+    expect(result.passives[0].type).toBe('reliable_talent')
+  })
+
   it('categorizes divine_order as passive', () => {
     const features = [{ name: 'Divine Order', automation: { type: 'divine_order' } }]
     const result = collectAutomationFromFeatures(features, {})

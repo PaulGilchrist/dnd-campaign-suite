@@ -175,6 +175,8 @@ describe('buildAttackInfo – passive_immunity', () => {
             name: 'Test Feature',
             target: 'self',
             conditionImmunity: '',
+            damageResistance: [],
+            saveAdvantage: [],
             hasAutomation: true,
         })
     })

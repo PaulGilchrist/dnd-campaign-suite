@@ -425,5 +425,27 @@ describe('saveModifierApplies with unknown conditions', () => {
       const effects = computeConditionEffects([], saveModifiers, [], false, true)
       expect(effects.saveAdvantageCount).toBe(1)
     })
+
+    it('applies reliable_talent effect to ability checks', () => {
+      const saveModifiers = [{
+        source: 'Reliable Talent',
+        target: 'ability_check',
+        condition: '',
+        effect: 'reliable_talent'
+      }]
+      const effects = computeConditionEffects([], saveModifiers)
+      expect(effects.reliableTalent).toBe(true)
+    })
+
+    it('does not set reliable_talent when no matching modifier', () => {
+      const saveModifiers = [{
+        source: 'Jack of All Trades',
+        target: 'ability_check',
+        condition: 'jack_of_all_trades',
+        effect: 'advantage'
+      }]
+      const effects = computeConditionEffects([], saveModifiers)
+      expect(effects.reliableTalent).toBe(false)
+    })
   })
 })

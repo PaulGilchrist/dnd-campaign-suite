@@ -59,6 +59,12 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
         if (effect.type === 'steady_aim_clear') {
             applySteadyAimClearTurnStart(activeName, playerStats, effect, campaignName);
         }
+        if (effect.type === 'supreme_sneak') {
+            applySupremeSneakTurnStart(activeName, playerStats, effect, campaignName);
+        }
+        if (effect.type === 'use_magic_device') {
+            applyUseMagicDeviceTurnStart(activeName, playerStats, effect, campaignName);
+        }
     }
 
     // Clean up Multiattack Defense effects at start of each creature's turn
@@ -253,6 +259,30 @@ async function applySteadyAimClearTurnStart(activeName, playerStats, effect, cam
     await setRuntimeValue(activeName, 'steadyAimSpeedZero', false, campaignName);
 }
 
+async function applySupremeSneakTurnStart(activeName, playerStats, effect, campaignName) {
+    // At the start of a new turn, check if the player had Stealth Attack active
+    // and Invisible condition. If so, preserve the Invisible condition (assuming
+    // they were behind 3/4 or Total Cover at end of their turn).
+    const stealthAttackCost = getRuntimeValue(activeName, 'stealthAttackCost', campaignName);
+    if (!stealthAttackCost || stealthAttackCost <= 0) return;
+
+    const storedConditions = getRuntimeValue(activeName, 'activeConditions') || [];
+    const hasInvisible = storedConditions.some(c => String(c).toLowerCase() === 'invisible');
+
+    if (hasInvisible) {
+        // Preserve Invisible condition — don't remove it
+        // Clear the Stealth Attack cost flag
+        await setRuntimeValue(activeName, 'stealthAttackCost', 0, campaignName);
+    }
+}
+
+async function applyUseMagicDeviceTurnStart(_activeName, _playerStats, _effect, _campaignName) {
+    // Use Magic Device: No per-turn state to manage.
+    // The passive effects (attunement limit, charge reroll, scroll handling)
+    // are applied continuously via saveModifiers and passive effects.
+    // This turn start handler is a no-op placeholder for future state management.
+}
+
 export function addExpiration(attackerName, targetName, effects, campaignName, rounds) {
     const list = getRuntimeValue(attackerName, KEY) || [];
     const currentRound = getCurrentCombatRound();
@@ -381,6 +411,19 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                         targetName,
                         'activeBuffs',
                         buffs.filter(b => b.effect !== 'fly_speed_20_hover'),
+                        campaignName
+                    );
+                }
+                break;
+            }
+
+            case 'dragon_wings': {
+                const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                if (Array.isArray(buffs)) {
+                    setRuntimeValue(
+                        targetName,
+                        'activeBuffs',
+                        buffs.filter(b => b.effect !== 'dragon_wings'),
                         campaignName
                     );
                 }

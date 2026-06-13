@@ -4,6 +4,7 @@ import { rules2024 } from '../character/race-rules/index.js';
 import classRules from '../character/classRules.js';
 import classRules2024 from '../character/classRules2024.js';
 import { computeTrackedResources } from './trackedResources.js';
+import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 
 const rulesFactory = {
       /**
@@ -142,6 +143,17 @@ const rulesFactory = {
             ])];
         }
 
+        // Resolve passive_immunity damageResistance (e.g., Psychic Defenses)
+        const passiveImmunityResistances = (playerStats.automation?.passives || [])
+            .filter(p => p.type === 'passive_immunity' && Array.isArray(p.damageResistance))
+            .flatMap(p => p.damageResistance);
+        if (passiveImmunityResistances.length) {
+            playerStats.resistances = [...new Set([
+                ...(playerStats.resistances || []),
+                ...passiveImmunityResistances
+            ])];
+        }
+
         // Resolve land_resistance automation (Circle of the Land Nature's Ward)
         const landResistances = (playerStats.automation?.passives || [])
             .filter(p => p.type === 'land_resistance')
@@ -155,6 +167,15 @@ const rulesFactory = {
             playerStats.resistances = [...new Set([
                 ...(playerStats.resistances || []),
                 ...landResistances
+            ])];
+        }
+
+        // Resolve Elemental Affinity damage type resistance (2024 Draconic Sorcery)
+        const elementalAffinityType = getRuntimeValue(playerStats.name, '_Elemental_Affinity_chosenType', playerSummary.campaignName);
+        if (elementalAffinityType) {
+            playerStats.resistances = [...new Set([
+                ...(playerStats.resistances || []),
+                elementalAffinityType
             ])];
         }
 

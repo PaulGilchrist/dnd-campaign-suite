@@ -81,3 +81,23 @@ export function hasTacticalShift(playerStats) {
     const passives = playerStats.automation?.passives || [];
     return passives.some(p => p.type === 'passive_rule' && p.effect === 'tactical_shift_no_oa');
 }
+
+export function hasDamageResistance(playerStats, damageType) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p =>
+        p.type === 'passive_immunity' &&
+        Array.isArray(p.damageResistance) &&
+        p.damageResistance.some(d => d.toLowerCase() === String(damageType).toLowerCase())
+    );
+}
+
+export function getDamageResistances(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    const resistances = [];
+    for (const passive of passives) {
+        if (passive.type === 'passive_immunity' && Array.isArray(passive.damageResistance)) {
+            resistances.push(...passive.damageResistance);
+        }
+    }
+    return [...new Set(resistances)];
+}

@@ -24,6 +24,7 @@ export const featuresToIgnore = [
     "Paladin Subclass",
     "Rage",
     "Ranger Subclass",
+    "Assassin's Tools",
     "Rogue Subclass",
     "Sorcerer Subclass",
     "Spellcasting",
@@ -78,7 +79,8 @@ export const reactions = [
     "Opportunity Attack",
     "Riposte",
     "Shield Block",
-    "Soul of Vengeance"
+    "Soul of Vengeance",
+    "Uncanny Dodge"
 ];
 
 export const characterAdvancement = [
@@ -88,6 +90,8 @@ export const characterAdvancement = [
     "Deft Explorer",
     "Divine Order",
     "Draconic Ancestry",
+    "Draconic Resilience",
+    "Draconic Spells",
     "Druidic",
     "Dwarven Toughness",
     "Elfish Lineage",

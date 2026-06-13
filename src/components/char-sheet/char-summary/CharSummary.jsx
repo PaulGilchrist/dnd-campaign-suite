@@ -176,6 +176,10 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     let buffSpeedBonus = 0;
     let iceWalkActive = false;
     let acrobaticMovementActive = false;
+    let seeInvisibleRange = null;
+    let narrowSpaceActive = false;
+    let glisteningFlightHover = false;
+    let dragonWingsHover = false;
     activeBuffs.forEach(buff => {
         if (buff.effect === 'fly_speed_equals_walk_speed' || buff.flySpeed) flySpeed = speed;
         if (buff.effect === 'fly_speed_20_hover') flySpeed = 20;
@@ -183,6 +187,11 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         if (buff.effect === 'avenging_angel_flight') flySpeed = buff.flySpeed || 60;
         if (buff.effect === 'speed_boost' && buff.speedBonus) buffSpeedBonus += buff.speedBonus;
         if (buff.effect === 'ice_walk') iceWalkActive = true;
+        if (buff.effect === 'glistening_flight') { flySpeed = speed; glisteningFlightHover = true; }
+        if (buff.effect === 'dragon_wings') { flySpeed = buff.flySpeed || 60; dragonWingsHover = true; }
+        if (buff.effect === 'aquatic_adaptation') swimSpeed = speed * 2;
+        if (buff.effect === 'see_the_invisible') seeInvisibleRange = 60;
+        if (buff.effect === 'wormhole_movement') narrowSpaceActive = true;
     });
     const acrobaticMovementPassive = (playerStats.automation?.passives || []).find(p => p.effect === 'acrobatic_movement');
     if (acrobaticMovementPassive && !hasArmorOrShield) {
@@ -262,7 +271,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                 <div>
                     <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{circleFormsACOverride ?? playerStats.armorClass}</div>
                     <CharHitPoints playerStats={playerStats} campaignName={campaignName}></CharHitPoints>
-                      <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeedWithBuff}{playerStats.climbSpeed ? `, climb ${playerStats.climbSpeed}` : ''}{playerStats.swimSpeed ? `, swim ${playerStats.swimSpeed}` : ''}{swimSpeed !== null ? `, swim ${swimSpeed}` : ''}{flySpeed !== null ? `, fly ${flySpeed + auraSpeedBonus}` : ''}{iceWalkActive ? ', ice walk' : ''}{acrobaticMovementActive ? ', acrobatic movement' : ''}</span> ft.{auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}<br />
+                      <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeedWithBuff}{playerStats.climbSpeed ? `, climb ${playerStats.climbSpeed}` : ''}{playerStats.swimSpeed ? `, swim ${playerStats.swimSpeed}` : ''}{swimSpeed !== null ? `, swim ${swimSpeed}` : ''}{flySpeed !== null ? `, fly ${flySpeed + auraSpeedBonus}${(glisteningFlightHover || dragonWingsHover) ? ' (hover)' : ''}` : ''}{iceWalkActive ? ', ice walk' : ''}{acrobaticMovementActive ? ', acrobatic movement' : ''}</span> ft.{auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}<br />
                     <CharGold playerStats={playerStats} campaignName={campaignName}></CharGold>
                 </div>
                 <div>
@@ -270,6 +279,8 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     <span className={'clickable' + (exhaustionLevel > 0 ? ' stat--penalized' : '')} onClick={() => rollInitiative(effectiveInitiative, playerStats.initiativeAdvantage ? { forcedMode: 'advantage' } : undefined)}><b>Initiative: </b>{signFormatter.format(effectiveInitiative)}</span><br />
                     <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiration} /><br />
                     {flyBuffActive && <span className="automation-badge">{flyBuffName} Active</span>}
+                    {seeInvisibleRange && <span className="automation-badge">See Invisible {seeInvisibleRange} ft</span>}
+                    {narrowSpaceActive && <span className="automation-badge">Narrow Space</span>}
                 </div>
                 <div>
                     <CharFeats playerStats={playerStats} showPopup={(feat) => {

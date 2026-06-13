@@ -63,7 +63,7 @@ describe('featureCategories2024', () => {
 
     it('should contain reaction features', () => {
       expect(reactions).toContain('Opportunity Attack');
-      expect(reactions).not.toContain('Uncanny Dodge');
+      expect(reactions).toContain('Uncanny Dodge');
       expect(reactions).not.toContain('Deflect Attacks');
           });
        });

@@ -123,6 +123,21 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const targetRiderForTarget = allTargetEffects.filter(te => te.target === target?.name)
     const targetEffectData = computeConditionEffects(targetConditions, [], targetRiderForTarget)
 
+    // Elusive: No attack roll can have Advantage against you unless you have the Incapacitated condition
+    const targetIsPlayer = target?.type === 'player'
+    if (targetIsPlayer && targetComputed) {
+      const hasElusive = [
+        ...(targetComputed.actions || []),
+        ...(targetComputed.bonusActions || []),
+        ...(targetComputed.reactions || []),
+        ...(targetComputed.specialActions || [])
+      ].some(a => a.name === 'Elusive')
+      const isIncapacitated = targetConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
+      if (hasElusive && !isIncapacitated) {
+        targetEffectData.targetDisadvantageCount = (targetEffectData.targetDisadvantageCount || 0) + 1
+      }
+    }
+
     const attackRange = action?.reach ? rangeToFeet(action.reach) : (action?.range ? rangeToFeet(action.range) : 30);
     const forcedMode = combineAttackModes(attackerEffects, targetEffectData, attackRange)
 

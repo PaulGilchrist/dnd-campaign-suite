@@ -45,9 +45,21 @@ export function collectTurnStartEffects(features) {
                     bonusExpression: auto.bonusExpression || '10',
                 })
             }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'supreme_sneak') {
+                effects.push({
+                    type: 'supreme_sneak',
+                    name: feature.name,
+                })
+            }
             if (auto?.type === 'passive_rule' && auto?.effect === 'umbral_sight') {
                 effects.push({
                     type: 'umbral_sight',
+                    name: feature.name,
+                })
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'mage_hand_legerdemain') {
+                effects.push({
+                    type: 'mage_hand_legerdemain',
                     name: feature.name,
                 })
             }
@@ -94,6 +106,13 @@ export function collectTurnStartEffects(features) {
                 effects.push({
                     type: 'hunter_lore',
                     name: feature.name,
+                })
+            }
+            if (auto?.type === 'use_magic_device') {
+                effects.push({
+                    type: 'use_magic_device',
+                    name: feature.name,
+                    attunementLimit: auto.attunementLimit || 4,
                 })
             }
         }
@@ -197,7 +216,16 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'condition_immunity_while_active':
             case 'resistance':
             case 'land_resistance':
-            case 'auto_effect':
+            case 'psionic_sorcery':
+            case 'psionic_spells_list':
+            case 'auto_effect': {
+                if (auto.effect === 'psychic_teleportation') {
+                    result.bonusActions.push(info)
+                } else {
+                    result.passives.push(info)
+                }
+                break
+            }
             case 'resource_restoration':
             case 'font_of_inspiration':
             case 'conditional_advantage':
@@ -212,6 +240,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'post_cast_inspiring_smite':
             case 'multi_target_spread':
             case 'jack_of_all_trades':
+            case 'reliable_talent':
             case 'divine_order':
             case 'moonlight_step_rider':
             case 'damage_type_modifier':
@@ -383,11 +412,67 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'steady_aim':
                 result.bonusActions.push(info)
                 break
+            case 'mage_hand_control':
+                result.bonusActions.push(info)
+                break
+            case 'magical_ambush':
+                result.passives.push(info)
+                break
+            case 'versatile_trickster':
+                result.passives.push(info)
+                break
+            case 'stroke_of_luck':
+                result.passives.push(info)
+                break
+            case 'spell_thief':
+                result.reactions.push(info)
+                break
+            case 'fast_hands':
+                result.bonusActions.push(info)
+                break
+            case 'stealth_attack':
+                result.actions.push(info)
+                break
+            case 'revelation_in_flesh':
+                result.specialActions.push(info)
+                break
+            case 'supreme_sneak':
+                result.passives.push(info)
+                break
+            case 'use_magic_device':
+                result.passives.push(info)
+                result.specialActions.push(info)
+                break
             case 'peerless_athlete':
                 result.specialActions.push(info)
                 break
             case 'save_proficiency':
                 result.passives.push(info)
+                break
+            case 'restore_balance':
+                result.reactions.push(info)
+                break
+            case 'bastion_of_law':
+                result.actions.push(info)
+                break
+            case 'transe_of_order':
+                result.specialActions.push(info)
+                break
+            case 'clockwork_cavalcade':
+                if (info.action === 'bonus_action') {
+                    result.bonusActions.push(info)
+                } else {
+                    result.actions.push(info)
+                }
+                break
+            case 'damage_type_choice':
+                result.passives.push(info)
+                break
+            case 'dragon_wings':
+                result.specialActions.push(info)
+                break
+            case 'dragon_companion':
+                result.actions.push(info)
                 break
             default:
                 result.specialActions.push(info)

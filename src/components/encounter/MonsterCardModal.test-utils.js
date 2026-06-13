@@ -21,8 +21,9 @@ export const defaultConditionEffects = {
    autoRerollCondition: null,
    autoRerollBonus: null,
    strSaveReplace: false,
-   strCheckReplace: false,
-   tacticalMind: false,
+    strCheckReplace: false,
+    reliableTalent: false,
+    tacticalMind: false,
    tacticalMindBonus: null,
 };
 

@@ -20,7 +20,8 @@ export async function handle(action, playerStats, campaignName) {
     // Check once-per-turn usage
     if (auto.oncePerTurn) {
         const currentRound = getCurrentCombatRound();
-        const usedRound = getRuntimeValue(playerStats.name, '_CunningAction_usedRound', campaignName);
+        const trackingKey = action.name === 'Fast Hands' ? '_FastHands_usedRound' : '_CunningAction_usedRound';
+        const usedRound = getRuntimeValue(playerStats.name, trackingKey, campaignName);
         if (usedRound === currentRound) {
             return {
                 type: 'popup',
@@ -63,7 +64,8 @@ export function applyBonusActionChoice(action, playerStats, campaignName, chosen
     // Track once-per-turn usage
     if (auto.oncePerTurn) {
         const currentRound = getCurrentCombatRound();
-        setRuntimeValue(playerStats.name, '_CunningAction_usedRound', currentRound, campaignName, true);
+        const trackingKey = action.name === 'Fast Hands' ? '_FastHands_usedRound' : '_CunningAction_usedRound';
+        setRuntimeValue(playerStats.name, trackingKey, currentRound, campaignName, true);
     }
 
     // Apply the chosen effect
@@ -77,6 +79,15 @@ export function applyBonusActionChoice(action, playerStats, campaignName, chosen
             break;
         case 'Hide':
             description = `You attempt to Hide. Make a Dexterity (Stealth) check to try to become hidden from creatures until the end of the turn.`;
+            break;
+        case 'Sleight of Hand':
+            description = `You use Fast Hands to make a Dexterity (Sleight of Hand) check — pick pocket, palming a small object, hiding a small item, etc.`;
+            break;
+        case 'Thieves\' Tools':
+            description = `You use Fast Hands to use thieves' tools to pick a lock or disarm a trap.`;
+            break;
+        case 'Use an Object':
+            description = `You use Fast Hands to use an object. Using a magic item that requires an action uses the Utilize action. Normal objects use the standard Action.`;
             break;
         default:
             description = `${action.name}: ${option.description}`;

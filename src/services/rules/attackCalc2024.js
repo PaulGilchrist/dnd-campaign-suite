@@ -99,6 +99,81 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
         attacks.push(...buildSpellAttacks(playerStats.spellAbilities.spells, allSpells, playerStats.spellAbilities, playerStats.level));
     }
 
+    // Soulknife (2024): Psychic Blade attacks
+    if (playerStats.class?.name === 'Rogue' && playerStats.class?.major?.name === 'Soulknife' && playerStats.level >= 3) {
+        const dexAbility = dexterity;
+        const dexMod = dexAbility?.bonus || 0;
+        const prof = proficiency;
+        const intAbility = playerStats.abilities.find(a => a.name === 'Intelligence');
+        const intMod = intAbility?.bonus || 0;
+        const abilityBonus = Math.max(dexMod, intMod);
+        const abilityName = dexMod >= intMod ? 'Dexterity' : 'Intelligence';
+
+        // Primary Psychic Blade (1d6 Psychic, Finesse, Thrown 60/120)
+        attacks.push({
+            name: 'Psychic Blade',
+            attackType: 'melee',
+            isRanged: false,
+            range: '5_ft',
+            toHit: abilityBonus + prof,
+            hitBonusFormula: `To Hit Bonus = ${abilityName} Modifier (${abilityBonus}) + Proficiency (${prof})`,
+            damageFormula: `Damage Formula = 1d6 + ${abilityName} Modifier (${abilityBonus})`,
+            damage: {
+                damage_dice: '1d6',
+                damage_type: 'Psychic',
+                damage_at_character_level: { [playerStats.level]: `1d6 + ${abilityBonus}` },
+            },
+            abilityName,
+            actionType: 'Action',
+            properties: ['Finesse', 'Thrown (60/120)'],
+            damageType: 'Psychic',
+            isPsychicBlade: true,
+        });
+
+        // Ranged Psychic Blade variant
+        attacks.push({
+            name: 'Psychic Blade (Ranged)',
+            attackType: 'ranged',
+            isRanged: true,
+            range: '60_ft',
+            toHit: abilityBonus + prof,
+            hitBonusFormula: `To Hit Bonus = ${abilityName} Modifier (${abilityBonus}) + Proficiency (${prof})`,
+            damageFormula: `Damage Formula = 1d6 + ${abilityName} Modifier (${abilityBonus})`,
+            damage: {
+                damage_dice: '1d6',
+                damage_type: 'Psychic',
+                damage_at_character_level: { [playerStats.level]: `1d6 + ${abilityBonus}` },
+            },
+            abilityName,
+            actionType: 'Action',
+            properties: ['Finesse', 'Thrown (60/120)'],
+            damageType: 'Psychic',
+            isPsychicBlade: true,
+        });
+
+        // Bonus Action Psychic Blade (1d4 Psychic)
+        attacks.push({
+            name: 'Psychic Blade (Bonus Action)',
+            attackType: 'melee',
+            isRanged: false,
+            range: '5_ft',
+            toHit: abilityBonus + prof,
+            hitBonusFormula: `To Hit Bonus = ${abilityName} Modifier (${abilityBonus}) + Proficiency (${prof})`,
+            damageFormula: `Damage Formula = 1d4 + ${abilityName} Modifier (${abilityBonus})`,
+            damage: {
+                damage_dice: '1d4',
+                damage_type: 'Psychic',
+                damage_at_character_level: { [playerStats.level]: `1d4 + ${abilityBonus}` },
+            },
+            abilityName,
+            actionType: 'Bonus Action',
+            properties: ['Finesse'],
+            damageType: 'Psychic',
+            isPsychicBlade: true,
+            isBonusActionBlade: true,
+        });
+    }
+
     // Starry Form: Archer constellation - ranged spell attack
     const starryFormBuff = (playerStats.activeBuffs || []).find(b => b.name === 'Starry Form' && b.constellation === 'Archer');
     if (starryFormBuff) {

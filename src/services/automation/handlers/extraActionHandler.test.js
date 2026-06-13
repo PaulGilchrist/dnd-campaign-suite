@@ -7,10 +7,16 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
+vi.mock('../../../services/encounters/combatData.js', () => ({
+  getCurrentCombatRound: vi.fn(),
+  loadCombatSummary: vi.fn(),
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './extraActionHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getCurrentCombatRound, loadCombatSummary } from '../../../services/encounters/combatData.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -282,6 +288,81 @@ describe('extraActionHandler.handle', () => {
       await handle(action, ps, campaignName);
 
       expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionsurgeUsedThisTurn', true, campaignName, true);
+    });
+  });
+
+  describe('oncePerCombat', () => {
+    beforeEach(() => {
+      vi.mocked(getCurrentCombatRound).mockReturnValue(1);
+      vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [] });
+    });
+
+    it('should return once-per-combat popup when round > 1', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction({ oncePerCombat: true, uses: 1 });
+
+      vi.mocked(loadCombatSummary).mockResolvedValue({ round: 2, creatures: [] });
+
+      const result = await handle(action, ps, campaignName);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toBe('Action Surge can only be used once per combat.');
+    });
+
+    it('should succeed when round is 1', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction({ oncePerCombat: true, uses: 1 });
+
+      vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [] });
+
+      const result = await handle(action, ps, campaignName);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+    });
+
+    it('should set uses to 0 after use when oncePerCombat is true', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction({ oncePerCombat: true, uses: 1 });
+
+      vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [] });
+
+      await handle(action, ps, campaignName);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionsurgeUses', 0, campaignName, true);
+    });
+  });
+
+  describe('firstRoundOnly', () => {
+    beforeEach(() => {
+      vi.mocked(getCurrentCombatRound).mockReturnValue(1);
+      vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [] });
+    });
+
+    it('should return first-round-only popup when round > 1', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction({ firstRoundOnly: true, uses: 1 });
+
+      vi.mocked(getCurrentCombatRound).mockReturnValue(2);
+
+      const result = await handle(action, ps, campaignName);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toBe('Action Surge can only be used in the first round of combat.');
+    });
+
+    it('should succeed when round is 1', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction({ firstRoundOnly: true, uses: 1 });
+
+      vi.mocked(getCurrentCombatRound).mockReturnValue(1);
+
+      const result = await handle(action, ps, campaignName);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
     });
   });
 });

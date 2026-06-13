@@ -193,6 +193,13 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             gloriousDefenseBonus = Number(getRuntimeValue(playerName, 'gloriousDefenseBonus', campaignName) || 1);
         }
 
+        // Stroke of Luck: check if the player has the passive available
+        const hasStrokeOfLuck = (playerStats.automation?.passives || []).some(
+            p => p.type === 'stroke_of_luck'
+        );
+        const strokeOfLuckUsed = hasStrokeOfLuck ? getRuntimeValue(playerName, 'strokeOfLuckUsed', campaignName) : false;
+        const strokeOfLuckAvailable = hasStrokeOfLuck && !strokeOfLuckUsed;
+
         return {
             damageType: attack.damageType,
             resistanceNotice,
@@ -213,6 +220,9 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             hitBonusFormula,
             sacredWeaponBonus,
             gloriousDefenseBonus,
+            strokeOfLuck: strokeOfLuckAvailable,
+            isPsychicBlade: attack.isPsychicBlade === true,
+            playerStats,
         };
        });
 }

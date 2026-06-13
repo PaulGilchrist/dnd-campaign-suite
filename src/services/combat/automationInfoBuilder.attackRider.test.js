@@ -78,6 +78,11 @@ describe('buildAttackInfo – attack_rider', () => {
             saveType: null,
             saveDc: null,
             saveAbility: null,
+            damageDoubled: false,
+            restoreCost: null,
+            uses: null,
+            recharge: 'long_rest',
+            casting_time: 'passive',
             hasAutomation: true,
         })
     })

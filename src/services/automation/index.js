@@ -85,6 +85,22 @@ import { handle as handleSuperiorHunterPrey } from './handlers/superiorHunterPre
 import { handle as handleSuperiorHunterDefense } from './handlers/superiorHunterDefenseHandler.js';
 import { handle as handleBonusActionChoice } from './handlers/bonusActionChoiceHandler.js';
 import { handle as handleSteadyAim } from './handlers/steadyAimHandler.js';
+import { handle as handleStrokeOfLuck } from './handlers/strokeOfLuckHandler.js';
+import { handle as handleMageHandControl } from './handlers/mageHandControlHandler.js';
+import { handle as handleSpellThief } from './handlers/spellThiefHandler.js';
+import { handle as handlePsychicTeleportation } from './handlers/psychicTeleportationHandler.js';
+import { handle as handleFastHands } from './handlers/fastHandsHandler.js';
+import { handle as handleStealthAttack } from './handlers/stealthAttackHandler.js';
+import { handle as handleUseMagicDevice } from './handlers/useMagicDeviceHandler.js';
+import { handle as handleRevelationInFlesh } from './handlers/revelationInFleshHandler.js';
+import { handle as handleWarpingImplosion } from './handlers/warpingImplosionHandler.js';
+import { handle as handleRestoreBalance } from './handlers/restoreBalanceHandler.js';
+import { handle as handleBastionOfLaw } from './handlers/bastionOfLawHandler.js';
+import { handle as handleTranseOfOrder } from './handlers/transeOfOrderHandler.js';
+import { handle as handleClockworkCavalcade } from './handlers/clockworkCavalcadeHandler.js';
+import { handle as handleElementalAffinity } from './handlers/elementalAffinityHandler.js';
+import { handle as handleDragonWings } from './handlers/dragonWingsHandler.js';
+import { handle as handleDragonCompanion, confirmDragonCompanion as handleDragonCompanionConfirm } from './handlers/dragonCompanionHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -194,6 +210,23 @@ const HANDLER_MAP = {
         superior_hunter_defense: handleSuperiorHunterDefense,
         bonus_action_choice: handleBonusActionChoice,
         steady_aim: handleSteadyAim,
+        stroke_of_luck: handleStrokeOfLuck,
+        mage_hand_control: handleMageHandControl,
+        spell_thief: handleSpellThief,
+        psychic_teleportation: handlePsychicTeleportation,
+        fast_hands: handleFastHands,
+        stealth_attack: handleStealthAttack,
+        use_magic_device: handleUseMagicDevice,
+        revelation_in_flesh: handleRevelationInFlesh,
+        warping_implosion: handleWarpingImplosion,
+         restore_balance: handleRestoreBalance,
+         bastion_of_law: handleBastionOfLaw,
+         transe_of_order: handleTranseOfOrder,
+          clockwork_cavalcade: handleClockworkCavalcade,
+          elemental_affinity: handleElementalAffinity,
+           dragon_wings: handleDragonWings,
+           dragon_companion: handleDragonCompanion,
+           dragon_companion_confirm: handleDragonCompanionConfirm,
 };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;

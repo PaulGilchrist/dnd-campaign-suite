@@ -295,8 +295,22 @@ const RangerFeatures = function RangerFeatures({ playerStats }) {
 };
 
 /* ─── Rogue ─── */
-const RogueFeatures = function RogueFeatures({ playerStats }) {
+const RogueFeatures = function RogueFeatures({ playerStats, campaignName }) {
     const rogueFeatures = getClassFeatures(playerStats);
+    const stealthAttackActive = getRuntimeValue(playerStats.name, 'stealthAttackCost', campaignName) > 0;
+
+    const handleSupremeSneak = async () => {
+        if (stealthAttackActive) {
+            await setRuntimeValue(playerStats.name, 'stealthAttackCost', 0, campaignName);
+            return;
+        }
+        const sneakAttackDice = rogueFeatures?.sneakAttack?.dice_count || 0;
+        if (sneakAttackDice < 1) {
+            return;
+        }
+        await setRuntimeValue(playerStats.name, 'stealthAttackCost', 1, campaignName);
+    };
+
     return (
          <div data-testid="char-class-rogue">
              <div><b>Sneak Attack Damage: </b>+{rogueFeatures?.sneakAttack?.dice_count || 0}d{rogueFeatures?.sneakAttack?.dice_value || 0}</div>
@@ -306,7 +320,11 @@ const RogueFeatures = function RogueFeatures({ playerStats }) {
                      <i className="fas fa-user-ninja"></i> Sneak Attack ({rogueFeatures?.sneakAttack?.dice_count || 0}d{rogueFeatures?.sneakAttack?.dice_value || 0})
                  </button>
                  {playerStats.level >= 9 && (
-                     <button className="automation-btn" title="Supreme Sneak: Advantage on Stealth if you move no more than half speed">
+                     <button
+                         className={'automation-btn' + (stealthAttackActive ? ' automation-btn--active' : '')}
+                         onClick={handleSupremeSneak}
+                         title={stealthAttackActive ? "Supreme Sneak: Stealth Attack active — next attack costs 1d6 Sneak Attack, Invisible preserved with cover" : "Supreme Sneak: Activate Stealth Attack (costs 1d6 Sneak Attack, preserves Invisible with cover)"}
+                     >
                          <i className="fas fa-eye-slash"></i> Supreme Sneak
                      </button>
                  )}
@@ -321,6 +339,13 @@ const SorcererFeatures = function SorcererFeatures({ playerStats, campaignName }
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     const innateSorceryActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Innate Sorcery');
     const hasRestoration = (playerStats.automation?.passives ?? []).some(a => a.type === 'resource_restoration');
+    const revelationOption = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'Revelation in Flesh') || null) : null;
+    const REVELATION_EFFECTS = {
+        'aquatic_adaptation': 'Aquatic Adaptation',
+        'glistening_flight': 'Glistening Flight',
+        'see_the_invisible': 'See the Invisible',
+        'wormhole_movement': 'Wormhole Movement',
+    };
     return (
             <div data-testid="char-class-sorcerer">
                    <TrackedResourceInput label="Sorcery Points" resourceKey="sorceryPoints" playerName={playerStats.name} getMax={() => sorcererFeatures?.maxSorceryPoints || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
@@ -328,6 +353,7 @@ const SorcererFeatures = function SorcererFeatures({ playerStats, campaignName }
                    {hasRestoration && <TrackedResourceInput label="Sorcerous Restoration" resourceKey="sorcerousRestorationUses" playerName={playerStats.name} getMax={() => 1} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />}
                     <TrackedResourceInput label="Innate Sorcery" resourceKey="innateSorceryUses" playerName={playerStats.name} getMax={() => sorcererFeatures?.maxInnateSorcery || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
                   {innateSorceryActive && <span className="automation-badge">+1 Save DC, Spell Adv</span>}
+                  {revelationOption && <span className="automation-badge">{REVELATION_EFFECTS[revelationOption.effect] || 'Revelation in Flesh'}</span>}
                   {sorcererFeatures?.creatingSpellSlotCosts?.length > 0 && <div><b>Spell Slot (level 1-5) Costs: </b>{sorcererFeatures.creatingSpellSlotCosts.join(', ')}</div>}
 
             </div>

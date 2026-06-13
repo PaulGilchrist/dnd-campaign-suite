@@ -2,7 +2,7 @@
     {
         "index": "barbarian",
         "name": "Barbarian",
-        "class_description": "<p><b>A fierce warrior of primal rage.</b></p><p>Barbarians are mighty warriors who are powered by primal forces of the multiverse that manifest as a Rage. More than a mere emotion\u2014and not limited to anger\u2014this Rage is an incarnation of a predator's ferocity, a storm's fury, and a sea's turmoil. Some Barbarians personify their Rage as a fierce spirit or revered forebear. Others see it as a connection to the pain and anguish of the world, as an impersonal tangle of wild magic, or as an expression of their own deepest self. For every Barbarian, their Rage is a power that fuels not just battle prowess, but also uncanny reflexes and heightened senses. Barbarians often serve as protectors and leaders in their communities. They charge headlong into danger so those under their protection don't have to. Their courage in the face of danger makes Barbarians perfectly suited for adventure.</p>",
+        "class_description": "<p><b>A fierce warrior of primal rage.</b></p><p>Barbarians are mighty warriors who are powered by primal forces of the multiverse that manifest as a Rage. More than a mere emotion—and not limited to anger—this Rage is an incarnation of a predator's ferocity, a storm's fury, and a sea's turmoil. Some Barbarians personify their Rage as a fierce spirit or revered forebear. Others see it as a connection to the pain and anguish of the world, as an impersonal tangle of wild magic, or as an expression of their own deepest self. For every Barbarian, their Rage is a power that fuels not just battle prowess, but also uncanny reflexes and heightened senses. Barbarians often serve as protectors and leaders in their communities. They charge headlong into danger so those under their protection don't have to. Their courage in the face of danger makes Barbarians perfectly suited for adventure.</p>",
         "primary_ability": "Strength",
         "hit_point_die": "12",
         "weapon_proficiencies": "Simple and Martial weapons",
@@ -4039,7 +4039,7 @@
     {
         "index": "fighter",
         "name": "Fighter",
-        "class_description": "<p><b>Fighters rule the battlefields.</b></p><p>Questing knights, loyal champions, elite soldiers, and hardened mercenaries\u2014as Fighters, they all share an unparalleled prowess with weapons and armor. And they are well acquainted with death, both meeting it out and defying it. Fighters master various weapon techniques, and a well-equipped Fighter always has the right tool at hand for any combat situation. Likewise, a Fighter is adept with every form of armor. Beyond that basic degree of familiarity, each Fighter specializes in certain styles of combat. Some concentrate on archery, some on fighting with two weapons at once, and some on augmenting their martial skills with magic. This combination of broad ability and extensive specialization makes Fighters superior combatants.</p>",
+        "class_description": "<p><b>Fighters rule the battlefields.</b></p><p>Questing knights, loyal champions, elite soldiers, and hardened mercenaries—as Fighters, they all share an unparalleled prowess with weapons and armor. And they are well acquainted with death, both meeting it out and defying it. Fighters master various weapon techniques, and a well-equipped Fighter always has the right tool at hand for any combat situation. Likewise, a Fighter is adept with every form of armor. Beyond that basic degree of familiarity, each Fighter specializes in certain styles of combat. Some concentrate on archery, some on fighting with two weapons at once, and some on augmenting their martial skills with magic. This combination of broad ability and extensive specialization makes Fighters superior combatants.</p>",
         "primary_ability": "Strength or Dexterity",
         "hit_point_die": "10",
         "skill_proficiencies": "Choose 2: Acrobatics, Animal Handling, Athletics, History, Insight, Intimidation, Persuasion, Perception, or Survival",
@@ -8106,7 +8106,10 @@
                         "automation": {
                             "type": "save_proficiency",
                             "saveType": "Wisdom",
-                            "fallbackTypes": ["Intelligence", "Charisma"],
+                            "fallbackTypes": [
+                                "Intelligence",
+                                "Charisma"
+                            ],
                             "casting_time": "passive"
                         }
                     },
@@ -8346,9 +8349,18 @@
                         "automation": {
                             "type": "bonus_action_choice",
                             "options": [
-                                { "name": "Dash", "description": "Double your movement speed until the end of the turn" },
-                                { "name": "Disengage", "description": "Your movement doesn't provoke opportunity attacks until the end of the turn" },
-                                { "name": "Hide", "description": "Attempt to hide from creatures until the end of the turn" }
+                                {
+                                    "name": "Dash",
+                                    "description": "Double your movement speed until the end of the turn"
+                                },
+                                {
+                                    "name": "Disengage",
+                                    "description": "Your movement doesn't provoke opportunity attacks until the end of the turn"
+                                },
+                                {
+                                    "name": "Hide",
+                                    "description": "Attempt to hide from creatures until the end of the turn"
+                                }
                             ],
                             "casting_time": "1 bonus action"
                         }
@@ -8484,7 +8496,11 @@
                         "name": "Uncanny Dodge",
                         "description": "When an attacker that you can see hits you with an attack roll, you can take a Reaction to halve the attack's damage against you (round down).",
                         "level": 5,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "superior_hunter_defense",
+                            "casting_time": "1 reaction"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -8556,7 +8572,11 @@
                         "name": "Reliable Talent",
                         "description": "Whenever you make an ability check that uses one of your skill or tool proficiencies, you can treat a d20 roll of 9 or lower as a 10.",
                         "level": 7,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "reliable_talent",
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -8674,6 +8694,37 @@
                             "oncePerTurn": true,
                             "chooseOne": true,
                             "maxEffects": 2,
+                            "options": [
+                                {
+                                    "name": "Poison",
+                                    "cost": "1d6",
+                                    "effect": "poisoned",
+                                    "saveType": "CON",
+                                    "saveDc": "ability",
+                                    "saveAbility": "DEX",
+                                    "condition": "poisoned",
+                                    "duration": "1_minute",
+                                    "repeatingSave": true,
+                                    "requires": "Poisoner's Kit"
+                                },
+                                {
+                                    "name": "Trip",
+                                    "cost": "1d6",
+                                    "effect": "prone",
+                                    "saveType": "DEX",
+                                    "saveDc": "ability",
+                                    "saveAbility": "DEX",
+                                    "condition": "prone",
+                                    "sizeLimit": "large_or_smaller"
+                                },
+                                {
+                                    "name": "Withdraw",
+                                    "cost": "1d6",
+                                    "effect": "no_opportunity_attacks",
+                                    "movement": "half_speed",
+                                    "noOAs": true
+                                }
+                            ],
                             "casting_time": "passive"
                         }
                     }
@@ -8767,6 +8818,35 @@
                             "maxEffects": 2,
                             "options": [
                                 {
+                                    "name": "Poison",
+                                    "cost": "1d6",
+                                    "effect": "poisoned",
+                                    "saveType": "CON",
+                                    "saveDc": "ability",
+                                    "saveAbility": "DEX",
+                                    "condition": "poisoned",
+                                    "duration": "1_minute",
+                                    "repeatingSave": true,
+                                    "requires": "Poisoner's Kit"
+                                },
+                                {
+                                    "name": "Trip",
+                                    "cost": "1d6",
+                                    "effect": "prone",
+                                    "saveType": "DEX",
+                                    "saveDc": "ability",
+                                    "saveAbility": "DEX",
+                                    "condition": "prone",
+                                    "sizeLimit": "large_or_smaller"
+                                },
+                                {
+                                    "name": "Withdraw",
+                                    "cost": "1d6",
+                                    "effect": "no_opportunity_attacks",
+                                    "movement": "half_speed",
+                                    "noOAs": true
+                                },
+                                {
                                     "name": "Daze",
                                     "cost": "2d6",
                                     "effect": "daze",
@@ -8826,7 +8906,21 @@
                         "name": "Slippery Mind",
                         "description": "You gain proficiency in Wisdom and Charisma saving throws.",
                         "level": 15,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": [
+                            {
+                                "type": "save_proficiency",
+                                "saveType": "Wisdom",
+                                "fallbackTypes": [],
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "save_proficiency",
+                                "saveType": "Charisma",
+                                "fallbackTypes": [],
+                                "casting_time": "passive"
+                            }
+                        ]
                     }
                 ],
                 "spellcasting": {
@@ -8966,7 +9060,13 @@
                         "name": "Stroke of Luck",
                         "description": "If you fail a D20 Test, you can turn the roll into a 20. Once per Short or Long Rest.",
                         "level": 20,
-                        "type": "class_feature"
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "stroke_of_luck",
+                            "target": "d20",
+                            "casting_time": "passive",
+                            "recharge": "short_or_long_rest"
+                        }
                     }
                 ],
                 "spellcasting": {
@@ -9000,22 +9100,64 @@
                     {
                         "name": "Mage Hand Legerdemain",
                         "description": "When you cast Mage Hand, cast as Bonus Action, make spectral hand Invisible. Control as Bonus Action, make Dexterity (Sleight of Hand) checks through it.",
-                        "level": 3
+                        "level": 3,
+                        "automation": [
+                            {
+                                "type": "passive_rule",
+                                "effect": "mage_hand_legerdemain",
+                                "casting_time": "passive",
+                                "hasAutomation": true
+                            },
+                            {
+                                "type": "conditional_advantage",
+                                "target": "ability_check",
+                                "condition": "mage_hand_legerdemain",
+                                "effect": "advantage",
+                                "abilities": [
+                                    "DEX"
+                                ],
+                                "hasAutomation": true
+                            },
+                            {
+                                "type": "mage_hand_control",
+                                "range": "30_ft",
+                                "action": "bonus_action",
+                                "casting_time": "1 bonus action",
+                                "hasAutomation": true
+                            }
+                        ]
                     },
                     {
                         "name": "Magical Ambush",
                         "description": "If you have Invisible condition when you cast a spell on a creature, it has Disadvantage on saving throw against the spell on the same turn.",
-                        "level": 9
+                        "level": 9,
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "magical_ambush"
+                        }
                     },
                     {
                         "name": "Versatile Trickster",
                         "description": "When you use Trip option of Cunning Strike on a creature, you can also use it on another creature within 5 feet of the spectral hand.",
-                        "level": 13
+                        "level": 13,
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "versatile_trickster"
+                        }
                     },
                     {
                         "name": "Spell Thief",
                         "description": "Immediately after a creature casts a spell targeting you or including you in its area, take Reaction to force Intelligence save (your spell save DC). On failed save, negate spell and steal knowledge of spell (level 1+, of a level you can cast). For 8 hours you have the spell prepared. Creature can't cast it until 8 hours pass. Once per Long Rest.",
-                        "level": 17
+                        "level": 17,
+                        "automation": {
+                            "type": "spell_thief",
+                            "saveType": "INT",
+                            "saveDc": "ability",
+                            "saveAbility": "INT",
+                            "trigger": "spell_cast",
+                            "oncePerLongRest": true,
+                            "casting_time": "1 reaction"
+                        }
                     }
                 ],
                 "spells": [
@@ -9042,14 +9184,28 @@
                         "name": "Assassinate",
                         "description": "Initiative: Advantage on Initiative rolls. Surprising Strikes: During first round of each combat, Advantage on attack rolls against any creature that hasn't taken a turn. If Sneak Attack hits any target during that round, target takes extra damage equal to your Rogue level.",
                         "level": 3,
-                        "automation": {
-                            "type": "damage_bonus",
-                            "trigger": "first_round_sneak_attack_hit",
-                            "damageExpression": "rogue_level",
-                            "damageType": "Sneak Attack",
-                            "oncePerTurn": false,
-                            "casting_time": "passive"
-                        }
+                        "automation": [
+                            {
+                                "type": "passive_rule",
+                                "effect": "initiative_advantage",
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "conditional_advantage",
+                                "target": "attack_roll",
+                                "condition": "first_round_target_no_turn",
+                                "effect": "advantage",
+                                "casting_time": "passive"
+                            },
+                            {
+                                "type": "damage_bonus",
+                                "trigger": "first_round_sneak_attack_hit",
+                                "damageExpression": "rogue_level",
+                                "damageType": "Sneak Attack",
+                                "oncePerTurn": false,
+                                "casting_time": "passive"
+                            }
+                        ]
                     },
                     {
                         "name": "Assassin's Tools",
@@ -9092,6 +9248,7 @@
                             "saveDc": "ability",
                             "saveAbility": "DEX",
                             "trigger": "first_round_sneak_attack_hit",
+                            "damageDoubled": true,
                             "casting_time": "passive"
                         }
                     }
@@ -9115,17 +9272,54 @@
                     {
                         "name": "Psychic Blades",
                         "description": "Manifest shimmering blades of psychic energy. When you take Attack action or make Opportunity Attack, manifest Psychic Blade in free hand. Simple Melee, 1d6 Psychic + ability modifier, Finesse, Thrown (60/120), Mastery: Vex (doesn't count against Weapon Mastery). Vanishes after hit/miss. After attacking, can make melee or ranged attack with second psychic blade as Bonus Action (1d4 damage).",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "bonus_action_attack",
+                            "trigger": "psychic_blade_attack",
+                            "action": "bonus_action",
+                            "weaponAttack": true,
+                            "extraDamageExpression": "1d4",
+                            "uses_expression": "psionic_energy_die",
+                            "hasAutomation": true
+                        }
                     },
                     {
                         "name": "Soul Blades",
                         "description": "Homing Strikes: If attack with Psychic Blade misses, roll Psionic Energy Die and add to attack roll. If causes hit, die expended. Psychic Teleportation: Bonus Action, manifest Psychic Blade, expend Psionic Energy Die, throw to unoccupied space up to 10x die roll feet. Teleport to that space, blade vanishes.",
-                        "level": 9
+                        "level": 9,
+                        "automation": [
+                            {
+                                "type": "auto_reroll",
+                                "target": "attack_roll",
+                                "condition": "psychic_blade_miss",
+                                "trigger": "psychic_blade_miss",
+                                "bonusExpression": "psionic_energy_die",
+                                "resourceCost": "psionic_energy",
+                                "oncePerRage": false
+                            },
+                            {
+                                "type": "auto_effect",
+                                "effect": "psychic_teleportation",
+                                "trigger": "psychic_teleportation",
+                                "uses": "1",
+                                "recharge": "short_rest"
+                            }
+                        ]
                     },
                     {
                         "name": "Psychic Veil",
                         "description": "Action, gain Invisible condition for 1 hour. Ends after dealing damage or forcing saving throw. Once per Long Rest (or expend Psionic Energy Die to restore).",
-                        "level": 13
+                        "level": 13,
+                        "automation": {
+                            "type": "temp_buff",
+                            "effect": "invisible",
+                            "duration": "1_hour",
+                            "action": "action",
+                            "uses": "1",
+                            "recharge": "long_rest",
+                            "resourceCost": "psionic_energy",
+                            "casting_time": "1 action"
+                        }
                     },
                     {
                         "name": "Rend Mind",
@@ -9160,27 +9354,84 @@
                     {
                         "name": "Fast Hands",
                         "description": "Bonus Action: Sleight of Hand (pick lock/disarm trap with Thieves' Tools or pick pocket), or Use an Object (Utilize action or Action to use magic item).",
-                        "level": 3
+                        "level": 3,
+                        "type": "class_feature",
+                        "automation": {
+                            "type": "fast_hands",
+                            "options": [
+                                {
+                                    "name": "Sleight of Hand",
+                                    "description": "Make a Dexterity (Sleight of Hand) check — pick pocket, palming, hiding small objects, etc."
+                                },
+                                {
+                                    "name": "Thieves' Tools",
+                                    "description": "Use thieves' tools to pick locks or disarm traps"
+                                },
+                                {
+                                    "name": "Use an Object",
+                                    "description": "Use an object — Utilize action for magic items, or Action for normal objects"
+                                }
+                            ],
+                            "casting_time": "1 bonus action",
+                            "hasAutomation": true
+                        }
                     },
                     {
                         "name": "Second-Storywork",
                         "description": "Climber: Climb Speed equal to Speed. Jumper: determine jump distance using Dexterity instead of Strength.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "second_storywork"
+                        }
                     },
                     {
                         "name": "Supreme Sneak",
                         "description": "Stealth Attack (Cost: 1d6). If you have Hide action's Invisible condition, this attack doesn't end that condition on you if you end turn behind Three-Quarters Cover or Total Cover.",
-                        "level": 9
+                        "level": 9,
+                        "automation": [
+                            {
+                                "type": "conditional_advantage",
+                                "target": "ability_check",
+                                "condition": "invisible",
+                                "effect": "advantage",
+                                "abilities": [
+                                    "DEX"
+                                ]
+                            },
+                            {
+                                "type": "passive_rule",
+                                "effect": "supreme_sneak"
+                            }
+                        ]
                     },
                     {
                         "name": "Use Magic Device",
                         "description": "Attunement: attune to up to 4 magic items at once. Charges: when using magic item property that expends charges, roll 1d6, on 6 use without expending. Scrolls: use any Spell Scroll, Intelligence as spellcasting ability. Cantrip/level 1: cast reliably. Higher level: succeed on Intelligence (Arcana) check (DC 10 + spell level) to cast. On fail, scroll disintegrates.",
-                        "level": 13
+                        "level": 13,
+                        "automation": {
+                            "type": "use_magic_device",
+                            "attunementLimit": 4,
+                            "chargeReroll": "1d6",
+                            "chargeRerollSuccess": 6,
+                            "scrollAbility": "INT",
+                            "scrollCheckDC": "10 + spell_level",
+                            "scrollDisintegratesOnFail": true,
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Thief's Reflexes",
                         "description": "Take two turns during first round of any combat. First turn at normal initiative, second turn at initiative minus 10.",
-                        "level": 17
+                        "level": 17,
+                        "automation": {
+                            "type": "extra_action",
+                            "uses": 1,
+                            "recharge": "long_rest",
+                            "oncePerCombat": true,
+                            "firstRoundOnly": true,
+                            "casting_time": "passive"
+                        }
                     }
                 ],
                 "spells": []
@@ -9820,32 +10071,123 @@
                     {
                         "name": "Psionic Spells",
                         "description": "Level 3: Arms of Hadar, Calm Emotions, Detect Thoughts, Dissonant Whispers, Mind Sliver. Level 5: Hunger of Hadar, Sending. Level 7: Evard's Black Tentacles, Summon Aberration. Level 9: Rary's Telepathic Bond, Telekinesis.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "psionic_spells_list",
+                            "psionic_spells": [
+                                "Arms of Hadar",
+                                "Calm Emotions",
+                                "Detect Thoughts",
+                                "Dissonant Whispers",
+                                "Mind Sliver",
+                                "Hunger of Hadar",
+                                "Sending",
+                                "Evard's Black Tentacles",
+                                "Summon Aberration",
+                                "Rary's Telepathic Bond",
+                                "Telekinesis"
+                            ]
+                        }
                     },
                     {
                         "name": "Telepathic Speech",
                         "description": "Bonus Action, choose one creature within 30 feet. Communicate telepathically while within a number of miles equal to Charisma modifier (minimum 1 mile). Duration: minutes equal to Sorcerer level.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "temp_buff",
+                            "effect": "telepathic_speech",
+                            "duration": "sorcerer_level_minutes",
+                            "action": "bonus_action",
+                            "casting_time": "1 bonus action"
+                        }
                     },
                     {
                         "name": "Psionic Sorcery",
                         "description": "When you cast any level 1+ spell from Psionic Spells feature, cast by expending spell slot normally or spending Sorcery Points equal to spell's level. If cast using Sorcery Points, no Verbal or Somatic components, no Material components unless consumed or have cost.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "psionic_sorcery",
+                            "psionic_spells": [
+                                "Arms of Hadar",
+                                "Calm Emotions",
+                                "Detect Thoughts",
+                                "Dissonant Whispers",
+                                "Mind Sliver",
+                                "Hunger of Hadar",
+                                "Sending",
+                                "Evard's Black Tentacles",
+                                "Summon Aberration",
+                                "Rary's Telepathic Bond",
+                                "Telekinesis"
+                            ]
+                        }
                     },
                     {
                         "name": "Psychic Defenses",
                         "description": "Resistance to Psychic damage. Advantage on saving throws to avoid/end Charmed or Frightened condition.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "passive_immunity",
+                            "damage_resistance": [
+                                "Psychic"
+                            ],
+                            "save_advantage": [
+                                {
+                                    "condition": "charmed",
+                                    "saveType": "charmed"
+                                },
+                                {
+                                    "condition": "frightened",
+                                    "saveType": "frightened"
+                                }
+                            ]
+                        }
                     },
                     {
                         "name": "Revelation in Flesh",
                         "description": "Bonus Action, spend 1+ Sorcery Points to magically alter body for 10 minutes. For each SP spent, gain one benefit: Aquatic Adaptation (Swim Speed = 2x Speed, breathe underwater), Glistening Flight (Fly Speed = Speed, hover), See the Invisible (see Invisible creatures within 60 feet), Wormhole Movement (move through spaces as narrow as 1 inch, escape nonmagical restraints).",
-                        "level": 14
+                        "level": 14,
+                        "automation": {
+                            "type": "revelation_in_flesh",
+                            "options": [
+                                { "name": "Aquatic Adaptation", "effect": "aquatic_adaptation", "description": "Swim Speed = 2x Speed, breathe underwater" },
+                                { "name": "Glistening Flight", "effect": "glistening_flight", "description": "Fly Speed = Speed, hover" },
+                                { "name": "See the Invisible", "effect": "see_the_invisible", "description": "See Invisible creatures within 60 feet" },
+                                { "name": "Wormhole Movement", "effect": "wormhole_movement", "description": "Move through spaces as narrow as 1 inch, escape nonmagical restraints" }
+                            ],
+                            "duration": "10_minutes",
+                            "action": "bonus_action",
+                            "casting_time": "1 bonus action"
+                        }
                     },
                     {
                         "name": "Warping Implosion",
                         "description": "Action, teleport to unoccupied space within 120 feet. Each creature within 30 feet of space you left makes Strength save or takes 3d10 Force damage and pulled toward space you left. Once per Long Rest (or spend 5 SP to restore).",
-                        "level": 18
+                        "level": 18,
+                        "automation": {
+                            "type": "save_attack",
+                            "action": "action",
+                            "casting_time": "1 action",
+                            "damage": "3d10",
+                            "damageType": "Force",
+                            "saveType": "STR",
+                            "saveDc": "ability",
+                            "saveAbility": "CHA",
+                            "shape": "emanation_30ft",
+                            "range": "30_ft",
+                            "uses": 1,
+                            "recharge": "long_rest",
+                            "resourceCost": "sorcery_points",
+                            "restoreCost": 5,
+                            "hasOptions": true,
+                            "optionDetails": {
+                                "_Warping_Implosion_option": {
+                                    "damage": "3d10",
+                                    "shape": "emanation_30ft",
+                                    "range": "30_ft"
+                                }
+                            }
+                        }
                     }
                 ],
                 "spells": [
@@ -9898,32 +10240,74 @@
             {
                 "name": "Clockwork Sorcery",
                 "subtitle": "Channel Cosmic Forces of Order",
-                "description": "The cosmic force of order has suffused you with magic. That power arises from Mechanus or a realm like it\u2014a plane of existence shaped entirely by clockwork efficiency.",
+                "description": "The cosmic force of order has suffused you with magic. That power arises from Mechanus or a realm like it—a plane of existence shaped entirely by clockwork efficiency.",
                 "features": [
                     {
                         "name": "Clockwork Spells",
                         "description": "Level 3: Aid, Alarm, Lesser Restoration, Protection from Evil and Good. Level 5: Dispel Magic, Protection from Energy. Level 7: Freedom of Movement, Summon Construct. Level 9: Greater Restoration, Wall of Force. Manifestations of Order (1d6): 1=Spectral cogwheels hover behind you. 2=Hands of clock spin in your eyes. 3=Skin glows with brassy sheen. 4=Floating equations overlay body. 5=Spellcasting Focus becomes Tiny clockwork mechanism. 6=Ticking of gears/ringing clock heard.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "psionic_spells_list",
+                            "psionic_spells": [
+                                "Aid",
+                                "Alarm",
+                                "Lesser Restoration",
+                                "Protection from Evil and Good",
+                                "Dispel Magic",
+                                "Protection from Energy",
+                                "Freedom of Movement",
+                                "Summon Construct",
+                                "Greater Restoration",
+                                "Wall of Force"
+                            ]
+                        }
                     },
                     {
                         "name": "Restore Balance",
                         "description": "When a creature you can see within 60 feet is about to roll a d20 with Advantage or Disadvantage, take Reaction to prevent roll from being affected. Uses = Charisma modifier (minimum once). Regain on Long Rest.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "restore_balance",
+                            "target": "d20",
+                            "range": "60_ft"
+                        }
                     },
                     {
                         "name": "Bastion of Law",
                         "description": "Action, expend 1-5 Sorcery Points to create magical ward around self or creature within 30 feet. Ward represented by number of d8s equal to SP spent. When warded creature takes damage, can expend dice, roll them, reduce damage by total rolled. Ward lasts until Long Rest or use again.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "bastion_of_law",
+                            "action": "action",
+                            "casting_time": "1 action",
+                            "resourceCost": "sorcery_points",
+                            "maxSP": 5,
+                            "minSP": 1,
+                            "range": "30_ft"
+                        }
                     },
                     {
                         "name": "Transe of Order",
                         "description": "Bonus Action for 1 minute. Attack rolls against you can't benefit from Advantage. Whenever you make a D20 Test, treat roll of 9 or lower as 10. Once per Long Rest (or spend 5 SP to restore).",
-                        "level": 14
+                        "level": 14,
+                        "automation": {
+                            "type": "transe_of_order",
+                            "action": "bonus_action",
+                            "duration": "1_minute",
+                            "restoreCost": 5
+                        }
                     },
                     {
                         "name": "Clockwork Cavalcade",
                         "description": "Action, summon spirits in 30-foot Cube. Effects: Heal (up to 100 HP divided among creatures), Repair (damaged objects repaired instantly), Dispel (every spell of level 6 and lower ends). Once per Long Rest (or spend 7 SP to restore).",
-                        "level": 18
+                        "level": 18,
+                        "automation": {
+                            "type": "clockwork_cavalcade",
+                            "action": "action",
+                            "range": "30_ft_cube",
+                            "maxHeal": 100,
+                            "restoreCost": 7
+                        }
                     }
                 ],
                 "spells": [
@@ -9982,22 +10366,63 @@
                     {
                         "name": "Draconic Spells",
                         "description": "Level 3: Alter Self, Chromatic Orb, Command, Dragon's Breath. Level 5: Fear, Fly. Level 7: Arcane Eye, Charm Monster. Level 9: Legend Lore, Summon Dragon.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "passive_rule",
+                            "effect": "always_prepared_spells",
+                            "spells": [
+                                "Alter Self",
+                                "Chromatic Orb",
+                                "Command",
+                                "Dragon's Breath",
+                                "Fear",
+                                "Fly",
+                                "Arcane Eye",
+                                "Charm Monster",
+                                "Legend Lore",
+                                "Summon Dragon"
+                            ],
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Elemental Affinity",
                         "description": "Choose one damage type (Acid, Cold, Fire, Lightning, or Poison). Resistance to that type. When you cast a spell that deals damage of that type, add Charisma modifier to one damage roll.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "damage_type_choice",
+                            "damageTypes": ["Acid", "Cold", "Fire", "Lightning", "Poison"],
+                            "effect": "elemental_affinity",
+                            "casting_time": "passive"
+                        }
                     },
                     {
                         "name": "Dragon Wings",
                         "description": "Bonus Action, cause draconic wings to appear for 1 hour. Fly Speed 60 feet. Once per Long Rest (or spend 3 SP to restore).",
-                        "level": 14
+                        "level": 14,
+                        "automation": {
+                            "type": "dragon_wings",
+                            "action": "bonus_action",
+                            "duration": "1_hour",
+                            "flySpeed": 60,
+                            "hover": true,
+                            "uses": 1,
+                            "recharge": "long_rest",
+                            "resourceCost": "sorcery_points",
+                            "restoreCost": 3
+                        }
                     },
                     {
                         "name": "Dragon Companion",
                         "description": "Cast Summon Dragon without Material component. Cast it once without spell slot, regain on Long Rest. Can modify so it doesn't require Concentration (duration becomes 1 minute).",
-                        "level": 18
+                        "level": 18,
+                        "automation": {
+                            "type": "dragon_companion",
+                            "action": "action",
+                            "spell": "Summon Dragon",
+                            "usesMax": 1,
+                            "recharge": "long_rest"
+                        }
                     }
                 ],
                 "spells": [
@@ -10052,27 +10477,68 @@
                     {
                         "name": "Wild Magic Surge",
                         "description": "Once per turn, you can roll 1d20 immediately after you cast a Sorcerer spell with a spell slot. If you roll a 20, roll on the Wild Magic Surge table. If the magical effect is a spell, it is too wild to be affected by your Metamagic.",
-                        "level": 3
+                        "level": 3,
+                        "automation": {
+                            "type": "wild_magic_surge",
+                            "trigger": "after_sorcerer_spell_slot",
+                            "oncePerTurn": true
+                        }
                     },
                     {
                         "name": "Feats of Chaos",
                         "description": "Manipulate chaos to give yourself Advantage on one D20 Test before rolling. Must cast Sorcerer spell with spell slot or finish Long Rest before using again. If you cast Sorcerer spell with spell slot before Long Rest, automatically roll on Wild Magic Surge table.",
-                        "level": 3
+                        "level": 3,
+                        "automation": [
+                            {
+                                "type": "conditional_advantage",
+                                "target": "d20",
+                                "condition": "feats_of_chaos_active",
+                                "effect": "advantage",
+                                "uses": 1,
+                                "recharge": "long_rest"
+                            },
+                            {
+                                "type": "auto_effect",
+                                "trigger": "after_sorcerer_spell_slot",
+                                "effect": "wild_magic_surge_auto",
+                                "uses": 1,
+                                "recharge": "long_rest"
+                            }
+                        ]
                     },
                     {
                         "name": "Bend Fate",
                         "description": "Immediately after another creature you can see rolls the d20 for a D20 Test, take Reaction and spend 1 Sorcery Point to roll 1d4 and apply as bonus or penalty (your choice) to the d20 roll.",
-                        "level": 6
+                        "level": 6,
+                        "automation": {
+                            "type": "reaction_bonus",
+                            "trigger": "after creature d20 roll",
+                            "resourceCost": "sorcery_points",
+                            "bonusExpression": "1d4",
+                            "effect": "bonus_or_penalty_choice",
+                            "casting_time": "1 reaction"
+                        }
                     },
                     {
                         "name": "Controlled Chaos",
                         "description": "Whenever you roll on the Wild Magic Surge table, you can roll twice and use either number.",
-                        "level": 14
+                        "level": 14,
+                        "automation": {
+                            "type": "auto_effect",
+                            "effect": "wild_magic_double_roll",
+                            "trigger": "wild_magic_surge_roll"
+                        }
                     },
                     {
                         "name": "Tamed Surge",
                         "description": "Immediately after casting Sorcerer spell with spell slot, create effect of your choice from Wild Magic Surge table instead of rolling. Can choose any effect except final row. Once per Long Rest.",
-                        "level": 18
+                        "level": 18,
+                        "automation": {
+                            "type": "wild_magic_tamed",
+                            "trigger": "after_sorcerer_spell_slot",
+                            "recharge": "long_rest",
+                            "uses": 1
+                        }
                     }
                 ],
                 "spells": []
@@ -10842,7 +11308,7 @@
             {
                 "name": "Great Old One Patron",
                 "subtitle": "Unearth Forbidden Lore of Ineffable Being",
-                "description": "Your pact binds you to an unspeakable being from the Far Realm or an elder god\u2014a being such as Tharizdun, the Chained God; Zargon, the Returner; Hadar, the Dark Hunger; or Great Cthulhu. Or you might involve several entities without yoking yourself to one. The motives of these beings are incomprehensible, and the Great Old One might be indifferent to your existence.",
+                "description": "Your pact binds you to an unspeakable being from the Far Realm or an elder god—a being such as Tharizdun, the Chained God; Zargon, the Returner; Hadar, the Dark Hunger; or Great Cthulhu. Or you might involve several entities without yoking yourself to one. The motives of these beings are incomprehensible, and the Great Old One might be indifferent to your existence.",
                 "features": [
                     {
                         "name": "Awakened Mind",
@@ -11431,7 +11897,7 @@
             {
                 "name": "Abjurer",
                 "subtitle": "Shield Companions and Banish Foes",
-                "description": "Your study of magic is focused on spells that block, banish, or protect\u2014ending harmful effects, banishing evil influences, and protecting the weak.",
+                "description": "Your study of magic is focused on spells that block, banish, or protect—ending harmful effects, banishing evil influences, and protecting the weak.",
                 "features": [
                     {
                         "name": "Abjuration Savant",

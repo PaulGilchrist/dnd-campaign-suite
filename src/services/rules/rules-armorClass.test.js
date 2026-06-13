@@ -299,15 +299,32 @@ describe('rules', () => {
       expect(ac).toBe(15); // 10 + 2 + 3
     });
 
-    it('should not apply Draconic Sorcerer unarmored defense in 2024 mode', () => {
+    it('should apply Draconic Sorcery unarmored defense in 2024 mode', () => {
       const playerStats = {
         rules: '2024',
-        class: { name: 'Sorcerer', subclass: { name: 'Draconic' } },
-        abilities: [{ name: 'Dexterity', bonus: 2 }],
+        class: { name: 'Sorcerer', major: { name: 'Draconic Sorcery' } },
+        abilities: [
+          { name: 'Dexterity', bonus: 2 },
+          { name: 'Charisma', bonus: 3 }
+        ],
         inventory: { equipped: [] }
       };
       const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
-      expect(ac).toBe(12); // 10 + 2, no Draconic bonus
+      expect(ac).toBe(15); // 10 + 2 (dex) + 3 (cha) for Draconic Sorcery
+    });
+
+    it('should not apply Draconic Sorcery unarmored defense when wearing armor', () => {
+      const playerStats = {
+        rules: '2024',
+        class: { name: 'Sorcerer', major: { name: 'Draconic Sorcery' } },
+        abilities: [
+          { name: 'Dexterity', bonus: 2 },
+          { name: 'Charisma', bonus: 3 }
+        ],
+        inventory: { equipped: ['Leather Armor'] }
+      };
+      const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
+      expect(ac).toBe(13); // 11 (leather) + 2 (dex), no Draconic bonus with armor
     });
   });
 

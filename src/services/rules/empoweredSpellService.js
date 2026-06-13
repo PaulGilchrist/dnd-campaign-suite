@@ -127,7 +127,9 @@ export async function executeEmpoweredReroll({ campaignName, playerStats, lastEv
             damageDifference,
             lastEvent.damageType ? [lastEvent.damageType] : [],
             campaignName,
-            null
+            null,
+            false,
+            name
         );
 
         saveLastDamageEvent(name, updatedLastEvent, campaignName);

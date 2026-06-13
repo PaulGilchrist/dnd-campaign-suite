@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
     const [tacticalUsed, setTacticalUsed] = useState(false);
     const [tacticalResult, setTacticalResult] = useState(null);
+    const [strokeUsed, setStrokeUsed] = useState(false);
+    const [strokeResult, setStrokeResult] = useState(null);
 
     const isD20 = type === 'd20';
 
@@ -29,13 +31,15 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
       }
 
     const originalTotal = finalRoll + bonus + modifier;
-    const displayRoll = rerollResult !== null ? rerollResult.roll : finalRoll;
-    const displayTotal = rerollResult !== null ? rerollResult.total : originalTotal;
+    const displayRoll = strokeResult !== null ? 20 : (rerollResult !== null ? rerollResult.roll : finalRoll);
+    const displayTotal = strokeResult !== null ? 20 + bonus + modifier : (rerollResult !== null ? rerollResult.total : originalTotal);
     const appliesReplace = (strSaveReplace && rollType === 'save') || (strCheckReplace && (rollType === 'check' || rollType === 'skill'));
     const finalDisplayTotal = appliesReplace && displayTotal < (strScore || 10) ? strScore : displayTotal;
     const wisBonus = wisCheckReplace ? (wisCheckMinBonus || 1) : bonus;
     const wisDisplayTotal = wisCheckReplace && (rollType === 'check' || rollType === 'skill') ? finalRoll + wisBonus + modifier : displayTotal;
-    const showCrit = isCrit || isAutoCrit || (isD20 && displayRoll === 20);
+    const reliableTalentTotal = reliableTalent && (rollType === 'check' || rollType === 'skill') && displayRoll <= 9 ? 10 + bonus + modifier : null;
+    const finalTotal = reliableTalentTotal !== null ? reliableTalentTotal : (wisCheckReplace && (rollType === 'check' || rollType === 'skill') ? wisDisplayTotal : finalDisplayTotal);
+    const showCrit = isCrit || isAutoCrit || (isD20 && displayRoll === 20) || (strokeResult !== null && isD20);
 
     const handleTacticalMind = () => {
         const tacticalBonus = tacticalMindBonus || 0;
@@ -67,10 +71,14 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                 }`}></i>
                 {name}
             </div>
-            <div className="dice-roll-total">{wisCheckReplace && (rollType === 'check' || rollType === 'skill') ? wisDisplayTotal : finalDisplayTotal}</div>
+            <div className="dice-roll-total">{finalTotal}</div>
             <div className="dice-roll-breakdown">
                 {formula ? `${formula}: ` : type === 'd20' ? 'd20 ' : ''}
-                {rerollResult !== null ? (
+                {strokeResult !== null ? (
+                  <span className="dice-rolled">
+                    20 (Stroke of Luck)
+                  </span>
+                ) : rerollResult !== null ? (
                   <span className="dice-rolled">
                     {rerollResult.roll} (reroll)
                   </span>
@@ -86,11 +94,19 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                     }
                   </span>
                 )}
-                {rerollResult !== null ? (
+                {strokeResult !== null ? (
+                  ` +${20 + bonus + modifier - 20}`
+                ) : rerollResult !== null ? (
                   ` +${rerollResult.total - rerollResult.roll}`
                 ) : (bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` :
                  (bonus + modifier) < 0 ? ` ${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` : ''}
             </div>
+
+            {reliableTalent && (rollType === 'check' || rollType === 'skill') && safeRolls[0] <= 9 && (
+              <div className="dice-roll-reliable-talent">
+                <i className="fa-solid fa-star"></i> Reliable Talent: d20 {safeRolls[0]} → 10
+              </div>
+            )}
 
               {isD20 && (
                   <div className="dice-roll-toggles">
@@ -206,6 +222,14 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
               </div>
             )}
 
+            {strokeOfLuck && !strokeUsed && isD20 && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={() => { setStrokeResult({ roll: 20, total: 20 + bonus + modifier }); setStrokeUsed(true); if (onStrokeOfLuck) onStrokeOfLuck(); }} type="button">
+                  <i className="fa-solid fa-star"></i> Stroke of Luck
+                </button>
+              </div>
+            )}
+
             {tacticalMind && !tacticalUsed && (rollType === 'check' || rollType === 'skill') && (
               <div className="dice-roll-reroll">
                 <button className="dice-roll-reroll-btn" onClick={handleTacticalMind} type="button">
@@ -217,6 +241,12 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
             {rerollUsed && rerollResult !== null && (
               <div className="dice-roll-reroll-result">
                 <i className="fa-solid fa-rotate"></i> Rerolled: {rerollResult.roll} + {rerollResult.total - rerollResult.roll} = <strong>{rerollResult.total}</strong>
+              </div>
+            )}
+
+            {strokeUsed && strokeResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-star"></i> Stroke of Luck: d20 → 20 + {strokeResult.total - 20} = <strong>{strokeResult.total}</strong>
               </div>
             )}
 

@@ -86,8 +86,9 @@ export const LONG_REST_RESOURCES = [
          'indomitableUses',
          'naturalRecoveryFreeCast',
          'naturalRecoverySlots',
-         '_Star_Map_freeCastCount'
-   ]
+          '_Star_Map_freeCastCount',
+          '_Dragon_Companion_freeCastCount'
+    ]
 
 export function getLongRestResources() {
   return [...LONG_REST_RESOURCES]
@@ -237,4 +238,9 @@ export async function applyLongRest(playerStats, campaignName) {
 
     // Reset Undying Sentinel (Oath of Glory level 15) on long rest
     setRuntimeValue(name, 'undyingSentinelUsed', false, campaignName, true)
+
+    // Reset Bastion of Law ward on long rest
+    setRuntimeValue(name, 'bastionOfLawActive', false, campaignName, true)
+    setRuntimeValue(name, 'bastionOfLawWardDice', [], campaignName, true)
+    setRuntimeValue(name, 'bastionOfLawWardTarget', null, campaignName, true)
 }

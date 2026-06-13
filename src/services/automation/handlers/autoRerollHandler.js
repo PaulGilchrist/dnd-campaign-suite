@@ -6,6 +6,7 @@ import { getCombatContext } from '../../rules/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../rules/rangeValidation.js';
 import { resolveMapPositions } from '../common/targetResolver.js';
 import { getClassFeatures } from '../../../services/character/classFeatures.js';
+import { evaluateAutoExpression } from '../../combat/automationService.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -299,6 +300,64 @@ export async function handle(action, playerStats, campaignName, mapName) {
             description: `${playerName} used ${action.name}: rolled 1d${bardicDieSize} (${biDieRoll}).`,
             biDieRoll,
             biDieSize: bardicDieSize,
+            timestamp: Date.now(),
+        }).catch(() => {});
+
+        return result;
+    }
+
+    if (auto.bonusExpression === 'psionic_energy_die') {
+        const usesKey = 'psionicEnergy';
+        const defaultMax = playerStats.resources?.[usesKey]?.max || 6;
+        const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? defaultMax);
+
+        if (currentUses <= 0) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: `${action.name}: No Psionic Energy remaining. Recharges on a Short or Long Rest.`,
+                    automation: auto,
+                },
+            };
+        }
+
+        const psionicDieSize = evaluateAutoExpression('psionic_energy_die', playerStats);
+        const dieRoll = Math.floor(Math.random() * psionicDieSize) + 1;
+
+        const attackEvent = getLastAttackRoll(playerName);
+        const abilityEvent = getLastAbilityCheck(playerName);
+
+        const attackFresh = attackEvent && !isStale(attackEvent) && attackEvent.hit === false;
+        const abilityFresh = abilityEvent && !isStale(abilityEvent);
+
+        if (!attackFresh && !abilityFresh) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: `No recent failed ability check or attack roll found. ${action.name} can only be used shortly after a failure.`,
+                    automation: auto,
+                },
+            };
+        }
+
+        let result;
+        if (attackFresh) {
+            result = handleAttackRoll(action, playerStats, campaignName, dieRoll);
+        } else {
+            result = handleAbilityCheck(action, playerStats, campaignName, dieRoll);
+        }
+
+        await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
+
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: `${playerName} used ${action.name}: rolled 1d${psionicDieSize} (${dieRoll}) to failed attack roll. Psionic Energy: ${currentUses - 1}/${defaultMax}.`,
             timestamp: Date.now(),
         }).catch(() => {});
 

@@ -5,10 +5,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
+    const flySpeed = auto.flySpeed === '2x_speed'
+        ? (playerStats.speed || 30) * 2
+        : auto.flySpeed;
+
     const { wasActive } = toggleBuff(
         playerName,
         action.name,
-        auto,
+        { ...auto, effect: 'telekinetic_leap', flySpeed },
         campaignName,
         playerName
     );
@@ -25,10 +29,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             },
         };
     }
-
-    const flySpeed = auto.flySpeed === '2x_speed'
-        ? (playerStats.speed || 30) * 2
-        : auto.flySpeed;
 
     return {
         type: 'popup',

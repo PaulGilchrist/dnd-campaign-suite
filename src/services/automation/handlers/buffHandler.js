@@ -4,7 +4,7 @@ import { handle as handleVowOfEnmity } from './vowOfEnmityHandler.js';
 import { getTargetFromAttacker } from '../../rules/damageUtils.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 import { evaluateAutoExpression } from '../../combat/automationService.js';
-import { setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -35,6 +35,21 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         campaignName,
         targetName
     );
+
+    if (auto?.effect === 'invisible') {
+        const storedConditions = getRuntimeValue(playerStats.name, 'activeConditions') || [];
+        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+        if (!wasActive) {
+            if (!conditions.some(c => String(c).toLowerCase() === 'invisible')) {
+                setRuntimeValue(playerStats.name, 'activeConditions', [...conditions, 'invisible'], campaignName);
+            }
+        } else {
+            const filtered = conditions.filter(c => String(c).toLowerCase() !== 'invisible');
+            if (filtered.length !== conditions.length) {
+                setRuntimeValue(playerStats.name, 'activeConditions', filtered, campaignName);
+            }
+        }
+    }
 
     if (!wasActive && auto?.tempHpExpression) {
         let amount = evaluateAutoExpression(auto.tempHpExpression, playerStats);

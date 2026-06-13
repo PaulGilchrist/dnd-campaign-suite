@@ -1,7 +1,7 @@
 import { rollExpression } from '../dice/diceRoller.js';
 import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet, rangeToFeet } from './rangeValidation.js';
 import { isInnateSorceryActive, getActiveBuffs } from '../combat/buffService.js';
-import { triggerPostCastRiderSaves } from './postCastRiderService.js';
+import { triggerPostCastRiderSaves, triggerSpellThief } from './postCastRiderService.js';
 import { triggerPostCastSelfHeals, triggerPostCastAllyHeals } from './postCastHealService.js';
 import { triggerSmiteOfProtection } from './smiteOfProtectionService.js';
 import { triggerInspiringSmite } from './inspiringSmiteService.js';
@@ -43,49 +43,60 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
       return;
   }
 
-  const rollContext = { ...metaCtx, damageType };
+   const rollContext = { ...metaCtx, damageType };
 
-  if (attackerPos && targetPos) {
-    let effectiveRange = computeEffectiveSpellRange(spell.range, metaCtx);
-    if (effectiveRange != null) {
-      const cantripRangeBonus = (featEffects?.cantripRangeBonus) || 0;
-      if (cantripRangeBonus > 0 && spell.level === 0) {
-        const baseRange = rangeToFeet(spell.range);
-        if (baseRange != null && baseRange >= 10) {
-          effectiveRange += cantripRangeBonus;
-        }
-      }
-      const distanceFt = getDistanceFeet(attackerPos, targetPos);
-      const rangeResult = computeRangeEffect(effectiveRange, distanceFt, featEffects || {});
-      if (rangeResult.mode === 'miss') {
-        rollContext.isAutoMiss = true;
-        rollContext.rangeReason = rangeResult.reason;
+   if (attackerPos && targetPos) {
+     let effectiveRange = computeEffectiveSpellRange(spell.range, metaCtx);
+     if (effectiveRange != null) {
+       const cantripRangeBonus = (featEffects?.cantripRangeBonus) || 0;
+       if (cantripRangeBonus > 0 && spell.level === 0) {
+         const baseRange = rangeToFeet(spell.range);
+         if (baseRange != null && baseRange >= 10) {
+           effectiveRange += cantripRangeBonus;
+         }
        }
+       const distanceFt = getDistanceFeet(attackerPos, targetPos);
+       const rangeResult = computeRangeEffect(effectiveRange, distanceFt, featEffects || {});
+       if (rangeResult.mode === 'miss') {
+         rollContext.isAutoMiss = true;
+         rollContext.rangeReason = rangeResult.reason;
+        }
      }
    }
 
-  if (spell.dc) {
-    const target = await getTargetInfo();
-    const context = {
-      targetName: target?.name,
-      attackerName: playerStats.name,
-       ...rollContext,
-      saveDc: playerStats.spellAbilities.saveDc + (innateSorceryActive ? 1 : 0),
-      saveType: spell.dc.dc_type,
-      dcSuccess: spell.dc.dc_success,
+   const magicalAmbush = (playerStats.automation?.passives || []).some(
+     p => p.type === 'passive_rule' && p.effect === 'magical_ambush'
+   );
+   const casterConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) || [];
+   const hasInvisible = magicalAmbush && casterConditions.some(c => String(c).toLowerCase() === 'invisible');
+
+   if (spell.dc) {
+     const target = await getTargetInfo();
+     const context = {
+       targetName: target?.name,
+       attackerName: playerStats.name,
+        ...rollContext,
+       saveDc: playerStats.spellAbilities.saveDc + (innateSorceryActive ? 1 : 0),
+       saveType: spell.dc.dc_type,
+       dcSuccess: spell.dc.dc_success,
+       metamagicHeighten: hasInvisible,
      };
     const result = rollExpression(formula);
     if (result) {
       rollDamage(spell.name, formula, result.total, result.rolls, result.modifier, context);
      }
-     } else {
-    const rollCtx = innateSorceryActive && !rollContext.forcedMode ? { ...rollContext, forcedMode: 'advantage' } : rollContext;
-    rollAttack(spell.name, playerStats.spellAbilities.toHit, {
-      autoDamageFormula: formula,
-      autoDamageName: spell.name,
-       ...rollCtx,
-       });
+      } else {
+     const rollCtx = innateSorceryActive && !rollContext.forcedMode ? { ...rollContext, forcedMode: 'advantage' } : rollContext;
+     const attackCtx = {
+       autoDamageFormula: formula,
+       autoDamageName: spell.name,
+        ...rollCtx,
+        };
+     if (hasInvisible) {
+       attackCtx.metamagicHeighten = true;
      }
+     rollAttack(spell.name, playerStats.spellAbilities.toHit, attackCtx);
+      }
 
     triggerPostCastRiderSaves(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast rider save failed:', e);
@@ -104,6 +115,9 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     });
     triggerPrimalCompanionSpellShare(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Primal companion spell share failed:', e);
+    });
+    triggerSpellThief(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+        console.error('[spellCast] Spell Thief failed:', e);
     });
 }
 

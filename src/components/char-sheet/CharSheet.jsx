@@ -12,6 +12,7 @@ import CharSpells from './char-spells/CharSpells.jsx'
 import CharSummary from './char-summary/CharSummary.jsx'
 import { computeAuraComboEffects } from '../../services/combat/auraComboEffects.js';
 import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditionEffects.js'
+import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { evaluateAutoExpression } from '../../services/combat/automationService.js'
 import { EXHAUSTION_LEVELS } from '../../services/combat/exhaustionRules.js'
 import './CharSheet.css'
@@ -79,6 +80,15 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                     stats.swimSpeed = stats.race?.subrace?.speed || stats.race?.speed || 30;
                 }
                 await setRuntimeValue(playerSummary.name, 'aquaticAffinityEmanationRange', 10, campaignName);
+            }
+
+            // Apply Second-Storywork passive (Rogue level 3: climb speed = walk speed, jump uses DEX)
+            const secondStoryworkPassive = (stats.automation?.passives || []).find(p => p.effect === 'second_storywork');
+            if (secondStoryworkPassive) {
+                const speed = stats.race?.subrace?.speed || stats.race?.speed || 30;
+                if (!stats.climbSpeed) {
+                    stats.climbSpeed = speed;
+                }
             }
 
             // Inject synthetic "Use Bardic Inspiration" feature if this character has an active BI die
@@ -187,7 +197,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const isRaging = Array.isArray(activeBuffs) && activeBuffs.some(b => b.damageBonusExpression);
     const shapeShiftActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shape_shift');
     const isPeerlessAthlete = getRuntimeValue(playerStats?.name, 'peerlessAthleteActive', campaignName);
-    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive, isPeerlessAthlete);
+    const combatContext = getCombatSummary();
+    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive, isPeerlessAthlete, combatContext);
     if (playerStats) {
         const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
         if (speedHalvedTime) conditionEffects.speedHalved = true;
@@ -211,6 +222,10 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         if (disciplinedSurvivorUsed && conditionEffects.autoReroll) {
             conditionEffects.autoReroll = false;
             conditionEffects.autoRerollBonus = null;
+        }
+        const strokeOfLuckUsed = getRuntimeValue(playerStats.name, 'strokeOfLuckUsed', campaignName);
+        if (strokeOfLuckUsed && conditionEffects.strokeOfLuck) {
+            conditionEffects.strokeOfLuck = false;
         }
     }
     // Reckless Attack: enemies have Advantage on attack rolls against you
@@ -260,6 +275,20 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         }
     }
 
+    // Elusive: No attack roll can have Advantage against you unless you have the Incapacitated condition
+    if (playerStats) {
+        const hasElusive = [
+            ...(playerStats.actions || []),
+            ...(playerStats.bonusActions || []),
+            ...(playerStats.reactions || []),
+            ...(playerStats.specialActions || [])
+        ].some(a => a.name === 'Elusive');
+        const isIncapacitated = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c));
+        if (hasElusive && !isIncapacitated) {
+            conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
+        }
+    }
+
     const cannotAct = activeConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
     const conditionAttackMode = getNetAttackMode(conditionEffects.attackAdvantageCount, conditionEffects.attackDisadvantageCount)
 
@@ -280,6 +309,12 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             }
         }
     }, [playerStats, campaignName, conditionEffects.autoRerollCondition]);
+
+    const handleStrokeOfLuck = React.useCallback(() => {
+        if (playerStats) {
+            setRuntimeValue(playerStats.name, 'strokeOfLuckUsed', true, campaignName);
+        }
+    }, [playerStats, campaignName]);
 
     React.useEffect(() => {
         if (!playerStats) return;
@@ -324,6 +359,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 conditionEffects={conditionEffects}
                 isRaging={isRaging}
                 onReroll={handleReroll}
+                onStrokeOfLuck={handleStrokeOfLuck}
               ></CharAbilities><hr />
 
                <CharActions

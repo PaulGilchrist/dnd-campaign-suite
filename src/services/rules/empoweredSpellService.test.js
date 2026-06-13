@@ -548,6 +548,8 @@ describe('executeEmpoweredReroll', () => {
       [], // no damageType
       CAMPAIGN,
       null,
+      false,
+      'Xander',
     );
 
     vi.restoreAllMocks();

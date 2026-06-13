@@ -1,5 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
+import { rollExpression } from '../../dice/diceRoller.js';
 import { evaluateAutoExpression } from '../../combat/automationService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -22,8 +23,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     const psionicDieSize = evaluateAutoExpression('psionic_energy_die', playerStats);
+    const dieRoll = rollExpression(`1d${psionicDieSize}`);
+    const dieValue = dieRoll?.total || psionicDieSize;
     const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0;
-    const reduction = Number(psionicDieSize) + intMod;
+    const reduction = dieValue + intMod;
 
     await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
 
@@ -31,7 +34,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         type: 'ability_use',
         characterName: playerName,
         abilityName: action.name,
-        description: `${playerName} used ${action.name} to reduce damage by ${reduction}.`,
+        description: `${playerName} used ${action.name} to reduce damage by ${reduction} (Rolled ${psionicDieSize} for ${dieValue} + INT ${intMod}).`,
     }).catch(() => {});
 
     return {
@@ -40,7 +43,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             type: 'automation_info',
             name: action.name,
             automationType: auto.type,
-            description: `${action.name}: Reduce damage by <strong>${reduction}</strong> (Rolled ${psionicDieSize} + INT ${intMod}). Psionic Energy: ${currentUses - 1}/${defaultMax}.`,
+            description: `${action.name}: Reduce damage by <strong>${reduction}</strong> (Rolled ${psionicDieSize} for ${dieValue} + INT ${intMod}). Psionic Energy: ${currentUses - 1}/${defaultMax}.`,
             automation: auto,
         },
     };

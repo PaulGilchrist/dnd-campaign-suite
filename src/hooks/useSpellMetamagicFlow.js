@@ -3,6 +3,7 @@ import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from
 import { addEntry } from '../services/ui/logService.js'
 import { getMultiTargetSpreadForSpell } from '../services/rules/postCastRiderService.js'
 import { getCombatSummary } from '../services/encounters/combatData.js'
+import { isPsionicSpell, hasPsionicSorcery } from '../services/rules/metamagicRules.js'
 
 function getCreatureTargets(excludeName) {
   const cs = getCombatSummary();
@@ -50,13 +51,19 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       return;
     }
 
+    const spellLevel = spell.level || 0;
     const currentSP = getCurrentSorceryPoints(playerStats.name, getMaxSorceryPoints(playerStats));
+    const isPsionic = isPsionicSpell(playerStats, spell.name);
+    const hasPsionic = hasPsionicSorcery(playerStats);
+
     setPendingMetamagic({
       spell,
       spellName: spell.name,
       spellLevel: spell.level || 0,
       castingTime: spell.casting_time,
       _currentSP: currentSP,
+      isPsionic: isPsionic && hasPsionic,
+      psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
     });
     }, [isSorcerer, playerStats, campaignName, onExecute]);
 
@@ -65,8 +72,21 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     setPendingMetamagic(null);
     if (!pending) return;
 
-    if (result?.totalCost > 0) {
-      spendSorceryPoints(playerStats.name, result.totalCost, campaignName, getMaxSorceryPoints(playerStats));
+    let totalMetamagicCost = result?.totalCost || 0;
+    let psionicCost = 0;
+
+    if (pending.isPsionic && !result?.options?.includes('Subtle Spell')) {
+      psionicCost = pending.psionicCost;
+    }
+
+    const totalCost = totalMetamagicCost + psionicCost;
+    if (totalCost > 0) {
+      spendSorceryPoints(playerStats.name, totalCost, campaignName, getMaxSorceryPoints(playerStats));
+    }
+
+    const metamagicOptions = result?.options || [];
+    if (psionicCost > 0 && !metamagicOptions.includes('Psionic Sorcery')) {
+      metamagicOptions.push('Psionic Sorcery');
     }
 
     addEntry(campaignName, {
@@ -75,8 +95,8 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       spellName: pending.spellName,
       spellLevel: pending.spellLevel || 0,
       castingTime: pending.castingTime,
-      metamagic: result?.options || [],
-      spCost: result?.totalCost || 0,
+      metamagic: metamagicOptions,
+      spCost: totalCost,
       timestamp: Date.now(),
     });
 
@@ -86,6 +106,9 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       if (result.options.includes('Careful Spell')) metaCtx.metamagicCareful = true;
       if (result.options.includes('Twinned Spell') && result.twinTarget) metaCtx.metamagicTwinTarget = result.twinTarget;
       if (result.options.includes('Distant Spell')) metaCtx.metamagicDistant = true;
+    }
+    if (psionicCost > 0) {
+      metaCtx.psionicSpell = true;
     }
 
     onExecute(pending.spell, metaCtx);

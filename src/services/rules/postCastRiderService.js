@@ -1,5 +1,6 @@
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { executeHandler } from '../automation/index.js';
+import { isBlockedBySpellThief } from '../automation/handlers/spellThiefHandler.js';
 
 const ENCHANTMENT_SCHOOL = 'enchantment';
 const ILLUSION_SCHOOL = 'illusion';
@@ -16,6 +17,15 @@ function usesSpellSlot(spell, metaCtx) {
 export function getPostCastRiderSaves(playerStats) {
     const passives = playerStats.automation?.passives || [];
     return passives.filter(p => p.type === 'post_cast_rider' || (p.type === 'passive_rule' && p.riderSave));
+}
+
+export function getSpellThiefFeatures(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.filter(p => p.type === 'spell_thief');
+}
+
+export function hasSpellThief(playerStats) {
+    return getSpellThiefFeatures(playerStats).length > 0;
 }
 
 export function getMultiTargetSpreads(playerStats) {
@@ -101,6 +111,67 @@ export async function triggerPostCastRiderSaves(spell, metaCtx, playerStats, cam
             }
         } catch (e) {
             console.error(`[postCastRider] Failed to execute rider save for ${riderName}:`, e);
+        }
+    }
+
+    return results.length > 0 ? results : null;
+}
+
+export async function triggerSpellThief(spell, metaCtx, playerStats, campaignName, mapName) {
+    if (!usesSpellSlot(spell, metaCtx)) {
+        return null;
+    }
+
+    if (isBlockedBySpellThief(playerStats.name, playerStats.name, spell.name, campaignName)) {
+        return null;
+    }
+
+    const spellThiefFeatures = getSpellThiefFeatures(playerStats);
+    if (spellThiefFeatures.length === 0) {
+        return null;
+    }
+
+    const results = [];
+    for (const thief of spellThiefFeatures) {
+        const featureName = thief.name;
+        const usesKey = featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
+        const restTimestampKey = featureName.toLowerCase().replace(/\s+/g, '') + 'RestTimestamp';
+        const lastRestTimestamp = getRuntimeValue(playerStats.name, restTimestampKey, campaignName);
+        const now = Date.now();
+
+        let currentUses = 1;
+        if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
+            currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
+        } else if (!lastRestTimestamp) {
+            currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
+        }
+
+        if (currentUses <= 0) {
+            continue;
+        }
+
+        const action = {
+            name: featureName,
+            automation: {
+                type: 'spell_thief',
+                saveType: thief.saveType || 'INT',
+                saveDc: thief.saveDc || 'ability',
+                saveAbility: thief.saveAbility || 'INT',
+                trigger: thief.trigger || 'spell_cast',
+                oncePerLongRest: !!thief.oncePerLongRest,
+                casting_time: thief.casting_time || '1 reaction',
+            },
+            casterName: playerStats.name,
+            spellName: spell.name,
+        };
+
+        try {
+            const result = await executeHandler(action, playerStats, campaignName, mapName);
+            if (result) {
+                results.push(result);
+            }
+        } catch (e) {
+            console.error(`[spellThief] Failed to execute Spell Thief for ${featureName}:`, e);
         }
     }
 

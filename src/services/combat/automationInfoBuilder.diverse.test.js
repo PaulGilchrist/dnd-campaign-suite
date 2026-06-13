@@ -48,6 +48,8 @@ describe('buildAttackInfo – extra_action', () => {
             uses: 1,
             recharge: 'short_rest',
             oncePerTurn: false,
+            oncePerCombat: false,
+            firstRoundOnly: false,
             resourceKey: 'testfeatureUses',
             hasAutomation: true,
         })
@@ -79,6 +81,22 @@ describe('buildAttackInfo – extra_action', () => {
         expect(result.uses).toBe(3)
         expect(result.recharge).toBe('long_rest')
         expect(result.oncePerTurn).toBe(true)
+    })
+
+    it('includes oncePerCombat and firstRoundOnly when provided', () => {
+        const feature = {
+            ...BASE_FEATURE,
+            automation: {
+                type: 'extra_action',
+                oncePerCombat: true,
+                firstRoundOnly: true,
+                recharge: 'long_rest',
+            },
+        }
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.oncePerCombat).toBe(true)
+        expect(result.firstRoundOnly).toBe(true)
+        expect(result.recharge).toBe('long_rest')
     })
 })
 

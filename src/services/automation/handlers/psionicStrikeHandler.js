@@ -22,6 +22,22 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
+    const oncePerTurn = auto.oncePerTurn;
+    if (oncePerTurn) {
+        const turnUsed = getRuntimeValue(playerName, 'psionicStrikeUsedThisTurn', campaignName);
+        if (turnUsed) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: `${action.name}: Already used this turn. Once per turn.`,
+                    automation: auto,
+                },
+            };
+        }
+    }
+
     const psionicDieSize = evaluateAutoExpression('psionic_energy_die', playerStats);
     const dieRoll = rollExpression(`1d${psionicDieSize}`);
     const dieValue = dieRoll?.total || psionicDieSize;
@@ -29,6 +45,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const totalDamage = dieValue + intMod;
 
     await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
+
+    if (oncePerTurn) {
+        const currentTurn = getRuntimeValue(playerName, 'currentTurn', campaignName) || 'unknown';
+        await setRuntimeValue(playerName, 'psionicStrikeUsedThisTurn', currentTurn, campaignName);
+    }
 
     await addEntry(campaignName, {
         type: 'ability_use',

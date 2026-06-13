@@ -9,7 +9,7 @@ import './CharAbilities.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
-function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects, isRaging = false, onReroll }) {
+function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects, isRaging = false, onReroll, onStrokeOfLuck }) {
      const abilityDesc = buildAbilityDetailHtml(allAbilityScores);
      const { popupHtml, setPopupHtml, rollAbilityCheck, rollSavingThrow, rollSkillCheck } = useLoggedDiceRoll(playerStats.name, campaignName);
 
@@ -89,10 +89,19 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
              const minBonus = Math.max(1, wisMod);
              return { ...ctx, wisCheckReplace: true, wisCheckMinBonus: minBonus }
            }
-           if (conditionEffects?.tacticalMind) {
-            return { ...ctx, tacticalMind: true, tacticalMindBonus: conditionEffects.tacticalMindBonus || null }
-          }
-          return ctx
+            if (conditionEffects?.tacticalMind) {
+              return { ...ctx, tacticalMind: true, tacticalMindBonus: conditionEffects.tacticalMindBonus || null }
+            }
+            if (conditionEffects?.reliableTalent) {
+              return { ...ctx, reliableTalent: true }
+            }
+             if (conditionEffects?.strokeOfLuck) {
+               return { ...ctx, strokeOfLuck: true }
+             }
+             if (conditionEffects?.d20Floor10) {
+               return { ...ctx, d20Floor10: true }
+             }
+             return ctx
         }
 
       const makeSaveContext = (abilityName) => {
@@ -108,14 +117,20 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
         if (!autoFail && !forcedMode && conditionEffects?.saveAdvantageAbilities?.includes(abilityName.substring(0, 3).toUpperCase())) {
           forcedMode = 'advantage'
          }
-          if (conditionEffects?.autoReroll) {
-            return { forcedMode, autoFail: autoFail || undefined, autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition, autoRerollBonus: conditionEffects.autoRerollBonus || null }
+           if (conditionEffects?.autoReroll) {
+             return { forcedMode, autoFail: autoFail || undefined, autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition, autoRerollBonus: conditionEffects.autoRerollBonus || null }
+           }
+           if (conditionEffects?.strokeOfLuck) {
+             return { forcedMode, autoFail: autoFail || undefined, strokeOfLuck: true }
+           }
+          if (conditionEffects?.strSaveReplace) {
+             const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
+             return { forcedMode, autoFail: autoFail || undefined, strSaveReplace: true, strScore: strAbility?.totalScore || 10 }
+           }
+          if (conditionEffects?.d20Floor10) {
+            return { forcedMode, autoFail: autoFail || undefined, d20Floor10: true }
           }
-         if (conditionEffects?.strSaveReplace) {
-            const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
-            return { forcedMode, autoFail: autoFail || undefined, strSaveReplace: true, strScore: strAbility?.totalScore || 10 }
-          }
-         return { forcedMode, autoFail: autoFail || undefined }
+          return { forcedMode, autoFail: autoFail || undefined }
       }
 
         const hasSaveAdvantage = (abilityName) => {
@@ -127,7 +142,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                 {popupHtml && (
                     <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
                         {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
-                         <DiceRollResult {...popupHtml} onReroll={onReroll} />}
+                          <DiceRollResult {...popupHtml} onReroll={onReroll} onStrokeOfLuck={onStrokeOfLuck} />}
                     </Popup>
                 )}
             <div className='abilities'>

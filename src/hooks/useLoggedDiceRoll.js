@@ -86,9 +86,9 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         const t = combatSummary.creatures.find(c => c.name === pendingTargetName);
         if (t) targetMaxHp = t.type === 'player' ? (getRuntimeValue(t.name, 'hitPoints') ?? 0) : t.maxHp;
        }
-      const applyResult = applyDamageToTarget(
-        combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, null
-         );
+       const applyResult = applyDamageToTarget(
+         combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, null, false, pending.attackerName || characterName
+          );
 
       logEntry({
         type: 'roll',
@@ -200,17 +200,19 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       }).catch(() => {});
    }
 
-    async function logAndShow(name, bonus, rollType, context) {
-     const r1 = rollD20();
-     const r2 = rollD20();
+     async function logAndShow(name, bonus, rollType, context) {
+      const r1 = rollD20();
+      const r2 = rollD20();
 
-     const combatSummary = await loadCombatSummary(campaignName);
+      const effectiveD20 = (context?.d20Floor10 && r1 <= 9) ? 10 : r1;
 
-     const target = combatSummary ? getTargetFromAttacker(combatSummary, utils.getName(characterName)) : null;
+      const combatSummary = await loadCombatSummary(campaignName);
 
-     let isAutoMiss = context?.isAutoMiss === true;
+      const target = combatSummary ? getTargetFromAttacker(combatSummary, utils.getName(characterName)) : null;
 
-      const coverAcBonus = context?.coverAcBonus || 0;
+      let isAutoMiss = context?.isAutoMiss === true;
+
+       const coverAcBonus = context?.coverAcBonus || 0;
 
       // Resolve AC: for NPCs, read from the combatSummary creature (stored at encounter setup).
       // For players, the combatSummary creature does NOT store AC — single source of truth is
@@ -228,8 +230,8 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         throw new Error(`[AC] Target "${target.name}" has no AC defined.`);
       }
 
-       const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) : undefined;
-       let hit = isAutoMiss ? false : (target ? (r1 + bonus >= effectiveAc) : undefined);
+        const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) : undefined;
+        let hit = isAutoMiss ? false : (target ? (effectiveD20 + bonus >= effectiveAc) : undefined);
        const targetName = target?.name || context?.targetName;
        const attackerName = context?.attackerName || characterName;
 
@@ -295,17 +297,17 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           }
       }
 
-      const criticalRange = context?.criticalRange;
-      let rollsInCriticalRange = false;
-      if (criticalRange) {
-          const match = criticalRange.match(/^(\d+)-(\d+)$/);
-          if (match) {
-              const low = parseInt(match[1], 10);
-              const high = parseInt(match[2], 10);
-              rollsInCriticalRange = r1 >= low && r1 <= high;
-          }
-      }
-      const isCrit = !isAutoMiss && (r1 === 20 || context?.isAutoCrit || rollsInCriticalRange) && hit;
+       const criticalRange = context?.criticalRange;
+       let rollsInCriticalRange = false;
+       if (criticalRange) {
+           const match = criticalRange.match(/^(\d+)-(\d+)$/);
+           if (match) {
+               const low = parseInt(match[1], 10);
+               const high = parseInt(match[2], 10);
+               rollsInCriticalRange = effectiveD20 >= low && effectiveD20 <= high;
+           }
+       }
+       const isCrit = !isAutoMiss && (r1 === 20 || context?.isAutoCrit || rollsInCriticalRange) && hit;
 
       const autoDamage = hit && context?.autoDamageFormula ? {
         name: context.autoDamageName || name,
@@ -367,45 +369,76 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
            autoRerollBonus: context?.autoRerollBonus,
             strSaveReplace: context?.strSaveReplace,
             strScore: context?.strScore,
-            strCheckReplace: context?.strCheckReplace,
-            wisCheckReplace: context?.wisCheckReplace,
-            wisCheckMinBonus: context?.wisCheckMinBonus,
-           gloriousDefenseBonus: context?.gloriousDefenseBonus || 0,
-         });
+             strCheckReplace: context?.strCheckReplace,
+            reliableTalent: context?.reliableTalent,
+              wisCheckReplace: context?.wisCheckReplace,
+             wisCheckMinBonus: context?.wisCheckMinBonus,
+            gloriousDefenseBonus: context?.gloriousDefenseBonus || 0,
+            d20Floor10: context?.d20Floor10,
+          });
 
-     if (rollType === 'attack') {
-         setRuntimeValue(characterName, 'lastAttackRoll', {
-             d20: r1,
-             bonus,
-             targetName,
-             targetAc,
-             hit,
-             isCrit,
-             effectiveAc,
-             coverAcBonus,
-             timestamp: Date.now(),
-         }, campaignName);
-     }
-
-      if (rollType === 'check' || rollType === 'skill') {
-          setRuntimeValue(characterName, 'lastAbilityCheck', {
-              d20: r1,
-              bonus,
-              checkName: name,
+       if (rollType === 'attack') {
+           setRuntimeValue(characterName, 'lastAttackRoll', {
+               d20: effectiveD20,
+               bonus,
               targetName,
+              targetAc,
+              hit,
+              isCrit,
+              effectiveAc,
+              coverAcBonus,
               timestamp: Date.now(),
           }, campaignName);
+
+          // Soulknife Homing Strikes (level 9+): if Psychic Blade misses, add psionic energy die
+          const ps = context?.playerStats;
+          const isSoulknife = ps?.class?.name === 'Rogue' && ps?.class?.major?.name === 'Soulknife';
+          const hasSoulBlades = isSoulknife && ps?.level >= 9;
+          const isPsychicBlade = context?.isPsychicBlade === true;
+          if (hasSoulBlades && isPsychicBlade && hit === false && !isAutoMiss) {
+              const classLevel = ps?.class?.class_levels?.find(cl => cl.level === ps?.level);
+              const psionicDieSize = classLevel?.energy?.energy_die || 6;
+              const psionicBonus = Math.floor(Math.random() * psionicDieSize) + 1;
+              const newTotal = effectiveD20 + bonus + psionicBonus;
+              const newHit = targetAc ? (newTotal >= targetAc) : null;
+              if (newHit === true) {
+                  // Update the stored attack roll with the homing strike bonus
+                  setRuntimeValue(characterName, 'lastAttackRoll', {
+                      d20: effectiveD20,
+                      bonus: bonus + psionicBonus,
+                      targetName,
+                      targetAc,
+                      hit: true,
+                      isCrit: false,
+                      effectiveAc,
+                      coverAcBonus,
+                      timestamp: Date.now(),
+                      homingStrikesBonus: psionicBonus,
+                  }, campaignName);
+              }
+          }
       }
 
-      if (rollType === 'save') {
-          setRuntimeValue(characterName, 'lastSaveRoll', {
-              d20: r1,
-              bonus,
-              saveType: context?.saveType || null,
-              targetName,
-              timestamp: Date.now(),
-          }, campaignName);
-      }
+       if (rollType === 'check' || rollType === 'skill') {
+           const effectiveD20 = context?.reliableTalent && r1 <= 9 ? 10 : r1;
+           setRuntimeValue(characterName, 'lastAbilityCheck', {
+               d20: effectiveD20,
+               bonus,
+               checkName: name,
+               targetName,
+               timestamp: Date.now(),
+           }, campaignName);
+       }
+
+       if (rollType === 'save') {
+           setRuntimeValue(characterName, 'lastSaveRoll', {
+               d20: effectiveD20,
+               bonus,
+               saveType: context?.saveType || null,
+               targetName,
+               timestamp: Date.now(),
+           }, campaignName);
+       }
 
     if (rollType === 'initiative') {
         const firstName = utils.getName(characterName);
@@ -470,11 +503,11 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           const { overlay, players, npcs } = aoeCtx;
           const affected = getAffectedCreatures(overlay, players, npcs, combatSummary);
           const npcResults = saveDc && saveType
-             ? processAoeNpcs(combatSummary, affected, total, damageType, saveDc, saveType, dcSuccess, campaignName)
-             : affected.map(({ creature }) => {
-                const applyResult = applyDamageToTarget(combatSummary, creature.name, total, [damageType], campaignName, null);
-                return { creatureName: creature.name, finalDamage: applyResult?.finalDamage, newHp: applyResult?.newHp, damageReduced: applyResult?.damageReduced, saveSuccess: null };
-               });
+              ? processAoeNpcs(combatSummary, affected, total, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName || characterName)
+              : affected.map(({ creature }) => {
+                 const applyResult = applyDamageToTarget(combatSummary, creature.name, total, [damageType], campaignName, null, false, attackerName || characterName);
+                 return { creatureName: creature.name, finalDamage: applyResult?.finalDamage, newHp: applyResult?.newHp, damageReduced: applyResult?.damageReduced, saveSuccess: null };
+                });
           const playerAffected = affected.filter(a => a.creature.type === 'player');
           if (playerAffected.length && saveDc && saveType) {
             const playerPrompts = sendAoePlayerSaves(playerAffected, total, damageType, saveDc, saveType, dcSuccess, campaignName, name, attackerName || characterName, rolls, formula);
@@ -519,46 +552,46 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
         : target?.maxHp ?? 0;
 
-      if (saveDc && saveType && target) {
-        if (target.type === 'npc') {
-          const disadvantage = context?.metamagicHeighten || false;
-          const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage);
-          const finalDamage = computeDamageAfterSave(total, saveResult.success, dcSuccess);
-          const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, null);
+       if (saveDc && saveType && target) {
+         if (target.type === 'npc') {
+           const disadvantage = context?.metamagicHeighten || false;
+            const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage);
+            const finalDamage = computeDamageAfterSave(total, saveResult.success, dcSuccess);
+            const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, null, false, characterName);
 
-          logEntry({
-            type: 'roll',
-            characterName,
-            rollType: 'save-damage',
-            name,
-            formula,
-            rolls,
-            total,
-            modifier,
-            damageType,
-            targetName: target.name,
-            saveType,
-            saveDc,
-            saveResult: saveResult.success ? 'success' : 'failure',
-            saveRoll: saveResult.roll,
-            saveBonus: saveResult.bonus,
-            saveRawRolls: saveResult.rawRolls,
-            mode: disadvantage ? 'disadvantage' : 'normal',
-            finalDamage: applyResult?.finalDamage ?? total,
-           });
+            logEntry({
+              type: 'roll',
+              characterName,
+              rollType: 'save-damage',
+              name,
+              formula,
+              rolls,
+              total,
+              modifier,
+              damageType,
+              targetName: target.name,
+              saveType,
+              saveDc,
+              saveResult: saveResult.success ? 'success' : 'failure',
+              saveRoll: saveResult.roll,
+              saveBonus: saveResult.bonus,
+              saveRawRolls: saveResult.rawRolls,
+              mode: disadvantage ? 'disadvantage' : 'normal',
+              finalDamage: applyResult?.finalDamage ?? total,
+            });
 
-          setPopupHtml({
-            type: 'save-damage',
-            name,
-            formula,
-            rolls,
-            bonus: 0,
-            modifier,
-            damageType,
-            targetName: target.name,
-            targetCurrentHp: applyResult?.newHp,
-            targetMaxHp,
-            saveDc,
+            setPopupHtml({
+              type: 'save-damage',
+              name,
+              formula,
+              rolls,
+              bonus: 0,
+              modifier,
+              damageType,
+              targetName: target.name,
+              targetCurrentHp: applyResult?.newHp,
+              targetMaxHp,
+              saveDc,
             saveType,
             dcSuccess,
             saveResult,
@@ -590,7 +623,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
               const twinDisadvantage = context?.metamagicHeighten || false;
               const twinSaveResult = rollSaveForCreature(twinTarget, saveType, saveDc, twinDisadvantage);
               const twinFinalDamage = computeDamageAfterSave(total, twinSaveResult.success, dcSuccess);
-              const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName, null);
+               const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName, null, false, characterName);
               logEntry({
                 type: 'roll',
                 characterName,
@@ -660,7 +693,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                     : (getRuntimeValue(multiTarget.name, 'hitPoints') ?? 0),
                 }));
               } else {
-                const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null);
+                const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null, false, characterName);
                 logEntry({
                   type: 'roll',
                   characterName,
@@ -684,7 +717,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           const isCarefulAlly = context?.metamagicCareful || false;
           if (isCarefulAlly) {
             const carefulDamage = computeDamageAfterSave(total, true, dcSuccess);
-            const applyResult = applyDamageToTarget(combatSummary, target.name, carefulDamage, [damageType], campaignName, null);
+            const applyResult = applyDamageToTarget(combatSummary, target.name, carefulDamage, [damageType], campaignName, null, false, characterName);
             logEntry({
               type: 'roll',
               characterName,
@@ -806,6 +839,54 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         applyResult = applyDamageToTarget(combatSummary, target.name, total, [damageType], campaignName, null);
        }
 
+       // Death Strike: check for pending save, double damage on failure
+       const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+       const deathStrikeEffect = storedEffects.find(te => te.effect === 'death_strike' && te.target === target?.name);
+       if (deathStrikeEffect && target) {
+         const dsSaveDc = deathStrikeEffect.saveDc;
+         const dsSaveType = deathStrikeEffect.saveType;
+         if (dsSaveDc && dsSaveType) {
+           const dsSaveResult = rollSaveForCreature(target, dsSaveType, dsSaveDc, false);
+           if (!dsSaveResult.success) {
+             const doubledTotal = total * 2;
+              const dsApplyResult = applyDamageToTarget(combatSummary, target.name, doubledTotal, [damageType], campaignName, null, false, characterName);
+             logEntry({
+               type: 'roll',
+               characterName,
+               rollType: 'save-damage',
+               name: 'Death Strike',
+               formula: `2× ${formula}`,
+               rolls,
+               total: doubledTotal,
+               modifier,
+               damageType,
+               targetName: target.name,
+               saveType: dsSaveType,
+               saveDc: dsSaveDc,
+               saveResult: 'failure',
+               saveRoll: dsSaveResult.roll,
+               saveBonus: dsSaveResult.bonus,
+               saveRawRolls: dsSaveResult.rawRolls,
+               finalDamage: dsApplyResult?.finalDamage ?? doubledTotal,
+               note: 'Death Strike: CON save failed, damage doubled',
+             });
+             if (!applyResult) {
+               applyResult = dsApplyResult;
+             }
+             setPopupHtml(prev => ({
+               ...prev,
+               deathStrikeDoubled: true,
+               deathStrikeSaveRoll: dsSaveResult.roll,
+               deathStrikeSaveBonus: dsSaveResult.bonus,
+               deathStrikeSaveDc: dsSaveDc,
+               deathStrikeFinalDamage: dsApplyResult?.finalDamage,
+             }));
+           }
+         }
+         const cleanedEffects = storedEffects.filter(te => te.effect !== 'death_strike' || te.target !== target.name);
+         setRuntimeValue(campaignName, 'targetEffects', cleanedEffects, campaignName);
+       }
+
        // Multiattack Defense: when a creature hits the player, apply disadvantage to that attacker's subsequent attacks
        if (target?.type === 'player' && applyResult && applyResult.finalDamage > 0) {
            const attackerNameResolved = attackerName || characterName;
@@ -894,7 +975,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
        if (context?.metamagicTwinTarget && target) {
         const twinTarget = combatSummary?.creatures?.find(c => c.name === context.metamagicTwinTarget);
         if (twinTarget && twinTarget.name !== target.name) {
-          const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, total, [damageType], campaignName, null);
+           const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, total, [damageType], campaignName, null, false, characterName);
           logEntry({
             type: 'roll',
             characterName,
@@ -923,7 +1004,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       if (context?.multiTarget && target) {
         const multiTarget = combatSummary?.creatures?.find(c => c.name === context.multiTarget);
         if (multiTarget && multiTarget.name !== target.name) {
-          const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null);
+          const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null, false, characterName);
           logEntry({
             type: 'roll',
             characterName,
@@ -1058,7 +1139,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       });
     const hasEvasion = hasOwnEvasion || hasSharedEvasion;
     const finalDamage = computeDamageAfterEvasion(pending.rawDamage, saveResult.success, pending.dcSuccess, hasEvasion);
-    const applyResult = applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName, null);
+    const applyResult = applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName, null, false, pending.attackerName || characterName);
 
     delete pendingSaves[promptId];
 

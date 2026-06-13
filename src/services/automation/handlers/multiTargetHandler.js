@@ -151,7 +151,7 @@ export async function applyMultiTarget(
     if (spell?.damage) {
         const rawDamage = metaCtx?.totalDamage || metaCtx?.rawDamage || 0;
         if (rawDamage > 0) {
-            const applyResult = applyDamageToTarget(combatSummary, secondTargetName, rawDamage, [damageType], campaignName, null);
+            const applyResult = applyDamageToTarget(combatSummary, secondTargetName, rawDamage, [damageType], campaignName, null, false, playerStats.name);
             if (applyResult) {
                 postLogEntry(campaignName, {
                     type: 'hp_change',
