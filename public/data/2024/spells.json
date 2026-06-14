@@ -8977,7 +8977,24 @@
     "saving_throw": null,
     "status_effects": [],
     "spell_list_order": 3,
-    "cantrip_scaling": {}
+    "cantrip_scaling": {},
+    "heal_at_slot_level": {
+      "3": "2d4 + MOD",
+      "4": "3d4 + MOD",
+      "5": "4d4 + MOD",
+      "6": "5d4 + MOD",
+      "7": "6d4 + MOD",
+      "8": "7d4 + MOD",
+      "9": "8d4 + MOD"
+    },
+    "automation": {
+      "type": "healing",
+      "healExpression": "heal_at_slot_level",
+      "action": "bonus_action",
+      "casting_time": "1 bonus action",
+      "maxTargets": 6,
+      "range": "60 feet"
+    }
   },
   {
     "index": "mass-suggestion",

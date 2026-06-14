@@ -17,6 +17,7 @@ import { triggerFalseLife } from './falseLifeService.js';
 import { triggerHealingWord } from './healingWordService.js';
 import { triggerMassCureWounds } from './massCureWoundsService.js';
 import { triggerMassHeal } from './massHealService.js';
+import { triggerMassHealingWord } from './massHealingWordService.js';
 import { triggerFear } from './fearService.js';
 import { triggerFeignDeath } from './feignDeathService.js';
 import { triggerFleshToStone } from './fleshToStoneService.js';
@@ -126,6 +127,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         // Mass Cure Wounds — multi-target healing in 30-ft radius sphere
         if (spell.name && spell.name.toLowerCase() === 'mass cure wounds') {
             await triggerMassCureWounds(spell, metaCtx, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Mass Healing Word — up to 6 creatures regain 2d4+MOD HP (bonus action)
+        if (spell.name && spell.name.toLowerCase() === 'mass healing word') {
+            await triggerMassHealingWord(spell, metaCtx, playerStats, campaignName, mapName);
             return;
         }
 
