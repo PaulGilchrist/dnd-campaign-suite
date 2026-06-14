@@ -25,6 +25,7 @@ import { triggerHoldMonster } from './holdMonsterService.js';
 import { triggerHypnoticPattern } from './hypnoticPatternService.js';
 import { triggerMassSuggestion } from './massSuggestionService.js';
 import { triggerForesight } from './foresightService.js';
+import { triggerResilientSphere } from './resilientSphereService.js';
 import { triggerFriends, endFriendsOnHostileAction } from './friendsService.js';
 import { endInvisibilityOnHostileAction } from './invisibilityService.js';
 import { triggerGlobeOfInvulnerability } from './globeOfInvulnerabilityService.js';
@@ -179,6 +180,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         // Mass Suggestion — multi-target WIS save, applies Charmed condition to failed targets
         if (spell.name && spell.name.toLowerCase() === 'mass suggestion') {
             await triggerMassSuggestion(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Otiluke's Resilient Sphere / Resilient Sphere — DEX save, encloses target in an immovable sphere
+        if (spell.name && (spell.name.toLowerCase() === "otiluke's resilient sphere" || spell.name.toLowerCase() === 'resilient sphere')) {
+            await triggerResilientSphere(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
             return;
         }
 

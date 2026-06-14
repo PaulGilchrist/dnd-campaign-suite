@@ -10020,6 +10020,12 @@
     "dc": {
       "dc_type": "DEX",
       "dc_success": "none"
+    },
+    "automation": {
+      "type": "resilient_sphere",
+      "saveDc": "ability",
+      "saveType": "DEX",
+      "duration": "Concentration, up to 1 minute"
     }
   },
   {

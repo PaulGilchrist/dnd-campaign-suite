@@ -1,6 +1,7 @@
 import { buildAttackInfo } from './automationInfoBuilder.js'
 import { evaluateAutoExpression } from './automationExpressions.js'
 import { parseMagicItemName } from '../rules/attackCalc.js'
+import { getRuntimeValue } from '../../hooks/useRuntimeState.js'
 
 export function getPassiveBuffs(features, playerStats) {
     const buffs = []
@@ -100,4 +101,15 @@ export function getDamageResistances(playerStats) {
         }
     }
     return [...new Set(resistances)];
+}
+
+export function isResilientSphereActive(targetName, campaignName) {
+    const activeBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+    return activeBuffs.some(b => b.effect === 'resilient_sphere');
+}
+
+export function getResilientSphereSource(targetName, campaignName) {
+    const activeBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+    const buff = activeBuffs.find(b => b.effect === 'resilient_sphere');
+    return buff?.sourceCharacter || null;
 }

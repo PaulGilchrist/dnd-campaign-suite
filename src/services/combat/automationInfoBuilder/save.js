@@ -100,5 +100,17 @@ export const saveHandlers = {
             duration: 'Concentration, up to 1 minute',
             hasAutomation: true,
         }
+    },
+
+    'resilient_sphere': (feature, playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'resilient_sphere',
+            name: feature.name,
+            saveType: auto.saveType || 'DEX',
+            saveDc: (auto.saveDc === 'ability') ? getSaveDc(playerStats, auto.saveAbility || 'DEX', playerStats.proficiency) : auto.saveDc || 10,
+            duration: auto.duration || 'Concentration, up to 1 minute',
+            hasAutomation: true,
+        }
     }
 }

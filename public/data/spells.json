@@ -7876,7 +7876,13 @@
     "classes": [
       "Wizard"
     ],
-    "subclasses": []
+    "subclasses": [],
+    "automation": {
+      "type": "resilient_sphere",
+      "saveDc": "ability",
+      "saveType": "DEX",
+      "duration": "Up to 1 minute"
+    }
   },
   {
     "index": "resistance",
