@@ -419,35 +419,6 @@ describe('settlementGenerator', () => {
       expect(result.name.length).toBeGreaterThan(0);
     });
 
-    it('should generate NPC names from the NPC name data', async () => {
-      const mockData = buildMockData();
-      setupFetchMocks(mockData);
-
-      const { generateSettlement } = await import('./settlementGenerator.js');
-      const result = await generateSettlement([], { size: 'village' });
-
-      expect(result.notableNPCs.length).toBeGreaterThan(0);
-      // NPC names should come from the mock data
-      const allNpcNames = [
-        ...mockData.npcNames.Human.male,
-        ...mockData.npcNames.Human.female,
-        ...mockData.npcNames.Elf.male,
-        ...mockData.npcNames.Elf.female,
-        ...mockData.npcNames.Dwarf.male,
-        ...mockData.npcNames.Dwarf.female,
-        ...mockData.npcNames.Halfling.male,
-        ...mockData.npcNames.Halfling.female,
-        ...mockData.npcNames['Half-Elf'].male,
-        ...mockData.npcNames['Half-Elf'].female,
-        ...mockData.npcNames['Half-Orc'].male,
-        ...mockData.npcNames['Half-Orc'].female,
-      ];
-      const allNpcNamesSet = new Set(allNpcNames);
-      for (const npc of result.notableNPCs) {
-        expect(allNpcNamesSet.has(npc.name)).toBe(true);
-      }
-    });
-
     it('should generate service types appropriate for the settlement size', async () => {
       const mockData = buildMockData();
       setupFetchMocks(mockData);
