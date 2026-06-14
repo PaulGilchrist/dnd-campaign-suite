@@ -68,6 +68,7 @@ import { executeSpellCast } from '../../services/rules/spellCastService.js'
 import { getTargetFromAttacker, getCombatContext } from '../../services/rules/damageUtils.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { endFriendsOnHostileAction } from '../../services/rules/friendsService.js';
+import { endInvisibilityOnHostileAction } from '../../services/rules/invisibilityService.js';
 import { applyDamageToTarget } from '../../services/rules/applyDamage.js';
 import { getNearestPlacedItem } from '../../services/rules/rangeValidation.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffService.js';
@@ -296,6 +297,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         if (cannotAct) return;
         // Making an attack roll ends any active Friends spell early
         endFriendsOnHostileAction(playerStats.name, campaignName);
+        endInvisibilityOnHostileAction(playerStats.name, campaignName);
         buildCtx(attack).then(ctx => {
             const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
             rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);

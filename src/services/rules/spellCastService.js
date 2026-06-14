@@ -22,6 +22,7 @@ import { triggerHoldMonster } from './holdMonsterService.js';
 import { triggerHypnoticPattern } from './hypnoticPatternService.js';
 import { triggerForesight } from './foresightService.js';
 import { triggerFriends, endFriendsOnHostileAction } from './friendsService.js';
+import { endInvisibilityOnHostileAction } from './invisibilityService.js';
 import { triggerGlobeOfInvulnerability } from './globeOfInvulnerabilityService.js';
 import { triggerHeroism } from './heroismService.js';
 import { triggerHolyAura } from './holyAuraService.js';
@@ -69,6 +70,9 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     if (spell.name && spell.name.toLowerCase() !== 'friends') {
         endFriendsOnHostileAction(playerStats.name, campaignName);
     }
+
+    // Casting any spell ends active Invisibility early on the caster
+    endInvisibilityOnHostileAction(playerStats.name, campaignName);
 
     if (spell.casting_time === '1 action') {
         setRuntimeValue(playerStats.name, 'lastActionSpellCast', 1, campaignName);

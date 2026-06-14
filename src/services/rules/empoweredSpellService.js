@@ -3,6 +3,7 @@ import { getChaModifier } from './metamagicRules.js';
 import { parseExpression } from '../dice/diceRoller.js';
 import { getCombatContext } from './damageUtils.js';
 import { applyDamageToTarget } from './applyDamage.js';
+import { endInvisibilityOnHostileAction } from './invisibilityService.js';
 
 export function buildEmpoweredSpellState(playerStats) {
     const name = playerStats.name;
@@ -131,6 +132,10 @@ export async function executeEmpoweredReroll({ campaignName, playerStats, lastEv
             false,
             name
         );
+
+        if (applyResult && applyResult.finalDamage > 0) {
+            endInvisibilityOnHostileAction(name, campaignName);
+        }
 
         saveLastDamageEvent(name, updatedLastEvent, campaignName);
 

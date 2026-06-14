@@ -5,6 +5,7 @@ import { getDistanceFeet, rangeToFeet } from '../../rules/rangeValidation.js';
 import { resolveMapPositions } from '../common/targetResolver.js';
 import { applyHealingToTarget } from '../../rules/applyHealing.js';
 import { applyDamageToTarget } from '../../rules/applyDamage.js';
+import { endInvisibilityOnHostileAction } from '../../rules/invisibilityService.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 
@@ -152,6 +153,9 @@ export async function applyMultiTarget(
         const rawDamage = metaCtx?.totalDamage || metaCtx?.rawDamage || 0;
         if (rawDamage > 0) {
             const applyResult = applyDamageToTarget(combatSummary, secondTargetName, rawDamage, [damageType], campaignName, null, false, playerStats.name);
+            if (applyResult && applyResult.finalDamage > 0) {
+                endInvisibilityOnHostileAction(playerStats.name, campaignName);
+            }
             if (applyResult) {
                 postLogEntry(campaignName, {
                     type: 'hp_change',

@@ -74,17 +74,24 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     );
 
     if (auto?.effect === 'invisible') {
-        const storedConditions = getRuntimeValue(playerStats.name, 'activeConditions') || [];
+        const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
         const conditions = Array.isArray(storedConditions) ? storedConditions : [];
         if (!wasActive) {
             if (!conditions.some(c => String(c).toLowerCase() === 'invisible')) {
-                setRuntimeValue(playerStats.name, 'activeConditions', [...conditions, 'invisible'], campaignName);
+                setRuntimeValue(targetName, 'activeConditions', [...conditions, 'invisible'], campaignName);
             }
         } else {
             const filtered = conditions.filter(c => String(c).toLowerCase() !== 'invisible');
             if (filtered.length !== conditions.length) {
-                setRuntimeValue(playerStats.name, 'activeConditions', filtered, campaignName);
+                setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
             }
+        }
+        if (!wasActive) {
+            const invisKey = `_activeInvisibility_${targetName}`;
+            setRuntimeValue(campaignName, invisKey, playerStats.name, campaignName);
+        } else {
+            const invisKey = `_activeInvisibility_${targetName}`;
+            setRuntimeValue(campaignName, invisKey, null, campaignName);
         }
     }
 

@@ -8031,9 +8031,18 @@
     "subclasses": [],
     "area_of_effect": null,
     "saving_throw": null,
-    "status_effects": [],
+    "status_effects": [
+      "Invisible"
+    ],
     "spell_list_order": 2,
-    "cantrip_scaling": {}
+    "cantrip_scaling": {},
+    "automation": {
+      "type": "temp_buff",
+      "effect": "invisible",
+      "duration": "Concentration, up to 1 hour",
+      "action": "action",
+      "casting_time": "1 action"
+    }
   },
   {
     "index": "jallarzis-storm-of-radiance",

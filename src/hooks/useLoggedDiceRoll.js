@@ -27,6 +27,7 @@ import { MELEE_REACH_FEET } from '../services/combat/baseCombatActions.js';
 import { getCombatContext } from '../services/rules/damageUtils.js';
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../services/rules/postCastRiderService.js';
 import { playerIsImmuneToCondition } from '../services/combat/automationService.js';
+import { endInvisibilityOnHostileAction } from '../services/rules/invisibilityService.js';
 
 function dispatchUnbreakableMajestySave(campaignName, defenderName, attackerName, saveDc, promptId) {
     sendSavePrompt(campaignName, {
@@ -109,9 +110,13 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         const t = combatSummary.creatures.find(c => c.name === pendingTargetName);
         if (t) targetMaxHp = t.type === 'player' ? (getRuntimeValue(t.name, 'hitPoints') ?? 0) : t.maxHp;
        }
-       const applyResult = applyDamageToTarget(
-         combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, null, false, pending.attackerName || characterName
-          );
+        const applyResult = applyDamageToTarget(
+          combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, null, false, pending.attackerName || characterName
+           );
+
+        if (applyResult && applyResult.finalDamage > 0) {
+          endInvisibilityOnHostileAction(pending.attackerName || characterName, pending.campaignName);
+        }
 
        logEntry({
          type: 'roll',
@@ -670,10 +675,13 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           const affected = getAffectedCreatures(overlay, players, npcs, combatSummary);
           const npcResults = saveDc && saveType
               ? processAoeNpcs(combatSummary, affected, total, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName || characterName)
-              : affected.map(({ creature }) => {
-                 const applyResult = applyDamageToTarget(combatSummary, creature.name, total, [damageType], campaignName, null, false, attackerName || characterName);
-                 return { creatureName: creature.name, finalDamage: applyResult?.finalDamage, newHp: applyResult?.newHp, damageReduced: applyResult?.damageReduced, saveSuccess: null };
-                });
+               : affected.map(({ creature }) => {
+                  const applyResult = applyDamageToTarget(combatSummary, creature.name, total, [damageType], campaignName, null, false, attackerName || characterName);
+                  if (applyResult && applyResult.finalDamage > 0) {
+                    endInvisibilityOnHostileAction(attackerName || characterName, campaignName);
+                  }
+                  return { creatureName: creature.name, finalDamage: applyResult?.finalDamage, newHp: applyResult?.newHp, damageReduced: applyResult?.damageReduced, saveSuccess: null };
+                 });
           const playerAffected = affected.filter(a => a.creature.type === 'player');
           const casterName = attackerName || characterName;
           // Filter out soulstitch-protected players from save prompts
@@ -798,7 +806,11 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             if (!isSoulstitchProtected && hasPotentFlag && isCantripFlag && saveResult.success && dcSuccess === 'none') {
               finalDamage = Math.floor(total / 2);
             }
-            const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, null, false, characterName);
+             const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, null, false, characterName);
+
+            if (applyResult && applyResult.finalDamage > 0) {
+              endInvisibilityOnHostileAction(characterName, campaignName);
+            }
 
             if (!saveResult.success && context?.statusEffects?.length > 0) {
                 for (const effect of context.statusEffects) {
@@ -926,7 +938,10 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                if (hasPotentFlag && isCantripFlag && twinSaveResult.success && dcSuccess === 'none') {
                  twinFinalDamage = Math.floor(total / 2);
                }
-               const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName, null, false, characterName);
+                const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName, null, false, characterName);
+               if (twinApplyResult && twinApplyResult.finalDamage > 0) {
+                 endInvisibilityOnHostileAction(characterName, campaignName);
+               }
               logEntry({
                 type: 'roll',
                 characterName,
@@ -1000,6 +1015,9 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                 }));
               } else {
                 const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null, false, characterName);
+                if (multiApplyResult && multiApplyResult.finalDamage > 0) {
+                  endInvisibilityOnHostileAction(characterName, campaignName);
+                }
                 logEntry({
                   type: 'roll',
                   characterName,
@@ -1023,7 +1041,10 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           const isCarefulAlly = context?.metamagicCareful || false;
           if (isCarefulAlly) {
             const carefulDamage = computeDamageAfterSave(total, true, dcSuccess);
-            const applyResult = applyDamageToTarget(combatSummary, target.name, carefulDamage, [damageType], campaignName, null, false, characterName);
+             const applyResult = applyDamageToTarget(combatSummary, target.name, carefulDamage, [damageType], campaignName, null, false, characterName);
+             if (applyResult && applyResult.finalDamage > 0) {
+               endInvisibilityOnHostileAction(characterName, campaignName);
+             }
             logEntry({
               type: 'roll',
               characterName,
@@ -1085,7 +1106,10 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           );
           if (hasContactPatron && name === 'Contact Other Plane' && target.name === characterName) {
             const successfulSave = computeDamageAfterSave(total, true, dcSuccess);
-            const applyResult = applyDamageToTarget(combatSummary, target.name, successfulSave, [damageType], campaignName, null, false, characterName);
+             const applyResult = applyDamageToTarget(combatSummary, target.name, successfulSave, [damageType], campaignName, null, false, characterName);
+             if (applyResult && applyResult.finalDamage > 0) {
+               endInvisibilityOnHostileAction(characterName, campaignName);
+             }
             logEntry({
               type: 'roll',
               characterName,
@@ -1235,10 +1259,14 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
            }
          }
 
-      let applyResult = null;
-      if (target) {
-        applyResult = applyDamageToTarget(combatSummary, target.name, total, [damageType], campaignName, null);
-       }
+       let applyResult = null;
+       if (target) {
+         applyResult = applyDamageToTarget(combatSummary, target.name, total, [damageType], campaignName, null);
+        }
+
+        if (applyResult && applyResult.finalDamage > 0) {
+          endInvisibilityOnHostileAction(characterName, campaignName);
+        }
 
        // Death Strike: check for pending save, double damage on failure
        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
@@ -1418,7 +1446,10 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
        if (context?.metamagicTwinTarget && target) {
         const twinTarget = combatSummary?.creatures?.find(c => c.name === context.metamagicTwinTarget);
         if (twinTarget && twinTarget.name !== target.name) {
-           const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, total, [damageType], campaignName, null, false, characterName);
+            const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, total, [damageType], campaignName, null, false, characterName);
+           if (twinApplyResult && twinApplyResult.finalDamage > 0) {
+             endInvisibilityOnHostileAction(characterName, campaignName);
+           }
           logEntry({
             type: 'roll',
             characterName,
