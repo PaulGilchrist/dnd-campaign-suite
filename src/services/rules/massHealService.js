@@ -5,7 +5,6 @@ import { postLogEntry } from '../shared/logPoster.js';
 import { getDistanceFeet, rangeToFeet } from './rangeValidation.js';
 
 const MASS_HEAL_NAME = 'Mass Heal';
-const MASS_HEAL_MAX_HP = 700;
 const CONDITIONS_TO_REMOVE = ['blinded', 'deafened', 'poisoned'];
 
 function isMassHeal(spell) {
@@ -94,14 +93,23 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
     }
 
     const results = [];
-    let remainingPool = MASS_HEAL_MAX_HP;
+    const slotLevel = metaCtx?.slotLevel || spell.level || 9;
+    const healAtSlotLevel = spell.heal_at_slot_level;
+    let totalPool = 700;
+    if (healAtSlotLevel) {
+        const expression = healAtSlotLevel[slotLevel] || healAtSlotLevel[Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b).pop()];
+        if (expression && expression !== 'max') {
+            totalPool = parseInt(expression, 10) || 700;
+        }
+    }
+    let remainingPool = totalPool;
 
     for (const target of targets) {
         const targetName = target.name;
         const maxHp = target.maxHp || playerStats.hitPoints || 0;
         const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
         const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
-        const healAmount = Math.min(MASS_HEAL_MAX_HP - (MASS_HEAL_MAX_HP - remainingPool), maxHp - currentHp);
+        const healAmount = Math.min(totalPool - (totalPool - remainingPool), maxHp - currentHp);
         const actualHeal = Math.min(healAmount, remainingPool);
 
         if (actualHeal > 0) {

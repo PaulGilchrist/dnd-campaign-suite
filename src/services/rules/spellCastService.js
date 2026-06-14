@@ -133,7 +133,78 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             const fearInnateBonus = innateSorceryActive ? 1 : 0;
             const fearMetaCtx = { ...metaCtx, spellSaveDc: spellSaveDc + fearInnateBonus };
             await triggerFear(spell, fearMetaCtx, playerStats, campaignName, mapName);
-            triggerFalseLife(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+        // Generic healing: use heal_at_slot_level for any healing spell without a dedicated handler
+        if (spell.heal_at_slot_level) {
+            const target = await getTargetInfo();
+            if (target?.name) {
+                const slotLevel = metaCtx?.slotLevel || spell.level || 1;
+                const healAtSlotLevel = spell.heal_at_slot_level;
+                let expression = healAtSlotLevel[slotLevel];
+                if (!expression) {
+                    const levels = Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b);
+                    const highestBelow = levels.filter(l => l <= slotLevel).pop();
+                    if (highestBelow) {
+                        expression = healAtSlotLevel[highestBelow];
+                    }
+                }
+                if (expression) {
+                    if (expression === 'max') {
+                        const combatSummary = await getCombatContext(campaignName);
+                        if (combatSummary) {
+                            const creature = combatSummary.creatures.find(c => c.name === target.name);
+                            const maxHp = creature?.maxHp || playerStats.hitPoints || 0;
+                            const currentHp = creature?.currentHp ?? getRuntimeValue(target.name, 'currentHitPoints', campaignName) ?? maxHp;
+                            const actualHeal = maxHp - currentHp;
+                            if (actualHeal > 0) {
+                                applyHealingToTarget(combatSummary, target.name, actualHeal, campaignName);
+                            }
+                            postLogEntry(campaignName, {
+                                type: 'hp_change',
+                                targetName: target.name,
+                                delta: actualHeal,
+                                currentHp: maxHp,
+                                maxHp,
+                                isHealing: true,
+                                sourceName: playerStats.name,
+                                note: spell.name,
+                                timestamp: Date.now(),
+                            });
+                        }
+                    } else {
+                        let resolvedExpression = expression.replace(/\bMOD\b/g, String(spellCastingMod));
+                        const { rollExpression } = await import('../dice/diceRoller.js');
+                        const result = rollExpression(resolvedExpression);
+                        if (result) {
+                            const combatSummary = await getCombatContext(campaignName);
+                            if (combatSummary) {
+                                const creature = combatSummary.creatures.find(c => c.name === target.name);
+                                const maxHp = creature?.maxHp || playerStats.hitPoints || 0;
+                                const currentHp = creature?.currentHp ?? getRuntimeValue(target.name, 'currentHitPoints', campaignName) ?? maxHp;
+                                const actualHeal = Math.min(result.total, maxHp - currentHp);
+                                if (actualHeal > 0) {
+                                    applyHealingToTarget(combatSummary, target.name, actualHeal, campaignName);
+                                }
+                                postLogEntry(campaignName, {
+                                    type: 'hp_change',
+                                    targetName: target.name,
+                                    delta: actualHeal,
+                                    currentHp: Math.min(maxHp, currentHp + actualHeal),
+                                    maxHp,
+                                    isHealing: true,
+                                    sourceName: playerStats.name,
+                                    note: spell.name,
+                                    formula: resolvedExpression,
+                                    timestamp: Date.now(),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
+        triggerFalseLife(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
                 console.error('[spellCast] False Life trigger failed:', e);
             });
             return;
@@ -573,7 +644,15 @@ async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) 
     const creature = combatSummary.creatures.find(c => c.name === targetName);
     if (!creature) return;
 
-    const healAmount = 70;
+    const slotLevel = metaCtx?.slotLevel || spell.level || 6;
+    const healAtSlotLevel = spell.heal_at_slot_level;
+    let healAmount = 70;
+    if (healAtSlotLevel) {
+        const expression = healAtSlotLevel[slotLevel] || healAtSlotLevel[Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b).pop()];
+        if (expression) {
+            healAmount = parseInt(expression, 10) || 70;
+        }
+    }
     const maxHp = creature.maxHp || playerStats.hitPoints || 0;
     const currentHp = creature.currentHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? maxHp;
     const actualHeal = Math.min(healAmount, maxHp - currentHp);
