@@ -13,6 +13,7 @@ const HEALING_SPELL_NAMES = new Set([
     'lesser restoration',
     'mass cure wounds',
     'mass healing word',
+    'mass heal',
     'prayer of healing',
     'power word heal',
     'regenerate',

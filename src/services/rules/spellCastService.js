@@ -16,6 +16,7 @@ import { rollExpressionMaximized } from '../dice/diceRoller.js';
 import { triggerFalseLife } from './falseLifeService.js';
 import { triggerHealingWord } from './healingWordService.js';
 import { triggerMassCureWounds } from './massCureWoundsService.js';
+import { triggerMassHeal } from './massHealService.js';
 import { triggerFear } from './fearService.js';
 import { triggerFeignDeath } from './feignDeathService.js';
 import { triggerFleshToStone } from './fleshToStoneService.js';
@@ -125,6 +126,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         // Mass Cure Wounds — multi-target healing in 30-ft radius sphere
         if (spell.name && spell.name.toLowerCase() === 'mass cure wounds') {
             await triggerMassCureWounds(spell, metaCtx, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Mass Heal — 9th level multi-target healing (up to 700 HP) + condition removal
+        if (spell.name && spell.name.toLowerCase() === 'mass heal') {
+            await triggerMassHeal(spell, metaCtx, playerStats, campaignName, mapName);
             return;
         }
 
