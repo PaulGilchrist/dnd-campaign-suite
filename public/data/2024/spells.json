@@ -7349,11 +7349,14 @@
     "subclasses": [],
     "area_of_effect": null,
     "saving_throw": null,
-    "status_effects": [
-      "Frightened"
-    ],
+    "status_effects": [],
     "spell_list_order": 1,
-    "cantrip_scaling": {}
+    "cantrip_scaling": {},
+    "automation": {
+      "type": "heroism",
+      "tempHpExpression": "spellcasting_ability_modifier",
+      "duration": "Concentration, up to 1 minute"
+    }
   },
   {
     "index": "hex",

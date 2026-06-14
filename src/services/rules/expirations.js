@@ -73,6 +73,9 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
         if (effect.type === 'use_magic_device') {
             applyUseMagicDeviceTurnStart(activeName, playerStats, effect, campaignName);
         }
+        if (effect.type === 'heroism_temp_hp') {
+            applyHeroismTempHp(activeName, playerStats, effect, campaignName);
+        }
     }
 
     // Clean up Multiattack Defense effects at start of each creature's turn
@@ -305,6 +308,19 @@ async function applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, c
         speedBonus: bonus,
     }];
     await setRuntimeValue(activeName, 'activeBuffs', newBuffs, campaignName);
+}
+
+async function applyHeroismTempHp(activeName, playerStats, effect, campaignName) {
+    const activeBuffs = getRuntimeValue(activeName, 'activeBuffs') || [];
+    const heroismBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.name === 'Heroism') : null;
+    if (!heroismBuff) return;
+
+    const tempHpAmount = Number(heroismBuff.tempHpAmount) || 0;
+    if (tempHpAmount <= 0) return;
+
+    const existingTempHp = Number(getRuntimeValue(activeName, 'tempHp') || 0);
+    const newTempHp = Math.max(existingTempHp, tempHpAmount);
+    await setRuntimeValue(activeName, 'tempHp', newTempHp, campaignName);
 }
 
 async function applyUmbralSightTurnStart(activeName, playerStats, effect, campaignName) {
@@ -729,6 +745,28 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                         setRuntimeValue(targetName, 'currentHitPoints', newCurrentHp, campaignName);
                     }
                     setRuntimeValue(targetName, effect.hpKey || 'aidHpMaxIncrease', 0, campaignName);
+                }
+                break;
+            }
+
+            case 'remove_heroism_buff': {
+                const allBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                if (Array.isArray(allBuffs)) {
+                    setRuntimeValue(
+                        targetName,
+                        'activeBuffs',
+                        allBuffs.filter(b => b.name !== effect.buffName),
+                        campaignName
+                    );
+                }
+                const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                if (Array.isArray(storedEffects)) {
+                    setRuntimeValue(
+                        campaignName,
+                        'targetEffects',
+                        storedEffects.filter(te => !(te.effect === 'heroism' && te.source === effect.buffName)),
+                        campaignName
+                    );
                 }
                 break;
             }

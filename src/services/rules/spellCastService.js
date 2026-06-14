@@ -21,6 +21,7 @@ import { triggerFleshToStone } from './fleshToStoneService.js';
 import { triggerForesight } from './foresightService.js';
 import { triggerFriends, endFriendsOnHostileAction } from './friendsService.js';
 import { triggerGlobeOfInvulnerability } from './globeOfInvulnerabilityService.js';
+import { triggerHeroism } from './heroismService.js';
 
 function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     if (spell.name !== 'Hex') return;
@@ -152,6 +153,14 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         // Globe of Invulnerability — toggle passive barrier that blocks spells of level 5 or lower
         if (spell.name && spell.name.toLowerCase() === 'globe of invulnerability') {
             await triggerGlobeOfInvulnerability(spell, metaCtx, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Heroism — grants Frightened immunity and temp HP at start of each turn
+        if (spell.name && spell.name.toLowerCase() === 'heroism') {
+            const target = await getTargetInfo();
+            const heroismMetaCtx = { ...metaCtx, targetName: target?.name };
+            await triggerHeroism(spell, heroismMetaCtx, playerStats, campaignName, mapName);
             return;
         }
 
