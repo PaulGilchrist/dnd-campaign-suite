@@ -6618,7 +6618,26 @@
     "dc": {
       "dc_type": "DEX",
       "dc_success": "none"
-    }
+    },
+    "automation": [
+      {
+        "type": "save_attack",
+        "saveType": "DEX",
+        "shape": "square",
+        "range": "60 feet",
+        "conditionInflicted": "Prone",
+        "duration": "1 minute",
+        "dcSuccess": "none"
+      },
+      {
+        "type": "grease_area_save",
+        "saveType": "DEX",
+        "shape": "square",
+        "size": "10-foot",
+        "conditionInflicted": "Prone",
+        "duration": "1 minute"
+      }
+    ]
   },
   {
     "index": "greater-invisibility",
@@ -6648,9 +6667,18 @@
     "subclasses": [],
     "area_of_effect": null,
     "saving_throw": null,
-    "status_effects": [],
+    "status_effects": [
+      "Invisible"
+    ],
     "spell_list_order": 4,
-    "cantrip_scaling": {}
+    "cantrip_scaling": {},
+    "automation": {
+      "type": "temp_buff",
+      "effect": "invisible",
+      "duration": "Concentration, up to 1 minute",
+      "action": "action",
+      "casting_time": "1 action"
+    }
   },
   {
     "index": "greater-restoration",
@@ -6683,10 +6711,11 @@
     "subclasses": [],
     "area_of_effect": null,
     "saving_throw": null,
-    "status_effects": [
-      "Charmed",
-      "Petrified"
-    ],
+    "status_effects": [],
+    "automation": {
+      "type": "greater_restoration",
+      "range": "Touch"
+    },
     "spell_list_order": 5,
     "cantrip_scaling": {}
   },
@@ -8210,12 +8239,11 @@
     "subclasses": [],
     "area_of_effect": null,
     "saving_throw": null,
-    "status_effects": [
-      "Blinded",
-      "Deafened",
-      "Paralyzed",
-      "Poisoned"
-    ],
+    "status_effects": [],
+    "automation": {
+      "type": "lesser_restoration",
+      "range": "Touch"
+    },
     "spell_list_order": 2,
     "cantrip_scaling": {}
   },

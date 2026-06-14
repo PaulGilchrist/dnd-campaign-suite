@@ -3,6 +3,7 @@ import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import MetamagicPopup from './MetamagicPopup.jsx'
 import AidTargetPopup from './AidTargetPopup.jsx'
+import GreaterRestorationPopup from './GreaterRestorationPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import EmpoweredSpellPopup from './EmpoweredSpellPopup.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
@@ -648,7 +649,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, featEffects: featRangeEffects, campaignName, mapName });
         cachedActionCastPosRef.current = null;
     }, [rollAttack, rollDamage, playerStats, getTargetInfo, featRangeEffects, campaignName, mapName]);
-    const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip, pendingAid: actionPendingAid, handleAidConfirm: actionHandleAidConfirm, handleAidSkip: actionHandleAidSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction);
+    const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip, pendingAid: actionPendingAid, handleAidConfirm: actionHandleAidConfirm, handleAidSkip: actionHandleAidSkip, pendingGreaterRestoration: actionPendingGreaterRestoration, handleGreaterRestorationConfirm: actionHandleGreaterRestorationConfirm, handleGreaterRestorationSkip: actionHandleGreaterRestorationSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction);
     const handleActionSpellCast = React.useCallback(async (spell) => {
         setSelectedActionSpell(null);
         if (mapName) {
@@ -1195,6 +1196,17 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         attackerPos={actionPendingAid.attackerPos}
                         onConfirm={actionHandleAidConfirm}
                         onSkip={actionHandleAidSkip}
+                    />
+                )}
+                {actionPendingGreaterRestoration && (
+                    <GreaterRestorationPopup
+                        spell={{ name: actionPendingGreaterRestoration.spellName, level: actionPendingGreaterRestoration.spellLevel || 0 }}
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        creatureTargets={actionPendingGreaterRestoration.creatureTargets}
+                        range={actionPendingGreaterRestoration.range}
+                        onConfirm={actionHandleGreaterRestorationConfirm}
+                        onSkip={actionHandleGreaterRestorationSkip}
                     />
                 )}
                 {pendingActionMetamagic && (

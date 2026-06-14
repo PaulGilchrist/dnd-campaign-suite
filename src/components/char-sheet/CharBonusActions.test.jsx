@@ -11,6 +11,9 @@ vi.mock('../../hooks/useSpellMetamagicFlow.js', () => ({
     pendingAid: null,
     handleAidConfirm: vi.fn(),
     handleAidSkip: vi.fn(),
+    pendingGreaterRestoration: null,
+    handleGreaterRestorationConfirm: vi.fn(),
+    handleGreaterRestorationSkip: vi.fn(),
   })),
 }));
 
@@ -920,6 +923,9 @@ describe('CharBonusActions', () => {
     pendingAid: null,
     handleAidConfirm: vi.fn(),
     handleAidSkip: vi.fn(),
+    pendingGreaterRestoration: null,
+    handleGreaterRestorationConfirm: vi.fn(),
+    handleGreaterRestorationSkip: vi.fn(),
     });
 
     const stats = createStats({

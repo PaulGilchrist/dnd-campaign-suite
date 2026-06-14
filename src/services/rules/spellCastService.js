@@ -13,7 +13,6 @@ import { getCombatContext } from '../rules/damageUtils.js';
 import { postLogEntry } from '../shared/logPoster.js';
 import { executeHandler } from '../automation/index.js';
 import { rollExpressionMaximized } from '../dice/diceRoller.js';
-import { triggerAidSpell } from './aidSpellService.js';
 import { triggerFalseLife } from './falseLifeService.js';
 import { triggerFear } from './fearService.js';
 import { triggerFeignDeath } from './feignDeathService.js';
@@ -322,10 +321,6 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
     triggerSpellBreakerSlotRetention(spell, metaCtx, playerStats, campaignName).catch(e => {
         console.error('[spellCast] Spell Breaker slot retention trigger failed:', e);
-    });
-
-    triggerAidSpell(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
-        console.error('[spellCast] Aid spell trigger failed:', e);
     });
 }
 

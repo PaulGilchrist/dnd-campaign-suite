@@ -11,6 +11,9 @@ vi.mock('../../hooks/useSpellMetamagicFlow.js', () => ({
     pendingAid: null,
     handleAidConfirm: vi.fn(),
     handleAidSkip: vi.fn(),
+    pendingGreaterRestoration: null,
+    handleGreaterRestorationConfirm: vi.fn(),
+    handleGreaterRestorationSkip: vi.fn(),
   })),
 }));
 

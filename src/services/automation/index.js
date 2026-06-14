@@ -150,6 +150,8 @@ import { handle as handleFeignDeath } from './handlers/feignDeathHandler.js';
 import { handle as handleFleshToStone } from './handlers/fleshToStoneHandler.js';
 import { handle as handleFriends } from './handlers/friendsHandler.js';
 import { handle as handleGlobeOfInvulnerability } from './handlers/globeOfInvulnerabilityHandler.js';
+import { handle as handleGreaseAreaSave } from './handlers/greaseAreaSaveHandler.js';
+import { handle as handleGreaterRestoration, applyGreaterRestoration as applyGreaterRestorationEffect } from './handlers/greaterRestorationHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -340,8 +342,10 @@ const HANDLER_MAP = {
         flesh_to_stone: handleFleshToStone,
         friends: handleFriends,
         globe_of_invulnerability: handleGlobeOfInvulnerability,
+        grease_area_save: handleGreaseAreaSave,
+        greater_restoration: handleGreaterRestoration,
 };
-export { applyAidEffect };
+export { applyAidEffect, applyGreaterRestorationEffect };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
 

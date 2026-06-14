@@ -37,6 +37,25 @@ npm test                                          # Vitest (watch mode)
 npm run test:run                                  # Vitest single run
 npm run test:coverage                             # Vitest with coverage
 ```
+## Git Permissions
+
+You may use git for **read-only inspection only**. Permitted commands:
+
+- `git log`, `git show`, `git diff`, `git status`
+- `git blame`, `git grep`, `git ls-files`
+- `git stash list`, `git stash show`
+- `git remote -v`, `git branch` (listing only)
+
+**Strictly forbidden — do not run these under any circumstances:**
+
+- `git commit`, `git commit --amend`
+- `git checkout`, `git switch`, `git restore`
+- `git push`, `git pull`, `git fetch`
+- `git merge`, `git rebase`, `git cherry-pick`
+- `git reset`, `git revert`, `git clean`
+- `git stash push` / `git stash pop` / `git stash drop`
+- `git branch -d` / `git branch -D` / `git tag -d`
+- `git rm`, `git mv`
 
 **Always run `npm run lint` and `npm run test:run` after changes.** Lint enforces zero warnings.
 

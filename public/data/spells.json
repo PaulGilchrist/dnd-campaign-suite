@@ -6746,10 +6746,14 @@
     "school": "Illusion",
     "classes": [
       "Bard",
-      "Druid",
-      "Wizard"
+      "Cleric",
+      "Druid"
     ],
-    "subclasses": []
+    "subclasses": [],
+    "automation": {
+      "type": "greater_restoration",
+      "range": "Touch"
+    }
   },
   {
     "index": "mirror-image",

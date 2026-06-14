@@ -182,6 +182,9 @@ describe('CharActions state and modals', () => {
     pendingAid: null,
     handleAidConfirm: vi.fn(),
     handleAidSkip: vi.fn(),
+    pendingGreaterRestoration: null,
+    handleGreaterRestorationConfirm: vi.fn(),
+    handleGreaterRestorationSkip: vi.fn(),
     });
   });
 
@@ -276,6 +279,9 @@ describe('CharActions state and modals', () => {
     pendingAid: null,
     handleAidConfirm: vi.fn(),
     handleAidSkip: vi.fn(),
+    pendingGreaterRestoration: null,
+    handleGreaterRestorationConfirm: vi.fn(),
+    handleGreaterRestorationSkip: vi.fn(),
       });
 
       const stats = createStats({

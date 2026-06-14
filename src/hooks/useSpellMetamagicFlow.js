@@ -18,8 +18,49 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
   const [pendingMetamagic, setPendingMetamagic] = React.useState(null);
   const [pendingMultiTarget, setPendingMultiTarget] = React.useState(null);
   const [pendingAid, setPendingAid] = React.useState(null);
+  const [pendingGreaterRestoration, setPendingGreaterRestoration] = React.useState(null);
 
   const gateMetamagic = React.useCallback((spell) => {
+    const isGreaterRestoration = (spell.name || '').toLowerCase() === 'greater restoration';
+    const isAid = (spell.name || '').toLowerCase() === 'aid';
+
+    if (isGreaterRestoration) {
+      const cs = getCombatSummary();
+      const creatureTargets = cs?.creatures
+        ?.filter(c => c.name !== playerStats?.name)
+        .map(c => c.name) || [];
+      if (creatureTargets.length > 0) {
+        setPendingGreaterRestoration({
+          spell,
+          spellName: spell.name,
+          spellLevel: spell.level || 0,
+          castingTime: spell.casting_time,
+          range: spell.range || 'Touch',
+          creatureTargets,
+        });
+        return;
+      }
+    }
+
+    if (isAid) {
+      const cs = getCombatSummary();
+      const creatureTargets = cs?.creatures
+        ?.filter(c => c.name !== playerStats?.name)
+        .map(c => c.name) || [];
+      if (creatureTargets.length > 0) {
+        setPendingAid({
+          spell,
+          spellName: spell.name,
+          spellLevel: spell.level || 0,
+          castingTime: spell.casting_time,
+          range: spell.range || '30 feet',
+          maxTargets: 3,
+          creatureTargets,
+        });
+        return;
+      }
+    }
+
     const multiTargetSpread = getMultiTargetSpreadForSpell(playerStats, spell.name);
 
     if (multiTargetSpread) {
@@ -177,7 +218,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     onExecute(pending.spell, {});
   }, [pendingMultiTarget, playerStats, campaignName, onExecute]);
 
-  const handleAidConfirm = React.useCallback((result) => {
+  const handleAidConfirm = React.useCallback(async (result) => {
     const pending = pendingAid;
     setPendingAid(null);
     if (!pending) return;
@@ -193,13 +234,19 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       timestamp: Date.now(),
     });
 
-    const metaCtx = {};
-    if (result?.targetName) {
-      metaCtx.aidTarget = result.targetName;
+    try {
+      const { applyAidEffect } = await import('../services/automation/index.js');
+      await applyAidEffect(
+        { name: pending.spellName, spell: pending.spell, automation: { type: 'aid', range: pending.range, maxTargets: pending.maxTargets } },
+        playerStats,
+        campaignName,
+        null,
+        result
+      );
+    } catch (e) {
+      console.error('[aid] Failed to apply effect:', e);
     }
-
-    onExecute(pending.spell, metaCtx);
-  }, [pendingAid, playerStats, campaignName, onExecute]);
+  }, [pendingAid, playerStats, campaignName]);
 
   const handleAidSkip = React.useCallback(() => {
     const pending = pendingAid;
@@ -216,9 +263,54 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       spCost: 0,
       timestamp: Date.now(),
     });
+  }, [pendingAid, playerStats, campaignName]);
 
-    onExecute(pending.spell, {});
-  }, [pendingAid, playerStats, campaignName, onExecute]);
+  const handleGreaterRestorationConfirm = React.useCallback(async (result) => {
+    const pending = pendingGreaterRestoration;
+    setPendingGreaterRestoration(null);
+    if (!pending) return;
 
-  return { pendingMetamagic, pendingMultiTarget, pendingAid, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip };
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+
+    try {
+      const { confirmGreaterRestoration } = await import('../services/rules/greaterRestorationService.js');
+      await confirmGreaterRestoration(
+        { name: pending.spellName, spell: pending.spell, automation: { type: 'greater_restoration', range: pending.range } },
+        playerStats,
+        campaignName,
+        null,
+        result
+      );
+    } catch (e) {
+      console.error('[greaterRestoration] Failed to apply effect:', e);
+    }
+  }, [pendingGreaterRestoration, playerStats, campaignName]);
+
+  const handleGreaterRestorationSkip = React.useCallback(() => {
+    const pending = pendingGreaterRestoration;
+    setPendingGreaterRestoration(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+  }, [pendingGreaterRestoration, playerStats, campaignName]);
+
+  return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingGreaterRestoration, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip };
 }
