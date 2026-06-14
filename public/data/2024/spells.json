@@ -8639,7 +8639,14 @@
     "saving_throw": null,
     "status_effects": [],
     "spell_list_order": 1,
-    "cantrip_scaling": {}
+    "cantrip_scaling": {},
+    "automation": {
+      "type": "mage_armor",
+      "target": "willing_creature",
+      "duration": "8 hours",
+      "casting_time": "1 action",
+      "range": "Touch"
+    }
   },
   {
     "index": "mage-hand",

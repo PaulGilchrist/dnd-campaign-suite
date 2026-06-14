@@ -21,6 +21,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
   const [pendingHeroesFeast, setPendingHeroesFeast] = React.useState(null);
   const [pendingGreaterRestoration, setPendingGreaterRestoration] = React.useState(null);
   const [pendingLesserRestoration, setPendingLesserRestoration] = React.useState(null);
+  const [pendingMageArmor, setPendingMageArmor] = React.useState(null);
 
   const gateMetamagic = React.useCallback((spell) => {
     const isGreaterRestoration = (spell.name || '').toLowerCase() === 'greater restoration';
@@ -96,6 +97,25 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
           castingTime: spell.casting_time,
           range: spell.range || 'Self',
           maxTargets: 12,
+          creatureTargets,
+        });
+        return;
+      }
+    }
+
+    const isMageArmor = (spell.name || '').toLowerCase() === 'mage armor';
+    if (isMageArmor) {
+      const cs = getCombatSummary();
+      const creatureTargets = cs?.creatures
+        ?.filter(c => c.name !== playerStats?.name)
+        .map(c => c.name) || [];
+      if (creatureTargets.length > 0) {
+        setPendingMageArmor({
+          spell,
+          spellName: spell.name,
+          spellLevel: spell.level || 0,
+          castingTime: spell.casting_time,
+          range: spell.range || 'Touch',
           creatureTargets,
         });
         return;
@@ -447,5 +467,52 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
   }, [pendingLesserRestoration, playerStats, campaignName]);
 
-  return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingHeroesFeast, pendingGreaterRestoration, pendingLesserRestoration, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleHeroesFeastConfirm, handleHeroesFeastSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, handleLesserRestorationConfirm, handleLesserRestorationSkip };
+  const handleMageArmorConfirm = React.useCallback(async (result) => {
+    const pending = pendingMageArmor;
+    setPendingMageArmor(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+
+    try {
+      const { applyMageArmorEffect } = await import('../services/automation/index.js');
+      await applyMageArmorEffect(
+        { name: pending.spellName, spell: pending.spell, automation: { type: 'mage_armor', range: pending.range } },
+        playerStats,
+        campaignName,
+        null,
+        result
+      );
+    } catch (e) {
+      console.error('[mageArmor] Failed to apply effect:', e);
+    }
+  }, [pendingMageArmor, playerStats, campaignName]);
+
+  const handleMageArmorSkip = React.useCallback(() => {
+    const pending = pendingMageArmor;
+    setPendingMageArmor(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+  }, [pendingMageArmor, playerStats, campaignName]);
+
+  return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingHeroesFeast, pendingGreaterRestoration, pendingLesserRestoration, pendingMageArmor, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleHeroesFeastConfirm, handleHeroesFeastSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, handleLesserRestorationConfirm, handleLesserRestorationSkip, handleMageArmorConfirm, handleMageArmorSkip };
 }
