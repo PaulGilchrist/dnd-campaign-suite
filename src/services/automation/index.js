@@ -160,6 +160,7 @@ import { handle as handleMageArmor, applyMageArmor as applyMageArmorEffect } fro
 import { handle as handleHeroesFeast, applyHeroesFeast as applyHeroesFeastEffect } from './handlers/heroesFeastHandler.js';
 import { handle as handleHypnoticPatternShake, handleConfirm as handleHypnoticPatternShakeConfirm } from './handlers/hypnoticPatternShake.js';
 import { handle as handleHypnoticPattern } from './handlers/hypnoticPatternHandler.js';
+import { handle as handleMassSuggestion } from './handlers/massSuggestionHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -364,6 +365,7 @@ const HANDLER_MAP = {
         hypnotic_pattern: handleHypnoticPattern,
         hypnotic_pattern_shake: handleHypnoticPatternShake,
         hypnotic_pattern_shake_confirm: handleHypnoticPatternShakeConfirm,
+        mass_suggestion: handleMassSuggestion,
 };
 export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect };
 export async function executeHandler(action, playerStats, campaignName, mapName) {

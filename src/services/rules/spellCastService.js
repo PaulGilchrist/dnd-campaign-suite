@@ -23,6 +23,7 @@ import { triggerFeignDeath } from './feignDeathService.js';
 import { triggerFleshToStone } from './fleshToStoneService.js';
 import { triggerHoldMonster } from './holdMonsterService.js';
 import { triggerHypnoticPattern } from './hypnoticPatternService.js';
+import { triggerMassSuggestion } from './massSuggestionService.js';
 import { triggerForesight } from './foresightService.js';
 import { triggerFriends, endFriendsOnHostileAction } from './friendsService.js';
 import { endInvisibilityOnHostileAction } from './invisibilityService.js';
@@ -172,6 +173,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         // Hypnotic Pattern — multi-target WIS save for all creatures in 30-ft cube (can see)
         if (spell.name && spell.name.toLowerCase() === 'hypnotic pattern') {
             await triggerHypnoticPattern(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Mass Suggestion — multi-target WIS save, applies Charmed condition to failed targets
+        if (spell.name && spell.name.toLowerCase() === 'mass suggestion') {
+            await triggerMassSuggestion(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
             return;
         }
 
