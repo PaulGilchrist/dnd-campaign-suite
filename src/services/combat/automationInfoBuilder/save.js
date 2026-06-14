@@ -24,10 +24,21 @@ export const saveHandlers = {
         if (healExpression) {
             healExpression = resolveDiceExpression(healExpression, playerStats)
         }
+        const castingTime = auto.casting_time || ''
+        let action = auto.action
+        if (!action && castingTime) {
+            if (castingTime === '1 bonus action' || castingTime === 'bonus_action') {
+                action = 'bonus_action'
+            } else if (castingTime === '1 action' || castingTime === 'action') {
+                action = 'action'
+            } else if (castingTime === '1 reaction' || castingTime === 'reaction') {
+                action = 'reaction'
+            }
+        }
         return {
             type: 'save_attack',
             name: feature.name,
-            action: auto.action || 'action',
+            action: action || 'action',
             damage,
             damageType: auto.damageType || '',
             saveType: auto.saveType || 'DEX',
@@ -46,6 +57,7 @@ export const saveHandlers = {
             optionDetails: auto.optionDetails || {},
             healExpression,
             dcSuccess: auto.dcSuccess || null,
+            casting_time: castingTime,
             hasAutomation: true
         }
     },

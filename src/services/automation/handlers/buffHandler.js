@@ -9,6 +9,42 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
+    // Check requiredLevel before allowing the buff (e.g., Draconic Flight at level 5)
+    if (auto?.requiredLevel && playerStats.level < auto.requiredLevel) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name} requires character level ${auto.requiredLevel}. You are level ${playerStats.level}.`,
+                automation: auto,
+            },
+        };
+    }
+
+    // Check long rest recharge for traits with no explicit uses field
+    if (auto?.recharge === 'long_rest' && !auto?.uses) {
+        const restKey = playerStats.name.toLowerCase().replace(/\s+/g, '') + '_buffRestTimestamp';
+        const lastRest = getRuntimeValue(playerStats.name, restKey, campaignName);
+        const now = Date.now();
+        if (lastRest && (now - lastRest) < 86400000) {
+            const stored = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+            const activeBuffs = Array.isArray(stored) ? stored : [];
+            const isActive = activeBuffs.some(b => b.name === action.name);
+            if (!isActive) {
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: action.name,
+                        description: `${action.name} has been used and cannot be used again until a Long Rest.`,
+                        automation: auto,
+                    },
+                };
+            }
+        }
+    }
+
     if (auto?.effect === 'teleport_on_rage' || auto?.effect === 'teleport_swap_with_illusion' || auto?.effect === 'shadow_step_teleport' || auto?.effect === 'moonlight_step_teleport') {
         return handleTeleport(action, playerStats, campaignName, _mapName);
     }
@@ -51,6 +87,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
     }
 
+    if (auto?.effect === 'fly_speed_equals_walk_speed' && wasActive) {
+        const restKey = playerStats.name.toLowerCase().replace(/\s+/g, '') + '_buffRestTimestamp';
+        await setRuntimeValue(playerStats.name, restKey, Date.now(), campaignName);
+    }
+
     if (!wasActive && auto?.tempHpExpression) {
         let amount = evaluateAutoExpression(auto.tempHpExpression, playerStats);
         // Circle of the Moon: Circle Forms overrides temp HP to 3 × Druid level
@@ -76,4 +117,4 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             automation: auto,
         },
     };
- }
+}

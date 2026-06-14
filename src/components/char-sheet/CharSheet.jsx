@@ -1,6 +1,6 @@
 import React from 'react'
 import { cloneDeep } from 'lodash';
-import { setRuntimeValue, getRuntimeValue, useRuntimeValue } from '../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/useRuntimeState.js'
 import rulesFactory from '../../services/rules/rulesFactory.js'
 import CharAbilities from './CharAbilities.jsx'
 import CharActions from './CharActions.jsx'
@@ -197,8 +197,9 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const isRaging = Array.isArray(activeBuffs) && activeBuffs.some(b => b.damageBonusExpression);
     const shapeShiftActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shape_shift');
     const isPeerlessAthlete = getRuntimeValue(playerStats?.name, 'peerlessAthleteActive', campaignName);
+    const isLargeFormActive = getRuntimeValue(playerStats?.name, 'largeFormActive', campaignName);
     const combatContext = getCombatSummary();
-    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive, isPeerlessAthlete, combatContext);
+    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext);
     if (playerStats) {
         const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
         if (speedHalvedTime) conditionEffects.speedHalved = true;

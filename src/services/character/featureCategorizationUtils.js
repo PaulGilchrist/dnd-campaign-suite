@@ -59,8 +59,15 @@ export const categorizeFeatures = (items, categories, options = {}) => {
     }
 
     // Categorize by casting_time for features that have automations with casting_time
-    if (item.automation?.casting_time) {
-      const ct = item.automation.casting_time;
+    let castingTime = item.automation?.casting_time;
+    if (!castingTime && Array.isArray(item.automation) && item.automation.length > 0) {
+      const firstAuto = item.automation.find(a => a?.casting_time);
+      if (firstAuto) {
+        castingTime = firstAuto.casting_time;
+      }
+    }
+    if (castingTime) {
+      const ct = castingTime;
       if (ct === '1 action' && !categorized.actions.some(f => f.name === item.name)) {
         categorized.actions.push(itemSummary);
       } else if (ct === '1 bonus action' && !categorized.bonusActions.some(f => f.name === item.name)) {

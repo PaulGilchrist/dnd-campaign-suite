@@ -271,4 +271,49 @@ describe('playerIsImmuneToCondition', () => {
     })
     expect(result).toBe(true)
   })
+
+  it('returns true when playerStats.immunities contains the condition', () => {
+    playerStats.immunities = ['Magical Sleep']
+    const result = playerIsImmuneToCondition({
+      conditionKey: 'Magical Sleep',
+      playerStats,
+      getRuntimeValue: mockGetRuntimeValue,
+      campaignName,
+    })
+    expect(result).toBe(true)
+  })
+
+  it('returns true for case-insensitive match in playerStats.immunities', () => {
+    playerStats.immunities = ['Magical Sleep']
+    const result = playerIsImmuneToCondition({
+      conditionKey: 'magical sleep',
+      playerStats,
+      getRuntimeValue: mockGetRuntimeValue,
+      campaignName,
+    })
+    expect(result).toBe(true)
+  })
+
+  it('returns false when playerStats.immunities does not contain the condition', () => {
+    playerStats.immunities = ['Magical Sleep']
+    const result = playerIsImmuneToCondition({
+      conditionKey: 'poisoned',
+      playerStats,
+      getRuntimeValue: mockGetRuntimeValue,
+      campaignName,
+    })
+    expect(result).toBe(false)
+  })
+
+  it('checks playerStats.immunities before allFeatures', () => {
+    playerStats.immunities = ['charmed']
+    playerStats.allFeatures = [makeFeature({ type: 'passive_immunity', conditionImmunity: 'frightened' })]
+    const result = playerIsImmuneToCondition({
+      conditionKey: 'charmed',
+      playerStats,
+      getRuntimeValue: mockGetRuntimeValue,
+      campaignName,
+    })
+    expect(result).toBe(true)
+  })
 })

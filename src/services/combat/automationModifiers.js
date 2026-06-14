@@ -85,6 +85,15 @@ export function collectSaveModifiers(features) {
                     effect: 'disadvantage',
                 })
             }
+            if (auto.type === 'large_form') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'ability_check',
+                    condition: 'large_form_active',
+                    effect: 'advantage',
+                    abilities: ['STR'],
+                })
+            }
             if (auto.type === 'otherworldly_glamour') {
                 modifiers.push({
                     source: feature.name,

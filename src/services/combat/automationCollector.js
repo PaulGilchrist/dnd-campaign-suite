@@ -109,6 +109,15 @@ export function collectTurnStartEffects(features) {
                     name: feature.name,
                 })
             }
+            if (auto?.type === 'damage_aura' && feature.name === 'Inner Radiance') {
+                effects.push({
+                    type: 'inner_radiance_turn_start',
+                    name: feature.name,
+                    damageExpression: auto.damageExpression || 'proficiency_bonus',
+                    damageType: auto.damageType || 'Radiant',
+                    range: auto.range || '10_ft',
+                })
+            }
             if (auto?.type === 'precise_hunter') {
                 effects.push({
                     type: 'precise_hunter',
@@ -298,7 +307,8 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break
             case 'attack_rider':
                 // attack_rider with options (chooseOne) is a passive that triggers on hit
-                if (info.chooseOne || info.maxEffects > 1) {
+                // attack_rider with oncePerTurn and passive casting_time is also a passive
+                if (info.chooseOne || info.maxEffects > 1 || (info.oncePerTurn && info.casting_time === 'passive')) {
                     result.passives.push(info)
                 } else {
                     // Single-option attack_rider is an action
@@ -479,6 +489,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'elder_champion':
                 result.specialActions.push(info)
                 break
+            case 'large_form':
+                result.specialActions.push(info)
+                break
             case 'umbral_sight':
                 result.passives.push(info)
                 break
@@ -519,6 +532,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 } else {
                     result.actions.push(info)
                 }
+                break
+            case 'cantrip_spellcasting_ability':
+                result.passives.push(info)
                 break
             case 'dark_ones_blessing':
                 result.passives.push(info)
@@ -623,6 +639,15 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break
             case 'create_thrall_temp_hp':
                 result.passives.push(info)
+                break
+            case 'celestial_revelation':
+                result.specialActions.push(info)
+                break
+            case 'elfish_lineage':
+                result.specialActions.push(info)
+                break
+            case 'gnomish_lineage':
+                result.specialActions.push(info)
                 break
             case 'memorize_spell':
                 result.specialActions.push(info);

@@ -5,6 +5,7 @@ import * as mapsService from '../../maps/mapsService.js';
 import { getCombatContext } from '../../rules/damageUtils.js';
 import { rangeToFeet } from '../../rules/rangeValidation.js';
 import { addExpiration } from '../../rules/expirations.js';
+import { resolveUses } from '../../combat/automationExpressions.js';
 
 const AREA_SHAPES = new Set(['emanation', 'cone', 'line', 'sphere', 'cube', 'cylinder', 'square', 'circle', 'wall', 'cage', 'floor', 'area']);
 
@@ -55,7 +56,7 @@ export function isExhausted(action, playerStats, campaignName) {
     }
 
     if (auto.uses === undefined && auto.usesMax === undefined) return false;
-    const maxUses = auto.usesMax ?? auto.uses ?? 1;
+    const maxUses = auto.usesMax ?? resolveUses(playerStats, auto.uses) ?? 1;
     const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
     return currentUses <= 0;
@@ -92,6 +93,38 @@ export async function handle(action, playerStats, campaignName, mapName) {
     // Normalize pushEffect to effect for push-based effects
     if (auto.pushEffect && !auto.effect) {
         auto.effect = auto.pushEffect;
+    }
+
+    // Resolve variable damage type from subrace (e.g., Draconic Ancestry Breath Weapon)
+    let resolvedDamageType = auto.damageType || '';
+    if (resolvedDamageType === 'variable') {
+        const subrace = playerStats.race?.subrace;
+        if (subrace?.damage_resistance) {
+            resolvedDamageType = subrace.damage_resistance;
+        }
+    }
+
+    // Resolve variable shape — show shape selection modal if no option chosen yet
+    let resolvedShape = auto.shape || '';
+    if (resolvedShape === 'variable' && auto.hasOptions && auto.optionDetails) {
+        const optionKey = `_${action.name.replace(/\s+/g, '_')}_option`;
+        const chosenOption = getRuntimeValue(playerStats.name, optionKey, campaignName);
+        if (!chosenOption) {
+            const optionKeys = Object.keys(auto.optionDetails);
+            return {
+                type: 'modal',
+                modalName: 'breathWeaponShape',
+                payload: {
+                    action,
+                    playerStats,
+                    campaignName,
+                    options: optionKeys,
+                },
+            };
+        }
+        resolvedShape = auto.shape || 'cone';
+    } else if (resolvedShape === 'variable') {
+        resolvedShape = 'cone';
     }
 
     if (auto.resourceCost === 'channel_divinity') {
@@ -135,7 +168,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         await setRuntimeValue(playerStats.name, 'wildShapeUses', resolvedWS - cost, campaignName);
 
         // Set up duration expiration for area effects
-        if (auto.duration && isAreaShape(auto.shape)) {
+        if (auto.duration && isAreaShape(resolvedShape)) {
             const durationRounds = parseDurationRounds(auto.duration);
             if (durationRounds) {
                 addExpiration(playerStats.name, playerStats.name, [
@@ -144,7 +177,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
             }
         }
     } else {
-        const maxUses = auto.usesMax ?? auto.uses ?? 1;
+        const resolvedUses = auto.usesMax ?? resolveUses(playerStats, auto.uses) ?? 1;
+        const maxUses = resolvedUses > 0 ? resolvedUses : 0;
 
         if (maxUses > 0) {
             const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
@@ -167,12 +201,12 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
     const dcSuccess = auto.dcSuccess !== undefined && auto.dcSuccess !== null
         ? auto.dcSuccess
-        : (auto.shape === 'cone' ? 0.5 : 0);
+        : (resolvedShape === 'cone' ? 0.5 : 0);
 
     const saveDcValue = buildSaveDc(auto, playerStats);
 
     // Handle save_attack with healing expression — use a modal for area + healing
-    if (auto.healExpression && isAreaShape(auto.shape)) {
+    if (auto.healExpression && isAreaShape(resolvedShape)) {
         const cs = await getCombatContext(campaignName);
 
         let attackerPos = null;
@@ -187,31 +221,31 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 } catch { /* positions unavailable */ }
          }
 
-        const rangeFeet = getEmanationRange(auto, playerStats, playerStats.name, campaignName);
+         const rangeFeet = getEmanationRange({ ...auto, shape: resolvedShape }, playerStats, playerStats.name, campaignName);
 
-        return {
-            type: 'modal',
-            modalName: 'saveAttackHeal',
-            payload: {
-                combatSummary: cs,
-                attackerName: playerStats.name,
-                attackerPos,
-                saveDc: saveDcValue,
-                campaignName,
-                mapData,
-                featureName: action.name,
-                saveType: auto.saveType || 'CON',
-                rangeFeet,
-                damageExpression: auto.damage || '',
-                damageType: auto.damageType || '',
-                healExpression: auto.healExpression,
-                dcSuccess: dcSuccess === 0 ? 'none' : (dcSuccess === 0.5 ? 'half' : dcSuccess),
-            },
-        };
-    }
+         return {
+             type: 'modal',
+             modalName: 'saveAttackHeal',
+             payload: {
+                 combatSummary: cs,
+                 attackerName: playerStats.name,
+                 attackerPos,
+                 saveDc: saveDcValue,
+                 campaignName,
+                 mapData,
+                 featureName: action.name,
+                 saveType: auto.saveType || 'CON',
+                 rangeFeet,
+                 damageExpression: auto.damage || '',
+                 damageType: resolvedDamageType,
+                 healExpression: auto.healExpression,
+                 dcSuccess: dcSuccess === 0 ? 'none' : (dcSuccess === 0.5 ? 'half' : dcSuccess),
+             },
+         };
+     }
 
     if (auto.conditionInflicted && !auto.damage) {
-        if (isAreaShape(auto.shape)) {
+        if (isAreaShape(resolvedShape)) {
             const cs = await getCombatContext(campaignName);
 
             let attackerPos = null;
@@ -223,29 +257,29 @@ export async function handle(action, playerStats, campaignName, mapName) {
                     if (attackerPlayer) {
                         attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
                      }
-                   } catch { /* positions unavailable */ }
+                    } catch { /* positions unavailable */ }
              }
 
-             const rangeFeet = getEmanationRange(auto, playerStats, playerStats.name, campaignName);
+             const rangeFeet = getEmanationRange({ ...auto, shape: resolvedShape }, playerStats, playerStats.name, campaignName);
 
-            return {
-                type: 'modal',
-                modalName: 'setCondition',
-                payload: {
-                    combatSummary: cs,
-                    attackerName: playerStats.name,
-                    attackerPos,
-                    saveDc: saveDcValue,
-                    campaignName,
-                    mapData,
-                    featureName: action.name,
-                    conditionName: auto.conditionInflicted.toLowerCase(),
-                    saveType: auto.saveType || 'WIS',
-                    rangeFeet,
-                    durationRounds: parseDurationRounds(auto.duration),
-                },
-            };
-        }
+             return {
+                 type: 'modal',
+                 modalName: 'setCondition',
+                 payload: {
+                     combatSummary: cs,
+                     attackerName: playerStats.name,
+                     attackerPos,
+                     saveDc: saveDcValue,
+                     campaignName,
+                     mapData,
+                     featureName: action.name,
+                     conditionName: auto.conditionInflicted.toLowerCase(),
+                     saveType: auto.saveType || 'WIS',
+                     rangeFeet,
+                     durationRounds: parseDurationRounds(auto.duration),
+                 },
+             };
+         }
 
         return {
             type: 'popup',
@@ -276,7 +310,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     if (!damageResult) return null;
 
     const notes = [];
-    if (auto.shape && isAreaShape(auto.shape)) {
+    if (resolvedShape && isAreaShape(resolvedShape)) {
         notes.push('Magical Darkness in the area is dispelled.');
     }
     if (auto.effect) {
@@ -296,13 +330,13 @@ export async function handle(action, playerStats, campaignName, mapName) {
             modifier: damageResult.modifier,
             notes: notes.length > 0 ? notes.join(' ') : undefined,
             contextConfig: {
-                damageType: auto.damageType || '',
+                damageType: resolvedDamageType,
                 saveDc: saveDcValue,
                 saveType: auto.saveType || 'DEX',
                 dcSuccess: dcSuccessDisplay,
                 attackerName: playerStats.name,
                 conditionInflicted: auto.conditionInflicted || null,
-                shape: auto.shape || '',
+                shape: resolvedShape,
              },
          },
      };

@@ -49,6 +49,8 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     if (!current) return;
 
     let saveBonus = 0;
+    let saveModifiers = null;
+    let activeConditions = [];
     try {
       const character = (characters || []).find(c => {
         const name = typeof c === 'string' ? c : c.name;
@@ -56,17 +58,37 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       });
       if (character && typeof character !== 'string') {
         saveBonus = getAbilitySaveBonus(character.computedStats || character, current.saveType);
+        saveModifiers = character.saveModifiers || character.computedStats?.saveModifiers;
+        activeConditions = getRuntimeValue(current.targetName, 'activeConditions') || [];
       }
     } catch { /* ignore */ }
 
     const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName });
     const auraBonus = aura.bonus;
+
+    let hasAdvantage = false;
+    if (current.advantage) {
+      hasAdvantage = true;
+    } else if (!current.disadvantage && saveModifiers && saveModifiers.length > 0) {
+      const conditionSet = new Set(activeConditions);
+      for (const mod of saveModifiers) {
+        if (mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition) {
+          if (conditionSet.has(mod.condition)) {
+            hasAdvantage = true;
+            break;
+          }
+        }
+      }
+    }
+
     const roll1 = rollD20();
     const roll2 = current.disadvantage ? rollD20() : roll1;
-    const finalRoll = current.disadvantage ? Math.min(roll1, roll2) : roll1;
+    const finalRoll = current.disadvantage ? Math.min(roll1, roll2) : hasAdvantage ? Math.max(roll1, roll2) : roll1;
     const total = finalRoll + saveBonus + auraBonus;
     const success = total >= current.saveDc;
     const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined;
+
+    const rollMode = current.disadvantage ? 'disadvantage' : hasAdvantage ? 'advantage' : 'normal';
 
     sendSaveResult(campaignName, current.targetName, {
       promptId: current.promptId,
@@ -75,6 +97,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
       total,
       saveBonus: saveBonus + auraBonus,
       rawRolls: [roll1, roll2],
+      mode: rollMode,
     });
 
     window.dispatchEvent(new CustomEvent('save-result', {
@@ -91,12 +114,13 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
         rawDamage: current.rawDamage,
         dcSuccess: current.dcSuccess,
         rawRolls: [roll1, roll2],
+        mode: rollMode,
       },
     }));
 
     setPrompts(prev => prev.map((p, i) =>
       i === 0
-        ? { ...p, result: { success, roll: finalRoll, total, saveBonus: saveBonus + auraBonus, bonusDetail, rawRolls: [roll1, roll2] } }
+        ? { ...p, result: { success, roll: finalRoll, total, saveBonus: saveBonus + auraBonus, bonusDetail, rawRolls: [roll1, roll2], mode: rollMode } }
         : p
     ));
   }, [campaignName, current, characters, activeMapName]);
@@ -156,7 +180,7 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
                 <div className={`sp-result ${current.result.success ? 'sp-result-success' : 'sp-result-fail'}`}>
                   <p className="sp-result-label">{current.result.success ? 'SAVE SUCCESS' : 'SAVE FAILURE'}</p>
                   <p className="sp-result-total">Total: <strong>{current.result.total}</strong> vs DC {current.saveDc}</p>
-                  <p className="sp-result-breakdown">d20 ({current.result.roll}) + {current.result.saveBonus}{current.result.bonusDetail ? ' ' + current.result.bonusDetail : ''}</p>
+                  <p className="sp-result-breakdown">d20 ({current.result.roll}) + {current.result.saveBonus}{current.result.bonusDetail ? ' ' + current.result.bonusDetail : ''}{current.result.mode === 'advantage' ? ' (Advantage)' : current.result.mode === 'disadvantage' ? ' (Disadvantage)' : ''}</p>
                 </div>
               )}
             </div>

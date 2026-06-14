@@ -67,6 +67,17 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     null;
   const damageType = spell.damage?.damage_type || '';
 
+  const cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
+  let spellToHit = playerStats.spellAbilities?.toHit || 0;
+  let spellSaveDc = playerStats.spellAbilities?.saveDc || 8 + playerStats.proficiency;
+  if (cantripSpellAbility && playerStats.abilities) {
+    const ability = playerStats.abilities.find(a => a.name === cantripSpellAbility);
+    if (ability) {
+      spellToHit = ability.bonus + playerStats.proficiency;
+      spellSaveDc = 8 + ability.bonus + playerStats.proficiency;
+    }
+  }
+
   if (!formula) {
       if (spell.name.toLowerCase() === 'power word heal' && metaCtx?.multiTarget) {
           const target = await getTargetInfo();
@@ -150,7 +161,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
          targetName: target?.name,
          attackerName: playerStats.name,
           ...rollContext,
-         saveDc: playerStats.spellAbilities.saveDc + (innateSorceryActive ? 1 : 0),
+          saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
          saveType: spell.dc.dc_type,
          dcSuccess: spell.dc.dc_success,
          metamagicHeighten: hasInvisible,
@@ -179,7 +190,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
        if (hasInvisible) {
          attackCtx.metamagicHeighten = true;
        }
-       rollAttack(spell.name, playerStats.spellAbilities.toHit, attackCtx);
+        rollAttack(spell.name, spellToHit, attackCtx);
         }
 
     triggerPostCastRiderSaves(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {

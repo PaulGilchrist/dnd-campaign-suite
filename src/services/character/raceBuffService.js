@@ -39,6 +39,12 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
 
   if (!race) return result;
 
+  if (ruleset === '2024' && race.damage_resistance) {
+    if (!result.resistances.includes(race.damage_resistance)) {
+      result.resistances.push(race.damage_resistance);
+    }
+  }
+
   if (ruleset === '5e') {
     const abilityBonuses = race.ability_bonuses || [];
     abilityBonuses.forEach(ab => {
@@ -88,10 +94,34 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
        }
      }
 
+    if (ruleset === '2024' && trait.description) {
+      const skillMatch = trait.description.match(/proficiency in the ([A-Z][a-z]+(?:,|[,\s]and[,\s]|[,\s]or[,\s]|,?)[A-Za-z\s]+?)\s*skill/i);
+      if (skillMatch) {
+        const skillsStr = skillMatch[1]
+          .replace(/\s+and\s+/g, ',')
+          .replace(/\s+or\s+/g, ',')
+          .replace(/,\s*,/g, ',')
+          .split(',')
+          .map(s => s.trim())
+          .filter(s => s.length > 0);
+        skillsStr.forEach(sName => {
+          result.proficiencies.push({ name: `Skill: ${sName}` });
+        });
+      }
+    }
+
     if (ruleset === '5e') {
-      const resistMatch = trait.description ? trait.description.match(/(?:resistance|resistant) to (\w+)/i) : null;
-      if (resistMatch) {
-        result.resistances.push(resistMatch[1]);
+      if (trait.description) {
+        const resistMatches = [...trait.description.matchAll(/(?:resistance|resistant) to (\w+)/gi)];
+        resistMatches.forEach(match => {
+          result.resistances.push(match[1]);
+        });
+      }
+    }
+
+    if (trait.name === 'Trance') {
+      if (!result.traits.some(t => t.name === 'Trance')) {
+        result.traits.push({ name: 'Trance', description: trait.description });
       }
     }
   });
@@ -100,7 +130,13 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
     ? race.subraces.find(sr => sr.name === playerData?.race?.subrace?.name)
     : null;
 
-  if (subrace) {
+    if (subrace) {
+    if (ruleset === '2024' && subrace.damage_resistance) {
+      if (!result.resistances.includes(subrace.damage_resistance)) {
+        result.resistances.push(subrace.damage_resistance);
+      }
+    }
+
     if (ruleset === '5e' && subrace.ability_bonuses) {
       subrace.ability_bonuses.forEach(ab => {
         const existing = result.abilityScoreIncreases.find(

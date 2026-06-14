@@ -1,4 +1,11 @@
-export async function handle(action, _playerStats, _campaignName, _mapName) {
+import { handle as handleGiantAncestry } from './giantAncestryHandler.js';
+
+export async function handle(action, playerStats, campaignName, mapName) {
+    // Giant Ancestry has its own sub-option selection flow
+    if (action.name === 'Giant Ancestry' || action.automation?.type === 'giant_ancestry') {
+        return await handleGiantAncestry(action, playerStats, campaignName, mapName);
+    }
+
     const conversion = action.automation?.conversion || '';
     if (conversion === 'spell_slot_to_moonlight_step') {
         return {

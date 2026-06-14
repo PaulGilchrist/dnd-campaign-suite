@@ -49,6 +49,11 @@ import WildMagicDoubleRollModal from './WildMagicDoubleRollModal.jsx'
 import WildMagicTamedModal from './WildMagicTamedModal.jsx'
 import SoulstitchSpellsModal from './SoulstitchSpellsModal.jsx'
 import IllusoryRealityModal from './IllusoryRealityModal.jsx'
+import CelestialRevelationModal from './CelestialRevelationModal.jsx'
+import ElfisLineageModal from './ElfisLineageModal.jsx'
+import GnomishLineageModal from './GnomishLineageModal.jsx'
+import GiantAncestryModal from './GiantAncestryModal.jsx'
+import BreathWeaponShapeModal from './BreathWeaponShapeModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/divineInterventionHandler.js';
@@ -252,6 +257,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         thirdEyeModal, setThirdEyeModal,
         soulstitchSpellsModal, setSoulstitchSpellsModal,
         illusoryRealityModal, setIllusoryRealityModal,
+        celestialRevelationModal, setCelestialRevelationModal,
+        elfishLineageModal, setElfisLineageModal,
+        gnomishLineageModal, setGnomishLineageModal,
+        giantAncestryModal, setGiantAncestryModal,
+        breathWeaponShapeModal, setBreathWeaponShapeModal,
         divineFuryChoice,
         damageTypeChoice,
         featureChoice, setFeatureChoice,
@@ -469,6 +479,23 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'illusoryReality':
                         setIllusoryRealityModal(result.payload);
                         break;
+                    case 'celestialRevelation':
+                        setCelestialRevelationModal(result.payload);
+                        break;
+                    case 'elfishLineage':
+                        setElfisLineageModal(result.payload);
+                        break;
+                    case 'gnomishLineage':
+                        setGnomishLineageModal(result.payload);
+                        break;
+                    case 'giantAncestry':
+                        setGiantAncestryModal(result.payload);
+                        break;
+                    case 'breathWeaponShape': {
+                        const bwPayload = result.payload;
+                        setBreathWeaponShapeModal({ action: bwPayload.action, playerStats, campaignName, options: bwPayload.options });
+                        break;
+                    }
                     case 'defensiveTactics': {
                         const actionData = result.payload?.action;
                         const defensiveChoice = getRuntimeValue(playerStats.name, '_Defensive_Tactics_choice', campaignName);
@@ -989,6 +1016,36 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <IllusoryRealityModal
                         {...illusoryRealityModal}
                         onClose={() => setIllusoryRealityModal(null)}
+                    />
+                )}
+                {celestialRevelationModal && (
+                    <CelestialRevelationModal
+                        {...celestialRevelationModal}
+                        onClose={() => setCelestialRevelationModal(null)}
+                    />
+                )}
+                {elfishLineageModal && (
+                    <ElfisLineageModal
+                        {...elfishLineageModal}
+                        onClose={() => setElfisLineageModal(null)}
+                    />
+                )}
+                {gnomishLineageModal && (
+                    <GnomishLineageModal
+                        {...gnomishLineageModal}
+                        onClose={() => setGnomishLineageModal(null)}
+                    />
+                )}
+                {giantAncestryModal && (
+                    <GiantAncestryModal
+                        {...giantAncestryModal}
+                        onClose={() => setGiantAncestryModal(null)}
+                    />
+                )}
+                {breathWeaponShapeModal && (
+                    <BreathWeaponShapeModal
+                        {...breathWeaponShapeModal}
+                        onClose={() => setBreathWeaponShapeModal(null)}
                     />
                 )}
                 {divineFuryChoice && (

@@ -7,9 +7,10 @@ import utils from '../ui/utils.js';
 import { parseMagicItemName } from './attackCalc.js';
 import * as proficiencyUtils from '../character/proficiencyUtils.js';
 import * as proficiencyUtils2024 from '../character/proficiencyUtils2024.js';
-import { getAbilities as getAbilities5e, getHitPoints as getHitPoints5e } from './abilityCalc.js';
+import { getAbilities as getAbilities5e, getHitPoints as getHitPoints5e, getCarryingCapacity as getCarryingCapacity5e } from './abilityCalc.js';
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
-import { getAbilities as getAbilities2024, getHitPoints as getHitPoints2024 } from './abilityCalc2024.js';
+import { getAbilities as getAbilities2024, getHitPoints as getHitPoints2024, getCarryingCapacity as getCarryingCapacity2024 } from './abilityCalc2024.js';
+import { getElfisLineageSelection } from '../automation/handlers/elfishLineageHandler.js';
 import { getSpellAbilities as getSpellAbilities5e } from './spellCalc.js';
 import { getSpellAbilities as getSpellAbilities2024 } from './spellCalc2024.js';
 import { getAttacks as getAttacks5e } from './attackCalc.js';
@@ -95,6 +96,32 @@ function applyUmbralSightDarkvision(playerStats, senses) {
     return senses;
 }
 
+/**
+ * Apply Elfish Lineage Wood Elf speed bonus.
+ * Adds 5 ft. to base speed when Wood Elf lineage is selected.
+ */
+function applyElfisLineageSpeed(playerStats, playerSummary) {
+    const lineage = getElfisLineageSelection(playerStats, playerSummary?.campaignName);
+    if (lineage === 'Wood Elf' && playerStats.speed != null) {
+        return playerStats.speed + 5;
+    }
+    return playerStats.speed;
+}
+
+/**
+ * Detect Powerful Build trait and set sizeMultiplier on playerStats.
+ * Powerful Build: "count as one size larger when determining your carrying capacity."
+ * One size larger = 2x carrying capacity.
+ */
+function applyPowerfulBuild(playerStats) {
+    const traits = playerStats.race?.traits || [];
+    const hasPowerfulBuild = traits.some(t => t.name === 'Powerful Build');
+    if (hasPowerfulBuild) {
+        playerStats.sizeMultiplier = 2;
+    }
+    return playerStats;
+}
+
 const rules = {
      // === SHARED METHODS (identical in both rulesets) ===
 
@@ -126,13 +153,21 @@ const rules = {
         return getAbilities5e(playerStats);
      },
 
-     // === RULESET-SPECIFIC: getHitPoints ===
-    getHitPoints: (playerStats, playerSummary) => {
-        if (is2024(playerStats, playerSummary)) {
-            return getHitPoints2024(playerStats);
-         }
-        return getHitPoints5e(playerStats);
-     },
+      // === RULESET-SPECIFIC: getHitPoints ===
+     getHitPoints: (playerStats, playerSummary) => {
+         if (is2024(playerStats, playerSummary)) {
+             return getHitPoints2024(playerStats);
+          }
+         return getHitPoints5e(playerStats);
+      },
+
+     // === SHARED: getCarryingCapacity ===
+     getCarryingCapacity: (playerStats) => {
+         if (is2024(playerStats, null)) {
+             return getCarryingCapacity2024(playerStats);
+          }
+         return getCarryingCapacity5e(playerStats);
+      },
 
      // === RULESET-SPECIFIC: getSpellAbilities ===
     getSpellAbilities: (allSpells, playerStats, playerSummary) => {
@@ -160,18 +195,40 @@ const rules = {
      getProficiencies: (playerStats, skill = true, playerSummary) => {
          const { proficiencyUtils: pu } = rules.getSubModules(playerStats, playerSummary);
 
-        if (is2024(playerStats, playerSummary)) {
-             // 2024: no racial extra proficiencies, uses class.major
-            return pu.getProficiencies(
-                playerStats,
-                skill,
-                pu.getProficiencyChoiceCount,
-                 {
-                    raceProficiencies: () => [],
-                    bonusSource: playerStats.class.major || {},
-                 }
-             );
-         }
+         if (is2024(playerStats, playerSummary)) {
+              // 2024: extract skill proficiencies from race trait descriptions
+             const raceProficiencies = () => {
+                 const extra = [];
+                 const traits = playerStats.race?.traits || [];
+                 traits.forEach(trait => {
+                     if (trait.description) {
+                         const match = trait.description.match(/proficiency in the ([A-Z][a-z]+(?:,|[,\s]and[,\s]|[,\s]or[,\s]|,?)[A-Za-z\s]+?)\s*skill/i);
+                         if (match) {
+                             const skillsStr = match[1]
+                                 .replace(/\s+and\s+/g, ',')
+                                 .replace(/\s+or\s+/g, ',')
+                                 .replace(/,\s*,/g, ',')
+                                 .split(',')
+                                 .map(s => s.trim())
+                                 .filter(s => s.length > 0);
+                             skillsStr.forEach(sName => {
+                                 extra.push(`Skill: ${sName}`);
+                             });
+                         }
+                     }
+                 });
+                 return extra;
+             };
+             return pu.getProficiencies(
+                 playerStats,
+                 skill,
+                 pu.getProficiencyChoiceCount,
+                  {
+                     raceProficiencies,
+                     bonusSource: playerStats.class.major || {},
+                  }
+              );
+          }
 
          // 5e: race proficiencies from traits/subrace, uses class.subclass
         return pu.getProficiencies(
@@ -485,10 +542,11 @@ const rules = {
 
         const { classRules: cr, raceRules: rr } = rules.getSubModules(playerStats, playerSummary);
 
-        playerStats.class = cr.getClass(allClasses, playerSummary);
-        playerStats.wildMagicSurgeTable = playerStats.class?.wild_magic_surge_table || null;
-        playerStats.race = rr.getRace(allRaces, playerSummary);
-        playerStats.inventory.magicItems = rules.getMagicItems(allMagicItems, playerSummary, playerStats);
+         playerStats.class = cr.getClass(allClasses, playerSummary);
+         playerStats.wildMagicSurgeTable = playerStats.class?.wild_magic_surge_table || null;
+         playerStats.race = rr.getRace(allRaces, playerSummary);
+         applyPowerfulBuild(playerStats);
+         playerStats.inventory.magicItems = rules.getMagicItems(allMagicItems, playerSummary, playerStats);
 
          // 2024-specific: set senses early, store equipment
         if (is2024(playerStats, playerSummary)) {
@@ -532,6 +590,8 @@ const rules = {
 
         playerStats.abilities = await rules.getAbilities(playerStats, playerSummary);
         playerStats.hitPoints = rules.getHitPoints(playerStats, playerSummary);
+        playerStats.carryingCapacity = rules.getCarryingCapacity(playerStats);
+        playerStats.speed = applyElfisLineageSpeed(playerStats, playerSummary);
         const dexAbility = playerStats.abilities.find((ability) => ability.name === 'Dexterity');
         playerStats.initiative = dexAbility.bonus;
         // Add Dread Ambush initiative bonus (WIS modifier) for Gloom Stalkers

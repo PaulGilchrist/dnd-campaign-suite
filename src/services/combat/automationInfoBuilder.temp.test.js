@@ -55,6 +55,9 @@ describe('buildAttackInfo – temp_buff', () => {
             enemiesDisadvantageSaves: [],
             triggerOnRage: false,
             distanceExpression: '',
+            casting_time: '',
+            uses: null,
+            usesMax: null,
             hasAutomation: true,
         })
     })
@@ -93,6 +96,13 @@ describe('buildAttackInfo – temp_buff', () => {
         expect(result.enemiesDisadvantageSaves).toEqual(['save1'])
         expect(result.triggerOnRage).toBe(true)
         expect(result.distanceExpression).toBe('2d6')
+    })
+
+    it('evaluates uses when proficiency_bonus', () => {
+        const feature = { ...BASE_FEATURE, automation: { type: 'temp_buff', uses: 'proficiency_bonus' } }
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.uses).toBe('proficiency_bonus')
+        expect(result.usesMax).toBe(3)
     })
 })
 

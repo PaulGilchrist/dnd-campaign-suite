@@ -48,7 +48,8 @@ vi.mock('../character/race-rules/index.js', () => ({
 
 vi.mock('./abilityCalc2024.js', () => ({
   getAbilities: vi.fn(),
-  getHitPoints: vi.fn()
+  getHitPoints: vi.fn(),
+  getCarryingCapacity: vi.fn()
 }));
 
 vi.mock('./attackCalc2024.js', () => ({

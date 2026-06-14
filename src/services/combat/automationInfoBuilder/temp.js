@@ -1,6 +1,17 @@
 export const tempHandlers = {
-    'temp_buff': (feature, _playerStats) => {
+    'temp_buff': (feature, playerStats) => {
         const auto = feature.automation
+        let usesMax = auto.uses || null;
+        if (auto.uses === 'proficiency_bonus') {
+            usesMax = playerStats.proficiency || 0;
+        } else if (typeof auto.uses === 'string' && auto.uses.endsWith('_level')) {
+            const className = auto.uses.replace('_level', '');
+            if (playerStats.class?.name?.toLowerCase() === className) {
+                usesMax = playerStats.level;
+            } else {
+                usesMax = playerStats.class?.levels || playerStats.level || 0;
+            }
+        }
         return {
             type: 'temp_buff',
             name: feature.name,
@@ -17,6 +28,9 @@ export const tempHandlers = {
             enemiesDisadvantageSaves: auto.enemies_disadvantage_saves || [],
             triggerOnRage: !!auto.triggerOnRage,
             distanceExpression: auto.distanceExpression || '',
+            casting_time: auto.casting_time || '',
+            uses: auto.uses || null,
+            usesMax,
             hasAutomation: true
         }
     },
@@ -171,6 +185,18 @@ export const tempHandlers = {
             name: feature.name,
             tempHpExpression: auto.tempHpExpression || '',
             range: auto.range || '10_ft',
+            hasAutomation: true
+        }
+    },
+
+    'large_form': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'large_form',
+            name: feature.name,
+            duration: auto.duration || '10_minutes',
+            casting_time: auto.casting_time || '1_bonus_action',
+            resourceCost: auto.resourceCost || 'long_rest',
             hasAutomation: true
         }
     }

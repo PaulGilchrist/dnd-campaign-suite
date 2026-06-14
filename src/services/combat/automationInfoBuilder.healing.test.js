@@ -118,6 +118,7 @@ describe('buildAttackInfo – healing', () => {
             uses: null,
             usesMax: null,
             recharge: 'long_rest',
+            casting_time: '',
             hasAutomation: true,
         })
     })

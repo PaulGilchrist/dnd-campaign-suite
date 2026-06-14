@@ -4,6 +4,7 @@ import utils from '../ui/utils.js';
 import storage from '../ui/storage.js';
 import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary } from '../encounters/combatData.js';
 import { addEntry } from '../ui/logService.js';
+import { getDistanceFeet } from '../rules/rangeValidation.js';
 
 const ALL_DAMAGES_EXCEPT_FORCE = [
     'acid', 'bludgeoning', 'cold', 'fire', 'lightning',
@@ -53,6 +54,9 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
         if (effect.type === 'radiant_soul_turn_start') {
             const key = `_radiantSoul_${activeName.replace(/\s+/g, '_')}_oncePerTurn`;
             setRuntimeValue(activeName, key, false, campaignName);
+        }
+        if (effect.type === 'inner_radiance_turn_start') {
+            applyInnerRadianceDamage(activeName, playerStats, effect, campaignName);
         }
         if (effect.type === 'dread_ambush_speed') {
             applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, campaignName);
@@ -194,6 +198,71 @@ async function applyHolyNimbusRadiantDamage(activeName, playerStats, effect, cam
                 timestamp: Date.now(),
             }).catch(() => {});
         } catch { /* ignore per-creature errors */ }
+    }
+
+    storage.set('combatSummary', combatSummary, campaignName);
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+}
+
+async function applyInnerRadianceDamage(activeName, playerStats, effect, campaignName) {
+    const innerRadianceActive = getRuntimeValue(activeName, 'activeBuffs', campaignName);
+    const activeBuffs = Array.isArray(innerRadianceActive) ? innerRadianceActive : [];
+    if (!activeBuffs.some(b => b.name === 'Inner Radiance')) return;
+
+    const combatSummary = getCombatSummary();
+    if (!combatSummary) return;
+
+    const creatures = combatSummary.creatures || [];
+    const damageExpression = effect.damageExpression || 'proficiency_bonus';
+    const damageType = effect.damageType || 'Radiant';
+    const range = effect.range || '10_ft';
+    const rangeNum = parseInt(range) || 10;
+
+    const prof = playerStats.proficiency || 0;
+
+    let expr = damageExpression
+        .replace(/proficiency_bonus/gi, prof);
+
+    let damage;
+    try {
+        damage = new Function(`"use strict"; return (${expr})`)();
+    } catch {
+        damage = prof;
+    }
+
+    if (typeof damage !== 'number' || isNaN(damage) || damage <= 0) return;
+
+    for (const creature of creatures) {
+        const creatureName = utils.getName(creature.name);
+        if (creatureName === utils.getName(activeName)) continue;
+
+        if (!creature.position) continue;
+
+        const playerCreature = combatSummary.players?.find(p => p.name === activeName);
+        if (!playerCreature?.position) continue;
+
+        const dist = getDistanceFeet(playerCreature.position, creature.position);
+        if (dist !== null && dist <= rangeNum) {
+            try {
+                const currentHp = creature.hit_points?.current ?? creature.currentHp ?? 0;
+                const newHp = Math.max(0, currentHp - damage);
+                creature.hit_points = creature.hit_points || {};
+                creature.hit_points.current = newHp;
+                if (creature.currentHp != null) {
+                    creature.currentHp = newHp;
+                }
+
+                await addEntry(campaignName, {
+                    type: 'damage',
+                    characterName: activeName,
+                    targetName: creatureName,
+                    damageType: damageType.toLowerCase(),
+                    damageAmount: damage,
+                    description: `Inner Radiance aura: ${damage} ${damageType.toLowerCase()} to ${creatureName}`,
+                    timestamp: Date.now(),
+                }).catch(() => {});
+            } catch { /* ignore per-creature errors */ }
+        }
     }
 
     storage.set('combatSummary', combatSummary, campaignName);
@@ -397,6 +466,17 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
 
             case 'fly_speed_equals_walk_speed': {
                 const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                const conditionSet = new Set(Array.isArray(conditions) ? conditions : []);
+                if (conditionSet.has('incapacitated')) {
+                    addEntry(campaignName, {
+                        type: 'ability_use',
+                        characterName: targetName,
+                        abilityName: 'Draconic Flight',
+                        description: `${targetName}'s spectral wings dissolve due to the Incapacitated condition.`,
+                        timestamp: Date.now(),
+                    }).catch(() => {});
+                }
                 if (Array.isArray(buffs)) {
                     setRuntimeValue(
                         targetName,
@@ -481,6 +561,20 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                         targetName,
                         'activeBuffs',
                         buffs.filter(b => b.effect !== 'peerless_athlete'),
+                        campaignName
+                    );
+                }
+                break;
+            }
+
+            case 'large_form_end': {
+                setRuntimeValue(targetName, 'largeFormActive', false, campaignName);
+                const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                if (Array.isArray(buffs)) {
+                    setRuntimeValue(
+                        targetName,
+                        'activeBuffs',
+                        buffs.filter(b => b.effect !== 'large_form'),
                         campaignName
                     );
                 }

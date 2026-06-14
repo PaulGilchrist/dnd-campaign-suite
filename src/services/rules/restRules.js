@@ -97,8 +97,10 @@ export const LONG_REST_RESOURCES = [
             '_Mystic_Arcanum_(level_8_spell)_freeCastCount',
              '_Mystic_Arcanum_(level_9_spell)_freeCastCount',
             'magicalCunningUsed',
-             '_Phantasmal_Creatures_freeCastCount'
-    ]
+             '_Phantasmal_Creatures_freeCastCount',
+              'breathWeaponUses',
+              'stonecunningUses'
+      ]
 
 export function getLongRestResources() {
   return [...LONG_REST_RESOURCES]
@@ -402,4 +404,8 @@ export async function applyLongRest(playerStats, campaignName) {
       setRuntimeValue(name, '_Phantasmal_Creatures_freeCastCount', null, campaignName, true)
       setRuntimeValue(name, '_phantasmalCreatures_list', [], campaignName, true)
     }
+
+    // Reset Stonecunning uses on long rest
+    setRuntimeValue(name, 'stonecunningUses', null, campaignName, true)
+    setRuntimeValue(name, 'stonecunningRestTimestamp', null, campaignName, true)
 }

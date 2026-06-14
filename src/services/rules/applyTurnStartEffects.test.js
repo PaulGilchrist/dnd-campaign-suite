@@ -25,6 +25,7 @@ vi.mock('../encounters/combatData.js', () => ({
 
 import { applyTurnStartEffects } from './expirations.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getCombatSummary } from '../encounters/combatData.js';
 
 function resetMocks() {
   vi.clearAllMocks();
@@ -332,6 +333,34 @@ describe('applyTurnStartEffects', () => {
         ['invisible'],
         'TestCampaign'
       );
+    });
+  });
+
+  describe('inner_radiance_turn_start', () => {
+    it('returns early when no turnStartEffects', () => {
+      applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('handles null activeBuffs gracefully', async () => {
+      getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+        if (prop === 'activeBuffs') return null;
+        return null;
+      });
+      getCombatSummary.mockReturnValue(null);
+
+      await applyTurnStartEffects('TestCharacter', {
+        turnStartEffects: [{
+          type: 'inner_radiance_turn_start',
+          name: 'Inner Radiance',
+          damageExpression: 'proficiency_bonus',
+          damageType: 'Radiant',
+          range: '10_ft',
+        }],
+        proficiency: 2,
+      }, 'TestCampaign');
+
+      expect(setRuntimeValue).not.toHaveBeenCalled();
     });
   });
 });

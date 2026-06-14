@@ -3,6 +3,7 @@ import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceR
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/damageUtils.js';
 import { getCurrentCombatRound, loadCombatSummary } from '../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
 import { collectWeaponMastery, evaluateAutoExpression } from '../../services/combat/automationService.js';
 import { applyDamageToTarget } from '../../services/rules/applyDamage.js';
 import { addEntry } from '../../services/ui/logService.js';
@@ -51,6 +52,10 @@ export default function useCharActionModals({
     const [thirdEyeModal, setThirdEyeModal] = useState(null);
     const [soulstitchSpellsModal, setSoulstitchSpellsModal] = useState(null);
     const [illusoryRealityModal, setIllusoryRealityModal] = useState(null);
+    const [celestialRevelationModal, setCelestialRevelationModal] = useState(null);
+    const [elfishLineageModal, setElfisLineageModal] = useState(null);
+    const [gnomishLineageModal, setGnomishLineageModal] = useState(null);
+    const [giantAncestryModal, setGiantAncestryModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
     const [featureChoice, setFeatureChoice] = useState(null);
@@ -269,6 +274,35 @@ export default function useCharActionModals({
                     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? bonus.usesMax);
                     if (currentUses > 0) {
                         setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+                    }
+                }
+            }
+        }
+
+        // Apply Celestial Revelation extra damage (once per turn, based on active transformation)
+        if (playerStats.automation?.passives) {
+            const celestialRiders = playerStats.automation.passives.filter(
+                a => a.type === 'attack_rider' && a.damageExpression && a.trigger === 'hit'
+            );
+            const activeBuffs = getActiveBuffs(playerStats.name, campaignName);
+            const transformationNames = ['Heavenly Wings', 'Inner Radiance', 'Necrotic Shroud'];
+            const activeTransformation = activeBuffs.find(b => transformationNames.includes(b.name));
+            if (activeTransformation) {
+                const transformationRider = celestialRiders.find(r => r.name === activeTransformation.name);
+                if (transformationRider) {
+                    const usedKey = `_${transformationRider.name.replace(/\s+/g, '_')}_usedRound`;
+                    const currentRound = getCurrentCombatRound();
+                    const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
+                    if (!transformationRider.oncePerTurn || usedRound !== currentRound) {
+                        const bonusResult = rollExpression(transformationRider.damageExpression);
+                        if (bonusResult) {
+                            formula += ` + ${transformationRider.damageExpression}[${transformationRider.damageType || ''}]`;
+                            total += bonusResult.total;
+                            rolls = [...rolls, ...bonusResult.rolls];
+                        }
+                        if (transformationRider.oncePerTurn) {
+                            setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+                        }
                     }
                 }
             }
@@ -867,6 +901,10 @@ export default function useCharActionModals({
         thirdEyeModal, setThirdEyeModal,
         soulstitchSpellsModal, setSoulstitchSpellsModal,
         illusoryRealityModal, setIllusoryRealityModal,
+        celestialRevelationModal, setCelestialRevelationModal,
+        elfishLineageModal, setElfisLineageModal,
+        gnomishLineageModal, setGnomishLineageModal,
+        giantAncestryModal, setGiantAncestryModal,
         divineFuryChoice, setDivineFuryChoice,
         damageTypeChoice, setDamageTypeChoice,
         featureChoice, setFeatureChoice,

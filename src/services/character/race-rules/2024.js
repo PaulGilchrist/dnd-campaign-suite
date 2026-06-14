@@ -2,6 +2,7 @@ import { cloneDeep } from 'lodash';
 import * as featureCategories from '../featureCategories2024.js'
 import { categorizeFeatures, mergeCategorizedFeatures } from '../featureCategorizationUtils.js'
 import utils from '../../ui/utils.js';
+import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 
 const raceRules = {
     getImmunities: (playerSummary) => {
@@ -17,6 +18,10 @@ const raceRules = {
                     if (match) {
                         immunities.push(match[1]);
                         }
+                    }
+                    // Trance: "magic can't put you to sleep"
+                if (trait.name === 'Trance') {
+                    immunities.push('Magical Sleep');
                     }
                });
             }
@@ -90,12 +95,14 @@ const raceRules = {
         if (playerSummary.race && playerSummary.race.traits) {
             playerSummary.race.traits.forEach(trait => {
                 if (trait.description) {
-                    const resistanceMatch = trait.description.match(/Resistance to ([^\s.]+)/i);
-                    if (resistanceMatch && resistanceMatch[1].toLowerCase() !== 'the') {
-                        resistances.push(resistanceMatch[1]);
-                    }
+                    const matches = [...trait.description.matchAll(/Resistance to ([^\s.]+)/gi)];
+                    matches.forEach(match => {
+                        if (match[1].toLowerCase() !== 'the') {
+                            resistances.push(match[1]);
+                        }
+                    });
                 }
-           });
+            });
         }
 
         if(playerSummary.resistances) {
@@ -122,19 +129,53 @@ const raceRules = {
                             }
                         }
 
-                        // Check for tremorsense
+                    // Check for tremorsense (skip Stonecunning — it's conditional, not passive)
                     if (trait.description.toLowerCase().includes('tremorsense')) {
-                        const tremorsenseMatch = trait.description.match(/tremorsense with a range of (\d+) feet/i);
-                        if (tremorsenseMatch) {
-                            const range = `${tremorsenseMatch[1]} ft.`;
-                            if (!senses.some((sense) => sense.name === 'Tremorsense')) {
-                                senses.push({ name: 'Tremorsense', value: range });
+                        // Stonecunning is a bonus action with uses, not a passive sense
+                        if (trait.name === 'Stonecunning') {
+                            // Don't add passive tremorsense for Stonecunning
+                        } else {
+                            const tremorsenseMatch = trait.description.match(/tremorsense with a range of (\d+) feet/i);
+                            if (tremorsenseMatch) {
+                                const range = `${tremorsenseMatch[1]} ft.`;
+                                if (!senses.some((sense) => sense.name === 'Tremorsense')) {
+                                    senses.push({ name: 'Tremorsense', value: range });
                                 }
                             }
                         }
                     }
-               });
+                    }
+                });
             }
+
+        // Elfish Lineage: Drow lineage overrides Darkvision to 120 ft.
+        const campaignName = playerStats.campaignName;
+        const elfisLineage = playerStats.race?.lineage || getRuntimeValue(playerStats.name, '_elfishLineageSelection', campaignName);
+        if (elfisLineage === 'Drow') {
+            const darkvisionIndex = senses.findIndex(s => s.name === 'Darkvision');
+            if (darkvisionIndex !== -1) {
+                const currentFeet = extractDarkvisionFeet(senses[darkvisionIndex].value);
+                if (currentFeet < 120) {
+                    senses[darkvisionIndex] = { ...senses[darkvisionIndex], value: '120 ft.' };
+                }
+            } else {
+                senses.push({ name: 'Darkvision', value: '120 ft.' });
+            }
+        }
+
+        // Gnomish Lineage: Deep Gnome lineage overrides Darkvision to 120 ft.
+        const gnomishLineage = playerStats.race?.lineage || getRuntimeValue(playerStats.name, '_gnomishLineageSelection', campaignName);
+        if (gnomishLineage === 'Deep Gnome') {
+            const darkvisionIndex = senses.findIndex(s => s.name === 'Darkvision');
+            if (darkvisionIndex !== -1) {
+                const currentFeet = extractDarkvisionFeet(senses[darkvisionIndex].value);
+                if (currentFeet < 120) {
+                    senses[darkvisionIndex] = { ...senses[darkvisionIndex], value: '120 ft.' };
+                }
+            } else {
+                senses.push({ name: 'Darkvision', value: '120 ft.' });
+            }
+        }
 
         // Passive skills
         const getPassiveScore = (abilityName, skillName) => {
@@ -185,5 +226,11 @@ const raceRules = {
         return traits;
          }
 };
+
+function extractDarkvisionFeet(value) {
+    if (!value) return 0;
+    const match = String(value).match(/(\d+)\s*ft/i);
+    return match ? parseInt(match[1], 10) : 0;
+}
 
 export default raceRules;

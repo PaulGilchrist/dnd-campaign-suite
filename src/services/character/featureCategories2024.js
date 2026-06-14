@@ -7,6 +7,7 @@ export const featuresToIgnore = [
     "Bardic Inspiration",
     "Channel Divinity",
     "Cleric Subclass",
+    "Celestial Resistance",
     "Darkvision",
     "Druid Subclass",
     "Eldritch Invocations",

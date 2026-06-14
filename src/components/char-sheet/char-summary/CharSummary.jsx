@@ -87,7 +87,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
 
     // Circle Forms AC override: 13 + WIS modifier when shape_shift is active for Circle of the Moon
     const isMoonDruid = playerStats.class?.major?.name === 'Moon' || playerStats.class?.subclass?.name === 'Moon';
-    const shapeShiftActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shape_shift');
+    const shapeShiftActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shape_shift' || b.effect === 'large_form');
     let circleFormsACOverride = null;
     if (isMoonDruid && shapeShiftActive) {
         const wis = playerStats.abilities.find(a => a.name === 'Wisdom');
@@ -186,6 +186,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         if (buff.effect === 'telekinetic_leap') flySpeed = buff.flySpeed;
         if (buff.effect === 'avenging_angel_flight') flySpeed = buff.flySpeed || 60;
         if (buff.effect === 'speed_boost' && buff.speedBonus) buffSpeedBonus += buff.speedBonus;
+        if (buff.effect === 'large_form') buffSpeedBonus += 10;
         if (buff.effect === 'ice_walk') iceWalkActive = true;
         if (buff.effect === 'glistening_flight') { flySpeed = speed; glisteningFlightHover = true; }
         if (buff.effect === 'dragon_wings') { flySpeed = buff.flySpeed || 60; dragonWingsHover = true; }

@@ -134,21 +134,89 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 description,
                 },
             };
-       } else {
-        const baseHeal = typeof auto.healAmount === 'number' ? auto.healAmount : null;
-        const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);
-        const totalHealAmount = baseHeal !== null ? baseHeal + bonusHeal : auto.healExpression;
+        } else if (auto.uses !== undefined && auto.uses !== null) {
+         const maxUses = auto.usesMax ?? auto.uses;
+         const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+         const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
 
-        return {
-            type: 'popup',
-            payload: {
-                type: 'healing',
-                name: action.name,
-                healAmount: typeof totalHealAmount === 'number' ? totalHealAmount : auto.healExpression,
-                description: bonusHeal > 0
-                    ? `${action.name}: Restores ${auto.healExpression} + ${bonusHeal} bonus HP`
-                    : `${action.name}: Restores ${auto.healExpression} HP`,
-                },
-            };
-       }
+         if (currentUses <= 0) {
+             return {
+                 type: 'popup',
+                 payload: {
+                     type: 'automation_info',
+                     name: action.name,
+                     automationType: auto.type,
+                     description: `${action.name} has been used and cannot be used again until you finish a Long Rest.`,
+                 },
+             };
+         }
+
+         await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+
+         const targetInfo = await resolveTarget(campaignName, playerStats.name);
+         const isSelf = !targetInfo?.target || targetInfo.target.name === playerStats.name;
+
+         if (isSelf && auto.healExpression) {
+             const expression = auto.healExpression || '';
+             const maximize = hasHealingMaximization(playerStats);
+             const rollResult = maximize ? rollExpressionMaximized(expression) : rollExpression(expression);
+             if (!rollResult) return null;
+
+             const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);
+             const healAmount = rollResult.total + bonusHeal;
+
+             const { newHp, maxHp, actualHeal } = applyHealingDirectly(playerStats, playerStats.name, healAmount, campaignName);
+
+             logHealingToSSE(campaignName, {
+                 targetName: playerStats.name,
+                 sourceName: action.name,
+                 actualHeal,
+                 newHp,
+                 maxHp,
+             });
+
+             const description = `Regained ${actualHeal} HP.`;
+             return {
+                 type: 'popup',
+                 payload: {
+                     type: 'automation_info',
+                     name: action.name,
+                     automationType: auto.type,
+                     description,
+                 },
+             };
+         }
+
+         const baseHeal = typeof auto.healAmount === 'number' ? auto.healAmount : null;
+         const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);
+         const totalHealAmount = baseHeal !== null ? baseHeal + bonusHeal : auto.healExpression;
+
+         return {
+             type: 'popup',
+             payload: {
+                 type: 'healing',
+                 name: action.name,
+                 healAmount: typeof totalHealAmount === 'number' ? totalHealAmount : auto.healExpression,
+                 description: bonusHeal > 0
+                     ? `${action.name}: Restores ${auto.healExpression} + ${bonusHeal} bonus HP`
+                     : `${action.name}: Restores ${auto.healExpression} HP`,
+                 },
+             };
+        } else {
+         const baseHeal = typeof auto.healAmount === 'number' ? auto.healAmount : null;
+         const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);
+         const totalHealAmount = baseHeal !== null ? baseHeal + bonusHeal : auto.healExpression;
+
+         return {
+             type: 'popup',
+             payload: {
+                 type: 'healing',
+                 name: action.name,
+                 healAmount: typeof totalHealAmount === 'number' ? totalHealAmount : auto.healExpression,
+                 description: bonusHeal > 0
+                     ? `${action.name}: Restores ${auto.healExpression} + ${bonusHeal} bonus HP`
+                     : `${action.name}: Restores ${auto.healExpression} HP`,
+                 },
+             };
+        }
    }

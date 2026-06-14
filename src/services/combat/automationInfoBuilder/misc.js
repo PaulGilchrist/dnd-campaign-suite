@@ -1,6 +1,17 @@
 import { evaluateAutoExpression } from '../automationExpressions.js'
 
 export const miscHandlers = {
+    'cantrip_spellcasting_ability': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'cantrip_spellcasting_ability',
+            name: feature.name,
+            cantripName: auto.cantripName || '',
+            spellcastingAbility: auto.spellcastingAbility || '',
+            hasAutomation: true
+        }
+    },
+
     'auto_effect': (feature, _playerStats) => {
         const auto = feature.automation
         return {
@@ -573,6 +584,44 @@ export const miscHandlers = {
             casting_time: auto.casting_time || '1 bonus_action',
             objectDuration: auto.objectDuration || '1 minute',
             hasAutomation: true,
+        }
+    },
+
+    'celestial_revelation': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'celestial_revelation',
+            name: feature.name,
+            options: auto.options || [],
+            chooseOne: !!auto.chooseOne,
+            duration: auto.duration || '1_minute',
+            action: auto.action || 'bonus_action',
+            casting_time: auto.casting_time || '1 bonus action',
+            recharge: auto.recharge || 'long_rest',
+            minLevel: auto.minLevel || 3,
+            hasAutomation: true
+        }
+    },
+
+    'elfish_lineage': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'elfish_lineage',
+            name: feature.name,
+            options: auto.options || [],
+            chooseOne: !!auto.chooseOne,
+            hasAutomation: true
+        }
+    },
+
+    'gnomish_lineage': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'gnomish_lineage',
+            name: feature.name,
+            options: auto.options || [],
+            chooseOne: !!auto.chooseOne,
+            hasAutomation: true
         }
     }
 }

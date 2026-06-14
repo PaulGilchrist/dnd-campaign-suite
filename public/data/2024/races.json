@@ -35,49 +35,93 @@
             },
             {
                 "name": "LightBearer",
-                "description": "You know the Light cantrip. Charisma is your spellcasting ability for it."
+                "description": "You know the Light cantrip. Charisma is your spellcasting ability for it.",
+                "automation": {
+                    "type": "cantrip_spellcasting_ability",
+                    "cantripName": "Light",
+                    "spellcastingAbility": "Charisma"
+                }
             },
             {
                 "name": "Celestial Revelation",
-                "description": "When you reach character level 3, you can transform as a Bonus Action using one of the options below (choose the option each time you transform). The transformation lasts for 1 minute or until you end it (no action required). Once you transform, you can't do so again until you finish a Long Rest. Once on each of your turns before the transformation ends, you can deal extra damage to one target when you deal damage to it with an attack or a spell. The extra damage equals your Proficiency Bonus, and the extra damage's type is either Necrotic for Necrotic Shroud or Radiant for Heavenly Wings and Inner Radiance. Here are the transformation options:"
+                "description": "When you reach character level 3, you can transform as a Bonus Action using one of the options below (choose the option each time you transform). The transformation lasts for 1 minute or until you end it (no action required). Once you transform, you can't do so again until you finish a Long Rest. Once on each of your turns before the transformation ends, you can deal extra damage to one target when you deal damage to it with an attack or a spell. The extra damage equals your Proficiency Bonus, and the extra damage's type is either Necrotic for Necrotic Shroud or Radiant for Heavenly Wings and Inner Radiance. Here are the transformation options:",
+                "automation": {
+                    "type": "celestial_revelation",
+                    "options": ["Heavenly Wings", "Inner Radiance", "Necrotic Shroud"],
+                    "chooseOne": true,
+                    "recharge": "long_rest",
+                    "casting_time": "1 bonus action",
+                    "minLevel": 3
+                }
             },
             {
                 "name": "Heavenly Wings",
                 "description": "Two spectral wings sprout from your back temporarily. Until the transformation ends, you have a Fly Speed equal to your Speed.",
-                "automation": {
-                    "type": "temp_buff",
-                    "effect": "fly_speed_equals_walk_speed",
-                    "duration": "1_minute",
-                    "recharge": "long_rest",
-                    "casting_time": "1 action"
-                }
+                "automation": [
+                    {
+                        "type": "temp_buff",
+                        "effect": "fly_speed_equals_walk_speed",
+                        "duration": "1_minute",
+                        "recharge": "long_rest",
+                        "casting_time": "1 bonus action"
+                    },
+                    {
+                        "type": "attack_rider",
+                        "damageExpression": "proficiency_bonus",
+                        "damageType": "Radiant",
+                        "trigger": "hit",
+                        "oncePerTurn": true,
+                        "casting_time": "passive"
+                    }
+                ]
             },
             {
                 "name": "Inner Radiance",
                 "description": "Searing light temporarily radiates from your eyes and mouth. For the duration, you shed Bright Light in a 10-foot radius and Dim Light for an additional 10 feet, and at the end of each of your turns, each creature within 10 feet of you takes Radiant damage equal to your Proficiency Bonus.",
-                "automation": {
-                    "type": "damage_aura",
-                    "damageType": "Radiant",
-                    "damageExpression": "proficiency_bonus",
-                    "range": "10_ft",
-                    "duration": "1_minute",
-                    "recharge": "long_rest",
-                    "casting_time": "1 action"
-                }
+                "automation": [
+                    {
+                        "type": "damage_aura",
+                        "damageType": "Radiant",
+                        "damageExpression": "proficiency_bonus",
+                        "range": "10_ft",
+                        "duration": "1_minute",
+                        "recharge": "long_rest",
+                        "casting_time": "1 bonus action"
+                    },
+                    {
+                        "type": "attack_rider",
+                        "damageExpression": "proficiency_bonus",
+                        "damageType": "Radiant",
+                        "trigger": "hit",
+                        "oncePerTurn": true,
+                        "casting_time": "passive"
+                    }
+                ]
             },
             {
                 "name": "Necrotic Shroud",
                 "description": "Your eyes briefly become pools of darkness, and flightless wings sprout from your back temporarily. Creatures other than your allies within 10 feet of you must succeed on a Charisma saving throw (DC 8 plus your Charisma modifier and Proficiency Bonus) or have the Frightened condition until the end of your next turn.",
-                "automation": {
-                    "type": "save_attack",
-                    "saveType": "CHA",
-                    "saveDc": "ability",
-                    "conditionInflicted": "frightened",
-                    "range": "10_ft",
-                    "duration": "until_end_of_next_turn",
-                    "recharge": "long_rest",
-                    "casting_time": "1 action"
-                }
+                "automation": [
+                    {
+                        "type": "save_attack",
+                        "saveType": "CHA",
+                        "saveDc": "ability",
+                        "conditionInflicted": "frightened",
+                        "shape": "emanation_10_ft",
+                        "range": "10_ft",
+                        "duration": "until_end_of_next_turn",
+                        "recharge": "long_rest",
+                        "casting_time": "1 bonus action"
+                    },
+                    {
+                        "type": "attack_rider",
+                        "damageExpression": "proficiency_bonus",
+                        "damageType": "Necrotic",
+                        "trigger": "hit",
+                        "oncePerTurn": true,
+                        "casting_time": "passive"
+                    }
+                ]
             }
         ],
         "languages": [
@@ -157,6 +201,18 @@
                     "saveType": "DEX",
                     "saveDc": "ability",
                     "shape": "variable",
+                    "dcSuccess": 0.5,
+                    "hasOptions": true,
+                    "optionDetails": {
+                        "cone": {
+                            "shape": "cone",
+                            "range": "15_ft"
+                        },
+                        "line": {
+                            "shape": "line",
+                            "range": "30_ft"
+                        }
+                    },
                     "scaling": [
                         {
                             "level": 5,
@@ -323,7 +379,36 @@
             },
             {
                 "name": "Elfish Lineage",
-                "description": "You are part of a lineage that grants you supernatural abilities. Choose one of the following options; whichever one you choose, Intelligence, Wisdom, or Charisma is your spellcasting ability for the spells you cast with this trait (choose the ability when you select the lineage):<br/><br/><table class='table table-condensed table-striped table-hover'><caption>Elven Lineages</caption><thead><tr><th>Lineage</th><th>Level 1</th><th>Level 3</th><th>Level 5</th></tr></thead><tbody><tr><td>Drow</td><td>The range of your Darkvision increases to 120 feet. You also know the <em>Dancing Lights</em> cantrip.</td><td><em>Faerie Fire</em></td><td><em>Darkness</em></td></tr><tr><td>High Elf</td><td>You know the <em>Prestidigitation</em> cantrip. Whenever you finish a Long Rest, you can replace that cantrip with a different cantrip from the Wizard spell list.</td><td><em>Detect Magic</em></td><td><em>Misty Step</em></td></tr><tr><td>Wood Elf</td><td>Your Speed increases to 35 feet. You also know the <em>Druidcraft</em> cantrip.</td><td><em>Longstrider</em></td><td><em>Pass Without Trace</em></td></tr></tbody></table>"
+                "description": "You are part of a lineage that grants you supernatural abilities. Choose one of the following options; whichever one you choose, Intelligence, Wisdom, or Charisma is your spellcasting ability for the spells you cast with this trait (choose the ability when you select the lineage):<br/><br/><table class='table table-condensed table-striped table-hover'><caption>Elven Lineages</caption><thead><tr><th>Lineage</th><th>Level 1</th><th>Level 3</th><th>Level 5</th></tr></thead><tbody><tr><td>Drow</td><td>The range of your Darkvision increases to 120 feet. You also know the <em>Dancing Lights</em> cantrip.</td><td><em>Faerie Fire</em></td><td><em>Darkness</em></td></tr><tr><td>High Elf</td><td>You know the <em>Prestidigitation</em> cantrip. Whenever you finish a Long Rest, you can replace that cantrip with a different cantrip from the Wizard spell list.</td><td><em>Detect Magic</em></td><td><em>Misty Step</em></td></tr><tr><td>Wood Elf</td><td>Your Speed increases to 35 feet. You also know the <em>Druidcraft</em> cantrip.</td><td><em>Longstrider</em></td><td><em>Pass Without Trace</em></td></tr></tbody></table>",
+                "automation": {
+                    "type": "elfish_lineage",
+                    "options": [
+                        {
+                            "name": "Drow",
+                            "spellcastingAbility": "CHA",
+                            "cantrip": "Dancing Lights",
+                            "level3Spell": "Faerie Fire",
+                            "level5Spell": "Darkness",
+                            "darkvisionRange": "120"
+                        },
+                        {
+                            "name": "High Elf",
+                            "spellcastingAbility": "INT",
+                            "cantrip": "Prestidigitation",
+                            "level3Spell": "Detect Magic",
+                            "level5Spell": "Misty Step",
+                            "wizardCantripSwap": true
+                        },
+                        {
+                            "name": "Wood Elf",
+                            "spellcastingAbility": "WIS",
+                            "cantrip": "Druidcraft",
+                            "level3Spell": "Longstrider",
+                            "level5Spell": "Pass Without Trace",
+                            "speedBonus": 5
+                        }
+                    ]
+                }
             }
         ],
         "languages": [
@@ -376,7 +461,34 @@
             },
             {
                 "name": "Gnomish Lineage",
-                "description": "You are part of a lineage that grants you supernatural abilities. Choose one of the following options; whichever one you choose, Intelligence, Wisdom, or Charisma is your spellcasting ability for the spells you cast with this trait (choose the ability when you select the lineage):"
+                "description": "You are part of a lineage that grants you supernatural abilities. Choose one of the following options; whichever one you choose, Intelligence, Wisdom, or Charisma is your spellcasting ability for the spells you cast with this trait (choose the ability when you select the lineage):<br/><br/><table class='table table-condensed table-striped table-hover'><caption>Gnomish Lineages</caption><thead><tr><th>Lineage</th><th>Level 1</th><th>Level 3</th><th>Level 5</th></tr></thead><tbody><tr><td>Deep Gnome</td><td>Your Darkvision range increases to 120 feet. You also know the <em>Magic Stone</em> cantrip.</td><td><em>Nondetection</em></td><td><em>Passwall</em></td></tr><tr><td>Forest Gnome</td><td>You can attempt to hide behind any creature that is at least one size larger than you. You also know the <em>Minor Illusion</em> cantrip.</td><td><em>Speak with Animals</em></td><td><em>Call Lightning</em></td></tr><tr><td>Rock Gnome</td><td>You can move through the space of any creature that is larger than yours. You also know the <em>Mending</em> cantrip.</td><td><em>Prestidigitation</em></td><td><em>Protection from Energy</em></td></tr></tbody></table>",
+                "automation": {
+                    "type": "gnomish_lineage",
+                    "options": [
+                        {
+                            "name": "Deep Gnome",
+                            "spellcastingAbility": "INT",
+                            "cantrip": "Magic Stone",
+                            "level3Spell": "Nondetection",
+                            "level5Spell": "Passwall",
+                            "darkvisionRange": "120"
+                        },
+                        {
+                            "name": "Forest Gnome",
+                            "spellcastingAbility": "INT",
+                            "cantrip": "Minor Illusion",
+                            "level3Spell": "Speak with Animals",
+                            "level5Spell": "Call Lightning"
+                        },
+                        {
+                            "name": "Rock Gnome",
+                            "spellcastingAbility": "INT",
+                            "cantrip": "Mending",
+                            "level3Spell": "Prestidigitation",
+                            "level5Spell": "Protection from Energy"
+                        }
+                    ]
+                }
             }
         ],
         "languages": [
@@ -443,11 +555,23 @@
         "traits": [
             {
                 "name": "Large Form",
-                "description": "Starting at character level 5, you can change your size to Large as a Bonus Action if you're in a big enough space. This transformation lasts for 10 minutes or until you end it (no action required). For that duration, you have Advantage on Strength checks, and your Speed increases by 10 feet. Once you use this trait, you can't use it again until you finish a Long Rest."
+                "description": "Starting at character level 5, you can change your size to Large as a Bonus Action if you're in a big enough space. This transformation lasts for 10 minutes or until you end it (no action required). For that duration, you have Advantage on Strength checks, and your Speed increases by 10 feet. Once you use this trait, you can't use it again until you finish a Long Rest.",
+                "automation": {
+                    "type": "large_form",
+                    "duration": "10_minutes",
+                    "casting_time": "1_bonus_action",
+                    "resourceCost": "long_rest"
+                }
             },
             {
                 "name": "Powerful Build",
-                "description": "You have Advantage on any ability check you make to end the Grappled condition. You also count as one size larger when determining your carrying capacity."
+                "description": "You have Advantage on any ability check you make to end the Grappled condition. You also count as one size larger when determining your carrying capacity.",
+                "automation": {
+                    "type": "conditional_advantage",
+                    "target": "ability_check",
+                    "condition": "grappled",
+                    "effect": "advantage"
+                }
             },
             {
                 "name": "Giant Ancestry",

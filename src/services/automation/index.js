@@ -56,6 +56,7 @@ import { handle as handleTelekineticThrust } from './handlers/telekineticThrustH
 import { handle as handleGuardedMind } from './handlers/guardedMindHandler.js';
 import { handle as handleBulwarkOfForce } from './handlers/bulwarkOfForceHandler.js';
 import { handle as handleConcentrationBonusAttack } from './handlers/concentrationBonusAttackHandler.js';
+import { handle as handleGiantAncestry } from './handlers/giantAncestryHandler.js';
 import { handle as handleDamageTypeModifier } from './handlers/damageTypeModifierHandler.js';
 import { handle as handleSuperiorDefense } from './handlers/superiorDefenseHandler.js';
 import { handle as handleHandOfUltimateMercy } from './handlers/handOfUltimateMercyHandler.js';
@@ -133,6 +134,11 @@ import { handle as handleOverchannel } from './handlers/overchannelHandler.js';
 import { handle as handlePhantasmalCreatures, confirmPhantasmalCreatures as handlePhantasmalCreaturesConfirm } from './handlers/phantasmalCreaturesHandler.js';
 import { handle as handleIllusorySelf } from './handlers/illusorySelfHandler.js';
 import { handle as handleIllusoryReality, confirmIllusoryReality as handleIllusoryRealityConfirm } from './handlers/illusoryRealityHandler.js';
+import { handle as handleCelestialRevelation } from './handlers/celestialRevelationHandler.js';
+import { handle as handleStonecunning } from './handlers/stonecunningHandler.js';
+import { handle as handleElfisLineage } from './handlers/elfishLineageHandler.js';
+import { handle as handleGnomishLineage } from './handlers/gnomishLineageHandler.js';
+import { handle as handleLargeForm } from './handlers/largeFormHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -302,6 +308,16 @@ const HANDLER_MAP = {
                      illusory_self: handleIllusorySelf,
                      illusory_reality: handleIllusoryReality,
                      illusory_reality_confirm: handleIllusoryRealityConfirm,
+                    celestial_revelation: handleCelestialRevelation,
+                    stonecunning: handleStonecunning,
+                    elfish_lineage: handleElfisLineage,
+                     gnomish_lineage: handleGnomishLineage,
+                     large_form: handleLargeForm,
+                     giant_ancestry: handleGiantAncestry,
+                     teleport: handleGiantAncestry,
+                     damage: handleGiantAncestry,
+                     damage_with_condition: handleGiantAncestry,
+                     auto_effect_giant: handleGiantAncestry,
 };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;

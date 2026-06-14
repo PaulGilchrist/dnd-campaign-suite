@@ -8,15 +8,18 @@ export const healingHandlers = {
         const healAmount = auto.healExpression
             ? evaluateAutoExpression(auto.healExpression, playerStats, prof, level)
             : 0
+        const action = auto.action || 'action'
+        const usesMax = auto.uses ?? null
         return {
             type: 'healing',
             name: feature.name,
             healAmount,
             healExpression: auto.healExpression || '',
-            action: auto.action || 'action',
-            uses: auto.uses || null,
-            usesMax: auto.uses || null,
+            action,
+            uses: usesMax,
+            usesMax,
             recharge: auto.recharge || 'long_rest',
+            casting_time: auto.casting_time || '',
             hasAutomation: true
         }
     },

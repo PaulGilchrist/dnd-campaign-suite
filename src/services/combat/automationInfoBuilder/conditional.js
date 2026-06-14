@@ -10,6 +10,7 @@ export const conditionalHandlers = {
             abilities: auto.abilities || [],
             uses: auto.uses || null,
             recharge: auto.recharge || 'long_rest',
+            casting_time: auto.casting_time || 'passive',
             hasAutomation: true
         }
     },

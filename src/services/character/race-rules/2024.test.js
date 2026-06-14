@@ -129,6 +129,32 @@ describe('raceRules 2024 (direct module)', () => {
       expect(result[0].name).toBe('Alpha');
       expect(result[1].name).toBe('Zebra');
     });
+
+    it('should add Magical Sleep immunity for Trance trait', () => {
+      const playerSummary = {
+        race: {
+          traits: [
+            { name: 'Trance', description: "You don't need to sleep, and magic can't put you to sleep." }
+          ]
+        }
+      };
+      const result = raceRules.getImmunities(playerSummary);
+      expect(result).toContain('Magical Sleep');
+    });
+
+    it('should combine Trance Magical Sleep with other immunities', () => {
+      const playerSummary = {
+        race: {
+          traits: [
+            { name: 'Trance', description: "You don't need to sleep, and magic can't put you to sleep." },
+            { description: 'You have immunity to poison.' }
+          ]
+        }
+      };
+      const result = raceRules.getImmunities(playerSummary);
+      expect(result).toContain('Magical Sleep');
+      expect(result).toContain('poison');
+    });
   });
 
   describe('getResistances', () => {

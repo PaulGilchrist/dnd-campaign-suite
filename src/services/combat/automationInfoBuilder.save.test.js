@@ -150,6 +150,7 @@ describe('buildAttackInfo – save_attack', () => {
             optionDetails: {},
             healExpression: '',
             dcSuccess: null,
+            casting_time: '',
             hasAutomation: true,
         })
     })

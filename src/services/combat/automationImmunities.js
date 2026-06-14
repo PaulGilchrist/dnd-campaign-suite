@@ -53,8 +53,16 @@ export function playerIsImmuneToCondition({
 }) {
     if (!conditionKey || !playerStats) return false
 
-    const allFeatures = playerStats.allFeatures || []
     const lowerCondition = String(conditionKey).toLowerCase()
+
+    // Check playerStats.immunities array (race immunities like "Magical Sleep")
+    if (playerStats.immunities && Array.isArray(playerStats.immunities)) {
+        if (playerStats.immunities.some(imm => String(imm).toLowerCase() === lowerCondition)) {
+            return true
+        }
+    }
+
+    const allFeatures = playerStats.allFeatures || []
 
     for (const feature of allFeatures) {
         if (!feature?.automation) continue
