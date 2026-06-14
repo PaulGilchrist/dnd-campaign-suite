@@ -61,6 +61,7 @@
         "eslint-plugin-react-hooks": "^4.6.2",
         "eslint-plugin-react-refresh": "^0.4.26",
         "jsdom": "^29.1.1",
+        "rollup-plugin-terser": "^7.0.2",
         "vite": "^8.0.6",
         "vitest": "^4.1.7"
     }

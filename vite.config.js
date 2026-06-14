@@ -1,9 +1,12 @@
 import { defineConfig } from 'vite'
+import { terser } from 'rollup-plugin-terser'
 import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [react()],
+    plugins: [
+        react()
+    ],
     build: {
         chunkSizeWarningLimit: 2000,
         rollupOptions: {
@@ -18,7 +21,18 @@ export default defineConfig({
                     }
                     return 'assets/[name].[ext]';
                 }
-            }
+            },
+            plugins: [
+                terser({
+                    format: {
+                        comments: false,
+                    },
+                    compress: {
+                        // Remove whitespace in JSON imports
+                        passes: 2,
+                    }
+                })
+            ]
         },
         copyPublicDir: true,
         outDir: 'dist',
