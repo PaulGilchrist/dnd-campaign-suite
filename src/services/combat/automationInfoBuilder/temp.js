@@ -167,6 +167,18 @@ export const tempHandlers = {
         }
     },
 
+    'holy_aura': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'holy_aura',
+            name: feature.name,
+            duration: auto.duration || '1_minute',
+            auraRange: auto.auraRange || 30,
+            casting_time: auto.casting_time || '1 action',
+            hasAutomation: true
+        }
+    },
+
     'elder_champion': (feature, _playerStats) => {
         const auto = feature.automation
         return {

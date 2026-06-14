@@ -58,6 +58,7 @@ export default function useCharActionModals({
     const [elfishLineageModal, setElfisLineageModal] = useState(null);
     const [gnomishLineageModal, setGnomishLineageModal] = useState(null);
     const [giantAncestryModal, setGiantAncestryModal] = useState(null);
+    const [hypnoticPatternShakeModal, setHypnoticPatternShakeModal] = useState(null);
     const [eyebiteEffectModal, setEyebiteEffectModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
@@ -906,6 +907,7 @@ export default function useCharActionModals({
         elfishLineageModal, setElfisLineageModal,
         gnomishLineageModal, setGnomishLineageModal,
         giantAncestryModal, setGiantAncestryModal,
+        hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
         eyebiteEffectModal, setEyebiteEffectModal,
         divineFuryChoice, setDivineFuryChoice,
         damageTypeChoice, setDamageTypeChoice,

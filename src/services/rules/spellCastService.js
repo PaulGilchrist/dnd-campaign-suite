@@ -19,10 +19,12 @@ import { triggerFear } from './fearService.js';
 import { triggerFeignDeath } from './feignDeathService.js';
 import { triggerFleshToStone } from './fleshToStoneService.js';
 import { triggerHoldMonster } from './holdMonsterService.js';
+import { triggerHypnoticPattern } from './hypnoticPatternService.js';
 import { triggerForesight } from './foresightService.js';
 import { triggerFriends, endFriendsOnHostileAction } from './friendsService.js';
 import { triggerGlobeOfInvulnerability } from './globeOfInvulnerabilityService.js';
 import { triggerHeroism } from './heroismService.js';
+import { triggerHolyAura } from './holyAuraService.js';
 
 function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     if (spell.name !== 'Hex') return;
@@ -141,6 +143,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             return;
         }
 
+        // Hypnotic Pattern — multi-target WIS save for all creatures in 30-ft cube (can see)
+        if (spell.name && spell.name.toLowerCase() === 'hypnotic pattern') {
+            await triggerHypnoticPattern(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
+            return;
+        }
+
         // Foresight — buffs target with advantage on D20 tests and disadvantage on attacks against it
         if (spell.name && spell.name.toLowerCase() === 'foresight') {
             const target = await getTargetInfo();
@@ -168,6 +176,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             const target = await getTargetInfo();
             const heroismMetaCtx = { ...metaCtx, targetName: target?.name };
             await triggerHeroism(spell, heroismMetaCtx, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Holy Aura — 30-ft emanation: allies in aura get save advantage, attackers get attack disadvantage, Fiend/Undead melee attackers save vs CON or Blinded
+        if (spell.name && spell.name.toLowerCase() === 'holy aura') {
+            await triggerHolyAura(spell, metaCtx, playerStats, campaignName, mapName);
             return;
         }
 

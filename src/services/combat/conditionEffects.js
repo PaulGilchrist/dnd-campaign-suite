@@ -34,6 +34,7 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
     }
   if (modifier.condition === 'fiend_undead') return true;
   if (modifier.condition === 'holy_nimbus_active') return true;
+  if (modifier.condition === 'holy_aura_active') return true;
   if (modifier.condition === 'living_legend_active') return true;
   if (modifier.condition === 'elder_champion_active') return true;
   if (modifier.condition === 'large_form_active') return isLargeFormActive;

@@ -244,6 +244,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'save_only':
             case 'flesh_to_stone':
             case 'hold_monster':
+            case 'hypnotic_pattern':
             case 'healing':
             case 'healing_pool':
             case 'self_healing':
@@ -450,6 +451,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 result.specialActions.push(info)
                 break
             case 'holy_nimbus':
+                result.specialActions.push(info)
+                break
+            case 'holy_aura':
                 result.specialActions.push(info)
                 break
             case 'avenging_angel':

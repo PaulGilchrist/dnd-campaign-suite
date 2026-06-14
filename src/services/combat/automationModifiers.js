@@ -253,6 +253,14 @@ export function collectSaveModifiers(features) {
                     })
                 }
             }
+            if (auto.type === 'holy_aura') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'attack_roll',
+                    condition: 'holy_aura_active',
+                    effect: 'disadvantage',
+                })
+            }
             if (auto.type === 'portent') {
                 modifiers.push({
                     source: feature.name,
@@ -275,6 +283,14 @@ export function collectSaveModifiers(features) {
                     target: 'spell_component',
                     condition: '',
                     effect: 'illusory_reality',
+                })
+            }
+            if (auto.type === 'holy_aura') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'saving_throw',
+                    condition: 'holy_aura_active',
+                    effect: 'advantage',
                 })
             }
         }

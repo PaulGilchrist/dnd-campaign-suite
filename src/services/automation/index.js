@@ -141,6 +141,7 @@ import { handle as handleGnomishLineage } from './handlers/gnomishLineageHandler
 import { handle as handleLargeForm } from './handlers/largeFormHandler.js';
 import { handle as handleAid, applyAid as applyAidEffect } from './handlers/aidHandler.js';
 import { handle as handleAuraOfPurity } from './handlers/auraOfPurityHandler.js';
+import { handle as handleHolyAura } from './handlers/holyAuraHandler.js';
 import { handle as handleBladeWard } from './handlers/bladeWardHandler.js';
 import { handle as handleCounterSpell } from './handlers/counterSpellHandler.js';
 import { handle as handleEyebite } from './handlers/eyebiteHandler.js';
@@ -154,6 +155,8 @@ import { handle as handleGlobeOfInvulnerability } from './handlers/globeOfInvuln
 import { handle as handleGreaseAreaSave } from './handlers/greaseAreaSaveHandler.js';
 import { handle as handleGreaterRestoration, applyGreaterRestoration as applyGreaterRestorationEffect } from './handlers/greaterRestorationHandler.js';
 import { handle as handleHeroesFeast, applyHeroesFeast as applyHeroesFeastEffect } from './handlers/heroesFeastHandler.js';
+import { handle as handleHypnoticPatternShake, handleConfirm as handleHypnoticPatternShakeConfirm } from './handlers/hypnoticPatternShake.js';
+import { handle as handleHypnoticPattern } from './handlers/hypnoticPatternHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -335,6 +338,7 @@ const HANDLER_MAP = {
                       auto_effect_giant: handleGiantAncestry,
                        aid: handleAid,
         aura_of_purity: handleAuraOfPurity,
+        holy_aura: handleHolyAura,
         blade_ward: handleBladeWard,
         reaction_counterspell: handleCounterSpell,
         eyebite: handleEyebite,
@@ -349,6 +353,9 @@ const HANDLER_MAP = {
         greater_restoration: handleGreaterRestoration,
         heroes_feast: handleHeroesFeast,
         heroes_feast_apply: handleHeroesFeast,
+        hypnotic_pattern: handleHypnoticPattern,
+        hypnotic_pattern_shake: handleHypnoticPatternShake,
+        hypnotic_pattern_shake_confirm: handleHypnoticPatternShakeConfirm,
 };
 export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect };
 export async function executeHandler(action, playerStats, campaignName, mapName) {

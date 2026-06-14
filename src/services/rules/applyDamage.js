@@ -5,6 +5,7 @@ import utils from '../ui/utils.js';
 import { sendDeathSavePrompt, sendConcentrationPrompt } from '../combat/savePromptService.js';
 import { rollConcentrationSave } from '../combat/concentrationRules.js';
 import { postLogEntry } from '../shared/logPoster.js';
+import { isHolyAuraActive, getHolyAuraTargets } from '../automation/handlers/holyAuraHandler.js';
 
 /**
  * Save the last damage event under the target's key so reaction features
@@ -226,9 +227,51 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
           // The stealthAttackCost will be cleared at start of next turn
         }
       }
+   }
+
+    // Holy Aura: Fiend/Undead melee attacker vs affected creature — CON save or Blinded until end of next turn
+    if (attackerName && attackerName !== creature.name && wardDamage > 0) {
+      const casterName = attackerName;
+      if (isHolyAuraActive(casterName, campaignName)) {
+        const holyAuraTargets = getHolyAuraTargets(casterName, campaignName);
+        const isTargetProtected = holyAuraTargets.includes(creature.name) || holyAuraTargets.length === 0;
+        if (isTargetProtected) {
+          const attackerCreature = combatSummary.creatures.find(c => c.name === attackerName);
+          if (attackerCreature) {
+            const attackerType = (attackerCreature.type || '').toLowerCase();
+            const attackerTemplate = (attackerCreature.template || []).map(t => t.toLowerCase());
+            const isFiendOrUndead = attackerType === 'fiend' || attackerType === 'undead' ||
+              attackerTemplate.includes('fiend') || attackerTemplate.includes('undead');
+            if (isFiendOrUndead) {
+              const conSaveDc = getRuntimeValue(casterName, 'holyAuraSaveDc', campaignName);
+              if (conSaveDc) {
+                const saveRoll = rollD20();
+                const conBonus = attackerCreature.ability_score_modifiers?.CON ?? attackerCreature.ability_score_modifiers?.constitution ?? 0;
+                const saveTotal = saveRoll + conBonus;
+                if (saveTotal < conSaveDc) {
+                  const attackerConditions = getRuntimeValue(attackerName, 'activeConditions') || [];
+                  const attackerCondArray = Array.isArray(attackerConditions) ? attackerConditions : [];
+                  const existingBlinded = attackerCondArray.find(c => String(c).toLowerCase() === 'blinded');
+                  if (!existingBlinded) {
+                    setRuntimeValue(attackerName, 'activeConditions', [...attackerCondArray, 'blinded'], campaignName);
+                    postLogEntry(campaignName, {
+                      type: 'condition',
+                      action: 'added',
+                      characterName: attackerName,
+                      condition: 'Blinded',
+                      reason: 'Holy Aura (Fiend/Undead melee hit)',
+                      timestamp: Date.now(),
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
 
-  }
+   }
 
    const wasAlive = oldHp > 0;
    const isNowUnconscious = newHp <= 0;

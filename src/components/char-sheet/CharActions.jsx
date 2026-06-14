@@ -57,6 +57,7 @@ import ElfisLineageModal from './ElfisLineageModal.jsx'
 import GnomishLineageModal from './GnomishLineageModal.jsx'
 import GiantAncestryModal from './GiantAncestryModal.jsx'
 import BreathWeaponShapeModal from './BreathWeaponShapeModal.jsx'
+import HypnoticPatternShakeModal from './HypnoticPatternShakeModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
 import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/divineInterventionHandler.js';
@@ -285,6 +286,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         handleFeatureChoiceSkip,
         handleConstellationSelect,
         handleElderChampionRestore,
+        hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
     } = useCharActionModals({
         playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects,
         popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
@@ -533,6 +535,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'breathWeaponShape': {
                         const bwPayload = result.payload;
                         setBreathWeaponShapeModal({ action: bwPayload.action, playerStats, campaignName, options: bwPayload.options });
+                        break;
+                    }
+                    case 'hypnoticPatternShake': {
+                        const shakePayload = result.payload;
+                        setHypnoticPatternShakeModal(shakePayload);
                         break;
                     }
                     case 'defensiveTactics': {
@@ -1129,6 +1136,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <BreathWeaponShapeModal
                         {...breathWeaponShapeModal}
                         onClose={() => setBreathWeaponShapeModal(null)}
+                    />
+                )}
+                {hypnoticPatternShakeModal && (
+                    <HypnoticPatternShakeModal
+                        {...hypnoticPatternShakeModal}
+                        onClose={() => setHypnoticPatternShakeModal(null)}
                     />
                 )}
                 {divineFuryChoice && (
