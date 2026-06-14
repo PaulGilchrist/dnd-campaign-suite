@@ -248,6 +248,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'self_healing':
             case 'damage_bonus':
             case 'extra_action':
+            case 'heroes_feast':
             case 'buff_ally':
             case 'bardic_inspiration':
             case 'bonus_attacks':

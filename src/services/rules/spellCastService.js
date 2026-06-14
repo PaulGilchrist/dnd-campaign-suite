@@ -14,6 +14,7 @@ import { postLogEntry } from '../shared/logPoster.js';
 import { executeHandler } from '../automation/index.js';
 import { rollExpressionMaximized } from '../dice/diceRoller.js';
 import { triggerFalseLife } from './falseLifeService.js';
+import { triggerHealingWord } from './healingWordService.js';
 import { triggerFear } from './fearService.js';
 import { triggerFeignDeath } from './feignDeathService.js';
 import { triggerFleshToStone } from './fleshToStoneService.js';
@@ -119,6 +120,13 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             return;
         }
 
+        // Heal — restores 70 HP and removes Blinded, Deafened, Poisoned conditions
+        if (spell.name && spell.name.toLowerCase() === 'heal') {
+            const target = await getTargetInfo();
+            await triggerHeal(spell, { ...metaCtx, targetName: target?.name }, playerStats, campaignName, mapName);
+            return;
+        }
+
         // Flesh to Stone — CON save, progressive Restrained→Petrified
         if (spell.name && spell.name.toLowerCase() === 'flesh to stone') {
             await triggerFleshToStone(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
@@ -165,11 +173,15 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
          rollDamage(spell.name, '0', 0, [], 0, context);
        }
 
-       triggerFalseLife(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
-           console.error('[spellCast] False Life trigger failed:', e);
-       });
+        triggerFalseLife(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+            console.error('[spellCast] False Life trigger failed:', e);
+        });
 
-       return;
+        triggerHealingWord(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+            console.error('[spellCast] Healing Word trigger failed:', e);
+        });
+
+        return;
    }
 
    const rollContext = { ...metaCtx, damageType };
@@ -395,6 +407,57 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName)
         isHealing: true,
         sourceName: playerStats.name,
         note: 'Power Word Heal',
+    });
+}
+
+async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) {
+    const combatSummary = await getCombatContext(campaignName);
+    if (!combatSummary) return;
+
+    const targetName = metaCtx?.targetName;
+    if (!targetName) return;
+
+    const creature = combatSummary.creatures.find(c => c.name === targetName);
+    if (!creature) return;
+
+    const healAmount = 70;
+    const maxHp = creature.maxHp || playerStats.hitPoints || 0;
+    const currentHp = creature.currentHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? maxHp;
+    const actualHeal = Math.min(healAmount, maxHp - currentHp);
+
+    if (actualHeal > 0) {
+        applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
+    }
+
+    const conditionsToRemove = ['blinded', 'deafened', 'poisoned'];
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const newConditions = conditions.filter(c => !conditionsToRemove.includes(String(c).toLowerCase()));
+    if (newConditions.length !== conditions.length) {
+        setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
+        for (const removed of conditionsToRemove) {
+            if (!newConditions.some(c => String(c).toLowerCase() === removed)) {
+                postLogEntry(campaignName, {
+                    type: 'condition',
+                    action: 'removed',
+                    characterName: targetName,
+                    condition: removed.charAt(0).toUpperCase() + removed.slice(1),
+                    reason: 'Heal',
+                    timestamp: Date.now(),
+                });
+            }
+        }
+    }
+
+    postLogEntry(campaignName, {
+        type: 'hp_change',
+        targetName,
+        delta: actualHeal,
+        currentHp: Math.min(maxHp, currentHp + actualHeal),
+        maxHp,
+        isHealing: true,
+        sourceName: playerStats.name,
+        note: 'Heal',
     });
 }
 

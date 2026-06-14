@@ -542,6 +542,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
 
             case 'remove_active_buff': {
                 const allBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                const wasHaste = Array.isArray(allBuffs) && allBuffs.some(b => b.name === effect.buffName && b.effect === 'haste');
                 if (Array.isArray(allBuffs)) {
                     setRuntimeValue(
                         targetName,
@@ -549,6 +550,26 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                         allBuffs.filter(b => b.name !== effect.buffName),
                         campaignName
                     );
+                }
+                if (wasHaste) {
+                    const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+                    const hasSpeedZero = conditions.some(c => String(c).toLowerCase() === 'speed_zero');
+                    const hasIncapacitated = conditions.some(c => String(c).toLowerCase() === 'incapacitated');
+                    const newConditions = [
+                        ...conditions.filter(c => String(c).toLowerCase() !== 'speed_zero'),
+                        'speed_zero',
+                        ...(!hasIncapacitated ? ['incapacitated'] : []),
+                    ];
+                    if (newConditions.length !== conditions.length || !hasSpeedZero) {
+                        setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
+                    }
+                    const lethargyKey = `_hasteLethargy_${targetName.replace(/\s+/g, '_')}`;
+                    addExpiration(attackerName, targetName, [
+                        { type: 'speed_zero' },
+                        { type: 'condition', condition: 'incapacitated' }
+                    ], campaignName, 2);
+                    setRuntimeValue(targetName, lethargyKey, Date.now(), campaignName);
                 }
                 break;
             }
@@ -657,6 +678,34 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                     auraTargets.filter(t => t !== targetName),
                     campaignName
                 );
+                break;
+            }
+
+            case 'remove_heroes_feast_buff': {
+                const allBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                if (Array.isArray(allBuffs)) {
+                    setRuntimeValue(
+                        targetName,
+                        'activeBuffs',
+                        allBuffs.filter(b => b.name !== effect.buffName),
+                        campaignName
+                    );
+                }
+                const currentIncrease = Number(getRuntimeValue(targetName, effect.hpKey || 'heroesFeastHpMaxIncrease', campaignName)) || 0;
+                if (currentIncrease > 0) {
+                    let baseHp = getRuntimeValue(targetName, 'hitPoints', campaignName);
+                    if (typeof baseHp === 'number' && baseHp > 0) {
+                        baseHp = Math.max(0, baseHp - currentIncrease);
+                        setRuntimeValue(targetName, 'hitPoints', baseHp, campaignName);
+                    }
+                    const storedCurrentHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+                    if (storedCurrentHp != null) {
+                        const currentHp = Number(storedCurrentHp);
+                        const newCurrentHp = Math.max(0, Math.min(baseHp, currentHp - currentIncrease));
+                        setRuntimeValue(targetName, 'currentHitPoints', newCurrentHp, campaignName);
+                    }
+                    setRuntimeValue(targetName, effect.hpKey || 'heroesFeastHpMaxIncrease', 0, campaignName);
+                }
                 break;
             }
 

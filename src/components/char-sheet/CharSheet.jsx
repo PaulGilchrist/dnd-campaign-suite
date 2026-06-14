@@ -261,6 +261,12 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
     }
 
+    // Haste: Advantage on Dexterity saving throws
+    const hasteActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'haste');
+    if (hasteActive) {
+        conditionEffects.saveAdvantageCount = (conditionEffects.saveAdvantageCount || 0) + 1;
+    }
+
     // Holy Nimbus: Holy Ward grants advantage on saving throws against Fiends/Undead
     if (playerStats) {
         const holyNimbusActive = getRuntimeValue(playerStats.name, 'holyNimbusActive', campaignName);

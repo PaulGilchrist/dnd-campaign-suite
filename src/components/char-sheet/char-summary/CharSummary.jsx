@@ -174,6 +174,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     let flySpeed = null;
     let swimSpeed = null;
     let buffSpeedBonus = 0;
+    let hasteAcBonus = 0;
     let iceWalkActive = false;
     let acrobaticMovementActive = false;
     let seeInvisibleRange = null;
@@ -194,6 +195,11 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         if (buff.effect === 'see_the_invisible') seeInvisibleRange = 60;
         if (buff.effect === 'wormhole_movement') narrowSpaceActive = true;
     });
+    const hasteActive = activeBuffs.some(b => b.effect === 'haste');
+    if (hasteActive) {
+        speed = speed * 2;
+        hasteAcBonus = 2;
+    }
     const acrobaticMovementPassive = (playerStats.automation?.passives || []).find(p => p.effect === 'acrobatic_movement');
     if (acrobaticMovementPassive && !hasArmorOrShield) {
         acrobaticMovementActive = true;
@@ -270,7 +276,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
             </div>
             <div className='summaryGrid'>
                 <div>
-                    <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{circleFormsACOverride ?? playerStats.armorClass}</div>
+                    <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{circleFormsACOverride ?? (playerStats.armorClass + hasteAcBonus)}{hasteAcBonus > 0 && <span className="aura-source" title="From Haste"> (+{hasteAcBonus})</span>}</div>
                     <CharHitPoints playerStats={playerStats} campaignName={campaignName}></CharHitPoints>
                       <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeedWithBuff}{playerStats.climbSpeed ? `, climb ${playerStats.climbSpeed}` : ''}{playerStats.swimSpeed ? `, swim ${playerStats.swimSpeed}` : ''}{swimSpeed !== null ? `, swim ${swimSpeed}` : ''}{flySpeed !== null ? `, fly ${flySpeed + auraSpeedBonus}${(glisteningFlightHover || dragonWingsHover) ? ' (hover)' : ''}` : ''}{iceWalkActive ? ', ice walk' : ''}{acrobaticMovementActive ? ', acrobatic movement' : ''}</span> ft.{auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}<br />
                     <CharGold playerStats={playerStats} campaignName={campaignName}></CharGold>

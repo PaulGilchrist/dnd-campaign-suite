@@ -7105,6 +7105,13 @@
     "dc": {
       "dc_type": "DEX",
       "dc_success": "none"
+    },
+    "automation": {
+      "type": "buff_ally",
+      "effect": "haste",
+      "duration": "Concentration, up to 1 minute",
+      "target": "willing_creature",
+      "casting_time": "1 action"
     }
   },
   {
@@ -7160,6 +7167,17 @@
     "level": 1,
     "attack_type": null,
     "damage": null,
+    "heal_at_slot_level": {
+      "1": "2d4 + MOD",
+      "2": "3d4 + MOD",
+      "3": "4d4 + MOD",
+      "4": "5d4 + MOD",
+      "5": "6d4 + MOD",
+      "6": "7d4 + MOD",
+      "7": "8d4 + MOD",
+      "8": "9d4 + MOD",
+      "9": "10d4 + MOD"
+    },
     "school": "Abjuration",
     "classes": [
       "Bard",
@@ -7295,7 +7313,14 @@
       "Poisoned"
     ],
     "spell_list_order": 6,
-    "cantrip_scaling": {}
+    "cantrip_scaling": {},
+    "automation": {
+      "type": "heroes_feast",
+      "range": "Self",
+      "maxTargets": 12,
+      "hpMaxIncreaseExpression": "2d10",
+      "slotLevel": 6
+    }
   },
   {
     "index": "heroism",

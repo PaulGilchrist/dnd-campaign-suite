@@ -10,6 +10,7 @@ import SpellDetailPopup from './SpellDetailPopup.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
 import MultiTargetPopup from '../MultiTargetPopup.jsx'
 import AidTargetPopup from '../AidTargetPopup.jsx'
+import HeroesFeastTargetPopup from '../HeroesFeastTargetPopup.jsx'
 import GreaterRestorationPopup from '../GreaterRestorationPopup.jsx'
 import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../../services/dice/diceRoller.js';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
@@ -187,7 +188,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
       executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName });
       cachedCastPosRef.current = null;
       }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName]);
-    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
+    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
 
     const resolveSpellPositions = React.useCallback(async () => {
@@ -437,6 +438,20 @@ return (
                         attackerPos={pendingAid.attackerPos}
                         onConfirm={handleAidConfirm}
                         onSkip={handleAidSkip}
+                      />
+                    )}
+                    {pendingHeroesFeast && (
+                      <HeroesFeastTargetPopup
+                        spell={{ name: pendingHeroesFeast.spellName, level: pendingHeroesFeast.spellLevel || 0 }}
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        range={pendingHeroesFeast.range}
+                        rangeFt={pendingHeroesFeast.rangeFt}
+                        creatureTargets={pendingHeroesFeast.creatureTargets}
+                        maxTargets={pendingHeroesFeast.maxTargets}
+                        attackerPos={pendingHeroesFeast.attackerPos}
+                        onConfirm={handleHeroesFeastConfirm}
+                        onSkip={handleHeroesFeastSkip}
                       />
                     )}
                     {pendingGreaterRestoration && (

@@ -18,6 +18,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
   const [pendingMetamagic, setPendingMetamagic] = React.useState(null);
   const [pendingMultiTarget, setPendingMultiTarget] = React.useState(null);
   const [pendingAid, setPendingAid] = React.useState(null);
+  const [pendingHeroesFeast, setPendingHeroesFeast] = React.useState(null);
   const [pendingGreaterRestoration, setPendingGreaterRestoration] = React.useState(null);
 
   const gateMetamagic = React.useCallback((spell) => {
@@ -55,6 +56,26 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
           castingTime: spell.casting_time,
           range: spell.range || '30 feet',
           maxTargets: 3,
+          creatureTargets,
+        });
+        return;
+      }
+    }
+
+    const isHeroesFeast = (spell.name || '').toLowerCase() === "heroes' feast";
+    if (isHeroesFeast) {
+      const cs = getCombatSummary();
+      const creatureTargets = cs?.creatures
+        ?.filter(c => c.name !== playerStats?.name)
+        .map(c => c.name) || [];
+      if (creatureTargets.length > 0) {
+        setPendingHeroesFeast({
+          spell,
+          spellName: spell.name,
+          spellLevel: spell.level || 0,
+          castingTime: spell.casting_time,
+          range: spell.range || 'Self',
+          maxTargets: 12,
           creatureTargets,
         });
         return;
@@ -265,6 +286,53 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
   }, [pendingAid, playerStats, campaignName]);
 
+  const handleHeroesFeastConfirm = React.useCallback(async (result) => {
+    const pending = pendingHeroesFeast;
+    setPendingHeroesFeast(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+
+    try {
+      const { applyHeroesFeastEffect } = await import('../services/automation/index.js');
+      await applyHeroesFeastEffect(
+        { name: pending.spellName, spell: pending.spell, automation: { type: 'heroes_feast', range: pending.range, maxTargets: pending.maxTargets } },
+        playerStats,
+        campaignName,
+        null,
+        result
+      );
+    } catch (e) {
+      console.error("[heroesFeast] Failed to apply effect:", e);
+    }
+  }, [pendingHeroesFeast, playerStats, campaignName]);
+
+  const handleHeroesFeastSkip = React.useCallback(() => {
+    const pending = pendingHeroesFeast;
+    setPendingHeroesFeast(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+  }, [pendingHeroesFeast, playerStats, campaignName]);
+
   const handleGreaterRestorationConfirm = React.useCallback(async (result) => {
     const pending = pendingGreaterRestoration;
     setPendingGreaterRestoration(null);
@@ -312,5 +380,5 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
   }, [pendingGreaterRestoration, playerStats, campaignName]);
 
-  return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingGreaterRestoration, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip };
+  return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingHeroesFeast, pendingGreaterRestoration, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleHeroesFeastConfirm, handleHeroesFeastSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip };
 }

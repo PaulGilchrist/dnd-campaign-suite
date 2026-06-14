@@ -152,6 +152,7 @@ import { handle as handleFriends } from './handlers/friendsHandler.js';
 import { handle as handleGlobeOfInvulnerability } from './handlers/globeOfInvulnerabilityHandler.js';
 import { handle as handleGreaseAreaSave } from './handlers/greaseAreaSaveHandler.js';
 import { handle as handleGreaterRestoration, applyGreaterRestoration as applyGreaterRestorationEffect } from './handlers/greaterRestorationHandler.js';
+import { handle as handleHeroesFeast, applyHeroesFeast as applyHeroesFeastEffect } from './handlers/heroesFeastHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -344,8 +345,10 @@ const HANDLER_MAP = {
         globe_of_invulnerability: handleGlobeOfInvulnerability,
         grease_area_save: handleGreaseAreaSave,
         greater_restoration: handleGreaterRestoration,
+        heroes_feast: handleHeroesFeast,
+        heroes_feast_apply: handleHeroesFeast,
 };
-export { applyAidEffect, applyGreaterRestorationEffect };
+export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
 

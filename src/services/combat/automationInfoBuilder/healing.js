@@ -146,5 +146,27 @@ export const healingHandlers = {
             range: auto.range || '30_ft',
             hasAutomation: true
         }
+    },
+
+    'heroes_feast': (feature, playerStats) => {
+        const auto = feature.automation
+        const slotLevel = auto.slotLevel || 6
+        const prof = playerStats.proficiency || 0
+        const level = playerStats.level || 1
+        const hpIncrease = auto.hpMaxIncreaseExpression
+            ? evaluateAutoExpression(auto.hpMaxIncreaseExpression, playerStats, prof, level, slotLevel)
+            : 11
+        return {
+            type: 'heroes_feast',
+            name: feature.name,
+            hpMaxIncrease: hpIncrease,
+            hpMaxIncreaseExpression: auto.hpMaxIncreaseExpression || '2d10',
+            slotLevel,
+            range: auto.range || 'Self',
+            maxTargets: auto.maxTargets || 12,
+            duration: auto.duration || '24 hours',
+            action: auto.action || 'action',
+            hasAutomation: true
+        }
     }
 }

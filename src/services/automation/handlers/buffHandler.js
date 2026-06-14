@@ -1,4 +1,5 @@
 import { toggleBuff } from '../common/buffToggle.js';
+import { addExpiration } from '../../rules/expirations.js';
 import { handle as handleTeleport } from './tempTeleportHandler.js';
 import { handle as handleVowOfEnmity } from './vowOfEnmityHandler.js';
 import { getTargetFromAttacker } from '../../rules/damageUtils.js';
@@ -90,6 +91,21 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     if (auto?.effect === 'fly_speed_equals_walk_speed' && wasActive) {
         const restKey = playerStats.name.toLowerCase().replace(/\s+/g, '') + '_buffRestTimestamp';
         await setRuntimeValue(playerStats.name, restKey, Date.now(), campaignName);
+    }
+
+    if (auto?.effect === 'haste') {
+        if (!wasActive) {
+            addExpiration(playerStats.name, targetName, [
+                { type: 'remove_active_buff', buffName: action.name }
+            ], campaignName);
+        } else {
+            const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
+            const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+            const filtered = conditions.filter(c => String(c).toLowerCase() !== 'speed_zero');
+            if (filtered.length !== conditions.length) {
+                await setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
+            }
+        }
     }
 
     if (!wasActive && auto?.tempHpExpression) {
