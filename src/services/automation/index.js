@@ -155,6 +155,7 @@ import { handle as handleGlobeOfInvulnerability } from './handlers/globeOfInvuln
 import { handle as handleGreaseAreaSave } from './handlers/greaseAreaSaveHandler.js';
 import { handle as handleGreaterRestoration, applyGreaterRestoration as applyGreaterRestorationEffect } from './handlers/greaterRestorationHandler.js';
 import { handle as handleLesserRestoration, applyLesserRestoration as applyLesserRestorationEffect } from './handlers/lesserRestorationHandler.js';
+import { handle as handleLongstrider, applyLongstrider as applyLongstriderEffect } from './handlers/longstriderHandler.js';
 import { handle as handleHeroesFeast, applyHeroesFeast as applyHeroesFeastEffect } from './handlers/heroesFeastHandler.js';
 import { handle as handleHypnoticPatternShake, handleConfirm as handleHypnoticPatternShakeConfirm } from './handlers/hypnoticPatternShake.js';
 import { handle as handleHypnoticPattern } from './handlers/hypnoticPatternHandler.js';
@@ -353,13 +354,15 @@ const HANDLER_MAP = {
         grease_area_save: handleGreaseAreaSave,
         greater_restoration: handleGreaterRestoration,
         lesser_restoration: handleLesserRestoration,
+        longstrider: handleLongstrider,
+        longstrider_apply: applyLongstriderEffect,
         heroes_feast: handleHeroesFeast,
         heroes_feast_apply: handleHeroesFeast,
         hypnotic_pattern: handleHypnoticPattern,
         hypnotic_pattern_shake: handleHypnoticPatternShake,
         hypnotic_pattern_shake_confirm: handleHypnoticPatternShakeConfirm,
 };
-export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect };
+export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
 

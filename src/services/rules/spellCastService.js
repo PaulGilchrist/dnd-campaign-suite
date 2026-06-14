@@ -26,6 +26,7 @@ import { endInvisibilityOnHostileAction } from './invisibilityService.js';
 import { triggerGlobeOfInvulnerability } from './globeOfInvulnerabilityService.js';
 import { triggerHeroism } from './heroismService.js';
 import { triggerHolyAura } from './holyAuraService.js';
+import { executeHandler as executeLongstrider } from '../automation/index.js';
 
 function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     if (spell.name !== 'Hex') return;
@@ -186,6 +187,17 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         // Holy Aura — 30-ft emanation: allies in aura get save advantage, attackers get attack disadvantage, Fiend/Undead melee attackers save vs CON or Blinded
         if (spell.name && spell.name.toLowerCase() === 'holy aura') {
             await triggerHolyAura(spell, metaCtx, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Longstrider — target's Speed increases by 10 feet for duration
+        if (spell.name && spell.name.toLowerCase() === 'longstrider') {
+            const action = {
+                name: 'Longstrider',
+                spell: spell,
+                automation: { type: 'longstrider' },
+            };
+            await executeLongstrider(action, playerStats, campaignName, mapName);
             return;
         }
 
