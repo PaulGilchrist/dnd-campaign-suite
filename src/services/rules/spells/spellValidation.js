@@ -4,7 +4,7 @@
  * Supports both 5e and 2024 rulesets
  */
 
-import { loadClassData, loadRaceData, loadBackgroundData, loadFeatData } from '../ui/dataLoader.js';
+import { loadClassData, loadRaceData, loadBackgroundData, loadFeatData } from '../../ui/dataLoader.js';
 
 /**
  * Gets the spell list for a given class

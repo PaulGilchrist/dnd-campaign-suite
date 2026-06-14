@@ -23,15 +23,15 @@ import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from
 import { useSpellMetamagicFlow } from '../../../hooks/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../../hooks/useSpellUpcastFlow.js'
 import UpcastPopup from './UpcastPopup.jsx'
-import { executeSpellCast } from '../../../services/rules/spellCastService.js'
+import { executeSpellCast } from '../../../services/rules/spells/spellCastService.js'
 import * as mapsService from '../../../services/maps/mapsService.js';
 import { getNearestPlacedItem } from '../../../services/rules/combat/rangeValidation.js';
 import { isInnateSorceryActive } from '../../../services/combat/buffService.js';
 import { useRuntimeValue, setRuntimeValue, getRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
-import { isPsionicSpell, hasPsionicSorcery } from '../../../services/rules/metamagicRules.js';
-import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../../services/rules/postCastRiderService.js';
+import { isPsionicSpell, hasPsionicSorcery } from '../../../services/rules/spells/metamagicRules.js';
+import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../../services/rules/spells/postCastRiderService.js';
 import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, characters }) {

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import SelectableList from './SelectableList.jsx';
 import WarningList from '../common/WarningList.jsx';
-import { getSpellLimits, validateSpellSelection } from '../../services/rules/spellLimits.js';
-import { getSpellValidationInfo } from '../../services/rules/spellValidation.js';
+import { getSpellLimits, validateSpellSelection } from '../../services/rules/spells/spellLimits.js';
+import { getSpellValidationInfo } from '../../services/rules/spells/spellValidation.js';
 import './WizardStepSpells.css';
 function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelectedSpells }) {
   const preSelected = useMemo(() => preSelectedSpells || [], [preSelectedSpells]);

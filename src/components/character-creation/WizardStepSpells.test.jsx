@@ -1,8 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WizardStepSpells from './WizardStepSpells.jsx';
-import * as spellLimits from '../../services/rules/spellLimits.js';
-import * as spellValidation from '../../services/rules/spellValidation.js';
+import * as spellLimits from '../../services/rules/spells/spellLimits.js';
+import * as spellValidation from '../../services/rules/spells/spellValidation.js';
 
 vi.mock('./SelectableList.jsx', () => ({
   default: vi.fn(({ title, resultLabel, renderSummary, items, renderItem }) => (
@@ -24,12 +24,12 @@ vi.mock('./SelectableList.jsx', () => ({
    ))
 }));
 
-vi.mock('../../services/rules/spellLimits.js', () => ({
+vi.mock('../../services/rules/spells/spellLimits.js', () => ({
   getSpellLimits: vi.fn(() => Promise.resolve({ cantrip: 3, level1: 2, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0, level7: 0, level8: 0, level9: 0, spellType: 'known', preparedSpells: null })),
   validateSpellSelection: vi.fn(() => Promise.resolve({ valid: true, violations: [] })),
 }));
 
-vi.mock('../../services/rules/spellValidation.js', () => ({
+vi.mock('../../services/rules/spells/spellValidation.js', () => ({
   getSpellValidationInfo: vi.fn(() => Promise.resolve({ warnings: [] })),
 }));
 

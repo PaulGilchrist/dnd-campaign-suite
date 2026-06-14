@@ -35,7 +35,7 @@ vi.mock('../../services/automation/handlers/saveAttackHandler.js', () => ({
   isExhausted: vi.fn(() => false),
 }));
 
-vi.mock('../../services/rules/postCastRiderService.js', () => ({
+vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
   getMultiTargetSpreadForSpell: vi.fn(() => null),
   triggerPostCastRiderSaves: vi.fn(),
 }));

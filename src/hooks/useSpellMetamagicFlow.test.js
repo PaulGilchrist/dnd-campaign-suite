@@ -14,7 +14,7 @@ vi.mock('../services/ui/logService.js', () => ({
   addEntry: vi.fn(),
 }));
 
-vi.mock('../services/rules/postCastRiderService.js', () => ({
+vi.mock('../services/rules/spells/postCastRiderService.js', () => ({
   getMultiTargetSpreadForSpell: vi.fn(() => null),
 }));
 
@@ -22,7 +22,7 @@ vi.mock('../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
 }));
 
-vi.mock('../services/rules/metamagicRules.js', () => ({
+vi.mock('../services/rules/spells/metamagicRules.js', () => ({
   isPsionicSpell: vi.fn(() => false),
   hasPsionicSorcery: vi.fn(() => false),
 }));

@@ -1,9 +1,9 @@
 import { getMaxSorceryPoints, getCurrentSorceryPoints, getLastDamageEvent, spendSorceryPoints, saveLastDamageEvent } from '../../hooks/useMetamagic.js';
 import { getChaModifier } from './metamagicRules.js';
-import { parseExpression } from '../dice/diceRoller.js';
-import { getCombatContext } from './combat/damageUtils.js';
-import { applyDamageToTarget } from './combat/applyDamage.js';
-import { endInvisibilityOnHostileAction } from './invisibilityService.js';
+import { parseExpression } from '../../dice/diceRoller.js';
+import { getCombatContext } from '../combat/damageUtils.js';
+import { applyDamageToTarget } from '../combat/applyDamage.js';
+import { endInvisibilityOnHostileAction } from '../invisibilityService.js';
 
 export function buildEmpoweredSpellState(playerStats) {
     const name = playerStats.name;

@@ -1,9 +1,9 @@
 import React from 'react'
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from './useMetamagic.js'
 import { addEntry } from '../services/ui/logService.js'
-import { getMultiTargetSpreadForSpell } from '../services/rules/postCastRiderService.js'
+import { getMultiTargetSpreadForSpell } from '../services/rules/spells/postCastRiderService.js'
 import { getCombatSummary } from '../services/encounters/combatData.js'
-import { isPsionicSpell, hasPsionicSorcery } from '../services/rules/metamagicRules.js'
+import { isPsionicSpell, hasPsionicSorcery } from '../services/rules/spells/metamagicRules.js'
 
 function getCreatureTargets(excludeName) {
   const cs = getCombatSummary();

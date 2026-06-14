@@ -3,11 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
 // Use inline vi.fn() — no closure over external variables
 
-vi.mock('../dice/diceRoller.js', () => ({
+vi.mock('../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
-vi.mock('./combat/rangeValidation.js', () => ({
+vi.mock('../combat/rangeValidation.js', () => ({
   computeRangeEffect: vi.fn(),
   computeEffectiveSpellRange: vi.fn(),
   getDistanceFeet: vi.fn(),
@@ -19,7 +19,7 @@ vi.mock('../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../combat/buffService.js', () => ({
+vi.mock('../../combat/buffService.js', () => ({
   isInnateSorceryActive: vi.fn(),
   getActiveBuffs: vi.fn().mockReturnValue([]),
 }));
@@ -42,15 +42,15 @@ vi.mock('./postCastHealService.js', () => ({
 
 import { executeSpellCast } from './spellCastService.js';
 
-import { rollExpression } from '../dice/diceRoller.js';
+import { rollExpression } from '../../dice/diceRoller.js';
 import {
   computeRangeEffect,
   computeEffectiveSpellRange,
   getDistanceFeet,
   rangeToFeet,
-} from './combat/rangeValidation.js';
+} from '../combat/rangeValidation.js';
 import * as useRuntimeState from '../../hooks/useRuntimeState.js';
-import * as buffService from '../combat/buffService.js';
+import * as buffService from '../../combat/buffService.js';
 import * as postCastRiderService from './postCastRiderService.js';
 import * as postCastHealService from './postCastHealService.js';
 

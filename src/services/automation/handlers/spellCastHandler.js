@@ -1,6 +1,6 @@
 import { rollExpression } from '../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../../services/rules/postCastRiderService.js';
+import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../../services/rules/spells/postCastRiderService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;

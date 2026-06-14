@@ -1,5 +1,5 @@
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
-import { getAbilityModifier } from '../shared/abilityLookup.js';
+import { getAbilityModifier } from '../../shared/abilityLookup.js';
 
 export const METAMAGIC_EFFECTS = {
   CAREFUL: 'ally_auto_succeed_save',

@@ -90,7 +90,7 @@ vi.mock('../../../hooks/useSpellUpcastFlow.js', () => ({
   })),
 }));
 
-vi.mock('../../../services/rules/spellCastService.js', () => ({
+vi.mock('../../../services/rules/spells/spellCastService.js', () => ({
   executeSpellCast: vi.fn(),
 }));
 

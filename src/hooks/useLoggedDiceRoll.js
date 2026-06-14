@@ -25,7 +25,7 @@ import {
 } from '../services/combat/unbreakableMajesty.js';
 import { MELEE_REACH_FEET } from '../services/combat/baseCombatActions.js';
 import { getCombatContext } from '../services/rules/combat/damageUtils.js';
-import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../services/rules/postCastRiderService.js';
+import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../services/rules/spells/postCastRiderService.js';
 import { playerIsImmuneToCondition } from '../services/combat/automationService.js';
 import { endInvisibilityOnHostileAction } from '../services/rules/invisibilityService.js';
 

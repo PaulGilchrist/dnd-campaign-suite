@@ -64,7 +64,7 @@ import { onSpellSelected as onDivineInterventionSpellSelected } from '../../serv
 import { getClassFeatures } from '../../services/character/classFeatures.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
-import { executeSpellCast } from '../../services/rules/spellCastService.js'
+import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { getTargetFromAttacker, getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { endFriendsOnHostileAction } from '../../services/rules/friendsService.js';
@@ -73,8 +73,8 @@ import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js'
 import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
-import { buildEmpoweredSpellState, executeEmpoweredReroll, getEmpoweredSpellDescription } from '../../services/rules/empoweredSpellService.js';
-import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/postCastRiderService.js';
+import { buildEmpoweredSpellState, executeEmpoweredReroll, getEmpoweredSpellDescription } from '../../services/rules/spells/empoweredSpellService.js';
+import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { useActionSpellMetamagic } from '../../hooks/useActionSpellMetamagic.js';
 import useCharActionModals from './useCharActionModals.js';
 import DivinationSavantModal from './DivinationSavantModal.jsx';

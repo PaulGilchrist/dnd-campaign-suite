@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getPreCastOptions, getMaxMetamagicPerSpell, computeMetamagicCost, hasArcaneApotheosis } from '../../services/rules/metamagicRules.js';
+import { getPreCastOptions, getMaxMetamagicPerSpell, computeMetamagicCost, hasArcaneApotheosis } from '../../services/rules/spells/metamagicRules.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import './MetamagicPopup.css';
 

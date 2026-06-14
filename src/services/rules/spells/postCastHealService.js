@@ -1,5 +1,5 @@
-import { evaluateAutoExpression } from '../combat/automationService.js';
-import { applyHealingDirectly, logHealingToSSE } from '../automation/common/healingRoll.js';
+import { evaluateAutoExpression } from '../../combat/automationService.js';
+import { applyHealingDirectly, logHealingToSSE } from '../../automation/common/healingRoll.js';
 
 const HEALING_SPELL_NAMES = new Set([
     'aid',

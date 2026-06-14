@@ -6,7 +6,7 @@ vi.mock('../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../automation/index.js', () => ({
+vi.mock('../../automation/index.js', () => ({
   executeHandler: vi.fn().mockResolvedValue({ type: 'popup', payload: {} }),
 }));
 
@@ -20,7 +20,7 @@ import {
   triggerPostCastRiderSaves,
 } from './postCastRiderService.js';
 import * as useRuntimeState from '../../hooks/useRuntimeState.js';
-import * as automationIndex from '../automation/index.js';
+import * as automationIndex from '../../automation/index.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

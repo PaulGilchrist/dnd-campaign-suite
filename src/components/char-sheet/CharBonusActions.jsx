@@ -10,7 +10,7 @@ import { isExhausted } from '../../services/automation/handlers/saveAttackHandle
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
 import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
-import { executeSpellCast } from '../../services/rules/spellCastService.js'
+import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { getCurrentCombatRound } from '../../services/encounters/combatData.js'
 import * as mapsService from '../../services/maps/mapsService.js';
 import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';

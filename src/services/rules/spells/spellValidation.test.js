@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import * as dataLoader from '../ui/dataLoader.js';
+import * as dataLoader from '../../ui/dataLoader.js';
 
 // Mock the dataLoader module
-vi.mock('../ui/dataLoader.js', () => ({
+vi.mock('../../ui/dataLoader.js', () => ({
   loadClassData: vi.fn(),
   loadRaceData: vi.fn(),
   loadBackgroundData: vi.fn(),

@@ -16,7 +16,7 @@ import {
   getPostCastRiderSaves,
   hasPostCastRiderSave,
   triggerPostCastRiderSaves,
-} from '../../rules/postCastRiderService.js';
+} from '../../rules/spells/postCastRiderService.js';
 import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
 import * as automationIndex from '../../automation/index.js';
 
