@@ -18,6 +18,7 @@ import { triggerHealingWord } from './healingWordService.js';
 import { triggerMassCureWounds } from './massCureWoundsService.js';
 import { triggerMassHeal } from './massHealService.js';
 import { triggerMassHealingWord } from './massHealingWordService.js';
+import { triggerPrayerOfHealing } from './prayerOfHealingService.js';
 import { triggerFear } from './fearService.js';
 import { triggerFeignDeath } from './feignDeathService.js';
 import { triggerFleshToStone } from './fleshToStoneService.js';
@@ -150,6 +151,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         // Mass Heal — 9th level multi-target healing (up to 700 HP) + condition removal
         if (spell.name && spell.name.toLowerCase() === 'mass heal') {
             await triggerMassHeal(spell, metaCtx, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Prayer of Healing — up to 5 creatures gain Short Rest benefits + 2d8 HP (10 min casting, Long Rest cooldown per creature)
+        if (spell.name && spell.name.toLowerCase() === 'prayer of healing') {
+            await triggerPrayerOfHealing(spell, metaCtx, playerStats, campaignName, mapName);
             return;
         }
 

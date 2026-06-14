@@ -10674,6 +10674,9 @@
     "area_of_effect": null,
     "saving_throw": null,
     "status_effects": [],
+    "heal_at_slot_level": {
+      "2": "2d8"
+    },
     "spell_list_order": 2,
     "cantrip_scaling": {}
   },
