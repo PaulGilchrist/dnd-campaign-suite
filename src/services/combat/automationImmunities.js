@@ -1,3 +1,5 @@
+import { isProtectionFromEvilAndGoodActive, isCreatureWarded } from '../automation/handlers/protectionFromEvilAndGoodHandler.js';
+
 export function getConditionImmunities(features) {
     const immunities = []
     if (!features) return immunities
@@ -50,10 +52,23 @@ export function playerIsImmuneToCondition({
     playerStats,
     getRuntimeValue,
     campaignName,
+    sourceCreatureType,
 }) {
     if (!conditionKey || !playerStats) return false
 
     const lowerCondition = String(conditionKey).toLowerCase()
+
+    // Protection from Evil and Good: if target has the spell active, they are immune
+    // to Charmed and Frightened conditions from warded creature types
+    if (isProtectionFromEvilAndGoodActive(playerStats.name, campaignName)) {
+        if ((lowerCondition === 'charmed' || lowerCondition === 'frightened') && sourceCreatureType) {
+            if (isCreatureWarded(sourceCreatureType, playerStats.name, campaignName)) {
+                return true
+            }
+        }
+        // Also prevent possession from warded creature types
+        // Possession is tracked as a special state, not a condition — handled separately
+    }
 
     // Check playerStats.immunities array (race immunities like "Magical Sleep")
     if (playerStats.immunities && Array.isArray(playerStats.immunities)) {

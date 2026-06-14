@@ -196,11 +196,14 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             const effectsToExpire = [];
             for (const effect of pending.statusEffects) {
                 const condKey = String(effect).toLowerCase();
+                const attackerName = pending.attackerName || characterName;
+                const attackerCreature = combatSummary?.creatures?.find(c => c.name === attackerName);
                 if (targetStats && playerIsImmuneToCondition({
                     conditionKey: condKey,
                     playerStats: targetStats,
                     getRuntimeValue: getRuntimeValue,
                     campaignName: pending.campaignName,
+                    sourceCreatureType: attackerCreature?.type,
                 })) {
                     continue;
                 }
@@ -817,11 +820,13 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                     const condKey = String(effect).toLowerCase();
                     const targetCharacter = (characters || []).find(c => utils.getName(c.name) === target.name);
                     const targetStats = targetCharacter?.computedStats || targetCharacter;
+                    const attackerCreature = combatSummary?.creatures?.find(c => c.name === characterName);
                     if (targetStats && playerIsImmuneToCondition({
                         conditionKey: condKey,
                         playerStats: targetStats,
                         getRuntimeValue: getRuntimeValue,
                         campaignName: campaignName,
+                        sourceCreatureType: attackerCreature?.type,
                     })) {
                         continue;
                     }

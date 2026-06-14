@@ -47,6 +47,7 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
     if (playerCreature && playerCreature.hasActed) return false;
     return true;
   }
+  if (modifier.condition === 'pfeag_save_advantage') return true;
   if (modifier.condition && conditionSet.has(modifier.condition)) return true;
   if (modifier.abilities && modifier.abilities.length > 0) {
     if (!abilityName) return true;

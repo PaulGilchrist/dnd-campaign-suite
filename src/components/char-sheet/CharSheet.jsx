@@ -11,10 +11,11 @@ import CharCharacterAdvancement from './CharCharacterAdvancement.jsx'
 import CharSpells from './char-spells/CharSpells.jsx'
 import CharSummary from './char-summary/CharSummary.jsx'
 import { computeAuraComboEffects } from '../../services/combat/auraComboEffects.js';
-import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditionEffects.js'
-import { getCombatSummary } from '../../services/encounters/combatData.js'
-import { evaluateAutoExpression } from '../../services/combat/automationService.js'
-import { EXHAUSTION_LEVELS } from '../../services/combat/exhaustionRules.js'
+import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditionEffects.js';
+import { getCombatSummary } from '../../services/encounters/combatData.js';
+import { evaluateAutoExpression } from '../../services/combat/automationService.js';
+import { EXHAUSTION_LEVELS } from '../../services/combat/exhaustionRules.js';
+import { isCreatureWarded } from '../../services/automation/handlers/protectionFromEvilAndGoodHandler.js';
 import './CharSheet.css'
 
 function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters }) {
@@ -191,7 +192,26 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 .filter(Boolean)
           )
         : [];
-    const allSaveModifiers = [...(playerStats?.saveModifiers || []), ...stanceSaveModifiers];
+
+    // Protection from Evil and Good: check if spell is active
+    const pfeagActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'protection_from_evil_and_good');
+
+    // Protection from Evil and Good: if already charmed/frightened by a warded creature,
+    // the target has Advantage on any new saving throw against the relevant effect
+    const pfeagSaveAdvantage = [];
+    if (pfeagActive && playerStats) {
+        const hasCharmed = activeConditions.includes('charmed');
+        const hasFrightened = activeConditions.includes('frightened');
+        if (hasCharmed || hasFrightened) {
+            pfeagSaveAdvantage.push({
+                source: 'Protection from Evil and Good',
+                target: 'saving_throw',
+                condition: 'pfeag_save_advantage',
+                effect: 'advantage',
+            });
+        }
+    }
+    const allSaveModifiers = [...(playerStats?.saveModifiers || []), ...stanceSaveModifiers, ...pfeagSaveAdvantage];
     const allTargetEffects = useRuntimeValue(campaignName, 'targetEffects') ?? [];
     const myTargetEffects = allTargetEffects.filter(te => te.target === (playerSummary?.name));
     const isRaging = Array.isArray(activeBuffs) && activeBuffs.some(b => b.damageBonusExpression);
@@ -259,6 +279,18 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const bladeWardActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'blade_ward');
     if (bladeWardActive) {
         conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
+    }
+
+    // Protection from Evil and Good: warded creature types have Disadvantage on attack rolls,
+    // target can't be charmed/frightened/possessed by them, advantage on new saves against existing effects
+    if (pfeagActive && playerStats && combatContext) {
+        const attackerName = combatContext.attackerName;
+        if (attackerName) {
+            const attackerCreature = combatContext.creatures?.find(c => c.name === attackerName);
+            if (attackerCreature && isCreatureWarded(attackerCreature.type, playerStats.name, campaignName)) {
+                conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
+            }
+        }
     }
 
     // Haste: Advantage on Dexterity saving throws

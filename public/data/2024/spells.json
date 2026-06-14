@@ -10988,7 +10988,14 @@
       "Frightened"
     ],
     "spell_list_order": 1,
-    "cantrip_scaling": {}
+    "cantrip_scaling": {},
+    "automation": {
+      "type": "protection_from_evil_and_good",
+      "wardedCreatureTypes": ["Aberration", "Celestial", "Elemental", "Fey", "Fiend", "Undead"],
+      "duration": "Concentration, up to 10 minutes",
+      "casting_time": "1 action",
+      "range": "Touch"
+    }
   },
   {
     "index": "protection-from-poison",

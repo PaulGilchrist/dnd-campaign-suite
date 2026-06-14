@@ -166,6 +166,7 @@ import { handle as handleResilientSphere } from './handlers/resilientSphereHandl
 import { handle as handlePowerWordStun } from './handlers/powerWordStunHandler.js';
 import { handle as handleOttoDance } from './handlers/ottosDanceHandler.js';
 import { handle as handlePassWithoutTrace } from './handlers/passWithoutTraceHandler.js';
+import { handle as handleProtectionFromEvilAndGood, isProtectionFromEvilAndGoodActive, isCreatureWarded } from './handlers/protectionFromEvilAndGoodHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -376,8 +377,9 @@ const HANDLER_MAP = {
         ottos_dance: handleOttoDance,
         pass_without_trace: handlePassWithoutTrace,
         protection_from_energy: handleProtectionFromEnergy,
+        protection_from_evil_and_good: handleProtectionFromEvilAndGood,
 };
-export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler };
+export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler, isProtectionFromEvilAndGoodActive, isCreatureWarded };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
 
