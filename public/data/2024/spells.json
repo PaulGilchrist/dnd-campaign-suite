@@ -11030,7 +11030,13 @@
       "Poisoned"
     ],
     "spell_list_order": 2,
-    "cantrip_scaling": {}
+    "cantrip_scaling": {},
+    "automation": {
+      "type": "protection_from_poison",
+      "duration": "1 hour",
+      "casting_time": "1 action",
+      "range": "Touch"
+    }
   },
   {
     "index": "purify-food-and-drink",

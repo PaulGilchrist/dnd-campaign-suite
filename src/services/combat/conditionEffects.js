@@ -48,6 +48,7 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
     return true;
   }
   if (modifier.condition === 'pfeag_save_advantage') return true;
+  if (modifier.condition === 'protection_from_poison_active') return true;
   if (modifier.condition && conditionSet.has(modifier.condition)) return true;
   if (modifier.abilities && modifier.abilities.length > 0) {
     if (!abilityName) return true;
@@ -165,6 +166,12 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
       effects.spellBreakerDispelBonus = true;
       effects.spellBreakerDispelBonusExpression = mod.bonusExpression || '';
     }
+    else if (mod.effect === 'str_check_disadvantage') {
+      effects.strCheckDisadvantage = true;
+    }
+    else if (mod.effect === 'ray_of_enfeeble_damage_reduction') {
+      effects.rayOfEnfeebleDamageReduction = true;
+    }
   }
 }
 
@@ -231,6 +238,8 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     repeatingSave: false,
     hexSaveDisadvantage: false,
     hexSaveDisadvantageAbility: null,
+    strCheckDisadvantage: false,
+    rayOfEnfeebleDamageReduction: false,
    }
 
   const conditionSet = new Set(conditions)
@@ -468,6 +477,11 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
       effects.hexSaveDisadvantage = true;
       effects.hexSaveDisadvantageAbility = te.ability || null;
       effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
+    }
+    // Handle Ray of Enfeeblement debuff — STR check disadvantage + damage reduction
+    if (te.effect === 'ray_of_enfeeble_debuff') {
+      if (te.strCheckDisadvantage) effects.strCheckDisadvantage = true;
+      if (te.rayOfEnfeebleDamageReduction) effects.rayOfEnfeebleDamageReduction = true;
     }
   }
 

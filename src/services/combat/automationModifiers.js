@@ -262,6 +262,14 @@ export function collectSaveModifiers(features) {
                     })
                 }
             }
+            if (auto.type === 'protection_from_poison') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'saving_throw',
+                    condition: 'protection_from_poison_active',
+                    effect: 'advantage',
+                })
+            }
             if (auto.type === 'holy_aura') {
                 modifiers.push({
                     source: feature.name,

@@ -1265,9 +1265,21 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
          }
 
        let applyResult = null;
-       if (target) {
-         applyResult = applyDamageToTarget(combatSummary, target.name, total, [damageType], campaignName, null);
-        }
+        if (target) {
+          // Ray of Enfeeblement: attacker with debuff subtracts 1d8 from damage
+          let rayReduction = 0;
+          const rayTargetEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+          const rayDebuffActive = rayTargetEffects.some(te => te.effect === 'ray_of_enfeeble_debuff' && te.source === (attackerName || characterName));
+          if (rayDebuffActive) {
+            const rayRoll = rollExpression('1d8');
+            rayReduction = rayRoll?.total || 0;
+          }
+          const reducedTotal = Math.max(0, total - rayReduction);
+          applyResult = applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, null);
+          if (rayReduction > 0) {
+            applyResult = { ...applyResult, rayOfEnfeebleReduction: rayReduction };
+          }
+         }
 
         if (applyResult && applyResult.finalDamage > 0) {
           endInvisibilityOnHostileAction(characterName, campaignName);

@@ -29,6 +29,7 @@ import { triggerForesight } from './foresightService.js';
 import { triggerResilientSphere } from './resilientSphereService.js';
 import { triggerOttoDance } from './ottoDanceService.js';
 import { triggerFriends, endFriendsOnHostileAction } from './friendsService.js';
+import { triggerRayOfEnfeeblement } from './rayOfEnfeeblementService.js';
 import { endInvisibilityOnHostileAction } from './invisibilityService.js';
 import { triggerGlobeOfInvulnerability } from './globeOfInvulnerabilityService.js';
 import { triggerHeroism } from './heroismService.js';
@@ -37,6 +38,7 @@ import { triggerPowerWordFortify } from './powerWordFortifyService.js';
 import { triggerPowerWordStun } from './powerWordStunService.js';
 import { executeHandler as executeLongstrider } from '../automation/index.js';
 import { executeHandler as executeProtectionFromEnergy } from '../automation/index.js';
+import { executeHandler as executeProtectionFromPoison } from '../automation/index.js';
 
 function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     if (spell.name !== 'Hex') return;
@@ -234,6 +236,13 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             return;
         }
 
+        // Ray of Enfeeblement (2024) — CON save: success = target has Disadvantage on next attack; failure = STR check disadvantage + 1d8 damage reduction
+        if (spell.name && spell.name.toLowerCase() === 'ray of enfeeblement') {
+            const rayTarget = await getTargetInfo();
+            await triggerRayOfEnfeeblement(spell, { ...metaCtx, spellSaveDc, targetName: rayTarget?.name }, playerStats, campaignName, mapName);
+            return;
+        }
+
         // Globe of Invulnerability — toggle passive barrier that blocks spells of level 5 or lower
         if (spell.name && spell.name.toLowerCase() === 'globe of invulnerability') {
             await triggerGlobeOfInvulnerability(spell, metaCtx, playerStats, campaignName, mapName);
@@ -291,18 +300,31 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
              console.error('[spellCast] Healing Word trigger failed:', e);
          });
 
-         // Protection from Energy — apply resistance buff to target
-         if (spell.name && spell.name.toLowerCase() === 'protection from energy') {
-             const target = await getTargetInfo();
-             if (target) {
-                 const action = {
-                     name: 'Protection from Energy',
-                     spell: spell,
-                     automation: spell.automation || {},
-                 };
-                 await executeProtectionFromEnergy(action, playerStats, campaignName, mapName);
-             }
-         }
+          // Protection from Energy — apply resistance buff to target
+          if (spell.name && spell.name.toLowerCase() === 'protection from energy') {
+              const target = await getTargetInfo();
+              if (target) {
+                  const action = {
+                      name: 'Protection from Energy',
+                      spell: spell,
+                      automation: spell.automation || {},
+                  };
+                  await executeProtectionFromEnergy(action, playerStats, campaignName, mapName);
+              }
+          }
+
+          // Protection from Poison — remove Poisoned condition and apply buff
+          if (spell.name && spell.name.toLowerCase() === 'protection from poison') {
+              const target = await getTargetInfo();
+              if (target) {
+                  const action = {
+                      name: 'Protection from Poison',
+                      spell: spell,
+                      automation: spell.automation || {},
+                  };
+                  await executeProtectionFromPoison(action, playerStats, campaignName, mapName);
+              }
+          }
 
          return;
    }

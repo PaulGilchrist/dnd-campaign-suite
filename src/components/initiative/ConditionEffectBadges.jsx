@@ -15,6 +15,8 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
     if (effects.autoFailSaves.length > 0) badges.push({ label: `Auto-Fail ${effects.autoFailSaves.join('/').toUpperCase()}`, cls: 'effect-auto-fail', icon: 'fa-shield' })
     if (effects.resistantToAll) badges.push({ label: 'Resist All', cls: 'effect-resist', icon: 'fa-shield-halved' })
     if (effects.attackDisadvantageCount > 0 || effects.abilityCheckDisadvantage) badges.push({ label: 'Disadv', cls: 'effect-disadvantage', icon: 'fa-arrow-down' })
+    if (effects.strCheckDisadvantage) badges.push({ label: 'STR Disadv', cls: 'effect-disadvantage', icon: 'fa-arrow-down' })
+    if (effects.rayOfEnfeebleDamageReduction) badges.push({ label: '-1d8 dmg', cls: 'effect-damage-reduction', icon: 'fa-burst' })
     if (effects.targetAdvantageCount > 0) badges.push({ label: 'Adv vs', cls: 'effect-target-adv', icon: 'fa-arrow-up' })
     if (effects.targetDisadvantageCount > 0) badges.push({ label: 'Disadv vs', cls: 'effect-target-disadv', icon: 'fa-arrow-down' })
     if (effects.riderSaveDisadvantage) badges.push({ label: 'Save Disadv', cls: 'effect-disadvantage', icon: 'fa-shield' })

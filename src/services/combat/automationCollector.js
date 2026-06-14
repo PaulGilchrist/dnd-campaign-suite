@@ -581,6 +581,13 @@ export function collectAutomationFromFeatures(features, playerStats) {
                     result.actions.push(info)
                 }
                 break
+            case 'protection_from_poison':
+                if (info.casting_time === '1 bonus_action' || info.casting_time === 'bonus_action' || info.casting_time === '1 bonus action') {
+                    result.bonusActions.push(info)
+                } else {
+                    result.actions.push(info)
+                }
+                break
             case 'magical_ambush':
                 result.passives.push(info)
                 break

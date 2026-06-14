@@ -68,19 +68,26 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
            return bonus;
        };
 
-        const makeCheckContext = (checkName) => {
-           let forcedMode = undefined
-           if (conditionEffects?.abilityCheckDisadvantage) forcedMode = 'disadvantage'
-           if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === checkName)) {
-             forcedMode = forcedMode === 'disadvantage' ? undefined : 'advantage'
-           }
-           // Check per-ability check advantage (e.g., Remarkable Athlete for STR)
-           if (!forcedMode && conditionEffects?.abilityCheckAdvantageAbilities) {
-             const abbr = checkName.substring(0, 3).toUpperCase();
-             if (conditionEffects.abilityCheckAdvantageAbilities.includes(abbr)) {
-               forcedMode = 'advantage'
-             }
-           }
+         const makeCheckContext = (checkName) => {
+            let forcedMode = undefined
+            if (conditionEffects?.abilityCheckDisadvantage) forcedMode = 'disadvantage'
+            if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === checkName)) {
+              forcedMode = forcedMode === 'disadvantage' ? undefined : 'advantage'
+            }
+            // Check per-ability check advantage (e.g., Remarkable Athlete for STR)
+            if (!forcedMode && conditionEffects?.abilityCheckAdvantageAbilities) {
+              const abbr = checkName.substring(0, 3).toUpperCase();
+              if (conditionEffects.abilityCheckAdvantageAbilities.includes(abbr)) {
+                forcedMode = 'advantage'
+              }
+            }
+            // Ray of Enfeeblement: STR-based d20 tests have disadvantage
+            if (!forcedMode && conditionEffects?.strCheckDisadvantage) {
+              const abbr = checkName.substring(0, 3).toUpperCase();
+              if (abbr === 'STR' || checkName === 'Strength') {
+                forcedMode = 'disadvantage'
+              }
+            }
            const ctx = forcedMode ? { forcedMode } : undefined
            if (conditionEffects?.strCheckReplace) {
              const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');

@@ -68,6 +68,7 @@ import { handle as handleInspiringSmite } from './handlers/inspiringSmiteHandler
 import { handle as handlePeerlessAthlete } from './handlers/peerlessAthleteHandler.js';
 import { handle as handleGloriousDefense } from './handlers/gloriousDefenseHandler.js';
 import { handle as handleProtectionFromEnergy, applyProtectionFromEnergy as applyProtectionFromEnergyHandler } from './handlers/protectionFromEnergyHandler.js';
+import { handle as handleProtectionFromPoison, applyProtectionFromPoison as applyProtectionFromPoisonHandler, isProtectionFromPoisonActive } from './handlers/protectionFromPoisonHandler.js';
 import { handle as handleLivingLegend } from './handlers/livingLegendHandler.js';
 import { handle as handleUndyingSentinel } from './handlers/undyingSentinelHandler.js';
 import { handle as handleElderChampion } from './handlers/elderChampionHandler.js';
@@ -167,6 +168,7 @@ import { handle as handlePowerWordStun } from './handlers/powerWordStunHandler.j
 import { handle as handleOttoDance } from './handlers/ottosDanceHandler.js';
 import { handle as handlePassWithoutTrace } from './handlers/passWithoutTraceHandler.js';
 import { handle as handleProtectionFromEvilAndGood, isProtectionFromEvilAndGoodActive, isCreatureWarded } from './handlers/protectionFromEvilAndGoodHandler.js';
+import { handle as handleRayOfEnfeeblement, isRayOfEnfeeblementActive } from './handlers/rayOfEnfeeblementHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -378,8 +380,10 @@ const HANDLER_MAP = {
         pass_without_trace: handlePassWithoutTrace,
         protection_from_energy: handleProtectionFromEnergy,
         protection_from_evil_and_good: handleProtectionFromEvilAndGood,
+        protection_from_poison: handleProtectionFromPoison,
+        ray_of_enfeeblement: handleRayOfEnfeeblement,
 };
-export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler, isProtectionFromEvilAndGoodActive, isCreatureWarded };
+export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler, applyProtectionFromPoisonHandler, isProtectionFromEvilAndGoodActive, isCreatureWarded, isProtectionFromPoisonActive, isRayOfEnfeeblementActive };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
 

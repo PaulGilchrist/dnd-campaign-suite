@@ -279,6 +279,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       if (condEffects.autoFailSaves.length > 0) condEffectBadges.push({ label: `Auto-Fail ${condEffects.autoFailSaves.join('/').toUpperCase()}`, cls: 'effect-auto-fail', icon: 'fa-shield' });
       if (condEffects.resistantToAll) condEffectBadges.push({ label: 'Resist All', cls: 'effect-resist', icon: 'fa-shield-halved' });
       if (condEffects.attackDisadvantageCount > 0 || condEffects.abilityCheckDisadvantage) condEffectBadges.push({ label: 'Disadv', cls: 'effect-disadvantage', icon: 'fa-arrow-down' });
+      if (condEffects.strCheckDisadvantage) condEffectBadges.push({ label: 'STR Disadv', cls: 'effect-disadvantage', icon: 'fa-arrow-down' });
+      if (condEffects.rayOfEnfeebleDamageReduction) condEffectBadges.push({ label: '-1d8 dmg', cls: 'effect-damage-reduction', icon: 'fa-burst' });
       if (condEffects.targetAdvantageCount > 0) condEffectBadges.push({ label: 'Adv vs', cls: 'effect-target-adv', icon: 'fa-arrow-up' });
       if (condEffects.riderSaveDisadvantage) condEffectBadges.push({ label: 'Save Disadv', cls: 'effect-disadvantage', icon: 'fa-shield' });
       if (condEffects.riderAttackBonus > 0) condEffectBadges.push({ label: `+${condEffects.riderAttackBonus} to hit`, cls: 'effect-target-adv', icon: 'fa-bullseye' });

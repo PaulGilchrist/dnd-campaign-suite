@@ -635,5 +635,17 @@ export const miscHandlers = {
             casting_time: auto.casting_time || 'bonus_action',
             hasAutomation: true
         }
+    },
+
+    'protection_from_poison': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'protection_from_poison',
+            name: feature.name,
+            range: auto.range || 'Touch',
+            duration: auto.duration || '1 hour',
+            casting_time: auto.casting_time || '1 action',
+            hasAutomation: true
+        }
     }
 }
