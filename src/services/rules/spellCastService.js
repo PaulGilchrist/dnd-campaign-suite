@@ -15,6 +15,7 @@ import { executeHandler } from '../automation/index.js';
 import { rollExpressionMaximized } from '../dice/diceRoller.js';
 import { triggerFalseLife } from './falseLifeService.js';
 import { triggerHealingWord } from './healingWordService.js';
+import { triggerMassCureWounds } from './massCureWoundsService.js';
 import { triggerFear } from './fearService.js';
 import { triggerFeignDeath } from './feignDeathService.js';
 import { triggerFleshToStone } from './fleshToStoneService.js';
@@ -118,6 +119,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             triggerFalseLife(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
                 console.error('[spellCast] False Life trigger failed:', e);
             });
+            return;
+        }
+
+        // Mass Cure Wounds — multi-target healing in 30-ft radius sphere
+        if (spell.name && spell.name.toLowerCase() === 'mass cure wounds') {
+            await triggerMassCureWounds(spell, metaCtx, playerStats, campaignName, mapName);
             return;
         }
 
