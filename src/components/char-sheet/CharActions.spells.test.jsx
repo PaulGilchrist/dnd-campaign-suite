@@ -112,7 +112,7 @@ vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../services/rules/attackCalc.js', () => ({
+vi.mock('../../services/rules/core/attackCalc.js', () => ({
   parseMagicItemName: vi.fn((name) => ({ baseName: name })),
 }));
 

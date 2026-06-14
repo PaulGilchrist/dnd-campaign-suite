@@ -1,17 +1,17 @@
-import classRules from '../character/classRules2024.js';
+import classRules from '../../character/classRules2024.js';
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import {
     getElfisLineageSelection,
     getElfisLineageCantrip,
     getElfisLineageLevel3Spell,
     getElfisLineageLevel5Spell,
-} from '../automation/handlers/elfishLineageHandler.js';
+} from '../../automation/handlers/elfishLineageHandler.js';
 import {
     getGnomishLineageSelection,
     getGnomishLineageCantrip,
     getGnomishLineageLevel3Spell,
     getGnomishLineageLevel5Spell,
-} from '../automation/handlers/gnomishLineageHandler.js';
+} from '../../automation/handlers/gnomishLineageHandler.js';
 
 export function getSpellAbilities(allSpells, playerStats, playerSummary) {
     let spellAbilities = null;

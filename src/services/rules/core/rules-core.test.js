@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../ui/dataLoader.js', () => ({
+vi.mock('../../ui/dataLoader.js', () => ({
   loadSkills: vi.fn(),
   loadPassiveSkills: vi.fn(),
   loadFeatData: vi.fn().mockResolvedValue([])
 }));
 
-vi.mock('../ui/utils.js', () => ({
+vi.mock('../../ui/utils.js', () => ({
   default: {
     getAbilityLongName: (abbr) => {
       const map = {
@@ -22,7 +22,7 @@ vi.mock('../ui/utils.js', () => ({
   }
 }));
 
-vi.mock('../character/classRules.js', () => ({
+vi.mock('../../character/classRules.js', () => ({
   default: {
     getClass: vi.fn(),
     getFeatures: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock('../character/classRules.js', () => ({
   }
 }));
 
-vi.mock('../character/race-rules/index.js', () => ({
+vi.mock('../../character/race-rules/index.js', () => ({
   rules5e: {
     getRace: vi.fn(),
     getRacialBonus: vi.fn(),
@@ -60,12 +60,12 @@ vi.mock('./spellCalc2024.js', () => ({
   getSpellAbilities: vi.fn()
 }));
 
-vi.mock('../character/proficiencyUtils2024.js', () => ({
+vi.mock('../../character/proficiencyUtils2024.js', () => ({
   getProficiencyChoiceCount: vi.fn(),
   getProficiencies: vi.fn()
 }));
 
-vi.mock('../character/classRules2024.js', () => ({
+vi.mock('../../character/classRules2024.js', () => ({
   default: {
     getClass: vi.fn(),
     getFeatures: vi.fn(),
@@ -73,15 +73,15 @@ vi.mock('../character/classRules2024.js', () => ({
   }
 }));
 
-import rules from './rules.js';
-import classRules from '../character/classRules.js';
-import { rules5e as raceRules, rules2024 as raceRules2024 } from '../character/race-rules/index.js';
-import * as dataLoader from '../ui/dataLoader.js';
+import rules from '../rules.js';
+import classRules from '../../character/classRules.js';
+import { rules5e as raceRules, rules2024 as raceRules2024 } from '../../character/race-rules/index.js';
+import * as dataLoader from '../../ui/dataLoader.js';
 import * as abilityCalc2024 from './abilityCalc2024.js';
 import * as attackCalc2024 from './attackCalc2024.js';
 import * as spellCalc2024 from './spellCalc2024.js';
-import * as proficiencyUtils2024 from '../character/proficiencyUtils2024.js';
-import classRules2024 from '../character/classRules2024.js';
+import * as proficiencyUtils2024 from '../../character/proficiencyUtils2024.js';
+import classRules2024 from '../../character/classRules2024.js';
 
 describe('rules', () => {
   describe('getSpellMaxLevel', () => {

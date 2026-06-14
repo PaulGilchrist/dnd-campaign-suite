@@ -1,6 +1,6 @@
 import { buildAttackInfo } from './automationInfoBuilder.js'
 import { evaluateAutoExpression } from './automationExpressions.js'
-import { parseMagicItemName } from '../rules/attackCalc.js'
+import { parseMagicItemName } from '../rules/core/attackCalc.js'
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js'
 
 export function getPassiveBuffs(features, playerStats) {

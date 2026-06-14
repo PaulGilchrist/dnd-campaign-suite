@@ -4,7 +4,7 @@ import { getSpellAbilities } from './spellCalc2024.js';
 // Reference to mocked classRules (filled in beforeEach)
 let mockGetHighestMajorLevel;
 
-vi.mock('../character/classRules2024.js', () => ({
+vi.mock('../../character/classRules2024.js', () => ({
   default: {
     getHighestMajorLevel: vi.fn(() => 0),
   },
@@ -12,7 +12,7 @@ vi.mock('../character/classRules2024.js', () => ({
 
 describe('spellCalc2024', () => {
   beforeEach(async () => {
-    const classRules = await import('../character/classRules2024.js');
+    const classRules = await import('../../character/classRules2024.js');
     mockGetHighestMajorLevel = classRules.default.getHighestMajorLevel;
     vi.clearAllMocks();
   });

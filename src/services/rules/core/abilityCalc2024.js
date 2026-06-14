@@ -1,4 +1,4 @@
-import { loadSkills } from '../ui/dataLoader.js';
+import { loadSkills } from '../../ui/dataLoader.js';
 
 export async function getAbilities(playerStats) {
     const skills = await loadSkills();

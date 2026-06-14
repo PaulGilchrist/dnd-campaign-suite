@@ -27,7 +27,7 @@ vi.mock('./automationExpressions.js', () => ({
     }),
 }))
 
-vi.mock('../rules/attackCalc.js', () => ({
+vi.mock('../rules/core/attackCalc.js', () => ({
     parseMagicItemName: vi.fn((itemName) => {
         if (itemName && typeof itemName === 'string' && itemName.charAt(0) === '+') {
             const magicBonus = Number(itemName.charAt(1))
@@ -44,7 +44,7 @@ vi.mock('../rules/attackCalc.js', () => ({
 
 import { buildAttackInfo } from './automationInfoBuilder.js'
 import { evaluateAutoExpression } from './automationExpressions.js'
-import { parseMagicItemName } from '../rules/attackCalc.js'
+import { parseMagicItemName } from '../rules/core/attackCalc.js'
 
 import {
     getPassiveBuffs,

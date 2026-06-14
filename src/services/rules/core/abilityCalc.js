@@ -1,5 +1,5 @@
-import { rules5e as raceRules } from '../character/race-rules/index.js';
-import { loadSkills } from '../ui/dataLoader.js';
+import { rules5e as raceRules } from '../../character/race-rules/index.js';
+import { loadSkills } from '../../ui/dataLoader.js';
 
 export async function getAbilities(playerStats) {
     const skills = await loadSkills();

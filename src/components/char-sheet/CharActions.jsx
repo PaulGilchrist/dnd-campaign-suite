@@ -7,7 +7,7 @@ import GreaterRestorationPopup from './GreaterRestorationPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import EmpoweredSpellPopup from './EmpoweredSpellPopup.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
-import { parseMagicItemName } from '../../services/rules/attackCalc.js';
+import { parseMagicItemName } from '../../services/rules/core/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'

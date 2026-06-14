@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../ui/dataLoader.js', () => ({
+vi.mock('../../ui/dataLoader.js', () => ({
   loadSkills: vi.fn(),
   loadPassiveSkills: vi.fn(),
   loadFeatData: vi.fn().mockResolvedValue([])
 }));
 
-vi.mock('../character/proficiencyUtils2024.js', () => ({
+vi.mock('../../character/proficiencyUtils2024.js', () => ({
   getProficiencyChoiceCount: vi.fn(),
   getProficiencies: vi.fn()
 }));
 
-import rules from './rules.js';
-import * as proficiencyUtils2024 from '../character/proficiencyUtils2024.js';
+import rules from '../rules.js';
+import * as proficiencyUtils2024 from '../../character/proficiencyUtils2024.js';
 
 describe('rules', () => {
   describe('getProficiencyChoiceCount', () => {

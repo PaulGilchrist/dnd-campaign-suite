@@ -1,5 +1,5 @@
 import { loadEquipment } from '../ui/dataLoader.js';
-import { parseMagicItemName } from './attackCalc.js';
+import { parseMagicItemName } from './core/attackCalc.js';
 
 const DAMAGE_TYPES = [
   'Acid', 'Bludgeoning', 'Cold', 'Fire', 'Force', 'Lightning',

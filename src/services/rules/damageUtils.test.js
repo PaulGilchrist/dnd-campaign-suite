@@ -8,7 +8,7 @@ vi.mock('../ui/dataLoader.js', () => ({
   clearDataCache: vi.fn(),
 }));
 
-vi.mock('./attackCalc.js', () => ({
+vi.mock('./core/attackCalc.js', () => ({
   parseMagicItemName: vi.fn(),
 }));
 
@@ -27,7 +27,7 @@ import {
 } from './damageUtils.js';
 
 import { loadEquipment, clearDataCache } from '../ui/dataLoader.js';
-import { parseMagicItemName } from './attackCalc.js';
+import { parseMagicItemName } from './core/attackCalc.js';
 
 // ── Globals ────────────────────────────────────────────────────
 

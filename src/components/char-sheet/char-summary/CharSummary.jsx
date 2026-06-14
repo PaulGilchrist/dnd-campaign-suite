@@ -4,7 +4,7 @@ import './CharSummary.css'
 import DiceRollResult from '../DiceRollResult.jsx'
 
 import rulesFactory from '../../../services/rules/rulesFactory.js'
-import { parseMagicItemName } from '../../../services/rules/attackCalc.js'
+import { parseMagicItemName } from '../../../services/rules/core/attackCalc.js'
 import CharGold from './CharGold.jsx'
 import CharHitPoints from './CharHitPoints.jsx'
 import CharClassFeatures from './CharClassFeatures.jsx'

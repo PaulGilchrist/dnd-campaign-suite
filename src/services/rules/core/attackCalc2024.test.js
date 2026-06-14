@@ -68,7 +68,7 @@ vi.mock('./attackCalc.js', () => {
   };
 });
 
-vi.mock('../character/classRules2024.js', () => ({
+vi.mock('../../character/classRules2024.js', () => ({
   default: {
     getMartialArtsDie: vi.fn(() => 8),
   },

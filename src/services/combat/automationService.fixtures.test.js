@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { makePlayerStats, makeFeature } from './automationService.fixtures.js'
 
 // ── Mocked module: attackCalc.js ──────────────────────────────────
-import { parseMagicItemName } from '../rules/attackCalc.js'
+import { parseMagicItemName } from '../rules/core/attackCalc.js'
 
 // ── Mocked module: abilityLookup.js ───────────────────────────────
 import { getAbilityModifier } from '../shared/abilityLookup.js'

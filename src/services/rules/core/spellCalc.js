@@ -1,5 +1,5 @@
-import classRules from '../character/classRules.js';
-import { getSpellMaxLevel } from '../shared/spell-utils.js';
+import classRules from '../../character/classRules.js';
+import { getSpellMaxLevel } from '../../shared/spell-utils.js';
 
 export function getSpellAbilities(allSpells, playerStats) {
     // Dependencies: Abilities, Class

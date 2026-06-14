@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../ui/dataLoader.js', () => ({
+vi.mock('../../ui/dataLoader.js', () => ({
   loadSkills: vi.fn(),
   loadPassiveSkills: vi.fn(),
   loadFeatData: vi.fn().mockResolvedValue([])
 }));
 
-vi.mock('../character/classRules.js', () => ({
+vi.mock('../../character/classRules.js', () => ({
   default: {
     getClass: vi.fn(),
     getFeatures: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock('../character/classRules.js', () => ({
   }
 }));
 
-vi.mock('../character/race-rules/index.js', () => ({
+vi.mock('../../character/race-rules/index.js', () => ({
   rules5e: {
     getRace: vi.fn(),
     getRacialBonus: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock('../character/race-rules/index.js', () => ({
   }
 }));
 
-vi.mock('../character/classRules2024.js', () => ({
+vi.mock('../../character/classRules2024.js', () => ({
   default: {
     getClass: vi.fn(),
     getFeatures: vi.fn(),
@@ -38,10 +38,10 @@ vi.mock('../character/classRules2024.js', () => ({
   }
 }));
 
-import rules from './rules.js';
-import classRules from '../character/classRules.js';
-import classRules2024 from '../character/classRules2024.js';
-import { rules5e as raceRules, rules2024 as raceRules2024 } from '../character/race-rules/index.js';
+import rules from '../rules.js';
+import classRules from '../../character/classRules.js';
+import classRules2024 from '../../character/classRules2024.js';
+import { rules5e as raceRules, rules2024 as raceRules2024 } from '../../character/race-rules/index.js';
 
 describe('rules', () => {
   describe('getActions', () => {

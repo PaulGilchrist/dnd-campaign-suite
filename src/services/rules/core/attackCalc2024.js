@@ -1,5 +1,5 @@
 import { parseMagicItemName, findEquippedWeapons, buildWeaponAttack, buildMonkAttacks, buildSpellAttacks } from './attackCalc.js';
-import classRules from '../character/classRules2024.js';
+import classRules from '../../character/classRules2024.js';
 
 /**
  * Build all attack entries for a character (2024 rules).

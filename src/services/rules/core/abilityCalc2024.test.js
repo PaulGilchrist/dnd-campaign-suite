@@ -23,7 +23,7 @@ const mockSkills = [
   { name: 'Persuasion', ability: 'Charisma' },
 ];
 
-vi.mock('../ui/dataLoader.js', () => ({
+vi.mock('../../ui/dataLoader.js', () => ({
   loadSkills: vi.fn(() => Promise.resolve(mockSkills)),
 }));
 
