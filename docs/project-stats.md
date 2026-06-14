@@ -1,50 +1,48 @@
-# Project Statistics Report
-
-**Generated:** 2026-06-06
+# Project Statistics
 
 ## Summary
 
 | Metric | Count |
-|---|---|
-| Total files (incl. config) | 629 |
-| Total lines (incl. config) | 276,776 |
-| Source code files (.js/.jsx) | 538 |
-| Source code lines | 107,386 |
-| Config files (.json) | 91 |
-| Config lines | 169,390 |
+|--------|------:|
+| Total Source Files | 919 |
+| Total Lines | 392,744 |
 
 ## Language Breakdown
 
-| Language | Files | Lines | % of Source |
-|---|---|---|---|
-| JavaScript | 309 | 59,432 | 55.4% |
-| JSX (React) | 229 | 47,954 | 44.6% |
-| **Source Total** | **538** | **107,386** | **100.0%** |
-| JSON (config) | 91 | 169,390 | — |
-| **All Files** | **629** | **276,776** | — |
+| Extension | Files | Lines | Category |
+|-----------|------:|------:|----------|
+| `.js` | 522 | 133,265 | Source |
+| `.jsx` | 310 | 81,891 | Source |
+| `.json` | 87 | 177,588 | Config/Data |
+| **Total** | **919** | **392,744** | |
 
-## Source Code by Directory
-
-| Directory | Files | Lines |
-|---|---|---|
-| `src/components/` | 246 | 48,060 |
-| `src/services/` | 185 | 42,969 |
-| `src/hooks/` | 68 | 10,444 |
-| `server/routes/` | 15 | 1,664 |
-| `src/config/` | 10 | 1,624 |
-| Other (root + misc) | 14 | 2,635 |
-
-## Top 10 Largest Files
+## Largest Files
 
 | # | Lines | File |
-|---|---|---|
-| 1 | 2,757 | `src/services/rules/rules.test.js` |
-| 2 | 1,810 | `src/services/maps/dungeonGenerator.js` |
-| 3 | 1,275 | `src/components/encounter/MonsterCardModal.test.jsx` |
-| 4 | 1,191 | `src/App.test.jsx` |
-| 5 | 1,176 | `src/components/npcs/NPCs.test.jsx` |
-| 6 | 1,141 | `src/services/character/resistancesValidation.test.js` |
-| 7 | 1,112 | `src/components/log/Log.test.jsx` |
-| 8 | 1,029 | `src/services/combat/auraOfProtection.test.js` |
-| 9 | 1,005 | `src/services/rules/expirations.test.js` |
-| 10 | 999 | `src/components/char-sheet/char-spells/CharSpells.test.jsx` |
+|--:|------:|------|
+| 1 | 63,517 | `public/data/monsters.json` |
+| 2 | 15,036 | `public/data/2024/spells.json` |
+| 3 | 13,091 | `public/data/classes.json` |
+| 4 | 10,868 | `public/data/2024/classes.json` |
+| 5 | 10,193 | `public/data/spells.json` |
+| 6 | 8,827 | `public/data/magic-items.json` |
+| 7 | 7,950 | `public/campaigns/General Testing/maps/monstrosity.json` |
+| 8 | 6,758 | `package-lock.json` |
+| 9 | 4,638 | `public/data/equipment.json` |
+| 10 | 3,381 | `public/data/settlement-names.json` |
+
+## Largest Source Files (`.js`/`.jsx` only)
+
+| # | Lines | File |
+|--:|------:|------|
+| 1 | 1,810 | `src/services/maps/dungeonGenerator.js` |
+| 2 | 1,346 | `src/components/char-sheet/CharActions.jsx` |
+| 3 | 1,341 | `src/services/rules/expirations.test.js` |
+| 4 | 1,291 | `src/services/automation/contextBuilder.test.js` |
+| 5 | 1,267 | `src/components/char-sheet/CharBonusActions.test.jsx` |
+| 6 | 1,229 | `src/services/automation/handlers/multiTargetHandler.test.js` |
+| 7 | 1,208 | `src/services/automation/handlers/saveAttackHandler.test.js` |
+| 8 | 1,195 | `src/services/automation/handlers/countercharmHandler.test.js` |
+| 9 | 1,176 | `src/components/npcs/NPCs.test.jsx` |
+| 10 | 1,176 | `src/components/encounter/MonsterCardModal.test.jsx` |
+
