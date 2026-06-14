@@ -245,6 +245,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'flesh_to_stone':
             case 'hold_monster':
             case 'hypnotic_pattern':
+            case 'power_word_stun':
             case 'resilient_sphere':
             case 'mass_suggestion':
             case 'ottos_dance':

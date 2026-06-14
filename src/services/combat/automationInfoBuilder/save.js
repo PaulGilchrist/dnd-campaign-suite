@@ -124,5 +124,16 @@ export const saveHandlers = {
             duration: 'Concentration, up to 1 minute',
             hasAutomation: true,
         }
+    },
+
+    'power_word_stun': (feature, playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'power_word_stun',
+            name: feature.name,
+            saveType: auto.saveType || 'CON',
+            saveDc: (auto.saveDc === 'ability') ? getSaveDc(playerStats, auto.saveAbility || 'CON', playerStats.proficiency) : auto.saveDc || 10,
+            hasAutomation: true,
+        }
     }
 }

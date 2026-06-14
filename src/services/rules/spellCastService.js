@@ -33,6 +33,7 @@ import { triggerGlobeOfInvulnerability } from './globeOfInvulnerabilityService.j
 import { triggerHeroism } from './heroismService.js';
 import { triggerHolyAura } from './holyAuraService.js';
 import { triggerPowerWordFortify } from './powerWordFortifyService.js';
+import { triggerPowerWordStun } from './powerWordStunService.js';
 import { executeHandler as executeLongstrider } from '../automation/index.js';
 
 function applyEldritchHex(spell, playerStats, campaignName, targetName) {
@@ -176,6 +177,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         // Hold Monster / Hold Person — WIS save, Paralyzed condition with end-of-turn repeat save
         if (spell.name && (spell.name.toLowerCase() === 'hold monster' || spell.name.toLowerCase() === 'hold person')) {
             await triggerHoldMonster(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Power Word Stun — no save, HP threshold check: ≤150 HP = Stunned (with repeat CON save), >150 HP = Speed 0
+        if (spell.name && spell.name.toLowerCase() === 'power word stun') {
+            await triggerPowerWordStun(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
             return;
         }
 

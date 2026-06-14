@@ -437,6 +437,15 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
       effects.conditionDuration = te.duration || 'until_end_of_next_turn';
       effects.hurlThroughHell = true;
     }
+    // Handle Power Word Stun — repeating CON save for Stunned condition
+    if (te.effect === 'power_word_stun_repeat_save') {
+      effects.saveType = te.saveType || 'CON';
+      effects.saveDc = te.saveDc;
+      effects.saveAbility = 'CON';
+      effects.conditionToApply = 'stunned';
+      effects.repeatingSave = true;
+      effects.powerWordStun = true;
+    }
     // Handle Clairvoyant Combatant — target has Disadvantage on attacks against you, you have Advantage on attacks against target
     if (te.effect === 'clairvoyant_combatant') {
       if (te.attackerAdvantage) {
