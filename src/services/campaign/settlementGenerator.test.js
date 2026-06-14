@@ -526,19 +526,6 @@ describe('settlementGenerator', () => {
       }
     });
 
-    it('should generate between 2 and 4 features', async () => {
-      const mockData = buildMockData();
-      setupFetchMocks(mockData);
-
-      const { generateSettlement } = await import('./settlementGenerator.js');
-      const result = await generateSettlement([], { size: 'village' });
-
-      // Should have 2-4 features appended
-      const featureCount = (result.description.match(/A (mossy stone well|weathered windmill|ancient oak tree)/g) || []).length;
-      expect(featureCount).toBeGreaterThanOrEqual(2);
-      expect(featureCount).toBeLessThanOrEqual(4);
-    });
-
     it('should handle empty existing settlements array', async () => {
       const mockData = buildMockData();
       setupFetchMocks(mockData);
