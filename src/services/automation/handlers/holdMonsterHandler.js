@@ -7,11 +7,11 @@ import { getCombatContext } from '../../rules/damageUtils.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 
 /**
- * Process a repeated WIS save for a creature already Paralyzed by Hold Monster.
+ * Process a repeated WIS save for a creature already Paralyzed by Hold Person/Monster.
  * Called at end of the affected creature's turn.
  * Returns { type, payload } for the popup, or null if no effect.
  */
-export async function processHoldMonsterRepeatSave(casterName, targetName, saveDc, campaignName) {
+export async function processHoldMonsterRepeatSave(casterName, targetName, saveDc, spellName, campaignName) {
     const trackingKey = getTrackingKey(targetName);
     const tracking = getRuntimeValue(casterName, trackingKey, campaignName);
     if (!tracking) {
@@ -28,8 +28,8 @@ export async function processHoldMonsterRepeatSave(casterName, targetName, saveD
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: casterName,
-        abilityName: 'Hold Monster',
-        description: `${targetName} makes a WIS save (DC ${saveDc}) at end of turn (Hold Monster).`,
+        abilityName: spellName,
+        description: `${targetName} makes a WIS save (DC ${saveDc}) at end of turn (${spellName}).`,
         promptId,
     }).catch(() => {});
 
@@ -53,7 +53,7 @@ export async function processHoldMonsterRepeatSave(casterName, targetName, saveD
             saveDc,
             saveType: 'WIS',
             success: true,
-            description: `${targetName} succeeded on WIS save. Hold Monster ends!`,
+            description: `${targetName} succeeded on WIS save. ${spellName} ends!`,
         }).catch(() => {});
 
         postLogEntry(campaignName, {
@@ -61,7 +61,7 @@ export async function processHoldMonsterRepeatSave(casterName, targetName, saveD
             action: 'removed',
             characterName: targetName,
             condition: 'Paralyzed',
-            reason: 'Hold Monster (successful save)',
+            reason: `${spellName} (successful save)`,
             timestamp: Date.now(),
         });
 
@@ -69,8 +69,8 @@ export async function processHoldMonsterRepeatSave(casterName, targetName, saveD
             type: 'popup',
             payload: {
                 type: 'automation_info',
-                name: 'Hold Monster',
-                description: `${targetName} succeeded on WIS save. Hold Monster ends!`,
+                name: spellName,
+                description: `${targetName} succeeded on WIS save. ${spellName} ends!`,
             },
         };
     }
@@ -84,15 +84,15 @@ export async function processHoldMonsterRepeatSave(casterName, targetName, saveD
         saveDc,
         saveType: 'WIS',
         success: false,
-        description: `${targetName} failed WIS save. Hold Monster continues.`,
+        description: `${targetName} failed WIS save. ${spellName} continues.`,
     }).catch(() => {});
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
-            name: 'Hold Monster',
-            description: `${targetName} failed WIS save. Hold Monster continues.`,
+            name: spellName,
+            description: `${targetName} failed WIS save. ${spellName} continues.`,
         },
     };
 }
@@ -121,7 +121,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: 'No creatures in combat. Hold Monster has no effect.',
+                description: `No creatures in combat. ${action.name} has no effect.`,
             },
         };
     }
@@ -136,17 +136,17 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: 'No target selected. Hold Monster has no effect.',
+                description: `No target selected. ${action.name} has no effect.`,
             },
         };
     }
 
-    // Check if this target already has an active Hold Monster effect (repeat save)
+    // Check if this target already has an active Hold Person/Monster effect (repeat save)
     const trackingKey = getTrackingKey(targetName);
     const existingTracking = getRuntimeValue(casterName, trackingKey, campaignName);
     if (existingTracking) {
         // This is a repeated end-of-turn save
-        return await processHoldMonsterRepeatSave(casterName, targetName, dc, campaignName);
+        return await processHoldMonsterRepeatSave(casterName, targetName, dc, action.name, campaignName);
     }
 
     const { promptId, promise } = createSaveListener(campaignName, {
@@ -160,7 +160,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         type: 'ability_use',
         characterName: casterName,
         abilityName: action.name,
-        description: `${casterName} casts Hold Monster on ${targetName}! ${targetName} must make a WIS save (DC ${dc}) or become Paralyzed.`,
+        description: `${casterName} casts ${action.name} on ${targetName}! ${targetName} must make a WIS save (DC ${dc}) or become Paralyzed.`,
         promptId,
     }).catch(() => {});
 
@@ -175,7 +175,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveDc: dc,
             saveType: 'WIS',
             success: true,
-            description: `${targetName} succeeded on WIS save against Hold Monster.`,
+            description: `${targetName} succeeded on WIS save against ${action.name}.`,
         }).catch(() => {});
 
         return {
@@ -183,7 +183,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `${targetName} succeeded on WIS save against Hold Monster.`,
+                description: `${targetName} succeeded on WIS save against ${action.name}.`,
             },
         };
     }
@@ -231,7 +231,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         saveDc: dc,
         saveType: 'WIS',
         success: false,
-        description: `${targetName} failed WIS save against Hold Monster and is Paralyzed. At the end of each of its turns, it repeats the save.`,
+        description: `${targetName} failed WIS save against ${action.name} and is Paralyzed. At the end of each of its turns, it repeats the save.`,
     }).catch(() => {});
 
     postLogEntry(campaignName, {
@@ -239,8 +239,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         action: 'applied',
         characterName: targetName,
         condition: 'Paralyzed',
-        reason: 'Hold Monster',
-        note: `${targetName} is Paralyzed by Hold Monster. Must make WIS save at end of each turn. Success ends the spell.`,
+        reason: action.name,
+        note: `${targetName} is Paralyzed by ${action.name}. Must make WIS save at end of each turn. Success ends the spell.`,
         timestamp: Date.now(),
     });
 
