@@ -32,6 +32,7 @@ import { endInvisibilityOnHostileAction } from './invisibilityService.js';
 import { triggerGlobeOfInvulnerability } from './globeOfInvulnerabilityService.js';
 import { triggerHeroism } from './heroismService.js';
 import { triggerHolyAura } from './holyAuraService.js';
+import { triggerPowerWordFortify } from './powerWordFortifyService.js';
 import { executeHandler as executeLongstrider } from '../automation/index.js';
 
 function applyEldritchHex(spell, playerStats, campaignName, targetName) {
@@ -114,6 +115,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                 await applyPowerWordHealToTarget(target.name, playerStats, campaignName);
                 await applyPowerWordHealToTarget(metaCtx.multiTarget, playerStats, campaignName);
             }
+        }
+
+        // Power Word Fortify — multi-target temp HP (up to 6 creatures within range)
+        if (spell.name && spell.name.toLowerCase() === 'power word fortify') {
+            await triggerPowerWordFortify(spell, metaCtx, playerStats, campaignName, mapName);
+            return;
         }
 
         // Fear — multi-target WIS save for all creatures (30-ft cone)
@@ -469,6 +476,7 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName)
     const conditionsToRemove = ['charmed', 'frightened', 'paralyzed', 'poisoned', 'stunned'];
     const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
     const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const hasProne = conditions.some(c => String(c).toLowerCase() === 'prone');
     const newConditions = conditions.filter(c => !conditionsToRemove.includes(String(c).toLowerCase()));
     if (newConditions.length !== conditions.length) {
         setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
@@ -483,6 +491,13 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName)
                     timestamp: Date.now(),
                 });
             }
+        }
+    }
+
+    if (hasProne) {
+        const existingStance = getRuntimeValue(targetName, 'powerWordHealStandPermission', campaignName);
+        if (!existingStance) {
+            setRuntimeValue(targetName, 'powerWordHealStandPermission', true, campaignName);
         }
     }
 

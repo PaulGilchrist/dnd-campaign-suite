@@ -10519,7 +10519,13 @@
     "saving_throw": null,
     "status_effects": [],
     "spell_list_order": 7,
-    "cantrip_scaling": {}
+    "cantrip_scaling": {},
+    "automation": {
+      "type": "power_word_fortify",
+      "range": "60 feet",
+      "maxTargets": 6,
+      "tempHpExpression": "120 + ((spellSlotLevel - 7) * 5)"
+    }
   },
   {
     "index": "power-word-heal",
@@ -10552,9 +10558,18 @@
       "Frightened",
       "Paralyzed",
       "Poisoned",
-      "Stunned",
-      "Prone"
+      "Stunned"
     ],
+    "automation": {
+      "type": "power_word_heal",
+      "conditions": [
+        "charmed",
+        "frightened",
+        "paralyzed",
+        "poisoned",
+        "stunned"
+      ]
+    },
     "spell_list_order": 9,
     "cantrip_scaling": {}
   },

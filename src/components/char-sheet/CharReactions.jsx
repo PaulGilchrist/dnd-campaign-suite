@@ -9,7 +9,7 @@
        import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js'
         import { hasAutomation, hasTacticalShift } from '../../services/combat/automationService.js'
         import { getCombatContext, getTargetFromAttacker } from '../../services/rules/damageUtils.js'
-        import { useRuntimeValue, getRuntimeValue } from '../../hooks/useRuntimeState.js'
+        import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
        import { executeHandler } from '../../services/automation/index.js'
      import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
      import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
@@ -22,6 +22,8 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     const [selectedSpell, setSelectedSpell] = React.useState(null);
 
     const activeBuffs = useRuntimeValue(playerStats?.name, 'activeBuffs', campaignName) ?? [];
+
+    const pwhStance = useRuntimeValue(playerStats?.name, 'powerWordHealStandPermission', campaignName);
 
      // Build reactions list immutably
     let reactions = [...(playerStats.reactions || [])];
@@ -40,6 +42,14 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         }
     }
 
+    // Add Stand reaction from Power Word Heal
+    if (pwhStance && !reactions.find(r => r.name === 'Stand (Power Word Heal)')) {
+        reactions.push({
+            name: 'Stand (Power Word Heal)',
+            description: 'You can use your Reaction to stand up.',
+        });
+    }
+
     let reactionSpells = [];
     if (playerStats.spellAbilities && playerStats.spellAbilities.spells.length > 0) {
         const reactionCastingTimes = ['1 reaction', '1 Reaction', 'reaction', 'Reaction'];
@@ -51,7 +61,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         reactions.push(OPPORTUNITY_ATTACK);
        }
 
-    const handleReactionClick = (reaction) => {
+    const handleReactionClick = async (reaction) => {
         if (cannotAct) return;
         if (hasAutomation(reaction)) {
             handleAutomationReaction(reaction);
@@ -59,6 +69,17 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         }
         if (reaction.name === OPPORTUNITY_ATTACK.name) {
             handleOpportunityAttack();
+            return;
+        }
+        if (reaction.name === 'Stand (Power Word Heal)') {
+            const conditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) || [];
+            const newConditions = conditions.filter(c => String(c).toLowerCase() !== 'prone');
+            if (newConditions.length !== conditions.length) {
+                setRuntimeValue(playerStats.name, 'activeConditions', newConditions, campaignName);
+            }
+            setRuntimeValue(playerStats.name, 'powerWordHealStandPermission', false, campaignName);
+            const html = `<b>Stand (Power Word Heal)</b><br/>You used your Reaction to stand up.`;
+            setPopupHtml(html);
             return;
         }
         const html = buildFeatureDetailHtml(reaction);

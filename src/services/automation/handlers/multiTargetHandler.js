@@ -191,23 +191,34 @@ export async function applyMultiTarget(
             }
         }
 
+        const storedConditions = getRuntimeValue(secondTargetName, 'activeConditions', campaignName) || [];
+        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+        const hasProne = conditions.some(c => String(c).toLowerCase() === 'prone');
+
         if (spell.status_effects) {
             const conditionsToRemove = spell.status_effects.map(e => e.toLowerCase());
-            const storedConditions = getRuntimeValue(secondTargetName, 'activeConditions', campaignName) || [];
-            const conditions = Array.isArray(storedConditions) ? storedConditions : [];
             const newConditions = conditions.filter(c => !conditionsToRemove.includes(String(c).toLowerCase()));
             if (newConditions.length !== conditions.length) {
                 setRuntimeValue(secondTargetName, 'activeConditions', newConditions, campaignName);
                 for (const removed of conditionsToRemove) {
-                    postLogEntry(campaignName, {
-                        type: 'condition',
-                        action: 'removed',
-                        characterName: secondTargetName,
-                        condition: removed.charAt(0).toUpperCase() + removed.slice(1),
-                        reason: `${spellName} (multi-target spread)`,
-                        timestamp: Date.now(),
-                    });
+                    if (!newConditions.some(c => String(c).toLowerCase() === removed)) {
+                        postLogEntry(campaignName, {
+                            type: 'condition',
+                            action: 'removed',
+                            characterName: secondTargetName,
+                            condition: removed.charAt(0).toUpperCase() + removed.slice(1),
+                            reason: `${spellName} (multi-target spread)`,
+                            timestamp: Date.now(),
+                        });
+                    }
                 }
+            }
+        }
+
+        if (hasProne) {
+            const existingStance = getRuntimeValue(secondTargetName, 'powerWordHealStandPermission', campaignName);
+            if (!existingStance) {
+                setRuntimeValue(secondTargetName, 'powerWordHealStandPermission', true, campaignName);
             }
         }
     }
