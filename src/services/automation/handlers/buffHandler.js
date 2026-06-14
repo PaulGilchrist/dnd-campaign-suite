@@ -1,5 +1,5 @@
 import { toggleBuff } from '../common/buffToggle.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 import { handle as handleTeleport } from './tempTeleportHandler.js';
 import { handle as handleVowOfEnmity } from './vowOfEnmityHandler.js';
 import { getTargetFromAttacker } from '../../rules/combat/damageUtils.js';

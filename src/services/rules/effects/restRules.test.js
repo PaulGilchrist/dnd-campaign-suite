@@ -24,7 +24,7 @@ vi.mock('./expirations.js', () => ({
   clearAllExpirationEffects: vi.fn(),
 }))
 
-import { getRuntimeValue, setRuntimeBatch } from '../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeBatch } from '../../../hooks/useRuntimeState.js'
 
 beforeEach(() => {
   vi.clearAllMocks()

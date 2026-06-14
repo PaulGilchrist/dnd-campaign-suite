@@ -19,7 +19,7 @@ vi.mock('../../hooks/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../services/rules/expirations.js', () => ({
+vi.mock('../../services/rules/effects/expirations.js', () => ({
   addExpiration: vi.fn(),
 }));
 
@@ -47,7 +47,7 @@ vi.mock('../../services/ui/storage.js', () => ({
 // ── Re-import mocked modules ──
 import * as savePromptService from '../../services/combat/savePromptService.js';
 import * as useRuntimeState from '../../hooks/useRuntimeState.js';
-import * as expirations from '../../services/rules/expirations.js';
+import * as expirations from '../../services/rules/effects/expirations.js';
 import * as logService from '../../services/ui/logService.js';
 import * as diceRoller from '../../services/dice/diceRoller.js';
 

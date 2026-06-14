@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './reactionBonusHandler.js';
 import * as targetResolver from '../common/targetResolver.js';
 import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
-import * as expirations from '../../rules/expirations.js';
+import * as expirations from '../../rules/effects/expirations.js';
 import * as logService from '../../ui/logService.js';
 import * as rangeValidation from '../../rules/combat/rangeValidation.js';
 
@@ -18,7 +18,7 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../rules/expirations.js', () => ({
+vi.mock('../../rules/effects/expirations.js', () => ({
   addExpiration: vi.fn().mockResolvedValue(undefined),
 }));
 

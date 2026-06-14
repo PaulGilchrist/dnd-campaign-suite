@@ -26,7 +26,7 @@ vi.mock('../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../rules/expirations.js', () => ({
+vi.mock('../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 

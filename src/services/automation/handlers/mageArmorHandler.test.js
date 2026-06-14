@@ -1,6 +1,6 @@
 import { handle, applyMageArmor } from './mageArmorHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../services/rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 
@@ -9,7 +9,7 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../rules/expirations.js', () => ({
+vi.mock('../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 

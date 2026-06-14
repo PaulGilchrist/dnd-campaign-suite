@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { handle, isProtectionFromEvilAndGoodActive, isCreatureWarded } from './protectionFromEvilAndGoodHandler.js'
 import { toggleBuff } from '../common/buffToggle.js'
-import { addExpiration } from '../../rules/expirations.js'
+import { addExpiration } from '../../rules/effects/expirations.js'
 import { getRuntimeValue } from '../../../hooks/useRuntimeState.js'
 
 vi.mock('../common/buffToggle.js', () => ({
     toggleBuff: vi.fn()
 }))
 
-vi.mock('../../rules/expirations.js', () => ({
+vi.mock('../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn()
 }))
 

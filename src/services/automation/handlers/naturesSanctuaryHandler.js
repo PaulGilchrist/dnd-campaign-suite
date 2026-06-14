@@ -1,5 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 import { rangeToFeet } from '../../rules/combat/rangeValidation.js';
 import { addEntry } from '../../ui/logService.js';
 import * as mapsService from '../../maps/mapsService.js';

@@ -27,7 +27,7 @@ vi.mock('../../rules/combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
 }));
 
-vi.mock('../../rules/expirations.js', () => ({
+vi.mock('../../rules/effects/expirations.js', () => ({
   addExpiration: vi.fn(),
 }));
 

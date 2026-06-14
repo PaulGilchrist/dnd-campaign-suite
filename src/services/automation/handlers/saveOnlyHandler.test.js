@@ -20,7 +20,7 @@ vi.mock('../../ui/logService.js', () => ({
   addEntry: vi.fn(),
 }));
 
-vi.mock('../../rules/expirations.js', () => ({
+vi.mock('../../rules/effects/expirations.js', () => ({
   addExpiration: vi.fn(),
 }));
 
@@ -31,7 +31,7 @@ import * as savePrompt from '../common/savePrompt.js';
 import * as targetResolver from '../common/targetResolver.js';
 import * as runtimeState from '../../../hooks/useRuntimeState.js';
 import * as logService from '../../ui/logService.js';
-import * as expirations from '../../rules/expirations.js';
+import * as expirations from '../../rules/effects/expirations.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

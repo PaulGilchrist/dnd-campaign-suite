@@ -1,7 +1,7 @@
-import { getLevelAfterLongRest } from '../combat/exhaustionRules.js'
-import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../hooks/useRuntimeState.js'
+import { getLevelAfterLongRest } from '../../combat/exhaustionRules.js'
+import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
 import { clearAllExpirationEffects } from './expirations.js'
-import { rollD20 } from '../../services/dice/diceRoller.js'
+import { rollD20 } from '../../../services/dice/diceRoller.js'
 
 export function getHitDieSize(playerStats) {
   const hitDieStr = playerStats?.class?.hit_point_die || playerStats?.class?.hit_die;

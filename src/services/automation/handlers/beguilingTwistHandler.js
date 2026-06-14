@@ -6,7 +6,7 @@ import { resolveMapPositions } from '../common/targetResolver.js';
 import { createSaveListener } from '../common/savePrompt.js';
 import { getLastAttackRoll, getLastAbilityCheck } from '../../../hooks/useMetamagic.js';
 import { getAbilityModifier } from '../../shared/abilityLookup.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 
 const EVENT_STALENESS_MS = 60000;
 

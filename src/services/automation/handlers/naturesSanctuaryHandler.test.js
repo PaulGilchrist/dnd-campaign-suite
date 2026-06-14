@@ -6,7 +6,7 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }))
 
-vi.mock('../../rules/expirations.js', () => ({
+vi.mock('../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }))
 
@@ -19,7 +19,7 @@ vi.mock('../../rules/combat/rangeValidation.js', () => ({
 }))
 
 const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/useRuntimeState.js')
-const { addExpiration } = await import('../../rules/expirations.js')
+const { addExpiration } = await import('../../rules/effects/expirations.js')
 
 beforeEach(() => {
     vi.clearAllMocks()

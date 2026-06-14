@@ -11,7 +11,7 @@ import { getAbilityLabel, CONDITIONS } from '../../services/combat/conditionUtil
 import { loadNPCs } from '../../services/npcs/npcsService.js'
 import { npcToMonsterFormat, npcHasStatBlock } from '../../services/encounters/npcStatBlockUtils.js'
 import * as mapsService from '../../services/maps/mapsService.js'
-import { expireStaleEffects, applyTurnStartEffects } from '../../services/rules/expirations.js'
+import { expireStaleEffects, applyTurnStartEffects } from '../../services/rules/effects/expirations.js'
 import { loadCombatSummary, getCombatSummary, getActiveCreatureName } from '../../services/encounters/combatData.js'
 import { clearPerRoundMajestyTrackers } from '../../services/combat/unbreakableMajesty.js'
 import {

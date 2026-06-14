@@ -15,7 +15,7 @@ vi.mock('../../maps/mapsService.js', () => ({
   loadMapData: vi.fn(),
 }));
 
-vi.mock('../../rules/expirations.js', () => ({
+vi.mock('../../rules/effects/expirations.js', () => ({
   addExpiration: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -34,7 +34,7 @@ import { handle, grantTempHpOnRage } from './tempHpBuffHandler.js';
 import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
 import * as automationService from '../../combat/automationService.js';
 import * as mapsService from '../../maps/mapsService.js';
-import * as expirations from '../../rules/expirations.js';
+import * as expirations from '../../rules/effects/expirations.js';
 import * as rangeValidation from '../../rules/combat/rangeValidation.js';
 import * as logService from '../../ui/logService.js';
 

@@ -1,5 +1,5 @@
 import { toggleBuff } from '../common/buffToggle.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 const PROTECTION_FROM_EVIL_AND_GOOD_KEY = 'protectionFromEvilAndGoodWardedTypes';

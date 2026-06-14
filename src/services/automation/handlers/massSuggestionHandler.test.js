@@ -19,7 +19,7 @@ vi.mock('../../shared/logPoster.js', () => ({
   postLogEntry: vi.fn(),
 }));
 
-vi.mock('../../rules/expirations.js', () => ({
+vi.mock('../../rules/effects/expirations.js', () => ({
   addExpiration: vi.fn(),
 }));
 
@@ -34,7 +34,7 @@ import { handle } from './massSuggestionHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { postLogEntry } from '../../shared/logPoster.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 import { buildSaveDc, createSaveListener } from '../common/savePrompt.js';
 
 // ── Helpers ────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { buildSaveDc, createSaveListener } from '../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { getCombatContext } from '../../rules/combat/damageUtils.js';
 

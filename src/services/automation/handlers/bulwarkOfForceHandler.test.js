@@ -1,6 +1,6 @@
 import { handle, handleAddTarget } from './bulwarkOfForceHandler.js';
 import * as runtimeState from '../../../hooks/useRuntimeState.js';
-import * as expirations from '../../rules/expirations.js';
+import * as expirations from '../../rules/effects/expirations.js';
 import * as logService from '../../ui/logService.js';
 
 vi.mock('../../../hooks/useRuntimeState.js', () => ({
@@ -8,7 +8,7 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../rules/expirations.js', () => ({
+vi.mock('../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 

@@ -1,5 +1,5 @@
 import { toggleBuff } from '../common/buffToggle.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 const STEALTH_BONUS_KEY = 'passWithoutTraceStealthBonus';

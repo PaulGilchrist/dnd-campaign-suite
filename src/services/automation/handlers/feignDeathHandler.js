@@ -1,4 +1,4 @@
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 const FEIGN_DEATH_CONDITIONS = ['blinded', 'incapacitated', 'speed_zero'];

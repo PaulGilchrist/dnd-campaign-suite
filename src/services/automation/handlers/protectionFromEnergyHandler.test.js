@@ -7,7 +7,7 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../rules/expirations.js', () => ({
+vi.mock('../../rules/effects/expirations.js', () => ({
   addExpiration: vi.fn(),
 }));
 
@@ -24,7 +24,7 @@ vi.mock('../../rules/combat/damageUtils.js', () => ({
 import { handle, applyProtectionFromEnergy, isProtectionFromEnergyActive, getProtectionFromEnergyDamageType } from './protectionFromEnergyHandler.js';
 
 import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
-import * as expirations from '../../rules/expirations.js';
+import * as expirations from '../../rules/effects/expirations.js';
 import * as logService from '../../ui/logService.js';
 import * as damageUtils from '../../rules/combat/damageUtils.js';
 

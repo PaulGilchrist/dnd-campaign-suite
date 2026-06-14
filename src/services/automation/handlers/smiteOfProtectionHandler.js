@@ -1,5 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 import { addEntry } from '../../ui/logService.js';
 
 const SMITE_COVER_KEY = 'smiteOfProtectionActive';

@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { rollExpression } from '../../dice/diceRoller.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 import { evaluateAutoExpression } from '../../combat/automationService.js';
 
 function getRuntimeUsesKey(featureName) {

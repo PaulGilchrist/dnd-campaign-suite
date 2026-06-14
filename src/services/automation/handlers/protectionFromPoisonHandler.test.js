@@ -5,7 +5,7 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../rules/expirations.js', () => ({
+vi.mock('../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 
@@ -18,7 +18,7 @@ vi.mock('../../rules/combat/damageUtils.js', () => ({
 }));
 
 const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
-const { addExpiration } = await import('../../rules/expirations.js');
+const { addExpiration } = await import('../../rules/effects/expirations.js');
 const { getCombatContext } = await import('../../rules/combat/damageUtils.js');
 
 const makePlayerStats = (overrides = {}) => ({

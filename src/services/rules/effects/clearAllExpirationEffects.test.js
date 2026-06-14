@@ -5,27 +5,27 @@ vi.mock('../../hooks/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../ui/utils.js', () => ({
+vi.mock('../../ui/utils.js', () => ({
   default: {
     getName: vi.fn(),
   },
 }));
 
-vi.mock('../ui/storage.js', () => ({
+vi.mock('../../ui/storage.js', () => ({
   default: {
     set: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-vi.mock('../encounters/combatData.js', () => ({
+vi.mock('../../encounters/combatData.js', () => ({
   getCurrentCombatRound: vi.fn(),
   getActiveCreatureName: vi.fn(),
   getCombatSummary: vi.fn(),
 }));
 
 import { clearAllExpirationEffects } from './expirations.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import utils from '../ui/utils.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import utils from '../../ui/utils.js';
 
 const KEY = 'pendingExpirations';
 

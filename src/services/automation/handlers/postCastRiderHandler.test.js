@@ -4,7 +4,7 @@ import { buildSaveDc, createSaveListener } from '../common/savePrompt.js';
 import { resolveTarget } from '../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 
 vi.mock('../common/savePrompt.js', () => ({
     buildSaveDc: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock('../../ui/logService.js', () => ({
     addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../rules/expirations.js', () => ({
+vi.mock('../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 

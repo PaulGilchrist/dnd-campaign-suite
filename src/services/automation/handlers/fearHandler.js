@@ -3,7 +3,7 @@ import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { addEntry } from '../../ui/logService.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};

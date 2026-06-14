@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './bardicInspirationHandler.js';
 import { resolveTarget, resolveMapPositions } from '../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 import { evaluateAutoExpression } from '../../combat/automationService.js';
 import { getDistanceFeet, rangeToFeet } from '../../rules/combat/rangeValidation.js';
 
@@ -16,7 +16,7 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../rules/expirations.js', () => ({
+vi.mock('../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 

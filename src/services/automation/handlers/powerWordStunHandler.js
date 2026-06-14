@@ -200,7 +200,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         setRuntimeValue(targetName, 'activeConditions', [...(getRuntimeValue(targetName, 'activeConditions', campaignName) || []), 'speed_zero'], campaignName);
 
         // Set expiration: speed_zero ends at start of caster's next turn
-        const { addExpiration } = await import('../../../services/rules/expirations.js');
+        const { addExpiration } = await import('../../../services/rules/effects/expirations.js');
         addExpiration(casterName, targetName, [
             { type: 'speed_zero', condition: 'speed_zero' },
         ], campaignName, 1);

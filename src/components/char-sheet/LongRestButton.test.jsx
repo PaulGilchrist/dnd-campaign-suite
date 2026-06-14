@@ -4,12 +4,12 @@ import LongRestButton from './LongRestButton.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../services/rules/restRules.js', () => ({
+vi.mock('../../services/rules/effects/restRules.js', () => ({
   applyLongRest: vi.fn(),
 }));
 
 // ── Re-import mocked modules ──
-import * as restRules from '../../services/rules/restRules.js';
+import * as restRules from '../../services/rules/effects/restRules.js';
 
 // ── Test fixtures ──
 

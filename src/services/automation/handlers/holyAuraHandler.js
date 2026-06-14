@@ -1,5 +1,5 @@
 import { toggleBuff } from '../common/buffToggle.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 const HOLY_AURA_TARGETS_KEY = 'holyAuraTargets';

@@ -6,7 +6,7 @@ vi.mock('../common/buffToggle.js', () => ({
   toggleBuff: vi.fn(),
 }));
 
-vi.mock('../../rules/expirations.js', () => ({
+vi.mock('../../rules/effects/expirations.js', () => ({
   addExpiration: vi.fn(),
 }));
 
@@ -20,7 +20,7 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
 import { handle } from './buffAllyHandler.js';
 
 import * as buffToggle from '../common/buffToggle.js';
-import * as expirations from '../../rules/expirations.js';
+import * as expirations from '../../rules/effects/expirations.js';
 import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
 
 // ── Helpers ───────────────────────────────────────────────────────

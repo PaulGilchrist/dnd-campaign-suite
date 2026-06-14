@@ -2,7 +2,7 @@ import { buildSaveDc, createSaveListener } from '../common/savePrompt.js';
 import { resolveTarget } from '../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
-import { addExpiration } from '../../rules/expirations.js';
+import { addExpiration } from '../../rules/effects/expirations.js';
 
 const STUNNING_STRIKE_EFFECTS = {
     success: [

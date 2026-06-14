@@ -1,6 +1,6 @@
 
-import { applyLongRest } from '../../services/rules/restRules.js'
-import { hasTranceTrait } from '../../services/rules/tranceRules.js'
+import { applyLongRest } from '../../services/rules/effects/restRules.js'
+import { hasTranceTrait } from '../../services/rules/effects/tranceRules.js'
 
 function LongRestButton({ playerStats, campaignName, onLongRest }) {
   const hasTrance = hasTranceTrait(playerStats)

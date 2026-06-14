@@ -19,7 +19,7 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
   }),
 }));
 
-vi.mock('../../services/rules/restRules.js', () => ({
+vi.mock('../../services/rules/effects/restRules.js', () => ({
   getHitDieSize: vi.fn(() => 8),
   computeHitDieRecovery: vi.fn((roll, conBonus) => Math.max(1, roll + conBonus)),
   SHORT_REST_RESOURCES: [
@@ -35,7 +35,7 @@ vi.mock('../../services/rules/restRules.js', () => ({
   getShortRestResourceLabels: vi.fn(() => []),
 }));
 
-vi.mock('../../services/rules/expirations.js', () => ({
+vi.mock('../../services/rules/effects/expirations.js', () => ({
   clearAllExpirationEffects: vi.fn(),
 }));
 
@@ -59,8 +59,8 @@ vi.mock('../../services/rules/combat/applyHealing.js', () => ({
 
 import * as useRuntimeState from '../../hooks/useRuntimeState.js';
 import * as diceRoller from '../../services/dice/diceRoller.js';
-import * as restRules from '../../services/rules/restRules.js';
-import * as expirations from '../../services/rules/expirations.js';
+import * as restRules from '../../services/rules/effects/restRules.js';
+import * as expirations from '../../services/rules/effects/expirations.js';
 import * as classFeatures from '../../services/character/classFeatures.js';
 import * as automationService from '../../services/combat/automationService.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
