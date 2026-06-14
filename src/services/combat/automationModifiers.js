@@ -207,6 +207,15 @@ export function collectSaveModifiers(features) {
                     effect: 'soulstitch_spells',
                 })
             }
+            if (auto.type === 'pass_without_trace') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'ability_check',
+                    condition: 'pass_without_trace_active',
+                    effect: 'pass_without_trace',
+                    bonusExpression: '10',
+                })
+            }
             if (auto.type === 'empowered_evocation') {
                 modifiers.push({
                     source: feature.name,

@@ -157,6 +157,9 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
     else if (mod.effect === 'soulstitch_spells') {
       effects.soulstitchSpells = true;
     }
+    else if (mod.effect === 'pass_without_trace') {
+      effects.passWithoutTraceBonus = mod.bonusExpression || '10';
+    }
     else if (mod.effect === 'spell_breaker_dispel_bonus') {
       effects.spellBreakerDispelBonus = true;
       effects.spellBreakerDispelBonusExpression = mod.bonusExpression || '';
@@ -207,6 +210,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     portent: false,
     potentCantrip: false,
     soulstitchSpells: false,
+    passWithoutTraceBonus: null,
     spellBreakerDispelBonus: false,
     spellBreakerDispelBonusExpression: null,
     improvedIllusions: false,

@@ -190,5 +190,17 @@ export const spellHandlers = {
             casting_time: auto.casting_time || 'passive',
             hasAutomation: true
         }
+    },
+
+    'pass_without_trace': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'pass_without_trace',
+            name: feature.name,
+            duration: auto.duration || '1_hour',
+            auraRange: auto.auraRange || 30,
+            casting_time: auto.casting_time || '1 action',
+            hasAutomation: true
+        }
     }
 }

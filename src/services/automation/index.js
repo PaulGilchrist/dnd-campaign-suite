@@ -371,6 +371,7 @@ const HANDLER_MAP = {
         mass_suggestion: handleMassSuggestion,
         resilient_sphere: handleResilientSphere,
         ottos_dance: handleOttoDance,
+        pass_without_trace: handlePassWithoutTrace,
 };
 export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect };
 export async function executeHandler(action, playerStats, campaignName, mapName) {

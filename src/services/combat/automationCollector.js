@@ -714,6 +714,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'overchannel':
                 result.passives.push(info)
                 break
+            case 'pass_without_trace':
+                result.passives.push(info)
+                break
             case 'third_eye':
                 result.bonusActions.push(info);
                 break;
