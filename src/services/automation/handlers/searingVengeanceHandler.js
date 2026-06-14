@@ -2,6 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState
 import { addEntry } from '../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../rules/damageUtils.js';
 import { rollExpression } from '../../dice/diceRoller.js';
+import storage from '../../ui/storage.js';
 
 function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
@@ -66,7 +67,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }
             const updatedCs = await getCombatContext(campaignName);
             if (updatedCs) {
-                const storage = await import('../../ui/storage.js').then(m => m.default);
                 storage.set('combatSummary', updatedCs, campaignName);
             }
         }
@@ -80,7 +80,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             creature.conditions = [];
             const updatedCs2 = await getCombatContext(campaignName);
             if (updatedCs2) {
-                const storage = await import('../../ui/storage.js').then(m => m.default);
                 storage.set('combatSummary', updatedCs2, campaignName);
             }
         }

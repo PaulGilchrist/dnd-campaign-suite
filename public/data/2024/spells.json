@@ -5208,6 +5208,12 @@
     "dc": {
       "dc_type": "WIS",
       "dc_success": "none"
+    },
+    "automation": {
+      "type": "fear",
+      "saveType": "WIS",
+      "range": "Self (30-foot Cone)",
+      "duration": "Concentration, up to 1 minute"
     }
   },
   {
@@ -5274,7 +5280,8 @@
     "saving_throw": null,
     "status_effects": [
       "Blinded",
-      "Incapacitated"
+      "Incapacitated",
+      "speed_zero"
     ],
     "spell_list_order": 3,
     "cantrip_scaling": {}
@@ -5828,14 +5835,19 @@
     "subclasses": [],
     "area_of_effect": null,
     "status_effects": [
-      "Restrained",
-      "Petrified"
+      "Restrained"
     ],
     "spell_list_order": 6,
     "cantrip_scaling": {},
     "dc": {
       "dc_type": "CON",
       "dc_success": "none"
+    },
+    "automation": {
+      "type": "flesh_to_stone",
+      "saveType": "CON",
+      "saveDc": "ability",
+      "saveAbility": "CON"
     }
   },
   {
@@ -6057,7 +6069,11 @@
     "saving_throw": null,
     "status_effects": [],
     "spell_list_order": 9,
-    "cantrip_scaling": {}
+    "cantrip_scaling": {},
+    "automation": {
+      "type": "foresight",
+      "duration": "8 hours"
+    }
   },
   {
     "index": "fount-of-moonlight",
@@ -6397,7 +6413,13 @@
     "saving_throw": null,
     "status_effects": [],
     "spell_list_order": 6,
-    "cantrip_scaling": {}
+    "cantrip_scaling": {},
+    "automation": {
+      "type": "globe_of_invulnerability",
+      "duration": "Concentration, up to 1 minute",
+      "auraRange": 10,
+      "maxBlockedSpellLevel": 5
+    }
   },
   {
     "index": "giant-insect",

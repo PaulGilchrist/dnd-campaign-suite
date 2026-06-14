@@ -630,6 +630,25 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 break;
             }
 
+            case 'remove_feign_death_buff': {
+                // Custom cleanup for Feign Death: remove the buff and all associated conditions
+                const feignBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                if (Array.isArray(feignBuffs)) {
+                    setRuntimeValue(
+                        targetName,
+                        'activeBuffs',
+                        feignBuffs.filter(b => b.name !== effect.buffName),
+                        campaignName
+                    );
+                }
+                // Remove conditions applied by Feign Death
+                for (const cond of ['blinded', 'incapacitated', 'speed_zero']) {
+                    removeActiveCondition(targetName, cond, campaignName);
+                    removeNpcCondition(targetName, cond, campaignName);
+                }
+                break;
+            }
+
             case 'avenging_angel_aura': {
                 const auraTargets = getRuntimeValue(attackerName, 'avengingAngelAuraTargets', campaignName) || [];
                 setRuntimeValue(

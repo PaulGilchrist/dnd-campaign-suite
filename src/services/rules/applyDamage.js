@@ -161,6 +161,18 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
           timestamp: Date.now(),
         });
       }
+      if (conditions.some(c => String(c).toLowerCase() === 'charmed')) {
+        const filtered = conditions.filter(c => String(c).toLowerCase() !== 'charmed');
+        setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
+        postLogEntry(campaignName, {
+          type: 'condition',
+          action: 'removed',
+          characterName: creature.name,
+          condition: 'Charmed',
+          reason: 'took damage (Friends)',
+          timestamp: Date.now(),
+        });
+      }
     } else {
       const hadFrightened = creature.conditions.some(c => c.key === 'frightened');
       if (hadFrightened) {

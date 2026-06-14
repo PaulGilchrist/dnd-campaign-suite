@@ -109,6 +109,20 @@ export function playerIsImmuneToCondition({
         }
     }
 
+    // Check active buffs for temporary condition immunity (e.g., Feign Death)
+    if (getRuntimeValue && campaignName) {
+        const activeBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName) || [];
+        if (Array.isArray(activeBuffs)) {
+            for (const buff of activeBuffs) {
+                if (buff.conditionImmunity && Array.isArray(buff.conditionImmunity)) {
+                    if (buff.conditionImmunity.some(c => String(c).toLowerCase() === lowerCondition)) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
     return false
 }
 

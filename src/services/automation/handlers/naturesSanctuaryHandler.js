@@ -2,6 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState
 import { addExpiration } from '../../rules/expirations.js';
 import { rangeToFeet } from '../../rules/rangeValidation.js';
 import { addEntry } from '../../ui/logService.js';
+import * as mapsService from '../../maps/mapsService.js';
 
 const SANCTUARY_KEY = 'naturesSanctuaryActive';
 const SANCTUARY_MOVES_KEY = 'naturesSanctuaryMoves';
@@ -62,7 +63,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const rangeFt = rangeToFeet(auto.range || '120_ft') || 120;
     if (_mapName) {
         try {
-            const mapsService = await import('../../maps/mapsService.js');
             const mapData = await mapsService.loadMapData(campaignName, _mapName);
             const playerOnMap = mapData?.players?.find(p => p.name === playerName);
             if (playerOnMap) {

@@ -8,6 +8,8 @@ import { collectWeaponMastery, evaluateAutoExpression } from '../../services/com
 import { applyDamageToTarget } from '../../services/rules/applyDamage.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { applyConstellationOption } from '../../services/automation/handlers/starryFormHandler.js';
+import { applyConstellationOption as twinklingApply } from '../../services/automation/handlers/twinklingConstellationHandler.js';
+import { handleRestore } from '../../services/automation/handlers/elderChampionHandler.js';
 
 export default function useCharActionModals({
     playerStats, campaignName, mapName,
@@ -840,7 +842,6 @@ export default function useCharActionModals({
         const isTwinkled = ps.level >= 10;
         let result;
         if (isTwinkled) {
-            const { applyConstellationOption: twinklingApply } = await import('../../services/automation/handlers/twinklingConstellationHandler.js');
             result = await twinklingApply(action, ps, cn, optionName);
         } else {
             result = await applyConstellationOption(action, ps, cn, optionName);
@@ -854,7 +855,6 @@ export default function useCharActionModals({
 
     const handleElderChampionRestore = async (payload) => {
         const { action, playerStats: ps, campaignName: cn } = payload;
-        const { handleRestore } = await import('../../services/automation/handlers/elderChampionHandler.js');
         const result = await handleRestore(action, ps, cn);
         if (result) {
             setPopupHtml(result.payload);

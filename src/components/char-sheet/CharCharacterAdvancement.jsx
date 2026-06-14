@@ -7,6 +7,8 @@ import { executeHandler } from '../../services/automation/index.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import SpellMasteryModal from './SpellMasteryModal.jsx'
 import SignatureSpellsModal from './SignatureSpellsModal.jsx'
+import { onSpellMasterySelected } from '../../services/automation/handlers/spellMasteryHandler.js';
+import { onSignatureSpellsSelected } from '../../services/automation/handlers/signatureSpellsHandler.js';
 import { useState, useCallback } from 'react';
 
 function CharCharacterAdvancement({ playerStats, campaignName }) {
@@ -17,7 +19,6 @@ function CharCharacterAdvancement({ playerStats, campaignName }) {
 
     const handleSpellMasteryConfirm = useCallback(async (level1, level2) => {
         if (!spellMasteryModal) return;
-        const { onSpellMasterySelected } = await import('../../services/automation/handlers/spellMasteryHandler.js');
         const result = await onSpellMasterySelected(spellMasteryModal.payload.action, playerStats, campaignName, level1, level2);
         setSpellMasteryModal(null);
         if (result?.type === 'popup') {
@@ -31,7 +32,6 @@ function CharCharacterAdvancement({ playerStats, campaignName }) {
 
     const handleSignatureSpellsConfirm = useCallback(async (spell1, spell2) => {
         if (!signatureSpellsModal) return;
-        const { onSignatureSpellsSelected } = await import('../../services/automation/handlers/signatureSpellsHandler.js');
         const result = await onSignatureSpellsSelected(signatureSpellsModal.payload.action, playerStats, campaignName, spell1, spell2);
         setSignatureSpellsModal(null);
         if (result?.type === 'popup') {

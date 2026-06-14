@@ -65,6 +65,7 @@ import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
 import { executeSpellCast } from '../../services/rules/spellCastService.js'
 import { getTargetFromAttacker, getCombatContext } from '../../services/rules/damageUtils.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
+import { endFriendsOnHostileAction } from '../../services/rules/friendsService.js';
 import { applyDamageToTarget } from '../../services/rules/applyDamage.js';
 import { getNearestPlacedItem } from '../../services/rules/rangeValidation.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffService.js';
@@ -74,7 +75,10 @@ import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../s
 import { useActionSpellMetamagic } from '../../hooks/useActionSpellMetamagic.js';
 import useCharActionModals from './useCharActionModals.js';
 import DivinationSavantModal from './DivinationSavantModal.jsx';
+import { onDivinationSavantSelected } from '../../services/automation/handlers/divinationSavantHandler.js';
 import IllusionSavantModal from './IllusionSavantModal.jsx';
+import { onIllusionSavantSelected } from '../../services/automation/handlers/illusionSavantHandler.js';
+import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/bastionOfLawHandler.js';
 import ThirdEyeModal from './ThirdEyeModal.jsx';
 import useInitiativeEffects from './useInitiativeEffects.js';
 import './CharActions.css'
@@ -287,11 +291,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const handleAttackClick = React.useCallback((attack) => {
         if (cannotAct) return;
+        // Making an attack roll ends any active Friends spell early
+        endFriendsOnHostileAction(playerStats.name, campaignName);
         buildCtx(attack).then(ctx => {
             const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
             rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
         }).catch(() => { });
-    }, [cannotAct, buildCtx, rollAttack, exhaustionPenalty]);
+    }, [cannotAct, buildCtx, rollAttack, exhaustionPenalty, playerStats.name, campaignName]);
 
     const {
         pendingActionMetamagic,
@@ -579,7 +585,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const handleDivinationSavantConfirm = React.useCallback(async (spell1, spell2) => {
         if (!divinationSavantModal) return;
-        const { onDivinationSavantSelected } = await import('../../services/automation/handlers/divinationSavantHandler.js');
         const result = await onDivinationSavantSelected(divinationSavantModal.payload.action, playerStats, campaignName, spell1, spell2);
         setDivinationSavantModal(null);
         if (result && result.type === 'popup') {
@@ -589,7 +594,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const handleIllusionSavantConfirm = React.useCallback(async (spell1, spell2) => {
         if (!illusionSavantModal) return;
-        const { onIllusionSavantSelected } = await import('../../services/automation/handlers/illusionSavantHandler.js');
         const result = await onIllusionSavantSelected(illusionSavantModal.payload.action, playerStats, campaignName, spell1, spell2);
         setIllusionSavantModal(null);
         if (result && result.type === 'popup') {
@@ -854,16 +858,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         onConfirm={async (spAmount, targetName, diceToSpend, clearWard) => {
                             if (clearWard) {
                                 const action = { name: bastionOfLawModal.featureName, automation: bastionOfLawModal.auto };
-                                const { handleClearWard } = await import('../../services/automation/handlers/bastionOfLawHandler.js');
                                 return await handleClearWard(action, playerStats, campaignName);
                             }
                             if (diceToSpend !== undefined && diceToSpend !== null) {
                                 const action = { name: bastionOfLawModal.featureName, automation: bastionOfLawModal.auto };
-                                const { handleSpendDice } = await import('../../services/automation/handlers/bastionOfLawHandler.js');
                                 return await handleSpendDice(action, playerStats, campaignName, diceToSpend);
                             }
                             const action = { name: bastionOfLawModal.featureName, automation: bastionOfLawModal.auto };
-                            const { handleApply } = await import('../../services/automation/handlers/bastionOfLawHandler.js');
                             return await handleApply(action, playerStats, campaignName, spAmount, targetName);
                         }}
                         onClose={() => setBastionOfLawModal(null)}

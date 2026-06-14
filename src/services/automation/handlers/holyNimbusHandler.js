@@ -1,5 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../rules/expirations.js';
+import { addEntry } from '../../ui/logService.js';
 
 const HOLY_NIMBUS_KEY = 'holyNimbusActive';
 

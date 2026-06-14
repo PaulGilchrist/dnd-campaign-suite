@@ -144,6 +144,12 @@ import { handle as handleAuraOfPurity } from './handlers/auraOfPurityHandler.js'
 import { handle as handleBladeWard } from './handlers/bladeWardHandler.js';
 import { handle as handleCounterSpell } from './handlers/counterSpellHandler.js';
 import { handle as handleEyebite } from './handlers/eyebiteHandler.js';
+import { handle as handleFalseLife } from './handlers/falseLifeHandler.js';
+import { handle as handleFear } from './handlers/fearHandler.js';
+import { handle as handleFeignDeath } from './handlers/feignDeathHandler.js';
+import { handle as handleFleshToStone } from './handlers/fleshToStoneHandler.js';
+import { handle as handleFriends } from './handlers/friendsHandler.js';
+import { handle as handleGlobeOfInvulnerability } from './handlers/globeOfInvulnerabilityHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -328,6 +334,12 @@ const HANDLER_MAP = {
         blade_ward: handleBladeWard,
         reaction_counterspell: handleCounterSpell,
         eyebite: handleEyebite,
+        false_life: handleFalseLife,
+        fear: handleFear,
+        feign_death: handleFeignDeath,
+        flesh_to_stone: handleFleshToStone,
+        friends: handleFriends,
+        globe_of_invulnerability: handleGlobeOfInvulnerability,
 };
 export { applyAidEffect };
 export async function executeHandler(action, playerStats, campaignName, mapName) {

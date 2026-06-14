@@ -1,5 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addExpiration } from '../../rules/expirations.js';
+import { toggleBuff } from '../common/buffToggle.js';
 
 const TRANSFORMATION_EFFECTS = {
     'Heavenly Wings': {
@@ -113,7 +114,6 @@ export async function confirmCelestialRevelation(playerStats, chosenOption, camp
     ], campaignName, 10);
 
     // Apply the chosen transformation's buff with the correct effect type
-    const { toggleBuff } = await import('../common/buffToggle.js');
     const effectConfig = TRANSFORMATION_EFFECTS[chosenOption] || { buffEffect: chosenOption, description: '' };
     toggleBuff(
         playerStats.name,

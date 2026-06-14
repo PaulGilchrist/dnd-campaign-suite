@@ -435,6 +435,13 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
         effects.attackDisadvantageCount = (effects.attackDisadvantageCount || 0) + 1;
       }
     }
+    // Handle Foresight — the target has Advantage on D20 Tests, and other creatures have Disadvantage on attack rolls against it
+    if (te.effect === 'foresight') {
+      effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;
+      effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
+      effects.abilityCheckAdvantage = true;
+      effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
+    }
     // Handle Eldritch Hex — target has Disadvantage on saves of chosen ability
     if (te.effect === 'hex_save_disadvantage') {
       effects.hexSaveDisadvantage = true;

@@ -74,5 +74,18 @@ export const saveHandlers = {
             successEffect: auto.successEffect || null,
             hasAutomation: true,
         }
+    },
+
+    'flesh_to_stone': (feature, playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'flesh_to_stone',
+            name: feature.name,
+            saveType: auto.saveType || 'CON',
+            saveDc: (auto.saveDc === 'ability') ? getSaveDc(playerStats, auto.saveAbility || 'CON', playerStats.proficiency) : auto.saveDc || 10,
+            conditionInflicted: 'restrained',
+            duration: 'Concentration, up to 1 minute',
+            hasAutomation: true,
+        }
     }
 }

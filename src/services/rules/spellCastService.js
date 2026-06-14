@@ -14,6 +14,13 @@ import { postLogEntry } from '../shared/logPoster.js';
 import { executeHandler } from '../automation/index.js';
 import { rollExpressionMaximized } from '../dice/diceRoller.js';
 import { triggerAidSpell } from './aidSpellService.js';
+import { triggerFalseLife } from './falseLifeService.js';
+import { triggerFear } from './fearService.js';
+import { triggerFeignDeath } from './feignDeathService.js';
+import { triggerFleshToStone } from './fleshToStoneService.js';
+import { triggerForesight } from './foresightService.js';
+import { triggerFriends, endFriendsOnHostileAction } from './friendsService.js';
+import { triggerGlobeOfInvulnerability } from './globeOfInvulnerabilityService.js';
 
 function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     if (spell.name !== 'Hex') return;
@@ -53,6 +60,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         return;
     }
 
+    // If casting any spell other than Friends, end active Friends early
+    // (Friends ends early when you make an attack roll, deal damage, or force a save)
+    if (spell.name && spell.name.toLowerCase() !== 'friends') {
+        endFriendsOnHostileAction(playerStats.name, campaignName);
+    }
+
     if (spell.casting_time === '1 action') {
         setRuntimeValue(playerStats.name, 'lastActionSpellCast', 1, campaignName);
     }
@@ -81,18 +94,66 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
    if (!formula) {
        if (spell.name.toLowerCase() === 'power word heal' && metaCtx?.multiTarget) {
-           const target = await getTargetInfo();
-           if (target?.name) {
-               await applyPowerWordHealToTarget(target.name, playerStats, campaignName);
-               await applyPowerWordHealToTarget(metaCtx.multiTarget, playerStats, campaignName);
-           }
-       }
-       if (spell.dc && spell.status_effects && spell.status_effects.length > 0) {
+            const target = await getTargetInfo();
+            if (target?.name) {
+                await applyPowerWordHealToTarget(target.name, playerStats, campaignName);
+                await applyPowerWordHealToTarget(metaCtx.multiTarget, playerStats, campaignName);
+            }
+        }
+
+        // Fear — multi-target WIS save for all creatures (30-ft cone)
+        if (spell.name && spell.name.toLowerCase() === 'fear' && spell.dc) {
+            const fearInnateBonus = innateSorceryActive ? 1 : 0;
+            const fearMetaCtx = { ...metaCtx, spellSaveDc: spellSaveDc + fearInnateBonus };
+            await triggerFear(spell, fearMetaCtx, playerStats, campaignName, mapName);
+            triggerFalseLife(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+                console.error('[spellCast] False Life trigger failed:', e);
+            });
+            return;
+        }
+
+        // Feign Death — buff/condition spell with no damage or save
+        if (spell.name && spell.name.toLowerCase() === 'feign death') {
+            const target = await getTargetInfo();
+            const feignMetaCtx = { ...metaCtx, targetName: target?.name };
+            await triggerFeignDeath(spell, feignMetaCtx, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Flesh to Stone — CON save, progressive Restrained→Petrified
+        if (spell.name && spell.name.toLowerCase() === 'flesh to stone') {
+            await triggerFleshToStone(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Foresight — buffs target with advantage on D20 tests and disadvantage on attacks against it
+        if (spell.name && spell.name.toLowerCase() === 'foresight') {
+            const target = await getTargetInfo();
+            const foresightMetaCtx = { ...metaCtx, targetName: target?.name };
+            await triggerForesight(spell, foresightMetaCtx, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Friends — single-target WIS save or Charmed, with auto-save conditions and early-end triggers
+        if (spell.name && spell.name.toLowerCase() === 'friends') {
+            const friendsTarget = await getTargetInfo();
+            const friendsMetaCtx = { ...metaCtx, spellSaveDc, targetName: friendsTarget?.name };
+            await triggerFriends(spell, friendsMetaCtx, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Globe of Invulnerability — toggle passive barrier that blocks spells of level 5 or lower
+        if (spell.name && spell.name.toLowerCase() === 'globe of invulnerability') {
+            await triggerGlobeOfInvulnerability(spell, metaCtx, playerStats, campaignName, mapName);
+            return;
+        }
+
+        if (spell.dc && spell.status_effects && spell.status_effects.length > 0) {
          const target = await getTargetInfo();
          const context = {
            targetName: target?.name,
            attackerName: playerStats.name,
-           ...rollContext,
+            ...rollContext,
            saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
            saveType: spell.dc.dc_type,
            dcSuccess: spell.dc.dc_success,
@@ -104,6 +165,11 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
          }
          rollDamage(spell.name, '0', 0, [], 0, context);
        }
+
+       triggerFalseLife(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+           console.error('[spellCast] False Life trigger failed:', e);
+       });
+
        return;
    }
 
