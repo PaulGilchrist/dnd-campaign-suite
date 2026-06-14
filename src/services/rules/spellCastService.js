@@ -13,6 +13,7 @@ import { getCombatContext } from '../rules/damageUtils.js';
 import { postLogEntry } from '../shared/logPoster.js';
 import { executeHandler } from '../automation/index.js';
 import { rollExpressionMaximized } from '../dice/diceRoller.js';
+import { triggerAidSpell } from './aidSpellService.js';
 
 function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     if (spell.name !== 'Hex') return;
@@ -78,16 +79,33 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     }
   }
 
-  if (!formula) {
-      if (spell.name.toLowerCase() === 'power word heal' && metaCtx?.multiTarget) {
-          const target = await getTargetInfo();
-          if (target?.name) {
-              await applyPowerWordHealToTarget(target.name, playerStats, campaignName);
-              await applyPowerWordHealToTarget(metaCtx.multiTarget, playerStats, campaignName);
-          }
-      }
-      return;
-  }
+   if (!formula) {
+       if (spell.name.toLowerCase() === 'power word heal' && metaCtx?.multiTarget) {
+           const target = await getTargetInfo();
+           if (target?.name) {
+               await applyPowerWordHealToTarget(target.name, playerStats, campaignName);
+               await applyPowerWordHealToTarget(metaCtx.multiTarget, playerStats, campaignName);
+           }
+       }
+       if (spell.dc && spell.status_effects && spell.status_effects.length > 0) {
+         const target = await getTargetInfo();
+         const context = {
+           targetName: target?.name,
+           attackerName: playerStats.name,
+           ...rollContext,
+           saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
+           saveType: spell.dc.dc_type,
+           dcSuccess: spell.dc.dc_success,
+           metamagicHeighten: hasInvisible,
+           isCantrip: spell.level === 0,
+         };
+         if (spell.status_effects && spell.status_effects.length > 0) {
+           context.statusEffects = spell.status_effects;
+         }
+         rollDamage(spell.name, '0', 0, [], 0, context);
+       }
+       return;
+   }
 
    const rollContext = { ...metaCtx, damageType };
 
@@ -156,18 +174,21 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     }
 
       if (spell.dc) {
-       const target = await getTargetInfo();
-       const context = {
-         targetName: target?.name,
-         attackerName: playerStats.name,
-          ...rollContext,
-          saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
-         saveType: spell.dc.dc_type,
-         dcSuccess: spell.dc.dc_success,
-         metamagicHeighten: hasInvisible,
-         isCantrip: spell.level === 0,
-       };
-     let overchannelResult;
+        const target = await getTargetInfo();
+        const context = {
+          targetName: target?.name,
+          attackerName: playerStats.name,
+           ...rollContext,
+           saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
+          saveType: spell.dc.dc_type,
+          dcSuccess: spell.dc.dc_success,
+          metamagicHeighten: hasInvisible,
+          isCantrip: spell.level === 0,
+        };
+        if (spell.status_effects && spell.status_effects.length > 0) {
+          context.statusEffects = spell.status_effects;
+        }
+      let overchannelResult;
      if (overchannelActive) {
          overchannelResult = rollExpressionMaximized(empEvocFormula);
      } else {
@@ -235,6 +256,10 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
     triggerSpellBreakerSlotRetention(spell, metaCtx, playerStats, campaignName).catch(e => {
         console.error('[spellCast] Spell Breaker slot retention trigger failed:', e);
+    });
+
+    triggerAidSpell(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+        console.error('[spellCast] Aid spell trigger failed:', e);
     });
 }
 

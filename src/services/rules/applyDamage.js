@@ -174,6 +174,18 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
           timestamp: Date.now(),
         });
       }
+      const charmedOnDamage = creature.conditions.find(c => c.key === 'charmed' && c.endsOnDamage);
+      if (charmedOnDamage) {
+        creature.conditions = creature.conditions.filter(c => c.key !== 'charmed');
+        postLogEntry(campaignName, {
+          type: 'condition',
+          action: 'removed',
+          characterName: creature.name,
+          condition: 'Charmed',
+          reason: 'took damage (Animal Friendship)',
+          timestamp: Date.now(),
+        });
+      }
     }
 
     if (attackerName && attackerName !== creature.name) {

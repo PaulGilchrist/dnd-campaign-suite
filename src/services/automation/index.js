@@ -139,6 +139,11 @@ import { handle as handleStonecunning } from './handlers/stonecunningHandler.js'
 import { handle as handleElfisLineage } from './handlers/elfishLineageHandler.js';
 import { handle as handleGnomishLineage } from './handlers/gnomishLineageHandler.js';
 import { handle as handleLargeForm } from './handlers/largeFormHandler.js';
+import { handle as handleAid, applyAid as applyAidEffect } from './handlers/aidHandler.js';
+import { handle as handleAuraOfPurity } from './handlers/auraOfPurityHandler.js';
+import { handle as handleBladeWard } from './handlers/bladeWardHandler.js';
+import { handle as handleCounterSpell } from './handlers/counterSpellHandler.js';
+import { handle as handleEyebite } from './handlers/eyebiteHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -316,9 +321,15 @@ const HANDLER_MAP = {
                      giant_ancestry: handleGiantAncestry,
                      teleport: handleGiantAncestry,
                      damage: handleGiantAncestry,
-                     damage_with_condition: handleGiantAncestry,
-                     auto_effect_giant: handleGiantAncestry,
+                      damage_with_condition: handleGiantAncestry,
+                      auto_effect_giant: handleGiantAncestry,
+                       aid: handleAid,
+        aura_of_purity: handleAuraOfPurity,
+        blade_ward: handleBladeWard,
+        reaction_counterspell: handleCounterSpell,
+        eyebite: handleEyebite,
 };
+export { applyAidEffect };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
 

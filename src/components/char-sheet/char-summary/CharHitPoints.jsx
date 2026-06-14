@@ -7,6 +7,8 @@ import DeathSavingThrows from './DeathSavingThrows.jsx'
 
 function CharHitPoints({ playerStats, campaignName }) {
       const storedHp = useRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
+      const aidHpMaxIncrease = useRuntimeValue(playerStats.name, 'aidHpMaxIncrease', campaignName) || 0;
+      const effectiveMaxHp = playerStats.hitPoints + Number(aidHpMaxIncrease);
 
       React.useEffect(() => {
           if (storedHp === null || storedHp === undefined) {
@@ -14,7 +16,7 @@ function CharHitPoints({ playerStats, campaignName }) {
           }
       }, [storedHp, playerStats.hitPoints, playerStats.name, campaignName]);
 
-      const currentHitPoints = storedHp != null ? storedHp : playerStats.hitPoints;
+      const currentHitPoints = storedHp != null ? storedHp : effectiveMaxHp;
      const [showInputCurrentHitPoints, setShowInputCurrentHitPoints] = React.useState(false);
      const handleInputToggleCurrentHitPoints = () => {
          setShowInputCurrentHitPoints((showInputCurrentHitPoints) => !showInputCurrentHitPoints);
@@ -35,7 +37,7 @@ function CharHitPoints({ playerStats, campaignName }) {
                       targetName: playerStats.name,
                       delta,
                       currentHp: value,
-                      maxHp: playerStats.hitPoints,
+                      maxHp: effectiveMaxHp,
                       isHealing: delta > 0,
                       isUnconscious: value <= 0,
                   })
@@ -62,7 +64,7 @@ function CharHitPoints({ playerStats, campaignName }) {
     return (
         <div>
             <div className="clickable" onClick={handleInputToggleCurrentHitPoints} onKeyDown={handleInputToggleCurrentHitPoints} tabIndex={0}>
-                <b>Hit Points: </b><HiddenInput handleInputToggle={handleInputToggleCurrentHitPoints} handleValueChange={(value) => handleValueChangeCurrentHitPoints(value)} showInput={showInputCurrentHitPoints} value={currentHitPoints}></HiddenInput>/{playerStats.hitPoints} <span className="text-muted">(cur/max)</span>
+                <b>Hit Points: </b><HiddenInput handleInputToggle={handleInputToggleCurrentHitPoints} handleValueChange={(value) => handleValueChangeCurrentHitPoints(value)} showInput={showInputCurrentHitPoints} value={currentHitPoints}></HiddenInput>/{effectiveMaxHp} <span className="text-muted">(cur/max)</span>
             </div>
             {currentHitPoints <= 0 && (
                 <DeathSavingThrows playerStats={playerStats} campaignName={campaignName} />

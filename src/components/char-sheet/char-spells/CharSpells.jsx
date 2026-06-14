@@ -9,6 +9,7 @@ import MetamagicPopup from '../MetamagicPopup.jsx'
 import SpellDetailPopup from './SpellDetailPopup.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
 import MultiTargetPopup from '../MultiTargetPopup.jsx'
+import AidTargetPopup from '../AidTargetPopup.jsx'
 import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../../services/dice/diceRoller.js';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../services/rules/damageUtils.js';
@@ -185,7 +186,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
       executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName });
       cachedCastPosRef.current = null;
       }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName]);
-    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
+    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
 
     const resolveSpellPositions = React.useCallback(async () => {
@@ -265,6 +266,9 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                     context.saveDc = playerStats.spellAbilities.saveDc + (innateSorceryActive ? 1 : 0);
                     context.saveType = spell.dc.dc_type;
                     context.dcSuccess = spell.dc.dc_success;
+                    if (spell.status_effects && spell.status_effects.length > 0) {
+                        context.statusEffects = spell.status_effects;
+                    }
                  }
                 rollDamage(spellName, empEvocFormula, result.total, result.rolls, result.modifier, context);
             };
@@ -418,6 +422,20 @@ return (
                         creatureTargets={pendingMultiTarget.creatureTargets}
                         onConfirm={handleMultiTargetConfirm}
                         onSkip={handleMultiTargetSkip}
+                      />
+                    )}
+                    {pendingAid && (
+                      <AidTargetPopup
+                        spell={{ name: pendingAid.spellName, level: pendingAid.spellLevel || 0 }}
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        range={pendingAid.range}
+                        rangeFt={pendingAid.rangeFt}
+                        creatureTargets={pendingAid.creatureTargets}
+                        maxTargets={pendingAid.maxTargets}
+                        attackerPos={pendingAid.attackerPos}
+                        onConfirm={handleAidConfirm}
+                        onSkip={handleAidSkip}
                       />
                     )}
             <hr />

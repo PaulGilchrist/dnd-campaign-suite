@@ -10,7 +10,7 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../dice/diceRoller.js', () => ({
-    rollExpression: vi.fn((expr) => ({ total: 5, rolls: [5], modifier: 0 })),
+    rollExpression: vi.fn((_expr) => ({ total: 5, rolls: [5], modifier: 0 })),
 }));
 
 vi.mock('../../ui/logService.js', () => ({
@@ -22,7 +22,7 @@ vi.mock('../common/targetResolver.js', () => ({
 }));
 
 vi.mock('../../combat/automationService.js', () => ({
-    evaluateAutoExpression: vi.fn((expr) => 5),
+    evaluateAutoExpression: vi.fn((_expr) => 5),
 }));
 
 vi.mock('../../rules/damageUtils.js', () => ({
@@ -33,9 +33,6 @@ vi.mock('../../rules/damageUtils.js', () => ({
 // ── Re-import after mocking ────────────────────────────────────
 
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { rollExpression } from '../../dice/diceRoller.js';
-import { resolveTarget } from '../common/targetResolver.js';
-import { evaluateAutoExpression } from '../../combat/automationService.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

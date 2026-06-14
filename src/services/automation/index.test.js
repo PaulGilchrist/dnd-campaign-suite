@@ -34,6 +34,7 @@ vi.mock('./handlers/divineSparkHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/divineInterventionHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/bonusActionAttackHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/extraActionHandler.js', () => ({ handle: vi.fn() }));
+vi.mock('./handlers/eyebiteHandler.js', () => ({ handle: vi.fn() }));
 
 // ── Imports ────────────────────────────────────────────────────
 
@@ -70,6 +71,7 @@ import * as divineSparkHandler from './handlers/divineSparkHandler.js';
 import * as divineInterventionHandler from './handlers/divineInterventionHandler.js';
 import * as bonusActionAttackHandler from './handlers/bonusActionAttackHandler.js';
 import * as extraActionHandler from './handlers/extraActionHandler.js';
+import * as eyebiteHandler from './handlers/eyebiteHandler.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -547,6 +549,16 @@ describe('executeHandler', () => {
 
       expect(extraActionHandler.handle).toHaveBeenCalled();
       expect(result).toEqual({ result: 'extra' });
+    });
+
+    it('calls the correct handler for eyebite type', async () => {
+      const action = makeAction({ type: 'eyebite' });
+      eyebiteHandler.handle.mockResolvedValue({ result: 'eyebite' });
+
+      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+
+      expect(eyebiteHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
+      expect(result).toEqual({ result: 'eyebite' });
     });
 
     it('damage_aura maps to genericPopup handler', async () => {

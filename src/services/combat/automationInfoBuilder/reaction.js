@@ -180,5 +180,23 @@ export const reactionHandlers = {
             casting_time: auto.casting_time || '1 reaction',
             hasAutomation: true
         }
+    },
+
+    'reaction_counterspell': (feature, playerStats) => {
+        const auto = feature.automation
+        const prof = playerStats.proficiency || 0
+        const chaBonus = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0
+        return {
+            type: 'reaction_counterspell',
+            name: feature.name,
+            trigger: auto.trigger || 'creature_casting_spell',
+            saveType: auto.saveType || 'CON',
+            saveDc: auto.saveDc || 'ability',
+            saveAbility: auto.saveAbility || 'CHA',
+            saveBonus: 8 + chaBonus + prof,
+            range: auto.range || '60 ft',
+            casting_time: auto.casting_time || '1 reaction',
+            hasAutomation: true
+        }
     }
 }

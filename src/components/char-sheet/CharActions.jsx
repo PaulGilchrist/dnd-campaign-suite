@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import MetamagicPopup from './MetamagicPopup.jsx'
+import AidTargetPopup from './AidTargetPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import EmpoweredSpellPopup from './EmpoweredSpellPopup.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
@@ -21,6 +22,7 @@ import FontOfMagicModal from './FontOfMagicModal.jsx'
 import ResourcePoolModal from './ResourcePoolModal.jsx'
 import WildCompanionModal from './WildCompanionModal.jsx'
 import SetConditionModal from './SetConditionModal.jsx'
+import EyebiteEffectModal from './EyebiteEffectModal.jsx'
 import DivineSparkModal from './DivineSparkModal.jsx'
 import DivineInterventionModal from './DivineInterventionModal.jsx'
 import AttackRiderModal from './AttackRiderModal.jsx'
@@ -261,6 +263,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         elfishLineageModal, setElfisLineageModal,
         gnomishLineageModal, setGnomishLineageModal,
         giantAncestryModal, setGiantAncestryModal,
+        eyebiteEffectModal, setEyebiteEffectModal,
         breathWeaponShapeModal, setBreathWeaponShapeModal,
         divineFuryChoice,
         damageTypeChoice,
@@ -417,6 +420,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'resourcePool': setResourcePoolModal(result.payload); break;
                     case 'wildCompanion': setWildCompanionModal(result.payload); break;
                     case 'setCondition': setSetConditionModal(result.payload); break;
+                    case 'eyebiteEffect': setEyebiteEffectModal(result.payload); break;
                     case 'attackRider': setAttackRiderModal(result.payload); break;
                     case 'openHandTechnique': setOpenHandTechniqueModal(result.payload); break;
                     case 'combatStance': setCombatStanceModal(result.payload); break;
@@ -640,7 +644,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, featEffects: featRangeEffects, campaignName, mapName });
         cachedActionCastPosRef.current = null;
     }, [rollAttack, rollDamage, playerStats, getTargetInfo, featRangeEffects, campaignName, mapName]);
-    const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction);
+    const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip, pendingAid: actionPendingAid, handleAidConfirm: actionHandleAidConfirm, handleAidSkip: actionHandleAidSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction);
     const handleActionSpellCast = React.useCallback(async (spell) => {
         setSelectedActionSpell(null);
         if (mapName) {
@@ -801,6 +805,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         {...setConditionModal}
                         characters={characters}
                         onClose={() => setSetConditionModal(null)}
+                    />
+                )}
+                {eyebiteEffectModal && (
+                    <EyebiteEffectModal
+                        {...eyebiteEffectModal}
+                        characters={characters}
+                        onClose={() => setEyebiteEffectModal(null)}
                     />
                 )}
                 {attackRiderModal && (
@@ -1169,6 +1180,20 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         campaignName={campaignName}
                         onConfirm={actionHandleConfirm}
                         onSkip={actionHandleSkip}
+                    />
+                )}
+                {actionPendingAid && (
+                    <AidTargetPopup
+                        spell={{ name: actionPendingAid.spellName, level: actionPendingAid.spellLevel || 0 }}
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        range={actionPendingAid.range}
+                        rangeFt={actionPendingAid.rangeFt}
+                        creatureTargets={actionPendingAid.creatureTargets}
+                        maxTargets={actionPendingAid.maxTargets}
+                        attackerPos={actionPendingAid.attackerPos}
+                        onConfirm={actionHandleAidConfirm}
+                        onSkip={actionHandleAidSkip}
                     />
                 )}
                 {pendingActionMetamagic && (

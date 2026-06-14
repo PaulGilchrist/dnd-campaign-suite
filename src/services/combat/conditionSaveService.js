@@ -3,6 +3,7 @@ import { getMonsterData } from '../npcs/monsterUtils.js'
 import { getAbilitySaveBonus } from './conditionUtils.js'
 import { computeAuraBonus } from './auraOfProtection.js'
 import { playerIsImmuneToCondition } from './automationService.js'
+import { getAuraOfPuritySaveAdvantageConditions, isAuraOfPurityActive } from '../automation/handlers/auraOfPurityHandler.js'
 
 async function getCreatureSaveBonus(creature, abilityAbbr, characters, campaignNpcs, getName) {
     if (creature.type === 'player') {
@@ -24,6 +25,18 @@ async function rollConditionSave(creature, condition, characters, campaignNpcs, 
     const saveBonus = await getCreatureSaveBonus(creature, condition.ability, characters, campaignNpcs, getName)
     const aura = await computeAuraBonus({ targetName: creature.name, characters, campaignName, activeMapName: mapName })
     const auraBonus = aura.bonus
+    const conditionKey = String(condition.key || condition.label || '').toLowerCase()
+    const hasAuraOfPurityAdvantage = isAuraOfPurityActive(creature.name, campaignName)
+        && getAuraOfPuritySaveAdvantageConditions(creature.name, campaignName).includes(conditionKey)
+    if (hasAuraOfPurityAdvantage) {
+        const a = rollD20()
+        const b = rollD20()
+        const roll = Math.max(a, b)
+        const total = roll + saveBonus + auraBonus
+        const success = total >= condition.dc
+        const bonusDetail = auraBonus > 0 ? `(+${auraBonus} aura${aura.sourceName ? ' from ' + aura.sourceName : ''})` : undefined
+        return { roll, total, success, bonus: saveBonus + auraBonus, bonusDetail, advantage: true }
+    }
     const r1 = rollD20()
     const total = r1 + saveBonus + auraBonus
     const success = total >= condition.dc

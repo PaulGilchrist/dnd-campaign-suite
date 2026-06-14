@@ -13,7 +13,7 @@ import {
 import { sendSavePrompt, sendSaveResult } from '../services/combat/savePromptService.js';
 import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../services/rules/aoeService.js';
 import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
-import { clearAllExpirationEffects } from '../services/rules/expirations.js';
+import { clearAllExpirationEffects, addExpiration } from '../services/rules/expirations.js';
 import { loadCombatSummary, getCombatSummary } from '../services/encounters/combatData.js';
 import { saveLastDamageEvent } from '../hooks/useMetamagic.js';
 import { SHOW_DICE_ROLL_DELAY } from '../config/ui-config.js';
@@ -26,6 +26,7 @@ import {
 import { MELEE_REACH_FEET } from '../services/combat/baseCombatActions.js';
 import { getCombatContext } from '../services/rules/damageUtils.js';
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../services/rules/postCastRiderService.js';
+import { playerIsImmuneToCondition } from '../services/combat/automationService.js';
 
 function dispatchUnbreakableMajestySave(campaignName, defenderName, attackerName, saveDc, promptId) {
     sendSavePrompt(campaignName, {
@@ -180,9 +181,48 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
            }
        }
 
-       delete window.__pendingSaves[e.detail.promptId];
+        delete window.__pendingSaves[e.detail.promptId];
 
-      pending.setPopupHtml({
+        if (!e.detail.success && pending.statusEffects?.length > 0) {
+            const targetName = pending.targetName;
+            const targetCreature = combatSummary?.creatures?.find(c => c.name === targetName);
+            const targetCharacter = (charactersRef.current || []).find(c => utils.getName(c.name) === targetName);
+            const targetStats = targetCharacter?.computedStats || targetCharacter;
+            const effectsToExpire = [];
+            for (const effect of pending.statusEffects) {
+                const condKey = String(effect).toLowerCase();
+                if (targetStats && playerIsImmuneToCondition({
+                    conditionKey: condKey,
+                    playerStats: targetStats,
+                    getRuntimeValue: getRuntimeValue,
+                    campaignName: pending.campaignName,
+                })) {
+                    continue;
+                }
+                if (targetCreature?.type === 'player') {
+                    const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                    const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
+                    setRuntimeValue(targetName, 'activeConditions', [...filtered, condKey], pending.campaignName);
+                    effectsToExpire.push({ type: 'condition', condition: condKey });
+                } else if (targetCreature) {
+                    targetCreature.conditions = (targetCreature.conditions || []).filter(c => c.key !== condKey);
+                    targetCreature.conditions.push({
+                        id: utils.guid(),
+                        key: condKey,
+                        label: effect.charAt(0).toUpperCase() + effect.slice(1),
+                        dc: pending.saveDc,
+                        ability: pending.saveType.toLowerCase(),
+                        endsOnDamage: true,
+                    });
+                    effectsToExpire.push({ type: 'condition', condition: condKey });
+                }
+            }
+            if (effectsToExpire.length > 0) {
+                addExpiration(characterName, targetName, effectsToExpire, pending.campaignName, 2);
+            }
+        }
+
+       pending.setPopupHtml({
         type: 'save-damage',
         name: pending.name,
         formula: pending.formula,
@@ -760,6 +800,37 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             }
             const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, null, false, characterName);
 
+            if (!saveResult.success && context?.statusEffects?.length > 0) {
+                for (const effect of context.statusEffects) {
+                    const condKey = String(effect).toLowerCase();
+                    const targetCharacter = (characters || []).find(c => utils.getName(c.name) === target.name);
+                    const targetStats = targetCharacter?.computedStats || targetCharacter;
+                    if (targetStats && playerIsImmuneToCondition({
+                        conditionKey: condKey,
+                        playerStats: targetStats,
+                        getRuntimeValue: getRuntimeValue,
+                        campaignName: campaignName,
+                    })) {
+                        continue;
+                    }
+                    if (target.type === 'player') {
+                        const conditions = getRuntimeValue(target.name, 'activeConditions') || [];
+                        const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
+                        setRuntimeValue(target.name, 'activeConditions', [...filtered, condKey], campaignName);
+                    } else {
+                        target.conditions = (target.conditions || []).filter(c => c.key !== condKey);
+                        target.conditions.push({
+                            id: utils.guid(),
+                            key: condKey,
+                            label: effect.charAt(0).toUpperCase() + effect.slice(1),
+                            dc: saveDc,
+                            ability: saveType.toLowerCase(),
+                            endsOnDamage: true,
+                        });
+                    }
+                }
+            }
+
             logEntry({
               type: 'roll',
               characterName,
@@ -1058,14 +1129,15 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           }
           const promptId = utils.guid();
            pendingSaves[promptId] = {
-              targetName: target.name, rawDamage: total, saveDc, saveType, dcSuccess,
-              damageType, attackerName: attackerName || characterName, name, formula, modifier, rolls, campaignName, setPopupHtml,
-              metamagicHeighten: context?.metamagicHeighten || false,
-              isCantrip: context?.isCantrip || false,
-              overchannelActive: context?.overchannelActive || false,
-              overchannelUseCount: context?.overchannelUseCount || 0,
-              overchannelSpellLevel: context?.overchannelSpellLevel || 1,
-             };
+               targetName: target.name, rawDamage: total, saveDc, saveType, dcSuccess,
+               damageType, attackerName: attackerName || characterName, name, formula, modifier, rolls, campaignName, setPopupHtml,
+               metamagicHeighten: context?.metamagicHeighten || false,
+               isCantrip: context?.isCantrip || false,
+               overchannelActive: context?.overchannelActive || false,
+               overchannelUseCount: context?.overchannelUseCount || 0,
+               overchannelSpellLevel: context?.overchannelSpellLevel || 1,
+               statusEffects: context?.statusEffects || [],
+              };
 
           sendSavePrompt(campaignName, {
             promptId,

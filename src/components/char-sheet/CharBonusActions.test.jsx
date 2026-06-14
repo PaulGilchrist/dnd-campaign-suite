@@ -8,6 +8,9 @@ vi.mock('../../hooks/useSpellMetamagicFlow.js', () => ({
     gateMetamagic: vi.fn(),
     handleConfirm: vi.fn(),
     handleSkip: vi.fn(),
+    pendingAid: null,
+    handleAidConfirm: vi.fn(),
+    handleAidSkip: vi.fn(),
   })),
 }));
 
@@ -914,6 +917,9 @@ describe('CharBonusActions', () => {
       gateMetamagic: vi.fn(),
       handleConfirm: vi.fn(),
       handleSkip: vi.fn(),
+    pendingAid: null,
+    handleAidConfirm: vi.fn(),
+    handleAidSkip: vi.fn(),
     });
 
     const stats = createStats({

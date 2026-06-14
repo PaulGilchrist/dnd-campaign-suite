@@ -641,6 +641,30 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 break;
             }
 
+            case 'remove_aid_buff': {
+                const allBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                if (Array.isArray(allBuffs)) {
+                    setRuntimeValue(
+                        targetName,
+                        'activeBuffs',
+                        allBuffs.filter(b => b.name !== effect.buffName),
+                        campaignName
+                    );
+                }
+                const currentIncrease = Number(getRuntimeValue(targetName, effect.hpKey || 'aidHpMaxIncrease', campaignName)) || 0;
+                if (currentIncrease > 0) {
+                    const storedCurrentHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+                    const baseHp = getRuntimeValue(targetName, 'hitPoints', campaignName);
+                    if (storedCurrentHp != null) {
+                        const currentHp = Number(storedCurrentHp);
+                        const newCurrentHp = Math.max(0, Math.min(baseHp, currentHp - currentIncrease));
+                        setRuntimeValue(targetName, 'currentHitPoints', newCurrentHp, campaignName);
+                    }
+                    setRuntimeValue(targetName, effect.hpKey || 'aidHpMaxIncrease', 0, campaignName);
+                }
+                break;
+            }
+
             default:
                 break;
              }

@@ -255,6 +255,12 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
     }
 
+    // Blade Ward: Attackers subtract 1d4 from attack rolls against you
+    const bladeWardActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'blade_ward');
+    if (bladeWardActive) {
+        conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
+    }
+
     // Holy Nimbus: Holy Ward grants advantage on saving throws against Fiends/Undead
     if (playerStats) {
         const holyNimbusActive = getRuntimeValue(playerStats.name, 'holyNimbusActive', campaignName);
