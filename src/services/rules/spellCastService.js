@@ -36,6 +36,7 @@ import { triggerHolyAura } from './holyAuraService.js';
 import { triggerPowerWordFortify } from './powerWordFortifyService.js';
 import { triggerPowerWordStun } from './powerWordStunService.js';
 import { executeHandler as executeLongstrider } from '../automation/index.js';
+import { executeHandler as executeProtectionFromEnergy } from '../automation/index.js';
 
 function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     if (spell.name !== 'Hex') return;
@@ -286,11 +287,24 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             console.error('[spellCast] False Life trigger failed:', e);
         });
 
-        triggerHealingWord(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
-            console.error('[spellCast] Healing Word trigger failed:', e);
-        });
+         triggerHealingWord(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
+             console.error('[spellCast] Healing Word trigger failed:', e);
+         });
 
-        return;
+         // Protection from Energy — apply resistance buff to target
+         if (spell.name && spell.name.toLowerCase() === 'protection from energy') {
+             const target = await getTargetInfo();
+             if (target) {
+                 const action = {
+                     name: 'Protection from Energy',
+                     spell: spell,
+                     automation: spell.automation || {},
+                 };
+                 await executeProtectionFromEnergy(action, playerStats, campaignName, mapName);
+             }
+         }
+
+         return;
    }
 
    const rollContext = { ...metaCtx, damageType };

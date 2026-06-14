@@ -10942,7 +10942,15 @@
     "saving_throw": null,
     "status_effects": [],
     "spell_list_order": 3,
-    "cantrip_scaling": {}
+    "cantrip_scaling": {},
+    "automation": {
+      "type": "protection_from_energy",
+      "damageTypes": ["Acid", "Cold", "Fire", "Lightning", "Thunder"],
+      "target": "willing_creature",
+      "duration": "Concentration, up to 1 hour",
+      "casting_time": "1 action",
+      "range": "Touch"
+    }
   },
   {
     "index": "protection-from-evil-and-good",

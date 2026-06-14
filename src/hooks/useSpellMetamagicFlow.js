@@ -22,6 +22,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
   const [pendingGreaterRestoration, setPendingGreaterRestoration] = React.useState(null);
   const [pendingLesserRestoration, setPendingLesserRestoration] = React.useState(null);
   const [pendingMageArmor, setPendingMageArmor] = React.useState(null);
+  const [pendingProtectionFromEnergy, setPendingProtectionFromEnergy] = React.useState(null);
 
   const gateMetamagic = React.useCallback((spell) => {
     const isGreaterRestoration = (spell.name || '').toLowerCase() === 'greater restoration';
@@ -117,6 +118,26 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
           castingTime: spell.casting_time,
           range: spell.range || 'Touch',
           creatureTargets,
+        });
+        return;
+      }
+    }
+
+    const isProtectionFromEnergy = (spell.name || '').toLowerCase() === 'protection from energy';
+    if (isProtectionFromEnergy) {
+      const cs = getCombatSummary();
+      const creatureTargets = cs?.creatures
+        ?.filter(c => c.name !== playerStats?.name)
+        .map(c => c.name) || [];
+      if (creatureTargets.length > 0) {
+        setPendingProtectionFromEnergy({
+          spell,
+          spellName: spell.name,
+          spellLevel: spell.level || 0,
+          castingTime: spell.casting_time,
+          range: spell.range || 'Touch',
+          creatureTargets,
+          damageTypes: spell.automation?.damageTypes || ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'],
         });
         return;
       }
@@ -512,7 +533,54 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       spCost: 0,
       timestamp: Date.now(),
     });
-  }, [pendingMageArmor, playerStats, campaignName]);
+  }, [pendingMageArmor, playerStats.name, campaignName]);
 
-  return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingHeroesFeast, pendingGreaterRestoration, pendingLesserRestoration, pendingMageArmor, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleHeroesFeastConfirm, handleHeroesFeastSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, handleLesserRestorationConfirm, handleLesserRestorationSkip, handleMageArmorConfirm, handleMageArmorSkip };
+  const handleProtectionFromEnergyConfirm = React.useCallback(async (result) => {
+    const pending = pendingProtectionFromEnergy;
+    setPendingProtectionFromEnergy(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+
+    try {
+      const { applyProtectionFromEnergyHandler } = await import('../services/automation/index.js');
+      await applyProtectionFromEnergyHandler(
+        { name: pending.spellName, spell: pending.spell, automation: { type: 'protection_from_energy', damageTypes: pending.damageTypes } },
+        playerStats,
+        campaignName,
+        result.targetName,
+        result.damageType
+      );
+    } catch (e) {
+      console.error('[protectionFromEnergy] Failed to apply effect:', e);
+    }
+  }, [pendingProtectionFromEnergy, playerStats, campaignName]);
+
+  const handleProtectionFromEnergySkip = React.useCallback(() => {
+    const pending = pendingProtectionFromEnergy;
+    setPendingProtectionFromEnergy(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+  }, [pendingProtectionFromEnergy, playerStats.name, campaignName]);
+
+  return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingHeroesFeast, pendingGreaterRestoration, pendingLesserRestoration, pendingMageArmor, pendingProtectionFromEnergy, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleHeroesFeastConfirm, handleHeroesFeastSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, handleLesserRestorationConfirm, handleLesserRestorationSkip, handleMageArmorConfirm, handleMageArmorSkip, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip };
 }

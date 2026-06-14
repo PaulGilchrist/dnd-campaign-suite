@@ -67,6 +67,7 @@ import { handle as handleHolyNimbus } from './handlers/holyNimbusHandler.js';
 import { handle as handleInspiringSmite } from './handlers/inspiringSmiteHandler.js';
 import { handle as handlePeerlessAthlete } from './handlers/peerlessAthleteHandler.js';
 import { handle as handleGloriousDefense } from './handlers/gloriousDefenseHandler.js';
+import { handle as handleProtectionFromEnergy, applyProtectionFromEnergy as applyProtectionFromEnergyHandler } from './handlers/protectionFromEnergyHandler.js';
 import { handle as handleLivingLegend } from './handlers/livingLegendHandler.js';
 import { handle as handleUndyingSentinel } from './handlers/undyingSentinelHandler.js';
 import { handle as handleElderChampion } from './handlers/elderChampionHandler.js';
@@ -374,8 +375,9 @@ const HANDLER_MAP = {
         power_word_stun: handlePowerWordStun,
         ottos_dance: handleOttoDance,
         pass_without_trace: handlePassWithoutTrace,
+        protection_from_energy: handleProtectionFromEnergy,
 };
-export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect };
+export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
 
