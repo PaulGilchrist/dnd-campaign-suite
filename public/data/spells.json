@@ -2944,7 +2944,10 @@
       "saveType": "WIS",
       "effects": {
         "fail": [
-          { "type": "charmed", "condition": "charmed" }
+          {
+            "type": "charmed",
+            "condition": "charmed"
+          }
         ]
       }
     }
@@ -5770,7 +5773,13 @@
       "Bard",
       "Wizard"
     ],
-    "subclasses": []
+    "subclasses": [],
+    "automation": {
+      "type": "ottos_dance",
+      "saveType": "WIS",
+      "range": "30 feet",
+      "duration": "Up to 1 minute"
+    }
   },
   {
     "index": "jump",

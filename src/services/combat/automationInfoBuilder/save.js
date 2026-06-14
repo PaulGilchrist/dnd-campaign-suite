@@ -112,5 +112,17 @@ export const saveHandlers = {
             duration: auto.duration || 'Concentration, up to 1 minute',
             hasAutomation: true,
         }
+    },
+
+    'ottos_dance': (feature, playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'ottos_dance',
+            name: feature.name,
+            saveType: auto.saveType || 'WIS',
+            saveDc: (auto.saveDc === 'ability') ? getSaveDc(playerStats, auto.saveAbility || 'WIS', playerStats.proficiency) : auto.saveDc || 10,
+            duration: 'Concentration, up to 1 minute',
+            hasAutomation: true,
+        }
     }
 }

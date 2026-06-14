@@ -247,6 +247,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'hypnotic_pattern':
             case 'resilient_sphere':
             case 'mass_suggestion':
+            case 'ottos_dance':
             case 'healing':
             case 'healing_pool':
             case 'self_healing':

@@ -162,6 +162,8 @@ import { handle as handleHypnoticPatternShake, handleConfirm as handleHypnoticPa
 import { handle as handleHypnoticPattern } from './handlers/hypnoticPatternHandler.js';
 import { handle as handleMassSuggestion } from './handlers/massSuggestionHandler.js';
 import { handle as handleResilientSphere } from './handlers/resilientSphereHandler.js';
+import { handle as handleOttoDance } from './handlers/ottosDanceHandler.js';
+import { handle as handlePassWithoutTrace } from './handlers/passWithoutTraceHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -368,6 +370,7 @@ const HANDLER_MAP = {
         hypnotic_pattern_shake_confirm: handleHypnoticPatternShakeConfirm,
         mass_suggestion: handleMassSuggestion,
         resilient_sphere: handleResilientSphere,
+        ottos_dance: handleOttoDance,
 };
 export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect };
 export async function executeHandler(action, playerStats, campaignName, mapName) {

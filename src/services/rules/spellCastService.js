@@ -26,6 +26,7 @@ import { triggerHypnoticPattern } from './hypnoticPatternService.js';
 import { triggerMassSuggestion } from './massSuggestionService.js';
 import { triggerForesight } from './foresightService.js';
 import { triggerResilientSphere } from './resilientSphereService.js';
+import { triggerOttoDance } from './ottoDanceService.js';
 import { triggerFriends, endFriendsOnHostileAction } from './friendsService.js';
 import { endInvisibilityOnHostileAction } from './invisibilityService.js';
 import { triggerGlobeOfInvulnerability } from './globeOfInvulnerabilityService.js';
@@ -180,6 +181,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         // Mass Suggestion — multi-target WIS save, applies Charmed condition to failed targets
         if (spell.name && spell.name.toLowerCase() === 'mass suggestion') {
             await triggerMassSuggestion(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Otto's Irresistible Dance / Irresistible Dance — single target WIS save, Charmed + speed_zero + save/attack modifiers
+        if (spell.name && (spell.name.toLowerCase() === "otto's irresistible dance" || spell.name.toLowerCase() === 'irresistible dance')) {
+            await triggerOttoDance(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
             return;
         }
 

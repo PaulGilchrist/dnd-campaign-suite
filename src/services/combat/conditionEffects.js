@@ -263,7 +263,13 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
         effects.targetAdvantageCount++
         break
 
-       case 'frightened':
+        case 'charmed':
+         effects.attackDisadvantageCount++
+         effects.targetAdvantageCount++
+         effects.saveDisadvantage.push('dex')
+         break
+
+        case 'frightened':
         effects.attackDisadvantageCount++
         effects.abilityCheckDisadvantage = true
         break

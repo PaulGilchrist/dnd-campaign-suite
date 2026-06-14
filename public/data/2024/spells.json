@@ -8293,7 +8293,12 @@
       "type": "lesser_restoration",
       "range": "Touch",
       "casting_time": "bonus_action",
-      "conditions": ["blinded", "deafened", "paralyzed", "poisoned"]
+      "conditions": [
+        "blinded",
+        "deafened",
+        "paralyzed",
+        "poisoned"
+      ]
     },
     "spell_list_order": 2,
     "cantrip_scaling": {}
@@ -10061,6 +10066,12 @@
     "dc": {
       "dc_type": "WIS",
       "dc_success": "none"
+    },
+    "automation": {
+      "type": "ottos_dance",
+      "saveType": "WIS",
+      "range": "30 feet",
+      "duration": "Concentration, up to 1 minute"
     }
   },
   {
@@ -10096,7 +10107,12 @@
     "saving_throw": null,
     "status_effects": [],
     "spell_list_order": 2,
-    "cantrip_scaling": {}
+    "cantrip_scaling": {},
+    "automation": {
+      "type": "pass_without_trace",
+      "duration": "Concentration, up to 1 hour",
+      "auraRange": 30
+    }
   },
   {
     "index": "passwall",
