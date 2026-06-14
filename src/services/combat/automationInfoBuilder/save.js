@@ -87,5 +87,18 @@ export const saveHandlers = {
             duration: 'Concentration, up to 1 minute',
             hasAutomation: true,
         }
+    },
+
+    'hold_monster': (feature, playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'hold_monster',
+            name: feature.name,
+            saveType: auto.saveType || 'WIS',
+            saveDc: (auto.saveDc === 'ability') ? getSaveDc(playerStats, auto.saveAbility || 'WIS', playerStats.proficiency) : auto.saveDc || 10,
+            conditionInflicted: 'paralyzed',
+            duration: 'Concentration, up to 1 minute',
+            hasAutomation: true,
+        }
     }
 }

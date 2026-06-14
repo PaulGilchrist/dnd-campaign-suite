@@ -243,6 +243,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'save_attack':
             case 'save_only':
             case 'flesh_to_stone':
+            case 'hold_monster':
             case 'healing':
             case 'healing_pool':
             case 'self_healing':

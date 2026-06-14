@@ -148,6 +148,7 @@ import { handle as handleFalseLife } from './handlers/falseLifeHandler.js';
 import { handle as handleFear } from './handlers/fearHandler.js';
 import { handle as handleFeignDeath } from './handlers/feignDeathHandler.js';
 import { handle as handleFleshToStone } from './handlers/fleshToStoneHandler.js';
+import { handle as handleHoldMonster } from './handlers/holdMonsterHandler.js';
 import { handle as handleFriends } from './handlers/friendsHandler.js';
 import { handle as handleGlobeOfInvulnerability } from './handlers/globeOfInvulnerabilityHandler.js';
 import { handle as handleGreaseAreaSave } from './handlers/greaseAreaSaveHandler.js';
@@ -341,6 +342,7 @@ const HANDLER_MAP = {
         fear: handleFear,
         feign_death: handleFeignDeath,
         flesh_to_stone: handleFleshToStone,
+        hold_monster: handleHoldMonster,
         friends: handleFriends,
         globe_of_invulnerability: handleGlobeOfInvulnerability,
         grease_area_save: handleGreaseAreaSave,

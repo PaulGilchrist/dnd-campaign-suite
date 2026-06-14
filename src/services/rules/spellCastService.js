@@ -18,6 +18,7 @@ import { triggerHealingWord } from './healingWordService.js';
 import { triggerFear } from './fearService.js';
 import { triggerFeignDeath } from './feignDeathService.js';
 import { triggerFleshToStone } from './fleshToStoneService.js';
+import { triggerHoldMonster } from './holdMonsterService.js';
 import { triggerForesight } from './foresightService.js';
 import { triggerFriends, endFriendsOnHostileAction } from './friendsService.js';
 import { triggerGlobeOfInvulnerability } from './globeOfInvulnerabilityService.js';
@@ -131,6 +132,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         // Flesh to Stone — CON save, progressive Restrained→Petrified
         if (spell.name && spell.name.toLowerCase() === 'flesh to stone') {
             await triggerFleshToStone(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Hold Monster / Hold Person — WIS save, Paralyzed condition with end-of-turn repeat save
+        if (spell.name && (spell.name.toLowerCase() === 'hold monster' || spell.name.toLowerCase() === 'hold person')) {
+            await triggerHoldMonster(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
             return;
         }
 
