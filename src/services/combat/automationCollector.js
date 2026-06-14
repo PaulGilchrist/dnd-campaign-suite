@@ -570,6 +570,13 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'mage_hand_control':
                 result.bonusActions.push(info)
                 break
+            case 'lesser_restoration':
+                if (info.casting_time === '1 bonus_action' || info.casting_time === 'bonus_action' || info.casting_time === '1 bonus action') {
+                    result.bonusActions.push(info)
+                } else {
+                    result.actions.push(info)
+                }
+                break
             case 'magical_ambush':
                 result.passives.push(info)
                 break

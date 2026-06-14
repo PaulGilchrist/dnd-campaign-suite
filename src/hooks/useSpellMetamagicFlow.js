@@ -20,10 +20,30 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
   const [pendingAid, setPendingAid] = React.useState(null);
   const [pendingHeroesFeast, setPendingHeroesFeast] = React.useState(null);
   const [pendingGreaterRestoration, setPendingGreaterRestoration] = React.useState(null);
+  const [pendingLesserRestoration, setPendingLesserRestoration] = React.useState(null);
 
   const gateMetamagic = React.useCallback((spell) => {
     const isGreaterRestoration = (spell.name || '').toLowerCase() === 'greater restoration';
+    const isLesserRestoration = (spell.name || '').toLowerCase() === 'lesser restoration';
     const isAid = (spell.name || '').toLowerCase() === 'aid';
+
+    if (isLesserRestoration) {
+      const cs = getCombatSummary();
+      const creatureTargets = cs?.creatures
+        ?.filter(c => c.name !== playerStats?.name)
+        .map(c => c.name) || [];
+      if (creatureTargets.length > 0) {
+        setPendingLesserRestoration({
+          spell,
+          spellName: spell.name,
+          spellLevel: spell.level || 0,
+          castingTime: spell.casting_time,
+          range: spell.range || 'Touch',
+          creatureTargets,
+        });
+        return;
+      }
+    }
 
     if (isGreaterRestoration) {
       const cs = getCombatSummary();
@@ -380,5 +400,52 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
   }, [pendingGreaterRestoration, playerStats, campaignName]);
 
-  return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingHeroesFeast, pendingGreaterRestoration, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleHeroesFeastConfirm, handleHeroesFeastSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip };
+  const handleLesserRestorationConfirm = React.useCallback(async (result) => {
+    const pending = pendingLesserRestoration;
+    setPendingLesserRestoration(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+
+    try {
+      const { applyLesserRestorationEffect } = await import('../services/automation/index.js');
+      await applyLesserRestorationEffect(
+        { name: pending.spellName, spell: pending.spell, automation: { type: 'lesser_restoration', range: pending.range } },
+        playerStats,
+        campaignName,
+        null,
+        result
+      );
+    } catch (e) {
+      console.error('[lesserRestoration] Failed to apply effect:', e);
+    }
+  }, [pendingLesserRestoration, playerStats, campaignName]);
+
+  const handleLesserRestorationSkip = React.useCallback(() => {
+    const pending = pendingLesserRestoration;
+    setPendingLesserRestoration(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+  }, [pendingLesserRestoration, playerStats, campaignName]);
+
+  return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingHeroesFeast, pendingGreaterRestoration, pendingLesserRestoration, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleHeroesFeastConfirm, handleHeroesFeastSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, handleLesserRestorationConfirm, handleLesserRestorationSkip };
 }

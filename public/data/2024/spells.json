@@ -8291,7 +8291,9 @@
     "status_effects": [],
     "automation": {
       "type": "lesser_restoration",
-      "range": "Touch"
+      "range": "Touch",
+      "casting_time": "bonus_action",
+      "conditions": ["blinded", "deafened", "paralyzed", "poisoned"]
     },
     "spell_list_order": 2,
     "cantrip_scaling": {}
