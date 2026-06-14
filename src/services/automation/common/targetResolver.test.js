@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
   getTargetFromAttacker: vi.fn(),
 }));
@@ -11,16 +11,16 @@ vi.mock('../../maps/mapsService.js', () => ({
   loadMapData: vi.fn(),
 }));
 
-vi.mock('../../rules/rangeValidation.js', () => ({
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
   getNearestPlacedItem: vi.fn(),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
 
 import { resolveTarget, resolveMapPositions } from './targetResolver.js';
-import * as damageUtils from '../../rules/damageUtils.js';
+import * as damageUtils from '../../rules/combat/damageUtils.js';
 import * as mapsService from '../../maps/mapsService.js';
-import * as rangeValidation from '../../rules/rangeValidation.js';
+import * as rangeValidation from '../../rules/combat/rangeValidation.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

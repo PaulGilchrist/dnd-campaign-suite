@@ -1,8 +1,8 @@
-import { hitTestOverlay } from '../../models/SpellOverlay.js';
+import { hitTestOverlay } from '../../../models/SpellOverlay.js';
 import { rollSaveForCreature, computeDamageAfterSave, applyDamageToTarget } from './applyDamage.js';
-import { sendSavePrompt } from '../combat/savePromptService.js';
-import utils from '../ui/utils.js';
-import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { sendSavePrompt } from '../../combat/savePromptService.js';
+import utils from '../../ui/utils.js';
+import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 function hasSoulstitchProtection(targetName, attackerName, campaignName) {
     if (!attackerName) return false;

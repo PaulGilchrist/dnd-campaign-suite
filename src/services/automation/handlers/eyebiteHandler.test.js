@@ -9,7 +9,7 @@ vi.mock('../common/savePrompt.js', () => ({
     }),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(() => Promise.resolve({ creatures: [] })),
 }));
 
@@ -17,7 +17,7 @@ vi.mock('../../maps/mapsService.js', () => ({
     loadMapData: vi.fn(() => Promise.resolve(null)),
 }));
 
-vi.mock('../../rules/rangeValidation.js', () => ({
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
     rangeToFeet: vi.fn(range => {
         if (!range) return 60;
         const match = range.match(/(\d+)\s*ft/);

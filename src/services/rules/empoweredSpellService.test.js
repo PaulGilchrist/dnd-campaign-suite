@@ -18,11 +18,11 @@ vi.mock('../dice/diceRoller.js', () => ({
   parseExpression: vi.fn(),
 }));
 
-vi.mock('./damageUtils.js', () => ({
+vi.mock('./combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
-vi.mock('./applyDamage.js', () => ({
+vi.mock('./combat/applyDamage.js', () => ({
   applyDamageToTarget: vi.fn(),
 }));
 
@@ -43,8 +43,8 @@ import {
 } from '../../hooks/useMetamagic.js';
 import { getChaModifier } from './metamagicRules.js';
 import { parseExpression } from '../dice/diceRoller.js';
-import { getCombatContext } from './damageUtils.js';
-import { applyDamageToTarget } from './applyDamage.js';
+import { getCombatContext } from './combat/damageUtils.js';
+import { applyDamageToTarget } from './combat/applyDamage.js';
 
 // ── Globals ────────────────────────────────────────────────────
 

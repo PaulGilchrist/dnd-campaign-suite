@@ -7,7 +7,7 @@ vi.mock('../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
-vi.mock('./rangeValidation.js', () => ({
+vi.mock('./combat/rangeValidation.js', () => ({
   computeRangeEffect: vi.fn(),
   computeEffectiveSpellRange: vi.fn(),
   getDistanceFeet: vi.fn(),
@@ -48,7 +48,7 @@ import {
   computeEffectiveSpellRange,
   getDistanceFeet,
   rangeToFeet,
-} from './rangeValidation.js';
+} from './combat/rangeValidation.js';
 import * as useRuntimeState from '../../hooks/useRuntimeState.js';
 import * as buffService from '../combat/buffService.js';
 import * as postCastRiderService from './postCastRiderService.js';

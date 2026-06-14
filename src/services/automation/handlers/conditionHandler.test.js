@@ -15,11 +15,11 @@ vi.mock('../../maps/mapsService.js', () => ({
   loadMapData: vi.fn(),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../rules/rangeValidation.js', () => ({
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
 }));
 
@@ -33,8 +33,8 @@ import { handle } from './conditionHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import * as mapsService from '../../maps/mapsService.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
-import { rangeToFeet } from '../../rules/rangeValidation.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
+import { rangeToFeet } from '../../rules/combat/rangeValidation.js';
 import { getAbilityModifier } from '../../shared/abilityLookup.js';
 
 // ── Helpers ────────────────────────────────────────────────────

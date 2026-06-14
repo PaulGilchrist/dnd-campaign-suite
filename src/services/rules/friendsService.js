@@ -1,5 +1,5 @@
 import { executeHandler } from '../automation/index.js';
-import { getCombatContext } from './damageUtils.js';
+import { getCombatContext } from './combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { getMonsterData } from '../npcs/monsterUtils.js';
 import { addEntry } from '../ui/logService.js';

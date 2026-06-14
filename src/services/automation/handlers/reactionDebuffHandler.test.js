@@ -16,16 +16,16 @@ vi.mock('../../ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock('../../rules/rangeValidation.js', () => ({
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
   rangeToFeet: vi.fn(),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../rules/applyHealing.js', () => ({
+vi.mock('../../rules/combat/applyHealing.js', () => ({
   applyHealingToTarget: vi.fn(),
 }));
 
@@ -46,9 +46,9 @@ import { handle } from './reactionDebuffHandler.js';
 import * as targetResolver from '../common/targetResolver.js';
 import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
 import * as logService from '../../ui/logService.js';
-import * as rangeValidation from '../../rules/rangeValidation.js';
-import * as damageUtils from '../../rules/damageUtils.js';
-import * as applyHealing from '../../rules/applyHealing.js';
+import * as rangeValidation from '../../rules/combat/rangeValidation.js';
+import * as damageUtils from '../../rules/combat/damageUtils.js';
+import * as applyHealing from '../../rules/combat/applyHealing.js';
 import * as useMetamagic from '../../../hooks/useMetamagic.js';
 import * as automationService from '../../combat/automationService.js';
 

@@ -1,5 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getCombatContext, getTargetFromAttacker } from '../../rules/damageUtils.js';
+import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import storage from '../../ui/storage.js';
 

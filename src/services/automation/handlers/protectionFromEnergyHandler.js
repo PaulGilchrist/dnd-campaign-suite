@@ -1,7 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addExpiration } from '../../rules/expirations.js';
 import { addEntry } from '../../ui/logService.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
 
 const PROTECTION_FROM_ENERGY_KEY = 'protectionFromEnergyDamageType';
 

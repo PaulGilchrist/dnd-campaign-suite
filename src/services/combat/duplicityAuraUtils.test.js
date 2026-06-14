@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('../rules/rangeValidation.js', () => ({
+vi.mock('../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
 }))
 
@@ -9,7 +9,7 @@ vi.mock('../../hooks/useRuntimeState.js', () => ({
 }))
 
 import { getDuplicityAdvantageAgainst } from './duplicityAuraUtils.js'
-import { getDistanceFeet } from '../rules/rangeValidation.js'
+import { getDistanceFeet } from '../rules/combat/rangeValidation.js'
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js'
 
 function makePlayer(name, gridX = 0, gridY = 0) {

@@ -1,7 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { rollExpression } from '../../dice/diceRoller.js';
 import { logHealingToSSE } from '../common/healingRoll.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import storage from '../../ui/storage.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {

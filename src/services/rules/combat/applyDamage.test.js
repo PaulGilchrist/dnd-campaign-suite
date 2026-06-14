@@ -3,28 +3,28 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
 // Use inline vi.fn() — no closure over external variables
 
-vi.mock('../dice/diceRoller.js', () => ({
+vi.mock('../../dice/diceRoller.js', () => ({
   rollD20: vi.fn(),
   rollExpression: vi.fn(),
 }));
 
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../ui/storage.js', () => ({ default: { get: vi.fn(), set: vi.fn() } }));
+vi.mock('../../ui/storage.js', () => ({ default: { get: vi.fn(), set: vi.fn() } }));
 
-vi.mock('../combat/savePromptService.js', () => ({
+vi.mock('../../combat/savePromptService.js', () => ({
   sendDeathSavePrompt: vi.fn(),
   sendConcentrationPrompt: vi.fn(),
 }));
 
-vi.mock('../combat/concentrationRules.js', () => ({
+vi.mock('../../combat/concentrationRules.js', () => ({
   rollConcentrationSave: vi.fn(),
 }));
 
-vi.mock('../ui/utils.js', () => ({ default: { guid: vi.fn(() => 'test-guid-001') } }));
+vi.mock('../../ui/utils.js', () => ({ default: { guid: vi.fn(() => 'test-guid-001') } }));
 
 // ── Imports (Vite returns mocked versions) ─────────────────────
 
@@ -37,11 +37,11 @@ import {
   applyDamageToTarget,
 } from './applyDamage.js';
 
-import { rollD20 } from '../dice/diceRoller.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import storage from '../ui/storage.js';
-import { sendDeathSavePrompt, sendConcentrationPrompt } from '../combat/savePromptService.js';
-import { rollConcentrationSave } from '../combat/concentrationRules.js';
+import { rollD20 } from '../../dice/diceRoller.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import storage from '../../ui/storage.js';
+import { sendDeathSavePrompt, sendConcentrationPrompt } from '../../combat/savePromptService.js';
+import { rollConcentrationSave } from '../../combat/concentrationRules.js';
 
 // ── Globals ────────────────────────────────────────────────────
 

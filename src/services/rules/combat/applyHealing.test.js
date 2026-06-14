@@ -3,18 +3,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
 // Use inline vi.fn() — no closure over external variables
 
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../ui/storage.js', () => ({ default: { get: vi.fn(), set: vi.fn() } }));
+vi.mock('../../ui/storage.js', () => ({ default: { get: vi.fn(), set: vi.fn() } }));
 
 // ── Imports (Vite returns mocked versions) ─────────────────────
 
 import { applyHealingToTarget } from './applyHealing.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import storage from '../ui/storage.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import storage from '../../ui/storage.js';
 
 global.fetch = vi.fn(() => new Promise(() => {}));
 

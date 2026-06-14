@@ -15,7 +15,7 @@ vi.mock('../common/healingRoll.js', () => ({
   logHealingToSSE: vi.fn(),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
@@ -33,7 +33,7 @@ import { handle } from './initiativeHandler.js';
 import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
 import * as diceRoller from '../../dice/diceRoller.js';
 import * as healingRoll from '../common/healingRoll.js';
-import * as damageUtils from '../../rules/damageUtils.js';
+import * as damageUtils from '../../rules/combat/damageUtils.js';
 import storage from '../../ui/storage.js';
 
 // ── Helpers ─────────────────────────────────────────────────────

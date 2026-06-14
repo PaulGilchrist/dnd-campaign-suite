@@ -4,7 +4,7 @@ import utils from '../ui/utils.js';
 import storage from '../ui/storage.js';
 import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary } from '../encounters/combatData.js';
 import { addEntry } from '../ui/logService.js';
-import { getDistanceFeet } from '../rules/rangeValidation.js';
+import { getDistanceFeet } from '../rules/combat/rangeValidation.js';
 
 const ALL_DAMAGES_EXCEPT_FORCE = [
     'acid', 'bludgeoning', 'cold', 'fire', 'lightning',

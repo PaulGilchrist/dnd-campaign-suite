@@ -3,15 +3,15 @@ import useDiceRoll from './useDiceRoll.js';
 import { rollD20, rollExpression } from '../services/dice/diceRoller.js';
 import utils from '../services/ui/utils.js';
 import storage from '../services/ui/storage.js';
-import { getTargetFromAttacker } from '../services/rules/damageUtils.js';
+import { getTargetFromAttacker } from '../services/rules/combat/damageUtils.js';
 import {
   computeDamageAfterSave,
   computeDamageAfterEvasion,
   rollSaveForCreature,
   applyDamageToTarget,
-} from '../services/rules/applyDamage.js';
+} from '../services/rules/combat/applyDamage.js';
 import { sendSavePrompt, sendSaveResult } from '../services/combat/savePromptService.js';
-import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../services/rules/aoeService.js';
+import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../services/rules/combat/aoeService.js';
 import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
 import { clearAllExpirationEffects, addExpiration } from '../services/rules/expirations.js';
 import { loadCombatSummary, getCombatSummary } from '../services/encounters/combatData.js';
@@ -24,7 +24,7 @@ import {
     markAttackerTriggeredMajesty,
 } from '../services/combat/unbreakableMajesty.js';
 import { MELEE_REACH_FEET } from '../services/combat/baseCombatActions.js';
-import { getCombatContext } from '../services/rules/damageUtils.js';
+import { getCombatContext } from '../services/rules/combat/damageUtils.js';
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../services/rules/postCastRiderService.js';
 import { playerIsImmuneToCondition } from '../services/combat/automationService.js';
 import { endInvisibilityOnHostileAction } from '../services/rules/invisibilityService.js';

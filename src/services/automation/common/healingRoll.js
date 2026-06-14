@@ -1,8 +1,8 @@
 import { rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.js';
 import { hasHealingMaximization } from '../../combat/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getCombatContext, getTargetFromAttacker } from '../../rules/damageUtils.js';
-import { applyHealingToTarget } from '../../rules/applyHealing.js';
+import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
+import { applyHealingToTarget } from '../../rules/combat/applyHealing.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 
 export function rollHealingForAction(auto, playerStats, campaignName, isSelf = false) {

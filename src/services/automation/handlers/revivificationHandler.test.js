@@ -7,7 +7,7 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
   getTargetFromAttacker: vi.fn(),
 }));
@@ -26,7 +26,7 @@ vi.mock('../../ui/storage.js', () => ({
 
 import { handle } from './revivificationHandler.js';
 import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
-import * as damageUtils from '../../rules/damageUtils.js';
+import * as damageUtils from '../../rules/combat/damageUtils.js';
 import * as logPoster from '../../shared/logPoster.js';
 import storage from '../../ui/storage.js';
 

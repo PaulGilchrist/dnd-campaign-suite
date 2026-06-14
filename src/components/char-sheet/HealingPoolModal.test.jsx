@@ -18,12 +18,12 @@ vi.mock('../../services/ui/storage.js', () => ({
   default: { set: vi.fn() },
 }));
 
-vi.mock('../../services/rules/damageUtils.js', () => ({
+vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   getTargetFromAttacker: vi.fn(() => null),
   getCombatContext: vi.fn(() => Promise.resolve(null)),
 }));
 
-vi.mock('../../services/rules/applyHealing.js', () => ({
+vi.mock('../../services/rules/combat/applyHealing.js', () => ({
   applyHealingToTarget: vi.fn(),
 }));
 
@@ -35,8 +35,8 @@ vi.mock('../../services/ui/utils.js', () => ({
 import * as useRuntimeState from '../../hooks/useRuntimeState.js';
 import useTrackedResource from '../../hooks/useTrackedResource.js';
 import storage from '../../services/ui/storage.js';
-import * as damageUtils from '../../services/rules/damageUtils.js';
-import * as applyHealingService from '../../services/rules/applyHealing.js';
+import * as damageUtils from '../../services/rules/combat/damageUtils.js';
+import * as applyHealingService from '../../services/rules/combat/applyHealing.js';
 
 // ── Test fixtures ──
 

@@ -13,8 +13,8 @@ import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
 import { executeSpellCast } from '../../services/rules/spellCastService.js'
 import { getCurrentCombatRound } from '../../services/encounters/combatData.js'
 import * as mapsService from '../../services/maps/mapsService.js';
-import { getNearestPlacedItem } from '../../services/rules/rangeValidation.js';
-import { getCombatContext, getTargetFromAttacker } from '../../services/rules/damageUtils.js';
+import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
+import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffService.js';
 import './CharActions.css'
 

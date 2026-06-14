@@ -54,7 +54,7 @@ export async function handle(action, playerStats, campaignName) {
     }
 
     // Find the summoned companion in combat context
-    const cs = await import('../../rules/damageUtils.js').then(m => m.getCombatContext(campaignName));
+    const cs = await import('../../rules/combat/damageUtils.js').then(m => m.getCombatContext(campaignName));
     if (!cs || !cs.creatures) {
         return null;
     }

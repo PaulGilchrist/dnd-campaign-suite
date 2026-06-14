@@ -13,13 +13,13 @@ vi.mock('../../ui/logService.js', () => ({
     addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
 }));
 
 const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
 const { addExpiration } = await import('../../rules/expirations.js');
-const { getCombatContext } = await import('../../rules/damageUtils.js');
+const { getCombatContext } = await import('../../rules/combat/damageUtils.js');
 
 const makePlayerStats = (overrides = {}) => ({
     name: 'TestCharacter',

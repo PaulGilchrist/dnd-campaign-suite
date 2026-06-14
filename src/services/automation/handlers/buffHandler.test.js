@@ -10,7 +10,7 @@ vi.mock('./tempTeleportHandler.js', () => ({
   handle: vi.fn(),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
   getTargetFromAttacker: vi.fn(),
 }));
 
@@ -31,7 +31,7 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
 import { handle } from './buffHandler.js';
 import * as buffToggle from '../common/buffToggle.js';
 import * as tempTeleportHandler from './tempTeleportHandler.js';
-import * as damageUtils from '../../rules/damageUtils.js';
+import * as damageUtils from '../../rules/combat/damageUtils.js';
 import * as combatData from '../../encounters/combatData.js';
 import * as automationService from '../../combat/automationService.js';
 import * as runtimeState from '../../../hooks/useRuntimeState.js';

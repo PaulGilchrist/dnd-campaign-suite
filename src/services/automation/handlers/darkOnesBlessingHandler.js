@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { evaluateAutoExpression } from '../../combat/automationService.js';
-import { getDistanceFeet, rangeToFeet } from '../../rules/rangeValidation.js';
+import { getDistanceFeet, rangeToFeet } from '../../rules/combat/rangeValidation.js';
 import { loadMapData } from '../../maps/mapsService.js';
 import { addEntry } from '../../ui/logService.js';
 

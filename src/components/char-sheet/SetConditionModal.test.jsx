@@ -4,7 +4,7 @@ import SetConditionModal from './SetConditionModal.jsx';
 
 // ── Mocked modules (before the component import) ──
 
-vi.mock('../../services/rules/rangeValidation.js', () => ({
+vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
   rangeToFeet: vi.fn(() => 60),
 }));

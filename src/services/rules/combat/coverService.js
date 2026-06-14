@@ -1,4 +1,4 @@
-import { bresenham } from '../maps/lineOfSight.js'
+import { bresenham } from '../../maps/lineOfSight.js'
 
 export const COVER = {
   FULL: 'full',

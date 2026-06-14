@@ -3,7 +3,7 @@ import { resolveTarget } from '../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import { addExpiration } from '../../rules/expirations.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 
 const MAX_FAILS = 3;

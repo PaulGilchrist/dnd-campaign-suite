@@ -6,7 +6,7 @@ vi.mock('../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn(() => ({ total: 30, rolls: [10, 10, 10], modifier: 0 })),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(() => Promise.resolve(null)),
 }));
 
@@ -39,7 +39,7 @@ vi.mock('../common/savePrompt.js', () => ({
     buildSaveDc: vi.fn(() => 15),
 }));
 
-vi.mock('../../rules/rangeValidation.js', () => ({
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
     rangeToFeet: vi.fn(() => null),
 }));
 

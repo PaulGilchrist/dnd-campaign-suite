@@ -1,6 +1,6 @@
-import { getCombatContext, getTargetFromAttacker } from '../../rules/damageUtils.js';
+import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 import * as mapsService from '../../maps/mapsService.js';
-import { getNearestPlacedItem } from '../../rules/rangeValidation.js';
+import { getNearestPlacedItem } from '../../rules/combat/rangeValidation.js';
 
 export function resolveTarget(campaignName, attackerName) {
     return getCombatContext(campaignName).then(cs => {

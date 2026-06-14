@@ -11,7 +11,7 @@ vi.mock('../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
@@ -19,7 +19,7 @@ vi.mock('../../encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(),
 }));
 
-vi.mock('../../rules/rangeValidation.js', () => ({
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
   getDistanceFeet: vi.fn(),
 }));
@@ -28,11 +28,11 @@ vi.mock('../common/targetResolver.js', () => ({
   resolveMapPositions: vi.fn(),
 }));
 
-vi.mock('../../rules/applyHealing.js', () => ({
+vi.mock('../../rules/combat/applyHealing.js', () => ({
   applyHealingToTarget: vi.fn(),
 }));
 
-vi.mock('../../rules/applyDamage.js', () => ({
+vi.mock('../../rules/combat/applyDamage.js', () => ({
   applyDamageToTarget: vi.fn(),
 }));
 
@@ -45,12 +45,12 @@ vi.mock('../../shared/logPoster.js', () => ({
 import { handle, applyMultiTarget } from './multiTargetHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
-import { rangeToFeet, getDistanceFeet } from '../../rules/rangeValidation.js';
+import { rangeToFeet, getDistanceFeet } from '../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../common/targetResolver.js';
-import { applyHealingToTarget } from '../../rules/applyHealing.js';
-import { applyDamageToTarget } from '../../rules/applyDamage.js';
+import { applyHealingToTarget } from '../../rules/combat/applyHealing.js';
+import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 
 // ── Helpers ────────────────────────────────────────────────────

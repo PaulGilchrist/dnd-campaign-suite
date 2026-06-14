@@ -1,8 +1,8 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import * as mapsService from '../../maps/mapsService.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
-import { rangeToFeet } from '../../rules/rangeValidation.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
+import { rangeToFeet } from '../../rules/combat/rangeValidation.js';
 import { getAbilityModifier } from '../../shared/abilityLookup.js';
 
 function buildSaveDc(auto, playerStats) {

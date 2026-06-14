@@ -3,7 +3,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState
 import { addEntry } from '../../ui/logService.js';
 import { addExpiration } from '../../rules/expirations.js';
 import { postLogEntry } from '../../shared/logPoster.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};

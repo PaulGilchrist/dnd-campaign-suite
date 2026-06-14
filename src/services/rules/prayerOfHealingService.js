@@ -1,9 +1,9 @@
 import { rollExpression } from '../dice/diceRoller.js';
-import { getCombatContext } from './damageUtils.js';
-import { applyHealingToTarget } from './applyHealing.js';
+import { getCombatContext } from './combat/damageUtils.js';
+import { applyHealingToTarget } from './combat/applyHealing.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { postLogEntry } from '../shared/logPoster.js';
-import { getDistanceFeet, rangeToFeet } from './rangeValidation.js';
+import { getDistanceFeet, rangeToFeet } from './combat/rangeValidation.js';
 
 const PRAYER_OF_HEALING_NAME = 'Prayer of Healing';
 

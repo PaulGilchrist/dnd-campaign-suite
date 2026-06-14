@@ -241,6 +241,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 }
 
 async function getCombatContext(campaignName) {
-    const { getCombatContext } = await import('../../rules/damageUtils.js');
+    const { getCombatContext } = await import('../../rules/combat/damageUtils.js');
     return getCombatContext(campaignName);
 }

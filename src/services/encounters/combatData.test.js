@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mock getCombatContext from damageUtils ────────────────────────
 const mockGetCombatContext = vi.fn();
-vi.mock('../rules/damageUtils.js', () => ({
+vi.mock('../rules/combat/damageUtils.js', () => ({
   getCombatContext: (...args) => mockGetCombatContext(...args),
 }));
 

@@ -4,8 +4,8 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState
 import { addEntry } from '../../ui/logService.js';
 import { getLastAttackRoll, getLastAbilityCheck } from '../../../hooks/useMetamagic.js';
 import { automationInfoPopup } from '../../shared/popupResponse.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
-import { getDistanceFeet, rangeToFeet } from '../../rules/rangeValidation.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
+import { getDistanceFeet, rangeToFeet } from '../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../common/targetResolver.js';
 
 vi.mock('../../../hooks/useRuntimeState.js', () => ({
@@ -26,11 +26,11 @@ vi.mock('../../shared/popupResponse.js', () => ({
     automationInfoPopup: vi.fn(),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../rules/rangeValidation.js', () => ({
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
     getDistanceFeet: vi.fn(),
     rangeToFeet: vi.fn(),
 }));

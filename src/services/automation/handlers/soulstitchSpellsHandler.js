@@ -1,5 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getCombatContext } from '../../../services/rules/damageUtils.js';
+import { getCombatContext } from '../../../services/rules/combat/damageUtils.js';
 import { addEntry } from '../../../services/ui/logService.js';
 
 const EVOCATION_SCHOOL = 'Evocation';

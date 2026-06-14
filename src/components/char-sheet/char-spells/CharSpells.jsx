@@ -17,7 +17,7 @@ import MageArmorTargetPopup from '../MageArmorTargetPopup.jsx'
 import ProtectionFromEnergyTargetPopup from '../ProtectionFromEnergyTargetPopup.jsx'
 import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../../services/dice/diceRoller.js';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
-import { getCombatContext, getTargetFromAttacker } from '../../../services/rules/damageUtils.js';
+import { getCombatContext, getTargetFromAttacker } from '../../../services/rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../../hooks/useMetamagic.js'
 import { useSpellMetamagicFlow } from '../../../hooks/useSpellMetamagicFlow.js'
@@ -25,11 +25,11 @@ import { useSpellUpcastFlow } from '../../../hooks/useSpellUpcastFlow.js'
 import UpcastPopup from './UpcastPopup.jsx'
 import { executeSpellCast } from '../../../services/rules/spellCastService.js'
 import * as mapsService from '../../../services/maps/mapsService.js';
-import { getNearestPlacedItem } from '../../../services/rules/rangeValidation.js';
+import { getNearestPlacedItem } from '../../../services/rules/combat/rangeValidation.js';
 import { isInnateSorceryActive } from '../../../services/combat/buffService.js';
 import { useRuntimeValue, setRuntimeValue, getRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../../services/ui/logService.js';
-import { applyDamageToTarget } from '../../../services/rules/applyDamage.js';
+import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { isPsionicSpell, hasPsionicSorcery } from '../../../services/rules/metamagicRules.js';
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../../services/rules/postCastRiderService.js';
 import './CharSpells.css'

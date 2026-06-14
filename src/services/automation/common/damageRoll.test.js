@@ -7,7 +7,7 @@ vi.mock('../../dice/diceRoller.js', () => ({
     rollExpressionDoubled: vi.fn(),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
     getTargetFromAttacker: vi.fn(),
     getCombatContext: vi.fn(),
     getResistanceNotice: vi.fn(),
@@ -18,7 +18,7 @@ vi.mock('../../maps/mapsService.js', () => ({
     loadMapData: vi.fn(),
 }));
 
-vi.mock('../../rules/rangeValidation.js', () => ({
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
     computeRangeEffect: vi.fn(),
     computeMeleeProximityEffect: vi.fn(),
     getDistanceFeet: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock('../../rules/rangeValidation.js', () => ({
     rangeToFeet: vi.fn(),
 }));
 
-vi.mock('../../rules/coverService.js', () => ({
+vi.mock('../../rules/combat/coverService.js', () => ({
     computeCover: vi.fn(),
 }));
 
@@ -39,10 +39,10 @@ vi.mock('../../npcs/npcsService.js', () => ({
 
 import { rollDamageForAction, buildAttackContextForDamage } from './damageRoll.js';
 import * as diceRoller from '../../dice/diceRoller.js';
-import * as damageUtils from '../../rules/damageUtils.js';
+import * as damageUtils from '../../rules/combat/damageUtils.js';
 import * as mapsService from '../../maps/mapsService.js';
-import * as rangeValidation from '../../rules/rangeValidation.js';
-import * as coverService from '../../rules/coverService.js';
+import * as rangeValidation from '../../rules/combat/rangeValidation.js';
+import * as coverService from '../../rules/combat/coverService.js';
 import * as npcsService from '../../npcs/npcsService.js';
 
 // ── Helpers ────────────────────────────────────────────────────

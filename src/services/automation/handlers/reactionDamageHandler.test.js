@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
   getTargetFromAttacker: vi.fn(),
 }));
@@ -14,7 +14,7 @@ vi.mock('../../combat/baseCombatActions.js', () => ({
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './reactionDamageHandler.js';
-import * as damageUtils from '../../rules/damageUtils.js';
+import * as damageUtils from '../../rules/combat/damageUtils.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

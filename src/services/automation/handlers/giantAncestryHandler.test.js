@@ -25,7 +25,7 @@ vi.mock('../../combat/automationService.js', () => ({
     evaluateAutoExpression: vi.fn((_expr) => 5),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(async () => null),
     getTargetFromAttacker: vi.fn(() => null),
 }));

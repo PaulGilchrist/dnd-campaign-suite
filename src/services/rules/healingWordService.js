@@ -1,6 +1,6 @@
 import { rollExpression } from '../dice/diceRoller.js';
-import { getCombatContext, getTargetFromAttacker } from './damageUtils.js';
-import { applyHealingToTarget } from './applyHealing.js';
+import { getCombatContext, getTargetFromAttacker } from './combat/damageUtils.js';
+import { applyHealingToTarget } from './combat/applyHealing.js';
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { postLogEntry } from '../shared/logPoster.js';
 

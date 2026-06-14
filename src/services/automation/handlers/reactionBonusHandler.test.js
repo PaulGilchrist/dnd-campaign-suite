@@ -4,7 +4,7 @@ import * as targetResolver from '../common/targetResolver.js';
 import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
 import * as expirations from '../../rules/expirations.js';
 import * as logService from '../../ui/logService.js';
-import * as rangeValidation from '../../rules/rangeValidation.js';
+import * as rangeValidation from '../../rules/combat/rangeValidation.js';
 
 // ── Mocks (hoisted) ────────────────────────────────────────────
 
@@ -26,7 +26,7 @@ vi.mock('../../ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock('../../rules/rangeValidation.js', () => ({
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
   rangeToFeet: vi.fn(),
 }));

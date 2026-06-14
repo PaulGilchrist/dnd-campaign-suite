@@ -22,7 +22,7 @@ vi.mock('../../hooks/useActionPopup.js', () => ({
     loadWeaponMasteries: vi.fn(),
 }));
 
-vi.mock('../../services/rules/damageUtils.js', () => ({
+vi.mock('../../services/rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
     getTargetFromAttacker: vi.fn(),
 }));
@@ -31,7 +31,7 @@ vi.mock('../../services/rules/damageUtils.js', () => ({
 
 import * as weaponMasteryHandler from '../../services/automation/handlers/weaponMasteryHandler.js';
 import * as useActionPopup from '../../hooks/useActionPopup.js';
-import * as damageUtils from '../../services/rules/damageUtils.js';
+import * as damageUtils from '../../services/rules/combat/damageUtils.js';
 
 // ── Test fixtures ──
 

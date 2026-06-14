@@ -1,11 +1,11 @@
 import { useState, useRef } from 'react'
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
-import { getCombatContext, getTargetFromAttacker } from '../../services/rules/damageUtils.js';
+import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { getCurrentCombatRound, loadCombatSummary } from '../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
 import { collectWeaponMastery, evaluateAutoExpression } from '../../services/combat/automationService.js';
-import { applyDamageToTarget } from '../../services/rules/applyDamage.js';
+import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { applyConstellationOption } from '../../services/automation/handlers/starryFormHandler.js';
 import { applyConstellationOption as twinklingApply } from '../../services/automation/handlers/twinklingConstellationHandler.js';

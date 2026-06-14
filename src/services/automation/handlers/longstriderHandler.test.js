@@ -1,14 +1,14 @@
 import { handle, applyLongstrider } from './longstriderHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addExpiration } from '../../rules/expirations.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { resolveMapPositions } from '../common/targetResolver.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 
 vi.mock('../../../hooks/useRuntimeState.js');
 vi.mock('../../rules/expirations.js');
-vi.mock('../../rules/damageUtils.js');
-vi.mock('../../rules/rangeValidation.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js');
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
     rangeToFeet: vi.fn((range) => {
         if (range === 'Touch') return 0;
         return 30;

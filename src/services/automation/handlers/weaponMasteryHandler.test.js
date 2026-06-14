@@ -11,7 +11,7 @@ vi.mock('../../ui/logService.js', () => ({
   addEntry: vi.fn().mockReturnValue(Promise.resolve()),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
   getTargetFromAttacker: vi.fn(),
 }));
@@ -26,7 +26,7 @@ import {
 
 import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
 import * as logService from '../../ui/logService.js';
-import * as damageUtils from '../../rules/damageUtils.js';
+import * as damageUtils from '../../rules/combat/damageUtils.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

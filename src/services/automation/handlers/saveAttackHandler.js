@@ -2,8 +2,8 @@ import { rollExpression } from '../../dice/diceRoller.js';
 import { buildSaveDc } from '../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import * as mapsService from '../../maps/mapsService.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
-import { rangeToFeet } from '../../rules/rangeValidation.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
+import { rangeToFeet } from '../../rules/combat/rangeValidation.js';
 import { addExpiration } from '../../rules/expirations.js';
 import { resolveUses } from '../../combat/automationExpressions.js';
 

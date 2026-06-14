@@ -11,7 +11,7 @@ vi.mock('../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
@@ -32,7 +32,7 @@ vi.mock('../common/savePrompt.js', () => ({
 
 import { handle } from './massSuggestionHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { addExpiration } from '../../rules/expirations.js';
 import { buildSaveDc, createSaveListener } from '../common/savePrompt.js';

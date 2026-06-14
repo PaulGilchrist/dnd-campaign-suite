@@ -11,7 +11,7 @@ vi.mock('../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
   getTargetFromAttacker: vi.fn(),
 }));
@@ -26,7 +26,7 @@ vi.mock('../../automation/common/savePrompt.js', () => ({
 import { handle, applyOpenHandTechnique } from './openHandTechniqueHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
-import { getCombatContext, getTargetFromAttacker } from '../../rules/damageUtils.js';
+import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../automation/common/savePrompt.js';
 
 // ── Helpers ────────────────────────────────────────────────────

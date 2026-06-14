@@ -1,7 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
 import { MELEE_REACH_FEET } from '../../combat/baseCombatActions.js';
-import { getCombatContext, getTargetFromAttacker } from '../../rules/damageUtils.js';
+import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 
 const GLORIOUS_DEFENSE_KEY = 'gloriousDefenseActive';
 

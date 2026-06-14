@@ -47,11 +47,11 @@ vi.mock('../../services/combat/automationService.js', () => ({
   evaluateAutoExpression: vi.fn(() => 0),
 }));
 
-vi.mock('../../services/rules/damageUtils.js', () => ({
+vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(() => Promise.resolve(null)),
 }));
 
-vi.mock('../../services/rules/applyHealing.js', () => ({
+vi.mock('../../services/rules/combat/applyHealing.js', () => ({
   applyHealingToTarget: vi.fn(() => null),
 }));
 
@@ -63,8 +63,8 @@ import * as restRules from '../../services/rules/restRules.js';
 import * as expirations from '../../services/rules/expirations.js';
 import * as classFeatures from '../../services/character/classFeatures.js';
 import * as automationService from '../../services/combat/automationService.js';
-import * as damageUtils from '../../services/rules/damageUtils.js';
-import * as applyHealingService from '../../services/rules/applyHealing.js';
+import * as damageUtils from '../../services/rules/combat/damageUtils.js';
+import * as applyHealingService from '../../services/rules/combat/applyHealing.js';
 
 // ── Test fixtures ──
 

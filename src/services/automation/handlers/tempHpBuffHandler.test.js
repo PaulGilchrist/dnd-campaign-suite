@@ -19,7 +19,7 @@ vi.mock('../../rules/expirations.js', () => ({
   addExpiration: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../rules/rangeValidation.js', () => ({
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
   rangeToFeet: vi.fn(),
 }));
@@ -35,7 +35,7 @@ import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
 import * as automationService from '../../combat/automationService.js';
 import * as mapsService from '../../maps/mapsService.js';
 import * as expirations from '../../rules/expirations.js';
-import * as rangeValidation from '../../rules/rangeValidation.js';
+import * as rangeValidation from '../../rules/combat/rangeValidation.js';
 import * as logService from '../../ui/logService.js';
 
 // ── Helpers ───────────────────────────────────────────────────

@@ -6,7 +6,7 @@ vi.mock('../maps/mapsService.js', () => ({
   loadMapData: vi.fn(),
 }));
 
-vi.mock('../rules/rangeValidation.js', () => ({
+vi.mock('../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
 }));
 
@@ -31,7 +31,7 @@ import {
 } from './auraOfProtection.js';
 
 import { loadMapData } from '../maps/mapsService.js';
-import { getDistanceFeet } from '../rules/rangeValidation.js';
+import { getDistanceFeet } from '../rules/combat/rangeValidation.js';
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 
 // ── Helpers ─────────────────────────────────────────────────────

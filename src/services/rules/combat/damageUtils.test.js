@@ -3,12 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
 // Use inline vi.fn() — no closure over external variables
 
-vi.mock('../ui/dataLoader.js', () => ({
+vi.mock('../../ui/dataLoader.js', () => ({
   loadEquipment: vi.fn(),
   clearDataCache: vi.fn(),
 }));
 
-vi.mock('./core/attackCalc.js', () => ({
+vi.mock('../core/attackCalc.js', () => ({
   parseMagicItemName: vi.fn(),
 }));
 
@@ -26,8 +26,8 @@ import {
   computeAcEstimate,
 } from './damageUtils.js';
 
-import { loadEquipment, clearDataCache } from '../ui/dataLoader.js';
-import { parseMagicItemName } from './core/attackCalc.js';
+import { loadEquipment, clearDataCache } from '../../ui/dataLoader.js';
+import { parseMagicItemName } from '../core/attackCalc.js';
 
 // ── Globals ────────────────────────────────────────────────────
 

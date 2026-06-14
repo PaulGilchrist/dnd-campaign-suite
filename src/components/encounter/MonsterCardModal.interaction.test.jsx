@@ -59,7 +59,7 @@ vi.mock('../../services/combat/conditionEffects.js', () => {
   };
 });
 
-vi.mock('../../services/rules/damageUtils.js', () => {
+vi.mock('../../services/rules/combat/damageUtils.js', () => {
   let _findCreatureReturn = null;
   const _findCreatureByName = vi.fn((_ctx, _name) => {
     return _findCreatureReturn ?? { name: 'Goblin', conditions: [] };
@@ -76,7 +76,7 @@ vi.mock('../../services/rules/damageUtils.js', () => {
   };
 });
 
-vi.mock('../../services/rules/rangeValidation.js', () => ({
+vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
   computeRangeEffect: vi.fn(() => ({ mode: 'normal' })),
   getDistanceFeet: vi.fn(() => null),
   getNearestPlacedItem: vi.fn(() => null),
@@ -96,7 +96,7 @@ vi.mock('../../services/maps/mapsService.js', () => ({
 // ── Re-import mocked modules ----
 import * as useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
 import * as conditionEffects from '../../services/combat/conditionEffects.js';
-import * as damageUtils from '../../services/rules/damageUtils.js';
+import * as damageUtils from '../../services/rules/combat/damageUtils.js';
 
 const rollAttack = useLoggedDiceRoll._rollAttack;
 const rollDamage = useLoggedDiceRoll._rollDamage;

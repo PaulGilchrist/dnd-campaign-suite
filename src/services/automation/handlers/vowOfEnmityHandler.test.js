@@ -5,13 +5,13 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
     getTargetFromAttacker: vi.fn(),
 }));
 
 const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
-const { getCombatContext, getTargetFromAttacker } = await import('../../rules/damageUtils.js');
+const { getCombatContext, getTargetFromAttacker } = await import('../../rules/combat/damageUtils.js');
 
 const campaignName = 'TestCampaign';
 

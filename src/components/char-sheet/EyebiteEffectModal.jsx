@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import './EyebiteEffectModal.css';
-import { getDistanceFeet } from '../../services/rules/rangeValidation.js';
+import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';
 import { sendSavePrompt, sendSaveResult } from '../../services/combat/savePromptService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { addExpiration } from '../../services/rules/expirations.js';

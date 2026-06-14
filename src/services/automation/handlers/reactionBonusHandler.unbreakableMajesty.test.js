@@ -24,7 +24,7 @@ vi.mock('../../ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock('../../rules/rangeValidation.js', () => ({
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
   rangeToFeet: vi.fn(),
 }));

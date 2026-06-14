@@ -5,7 +5,7 @@ import * as runtimeState from '../../../hooks/useRuntimeState.js';
 import * as logService from '../../ui/logService.js';
 import * as expirations from '../../rules/expirations.js';
 import * as logPoster from '../../shared/logPoster.js';
-import * as damageUtils from '../../rules/damageUtils.js';
+import * as damageUtils from '../../rules/combat/damageUtils.js';
 
 const campaignName = 'test-campaign';
 

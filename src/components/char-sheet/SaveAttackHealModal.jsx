@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { getDistanceFeet } from '../../services/rules/rangeValidation.js';
+import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';
 import { sendSavePrompt, sendSaveResult } from '../../services/combat/savePromptService.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { rollExpression } from '../../services/dice/diceRoller.js';

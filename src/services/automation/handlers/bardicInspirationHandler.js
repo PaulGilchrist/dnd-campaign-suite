@@ -3,7 +3,7 @@ import { resolveMapPositions } from '../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addExpiration } from '../../rules/expirations.js';
 import { evaluateAutoExpression } from '../../combat/automationService.js';
-import { getDistanceFeet, rangeToFeet } from '../../rules/rangeValidation.js';
+import { getDistanceFeet, rangeToFeet } from '../../rules/combat/rangeValidation.js';
 
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;

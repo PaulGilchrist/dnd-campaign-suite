@@ -19,11 +19,11 @@ vi.mock('../../../hooks/useMetamagic.js', () => ({
   getLastDamageEvent: vi.fn(),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../rules/applyHealing.js', () => ({
+vi.mock('../../rules/combat/applyHealing.js', () => ({
   applyHealingToTarget: vi.fn(),
 }));
 
@@ -35,8 +35,8 @@ import * as diceRoller from '../../dice/diceRoller.js';
 import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
 import * as logService from '../../ui/logService.js';
 import * as useMetamagic from '../../../hooks/useMetamagic.js';
-import * as damageUtils from '../../rules/damageUtils.js';
-import * as applyHealing from '../../rules/applyHealing.js';
+import * as damageUtils from '../../rules/combat/damageUtils.js';
+import * as applyHealing from '../../rules/combat/applyHealing.js';
 
 // ── Helpers ────────────────────────────────────────────────────────
 

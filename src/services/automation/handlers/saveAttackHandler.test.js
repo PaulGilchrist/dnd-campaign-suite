@@ -19,11 +19,11 @@ vi.mock('../../maps/mapsService.js', () => ({
   loadMapData: vi.fn(),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../rules/rangeValidation.js', () => ({
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
 }));
 
@@ -38,7 +38,7 @@ import * as diceRoller from '../../dice/diceRoller.js';
 import * as savePrompt from '../common/savePrompt.js';
 import * as runtimeState from '../../../hooks/useRuntimeState.js';
 import * as mapsService from '../../maps/mapsService.js';
-import * as damageUtils from '../../rules/damageUtils.js';
+import * as damageUtils from '../../rules/combat/damageUtils.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

@@ -6,8 +6,8 @@ import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES, getShortRes
 import { clearAllExpirationEffects } from '../../services/rules/expirations.js'
 import { getClassFeatures } from '../../services/character/classFeatures.js'
 import { evaluateAutoExpression } from '../../services/combat/automationService.js'
-import { getCombatContext } from '../../services/rules/damageUtils.js'
-import { applyHealingToTarget } from '../../services/rules/applyHealing.js'
+import { getCombatContext } from '../../services/rules/combat/damageUtils.js'
+import { applyHealingToTarget } from '../../services/rules/combat/applyHealing.js'
 import { loadSpellData } from '../../services/ui/dataLoader.js'
 
 function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {

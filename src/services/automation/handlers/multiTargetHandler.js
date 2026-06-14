@@ -1,10 +1,10 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
-import { getDistanceFeet, rangeToFeet } from '../../rules/rangeValidation.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
+import { getDistanceFeet, rangeToFeet } from '../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../common/targetResolver.js';
-import { applyHealingToTarget } from '../../rules/applyHealing.js';
-import { applyDamageToTarget } from '../../rules/applyDamage.js';
+import { applyHealingToTarget } from '../../rules/combat/applyHealing.js';
+import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
 import { endInvisibilityOnHostileAction } from '../../rules/invisibilityService.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 import { postLogEntry } from '../../shared/logPoster.js';

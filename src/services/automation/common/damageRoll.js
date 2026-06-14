@@ -1,8 +1,8 @@
 import { rollExpression, rollExpressionDoubled } from '../../dice/diceRoller.js';
-import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetName } from '../../rules/damageUtils.js';
+import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetName } from '../../rules/combat/damageUtils.js';
 import * as mapsService from '../../maps/mapsService.js';
-import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem, rangeToFeet } from '../../rules/rangeValidation.js';
-import { computeCover } from '../../rules/coverService.js';
+import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem, rangeToFeet } from '../../rules/combat/rangeValidation.js';
+import { computeCover } from '../../rules/combat/coverService.js';
 import { loadNPCs } from '../../npcs/npcsService.js';
 
 export function rollDamageForAction(auto, options = {}) {

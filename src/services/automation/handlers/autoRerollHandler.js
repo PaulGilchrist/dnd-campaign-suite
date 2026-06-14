@@ -2,8 +2,8 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState
 import { addEntry } from '../../ui/logService.js';
 import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../hooks/useMetamagic.js';
 import { automationInfoPopup } from '../../shared/popupResponse.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
-import { getDistanceFeet, rangeToFeet } from '../../rules/rangeValidation.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
+import { getDistanceFeet, rangeToFeet } from '../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../common/targetResolver.js';
 import { getClassFeatures } from '../../../services/character/classFeatures.js';
 import { evaluateAutoExpression } from '../../combat/automationService.js';

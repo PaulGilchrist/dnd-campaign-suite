@@ -1,7 +1,7 @@
 import { handle, applyMageArmor } from './mageArmorHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addExpiration } from '../../rules/expirations.js';
-import { getCombatContext } from '../../../services/rules/damageUtils.js';
+import { getCombatContext } from '../../../services/rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 
 vi.mock('../../../hooks/useRuntimeState.js', () => ({
@@ -13,7 +13,7 @@ vi.mock('../../rules/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 
-vi.mock('../../../services/rules/damageUtils.js', () => ({
+vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
 }));
 
@@ -21,7 +21,7 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(),
 }));
 
-vi.mock('../../../services/rules/rangeValidation.js', () => ({
+vi.mock('../../../services/rules/combat/rangeValidation.js', () => ({
     rangeToFeet: vi.fn((r) => (r ? 5 : 0)),
 }));
 

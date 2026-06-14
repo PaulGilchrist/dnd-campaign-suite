@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
 // Use inline vi.fn() — no closure over external variables
 
-vi.mock('../../models/SpellOverlay.js', () => ({
+vi.mock('../../../models/SpellOverlay.js', () => ({
   hitTestOverlay: vi.fn(),
   OverlayShape: { SPHERE: 'sphere', CYLINDER: 'cylinder' },
 }));
@@ -14,9 +14,9 @@ vi.mock('./applyDamage.js', () => ({
   applyDamageToTarget: vi.fn(),
 }));
 
-vi.mock('../combat/savePromptService.js', () => ({ sendSavePrompt: vi.fn() }));
+vi.mock('../../combat/savePromptService.js', () => ({ sendSavePrompt: vi.fn() }));
 
-vi.mock('../ui/utils.js', () => ({ default: { guid: vi.fn(() => 'aoe-guid-001') } }));
+vi.mock('../../ui/utils.js', () => ({ default: { guid: vi.fn(() => 'aoe-guid-001') } }));
 
 // ── Imports (Vite returns mocked versions) ─────────────────────
 
@@ -26,14 +26,14 @@ import {
   sendAoePlayerSaves,
 } from './aoeService.js';
 
-import { hitTestOverlay } from '../../models/SpellOverlay.js';
+import { hitTestOverlay } from '../../../models/SpellOverlay.js';
 import {
   rollSaveForCreature,
   computeDamageAfterSave,
   applyDamageToTarget,
 } from './applyDamage.js';
-import { sendSavePrompt } from '../combat/savePromptService.js';
-import utils from '../ui/utils.js';
+import { sendSavePrompt } from '../../combat/savePromptService.js';
+import utils from '../../ui/utils.js';
 
 // ── Globals ────────────────────────────────────────────────────
 

@@ -1,9 +1,9 @@
 import { resolveTarget, resolveMapPositions } from '../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../ui/logService.js';
-import { getDistanceFeet, rangeToFeet } from '../../rules/rangeValidation.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
-import { applyHealingToTarget } from '../../rules/applyHealing.js';
+import { getDistanceFeet, rangeToFeet } from '../../rules/combat/rangeValidation.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
+import { applyHealingToTarget } from '../../rules/combat/applyHealing.js';
 import { getLastDamageEvent, getLastAttackRoll, getLastAbilityCheck } from '../../../hooks/useMetamagic.js';
 import { evaluateAutoExpression } from '../../combat/automationService.js';
 

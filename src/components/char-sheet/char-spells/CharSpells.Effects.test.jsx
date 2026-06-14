@@ -93,7 +93,7 @@ vi.mock('../../../services/rules/spellCastService.js', () => ({
   executeSpellCast: vi.fn(),
 }));
 
-vi.mock('../../../services/rules/damageUtils.js', () => ({
+vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(() => Promise.resolve(null)),
   getTargetFromAttacker: vi.fn(() => null),
 }));
@@ -113,7 +113,7 @@ vi.mock('../../../services/maps/mapsService.js', () => ({
   loadMapData: vi.fn(() => Promise.resolve({})),
 }));
 
-vi.mock('../../../services/rules/rangeValidation.js', () => ({
+vi.mock('../../../services/rules/combat/rangeValidation.js', () => ({
   getNearestPlacedItem: vi.fn(() => null),
 }));
 

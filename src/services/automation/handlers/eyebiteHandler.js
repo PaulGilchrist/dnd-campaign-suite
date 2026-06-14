@@ -1,7 +1,7 @@
 import { buildSaveDc } from '../common/savePrompt.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import * as mapsService from '../../maps/mapsService.js';
-import { rangeToFeet } from '../../rules/rangeValidation.js';
+import { rangeToFeet } from '../../rules/combat/rangeValidation.js';
 
 const EFFECT_OPTIONS = [
     { key: 'asleep', label: 'Asleep', condition: 'unconscious' },

@@ -2,7 +2,7 @@ import { handle } from './hurlThroughHellHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { rollExpression } from '../../dice/diceRoller.js';
 import { buildSaveDc, createSaveListener } from '../common/savePrompt.js';
-import { getCombatContext, getTargetFromAttacker } from '../../rules/damageUtils.js';
+import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 
 vi.mock('../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock('../common/savePrompt.js', () => ({
     createSaveListener: vi.fn(),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
     getTargetFromAttacker: vi.fn(),
 }));

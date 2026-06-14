@@ -60,12 +60,12 @@ vi.mock('../../services/maps/mapsService.js', () => ({
   loadMapData: vi.fn(() => Promise.resolve({})),
 }));
 
-vi.mock('../../services/rules/damageUtils.js', () => ({
+vi.mock('../../services/rules/combat/damageUtils.js', () => ({
   getTargetFromAttacker: vi.fn(() => null),
   getCombatContext: vi.fn(() => Promise.resolve(null)),
 }));
 
-vi.mock('../../services/rules/rangeValidation.js', () => ({
+vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
   getNearestPlacedItem: vi.fn(() => null),
 }));
 

@@ -1,5 +1,5 @@
 import { loadMapData } from '../maps/mapsService.js';
-import { getDistanceFeet } from '../rules/rangeValidation.js';
+import { getDistanceFeet } from '../rules/combat/rangeValidation.js';
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 
 export const CANNOT_ACT_CONDITIONS = ['incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious'];

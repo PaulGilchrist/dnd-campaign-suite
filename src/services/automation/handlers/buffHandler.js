@@ -2,7 +2,7 @@ import { toggleBuff } from '../common/buffToggle.js';
 import { addExpiration } from '../../rules/expirations.js';
 import { handle as handleTeleport } from './tempTeleportHandler.js';
 import { handle as handleVowOfEnmity } from './vowOfEnmityHandler.js';
-import { getTargetFromAttacker } from '../../rules/damageUtils.js';
+import { getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 import { evaluateAutoExpression } from '../../combat/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';

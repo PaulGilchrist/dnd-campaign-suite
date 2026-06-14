@@ -65,12 +65,12 @@ import { getClassFeatures } from '../../services/character/classFeatures.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
 import { executeSpellCast } from '../../services/rules/spellCastService.js'
-import { getTargetFromAttacker, getCombatContext } from '../../services/rules/damageUtils.js';
+import { getTargetFromAttacker, getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { endFriendsOnHostileAction } from '../../services/rules/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/invisibilityService.js';
-import { applyDamageToTarget } from '../../services/rules/applyDamage.js';
-import { getNearestPlacedItem } from '../../services/rules/rangeValidation.js';
+import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
+import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
 import { buildEmpoweredSpellState, executeEmpoweredReroll, getEmpoweredSpellDescription } from '../../services/rules/empoweredSpellService.js';

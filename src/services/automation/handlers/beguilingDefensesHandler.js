@@ -2,7 +2,7 @@ import { buildSaveDc, createSaveListener } from '../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { getLastAttackRoll } from '../../../hooks/useMetamagic.js';
 import { addEntry } from '../../ui/logService.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
 
 const EVENT_STALENESS_MS = 60000;
 const USES_KEY = 'beguilingDefensesUses';

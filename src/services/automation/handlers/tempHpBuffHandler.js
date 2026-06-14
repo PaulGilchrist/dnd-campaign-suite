@@ -2,7 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState
 import { evaluateAutoExpression } from '../../combat/automationService.js';
 import { loadMapData } from '../../maps/mapsService.js';
 import { addExpiration } from '../../rules/expirations.js';
-import { getDistanceFeet, rangeToFeet } from '../../rules/rangeValidation.js';
+import { getDistanceFeet, rangeToFeet } from '../../rules/combat/rangeValidation.js';
 import { addEntry } from '../../ui/logService.js';
 
 function getBardicDieSize(playerStats) {

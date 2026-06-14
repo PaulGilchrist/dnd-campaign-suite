@@ -4,11 +4,11 @@ import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceR
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
 import Popup from '../common/Popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
-import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResistanceNotice } from '../../services/rules/damageUtils.js';
-import { getCombatContext } from '../../services/rules/damageUtils.js';
-import { findCreatureByName } from '../../services/rules/damageUtils.js';
+import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResistanceNotice } from '../../services/rules/combat/damageUtils.js';
+import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
+import { findCreatureByName } from '../../services/rules/combat/damageUtils.js';
 import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditionEffects.js';
-import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rules/rangeValidation.js';
+import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rules/combat/rangeValidation.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { useRuntimeValue } from '../../hooks/useRuntimeState.js';
 import './MonsterCardModal.css';

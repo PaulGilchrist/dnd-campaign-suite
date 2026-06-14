@@ -1,4 +1,4 @@
-import { getCombatContext } from '../../rules/damageUtils.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
 
 export async function handle(action, playerStats, campaignName) {
     const cs = await getCombatContext(campaignName);

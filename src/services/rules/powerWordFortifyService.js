@@ -1,9 +1,9 @@
 import { rollExpression } from '../dice/diceRoller.js';
-import { getCombatContext } from './damageUtils.js';
+import { getCombatContext } from './combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { postLogEntry } from '../shared/logPoster.js';
-import { rangeToFeet } from './rangeValidation.js';
-import { getDistanceFeet } from './rangeValidation.js';
+import { rangeToFeet } from './combat/rangeValidation.js';
+import { getDistanceFeet } from './combat/rangeValidation.js';
 
 const POWER_WORD_FORTIFY_NAME = 'Power Word Fortify';
 

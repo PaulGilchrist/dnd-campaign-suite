@@ -1,4 +1,4 @@
-import { getDistanceFeet } from '../rules/rangeValidation.js';
+import { getDistanceFeet } from '../rules/combat/rangeValidation.js';
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 
 export function getWolfAdvantageAgainst({ targetPos, attackerName, campaignName, mapData, skipRangeCheck }) {

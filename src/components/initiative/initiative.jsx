@@ -34,7 +34,7 @@ import {
     addCondition,
     buildConditionPopup,
 } from '../../services/combat/conditionSaveService.js'
-import { applyDamageToTarget } from '../../services/rules/applyDamage.js'
+import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js'
 import {
     rollConcentrationSave,
     breakConcentration,

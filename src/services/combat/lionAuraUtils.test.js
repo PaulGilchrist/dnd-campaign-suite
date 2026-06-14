@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
 
-vi.mock('../rules/rangeValidation.js', () => ({
+vi.mock('../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
 }))
 
@@ -13,7 +13,7 @@ vi.mock('../../hooks/useRuntimeState.js', () => ({
 // ── Imports (Vite returns mocked versions) ─────────────────────
 
 import { getLionDisadvantageAgainst } from './lionAuraUtils.js'
-import { getDistanceFeet } from '../rules/rangeValidation.js'
+import { getDistanceFeet } from '../rules/combat/rangeValidation.js'
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js'
 
 // ── Helpers ─────────────────────────────────────────────────────

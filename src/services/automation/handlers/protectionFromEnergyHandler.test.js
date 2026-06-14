@@ -15,7 +15,7 @@ vi.mock('../../ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
@@ -26,7 +26,7 @@ import { handle, applyProtectionFromEnergy, isProtectionFromEnergyActive, getPro
 import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
 import * as expirations from '../../rules/expirations.js';
 import * as logService from '../../ui/logService.js';
-import * as damageUtils from '../../rules/damageUtils.js';
+import * as damageUtils from '../../rules/combat/damageUtils.js';
 
 // ── Helpers ───────────────────────────────────────────────────────
 

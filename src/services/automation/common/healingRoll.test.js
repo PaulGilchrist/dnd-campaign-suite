@@ -23,12 +23,12 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../rules/damageUtils.js', () => ({
+vi.mock('../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
     getTargetFromAttacker: vi.fn(),
 }));
 
-vi.mock('../../rules/applyHealing.js', () => ({
+vi.mock('../../rules/combat/applyHealing.js', () => ({
     applyHealingToTarget: vi.fn(),
 }));
 
@@ -47,9 +47,9 @@ const { getRuntimeValue, setRuntimeValue } = await import(
      '../../../hooks/useRuntimeState.js'
 );
 const { getCombatContext, getTargetFromAttacker } = await import(
-     '../../rules/damageUtils.js'
+     '../../rules/combat/damageUtils.js'
 );
-const { applyHealingToTarget } = await import('../../rules/applyHealing.js');
+const { applyHealingToTarget } = await import('../../rules/combat/applyHealing.js');
 const { postLogEntry } = await import('../../shared/logPoster.js');
 
 // ── Test fixtures ─────────────────────────────────────────────────

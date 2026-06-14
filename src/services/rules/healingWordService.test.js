@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────
 
-vi.mock('./damageUtils.js', () => ({
+vi.mock('./combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
     getTargetFromAttacker: vi.fn(),
 }));
@@ -27,7 +27,7 @@ vi.mock('../dice/diceRoller.js', () => ({
 // ── Imports ────────────────────────────────────────────────────
 
 import { triggerHealingWord } from './healingWordService.js';
-import { getCombatContext, getTargetFromAttacker } from './damageUtils.js';
+import { getCombatContext, getTargetFromAttacker } from './combat/damageUtils.js';
 import { rollExpression } from '../dice/diceRoller.js';
 
 // ── Globals ────────────────────────────────────────────────────

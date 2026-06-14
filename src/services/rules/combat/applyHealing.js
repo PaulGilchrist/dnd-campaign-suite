@@ -1,7 +1,7 @@
 
-import { setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import storage from '../ui/storage.js';
-import { modifyHitPoints } from '../shared/hpModifier.js';
+import { setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import storage from '../../ui/storage.js';
+import { modifyHitPoints } from '../../shared/hpModifier.js';
 
 export function applyHealingToTarget(combatSummary, targetName, healAmount, campaignName) {
     const result = modifyHitPoints(combatSummary, targetName, healAmount, campaignName);

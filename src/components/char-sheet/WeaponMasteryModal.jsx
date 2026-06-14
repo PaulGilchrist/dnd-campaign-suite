@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MASTERY_EFFECTS, applyMasteryEffect } from '../../services/automation/handlers/weaponMasteryHandler.js';
 import { loadWeaponMasteries } from '../../hooks/useActionPopup.js';
-import { getCombatContext, getTargetFromAttacker } from '../../services/rules/damageUtils.js';
+import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import './CharSheet.css';
 
 function WeaponMasteryModal({ attackName, baseMastery, extraMasteries, playerStats, campaignName, targetName: targetNameProp, onClose }) {

@@ -1,5 +1,5 @@
 import { rollExpression } from '../dice/diceRoller.js';
-import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet, rangeToFeet } from './rangeValidation.js';
+import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet, rangeToFeet } from './combat/rangeValidation.js';
 import { isInnateSorceryActive, getActiveBuffs } from '../combat/buffService.js';
 import { triggerPostCastRiderSaves, triggerSpellThief, triggerBewitchingMagic, triggerSoulstitchSpells, hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from './postCastRiderService.js';
 import { triggerPostCastSelfHeals, triggerPostCastAllyHeals } from './postCastHealService.js';
@@ -8,8 +8,8 @@ import { triggerInspiringSmite } from './inspiringSmiteService.js';
 import { triggerPrimalCompanionSpellShare } from './primalCompanionSpellShareService.js';
 import { triggerWildMagicSurge } from './wildMagicSurgeService.js';
 import { setRuntimeValue, getRuntimeValue } from '../../hooks/useRuntimeState.js';
-import { applyHealingToTarget } from './applyHealing.js';
-import { getCombatContext } from '../rules/damageUtils.js';
+import { applyHealingToTarget } from './combat/applyHealing.js';
+import { getCombatContext } from '../rules/combat/damageUtils.js';
 import { postLogEntry } from '../shared/logPoster.js';
 import { executeHandler } from '../automation/index.js';
 import { rollExpressionMaximized } from '../dice/diceRoller.js';

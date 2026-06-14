@@ -1,4 +1,4 @@
-import { getCombatContext } from '../rules/damageUtils.js'
+import { getCombatContext } from '../rules/combat/damageUtils.js'
 
 const CS_KEY = 'combatSummary'
 const ACTIVE_KEY = 'activeCreatureName'

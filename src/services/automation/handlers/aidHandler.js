@@ -1,7 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addExpiration } from '../../rules/expirations.js';
-import { getCombatContext } from '../../rules/damageUtils.js';
-import { rangeToFeet } from '../../rules/rangeValidation.js';
+import { getCombatContext } from '../../rules/combat/damageUtils.js';
+import { rangeToFeet } from '../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../common/targetResolver.js';
 import { evaluateAutoExpression } from '../../combat/automationExpressions.js';
 import { postLogEntry } from '../../shared/logPoster.js';
