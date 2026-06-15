@@ -1,4 +1,4 @@
-import { addEntry } from '../../ui/logService.js';
+import { addEntry } from '../../../ui/logService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;

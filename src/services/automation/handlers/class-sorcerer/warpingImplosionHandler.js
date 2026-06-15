@@ -1,12 +1,12 @@
-import { rollExpression } from '../../dice/diceRoller.js';
-import { buildSaveDc } from '../common/savePrompt.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import * as mapsService from '../../maps/mapsService.js';
-import { getCombatContext } from '../../rules/combat/damageUtils.js';
-import { rangeToFeet } from '../../rules/combat/rangeValidation.js';
-import { getCurrentSorceryPoints, spendSorceryPoints } from '../../../hooks/useMetamagic.js';
-import { getClassFeatures } from '../../../services/character/classFeatures.js';
-import { addEntry } from '../../ui/logService.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
+import { buildSaveDc } from '../../common/savePrompt.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import * as mapsService from '../../../maps/mapsService.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { getCurrentSorceryPoints, spendSorceryPoints } from '../../../../hooks/useMetamagic.js';
+import { getClassFeatures } from '../../../../services/character/classFeatures.js';
+import { addEntry } from '../../../ui/logService.js';
 
 const AREA_SHAPES = new Set(['emanation', 'cone', 'line', 'sphere', 'cube', 'cylinder', 'square', 'circle', 'wall', 'cage', 'floor', 'area']);
 

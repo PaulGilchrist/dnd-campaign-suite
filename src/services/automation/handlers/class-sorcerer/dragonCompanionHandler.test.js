@@ -1,6 +1,6 @@
 import { handle, confirmDragonCompanion } from './dragonCompanionHandler.js';
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));

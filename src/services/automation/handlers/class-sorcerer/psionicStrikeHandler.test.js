@@ -1,18 +1,18 @@
 import { handle } from './psionicStrikeHandler.js';
-import * as runtimeState from '../../../hooks/useRuntimeState.js';
-import * as logService from '../../ui/logService.js';
-import * as diceRoller from '../../dice/diceRoller.js';
+import * as runtimeState from '../../../../hooks/useRuntimeState.js';
+import * as logService from '../../../ui/logService.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../dice/diceRoller.js', () => ({
+vi.mock('../../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
 }));
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { confirmCelestialRevelation } from '../../services/automation/handlers/celestialRevelationHandler.js';
+import { confirmCelestialRevelation } from '../../services/automation/handlers/class-sorcerer/celestialRevelationHandler.js';
 import './CharSheet.css';
 
 const TRANSFORMATION_OPTIONS = [

@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 
 const CONSTELLATION_OPTIONS = ['Archer', 'Chalice', 'Dragon'];
 

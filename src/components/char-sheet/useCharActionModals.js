@@ -7,8 +7,8 @@ import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
 import { collectWeaponMastery, evaluateAutoExpression } from '../../services/combat/automationService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../services/ui/logService.js';
-import { applyConstellationOption } from '../../services/automation/handlers/starryFormHandler.js';
-import { applyConstellationOption as twinklingApply } from '../../services/automation/handlers/twinklingConstellationHandler.js';
+import { applyConstellationOption } from '../../services/automation/handlers/class-sorcerer/starryFormHandler.js';
+import { applyConstellationOption as twinklingApply } from '../../services/automation/handlers/class-sorcerer/twinklingConstellationHandler.js';
 import { handleRestore } from '../../services/automation/handlers/elderChampionHandler.js';
 
 export default function useCharActionModals({

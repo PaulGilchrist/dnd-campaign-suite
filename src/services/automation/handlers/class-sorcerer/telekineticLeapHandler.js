@@ -1,5 +1,5 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { toggleBuff } from '../common/buffToggle.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { toggleBuff } from '../../common/buffToggle.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;

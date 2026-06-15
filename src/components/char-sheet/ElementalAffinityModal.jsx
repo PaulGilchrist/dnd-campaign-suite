@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { applyTypeChoice } from '../../services/automation/handlers/elementalAffinityHandler.js';
+import { applyTypeChoice } from '../../services/automation/handlers/class-sorcerer/elementalAffinityHandler.js';
 import './CharSheet.css';
 
 function ElementalAffinityModal({ action, playerStats, campaignName, onClose }) {

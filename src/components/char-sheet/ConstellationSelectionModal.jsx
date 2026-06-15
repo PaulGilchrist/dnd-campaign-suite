@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { applyConstellationOption } from '../../services/automation/handlers/starryFormHandler.js';
+import { applyConstellationOption } from '../../services/automation/handlers/class-sorcerer/starryFormHandler.js';
 import './CharSheet.css';
 
 function ConstellationSelectionModal({ action, playerStats, campaignName, isTwinkled, onConfirm, onClose }) {

@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 
 const HANDLER_MODAL = 'dragonCompanion';
 const HANDLER_CONFIRM = 'dragon_companion_confirm';

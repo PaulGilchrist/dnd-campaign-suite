@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { confirmDragonCompanion } from '../../services/automation/handlers/dragonCompanionHandler.js';
+import { confirmDragonCompanion } from '../../services/automation/handlers/class-sorcerer/dragonCompanionHandler.js';
 import './CharSheet.css';
 
 function DragonCompanionModal({ action, playerStats, campaignName, onClose }) {

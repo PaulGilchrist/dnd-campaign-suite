@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { confirmArcaneCharge } from '../../services/automation/handlers/arcaneChargeHandler.js';
+import { confirmArcaneCharge } from '../../services/automation/handlers/class-sorcerer/arcaneChargeHandler.js';
 import './CharSheet.css';
 
 function ArcaneChargeModal({ action, playerStats, campaignName, distance, onClose }) {

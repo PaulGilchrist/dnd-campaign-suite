@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { onDoubleRollSelected } from '../../services/automation/handlers/wildMagicSurgeHandler.js';
+import { onDoubleRollSelected } from '../../services/automation/handlers/class-sorcerer/wildMagicSurgeHandler.js';
 import './CharSheet.css';
 
 function WildMagicDoubleRollModal({ featureName, roll1, roll2, surgeTable, campaignName, playerStats, onClose }) {

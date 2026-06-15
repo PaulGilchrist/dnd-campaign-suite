@@ -2,19 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ─────────────────────
 
-vi.mock('../../dice/diceRoller.js', () => ({
+vi.mock('../../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn(() => ({ total: 30, rolls: [10, 10, 10], modifier: 0 })),
 }));
 
-vi.mock('../../rules/combat/damageUtils.js', () => ({
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(() => Promise.resolve(null)),
 }));
 
-vi.mock('../../maps/mapsService.js', () => ({
+vi.mock('../../../maps/mapsService.js', () => ({
     loadMapData: vi.fn(() => Promise.resolve(null)),
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => {
+vi.mock('../../../../hooks/useRuntimeState.js', () => {
     const mockFn = vi.fn((_playerName, _key, _campaignName) => {
         if (_key === 'aquaticAffinityEmanationRange') return null;
         return 1;
@@ -22,32 +22,32 @@ vi.mock('../../../hooks/useRuntimeState.js', () => {
     return { getRuntimeValue: mockFn, setRuntimeValue: vi.fn().mockResolvedValue(undefined) };
 });
 
-vi.mock('../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/useMetamagic.js', () => ({
     getCurrentSorceryPoints: vi.fn(() => 10),
     spendSorceryPoints: vi.fn(),
 }));
 
-vi.mock('../../../services/character/classFeatures.js', () => ({
+vi.mock('../../../../services/character/classFeatures.js', () => ({
     getClassFeatures: vi.fn(() => ({ maxSorceryPoints: 10 })),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../common/savePrompt.js', () => ({
+vi.mock('../../common/savePrompt.js', () => ({
     buildSaveDc: vi.fn(() => 15),
 }));
 
-vi.mock('../../rules/combat/rangeValidation.js', () => ({
+vi.mock('../../../rules/combat/rangeValidation.js', () => ({
     rangeToFeet: vi.fn(() => null),
 }));
 
 // ── Imports (Vite returns mocked versions) ───────────────────────
 
 import { handle, applyWarpingImplosion } from './warpingImplosionHandler.js';
-import * as runtimeState from '../../../hooks/useRuntimeState.js';
-import * as metamagic from '../../../hooks/useMetamagic.js';
+import * as runtimeState from '../../../../hooks/useRuntimeState.js';
+import * as metamagic from '../../../../hooks/useMetamagic.js';
 
 // ── Helpers ───────────────────────────────────────────────────────
 

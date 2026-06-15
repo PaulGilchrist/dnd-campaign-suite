@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { onTamedSurgeSelected } from '../../services/automation/handlers/wildMagicSurgeHandler.js';
+import { onTamedSurgeSelected } from '../../services/automation/handlers/class-sorcerer/wildMagicSurgeHandler.js';
 import './CharSheet.css';
 
 function WildMagicTamedModal({ featureName, availableSurges, campaignName, playerStats, onClose }) {

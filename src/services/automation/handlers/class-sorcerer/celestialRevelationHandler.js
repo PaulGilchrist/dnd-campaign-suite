@@ -1,6 +1,6 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addExpiration } from '../../rules/effects/expirations.js';
-import { toggleBuff } from '../common/buffToggle.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
+import { toggleBuff } from '../../common/buffToggle.js';
 
 const TRANSFORMATION_EFFECTS = {
     'Heavenly Wings': {
