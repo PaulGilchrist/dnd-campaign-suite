@@ -1,5 +1,6 @@
 import { parseMagicItemName, findEquippedWeapons, buildWeaponAttack, buildMonkAttacks, buildSpellAttacks } from './attackCalc.js';
 import classRules from '../../character/classRules2024.js';
+import { getCombatSummary } from '../../encounters/combatData.js';
 
 /**
  * Build all attack entries for a character (2024 rules).
@@ -222,6 +223,59 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
             isPsychicBlade: true,
             isBonusActionBlade: true,
         });
+    }
+
+    // Swift Quiver: two bonus action ranged attacks with bow/crossbow while concentration active
+    const combatSummary = getCombatSummary();
+    const swiftQuiverCreature = combatSummary?.creatures?.find(c => c.name === playerStats.name);
+    const hasSwiftQuiverConcentration = swiftQuiverCreature?.concentration?.spell === 'Swift Quiver';
+    if (hasSwiftQuiverConcentration) {
+        const dex = playerStats.abilities.find(a => a.name === 'Dexterity');
+        const dexMod = dex?.bonus || 0;
+        const prof = proficiency;
+        const toHit = dexMod + prof;
+        const equippedWeapons = playerStats.inventory?.equipped || [];
+        const allEquip = allEquipment || [];
+        let bowWeapon = null;
+        for (const equippedName of equippedWeapons) {
+            let baseName = equippedName;
+            if (equippedName && typeof equippedName === 'string' && equippedName.charAt(0) === '+') {
+                baseName = equippedName.substring(3);
+            }
+            const weapon = allEquip.find(w => w.name === baseName);
+            if (!weapon) continue;
+            const props = weapon.properties || [];
+            const isBow = weapon.weapon_category === 'Ranged' && (props.includes('Ammunition') || props.includes('Heavy') || props.includes('Light'));
+            const isBoltWeapon = ['Longbow', 'Light Crossbow', 'Hand Crossbow', 'Crossbow, Heavy', 'Crossbow, Light'].includes(weapon.name);
+            if (isBow || isBoltWeapon) {
+                bowWeapon = { weapon, baseName, equippedName };
+                break;
+            }
+        }
+        const range = bowWeapon?.weapon?.range?.long || bowWeapon?.weapon?.range?.normal || '80_ft';
+        const damageDie = bowWeapon?.weapon?.damage?.damage_dice || '1d8';
+        const damageType = bowWeapon?.weapon?.damage?.damage_type || 'Piercing';
+        const hitBonus = toHit;
+        const hitBonusFormula = `To Hit Bonus = Dexterity Modifier (${dexMod}) + Proficiency (${prof})`;
+        const damageFormula = `Damage Formula = ${damageDie} + Dexterity Modifier (${dexMod})`;
+        const damage = `${damageDie}+${dexMod}`;
+        for (let i = 0; i < 2; i++) {
+            attacks.push({
+                name: i === 0 ? 'Swift Quiver (1st Attack)' : 'Swift Quiver (2nd Attack)',
+                attackType: 'ranged',
+                isRanged: true,
+                range: range.replace(/_ft$/, '').replace(/_ft/g, ' ft'),
+                toHit: hitBonus,
+                hitBonusFormula,
+                damageFormula,
+                damage,
+                damageType,
+                abilityName: 'Dexterity',
+                actionType: 'Bonus Action',
+                properties: ['Ammunition'],
+                isSwiftQuiver: true,
+            });
+        }
     }
 
     // Starry Form: Archer constellation - ranged spell attack

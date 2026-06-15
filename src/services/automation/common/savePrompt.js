@@ -26,6 +26,8 @@ export function createSaveListener(campaignName, config) {
         saveType: config.saveType || 'CON',
         saveDc: config.saveDc,
         dcSuccess: config.dcSuccess,
+        advantage: config.advantage || false,
+        disadvantage: config.disadvantage || false,
      });
 
     const promise = new Promise((resolve) => {

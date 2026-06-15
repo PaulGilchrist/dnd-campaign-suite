@@ -202,5 +202,17 @@ export const spellHandlers = {
             casting_time: auto.casting_time || '1 action',
             hasAutomation: true
         }
+    },
+
+    'warding_bond': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'warding_bond',
+            name: feature.name,
+            range: auto.range || 'touch',
+            duration: auto.duration || '1 hour',
+            casting_time: auto.casting_time || '1 action',
+            hasAutomation: true
+        }
     }
 }

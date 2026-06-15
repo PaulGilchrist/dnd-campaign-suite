@@ -27,6 +27,7 @@ import { triggerRemoveCurse } from '../features/removeCurseService.js';
 import { triggerHoldMonster } from '../features/holdMonsterService.js';
 import { triggerHypnoticPattern } from '../features/hypnoticPatternService.js';
 import { triggerMassSuggestion } from '../features/massSuggestionService.js';
+import { triggerSuggestion } from '../features/suggestionService.js';
 import { triggerForesight } from '../features/foresightService.js';
 import { triggerResilientSphere } from '../features/resilientSphereService.js';
 import { triggerOttoDance } from '../features/ottoDanceService.js';
@@ -37,12 +38,17 @@ import { triggerGlobeOfInvulnerability } from '../features/globeOfInvulnerabilit
 import { triggerHeroism } from '../features/heroismService.js';
 import { triggerHolyAura } from '../features/holyAuraService.js';
 import { triggerSilence, getSilenceSource, isCreatureInSilenceZone } from '../features/silenceService.js';
+import { triggerSlow } from '../features/slowService.js';
 import { triggerPowerWordFortify } from '../features/powerWordFortifyService.js';
 import { triggerPowerWordStun } from '../features/powerWordStunService.js';
 import { triggerSeeInvisibility } from '../features/seeInvisibilityService.js';
+import { triggerSleep } from '../features/sleepService.js';
+import { triggerStinkingCloud } from '../features/stinkingCloudService.js';
+import { triggerTashasHideousLaughter } from '../features/tashasHideousLaughterService.js';
 import { executeHandler as executeLongstrider } from '../../automation/index.js';
 import { executeHandler as executeProtectionFromEnergy } from '../../automation/index.js';
 import { executeHandler as executeProtectionFromPoison } from '../../automation/index.js';
+import { executeHandler as executeStoneSkin } from '../../automation/index.js';
 
 function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     if (spell.name !== 'Hex') return;
@@ -312,9 +318,21 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             return;
         }
 
+        // Slow — multi-target WIS save, applies speed halved, -2 AC, no reactions, action/bonus limit
+        if (spell.name && spell.name.toLowerCase() === 'slow') {
+            await triggerSlow(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
+            return;
+        }
+
         // Mass Suggestion — multi-target WIS save, applies Charmed condition to failed targets
         if (spell.name && spell.name.toLowerCase() === 'mass suggestion') {
             await triggerMassSuggestion(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Suggestion — single target WIS save, applies Charmed condition to failed target
+        if (spell.name && spell.name.toLowerCase() === 'suggestion') {
+            await triggerSuggestion(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
             return;
         }
 
@@ -362,6 +380,24 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         // Silence — 20-ft-radius sphere: creatures inside are Deafened, immune to Thunder, cannot cast Verbal spells
         if (spell.name && spell.name.toLowerCase() === 'silence') {
             await triggerSilence(spell, metaCtx, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Sleep — multi-target WIS save for all creatures in 5-ft-radius sphere: Incapacitated with repeating save
+        if (spell.name && spell.name.toLowerCase() === 'sleep') {
+            await triggerSleep(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Stinking Cloud — multi-target CON save for all creatures in 20-ft-radius sphere: Poisoned with repeating save
+        if (spell.name && spell.name.toLowerCase() === 'stinking cloud') {
+            await triggerStinkingCloud(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Tasha's Hideous Laughter — single target WIS save: Prone + Incapacitated with repeating save (end of turn + on damage)
+        if (spell.name && spell.name.toLowerCase() === "tasha's hideous laughter") {
+            await triggerTashasHideousLaughter(spell, { ...metaCtx, spellSaveDc }, playerStats, campaignName, mapName);
             return;
         }
 
@@ -430,17 +466,30 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
           }
 
            // Protection from Poison — remove Poisoned condition and apply buff
-           if (spell.name && spell.name.toLowerCase() === 'protection from poison') {
-               const target = await getTargetInfo();
-               if (target) {
-                   const action = {
-                       name: 'Protection from Poison',
-                       spell: spell,
-                       automation: spell.automation || {},
-                   };
-                   await executeProtectionFromPoison(action, playerStats, campaignName, mapName);
-               }
-           }
+            if (spell.name && spell.name.toLowerCase() === 'protection from poison') {
+                const target = await getTargetInfo();
+                if (target) {
+                    const action = {
+                        name: 'Protection from Poison',
+                        spell: spell,
+                        automation: spell.automation || {},
+                    };
+                    await executeProtectionFromPoison(action, playerStats, campaignName, mapName);
+                }
+            }
+
+            // Stone Skin — apply resistance to Bludgeoning, Piercing, and Slashing damage
+            if (spell.name && spell.name.toLowerCase() === 'stone skin') {
+                const target = await getTargetInfo();
+                if (target) {
+                    const action = {
+                        name: 'Stone Skin',
+                        spell: spell,
+                        automation: spell.automation || {},
+                    };
+                    await executeStoneSkin(action, playerStats, campaignName, mapName);
+                }
+            }
 
             // Remove Curse — remove curses and break attunement on target
             if (spell.name && spell.name.toLowerCase() === 'remove curse') {

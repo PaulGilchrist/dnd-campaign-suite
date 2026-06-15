@@ -5,6 +5,8 @@ import storage from '../../ui/storage.js';
 import { getCurrentCombatRound, getActiveCreatureName, getCombatSummary } from '../../encounters/combatData.js';
 import { addEntry } from '../../ui/logService.js';
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
+import { processSlowRepeatSave } from '../../automation/handlers/spells/slowHandler.js';
+import { processTashasLaughterRepeatSave } from '../../automation/handlers/spells/tashasLaughterHandler.js';
 
 const ALL_DAMAGES_EXCEPT_FORCE = [
     'acid', 'bludgeoning', 'cold', 'fire', 'lightning',
@@ -109,6 +111,36 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
         const cleaned = allTargetEffects.filter(te => te.effect !== 'multiattack_defense');
         if (cleaned.length !== allTargetEffects.length) {
             setRuntimeValue(campaignName, 'targetEffects', cleaned, campaignName);
+        }
+    }
+
+    // Process Slow repeat saves for affected creatures at start of their turn
+    if (activeName && playerStats) {
+        const slowTracking = getRuntimeValue(activeName, `_slow_${activeName.replace(/\s+/g, '_')}`, campaignName);
+        if (slowTracking) {
+            const targetEffects = getRuntimeValue(campaignName, 'targetEffects', campaignName) || [];
+            const slowEffect = Array.isArray(targetEffects) ? targetEffects.find(
+                te => te.target === activeName && te.effect === 'slow_repeat_save'
+            ) : null;
+            if (slowEffect) {
+                processSlowRepeatSave(slowEffect.source, activeName, slowEffect.dc, campaignName).catch(e => {
+                    console.error('[expirations] Slow repeat save failed:', e);
+                });
+            }
+        }
+
+        // Process Tasha's Hideous Laughter repeat saves for affected creatures at start of their turn
+        const tashasTracking = getRuntimeValue(activeName, `_tashas_laughter_${activeName.replace(/\s+/g, '_')}`, campaignName);
+        if (tashasTracking) {
+            const targetEffects = getRuntimeValue(campaignName, 'targetEffects', campaignName) || [];
+            const tashasEffect = Array.isArray(targetEffects) ? targetEffects.find(
+                te => te.target === activeName && te.effect === 'tashas_laughter_repeat_save'
+            ) : null;
+            if (tashasEffect) {
+                processTashasLaughterRepeatSave(tashasEffect.source, activeName, tashasEffect.dc, campaignName).catch(e => {
+                    console.error('[expirations] Tasha\'s Hideous Laughter repeat save failed:', e);
+                });
+            }
         }
     }
 }
@@ -755,6 +787,10 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             case 'condition':
                 removeActiveCondition(targetName, effect.condition, campaignName);
                 removeNpcCondition(targetName, effect.condition, campaignName);
+                break;
+
+            case 'tashas_laughter_expiration':
+                setRuntimeValue(targetName, `tashas_laughter_${targetName.replace(/\s+/g, '_')}_damageTrigger`, false, campaignName);
                 break;
 
             case 'speed_zero': {

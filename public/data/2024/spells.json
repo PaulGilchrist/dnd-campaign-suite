@@ -11474,6 +11474,13 @@
     "dc": {
       "dc_type": "WIS",
       "dc_success": "none"
+    },
+    "automation": {
+      "type": "sleep",
+      "saveType": "WIS",
+      "saveDc": "spell_save_dc",
+      "range": "60 feet",
+      "duration": "Concentration, up to 1 minute"
     }
   },
   {
@@ -11546,10 +11553,42 @@
       "shape": "cube",
       "size": "40-foot"
     },
-    "status_effects": [],
+    "status_effects": [
+      {
+        "effect": "speed_halved",
+        "condition": "slow"
+      },
+      {
+        "effect": "no_reactions"
+      },
+      {
+        "effect": "ac_penalty",
+        "value": -2
+      },
+      {
+        "effect": "dex_save_disadvantage"
+      },
+      {
+        "effect": "action_limit"
+      },
+      {
+        "effect": "single_attack_limit"
+      },
+      {
+        "effect": "somatic_failure_chance",
+        "chance": 25
+      }
+    ],
     "dc": {
       "dc_type": "WIS",
       "dc_success": "none"
+    },
+    "automation": {
+      "type": "slow",
+      "saveType": "WIS",
+      "range": "120 feet",
+      "duration": "Concentration, up to 1 minute",
+      "repeatingSave": true
     }
   },
   {
@@ -12080,7 +12119,18 @@
     ],
     "subclasses": [],
     "area_of_effect": null,
-    "status_effects": []
+    "status_effects": [],
+    "automation": {
+      "type": "protection_from_energy",
+      "damageTypes": [
+        "Bludgeoning",
+        "Piercing",
+        "Slashing"
+      ],
+      "target": "willing_creature",
+      "duration": "Concentration, up to 1 hour",
+      "casting_time": "1 action"
+    }
   },
   {
     "index": "storm-of-vengeance",
@@ -12157,6 +12207,13 @@
     "dc": {
       "dc_type": "WIS",
       "dc_success": "none"
+    },
+    "automation": {
+      "type": "suggestion",
+      "saveType": "WIS",
+      "saveDc": "spell_save_dc",
+      "range": "30 feet",
+      "duration": "Concentration, up to 8 hours"
     }
   },
   {
@@ -12512,7 +12569,18 @@
     ],
     "subclasses": [],
     "area_of_effect": null,
-    "status_effects": []
+    "status_effects": [],
+    "automation": {
+      "type": "concentration_bonus_attack",
+      "trigger": "each_turn",
+      "action": "bonus_action",
+      "weaponAttack": true,
+      "concentrationSpell": "Swift Quiver",
+      "casting_time": "1 bonus action",
+      "attacks": 2,
+      "weaponRequirement": "arrow_bolt_weapon",
+      "attack_type": "ranged"
+    }
   },
   {
     "index": "symbol",
@@ -12674,9 +12742,8 @@
     "subclasses": [],
     "area_of_effect": null,
     "status_effects": [
-      "Charmed",
-      "Incapacitated",
-      "speed_zero"
+      "prone",
+      "incapacitated"
     ],
     "dc": {
       "dc_type": "WIS",
@@ -13740,7 +13807,13 @@
     ],
     "subclasses": [],
     "area_of_effect": null,
-    "status_effects": []
+    "status_effects": [],
+    "automation": {
+      "type": "warding_bond",
+      "duration": "1 hour",
+      "target": "willing_creature",
+      "casting_time": "1 action"
+    }
   },
   {
     "index": "water-breathing",
@@ -13840,7 +13913,26 @@
     "dc": {
       "dc_type": "DEX",
       "dc_success": "none"
-    }
+    },
+    "automation": [
+      {
+        "type": "save_attack",
+        "saveType": "DEX",
+        "shape": "cube",
+        "range": "60 feet",
+        "conditionInflicted": "Restrained",
+        "duration": "Concentration, up to 1 hour",
+        "dcSuccess": "none"
+      },
+      {
+        "type": "web_area_save",
+        "saveType": "DEX",
+        "shape": "cube",
+        "size": "20-foot",
+        "conditionInflicted": "Restrained",
+        "duration": "Concentration, up to 1 hour"
+      }
+    ]
   },
   {
     "index": "weird",

@@ -224,6 +224,9 @@ export const attackHandlers = {
             weaponAttack: !!auto.weaponAttack,
             concentrationSpell: auto.concentrationSpell || '',
             casting_time: auto.casting_time || '1 bonus action',
+            attacks: auto.attacks || 2,
+            weaponRequirement: auto.weaponRequirement || null,
+            attack_type: auto.attack_type || 'ranged',
             hasAutomation: true
         }
     },

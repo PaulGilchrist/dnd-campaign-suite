@@ -8,6 +8,8 @@ import { postLogEntry } from '../../shared/logPoster.js';
 import { isHolyAuraActive, getHolyAuraTargets } from '../../automation/handlers/buffs/holyAuraHandler.js';
 import { getDamageReduction } from '../../combat/automationPassives.js';
 import { isCreatureInSilenceZone } from '../../rules/features/silenceService.js';
+import { processTashasLaughterRepeatSave } from '../../automation/handlers/spells/tashasLaughterHandler.js';
+import { getDistanceFeet } from './rangeValidation.js';
 
 /**
  * Save the last damage event under the target's key so reaction features
@@ -159,11 +161,62 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
      oldHp = creature.currentHp;
      newHp = Math.max(0, oldHp - wardDamage);
      creature.currentHp = newHp;
-   }
+    }
 
-   if (wardDamage > 0) {
-    // Thought Shield: reflect Psychic damage back to the attacker
-    if (isPlayer && attackerName && attackerName !== creature.name) {
+    // Tasha's Hideous Laughter: damage-triggered repeat WIS save with Advantage
+    if (wardDamage > 0 && !isPlayer) {
+        // For NPCs, check creature.conditions directly (no getRuntimeValue call needed)
+        const hasIncapacitated = (creature.conditions || []).some(c => {
+            const condKey = typeof c === 'object' ? c.key : String(c);
+            return String(condKey).toLowerCase() === 'incapacitated';
+        });
+        if (hasIncapacitated) {
+            const targetEffects = getRuntimeValue(campaignName, 'targetEffects', campaignName) || [];
+            const tashasEffect = Array.isArray(targetEffects) ? targetEffects.find(
+                te => te.target === creature.name && te.effect === 'tashas_laughter_repeat_save'
+            ) : null;
+            if (tashasEffect) {
+                processTashasLaughterRepeatSave(tashasEffect.source, creature.name, tashasEffect.dc, campaignName).catch(e => {
+                    console.error('[applyDamage] Tasha\'s damage-triggered repeat save failed:', e);
+                });
+            }
+        }
+    }
+
+    if (wardDamage > 0) {
+      // Warding Bond: caster takes the same damage as the target (only if within 60 feet)
+      if (isPlayer) {
+        const targetBondSource = getRuntimeValue(creature.name, 'activeBuffs', campaignName);
+        const targetActiveBuffs = Array.isArray(targetBondSource) ? targetBondSource : [];
+        const wardingBondBuff = targetActiveBuffs.find(b => b.effect === 'warding_bond');
+        if (wardingBondBuff && wardingBondBuff.sourceCharacter && wardingBondBuff.sourceCharacter !== creature.name) {
+          const casterName = wardingBondBuff.sourceCharacter;
+          const casterCreature = combatSummary.creatures.find(c => c.name === casterName);
+          const targetCreature = combatSummary.creatures.find(c => c.name === creature.name);
+          const distance = casterCreature && targetCreature ? getDistanceFeet(casterCreature.position, targetCreature.position) : null;
+          if (distance === null || distance <= 60) {
+            if (casterCreature && casterCreature.currentHp > 0) {
+              const sharedDamage = wardDamage;
+              casterCreature.currentHp = Math.max(0, casterCreature.currentHp - sharedDamage);
+              postLogEntry(campaignName, {
+                type: 'hp_change',
+                targetName: casterName,
+                delta: -sharedDamage,
+                currentHp: casterCreature.currentHp,
+                maxHp: casterCreature.maxHp,
+                isHealing: false,
+                isUnconscious: casterCreature.currentHp <= 0,
+                abilityName: 'Warding Bond',
+              });
+              if (casterCreature.concentration && sharedDamage > 0) {
+                casterCreature.concentration.dc = Math.max(10, Math.floor(sharedDamage / 2));
+              }
+            }
+          }
+        }
+      }
+      // Thought Shield: reflect Psychic damage back to the attacker
+     if (isPlayer && attackerName && attackerName !== creature.name) {
       const hasThoughtShield = playerComputed?.characterAdvancement?.some(f => f.name === 'Thought Shield');
       if (hasThoughtShield && damageTypes?.some(d => d.toLowerCase() === 'psychic')) {
         const attackerCreature = combatSummary.creatures.find(c => c.name === attackerName);

@@ -135,5 +135,44 @@ export const saveHandlers = {
             saveDc: (auto.saveDc === 'ability') ? getSaveDc(playerStats, auto.saveAbility || 'CON', playerStats.proficiency) : auto.saveDc || 10,
             hasAutomation: true,
         }
-    }
+    },
+
+    'sleep': (feature, playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'sleep',
+            name: feature.name,
+            saveType: auto.saveType || 'WIS',
+            saveDc: (auto.saveDc === 'ability') ? getSaveDc(playerStats, auto.saveAbility || 'WIS', playerStats.proficiency) : auto.saveDc || 10,
+            conditionInflicted: 'incapacitated',
+            duration: auto.duration || '',
+            hasAutomation: true,
+        }
+    },
+
+    'stinking_cloud': (feature, playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'stinking_cloud',
+            name: feature.name,
+            saveType: auto.saveType || 'CON',
+            saveDc: (auto.saveDc === 'ability') ? getSaveDc(playerStats, auto.saveAbility || 'CON', playerStats.proficiency) : auto.saveDc || 10,
+            conditionInflicted: 'poisoned',
+            duration: auto.duration || '',
+            hasAutomation: true,
+        }
+    },
+
+    'tashas_laughter': (feature, playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'tashas_laughter',
+            name: feature.name,
+            saveType: auto.saveType || 'WIS',
+            saveDc: (auto.saveDc === 'ability') ? getSaveDc(playerStats, auto.saveAbility || 'WIS', playerStats.proficiency) : auto.saveDc || 10,
+            conditionInflicted: ['prone', 'incapacitated'],
+            duration: auto.duration || '',
+            hasAutomation: true,
+        }
+    },
 }

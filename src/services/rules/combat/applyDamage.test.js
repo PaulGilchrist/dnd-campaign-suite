@@ -26,6 +26,15 @@ vi.mock('../../combat/concentrationRules.js', () => ({
 
 vi.mock('../../ui/utils.js', () => ({ default: { guid: vi.fn(() => 'test-guid-001') } }));
 
+vi.mock('../../automation/handlers/spells/tashasLaughterHandler.js', () => ({
+    processTashasLaughterRepeatSave: vi.fn(),
+    handle: vi.fn(),
+}));
+
+vi.mock('./rangeValidation.js', () => ({
+    getDistanceFeet: vi.fn(() => 30),
+}));
+
 // ── Imports (Vite returns mocked versions) ─────────────────────
 
 import {

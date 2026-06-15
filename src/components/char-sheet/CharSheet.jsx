@@ -13,6 +13,7 @@ import CharSummary from './char-summary/CharSummary.jsx'
 import { computeAuraComboEffects } from '../../services/combat/auraComboEffects.js';
 import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditionEffects.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
+import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';
 import { evaluateAutoExpression } from '../../services/combat/automationService.js';
 import { EXHAUSTION_LEVELS } from '../../services/combat/exhaustionRules.js';
 import { isCreatureWarded } from '../../services/automation/handlers/buffs/protectionFromEvilAndGoodHandler.js';
@@ -305,6 +306,33 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     if (shieldActive) {
         conditionEffects.shieldAcBonus = 5;
         conditionEffects.magicMissileImmune = true;
+    }
+
+    // Warding Bond: +1 AC and +1 to all saving throws (only if within 60 feet)
+    let wardingBondAcBonus = 0;
+    let wardingBondSaveBonus = 0;
+    for (const buff of activeBuffs) {
+        if (buff.effect === 'warding_bond' && buff.sourceCharacter) {
+            const casterName = buff.sourceCharacter;
+            if (casterName === playerSummary?.name) continue;
+            const casterCreature = combatContext?.creatures?.find(c => c.name === casterName);
+            const targetCreature = combatContext?.creatures?.find(c => c.name === playerSummary?.name);
+            const distance = casterCreature && targetCreature ? getDistanceFeet(casterCreature.position, targetCreature.position) : null;
+            if (distance === null || distance <= 60) {
+                if (buff.acBonus) {
+                    wardingBondAcBonus += buff.acBonus;
+                }
+                if (buff.saveBonus) {
+                    wardingBondSaveBonus += buff.saveBonus;
+                }
+            }
+        }
+    }
+    if (wardingBondAcBonus > 0) {
+        conditionEffects.wardingBondAcBonus = wardingBondAcBonus;
+    }
+    if (wardingBondSaveBonus > 0) {
+        conditionEffects.saveAdvantageCount = (conditionEffects.saveAdvantageCount || 0) + wardingBondSaveBonus;
     }
 
     // Shield of Faith: +2 AC for duration (Concentration, up to 10 minutes)

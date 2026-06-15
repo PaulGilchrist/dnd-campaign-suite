@@ -285,9 +285,14 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'hold_monster':
             case 'hypnotic_pattern':
             case 'power_word_stun':
+            case 'sleep':
             case 'resilient_sphere':
             case 'mass_suggestion':
+            case 'suggestion':
             case 'ottos_dance':
+            case 'stinking_cloud':
+            case 'tashas_laughter':
+            case 'slow':
             case 'healing':
             case 'healing_pool':
             case 'self_healing':
@@ -435,6 +440,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break
             case 'starry_form':
                 result.specialActions.push(info)
+                break
+            case 'warding_bond':
+                result.actions.push(info)
                 break
             case 'cosmic_omen':
                 if (info.casting_time === '1 bonus_action' || info.casting_time === 'bonus_action') {
@@ -827,6 +835,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 } else {
                     result.specialActions.push(info);
                 }
+                break;
+            case 'web_area_save':
+                result.specialActions.push(info)
                 break;
             default:
                 result.specialActions.push(info)

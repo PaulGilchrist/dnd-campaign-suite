@@ -258,6 +258,8 @@ describe('createSaveListener', () => {
             saveType: 'DEX',
             saveDc: 15,
             dcSuccess: 'The orc falls prone.',
+            advantage: false,
+            disadvantage: false,
           });
       });
 
@@ -271,6 +273,8 @@ describe('createSaveListener', () => {
             promptId: 'prompt-default',
             targetName: 'Goblin',
             saveType: 'CON',
+            advantage: false,
+            disadvantage: false,
           });
       });
 

@@ -317,8 +317,18 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     hexSaveDisadvantage: false,
     hexSaveDisadvantageAbility: null,
     strCheckDisadvantage: false,
+    slowRepeatSave: false,
+    slowNoReactions: false,
+    slowActionLimit: false,
+    slowSingleAttackLimit: false,
+    slowSomaticFailure: false,
+    slowDexSaveDisadvantage: false,
+    stinkingCloudRepeatSave: false,
+    webRepeatSave: false,
+    acPenalty: 0,
     rayOfEnfeebleDamageReduction: false,
     seeInvisibilityActive: false,
+    wardingBondAcBonus: 0,
    }
 
   const conditionSet = new Set(conditions)
@@ -438,14 +448,31 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
          effects.autoCritWithin5ft = true
          break
 
-       case 'dazed':
-         // Dazed: on next turn can only do one of: move OR action OR Bonus Action
-         // We represent this as partial incapacitation — no attack advantage for target,
-         // but the creature can still move. The UI will enforce the restriction.
-         effects.dazed = true
-         effects.targetAdvantageCount++
-         break
-       }
+        case 'dazed':
+          // Dazed: on next turn can only do one of: move OR action OR Bonus Action
+          // We represent this as partial incapacitation — no attack advantage for target,
+          // but the creature can still move. The UI will enforce the restriction.
+          effects.dazed = true
+          effects.targetAdvantageCount++
+          break
+
+        case 'slow':
+          // Slow: Speed halved, -2 AC, disadvantage on DEX saves, no reactions,
+          // action OR bonus action (not both), one attack max, 25% somatic failure
+          effects.speedHalved = true;
+          effects.speedReduction = (effects.speedReduction || 0) + 50;
+          effects.acPenalty = (effects.acPenalty || 0) + 2;
+          effects.slowNoReactions = true;
+          effects.slowActionLimit = true;
+          effects.slowSingleAttackLimit = true;
+          effects.slowSomaticFailure = true;
+          effects.targetAdvantageCount++;
+          // DEX save disadvantage from Slow
+          if (!effects.saveDisadvantage.includes('dex')) {
+            effects.saveDisadvantage.push('dex');
+          }
+          break;
+        }
     }
 
   for (const te of targetEffects) {
@@ -547,6 +574,41 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
       effects.repeatingSave = true;
       effects.powerWordStun = true;
     }
+    // Handle Sleep — repeating WIS save at end of target's turn for Incapacitated→Unconscious
+    if (te.effect === 'sleep_repeat_save') {
+      effects.saveType = te.saveType || 'WIS';
+      effects.saveDc = te.saveDc;
+      effects.saveAbility = 'WIS';
+      effects.conditionToApply = 'unconscious';
+      effects.repeatingSave = true;
+      effects.sleepRepeatSave = true;
+    }
+    // Handle Slow — repeating WIS save at end of target's turn, success ends spell
+    if (te.effect === 'slow_repeat_save') {
+      effects.saveType = te.saveType || 'WIS';
+      effects.saveDc = te.saveDc;
+      effects.saveAbility = 'WIS';
+      effects.repeatingSave = true;
+      effects.slowRepeatSave = true;
+    }
+    // Handle Stinking Cloud — repeating CON save at end of target's turn for Poisoned condition
+    if (te.effect === 'stinking_cloud_repeat_save') {
+      effects.saveType = te.saveType || 'CON';
+      effects.saveDc = te.saveDc;
+      effects.saveAbility = 'CON';
+      effects.conditionToApply = 'poisoned';
+      effects.repeatingSave = true;
+      effects.stinkingCloudRepeatSave = true;
+    }
+    // Handle Web — repeating DEX save when creature enters or starts turn in webs for Restrained condition
+    if (te.effect === 'web_repeat_save') {
+      effects.saveType = te.saveType || 'DEX';
+      effects.saveDc = te.saveDc;
+      effects.saveAbility = 'DEX';
+      effects.conditionToApply = 'restrained';
+      effects.repeatingSave = true;
+      effects.webRepeatSave = true;
+    }
     // Handle Clairvoyant Combatant — target has Disadvantage on attacks against you, you have Advantage on attacks against target
     if (te.effect === 'clairvoyant_combatant') {
       if (te.attackerAdvantage) {
@@ -573,6 +635,16 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     if (te.effect === 'ray_of_enfeeble_debuff') {
       if (te.strCheckDisadvantage) effects.strCheckDisadvantage = true;
       if (te.rayOfEnfeebleDamageReduction) effects.rayOfEnfeebleDamageReduction = true;
+    }
+    // Handle Slow — AC penalty and DEX save disadvantage
+    if (te.effect === 'ac_penalty') {
+      effects.acPenalty = (effects.acPenalty || 0) + (te.value || 2);
+    }
+    if (te.effect === 'dex_save_disadvantage') {
+      effects.slowDexSaveDisadvantage = true;
+      if (!effects.saveDisadvantage.includes('dex')) {
+        effects.saveDisadvantage.push('dex');
+      }
     }
   }
 

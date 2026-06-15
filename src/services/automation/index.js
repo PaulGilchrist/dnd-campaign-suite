@@ -78,6 +78,7 @@ import { handle as handlePeerlessAthlete } from './handlers/class-cleric-paladin
 import { handle as handleGloriousDefense } from './handlers/class-cleric-paladin/gloriousDefenseHandler.js';
 import { handle as handleProtectionFromEnergy, applyProtectionFromEnergy as applyProtectionFromEnergyHandler } from './handlers/buffs/protectionFromEnergyHandler.js';
 import { handle as handleProtectionFromPoison, applyProtectionFromPoison as applyProtectionFromPoisonHandler, isProtectionFromPoisonActive } from './handlers/buffs/protectionFromPoisonHandler.js';
+import { handle as handleStoneSkin, applyStoneSkin as applyStoneSkinHandler, isStoneSkinActive, getStoneSkinDamageTypes } from './handlers/buffs/stoneSkinHandler.js';
 import { handle as handleLivingLegend } from './handlers/class-cleric-paladin/livingLegendHandler.js';
 import { handle as handleUndyingSentinel } from './handlers/class-cleric-paladin/undyingSentinelHandler.js';
 import { handle as handleElderChampion } from './handlers/class-cleric-paladin/elderChampionHandler.js';
@@ -166,6 +167,8 @@ import { handle as handleFeignDeath } from './handlers/spells/feignDeathHandler.
 import { handle as handleFleshToStone } from './handlers/spells/fleshToStoneHandler.js';
 import { handle as handleHoldMonster } from './handlers/spells/holdMonsterHandler.js';
 import { handle as handleFriends } from './handlers/spells/friendsHandler.js';
+import { handle as handleSleep } from './handlers/spells/sleepHandler.js';
+import { handle as handleSleepShake } from './handlers/spells/sleepShakeHandler.js';
 import { handle as handleGlobeOfInvulnerability } from './handlers/spells/globeOfInvulnerabilityHandler.js';
 import { handle as handleGreaseAreaSave } from './handlers/spells/greaseAreaSaveHandler.js';
 import { handle as handleGreaterRestoration, applyGreaterRestoration as applyGreaterRestorationEffect } from './handlers/spells/greaterRestorationHandler.js';
@@ -177,16 +180,22 @@ import { handle as handleHeroesFeast, applyHeroesFeast as applyHeroesFeastEffect
 import { handle as handleHypnoticPatternShake, handleConfirm as handleHypnoticPatternShakeConfirm } from './handlers/spells/hypnoticPatternShake.js';
 import { handle as handleHypnoticPattern } from './handlers/spells/hypnoticPatternHandler.js';
 import { handle as handleMassSuggestion } from './handlers/spells/massSuggestionHandler.js';
+import { handle as handleSuggestion } from './handlers/spells/suggestionHandler.js';
 import { handle as handleSilence } from './handlers/spells/silenceHandler.js';
+import { handle as handleSlow } from './handlers/spells/slowHandler.js';
 import { handle as handleResilientSphere } from './handlers/spells/resilientSphereHandler.js';
 import { handle as handlePowerWordStun } from './handlers/spells/powerWordStunHandler.js';
+import { handle as handleWardingBond, getWardingBondTarget, getWardingBondSource, isWardingBondActive } from './handlers/spells/wardingBondHandler.js';
 import { handle as handleOttoDance } from './handlers/spells/ottosDanceHandler.js';
+import { handle as handleStinkingCloud } from './handlers/spells/stinkingCloudHandler.js';
+import { handle as handleTashasLaughter } from './handlers/spells/tashasLaughterHandler.js';
 import { handle as handlePassWithoutTrace } from './handlers/buffs/passWithoutTraceHandler.js';
 import { handle as handleProtectionFromEvilAndGood, isProtectionFromEvilAndGoodActive, isCreatureWarded } from './handlers/buffs/protectionFromEvilAndGoodHandler.js';
 import { handle as handleResistance, applyResistance as applyResistanceEffect, getResistanceDamageType, isResistanceUsedThisTurn } from './handlers/buffs/resistanceHandler.js';
 import { handle as handleRayOfEnfeeblement, isRayOfEnfeeblementActive } from './handlers/spells/rayOfEnfeeblementHandler.js';
 import { handle as handleSentinelGuardian } from './handlers/combat/sentinelGuardianHandler.js';
 import { handle as handleSentinelHalt } from './handlers/combat/sentinelHaltHandler.js';
+import { handle as handleWebAreaSave } from './handlers/spells/webAreaSaveHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -383,11 +392,14 @@ const HANDLER_MAP = {
         false_life: handleFalseLife,
         fear: handleFear,
         feign_death: handleFeignDeath,
+        sleep: handleSleep,
+        sleep_shake: handleSleepShake,
         flesh_to_stone: handleFleshToStone,
         hold_monster: handleHoldMonster,
         friends: handleFriends,
         globe_of_invulnerability: handleGlobeOfInvulnerability,
         grease_area_save: handleGreaseAreaSave,
+        web_area_save: handleWebAreaSave,
         greater_restoration: handleGreaterRestoration,
         lesser_restoration: handleLesserRestoration,
         remove_curse: handleRemoveCurse,
@@ -401,18 +413,24 @@ const HANDLER_MAP = {
         hypnotic_pattern_shake: handleHypnoticPatternShake,
         hypnotic_pattern_shake_confirm: handleHypnoticPatternShakeConfirm,
         mass_suggestion: handleMassSuggestion,
+        suggestion: handleSuggestion,
         resilient_sphere: handleResilientSphere,
         power_word_stun: handlePowerWordStun,
+        warding_bond: handleWardingBond,
         ottos_dance: handleOttoDance,
+        stinking_cloud: handleStinkingCloud,
+        tashas_laughter: handleTashasLaughter,
         pass_without_trace: handlePassWithoutTrace,
         protection_from_energy: handleProtectionFromEnergy,
         protection_from_evil_and_good: handleProtectionFromEvilAndGood,
         protection_from_poison: handleProtectionFromPoison,
+        stone_skin: handleStoneSkin,
         resistance: handleResistance,
         boon_of_energy_resistance: handleBoonOfEnergyResistance,
         modify_d20_roll: handleBoonOfFate,
         ray_of_enfeeblement: handleRayOfEnfeeblement,
         silence: handleSilence,
+        slow: handleSlow,
         survive_and_heal: handleBoonOfRecovery,
         lucky_point: handleLuckyPoint,
         magic_initiate: handleMagicInitiate,
@@ -422,7 +440,15 @@ const HANDLER_MAP = {
         tavern_brawler_push: handleGenericPopup,
         grapple_damage: handleGenericPopup,
 };
-export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler, applyProtectionFromPoisonHandler, applyRemoveCurseEffect, applyBoonOfEnergyResistance, applyWeaponMasteryChoice, applyResistanceEffect, isProtectionFromEvilAndGoodActive, isCreatureWarded, isProtectionFromPoisonActive, isRayOfEnfeeblementActive, getResistanceDamageType, isResistanceUsedThisTurn, applyShieldOfFaithEffect, isShieldOfFaithActive, getShieldOfFaithBonus };
+export {
+    applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect,
+    applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler, applyProtectionFromPoisonHandler,
+    applyRemoveCurseEffect, applyBoonOfEnergyResistance, applyWeaponMasteryChoice, applyResistanceEffect,
+    applyStoneSkinHandler, isProtectionFromEvilAndGoodActive, isCreatureWarded, isProtectionFromPoisonActive,
+    isStoneSkinActive, getStoneSkinDamageTypes, isRayOfEnfeeblementActive, getResistanceDamageType,
+    isResistanceUsedThisTurn, applyShieldOfFaithEffect, isShieldOfFaithActive, getShieldOfFaithBonus,
+    getWardingBondTarget, getWardingBondSource, isWardingBondActive,
+};
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
 

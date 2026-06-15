@@ -18,7 +18,7 @@ export function toggleBuff(playerName, actionName, auto, campaignName, targetNam
 
         const newBuffs = wasActive
              ? activeBuffs.filter(b => b.name !== actionName)
-              : [...activeBuffs, { name: actionName, effect: auto.effect, duration: auto.duration, enemiesDisadvantageSaves: auto.enemies_disadvantage_saves || [], distance: auto.distance || '', extendedDistance: auto.extendedDistance || '', sourceCharacter: playerName, blocksSpellcasting: auto.blocksSpellcasting || false, flySpeed: auto.flySpeed || null, hover: auto.hover || false, seeInvisibleRange: auto.seeInvisibleRange || null, narrowSpace: !!auto.narrowSpace, castingTime: auto.casting_time || '', resistanceTypes: auto.resistanceTypes || [] }];
+              : [...activeBuffs, { name: actionName, effect: auto.effect, duration: auto.duration, enemiesDisadvantageSaves: auto.enemies_disadvantage_saves || [], distance: auto.distance || '', extendedDistance: auto.extendedDistance || '', sourceCharacter: playerName, blocksSpellcasting: auto.blocksSpellcasting || false, flySpeed: auto.flySpeed || null, hover: auto.hover || false, seeInvisibleRange: auto.seeInvisibleRange || null, narrowSpace: !!auto.narrowSpace, castingTime: auto.casting_time || '', resistanceTypes: auto.resistanceTypes || [], acBonus: auto.acBonus || 0, saveBonus: auto.saveBonus || 0 }];
 
      setRuntimeValue(resolvedTarget, 'activeBuffs', newBuffs, campaignName);
 

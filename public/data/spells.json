@@ -9997,7 +9997,13 @@
     ],
     "subclasses": [
       "Lore"
-    ]
+    ],
+    "automation": {
+      "type": "warding_bond",
+      "duration": "1 hour",
+      "target": "willing_creature",
+      "casting_time": "1 action"
+    }
   },
   {
     "index": "water-breathing",
