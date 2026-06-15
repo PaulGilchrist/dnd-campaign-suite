@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { confirmWarMagicSpell } from '../../services/automation/handlers/warMagicSpellHandler.js';
+import { confirmWarMagicSpell } from '../../services/automation/handlers/class-fighter-rogue/warMagicSpellHandler.js';
 import './CharSheet.css';
 
 function WarMagicSpellModal({ action, playerStats, campaignName, options, optionDetails, maxSpellLevel, onClose }) {

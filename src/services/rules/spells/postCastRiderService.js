@@ -1,6 +1,6 @@
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { executeHandler } from '../../automation/index.js';
-import { isBlockedBySpellThief } from '../../automation/handlers/spellThiefHandler.js';
+import { isBlockedBySpellThief } from '../../automation/handlers/class-fighter-rogue/spellThiefHandler.js';
 
 const ENCHANTMENT_SCHOOL = 'enchantment';
 const ILLUSION_SCHOOL = 'illusion';

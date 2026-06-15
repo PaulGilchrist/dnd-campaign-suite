@@ -1,11 +1,11 @@
 import { handle } from './strokeOfLuckHandler.js';
-import * as runtimeState from '../../../hooks/useRuntimeState.js';
-import * as metamagic from '../../../hooks/useMetamagic.js';
-import * as logService from '../../ui/logService.js';
+import * as runtimeState from '../../../../hooks/useRuntimeState.js';
+import * as metamagic from '../../../../hooks/useMetamagic.js';
+import * as logService from '../../../ui/logService.js';
 
-vi.mock('../../../hooks/useRuntimeState.js');
-vi.mock('../../../hooks/useMetamagic.js');
-vi.mock('../../ui/logService.js');
+vi.mock('../../../../hooks/useRuntimeState.js');
+vi.mock('../../../../hooks/useMetamagic.js');
+vi.mock('../../../ui/logService.js');
 
 describe('strokeOfLuckHandler.handle', () => {
     const mockPlayerStats = { name: 'TestRogue', level: 20, class: { name: 'Rogue' } };

@@ -1,5 +1,5 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
 
 const MOVED_THIS_TURN_KEY = 'steadyAimMovedThisTurn';
 const SPEED_ZERO_KEY = 'steadyAimSpeedZero';

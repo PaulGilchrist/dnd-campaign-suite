@@ -1,9 +1,10 @@
-import { loadSpellData } from '../../ui/dataLoader.js';
-import { addEntry } from '../../ui/logService.js';
+import { loadSpellData } from '../../../ui/dataLoader.js';
+import { addEntry } from '../../../ui/logService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
-    const spellListKey = auto.spellList || 'wizard_cantrips';
+    const spellListKey = auto.spellList || 'wizard_spells';
+    const maxLevel = auto.maxSpellLevel || 2;
 
     const allSpells = await loadSpellData(spellListKey, playerStats);
     if (!allSpells || !allSpells.length) {
@@ -12,26 +13,26 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: 'No Wizard cantrips available.',
+                description: 'No Wizard spells available.',
             },
         };
     }
 
-    const cantrips = allSpells.filter(s => s.level === 0);
-    if (!cantrips.length) {
+    const eligibleSpells = allSpells.filter(s => s.level > 0 && s.level <= maxLevel);
+    if (!eligibleSpells.length) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: 'No Wizard cantrips available.',
+                description: 'No Wizard spells of level 1-2 available.',
             },
         };
     }
 
-    const optionNames = cantrips.map(s => s.name);
+    const optionNames = eligibleSpells.map(s => s.name);
     const optionDetails = {};
-    for (const s of cantrips) {
+    for (const s of eligibleSpells) {
         optionDetails[s.name] = {
             name: s.name,
             level: s.level,
@@ -44,7 +45,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     return {
         type: 'modal',
-        modalName: 'warMagicCantrip',
+        modalName: 'warMagicSpell',
         payload: {
             action,
             playerStats,
@@ -52,18 +53,19 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             options: optionNames,
             optionDetails,
             spellListKey,
+            maxSpellLevel: maxLevel,
         },
     };
 }
 
-export async function confirmWarMagicCantrip(action, playerStats, campaignName, selectedSpellName) {
+export async function confirmWarMagicSpell(action, playerStats, campaignName, selectedSpellName) {
     if (!selectedSpellName) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: 'No cantrip selected.',
+                description: 'No spell selected.',
             },
         };
     }
@@ -72,7 +74,7 @@ export async function confirmWarMagicCantrip(action, playerStats, campaignName, 
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: action.name,
-        description: `${action.name}: Replaced attack with cantrip "${selectedSpellName}"`,
+        description: `${action.name}: Replaced attack with spell "${selectedSpellName}"`,
     }).catch(() => {});
 
     return {
@@ -80,8 +82,8 @@ export async function confirmWarMagicCantrip(action, playerStats, campaignName, 
         payload: {
             type: 'automation_info',
             name: action.name,
-            automationType: 'war_magic_cantrip',
-            description: `${action.name}: Replaced one attack with the cantrip <b>${selectedSpellName}</b>.`,
+            automationType: 'war_magic_spell',
+            description: `${action.name}: Replaced one attack with the level ${action.automation.maxSpellLevel || 2} spell <b>${selectedSpellName}</b>.`,
             automation: action.automation,
         },
     };

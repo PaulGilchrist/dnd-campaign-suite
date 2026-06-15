@@ -1,7 +1,7 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
-import { createSaveListener, buildSaveDc } from '../common/savePrompt.js';
-import { addExpiration } from '../../rules/effects/expirations.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
+import { createSaveListener, buildSaveDc } from '../../common/savePrompt.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
 
 const SPELL_THIEF_BLOCK_KEY = 'spellThiefBlocked';
 const SPELL_THIEF_STOLEN_KEY = 'spellThiefStolen';

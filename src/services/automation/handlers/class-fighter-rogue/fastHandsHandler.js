@@ -1,5 +1,5 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getCurrentCombatRound } from '../../../services/encounters/combatData.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;

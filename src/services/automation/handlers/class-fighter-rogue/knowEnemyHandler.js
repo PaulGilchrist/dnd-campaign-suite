@@ -1,5 +1,5 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getMonsterData } from '../../../services/npcs/monsterUtils.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getMonsterData } from '../../../../services/npcs/monsterUtils.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -26,7 +26,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Get target from combat context
     let targetName = null;
     try {
-        const { getCombatContext, getTargetFromAttacker } = await import('../../../services/rules/combat/damageUtils.js');
+        const { getCombatContext, getTargetFromAttacker } = await import('../../../../services/rules/combat/damageUtils.js');
         const combatContext = await getCombatContext(campaignName);
         if (combatContext) {
             const target = getTargetFromAttacker(combatContext, playerStats.name);

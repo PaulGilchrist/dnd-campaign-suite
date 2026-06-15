@@ -1,11 +1,11 @@
 import { handle, handleSummon } from './warBondHandler.js';
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 
 const mockPlayerStats = { name: 'TestFighter' };
 const mockCampaignName = 'test-campaign';

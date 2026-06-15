@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { handle, confirmWarMagicSpell } from './warMagicSpellHandler.js'
 
-vi.mock('../../ui/dataLoader.js', () => ({
+vi.mock('../../../ui/dataLoader.js', () => ({
     loadSpellData: vi.fn(),
 }))
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }))
 
@@ -19,7 +19,7 @@ describe('warMagicSpellHandler', () => {
 
     describe('handle', () => {
         it('should return a modal with modalName warMagicSpell', async () => {
-            const { loadSpellData } = await import('../../ui/dataLoader.js')
+            const { loadSpellData } = await import('../../../ui/dataLoader.js')
             loadSpellData.mockResolvedValue([
                 { name: 'Burning Hands', level: 1 },
                 { name: 'Shield', level: 1 },
@@ -49,7 +49,7 @@ describe('warMagicSpellHandler', () => {
         })
 
         it('should filter out cantrips and level 3+ spells', async () => {
-            const { loadSpellData } = await import('../../ui/dataLoader.js')
+            const { loadSpellData } = await import('../../../ui/dataLoader.js')
             loadSpellData.mockResolvedValue([
                 { name: 'Burning Hands', level: 1 },
                 { name: 'Web', level: 2 },
@@ -68,7 +68,7 @@ describe('warMagicSpellHandler', () => {
         })
 
         it('should return popup when no eligible spells available', async () => {
-            const { loadSpellData } = await import('../../ui/dataLoader.js')
+            const { loadSpellData } = await import('../../../ui/dataLoader.js')
             loadSpellData.mockResolvedValue([
                 { name: 'Ray of Frost', level: 0 },
                 { name: 'Fireball', level: 3 },
@@ -87,7 +87,7 @@ describe('warMagicSpellHandler', () => {
         })
 
         it('should default maxSpellLevel to 2', async () => {
-            const { loadSpellData } = await import('../../ui/dataLoader.js')
+            const { loadSpellData } = await import('../../../ui/dataLoader.js')
             loadSpellData.mockResolvedValue([
                 { name: 'Burning Hands', level: 1 },
                 { name: 'Fireball', level: 3 },
@@ -104,7 +104,7 @@ describe('warMagicSpellHandler', () => {
         })
 
         it('should default spellList to wizard_spells', async () => {
-            const { loadSpellData } = await import('../../ui/dataLoader.js')
+            const { loadSpellData } = await import('../../../ui/dataLoader.js')
             loadSpellData.mockResolvedValue([{ name: 'Burning Hands', level: 1 }])
 
             const action = {
@@ -148,7 +148,7 @@ describe('warMagicSpellHandler', () => {
         })
 
         it('should log ability_use entry', async () => {
-            const { addEntry } = await import('../../ui/logService.js')
+            const { addEntry } = await import('../../../ui/logService.js')
             addEntry.mockResolvedValue()
 
             const action = {

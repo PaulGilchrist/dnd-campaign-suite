@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { handle, confirmWarMagicCantrip } from './warMagicCantripHandler.js'
 
-vi.mock('../../ui/dataLoader.js', () => ({
+vi.mock('../../../ui/dataLoader.js', () => ({
     loadSpellData: vi.fn(),
 }))
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }))
 
@@ -19,7 +19,7 @@ describe('warMagicCantripHandler', () => {
 
     describe('handle', () => {
         it('should return a modal with modalName warMagicCantrip', async () => {
-            const { loadSpellData } = await import('../../ui/dataLoader.js')
+            const { loadSpellData } = await import('../../../ui/dataLoader.js')
             loadSpellData.mockResolvedValue([
                 { name: 'Ray of Frost', level: 0 },
                 { name: 'Shocking Grasp', level: 0 },
@@ -45,7 +45,7 @@ describe('warMagicCantripHandler', () => {
         })
 
         it('should filter out non-cantrips from options', async () => {
-            const { loadSpellData } = await import('../../ui/dataLoader.js')
+            const { loadSpellData } = await import('../../../ui/dataLoader.js')
             loadSpellData.mockResolvedValue([
                 { name: 'Ray of Frost', level: 0 },
                 { name: 'Burning Hands', level: 1 },
@@ -63,7 +63,7 @@ describe('warMagicCantripHandler', () => {
         })
 
         it('should return popup when no cantrips available', async () => {
-            const { loadSpellData } = await import('../../ui/dataLoader.js')
+            const { loadSpellData } = await import('../../../ui/dataLoader.js')
             loadSpellData.mockResolvedValue([
                 { name: 'Burning Hands', level: 1 },
             ])
@@ -80,7 +80,7 @@ describe('warMagicCantripHandler', () => {
         })
 
         it('should return popup when no spells available', async () => {
-            const { loadSpellData } = await import('../../ui/dataLoader.js')
+            const { loadSpellData } = await import('../../../ui/dataLoader.js')
             loadSpellData.mockResolvedValue([])
 
             const action = {
@@ -94,7 +94,7 @@ describe('warMagicCantripHandler', () => {
         })
 
         it('should default spellList to wizard_cantrips', async () => {
-            const { loadSpellData } = await import('../../ui/dataLoader.js')
+            const { loadSpellData } = await import('../../../ui/dataLoader.js')
             loadSpellData.mockResolvedValue([{ name: 'Ray of Frost', level: 0 }])
 
             const action = {
@@ -137,7 +137,7 @@ describe('warMagicCantripHandler', () => {
         })
 
         it('should log ability_use entry', async () => {
-            const { addEntry } = await import('../../ui/logService.js')
+            const { addEntry } = await import('../../../ui/logService.js')
             addEntry.mockResolvedValue()
 
             const action = {

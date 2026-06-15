@@ -4,12 +4,12 @@ import OpenHandTechniqueModal from './OpenHandTechniqueModal.jsx';
 
 // ── Mocked modules (before the component import) ──
 
-vi.mock('../../services/automation/handlers/openHandTechniqueHandler.js', () => ({
+vi.mock('../../services/automation/handlers/class-fighter-rogue/openHandTechniqueHandler.js', () => ({
   applyOpenHandTechnique: vi.fn(),
 }));
 
 // ── Re-import mocked modules ──
-import * as openHandHandler from '../../services/automation/handlers/openHandTechniqueHandler.js';
+import * as openHandHandler from '../../services/automation/handlers/class-fighter-rogue/openHandTechniqueHandler.js';
 
 // ── Test fixtures ──
 

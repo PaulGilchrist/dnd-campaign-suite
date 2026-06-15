@@ -1,22 +1,22 @@
 import { handle } from './combatSuperiorityHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { rollExpression } from '../../dice/diceRoller.js';
-import { getCurrentCombatRound } from '../../../services/encounters/combatData.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
+import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../dice/diceRoller.js', () => ({
+vi.mock('../../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
 }));
 
-vi.mock('../../../services/encounters/combatData.js', () => ({
+vi.mock('../../../../services/encounters/combatData.js', () => ({
     getCurrentCombatRound: vi.fn(() => 1),
 }));
 
-vi.mock('../common/targetResolver.js', () => ({
+vi.mock('../../common/targetResolver.js', () => ({
     resolveTarget: vi.fn(async () => ({ target: { name: 'Goblin' } })),
 }));
 

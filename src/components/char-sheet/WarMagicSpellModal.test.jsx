@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import WarMagicSpellModal from './WarMagicSpellModal.jsx'
 
-vi.mock('../../services/automation/handlers/warMagicCantripHandler.js', () => ({
+vi.mock('../../services/automation/handlers/class-fighter-rogue/warMagicCantripHandler.js', () => ({
     confirmWarMagicCantrip: vi.fn(),
 }))
 
-vi.mock('../../services/automation/handlers/warMagicSpellHandler.js', () => ({
+vi.mock('../../services/automation/handlers/class-fighter-rogue/warMagicSpellHandler.js', () => ({
     confirmWarMagicSpell: vi.fn(),
 }))
 
@@ -102,7 +102,7 @@ describe('WarMagicSpellModal', () => {
     })
 
     it('calls confirm handler and shows result on confirm', async () => {
-        const { confirmWarMagicSpell } = await import('../../services/automation/handlers/warMagicSpellHandler.js')
+        const { confirmWarMagicSpell } = await import('../../services/automation/handlers/class-fighter-rogue/warMagicSpellHandler.js')
         confirmWarMagicSpell.mockResolvedValue({
             type: 'popup',
             payload: {
@@ -142,7 +142,7 @@ describe('WarMagicSpellModal', () => {
     })
 
     it('calls onClose when Done is clicked after confirmation', async () => {
-        const { confirmWarMagicSpell } = await import('../../services/automation/handlers/warMagicSpellHandler.js')
+        const { confirmWarMagicSpell } = await import('../../services/automation/handlers/class-fighter-rogue/warMagicSpellHandler.js')
         confirmWarMagicSpell.mockResolvedValue({
             type: 'popup',
             payload: {

@@ -51,7 +51,7 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
 
     const handleVtApply = async () => {
         if (!vtSelected) return;
-        const { applyVersatileTrickster } = await import('../../services/automation/handlers/versatileTricksterHandler.js');
+        const { applyVersatileTrickster } = await import('../../services/automation/handlers/class-fighter-rogue/versatileTricksterHandler.js');
         const vtAction = getRuntimeValue(playerStats.name, 'versatileTricksterAction', campaignName);
         const res = await applyVersatileTrickster(vtAction, playerStats, campaignName, vtSelected);
         setVtResult(res);

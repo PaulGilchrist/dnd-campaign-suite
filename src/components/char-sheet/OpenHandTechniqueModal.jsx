@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { applyOpenHandTechnique } from '../../services/automation/handlers/openHandTechniqueHandler.js';
+import { applyOpenHandTechnique } from '../../services/automation/handlers/class-fighter-rogue/openHandTechniqueHandler.js';
 import './CharSheet.css';
 
 function OpenHandTechniqueModal({ action, playerStats, campaignName, targetName, saveDc, saveType, onClose }) {

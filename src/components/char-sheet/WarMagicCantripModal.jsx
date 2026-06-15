@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { confirmWarMagicCantrip } from '../../services/automation/handlers/warMagicCantripHandler.js';
+import { confirmWarMagicCantrip } from '../../services/automation/handlers/class-fighter-rogue/warMagicCantripHandler.js';
 import './CharSheet.css';
 
 function WarMagicCantripModal({ action, playerStats, campaignName, options, optionDetails, onClose }) {
