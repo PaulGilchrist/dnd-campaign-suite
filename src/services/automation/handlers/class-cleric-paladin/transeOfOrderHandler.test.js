@@ -1,22 +1,22 @@
 import { handle, isActive, deactivate } from './transeOfOrderHandler.js';
-import * as runtimeState from '../../../hooks/useRuntimeState.js';
-import * as metamagic from '../../../hooks/useMetamagic.js';
-import * as classFeatures from '../../character/classFeatures.js';
+import * as runtimeState from '../../../../hooks/useRuntimeState.js';
+import * as metamagic from '../../../../hooks/useMetamagic.js';
+import * as classFeatures from '../../../character/classFeatures.js';
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/useMetamagic.js', () => ({
     spendSorceryPoints: vi.fn(),
 }));
 
-vi.mock('../../character/classFeatures.js', () => ({
+vi.mock('../../../character/classFeatures.js', () => ({
     getClassFeatures: vi.fn(),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 

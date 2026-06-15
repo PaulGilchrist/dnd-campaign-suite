@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { handle, applyDamageTypeChoice } from './sacredWeaponHandler.js';
-import * as runtimeState from '../../../hooks/useRuntimeState.js';
+import * as runtimeState from '../../../../hooks/useRuntimeState.js';
 
 const campaignName = 'test-campaign';
 

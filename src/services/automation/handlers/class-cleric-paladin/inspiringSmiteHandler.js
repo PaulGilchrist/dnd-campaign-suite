@@ -1,9 +1,9 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { resolveDiceExpression } from '../../combat/automationService.js';
-import { loadMapData } from '../../maps/mapsService.js';
-import { getDistanceFeet, rangeToFeet } from '../../rules/combat/rangeValidation.js';
-import { addEntry } from '../../ui/logService.js';
-import { rollExpression } from '../../dice/diceRoller.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { resolveDiceExpression } from '../../../combat/automationService.js';
+import { loadMapData } from '../../../maps/mapsService.js';
+import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { addEntry } from '../../../ui/logService.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
 
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;

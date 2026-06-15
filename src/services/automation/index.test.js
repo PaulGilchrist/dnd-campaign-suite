@@ -30,8 +30,8 @@ vi.mock('./handlers/reactions/reactionBonusHandler.js', () => ({ handle: vi.fn()
 vi.mock('./handlers/postCastRiderHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/class-bard/bardicInspirationDefenseHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/class-bard/bardicInspirationOffenseHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/divineSparkHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/divineInterventionHandler.js', () => ({ handle: vi.fn() }));
+vi.mock('./handlers/class-cleric-paladin/divineSparkHandler.js', () => ({ handle: vi.fn() }));
+vi.mock('./handlers/class-cleric-paladin/divineInterventionHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/bonusActionAttackHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/extraActionHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/eyebiteHandler.js', () => ({ handle: vi.fn() }));
@@ -67,8 +67,8 @@ import * as reactionBonusHandler from './handlers/reactions/reactionBonusHandler
 import * as postCastRiderHandler from './handlers/postCastRiderHandler.js';
 import * as bardicInspirationDefenseHandler from './handlers/class-bard/bardicInspirationDefenseHandler.js';
 import * as bardicInspirationOffenseHandler from './handlers/class-bard/bardicInspirationOffenseHandler.js';
-import * as divineSparkHandler from './handlers/divineSparkHandler.js';
-import * as divineInterventionHandler from './handlers/divineInterventionHandler.js';
+import * as divineSparkHandler from './handlers/class-cleric-paladin/divineSparkHandler.js';
+import * as divineInterventionHandler from './handlers/class-cleric-paladin/divineInterventionHandler.js';
 import * as bonusActionAttackHandler from './handlers/bonusActionAttackHandler.js';
 import * as extraActionHandler from './handlers/extraActionHandler.js';
 import * as eyebiteHandler from './handlers/eyebiteHandler.js';

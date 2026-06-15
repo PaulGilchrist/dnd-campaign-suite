@@ -1,5 +1,5 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { loadSpells } from '../../ui/dataLoader.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { loadSpells } from '../../../ui/dataLoader.js';
 
 const REACTION_TIMES = new Set(['Reaction', '1 Reaction']);
 

@@ -60,7 +60,7 @@ import BreathWeaponShapeModal from './BreathWeaponShapeModal.jsx'
 import HypnoticPatternShakeModal from './HypnoticPatternShakeModal.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
-import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/divineInterventionHandler.js';
+import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js';
 import { getClassFeatures } from '../../services/character/classFeatures.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
@@ -81,7 +81,7 @@ import DivinationSavantModal from './DivinationSavantModal.jsx';
 import { onDivinationSavantSelected } from '../../services/automation/handlers/class-wizard/divinationSavantHandler.js';
 import IllusionSavantModal from './IllusionSavantModal.jsx';
 import { onIllusionSavantSelected } from '../../services/automation/handlers/class-wizard/illusionSavantHandler.js';
-import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/bastionOfLawHandler.js';
+import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js';
 import ThirdEyeModal from './ThirdEyeModal.jsx';
 import useInitiativeEffects from './useInitiativeEffects.js';
 import './CharActions.css'

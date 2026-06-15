@@ -1,5 +1,5 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getClassFeatures } from '../../character/classFeatures.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getClassFeatures } from '../../../character/classFeatures.js';
 
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;

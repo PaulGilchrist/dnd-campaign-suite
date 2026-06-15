@@ -1,21 +1,22 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
+import { addEntry } from '../../../ui/logService.js';
 
-const HOLY_NIMBUS_KEY = 'holyNimbusActive';
+const PEERLESS_ATHLETE_KEY = 'peerlessAthleteActive';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
     // Check if already active
-    const isActive = getRuntimeValue(playerName, HOLY_NIMBUS_KEY, campaignName);
+    const isActive = getRuntimeValue(playerName, PEERLESS_ATHLETE_KEY, campaignName);
     if (isActive) {
-        // Toggle off - remove sunlight_aura buff
+        // Toggle off
         const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
         const activeBuffs = Array.isArray(stored) ? stored : [];
         const newBuffs = activeBuffs.filter(b => b.name !== action.name);
         await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
-        await setRuntimeValue(playerName, HOLY_NIMBUS_KEY, false, campaignName);
+        await setRuntimeValue(playerName, PEERLESS_ATHLETE_KEY, false, campaignName);
         return {
             type: 'popup',
             payload: {
@@ -51,22 +52,25 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     await setRuntimeValue(playerName, 'channelDivinityCharges', currentCharges - 1, campaignName);
 
     // Activate
-    await setRuntimeValue(playerName, HOLY_NIMBUS_KEY, true, campaignName);
+    await setRuntimeValue(playerName, PEERLESS_ATHLETE_KEY, true, campaignName);
 
-    // Add sunlight_aura buff (aura filled with bright light that is sunlight)
+    // Add buff to activeBuffs
     const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
     const activeBuffs = Array.isArray(stored) ? stored : [];
-    const newBuffs = activeBuffs.some(b => b.name === action.name)
-        ? activeBuffs
-        : [...activeBuffs, { name: action.name, effect: 'sunlight_aura', duration: '10_minutes', distance: '10_ft' }];
+    const newBuffs = [...activeBuffs, { name: action.name, effect: 'peerless_athlete', duration: auto.duration || '1_hour' }];
     await setRuntimeValue(playerName, 'activeBuffs', newBuffs, campaignName);
+
+    // Add expiration for 1 hour (6 rounds)
+    addExpiration(playerName, playerName, [
+        { type: 'peerless_athlete_end' }
+    ], campaignName, 6);
 
     // Log the ability use
     await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: action.name,
-        description: `${playerName} activated Holy Nimbus. Aura of Protection gains holy power for 10 minutes.`,
+        description: `${playerName} activated Peerless Athlete for 1 hour.`,
         timestamp: Date.now(),
     }).catch(() => {});
 
@@ -76,7 +80,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             type: 'automation_info',
             name: action.name,
             automationType: auto.type,
-            description: `${action.name} activated! Aura of Protection is imbued with holy power for 10 minutes.`,
+            description: `${action.name} activated! You have Advantage on Strength (Athletics) and Dexterity (Acrobatics) checks, and Long/High Jump distance +10 feet for 1 hour.`,
             automation: auto,
         },
     };

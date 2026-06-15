@@ -1,7 +1,7 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { spendSorceryPoints } from '../../../hooks/useMetamagic.js';
-import { getClassFeatures } from '../../character/classFeatures.js';
-import { addEntry } from '../../ui/logService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { spendSorceryPoints } from '../../../../hooks/useMetamagic.js';
+import { getClassFeatures } from '../../../character/classFeatures.js';
+import { addEntry } from '../../../ui/logService.js';
 
 function getRuntimeKey(playerName, key) {
     return playerName.toLowerCase().replace(/\s+/g, '') + '_' + key;

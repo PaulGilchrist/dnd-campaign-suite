@@ -37,7 +37,7 @@ vi.mock('../../services/automation/handlers/saveAttackHandler.js', () => ({
   isExhausted: vi.fn(() => false),
 }));
 
-vi.mock('../../services/automation/handlers/divineInterventionHandler.js', () => ({
+vi.mock('../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js', () => ({
   onSpellSelected: vi.fn(),
 }));
 

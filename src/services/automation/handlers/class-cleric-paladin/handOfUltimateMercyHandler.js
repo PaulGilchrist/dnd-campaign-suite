@@ -1,9 +1,9 @@
-import { rollExpression } from '../../dice/diceRoller.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getCombatContext } from '../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../shared/logPoster.js';
-import storage from '../../ui/storage.js';
-import { resolveTarget } from '../common/targetResolver.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { postLogEntry } from '../../../shared/logPoster.js';
+import storage from '../../../ui/storage.js';
+import { resolveTarget } from '../../common/targetResolver.js';
 
 const CUREABLE_CONDITIONS = ['Blinded', 'Deafened', 'Paralyzed', 'Poisoned', 'Stunned'];
 

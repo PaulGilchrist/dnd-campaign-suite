@@ -1,5 +1,5 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
 
 const ELDER_CHAMPION_KEY = 'elderChampionActive';
 const ELDER_CHAMPION_REST_KEY = 'elderChampionRestUsed';

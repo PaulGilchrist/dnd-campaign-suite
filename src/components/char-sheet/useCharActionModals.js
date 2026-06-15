@@ -9,7 +9,7 @@ import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js'
 import { addEntry } from '../../services/ui/logService.js';
 import { applyConstellationOption } from '../../services/automation/handlers/class-sorcerer/starryFormHandler.js';
 import { applyConstellationOption as twinklingApply } from '../../services/automation/handlers/class-sorcerer/twinklingConstellationHandler.js';
-import { handleRestore } from '../../services/automation/handlers/elderChampionHandler.js';
+import { handleRestore } from '../../services/automation/handlers/class-cleric-paladin/elderChampionHandler.js';
 
 export default function useCharActionModals({
     playerStats, campaignName, mapName,

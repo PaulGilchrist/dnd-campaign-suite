@@ -1,8 +1,8 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { rollExpression } from '../../dice/diceRoller.js';
-import { addEntry } from '../../ui/logService.js';
-import { rangeToFeet, getDistanceFeet } from '../../rules/combat/rangeValidation.js';
-import { resolveMapPositions, resolveTarget } from '../common/targetResolver.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
+import { addEntry } from '../../../ui/logService.js';
+import { rangeToFeet, getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
+import { resolveMapPositions, resolveTarget } from '../../common/targetResolver.js';
 
 const WARD_DICE_KEY = 'bastionOfLawWardDice';
 const WARD_TARGET_KEY = 'bastionOfLawWardTarget';

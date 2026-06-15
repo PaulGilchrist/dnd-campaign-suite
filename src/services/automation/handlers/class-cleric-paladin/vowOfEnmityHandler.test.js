@@ -1,17 +1,17 @@
 import { handle, applyTargetChoice } from './vowOfEnmityHandler.js';
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../rules/combat/damageUtils.js', () => ({
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
     getTargetFromAttacker: vi.fn(),
 }));
 
-const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
-const { getCombatContext, getTargetFromAttacker } = await import('../../rules/combat/damageUtils.js');
+const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/useRuntimeState.js');
+const { getCombatContext, getTargetFromAttacker } = await import('../../../rules/combat/damageUtils.js');
 
 const campaignName = 'TestCampaign';
 

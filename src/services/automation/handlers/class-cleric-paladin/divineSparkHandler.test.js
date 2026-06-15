@@ -2,25 +2,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../common/targetResolver.js', () => ({
+vi.mock('../../common/targetResolver.js', () => ({
   resolveTarget: vi.fn(),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './divineSparkHandler.js';
-import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
-import * as targetResolver from '../common/targetResolver.js';
-import * as logService from '../../ui/logService.js';
+import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
+import * as targetResolver from '../../common/targetResolver.js';
+import * as logService from '../../../ui/logService.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

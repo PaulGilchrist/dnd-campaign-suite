@@ -2,38 +2,38 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../rules/combat/damageUtils.js', () => ({
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
   getTargetFromAttacker: vi.fn(),
 }));
 
-vi.mock('../../ui/storage.js', () => ({
+vi.mock('../../../ui/storage.js', () => ({
   default: {
     set: vi.fn(),
   },
 }));
 
-vi.mock('../../dice/diceRoller.js', () => ({
+vi.mock('../../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './searingVengeanceHandler.js';
-import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
-import * as damageUtils from '../../rules/combat/damageUtils.js';
-import * as diceRoller from '../../dice/diceRoller.js';
-import storage from '../../ui/storage.js';
-import { addEntry } from '../../ui/logService.js';
+import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
+import storage from '../../../ui/storage.js';
+import { addEntry } from '../../../ui/logService.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

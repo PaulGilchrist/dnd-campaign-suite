@@ -1,7 +1,7 @@
-import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
-import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
-import { MELEE_REACH_FEET } from '../../combat/baseCombatActions.js';
+import { getRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
+import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { MELEE_REACH_FEET } from '../../../combat/baseCombatActions.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;

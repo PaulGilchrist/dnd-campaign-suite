@@ -10,7 +10,7 @@ import { getDuplicityAdvantageAgainst } from '../combat/duplicityAuraUtils.js';
 import { getLionDisadvantageAgainst } from '../combat/lionAuraUtils.js';
 import { getCoronaSaveDisadvantage } from '../combat/coronaAuraUtils.js';
 import { hasAuraOfProtection } from '../combat/auraOfProtection.js';
-import { isActive as isAvengingAngelActive, isAuraTarget } from '../automation/handlers/avengingAngelHandler.js';
+import { isActive as isAvengingAngelActive, isAuraTarget } from '../automation/handlers/class-cleric-paladin/avengingAngelHandler.js';
 
 export function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects) {
     const playerName = playerStats.name;
