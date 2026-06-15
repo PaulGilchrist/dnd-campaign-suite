@@ -16,6 +16,12 @@ import {
     getMagicInitiateCantrips,
     getMagicInitiateLevel1Spell,
 } from '../../automation/handlers/feats/magicInitiateHandler.js';
+import {
+    getFiendishLegacySelection,
+    getFiendishLegacyCantrip,
+    getFiendishLegacyLevel3Spell,
+    getFiendishLegacyLevel5Spell,
+} from '../../automation/handlers/class-other/fiendishLegacyHandler.js';
 
 export function getSpellAbilities(allSpells, playerStats, playerSummary) {
     let spellAbilities = null;
@@ -177,6 +183,36 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                             }
                             // Add level 5 spell
                             const level5Spell = getGnomishLineageLevel5Spell(playerStats, playerSummary?.campaignName);
+                            if (level5Spell) {
+                                if (!spellAbilities.spells.find(s => s.name === level5Spell)) {
+                                    spellAbilities.spells.push({ name: level5Spell, prepared: 'Always' });
+                                }
+                            }
+                        }
+                    }
+                }
+                if (feature.type === 'fiendish_legacy') {
+                    const campaignName = playerSummary?.campaignName;
+                    const legacy = getFiendishLegacySelection(playerStats, campaignName);
+                    if (legacy) {
+                        const legacyData = feature.options?.find(o => o.name === legacy);
+                        if (legacyData) {
+                            const cantripName = getFiendishLegacyCantrip(playerStats, campaignName);
+                            if (cantripName) {
+                                const cantripEntry = spellAbilities.spells.find(s => s.name === cantripName);
+                                if (cantripEntry) {
+                                    cantripEntry.spellCastingAbility = legacyData.spellcastingAbility;
+                                } else {
+                                    spellAbilities.spells.push({ name: cantripName, prepared: 'Always', spellCastingAbility: legacyData.spellcastingAbility });
+                                }
+                            }
+                            const level3Spell = getFiendishLegacyLevel3Spell(playerStats, campaignName);
+                            if (level3Spell) {
+                                if (!spellAbilities.spells.find(s => s.name === level3Spell)) {
+                                    spellAbilities.spells.push({ name: level3Spell, prepared: 'Always' });
+                                }
+                            }
+                            const level5Spell = getFiendishLegacyLevel5Spell(playerStats, campaignName);
                             if (level5Spell) {
                                 if (!spellAbilities.spells.find(s => s.name === level5Spell)) {
                                     spellAbilities.spells.push({ name: level5Spell, prepared: 'Always' });

@@ -660,6 +660,17 @@ export const miscHandlers = {
         }
     },
 
+    'fiendish_legacy': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'fiendish_legacy',
+            name: feature.name,
+            options: auto.options || [],
+            chooseOne: !!auto.chooseOne,
+            hasAutomation: true
+        }
+    },
+
     'lesser_restoration': (feature, _playerStats) => {
         const auto = feature.automation
         return {

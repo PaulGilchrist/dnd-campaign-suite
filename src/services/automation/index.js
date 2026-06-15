@@ -83,6 +83,7 @@ import { handle as handleUndyingSentinel } from './handlers/class-cleric-paladin
 import { handle as handleElderChampion } from './handlers/class-cleric-paladin/elderChampionHandler.js';
 import { handle as handleVowOfEnmity } from './handlers/class-cleric-paladin/vowOfEnmityHandler.js';
 import { handle as handleRelentlessAvenger } from './handlers/class-cleric-paladin/relentlessAvengerHandler.js';
+import { handle as handleRelentlessEndurance } from './handlers/class-cleric-paladin/relentlessEnduranceHandler.js';
 import { handle as handleSoulOfVengeance } from './handlers/class-cleric-paladin/soulOfVengeanceHandler.js';
 import { handle as handleAvengingAngel } from './handlers/class-cleric-paladin/avengingAngelHandler.js';
 import { handle as handlePrimalCompanionSummon, handleCommand as handlePrimalCompanionCommand, handleRestore as handlePrimalCompanionRestore, handleBonusActionCommand as handlePrimalCompanionBonusActionCommand, applyBonusActionCommand as applyPrimalCompanionBonusActionCommand } from './handlers/class-ranger/primalCompanionHandler.js';
@@ -150,6 +151,7 @@ import { handle as handleStonecunning } from './handlers/class-other/stonecunnin
 import { handle as handleElfisLineage } from './handlers/class-other/elfishLineageHandler.js';
 import { handle as handleGnomishLineage } from './handlers/class-other/gnomishLineageHandler.js';
 import { handle as handleLargeForm } from './handlers/class-other/largeFormHandler.js';
+import { handle as handleFiendishLegacy } from './handlers/class-other/fiendishLegacyHandler.js';
 import { handle as handleAid, applyAid as applyAidEffect } from './handlers/healing/aidHandler.js';
 import { handle as handleAuraOfPurity } from './handlers/buffs/auraOfPurityHandler.js';
 import { handle as handleHolyAura } from './handlers/buffs/holyAuraHandler.js';
@@ -272,6 +274,7 @@ const HANDLER_MAP = {
         elder_champion: handleElderChampion,
         vow_of_enmity: handleVowOfEnmity,
         relentless_avenger: handleRelentlessAvenger,
+        relentless_endurance: handleRelentlessEndurance,
         soul_of_vengeance: handleSoulOfVengeance,
         avenging_angel: handleAvengingAngel,
         primal_companion_summon: handlePrimalCompanionSummon,
@@ -357,8 +360,9 @@ const HANDLER_MAP = {
                     stonecunning: handleStonecunning,
                     elfish_lineage: handleElfisLineage,
                      gnomish_lineage: handleGnomishLineage,
-                     large_form: handleLargeForm,
-                     giant_ancestry: handleGiantAncestry,
+                    large_form: handleLargeForm,
+                    fiendish_legacy: handleFiendishLegacy,
+                    giant_ancestry: handleGiantAncestry,
                      teleport: handleGiantAncestry,
                      damage: handleGiantAncestry,
                       damage_with_condition: handleGiantAncestry,

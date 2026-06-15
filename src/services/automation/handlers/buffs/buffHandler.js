@@ -7,8 +7,16 @@ import { getCombatSummary } from '../../../encounters/combatData.js';
 import { evaluateAutoExpression } from '../../../combat/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 
+const ADRENALINE_RUSH_USES_KEY = 'adrenalineRushUses';
+const ADRENALINE_RUSH_REST_KEY = 'adrenalineRushRestTimestamp';
+
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
+
+    // Handle Adrenaline Rush: bonus action dash with temp HP, uses = proficiency_bonus, short_rest recharge
+    if (auto?.effect === 'bonus_action_dash') {
+        return handleBonusActionDash(action, playerStats, campaignName, _mapName);
+    }
 
     // Handle dash_action trigger: apply speed bonus temporarily
     if (auto?.trigger === 'dash_action' && auto?.effect === 'speed_bonus') {
@@ -167,4 +175,83 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             automation: auto,
         },
     };
+}
+
+async function handleBonusActionDash(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const featureName = action.name || 'Adrenaline Rush';
+
+    const usesKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${ADRENALINE_RUSH_USES_KEY}`;
+    const restKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${ADRENALINE_RUSH_REST_KEY}`;
+
+    const now = Date.now();
+    const lastRest = getRuntimeValue(playerName, restKey, campaignName);
+
+    let usesMax;
+    if (auto.uses === 'proficiency_bonus') {
+        usesMax = playerStats.proficiency || 0;
+    } else if (typeof auto.uses === 'number') {
+        usesMax = auto.uses;
+    } else {
+        usesMax = auto.usesMax != null ? auto.usesMax : 1;
+    }
+
+    let usesRemaining = 0;
+    let canUse = false;
+
+    if (lastRest && (now - lastRest) < 43200000) {
+        const stored = getRuntimeValue(playerName, usesKey, campaignName);
+        usesRemaining = stored != null ? Number(stored) : usesMax;
+        canUse = usesRemaining > 0;
+    } else {
+        usesRemaining = usesMax;
+        canUse = true;
+    }
+
+    if (!canUse) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                automationType: auto.type,
+                description: `${featureName} has no uses remaining. Recharges on a Short or Long Rest.`,
+                automation: auto,
+            },
+        };
+    }
+
+    if (auto?.bonusEffect === 'temp_hp' && auto?.bonusExpression) {
+        const tempHpAmount = evaluateAutoExpression(auto.bonusExpression, playerStats);
+        if (typeof tempHpAmount === 'number' && tempHpAmount > 0) {
+            setRuntimeValue(playerName, 'tempHp', tempHpAmount, campaignName);
+        }
+    }
+
+    const newUses = usesRemaining - 1;
+    await setRuntimeValue(playerName, usesKey, newUses, campaignName);
+
+    const tempHpDesc = auto?.bonusEffect === 'temp_hp' && auto?.bonusExpression
+        ? ` Gained ${evaluateAutoExpression(auto.bonusExpression, playerStats)} temporary hit points.`
+        : '';
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            automationType: auto.type,
+            description: `${featureName}: You take the Dash action as a Bonus Action.${tempHpDesc} (${newUses} use${newUses !== 1 ? 's' : ''} remaining).`,
+            automation: auto,
+        },
+    };
+}
+
+export function restoreAdrenalineRushUses(playerName, campaignName) {
+    const usesKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${ADRENALINE_RUSH_USES_KEY}`;
+    const restKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${ADRENALINE_RUSH_REST_KEY}`;
+
+    setRuntimeValue(playerName, restKey, Date.now(), campaignName);
+    setRuntimeValue(playerName, usesKey, null, campaignName);
 }

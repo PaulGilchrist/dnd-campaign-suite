@@ -54,7 +54,8 @@ export const SHORT_REST_RESOURCES = [
   'superiorityDice',
   'kiPoints',
     'actionsurgeUses',
-    'luckyPoints'
+    'luckyPoints',
+    'adrenalineRushUses'
 ]
 
 export function getShortRestResources() {
@@ -99,8 +100,9 @@ export const LONG_REST_RESOURCES = [
             'magicalCunningUsed',
              '_Phantasmal_Creatures_freeCastCount',
               'breathWeaponUses',
-              'stonecunningUses'
-      ]
+               'stonecunningUses',
+               'adrenalineRushUses'
+       ]
 
 export function getLongRestResources() {
   return [...LONG_REST_RESOURCES]
@@ -364,6 +366,9 @@ export async function applyLongRest(playerStats, campaignName) {
     // Reset Undying Sentinel (Oath of Glory level 15) on long rest
     setRuntimeValue(name, 'undyingSentinelUsed', false, campaignName, true)
 
+    // Reset Relentless Endurance (Orc race trait) on long rest
+    setRuntimeValue(name, 'relentlessEnduranceUsed', false, campaignName, true)
+
     // Reset Signature Spells on long rest
     setRuntimeValue(name, '_Signature_Spells_freeCastCount', null, campaignName, true)
 
@@ -417,6 +422,10 @@ export async function applyLongRest(playerStats, campaignName) {
     // Reset Stonecunning uses on long rest
     setRuntimeValue(name, 'stonecunningUses', null, campaignName, true)
     setRuntimeValue(name, 'stonecunningRestTimestamp', null, campaignName, true)
+
+    // Reset Adrenaline Rush uses on long rest
+    setRuntimeValue(name, 'adrenalineRushUses', null, campaignName, true)
+    setRuntimeValue(name, 'adrenalineRushRestTimestamp', null, campaignName, true)
 
     // Chef: Bolstering Treats crafted on Long Rest
     const hasBolsteringTreats = (playerStats.automation?.passives ?? []).some(

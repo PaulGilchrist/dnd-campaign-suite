@@ -344,6 +344,12 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         return boonOfRecoveryResult;
       }
 
+      // Check for Relentless Endurance (Orc race trait)
+      const relentlessEnduranceResult = checkRelentlessEndurance(creature, playerComputed, campaignName);
+      if (relentlessEnduranceResult.intercepted) {
+        return relentlessEnduranceResult;
+      }
+
       const promptId = utils.guid();
       sendDeathSavePrompt(campaignName, {
         promptId,
@@ -575,6 +581,72 @@ function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName) {
         isHealing: true,
         isUnconscious: false,
         abilityName: 'Boon Of Recovery - Last Stand',
+    });
+
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+
+    return {
+        intercepted: true,
+        finalDamage: 0,
+        newHp,
+    };
+}
+
+function checkRelentlessEndurance(creature, playerComputed, campaignName) {
+    const allFeatures = playerComputed?.allFeatures || [];
+    let hasRelentlessEndurance = false;
+
+    for (const feature of allFeatures) {
+        if (feature?.name === 'Relentless Endurance') {
+            hasRelentlessEndurance = true;
+            break;
+        }
+    }
+
+    if (!hasRelentlessEndurance) {
+        return { intercepted: false };
+    }
+
+    // Check if already used this long rest
+    const alreadyUsed = getRuntimeValue(creature.name, 'relentlessEnduranceUsed', campaignName);
+    if (alreadyUsed) {
+        return { intercepted: false };
+    }
+
+    // Relentless Endurance: set HP to 1 instead of 0
+    const maxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName) ?? playerComputed?.hitPoints?.max ?? 100;
+    const newHp = 1;
+
+    // Set the runtime HP value
+    setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
+
+    // Mark as used
+    setRuntimeValue(creature.name, 'relentlessEnduranceUsed', true, campaignName);
+
+    // Reset death saves since the character is back above 0 HP
+    setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
+    setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
+
+    // Remove unconscious condition
+    const conditions = getRuntimeValue(creature.name, 'activeConditions', campaignName) || [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'unconscious');
+    setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
+
+    // Update the creature in combat summary
+    if (creature.type === 'player') {
+        creature.currentHp = newHp;
+    }
+
+    // Log the healing
+    postLogEntry(campaignName, {
+        type: 'heal',
+        targetName: creature.name,
+        delta: newHp,
+        currentHp: newHp,
+        maxHp: maxHp,
+        isHealing: true,
+        isUnconscious: false,
+        abilityName: 'Relentless Endurance',
     });
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));

@@ -737,6 +737,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'gnomish_lineage':
                 result.specialActions.push(info)
                 break
+            case 'fiendish_legacy':
+                result.specialActions.push(info)
+                break
             case 'memorize_spell':
                 result.specialActions.push(info);
                 break;

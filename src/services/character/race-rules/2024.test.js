@@ -8,6 +8,10 @@ vi.mock('../../ui/utils.js', () => ({
   }
 }));
 
+vi.mock('../../hooks/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(() => null)
+}));
+
 describe('raceRules 2024 (direct module)', () => {
   describe('getImmunities', () => {
     it('should return empty array when no race', () => {
@@ -253,6 +257,69 @@ describe('raceRules 2024 (direct module)', () => {
       expect(result[0].name).toBe('Alpha');
       expect(result[1].name).toBe('Middle');
       expect(result[2].name).toBe('Zebra');
+    });
+
+    it('should return Fiendish Legacy resistance based on runtime selection (Abyssal)', async () => {
+      const { getRuntimeValue } = await import('../../hooks/useRuntimeState.js');
+      getRuntimeValue.mockReturnValue('Abyssal');
+
+      const playerSummary = {
+        name: 'TestChar',
+        race: {
+          traits: [
+            { name: 'Fiendish Legacies', description: 'Abyssal: Resistance to Poison damage.' }
+          ]
+        }
+      };
+      const result = raceRules.getResistances(playerSummary);
+      expect(result).toContain('Poison');
+    });
+
+    it('should return Fiendish Legacy resistance based on runtime selection (Chthonic)', async () => {
+      const { getRuntimeValue } = await import('../../hooks/useRuntimeState.js');
+      getRuntimeValue.mockReturnValue('Chthonic');
+
+      const playerSummary = {
+        name: 'TestChar',
+        race: {
+          traits: [
+            { name: 'Fiendish Legacies', description: 'Chthonic: Resistance to Necrotic damage.' }
+          ]
+        }
+      };
+      const result = raceRules.getResistances(playerSummary);
+      expect(result).toContain('Necrotic');
+    });
+
+    it('should return Fiendish Legacy resistance based on runtime selection (Infernal)', async () => {
+      const { getRuntimeValue } = await import('../../hooks/useRuntimeState.js');
+      getRuntimeValue.mockReturnValue('Infernal');
+
+      const playerSummary = {
+        name: 'TestChar',
+        race: {
+          traits: [
+            { name: 'Fiendish Legacies', description: 'Infernal: Resistance to Fire damage.' }
+          ]
+        }
+      };
+      const result = raceRules.getResistances(playerSummary);
+      expect(result).toContain('Fire');
+    });
+
+    it('should not add Fiendish Legacy resistance when no legacy selected', async () => {
+      const { getRuntimeValue } = await import('../../hooks/useRuntimeState.js');
+      getRuntimeValue.mockReturnValue(null);
+
+      const playerSummary = {
+        race: {
+          traits: [
+            { name: 'Fiendish Legacies', description: 'Abyssal: Resistance to Poison damage.' }
+          ]
+        }
+      };
+      const result = raceRules.getResistances(playerSummary);
+      expect(result).toContain('Poison');
     });
   });
 

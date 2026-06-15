@@ -4,6 +4,8 @@ import { categorizeFeatures, mergeCategorizedFeatures } from '../featureCategori
 import utils from '../../ui/utils.js';
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 
+const LEGACY_KEY = '_fiendishLegacySelection';
+
 const raceRules = {
     getImmunities: (playerSummary) => {
             // 2024 Rules: Simplified immunities based on racial traits
@@ -92,9 +94,26 @@ const raceRules = {
             resistances.push(playerSummary.race.subrace.damage_resistance);
         }
 
+        // Fiendish Legacy: resistance is determined by runtime selection
+        const campaignName = playerSummary?.campaignName;
+        const fiendishLegacy = getRuntimeValue(playerSummary?.name, LEGACY_KEY, campaignName);
+        const fiendishLegacyResistanceMap = {
+            'Abyssal': 'Poison',
+            'Chthonic': 'Necrotic',
+            'Infernal': 'Fire',
+        };
+
         if (playerSummary.race && playerSummary.race.traits) {
             playerSummary.race.traits.forEach(trait => {
                 if (trait.description) {
+                    // Skip Fiendish Legacies table — its resistances are runtime-dependent
+                    if (trait.name === 'Fiendish Legacies' && fiendishLegacy) {
+                        const legResist = fiendishLegacyResistanceMap[fiendishLegacy];
+                        if (legResist && !resistances.includes(legResist)) {
+                            resistances.push(legResist);
+                        }
+                        return;
+                    }
                     const matches = [...trait.description.matchAll(/Resistance to ([^\s.]+)/gi)];
                     matches.forEach(match => {
                         if (match[1].toLowerCase() !== 'the') {
@@ -110,7 +129,7 @@ const raceRules = {
         }
 
         return resistances.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-         },
+          },
     getSenses: (playerStats) => {
             // 2024 Rules: Extract senses from racial traits
         const senses = playerStats.senses ? [...playerStats.senses] : [];

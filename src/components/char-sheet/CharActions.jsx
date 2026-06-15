@@ -57,6 +57,7 @@ import IllusoryRealityModal from './IllusoryRealityModal.jsx'
 import CelestialRevelationModal from './CelestialRevelationModal.jsx'
 import ElfisLineageModal from './ElfisLineageModal.jsx'
 import GnomishLineageModal from './GnomishLineageModal.jsx'
+import FiendishLegacyModal from './FiendishLegacyModal.jsx'
 import GiantAncestryModal from './GiantAncestryModal.jsx'
 import BreathWeaponShapeModal from './BreathWeaponShapeModal.jsx'
 import HypnoticPatternShakeModal from './HypnoticPatternShakeModal.jsx'
@@ -273,6 +274,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         celestialRevelationModal, setCelestialRevelationModal,
         elfishLineageModal, setElfisLineageModal,
         gnomishLineageModal, setGnomishLineageModal,
+        fiendishLegacyModal, setFiendishLegacyModal,
         giantAncestryModal, setGiantAncestryModal,
         eyebiteEffectModal, setEyebiteEffectModal,
         breathWeaponShapeModal, setBreathWeaponShapeModal,
@@ -547,6 +549,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         break;
                     case 'gnomishLineage':
                         setGnomishLineageModal(result.payload);
+                        break;
+                    case 'fiendishLegacy':
+                        setFiendishLegacyModal(result.payload);
                         break;
                     case 'giantAncestry':
                         setGiantAncestryModal(result.payload);
@@ -1158,6 +1163,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <GnomishLineageModal
                         {...gnomishLineageModal}
                         onClose={() => setGnomishLineageModal(null)}
+                    />
+                )}
+                {fiendishLegacyModal && (
+                    <FiendishLegacyModal
+                        {...fiendishLegacyModal}
+                        onClose={() => setFiendishLegacyModal(null)}
                     />
                 )}
                 {giantAncestryModal && (

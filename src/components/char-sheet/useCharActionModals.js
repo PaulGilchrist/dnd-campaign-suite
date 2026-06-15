@@ -60,6 +60,7 @@ export default function useCharActionModals({
     const [celestialRevelationModal, setCelestialRevelationModal] = useState(null);
     const [elfishLineageModal, setElfisLineageModal] = useState(null);
     const [gnomishLineageModal, setGnomishLineageModal] = useState(null);
+    const [fiendishLegacyModal, setFiendishLegacyModal] = useState(null);
     const [giantAncestryModal, setGiantAncestryModal] = useState(null);
     const [hypnoticPatternShakeModal, setHypnoticPatternShakeModal] = useState(null);
     const [eyebiteEffectModal, setEyebiteEffectModal] = useState(null);
@@ -1423,6 +1424,7 @@ export default function useCharActionModals({
         celestialRevelationModal, setCelestialRevelationModal,
         elfishLineageModal, setElfisLineageModal,
         gnomishLineageModal, setGnomishLineageModal,
+        fiendishLegacyModal, setFiendishLegacyModal,
         giantAncestryModal, setGiantAncestryModal,
         hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
         eyebiteEffectModal, setEyebiteEffectModal,

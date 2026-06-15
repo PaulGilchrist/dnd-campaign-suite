@@ -1076,6 +1076,130 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
       expect(goblin.currentHp).toBe(0);
     });
 
+    describe('Relentless Endurance (Orc race trait)', () => {
+      it('triggers when orc is reduced to 0 HP and sets HP to 1', () => {
+        const orc = createPlayerCreature('OrcPlayer');
+        const cs = makeCombatSummary([orc]);
+
+        getRuntimeValue.mockImplementation((charName, key) => {
+          if (charName === 'OrcPlayer' && key === 'currentHitPoints') return 10;
+          if (charName === 'OrcPlayer' && key === 'hitPoints') return 100;
+          return undefined;
+        });
+
+        const result = applyDamageToTarget(cs, 'OrcPlayer', 10, ['Slashing'], 'TestCampaign', [createPlayerCharacterWithComputed('OrcPlayer', {
+          level: 1,
+          hitPoints: { max: 100 },
+          allFeatures: [{ name: 'Relentless Endurance' }, { name: 'Darkvision' }],
+        })]);
+
+        expect(result.intercepted).toBe(true);
+        expect(result.finalDamage).toBe(0);
+        expect(result.newHp).toBe(1);
+        expect(setRuntimeValue).toHaveBeenCalledWith('OrcPlayer', 'currentHitPoints', 1, 'TestCampaign');
+      });
+
+      it('does not trigger if already used this long rest', () => {
+        const orc = createPlayerCreature('OrcPlayer2');
+        const cs = makeCombatSummary([orc]);
+
+        getRuntimeValue.mockImplementation((charName, key) => {
+          if (charName === 'OrcPlayer2' && key === 'currentHitPoints') return 10;
+          if (charName === 'OrcPlayer2' && key === 'hitPoints') return 100;
+          if (charName === 'OrcPlayer2' && key === 'relentlessEnduranceUsed') return true;
+          return undefined;
+        });
+
+        const result = applyDamageToTarget(cs, 'OrcPlayer2', 10, ['Slashing'], 'TestCampaign', [createPlayerCharacterWithComputed('OrcPlayer2', {
+          level: 1,
+          hitPoints: { max: 100 },
+          allFeatures: [{ name: 'Relentless Endurance' }],
+        })]);
+
+        expect(result.finalDamage).toBe(10);
+        expect(result.newHp).toBe(0);
+      });
+
+      it('does not trigger if orc does not have the trait', () => {
+        const elf = createPlayerCreature('ElfPlayer');
+        const cs = makeCombatSummary([elf]);
+
+        getRuntimeValue.mockImplementation((charName, key) => {
+          if (charName === 'ElfPlayer' && key === 'currentHitPoints') return 10;
+          if (charName === 'ElfPlayer' && key === 'hitPoints') return 80;
+          return undefined;
+        });
+
+        const result = applyDamageToTarget(cs, 'ElfPlayer', 10, ['Slashing'], 'TestCampaign', [createPlayerCharacterWithComputed('ElfPlayer', {
+          level: 1,
+          hitPoints: { max: 80 },
+          allFeatures: [{ name: 'Darkvision' }, { name: 'Fey Ancestry' }],
+        })]);
+
+        expect(result.finalDamage).toBe(10);
+        expect(result.newHp).toBe(0);
+      });
+
+      it('resets death saves when triggering', () => {
+        const orc = createPlayerCreature('OrcPlayer3');
+        const cs = makeCombatSummary([orc]);
+
+        getRuntimeValue.mockImplementation((charName, key) => {
+          if (charName === 'OrcPlayer3' && key === 'currentHitPoints') return 10;
+          if (charName === 'OrcPlayer3' && key === 'hitPoints') return 100;
+          return undefined;
+        });
+
+        applyDamageToTarget(cs, 'OrcPlayer3', 10, ['Slashing'], 'TestCampaign', [createPlayerCharacterWithComputed('OrcPlayer3', {
+          level: 1,
+          hitPoints: { max: 100 },
+          allFeatures: [{ name: 'Relentless Endurance' }],
+        })]);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith('OrcPlayer3', 'deathSaves', [false, false, false], 'TestCampaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('OrcPlayer3', 'deathFailures', [false, false, false], 'TestCampaign');
+      });
+
+      it('marks feature as used', () => {
+        const orc = createPlayerCreature('OrcPlayer4');
+        const cs = makeCombatSummary([orc]);
+
+        getRuntimeValue.mockImplementation((charName, key) => {
+          if (charName === 'OrcPlayer4' && key === 'currentHitPoints') return 10;
+          if (charName === 'OrcPlayer4' && key === 'hitPoints') return 100;
+          return undefined;
+        });
+
+        applyDamageToTarget(cs, 'OrcPlayer4', 10, ['Slashing'], 'TestCampaign', [createPlayerCharacterWithComputed('OrcPlayer4', {
+          level: 1,
+          hitPoints: { max: 100 },
+          allFeatures: [{ name: 'Relentless Endurance' }],
+        })]);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith('OrcPlayer4', 'relentlessEnduranceUsed', true, 'TestCampaign');
+      });
+
+      it('removes unconscious condition when triggering', () => {
+        const orc = createPlayerCreature('OrcPlayer5');
+        const cs = makeCombatSummary([orc]);
+
+        getRuntimeValue.mockImplementation((charName, key, campaignName) => {
+          if (charName === 'OrcPlayer5' && key === 'currentHitPoints') return 10;
+          if (charName === 'OrcPlayer5' && key === 'hitPoints') return 100;
+          if (charName === 'OrcPlayer5' && key === 'activeConditions' && campaignName === 'TestCampaign') return ['unconscious', 'blinded'];
+          return undefined;
+        });
+
+        applyDamageToTarget(cs, 'OrcPlayer5', 10, ['Slashing'], 'TestCampaign', [createPlayerCharacterWithComputed('OrcPlayer5', {
+          level: 1,
+          hitPoints: { max: 100 },
+          allFeatures: [{ name: 'Relentless Endurance' }],
+        })]);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith('OrcPlayer5', 'activeConditions', ['blinded'], 'TestCampaign');
+      });
+    });
+
     describe('Dark One\'s Blessing', () => {
       function createFiendWarlock(name, level, chaScore, warlockLevel) {
         return {
