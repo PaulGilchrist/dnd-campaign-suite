@@ -11,7 +11,7 @@ vi.mock('./tempHpBuffHandler.js', () => ({
   grantTempHpOnRage: vi.fn(),
 }));
 
-vi.mock('./tempTeleportHandler.js', () => ({
+vi.mock('./class-warlock/tempTeleportHandler.js', () => ({
   clearExtendedFlag: vi.fn(),
 }));
 
@@ -21,7 +21,7 @@ import { handle, applyStanceOption } from './combatStanceHandler.js';
 
 import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
 import * as tempHpBuffHandler from './tempHpBuffHandler.js';
-import * as tempTeleportHandler from './tempTeleportHandler.js';
+import * as tempTeleportHandler from './class-warlock/tempTeleportHandler.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
-import { buildSaveDc, createSaveListener } from '../common/savePrompt.js';
-import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
+import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
+import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 
 const USES_KEY = 'clairvoyantCombatantUses';
 

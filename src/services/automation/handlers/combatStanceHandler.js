@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { grantTempHpOnRage } from './tempHpBuffHandler.js';
-import { clearExtendedFlag } from './tempTeleportHandler.js';
+import { clearExtendedFlag } from './class-warlock/tempTeleportHandler.js';
 
 function resolveResistanceTypes(resistanceTypes) {
     return resistanceTypes.flatMap(rt => {

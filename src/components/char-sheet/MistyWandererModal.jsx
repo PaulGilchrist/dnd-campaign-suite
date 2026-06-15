@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { confirmMistyWanderer } from '../../services/automation/handlers/mistyWandererHandler.js';
+import { confirmMistyWanderer } from '../../services/automation/handlers/class-warlock/mistyWandererHandler.js';
 import './CharSheet.css';
 
 function MistyWandererModal({ action, playerStats, campaignName, onClose }) {

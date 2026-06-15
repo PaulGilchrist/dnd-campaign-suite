@@ -1,5 +1,5 @@
-import { addEntry } from '../../ui/logService.js';
-import { getLastAttackRoll } from '../../../hooks/useMetamagic.js';
+import { addEntry } from '../../../ui/logService.js';
+import { getLastAttackRoll } from '../../../../hooks/useMetamagic.js';
 
 const EVENT_STALENESS_MS = 60000;
 

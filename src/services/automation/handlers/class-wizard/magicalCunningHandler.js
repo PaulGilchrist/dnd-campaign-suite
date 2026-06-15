@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { grantCelestialResilience } from '../celestialResilienceHandler.js';
+import { grantCelestialResilience } from '../class-warlock/celestialResilienceHandler.js';
 
 const MAGICAL_CUNNING_KEY = 'magicalCunningUsed';
 

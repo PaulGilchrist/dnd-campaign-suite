@@ -1,5 +1,5 @@
-import { setRuntimeValue, getRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
+import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
 
 const DAMAGE_TYPES = [
     'Acid', 'Bludgeoning', 'Cold', 'Fire', 'Lightning',

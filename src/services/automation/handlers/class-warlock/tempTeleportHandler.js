@@ -1,7 +1,7 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { buildSaveDc, createSaveListener } from '../common/savePrompt.js';
-import { resolveTarget } from '../common/targetResolver.js';
-import { evaluateAutoExpression } from '../../combat/automationService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
+import { resolveTarget } from '../../common/targetResolver.js';
+import { evaluateAutoExpression } from '../../../combat/automationService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;

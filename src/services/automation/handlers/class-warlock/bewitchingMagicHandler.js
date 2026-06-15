@@ -1,4 +1,4 @@
-import { setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const freeCastKey = '_Bewitching_Magic_freeCast';

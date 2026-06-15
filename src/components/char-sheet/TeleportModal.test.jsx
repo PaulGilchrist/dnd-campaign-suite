@@ -4,14 +4,14 @@ import TeleportModal from './TeleportModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../services/automation/handlers/tempTeleportHandler.js', () => ({
+vi.mock('../../services/automation/handlers/class-warlock/tempTeleportHandler.js', () => ({
   confirmTeleport: vi.fn(),
   isExtendedAvailable: vi.fn(() => true),
 }));
 
 // ── Re-import mocked modules ──
 
-import * as tempTeleportHandler from '../../services/automation/handlers/tempTeleportHandler.js';
+import * as tempTeleportHandler from '../../services/automation/handlers/class-warlock/tempTeleportHandler.js';
 
 // ── Test fixtures ──
 

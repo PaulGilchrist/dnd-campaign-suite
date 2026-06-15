@@ -6,7 +6,7 @@ vi.mock('../common/buffToggle.js', () => ({
   toggleBuff: vi.fn(),
 }));
 
-vi.mock('./tempTeleportHandler.js', () => ({
+vi.mock('./class-warlock/tempTeleportHandler.js', () => ({
   handle: vi.fn(),
 }));
 
@@ -30,7 +30,7 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
 
 import { handle } from './buffHandler.js';
 import * as buffToggle from '../common/buffToggle.js';
-import * as tempTeleportHandler from './tempTeleportHandler.js';
+import * as tempTeleportHandler from './class-warlock/tempTeleportHandler.js';
 import * as damageUtils from '../../rules/combat/damageUtils.js';
 import * as combatData from '../../encounters/combatData.js';
 import * as automationService from '../../combat/automationService.js';

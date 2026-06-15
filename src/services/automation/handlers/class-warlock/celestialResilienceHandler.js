@@ -1,8 +1,8 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { evaluateAutoExpression } from '../../combat/automationService.js';
-import { addEntry } from '../../ui/logService.js';
-import { loadMapData } from '../../maps/mapsService.js';
-import { getDistanceFeet, rangeToFeet } from '../../rules/combat/rangeValidation.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { evaluateAutoExpression } from '../../../combat/automationService.js';
+import { addEntry } from '../../../ui/logService.js';
+import { loadMapData } from '../../../maps/mapsService.js';
+import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
 export async function grantCelestialResilience(playerStats, campaignName, source, mapName) {
     const isCelestial = playerStats.class?.major?.name === 'Celestial Patron'

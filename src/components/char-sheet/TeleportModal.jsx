@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { confirmTeleport, isExtendedAvailable } from '../../services/automation/handlers/tempTeleportHandler.js';
+import { confirmTeleport, isExtendedAvailable } from '../../services/automation/handlers/class-warlock/tempTeleportHandler.js';
 import './CharSheet.css';
 
 function TeleportModal({ action, playerStats, campaignName, onClose, triggeredByElementalStride }) {

@@ -1,8 +1,8 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { evaluateAutoExpression } from '../../combat/automationService.js';
-import { getDistanceFeet, rangeToFeet } from '../../rules/combat/rangeValidation.js';
-import { loadMapData } from '../../maps/mapsService.js';
-import { addEntry } from '../../ui/logService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { evaluateAutoExpression } from '../../../combat/automationService.js';
+import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { loadMapData } from '../../../maps/mapsService.js';
+import { addEntry } from '../../../ui/logService.js';
 
 export async function grantDarkOnesBlessing(playerStats, campaignName, attackerName, mapName) {
     const isFiend = playerStats.class?.subclass?.name === 'Fiend Patron';

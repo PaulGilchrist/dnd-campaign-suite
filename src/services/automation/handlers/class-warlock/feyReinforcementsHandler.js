@@ -1,12 +1,9 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-
-const HANDLER_MODAL = 'createThrall';
-const HANDLER_CONFIRM = 'create_thrall_confirm';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
     const playerName = playerStats.name;
-    const featureName = action.name || 'Create Thrall';
+    const featureName = action.name || 'Fey Reinforcements';
 
     const freeCastCountKey = `_${featureName.replace(/\s+/g, '_')}_freeCastCount`;
     const currentCount = Number(getRuntimeValue(playerName, freeCastCountKey, campaignName) ?? auto.usesMax);
@@ -25,7 +22,7 @@ export async function handle(action, playerStats, campaignName) {
 
     return {
         type: 'modal',
-        modalName: HANDLER_MODAL,
+        modalName: 'feyReinforcements',
         payload: {
             action,
             playerStats,
@@ -35,10 +32,10 @@ export async function handle(action, playerStats, campaignName) {
     };
 }
 
-export async function confirmCreateThrall(action, playerStats, campaignName, noConcentration) {
+export async function confirmFeyReinforcement(action, playerStats, campaignName, noConcentration) {
     const auto = action.automation;
     const playerName = playerStats.name;
-    const featureName = action.name || 'Create Thrall';
+    const featureName = action.name || 'Fey Reinforcements';
 
     const freeCastCountKey = `_${featureName.replace(/\s+/g, '_')}_freeCastCount`;
     const currentCount = Number(getRuntimeValue(playerName, freeCastCountKey, campaignName) ?? auto.usesMax);
@@ -58,7 +55,7 @@ export async function confirmCreateThrall(action, playerStats, campaignName, noC
     const newCount = currentCount - 1;
     await setRuntimeValue(playerName, freeCastCountKey, newCount, campaignName);
 
-    const spellName = auto.spell || 'Summon Aberration';
+    const spellName = auto.spell || 'Summon Fey';
     const noConcLabel = noConcentration ? ' Does not require Concentration.' : '';
     const durLabel = noConcentration ? ' Duration: 1 minute.' : '';
 
@@ -67,10 +64,8 @@ export async function confirmCreateThrall(action, playerStats, campaignName, noC
         payload: {
             type: 'automation_info',
             name: featureName,
-            description: `${featureName}: Free cast of ${spellName} (${newCount} remaining).${noConcLabel}${durLabel}<br/><br/><em>Open your spell sheet and cast ${spellName} normally — no spell slot or material components will be consumed.</em>`,
+            description: `${featureName}: Free cast of ${spellName} (${newCount} remaining).${noConcLabel}${durLabel}<br/><br/><em>Open your spell sheet and cast ${spellName} normally — no spell slot will be consumed.</em>`,
             automation: { ...auto, noConcentration },
         },
     };
 }
-
-export { HANDLER_MODAL as modalName, HANDLER_CONFIRM as confirmType };

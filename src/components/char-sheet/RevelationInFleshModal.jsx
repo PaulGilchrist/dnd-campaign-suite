@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { applyRevelationOption } from '../../services/automation/handlers/revelationInFleshHandler.js';
+import { applyRevelationOption } from '../../services/automation/handlers/class-warlock/revelationInFleshHandler.js';
 import './CharSheet.css';
 
 function RevelationInFleshModal({ action, playerStats, campaignName, onClose }) {

@@ -1,6 +1,6 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getCurrentSorceryPoints, spendSorceryPoints } from '../../../hooks/useMetamagic.js';
-import { getClassFeatures } from '../../../services/character/classFeatures.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getCurrentSorceryPoints, spendSorceryPoints } from '../../../../hooks/useMetamagic.js';
+import { getClassFeatures } from '../../../../services/character/classFeatures.js';
 
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;

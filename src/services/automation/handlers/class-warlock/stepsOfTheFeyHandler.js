@@ -1,9 +1,9 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { evaluateAutoExpression } from '../../combat/automationExpressions.js';
-import { buildSaveDc, createSaveListener } from '../common/savePrompt.js';
-import { resolveTarget } from '../common/targetResolver.js';
-import { addEntry } from '../../ui/logService.js';
-import { addExpiration } from '../../rules/effects/expirations.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { evaluateAutoExpression } from '../../../combat/automationExpressions.js';
+import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
+import { resolveTarget } from '../../common/targetResolver.js';
+import { addEntry } from '../../../ui/logService.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
 
 function rollDie(sides) {
     return Math.floor(Math.random() * sides) + 1;

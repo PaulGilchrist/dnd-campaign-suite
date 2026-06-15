@@ -1,20 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { grantCelestialResilience, handle } from './celestialResilienceHandler.js'
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }))
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('../../maps/mapsService.js', () => ({
+vi.mock('../../../maps/mapsService.js', () => ({
     loadMapData: vi.fn().mockResolvedValue({ players: [] }),
 }))
 
-vi.mock('../../combat/automationService.js', () => ({
+vi.mock('../../../combat/automationService.js', () => ({
     evaluateAutoExpression: vi.fn((expr, ps) => {
         if (expr.includes('warlock level + CHA')) {
             return (ps.level || 0) + (ps.abilities?.find(a => a.name === 'Charisma')?.bonus || 0)
@@ -28,7 +28,7 @@ vi.mock('../../combat/automationService.js', () => ({
     }),
 }))
 
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js'
 
 const campaignName = 'test-campaign'
 const mapName = 'test-map'

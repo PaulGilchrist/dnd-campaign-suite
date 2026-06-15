@@ -1,28 +1,28 @@
 import { handle } from './hurlThroughHellHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { rollExpression } from '../../dice/diceRoller.js';
-import { buildSaveDc, createSaveListener } from '../common/savePrompt.js';
-import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
+import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
+import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../dice/diceRoller.js', () => ({
+vi.mock('../../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
 }));
 
-vi.mock('../common/savePrompt.js', () => ({
+vi.mock('../../common/savePrompt.js', () => ({
     buildSaveDc: vi.fn(),
     createSaveListener: vi.fn(),
 }));
 
-vi.mock('../../rules/combat/damageUtils.js', () => ({
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
     getTargetFromAttacker: vi.fn(),
 }));
@@ -111,7 +111,7 @@ describe('hurlThroughHellHandler', () => {
     });
 
     it('should have correct automation info builder output', () => {
-        const { miscHandlers } = require('../../combat/automationInfoBuilder/misc.js');
+        const { miscHandlers } = require('../../../combat/automationInfoBuilder/misc.js');
         expect(miscHandlers.hurl_through_hell).toBeDefined();
 
         const feature = {
@@ -144,7 +144,7 @@ describe('hurlThroughHellHandler', () => {
     });
 
     it('should include hurl_through_hell in collector passives', () => {
-        const { collectAutomationFromFeatures } = require('../../combat/automationCollector.js');
+        const { collectAutomationFromFeatures } = require('../../../combat/automationCollector.js');
 
         const features = [{
             name: 'Hurl Through Hell',

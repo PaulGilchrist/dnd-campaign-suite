@@ -1,6 +1,6 @@
 import { toggleBuff } from '../common/buffToggle.js';
 import { addExpiration } from '../../rules/effects/expirations.js';
-import { handle as handleTeleport } from './tempTeleportHandler.js';
+import { handle as handleTeleport } from './class-warlock/tempTeleportHandler.js';
 import { handle as handleVowOfEnmity } from './vowOfEnmityHandler.js';
 import { getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../encounters/combatData.js';

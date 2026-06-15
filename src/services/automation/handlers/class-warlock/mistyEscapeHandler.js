@@ -1,8 +1,8 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getLastDamageEvent } from '../../../hooks/useMetamagic.js';
-import { addEntry } from '../../ui/logService.js';
-import { buildSaveDc } from '../common/savePrompt.js';
-import { addExpiration } from '../../rules/effects/expirations.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getLastDamageEvent } from '../../../../hooks/useMetamagic.js';
+import { addEntry } from '../../../ui/logService.js';
+import { buildSaveDc } from '../../common/savePrompt.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
 
 const EVENT_STALENESS_MS = 60000;
 

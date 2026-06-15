@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { applyTypeChoice } from '../../services/automation/handlers/fiendishResilienceHandler.js';
+import { applyTypeChoice } from '../../services/automation/handlers/class-warlock/fiendishResilienceHandler.js';
 import './CharSheet.css';
 
 function FiendishResilienceModal({ action, playerStats, campaignName, onClose }) {
