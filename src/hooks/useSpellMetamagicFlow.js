@@ -23,10 +23,13 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
   const [pendingLesserRestoration, setPendingLesserRestoration] = React.useState(null);
   const [pendingMageArmor, setPendingMageArmor] = React.useState(null);
   const [pendingProtectionFromEnergy, setPendingProtectionFromEnergy] = React.useState(null);
+  const [pendingResistance, setPendingResistance] = React.useState(null);
+  const [pendingRemoveCurse, setPendingRemoveCurse] = React.useState(null);
 
   const gateMetamagic = React.useCallback((spell) => {
     const isGreaterRestoration = (spell.name || '').toLowerCase() === 'greater restoration';
     const isLesserRestoration = (spell.name || '').toLowerCase() === 'lesser restoration';
+    const isRemoveCurse = (spell.name || '').toLowerCase() === 'remove curse';
     const isAid = (spell.name || '').toLowerCase() === 'aid';
 
     if (isLesserRestoration) {
@@ -54,6 +57,24 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
         .map(c => c.name) || [];
       if (creatureTargets.length > 0) {
         setPendingGreaterRestoration({
+          spell,
+          spellName: spell.name,
+          spellLevel: spell.level || 0,
+          castingTime: spell.casting_time,
+          range: spell.range || 'Touch',
+          creatureTargets,
+        });
+        return;
+      }
+    }
+
+    if (isRemoveCurse) {
+      const cs = getCombatSummary();
+      const creatureTargets = cs?.creatures
+        ?.filter(c => c.name !== playerStats?.name)
+        .map(c => c.name) || [];
+      if (creatureTargets.length > 0) {
+        setPendingRemoveCurse({
           spell,
           spellName: spell.name,
           spellLevel: spell.level || 0,
@@ -138,6 +159,26 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
           range: spell.range || 'Touch',
           creatureTargets,
           damageTypes: spell.automation?.damageTypes || ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'],
+        });
+        return;
+      }
+    }
+
+    const isResistance = (spell.name || '').toLowerCase() === 'resistance';
+    if (isResistance) {
+      const cs = getCombatSummary();
+      const creatureTargets = cs?.creatures
+        ?.filter(c => c.name !== playerStats?.name)
+        .map(c => c.name) || [];
+      if (creatureTargets.length > 0) {
+        setPendingResistance({
+          spell,
+          spellName: spell.name,
+          spellLevel: spell.level || 0,
+          castingTime: spell.casting_time,
+          range: spell.range || 'Touch',
+          creatureTargets,
+          damageTypes: ['Acid', 'Bludgeoning', 'Cold', 'Fire', 'Lightning', 'Necrotic', 'Piercing', 'Poison', 'Radiant', 'Slashing', 'Thunder'],
         });
         return;
       }
@@ -488,6 +529,53 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
   }, [pendingLesserRestoration, playerStats, campaignName]);
 
+  const handleRemoveCurseConfirm = React.useCallback(async (result) => {
+    const pending = pendingRemoveCurse;
+    setPendingRemoveCurse(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+
+    try {
+      const { confirmRemoveCurse } = await import('../services/rules/features/removeCurseService.js');
+      await confirmRemoveCurse(
+        { name: pending.spellName, spell: pending.spell, automation: { type: 'remove_curse', range: pending.range } },
+        playerStats,
+        campaignName,
+        null,
+        result
+      );
+    } catch (e) {
+      console.error('[removeCurse] Failed to apply effect:', e);
+    }
+  }, [pendingRemoveCurse, playerStats, campaignName]);
+
+  const handleRemoveCurseSkip = React.useCallback(() => {
+    const pending = pendingRemoveCurse;
+    setPendingRemoveCurse(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+  }, [pendingRemoveCurse, playerStats, campaignName]);
+
   const handleMageArmorConfirm = React.useCallback(async (result) => {
     const pending = pendingMageArmor;
     setPendingMageArmor(null);
@@ -582,5 +670,52 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
   }, [pendingProtectionFromEnergy, playerStats.name, campaignName]);
 
-  return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingHeroesFeast, pendingGreaterRestoration, pendingLesserRestoration, pendingMageArmor, pendingProtectionFromEnergy, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleHeroesFeastConfirm, handleHeroesFeastSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, handleLesserRestorationConfirm, handleLesserRestorationSkip, handleMageArmorConfirm, handleMageArmorSkip, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip };
+  const handleResistanceConfirm = React.useCallback(async (result) => {
+    const pending = pendingResistance;
+    setPendingResistance(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+
+    try {
+      const { applyResistanceEffect } = await import('../services/automation/index.js');
+      await applyResistanceEffect(
+        { name: pending.spellName, spell: pending.spell, automation: { type: 'damage_reduction', reductionExpression: '1d4', damageTypes: [], trigger: 'damage_taken_of_chosen_resistance_type' } },
+        playerStats,
+        campaignName,
+        result.targetName,
+        result.damageType
+      );
+    } catch (e) {
+      console.error('[resistance] Failed to apply effect:', e);
+    }
+  }, [pendingResistance, playerStats, campaignName]);
+
+  const handleResistanceSkip = React.useCallback(() => {
+    const pending = pendingResistance;
+    setPendingResistance(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+  }, [pendingResistance, playerStats.name, campaignName]);
+
+  return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingHeroesFeast, pendingGreaterRestoration, pendingLesserRestoration, pendingMageArmor, pendingProtectionFromEnergy, pendingResistance, pendingRemoveCurse, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleHeroesFeastConfirm, handleHeroesFeastSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, handleLesserRestorationConfirm, handleLesserRestorationSkip, handleMageArmorConfirm, handleMageArmorSkip, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, handleResistanceConfirm, handleResistanceSkip, handleRemoveCurseConfirm, handleRemoveCurseSkip };
 }

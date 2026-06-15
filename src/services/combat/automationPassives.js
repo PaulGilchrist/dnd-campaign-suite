@@ -238,6 +238,18 @@ export function getDamageReduction(playerStats, damageType, isWearingHeavyArmor)
         if (condition === 'wearing_heavy_armor' && !isWearingHeavyArmor) {
             continue;
         }
+        if (auto.trigger === 'damage_taken_of_chosen_resistance_type') {
+            const playerName = playerStats.name;
+            const campaignName = playerStats.campaignName;
+            const chosenDamageType = getRuntimeValue(playerName, 'resistanceChosenDamageType', campaignName);
+            if (!chosenDamageType || chosenDamageType.toLowerCase() !== String(damageType).toLowerCase()) {
+                continue;
+            }
+            const isUsedThisTurn = getRuntimeValue(playerName, 'resistanceUsedThisTurn', campaignName);
+            if (isUsedThisTurn) {
+                continue;
+            }
+        }
         let reduction = 0;
         if (typeof auto.reduction === 'number') {
             reduction = auto.reduction;

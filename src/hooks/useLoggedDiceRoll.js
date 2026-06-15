@@ -54,6 +54,17 @@ function hasPotentCantrip(playerStats) {
     return passives.some(p => p.type === 'potent_cantrip');
 }
 
+function getShieldAcBonus(characterName, campaignName) {
+    const activeBuffs = getRuntimeValue(characterName, 'activeBuffs', campaignName) || [];
+    const shieldActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shield');
+    return shieldActive ? 5 : 0;
+}
+
+function isMagicMissileImmune(characterName, campaignName) {
+    const activeBuffs = getRuntimeValue(characterName, 'activeBuffs', campaignName) || [];
+    return Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shield');
+}
+
 function getSoulstitchProtectedCreatures(playerName, campaignName) {
     const key = `_${playerName.replace(/\s+/g, '_')}_Soulstitch_Spells_active`;
     const stored = getRuntimeValue(playerName, key, campaignName);
@@ -102,6 +113,14 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
 
       // Soulstitch Spells: chosen creatures auto-succeed and take no damage
       const isSoulstitchProtected = hasSoulstitchProtection(e.detail.targetName, characterName, pending.campaignName);
+
+      // Shield spell: immunity to Magic Missile damage
+      const targetActiveBuffs = getRuntimeValue(e.detail.targetName, 'activeBuffs', pending.campaignName) || [];
+      const isShieldActive = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'shield');
+      const isMagicMissile = pending.name && pending.name.toLowerCase() === 'magic missile';
+      if (isShieldActive && isMagicMissile) {
+        finalDamage = 0;
+      }
 
       const ownEvasion = targetChar?.computedStats?.evasionEffects;
       const hasOwnEvasion = !isIncapacitated && pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === saveTypeUpper);
@@ -363,7 +382,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         throw new Error(`[AC] Target "${target.name}" has no AC defined.`);
       }
 
-        const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) + (context?.defensiveDuelistBonus || 0) : undefined;
+        const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) + (context?.defensiveDuelistBonus || 0) + getShieldAcBonus(characterName, campaignName) : undefined;
         let hit = isAutoMiss ? false : (target ? (effectiveD20 + bonus >= effectiveAc) : undefined);
        const targetName = target?.name || context?.targetName;
        const attackerName = context?.attackerName || characterName;
@@ -726,9 +745,52 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
      }
 
     async function logDamageAndShow(name, formula, total, rolls, modifier, context) {
-       const { saveDc, saveType, dcSuccess, damageType, attackerName, isAutoMiss, rangeReason } = context || {};
-       const adjustedTotal = applyMinDamageAdjustment(total, rolls, context?.playerStats, damageType);
-       const combatSummary = await loadCombatSummary(campaignName);
+        const { saveDc, saveType, dcSuccess, damageType, attackerName, isAutoMiss, rangeReason } = context || {};
+        const adjustedTotal = applyMinDamageAdjustment(total, rolls, context?.playerStats, damageType);
+
+        // Shield spell: immunity to Magic Missile damage
+        if (isMagicMissileImmune(characterName, campaignName) && name && name.toLowerCase() === 'magic missile') {
+            const combatSummary = await loadCombatSummary(campaignName);
+            const target = combatSummary?.creatures?.find(c => c.name === context?.targetName) || null;
+            const targetMaxHp = target?.type === 'player'
+                ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
+                : target?.maxHp ?? 0;
+            logEntry({
+                type: 'roll',
+                characterName,
+                rollType: 'damage',
+                name,
+                formula,
+                rolls,
+                total,
+                modifier,
+                damageType,
+                targetName: context?.targetName,
+                finalDamage: 0,
+                note: 'Shield: Immune to Magic Missile',
+            });
+            setPopupHtml({
+                type: 'damage',
+                name,
+                formula,
+                rolls,
+                bonus: 0,
+                modifier,
+                damageType,
+                targetName: context?.targetName,
+                total,
+                adjustedTotal: 0,
+                targetCurrentHp: target?.type === 'player' ? (getRuntimeValue(target.name, 'hitPoints') ?? 0) : (target?.currentHp ?? target?.maxHp),
+                targetMaxHp,
+                damageApplied: true,
+                finalDamage: 0,
+                damageReduced: true,
+                note: 'Shield: Immune to Magic Missile',
+            });
+            return;
+        }
+
+        const combatSummary = await loadCombatSummary(campaignName);
 
       if (isAutoMiss) {
         logEntry({
@@ -1755,6 +1817,14 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       });
     const hasEvasion = hasOwnEvasion || hasSharedEvasion;
     let finalDamage = computeDamageAfterEvasion(pending.rawDamage, saveResult.success, pending.dcSuccess, hasEvasion);
+
+    // Shield spell: immunity to Magic Missile damage
+    const targetActiveBuffs = getRuntimeValue(pending.targetName, 'activeBuffs', campaignName) || [];
+    const isShieldActive = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'shield');
+    const isMagicMissile = pending.name && pending.name.toLowerCase() === 'magic missile';
+    if (isShieldActive && isMagicMissile) {
+      finalDamage = 0;
+    }
 
     const interveneShieldActive = getRuntimeValue(pending.targetName, 'interveneShieldActive', campaignName);
     if (interveneShieldActive && pending.saveType === 'DEX' && pending.dcSuccess === 'half') {

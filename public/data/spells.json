@@ -7800,6 +7800,11 @@
     "heal_at_slot_level": {
       "7": "4d8 + 15"
     },
+    "automation": {
+      "type": "healing_start_of_turn",
+      "healExpression": "1",
+      "bodyPartRegrowMinutes": 2
+    },
     "school": "Transmutation",
     "classes": [
       "Bard",
@@ -8242,7 +8247,14 @@
     ],
     "subclasses": [
       "Lore"
-    ]
+    ],
+    "automation": {
+      "type": "temp_buff",
+      "effect": "see_invisibility",
+      "duration": "1_hour",
+      "action": "action",
+      "casting_time": "1 action"
+    }
   },
   {
     "index": "seeming",

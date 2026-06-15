@@ -79,6 +79,28 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
         if (effect.type === 'heroism_temp_hp') {
             applyHeroismTempHp(activeName, playerStats, effect, campaignName);
         }
+        if (effect.type === 'regenerate_turn_start_heal') {
+            applyRegenerateTurnStartHeal(activeName, playerStats, effect, campaignName);
+        }
+        if (effect.type === 'resistance_clear_turn') {
+            setRuntimeValue(activeName, 'resistanceUsedThisTurn', false, campaignName);
+        }
+    }
+
+    // Check for regenerate buff (not tied to turnStartEffects - it's a spell buff)
+    if (activeName && playerStats) {
+        const regenerateActive = getRuntimeValue(activeName, 'regenerateActive', campaignName);
+        if (regenerateActive) {
+            applyRegenerateBuffHeal(activeName, playerStats, campaignName);
+        }
+    }
+
+    // Clear Resistance once-per-turn flag at start of each creature's turn
+    if (activeName) {
+        const resistanceUsed = getRuntimeValue(activeName, 'resistanceUsedThisTurn', campaignName);
+        if (resistanceUsed) {
+            setRuntimeValue(activeName, 'resistanceUsedThisTurn', false, campaignName);
+        }
     }
 
     // Clean up Multiattack Defense effects at start of each creature's turn
@@ -373,6 +395,29 @@ async function applyUseMagicDeviceTurnStart(_activeName, _playerStats, _effect, 
     // The passive effects (attunement limit, charge reroll, scroll handling)
     // are applied continuously via saveModifiers and passive effects.
     // This turn start handler is a no-op placeholder for future state management.
+}
+
+async function applyRegenerateTurnStartHeal(activeName, playerStats, effect, campaignName) {
+    const regenerateActive = getRuntimeValue(activeName, 'regenerateActive', campaignName);
+    if (!regenerateActive) return;
+
+    const healAmount = effect.healExpression ? evaluateAutoExpression(effect.healExpression, playerStats) : 1;
+    if (typeof healAmount !== 'number' || isNaN(healAmount) || healAmount <= 0) return;
+
+    const maxHp = getRuntimeValue(activeName, 'hitPoints', campaignName) ?? playerStats.hitPoints ?? 100;
+    const currentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName) ?? getRuntimeValue(activeName, 'hitPoints', campaignName) ?? maxHp;
+    const newHp = Math.min(maxHp, currentHp + healAmount);
+
+    await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
+}
+
+async function applyRegenerateBuffHeal(activeName, playerStats, campaignName) {
+    const healAmount = 1;
+    const maxHp = getRuntimeValue(activeName, 'hitPoints', campaignName) ?? playerStats.hitPoints ?? 100;
+    const currentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName) ?? getRuntimeValue(activeName, 'hitPoints', campaignName) ?? maxHp;
+    const newHp = Math.min(maxHp, currentHp + healAmount);
+
+    await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
 }
 
 async function applyGrappleDamageTurnStart(activeName, playerStats, effect, campaignName) {
@@ -819,6 +864,14 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                         campaignName
                     );
                 }
+                break;
+            }
+
+            case 'remove_regenerate_buff': {
+                setRuntimeValue(targetName, 'regenerateActive', null, campaignName);
+                setRuntimeValue(targetName, 'regenerateSource', null, campaignName);
+                setRuntimeValue(targetName, 'regenerateBodyPartRegrowTime', null, campaignName);
+                setRuntimeValue(targetName, 'regenerateBodyPartsTracked', null, campaignName);
                 break;
             }
 

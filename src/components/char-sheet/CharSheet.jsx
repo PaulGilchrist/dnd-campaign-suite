@@ -236,8 +236,9 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const shapeShiftActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shape_shift');
     const isPeerlessAthlete = getRuntimeValue(playerStats?.name, 'peerlessAthleteActive', campaignName);
     const isLargeFormActive = getRuntimeValue(playerStats?.name, 'largeFormActive', campaignName);
+    const seeInvisibilityActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'see_invisibility');
     const combatContext = getCombatSummary();
-    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext);
+    const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, seeInvisibilityActive);
     if (playerStats) {
         const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);
         if (speedHalvedTime) conditionEffects.speedHalved = true;
@@ -297,6 +298,13 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const bladeWardActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'blade_ward');
     if (bladeWardActive) {
         conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
+    }
+
+    // Shield: +5 AC until start of next turn, immune to Magic Missile
+    const shieldActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shield');
+    if (shieldActive) {
+        conditionEffects.shieldAcBonus = 5;
+        conditionEffects.magicMissileImmune = true;
     }
 
     // Alert: Other creatures don't gain advantage on attack rolls against you from being unseen

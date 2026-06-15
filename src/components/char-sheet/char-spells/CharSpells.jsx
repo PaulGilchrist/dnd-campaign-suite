@@ -13,8 +13,10 @@ import AidTargetPopup from '../AidTargetPopup.jsx'
 import HeroesFeastTargetPopup from '../HeroesFeastTargetPopup.jsx'
 import GreaterRestorationPopup from '../GreaterRestorationPopup.jsx'
 import LesserRestorationPopup from '../LesserRestorationPopup.jsx'
+import RemoveCursePopup from '../RemoveCursePopup.jsx'
 import MageArmorTargetPopup from '../MageArmorTargetPopup.jsx'
 import ProtectionFromEnergyTargetPopup from '../ProtectionFromEnergyTargetPopup.jsx'
+import ResistanceTargetPopup from '../ResistanceTargetPopup.jsx'
 import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../../services/dice/diceRoller.js';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../services/rules/combat/damageUtils.js';
@@ -191,7 +193,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
       executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName });
       cachedCastPosRef.current = null;
       }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName]);
-    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingMageArmor, handleMageArmorConfirm, handleMageArmorSkip, pendingProtectionFromEnergy, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
+    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingMageArmor, handleMageArmorConfirm, handleMageArmorSkip, pendingProtectionFromEnergy, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, pendingResistance, handleResistanceConfirm, handleResistanceSkip, pendingRemoveCurse, handleRemoveCurseConfirm, handleRemoveCurseSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
 
     const resolveSpellPositions = React.useCallback(async () => {
@@ -479,6 +481,17 @@ return (
                         onSkip={handleLesserRestorationSkip}
                       />
                     )}
+                    {pendingRemoveCurse && (
+                      <RemoveCursePopup
+                        spell={{ name: pendingRemoveCurse.spellName, level: pendingRemoveCurse.spellLevel || 0 }}
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        creatureTargets={pendingRemoveCurse.creatureTargets}
+                        range={pendingRemoveCurse.range}
+                        onConfirm={handleRemoveCurseConfirm}
+                        onSkip={handleRemoveCurseSkip}
+                      />
+                    )}
                     {pendingMageArmor && (
                       <MageArmorTargetPopup
                         spell={{ name: pendingMageArmor.spellName, level: pendingMageArmor.spellLevel || 0 }}
@@ -500,6 +513,18 @@ return (
                         damageTypes={pendingProtectionFromEnergy.damageTypes}
                         onConfirm={handleProtectionFromEnergyConfirm}
                         onSkip={handleProtectionFromEnergySkip}
+                      />
+                    )}
+                    {pendingResistance && (
+                      <ResistanceTargetPopup
+                        spell={{ name: pendingResistance.spellName, level: pendingResistance.spellLevel || 0 }}
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        range={pendingResistance.range}
+                        creatureTargets={pendingResistance.creatureTargets}
+                        damageTypes={pendingResistance.damageTypes}
+                        onConfirm={handleResistanceConfirm}
+                        onSkip={handleResistanceSkip}
                       />
                     )}
             <hr />

@@ -683,6 +683,17 @@ export const miscHandlers = {
         }
     },
 
+    'remove_curse': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'remove_curse',
+            name: feature.name,
+            range: auto.range || 'Touch',
+            casting_time: auto.casting_time || '1 action',
+            hasAutomation: true
+        }
+    },
+
     'protection_from_poison': (feature, _playerStats) => {
         const auto = feature.automation
         return {

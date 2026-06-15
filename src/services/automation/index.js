@@ -156,6 +156,7 @@ import { handle as handleAid, applyAid as applyAidEffect } from './handlers/heal
 import { handle as handleAuraOfPurity } from './handlers/buffs/auraOfPurityHandler.js';
 import { handle as handleHolyAura } from './handlers/buffs/holyAuraHandler.js';
 import { handle as handleBladeWard } from './handlers/buffs/bladeWardHandler.js';
+import { handle as handleShield } from './handlers/shieldHandler.js';
 import { handle as handleCounterSpell } from './handlers/spells/counterSpellHandler.js';
 import { handle as handleEyebite } from './handlers/spells/eyebiteHandler.js';
 import { handle as handleFalseLife } from './handlers/buffs/falseLifeHandler.js';
@@ -168,6 +169,7 @@ import { handle as handleGlobeOfInvulnerability } from './handlers/spells/globeO
 import { handle as handleGreaseAreaSave } from './handlers/spells/greaseAreaSaveHandler.js';
 import { handle as handleGreaterRestoration, applyGreaterRestoration as applyGreaterRestorationEffect } from './handlers/spells/greaterRestorationHandler.js';
 import { handle as handleLesserRestoration, applyLesserRestoration as applyLesserRestorationEffect } from './handlers/spells/lesserRestorationHandler.js';
+import { handle as handleRemoveCurse, applyRemoveCurse as applyRemoveCurseEffect } from './handlers/spells/removeCurseHandler.js';
 import { handle as handleLongstrider, applyLongstrider as applyLongstriderEffect } from './handlers/buffs/longstriderHandler.js';
 import { handle as handleMageArmor, applyMageArmor as applyMageArmorEffect } from './handlers/buffs/mageArmorHandler.js';
 import { handle as handleHeroesFeast, applyHeroesFeast as applyHeroesFeastEffect } from './handlers/buffs/heroesFeastHandler.js';
@@ -179,6 +181,7 @@ import { handle as handlePowerWordStun } from './handlers/spells/powerWordStunHa
 import { handle as handleOttoDance } from './handlers/spells/ottosDanceHandler.js';
 import { handle as handlePassWithoutTrace } from './handlers/buffs/passWithoutTraceHandler.js';
 import { handle as handleProtectionFromEvilAndGood, isProtectionFromEvilAndGoodActive, isCreatureWarded } from './handlers/buffs/protectionFromEvilAndGoodHandler.js';
+import { handle as handleResistance, applyResistance as applyResistanceEffect, getResistanceDamageType, isResistanceUsedThisTurn } from './handlers/buffs/resistanceHandler.js';
 import { handle as handleRayOfEnfeeblement, isRayOfEnfeeblementActive } from './handlers/spells/rayOfEnfeeblementHandler.js';
 import { handle as handleSentinelGuardian } from './handlers/combat/sentinelGuardianHandler.js';
 import { handle as handleSentinelHalt } from './handlers/combat/sentinelHaltHandler.js';
@@ -371,6 +374,7 @@ const HANDLER_MAP = {
         aura_of_purity: handleAuraOfPurity,
         holy_aura: handleHolyAura,
         blade_ward: handleBladeWard,
+        shield: handleShield,
         reaction_counterspell: handleCounterSpell,
         eyebite: handleEyebite,
         false_life: handleFalseLife,
@@ -383,6 +387,7 @@ const HANDLER_MAP = {
         grease_area_save: handleGreaseAreaSave,
         greater_restoration: handleGreaterRestoration,
         lesser_restoration: handleLesserRestoration,
+        remove_curse: handleRemoveCurse,
         longstrider: handleLongstrider,
         longstrider_apply: applyLongstriderEffect,
         mage_armor: handleMageArmor,
@@ -400,6 +405,7 @@ const HANDLER_MAP = {
         protection_from_energy: handleProtectionFromEnergy,
         protection_from_evil_and_good: handleProtectionFromEvilAndGood,
         protection_from_poison: handleProtectionFromPoison,
+        resistance: handleResistance,
         boon_of_energy_resistance: handleBoonOfEnergyResistance,
         modify_d20_roll: handleBoonOfFate,
         ray_of_enfeeblement: handleRayOfEnfeeblement,
@@ -412,7 +418,7 @@ const HANDLER_MAP = {
         tavern_brawler_push: handleGenericPopup,
         grapple_damage: handleGenericPopup,
 };
-export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler, applyProtectionFromPoisonHandler, applyBoonOfEnergyResistance, applyWeaponMasteryChoice, isProtectionFromEvilAndGoodActive, isCreatureWarded, isProtectionFromPoisonActive, isRayOfEnfeeblementActive };
+export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler, applyProtectionFromPoisonHandler, applyRemoveCurseEffect, applyBoonOfEnergyResistance, applyWeaponMasteryChoice, applyResistanceEffect, isProtectionFromEvilAndGoodActive, isCreatureWarded, isProtectionFromPoisonActive, isRayOfEnfeeblementActive, getResistanceDamageType, isResistanceUsedThisTurn };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
 

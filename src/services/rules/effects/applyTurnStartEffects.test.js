@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
@@ -361,6 +361,31 @@ describe('applyTurnStartEffects', () => {
       }, 'TestCampaign');
 
       expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('regenerate turn-start healing', () => {
+    it('checks regenerateActive when regenerateActive is true', () => {
+      getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+        if (name === 'Target' && prop === 'regenerateActive') return true;
+        if (name === 'Target' && prop === 'currentHitPoints') return 10;
+        if (name === 'Target' && prop === 'hitPoints') return 20;
+        return undefined;
+      });
+      setRuntimeValue.mockResolvedValue(undefined);
+
+      applyTurnStartEffects('Target', { turnStartEffects: [] }, 'TestCampaign');
+
+      expect(getRuntimeValue).toHaveBeenCalledWith('Target', 'regenerateActive', 'TestCampaign');
+    });
+
+    it('does not check regenerateActive when turnStartEffects is empty', () => {
+      getRuntimeValue.mockReturnValue(undefined);
+      setRuntimeValue.mockResolvedValue(undefined);
+
+      applyTurnStartEffects('Target', { turnStartEffects: [] }, 'TestCampaign');
+
+      expect(getRuntimeValue).toHaveBeenCalledWith('Target', 'regenerateActive', 'TestCampaign');
     });
   });
 });

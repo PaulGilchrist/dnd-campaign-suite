@@ -10529,6 +10529,11 @@
     "status_effects": [],
     "heal_at_slot_level": {
       "7": "4d8 + 15"
+    },
+    "automation": {
+      "type": "healing_start_of_turn",
+      "healExpression": "1",
+      "bodyPartRegrowMinutes": 2
     }
   },
   {
@@ -10587,7 +10592,12 @@
     ],
     "subclasses": [],
     "area_of_effect": null,
-    "status_effects": []
+    "status_effects": [],
+    "automation": {
+      "type": "remove_curse",
+      "range": "Touch",
+      "casting_time": "1 action"
+    }
   },
   {
     "index": "resistance",
@@ -10615,7 +10625,14 @@
     ],
     "subclasses": [],
     "area_of_effect": null,
-    "status_effects": []
+    "status_effects": [],
+    "automation": {
+      "type": "damage_reduction",
+      "reductionExpression": "1d4",
+      "damageTypes": [],
+      "trigger": "damage_taken_of_chosen_resistance_type",
+      "casting_time": "1 action"
+    }
   },
   {
     "index": "resurrection",
@@ -10965,7 +10982,14 @@
     ],
     "subclasses": [],
     "area_of_effect": null,
-    "status_effects": []
+    "status_effects": [],
+    "automation": {
+      "type": "temp_buff",
+      "effect": "see_invisibility",
+      "duration": "1_hour",
+      "action": "action",
+      "casting_time": "1 action"
+    }
   },
   {
     "index": "seeming",
@@ -11165,7 +11189,10 @@
     ],
     "subclasses": [],
     "area_of_effect": null,
-    "status_effects": []
+    "status_effects": [],
+    "automation": {
+      "type": "shield"
+    }
   },
   {
     "index": "shield-of-faith",

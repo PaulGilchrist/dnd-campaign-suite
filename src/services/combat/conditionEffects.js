@@ -246,7 +246,7 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
   }
 }
 
-function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null) {
+function computeConditionEffects(conditions = [], saveModifiers = [], targetEffects = [], isRaging = false, shapeShiftActive = false, isPeerlessAthlete = false, isLargeFormActive = false, combatContext = null, seeInvisibilityActive = false) {
   const effects = {
     attackAdvantageCount: 0,
     attackDisadvantageCount: 0,
@@ -318,6 +318,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     hexSaveDisadvantageAbility: null,
     strCheckDisadvantage: false,
     rayOfEnfeebleDamageReduction: false,
+    seeInvisibilityActive: false,
    }
 
   const conditionSet = new Set(conditions)
@@ -376,10 +377,12 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
         effects.concentrationBroken = true
         break
 
-       case 'invisible':
-        effects.attackAdvantageCount++
-        effects.targetDisadvantageCount++
-        break
+        case 'invisible':
+         if (!seeInvisibilityActive) {
+           effects.attackAdvantageCount++
+           effects.targetDisadvantageCount++
+         }
+         break
 
        case 'paralyzed':
         effects.cannotAct = true

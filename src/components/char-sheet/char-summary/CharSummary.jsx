@@ -201,6 +201,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         if (buff.effect === 'dragon_wings') { flySpeed = buff.flySpeed || 60; dragonWingsHover = true; }
         if (buff.effect === 'aquatic_adaptation') swimSpeed = speed * 2;
         if (buff.effect === 'see_the_invisible') seeInvisibleRange = 60;
+        if (buff.effect === 'see_invisibility') seeInvisibleRange = 120;
         if (buff.effect === 'wormhole_movement') narrowSpaceActive = true;
     });
     const hasteActive = activeBuffs.some(b => b.effect === 'haste');

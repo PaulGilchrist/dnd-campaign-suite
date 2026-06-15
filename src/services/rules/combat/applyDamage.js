@@ -104,6 +104,12 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         if (reduction !== null && reduction > 0) {
             damageReducedByFeature = reduction;
             finalDamage = Math.max(0, finalDamage - reduction);
+            const hasResistanceTrigger = (playerComputed.automation?.passives || []).some(
+                p => p.type === 'damage_reduction' && p.trigger === 'damage_taken_of_chosen_resistance_type'
+            );
+            if (hasResistanceTrigger) {
+                setRuntimeValue(creature.name, 'resistanceUsedThisTurn', true, campaignName);
+            }
         }
     }
 

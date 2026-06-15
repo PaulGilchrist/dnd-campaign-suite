@@ -198,6 +198,14 @@ export function collectTurnStartEffects(features) {
                     name: feature.name,
                 })
             }
+            if (auto?.type === 'healing_start_of_turn') {
+                effects.push({
+                    type: 'regenerate_turn_start_heal',
+                    name: feature.name,
+                    healExpression: auto.healExpression || '1',
+                    bodyPartRegrowMinutes: auto.bodyPartRegrowMinutes || 2,
+                })
+            }
             if (auto?.type === 'third_eye') {
                 effects.push({
                     type: 'third_eye',
@@ -637,6 +645,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 } else {
                     result.actions.push(info)
                 }
+                break
+            case 'remove_curse':
+                result.actions.push(info)
                 break
             case 'protection_from_poison':
                 if (info.casting_time === '1 bonus_action' || info.casting_time === 'bonus_action' || info.casting_time === '1 bonus action') {

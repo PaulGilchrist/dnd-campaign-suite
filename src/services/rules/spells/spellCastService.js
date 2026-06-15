@@ -13,6 +13,7 @@ import { getCombatContext } from '../combat/damageUtils.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { executeHandler } from '../../automation/index.js';
 import { rollExpressionMaximized } from '../../dice/diceRoller.js';
+import { addExpiration } from '../effects/expirations.js';
 import { triggerFalseLife } from '../features/falseLifeService.js';
 import { triggerHealingWord } from '../features/healingWordService.js';
 import { triggerMassCureWounds } from '../features/massCureWoundsService.js';
@@ -22,6 +23,7 @@ import { triggerPrayerOfHealing } from '../features/prayerOfHealingService.js';
 import { triggerFear } from '../features/fearService.js';
 import { triggerFeignDeath } from '../features/feignDeathService.js';
 import { triggerFleshToStone } from '../features/fleshToStoneService.js';
+import { triggerRemoveCurse } from '../features/removeCurseService.js';
 import { triggerHoldMonster } from '../features/holdMonsterService.js';
 import { triggerHypnoticPattern } from '../features/hypnoticPatternService.js';
 import { triggerMassSuggestion } from '../features/massSuggestionService.js';
@@ -36,6 +38,7 @@ import { triggerHeroism } from '../features/heroismService.js';
 import { triggerHolyAura } from '../features/holyAuraService.js';
 import { triggerPowerWordFortify } from '../features/powerWordFortifyService.js';
 import { triggerPowerWordStun } from '../features/powerWordStunService.js';
+import { triggerSeeInvisibility } from '../features/seeInvisibilityService.js';
 import { executeHandler as executeLongstrider } from '../../automation/index.js';
 import { executeHandler as executeProtectionFromEnergy } from '../../automation/index.js';
 import { executeHandler as executeProtectionFromPoison } from '../../automation/index.js';
@@ -143,6 +146,16 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             const fearInnateBonus = innateSorceryActive ? 1 : 0;
             const fearMetaCtx = { ...metaCtx, spellSaveDc: spellSaveDc + fearInnateBonus };
             await triggerFear(spell, fearMetaCtx, playerStats, campaignName, mapName);
+
+        // Regenerate — heal target, set turn-start healing, track body part regrowth
+        if (spell.name && spell.name.toLowerCase() === 'regenerate') {
+            const target = await getTargetInfo();
+            if (target?.name) {
+                await applyRegenerateSpell(spell, target, playerStats, campaignName);
+            }
+            return;
+        }
+
         // Generic healing: use heal_at_slot_level for any healing spell without a dedicated handler
         if (spell.heal_at_slot_level) {
             const target = await getTargetInfo();
@@ -249,6 +262,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             const target = await getTargetInfo();
             const feignMetaCtx = { ...metaCtx, targetName: target?.name };
             await triggerFeignDeath(spell, feignMetaCtx, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // See Invisibility — self-target buff that lets you see invisible creatures
+        if (spell.name && spell.name.toLowerCase() === 'see invisibility') {
+            await triggerSeeInvisibility(spell, metaCtx, playerStats, campaignName, mapName);
             return;
         }
 
@@ -394,20 +413,38 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
               }
           }
 
-          // Protection from Poison — remove Poisoned condition and apply buff
-          if (spell.name && spell.name.toLowerCase() === 'protection from poison') {
-              const target = await getTargetInfo();
-              if (target) {
-                  const action = {
-                      name: 'Protection from Poison',
-                      spell: spell,
-                      automation: spell.automation || {},
-                  };
-                  await executeProtectionFromPoison(action, playerStats, campaignName, mapName);
-              }
-          }
+           // Protection from Poison — remove Poisoned condition and apply buff
+           if (spell.name && spell.name.toLowerCase() === 'protection from poison') {
+               const target = await getTargetInfo();
+               if (target) {
+                   const action = {
+                       name: 'Protection from Poison',
+                       spell: spell,
+                       automation: spell.automation || {},
+                   };
+                   await executeProtectionFromPoison(action, playerStats, campaignName, mapName);
+               }
+           }
 
-         return;
+            // Remove Curse — remove curses and break attunement on target
+            if (spell.name && spell.name.toLowerCase() === 'remove curse') {
+                await triggerRemoveCurse(spell, metaCtx, playerStats, campaignName, mapName);
+            }
+
+            // Resistance (2024) — apply damage reduction buff to target
+            if (spell.name && spell.name.toLowerCase() === 'resistance') {
+                const target = await getTargetInfo();
+                if (target) {
+                    const action = {
+                        name: 'Resistance',
+                        spell: spell,
+                        automation: spell.automation || {},
+                    };
+                    await executeHandler(action, playerStats, campaignName, mapName);
+                }
+            }
+
+           return;
    }
 
    const rollContext = { ...metaCtx, damageType };
@@ -748,4 +785,72 @@ async function triggerExpertDivination(spell, metaCtx, playerStats, campaignName
         console.error('[spellCast] Expert Divination trigger failed:', e);
         return null;
     }
+}
+
+async function applyRegenerateSpell(spell, target, caster, campaignName) {
+    const targetName = target.name;
+    const casterName = caster.name;
+    const slotLevel = spell.level || 7;
+    const healAtSlotLevel = spell.heal_at_slot_level;
+    let expression = healAtSlotLevel?.[slotLevel];
+    if (!expression) {
+        const levels = Object.keys(healAtSlotLevel || {}).map(Number).sort((a, b) => a - b);
+        const highestBelow = levels.filter(l => l <= slotLevel).pop();
+        if (highestBelow) {
+            expression = healAtSlotLevel[highestBelow];
+        }
+    }
+
+    // Apply initial healing
+    if (expression) {
+        const { rollExpression } = await import('../../dice/diceRoller.js');
+        const result = rollExpression(expression);
+        if (result) {
+            const combatSummary = await getCombatContext(campaignName);
+            if (combatSummary) {
+                const creature = combatSummary.creatures.find(c => c.name === targetName);
+                const maxHp = creature?.maxHp || caster.hitPoints || 100;
+                const currentHp = creature?.currentHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? maxHp;
+                const actualHeal = Math.min(result.total, maxHp - currentHp);
+                if (actualHeal > 0) {
+                    applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
+                }
+                postLogEntry(campaignName, {
+                    type: 'hp_change',
+                    targetName,
+                    delta: actualHeal,
+                    currentHp: Math.min(maxHp, currentHp + actualHeal),
+                    maxHp,
+                    isHealing: true,
+                    sourceName: casterName,
+                    note: spell.name,
+                    formula: expression,
+                    timestamp: Date.now(),
+                });
+            }
+        }
+    }
+
+    // Set up turn-start healing: store regenerateActive on the target
+    await setRuntimeValue(targetName, 'regenerateActive', true, campaignName);
+    await setRuntimeValue(targetName, 'regenerateSource', casterName, campaignName);
+
+    // Track body part regrowth timestamp (2 minutes = 120000ms)
+    const bodyPartRegrowMinutes = spell.automation?.bodyPartRegrowMinutes || 2;
+    const regrowTimestamp = Date.now() + (bodyPartRegrowMinutes * 60 * 1000);
+    await setRuntimeValue(targetName, 'regenerateBodyPartRegrowTime', regrowTimestamp, campaignName);
+    await setRuntimeValue(targetName, 'regenerateBodyPartsTracked', true, campaignName);
+
+    // Add expiration for combat: remove regenerate buff after 1 hour (3600 seconds / 6 = 600 rounds)
+    addExpiration(casterName, targetName, [
+        { type: 'remove_regenerate_buff' }
+    ], campaignName, 600);
+
+    postLogEntry(campaignName, {
+        type: 'ability_use',
+        characterName: casterName,
+        abilityName: spell.name,
+        description: `${casterName} cast ${spell.name} on ${targetName}. Target regains HP and regains 1 HP at start of each turn for 1 hour.`,
+        timestamp: Date.now(),
+    }).catch(() => {});
 }

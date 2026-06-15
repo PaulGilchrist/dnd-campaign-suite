@@ -130,6 +130,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
     }
 
+    if (auto?.effect === 'see_invisibility') {
+        if (!wasActive) {
+            addExpiration(playerStats.name, targetName, [
+                { type: 'remove_active_buff', buffName: action.name }
+            ], campaignName);
+        }
+    }
+
     if (auto?.effect === 'fly_speed_equals_walk_speed' && wasActive) {
         const restKey = playerStats.name.toLowerCase().replace(/\s+/g, '') + '_buffRestTimestamp';
         await setRuntimeValue(playerStats.name, restKey, Date.now(), campaignName);
