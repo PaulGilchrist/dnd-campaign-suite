@@ -12,8 +12,8 @@ import { handle as handleFontOfMagic } from './handlers/resources/fontOfMagicHan
 import { handle as handleHealingPool } from './handlers/healing/healingPoolHandler.js';
 import { handle as handleSpellModifier } from './handlers/spellModifierHandler.js';
 import { handle as handleCombatStance } from './handlers/combatStanceHandler.js';
-import { handle as handleReactionDamage } from './handlers/reactionDamageHandler.js';
-import { handle as handleReactionDebuff } from './handlers/reactionDebuffHandler.js';
+import { handle as handleReactionDamage } from './handlers/reactions/reactionDamageHandler.js';
+import { handle as handleReactionDebuff } from './handlers/reactions/reactionDebuffHandler.js';
 import { handle as handleAttackRider } from './handlers/attackRiderHandler.js';
 import { handle as handleTempHpBuff } from './handlers/tempHpBuffHandler.js';
 import { handle as handleWeaponMastery } from './handlers/weaponMasteryHandler.js';
@@ -22,7 +22,7 @@ import { handle as handleRevivification } from './handlers/healing/revivificatio
 import { handle as handleBardicInspiration } from './handlers/bardicInspirationHandler.js';
 import { handle as handleAutoReroll } from './handlers/autoRerollHandler.js';
 import { handle as handleBardicInspirationUse } from './handlers/bardicInspirationUseHandler.js';
-import { handle as handleReactionBonus } from './handlers/reactionBonusHandler.js';
+import { handle as handleReactionBonus } from './handlers/reactions/reactionBonusHandler.js';
 import { handle as handlePostCastRider } from './handlers/postCastRiderHandler.js';
 import { handle as handleBardicInspirationDefense } from './handlers/bardicInspirationDefenseHandler.js';
 import { handle as handleBardicInspirationOffense } from './handlers/bardicInspirationOffenseHandler.js';
@@ -32,7 +32,7 @@ import { handle as handleBonusActionAttack } from './handlers/bonusActionAttackH
 import { handle as handleExtraAction } from './handlers/extraActionHandler.js';
 import { handle as handleDamageReduction } from './handlers/damageReductionHandler.js';
 import { handle as handleOpenHandTechnique } from './handlers/openHandTechniqueHandler.js';
-import { handle as handleReactionSaveHeal } from './handlers/reactionSaveHealHandler.js';
+import { handle as handleReactionSaveHeal } from './handlers/reactions/reactionSaveHealHandler.js';
 import { handle as handleCountercharm } from './handlers/countercharmHandler.js';
 import { handle as handleFontOfInspiration } from './handlers/fontOfInspirationHandler.js';
 import { handle as handleMultiTarget } from './handlers/multiTargetHandler.js';

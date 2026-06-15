@@ -16,8 +16,8 @@ vi.mock('./handlers/resources/fontOfMagicHandler.js', () => ({ handle: vi.fn() }
 vi.mock('./handlers/healing/healingPoolHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/spellModifierHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/combatStanceHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/reactionDamageHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/reactionDebuffHandler.js', () => ({ handle: vi.fn() }));
+vi.mock('./handlers/reactions/reactionDamageHandler.js', () => ({ handle: vi.fn() }));
+vi.mock('./handlers/reactions/reactionDebuffHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/attackRiderHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/tempHpBuffHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/weaponMasteryHandler.js', () => ({ handle: vi.fn() }));
@@ -26,7 +26,7 @@ vi.mock('./handlers/healing/revivificationHandler.js', () => ({ handle: vi.fn() 
 vi.mock('./handlers/bardicInspirationHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/autoRerollHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/bardicInspirationUseHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/reactionBonusHandler.js', () => ({ handle: vi.fn() }));
+vi.mock('./handlers/reactions/reactionBonusHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/postCastRiderHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/bardicInspirationDefenseHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/bardicInspirationOffenseHandler.js', () => ({ handle: vi.fn() }));
@@ -53,8 +53,8 @@ import * as fontOfMagicHandler from './handlers/resources/fontOfMagicHandler.js'
 import * as healingPoolHandler from './handlers/healing/healingPoolHandler.js';
 import * as spellModifierHandler from './handlers/spellModifierHandler.js';
 import * as combatStanceHandler from './handlers/combatStanceHandler.js';
-import * as reactionDamageHandler from './handlers/reactionDamageHandler.js';
-import * as reactionDebuffHandler from './handlers/reactionDebuffHandler.js';
+import * as reactionDamageHandler from './handlers/reactions/reactionDamageHandler.js';
+import * as reactionDebuffHandler from './handlers/reactions/reactionDebuffHandler.js';
 import * as attackRiderHandler from './handlers/attackRiderHandler.js';
 import * as tempHpBuffHandler from './handlers/tempHpBuffHandler.js';
 import * as weaponMasteryHandler from './handlers/weaponMasteryHandler.js';
@@ -63,7 +63,7 @@ import * as revivificationHandler from './handlers/healing/revivificationHandler
 import * as bardicInspirationHandler from './handlers/bardicInspirationHandler.js';
 import * as autoRerollHandler from './handlers/autoRerollHandler.js';
 import * as bardicInspirationUseHandler from './handlers/bardicInspirationUseHandler.js';
-import * as reactionBonusHandler from './handlers/reactionBonusHandler.js';
+import * as reactionBonusHandler from './handlers/reactions/reactionBonusHandler.js';
 import * as postCastRiderHandler from './handlers/postCastRiderHandler.js';
 import * as bardicInspirationDefenseHandler from './handlers/bardicInspirationDefenseHandler.js';
 import * as bardicInspirationOffenseHandler from './handlers/bardicInspirationOffenseHandler.js';

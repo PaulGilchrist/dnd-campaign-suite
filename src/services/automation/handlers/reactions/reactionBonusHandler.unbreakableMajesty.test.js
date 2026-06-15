@@ -1,30 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './reactionBonusHandler.js';
-import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
-import * as expirations from '../../rules/effects/expirations.js';
-import * as logService from '../../ui/logService.js';
+import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
+import * as expirations from '../../../rules/effects/expirations.js';
+import * as logService from '../../../ui/logService.js';
 
 // ── Mocks (hoisted) ────────────────────────────────────────────
 
-vi.mock('../common/targetResolver.js', () => ({
+vi.mock('../../common/targetResolver.js', () => ({
   resolveTarget: vi.fn(),
   resolveMapPositions: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../rules/effects/expirations.js', () => ({
+vi.mock('../../../rules/effects/expirations.js', () => ({
   addExpiration: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock('../../rules/combat/rangeValidation.js', () => ({
+vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
   rangeToFeet: vi.fn(),
 }));

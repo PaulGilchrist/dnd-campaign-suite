@@ -1,12 +1,12 @@
-import { resolveTarget, resolveMapPositions } from '../common/targetResolver.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addExpiration } from '../../rules/effects/expirations.js';
-import { addEntry } from '../../ui/logService.js';
-import { getDistanceFeet, rangeToFeet } from '../../rules/combat/rangeValidation.js';
-import { rollExpression } from '../../dice/diceRoller.js';
-import { spendSorceryPoints, getCurrentSorceryPoints } from '../../../hooks/useMetamagic.js';
-import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../hooks/useMetamagic.js';
-import { getClassFeatures } from '../../../services/character/classFeatures.js';
+import { resolveTarget, resolveMapPositions } from '../../common/targetResolver.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
+import { addEntry } from '../../../ui/logService.js';
+import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
+import { spendSorceryPoints, getCurrentSorceryPoints } from '../../../../hooks/useMetamagic.js';
+import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../../hooks/useMetamagic.js';
+import { getClassFeatures } from '../../../../services/character/classFeatures.js';
 
 const EVENT_STALENESS_MS = 60000;
 

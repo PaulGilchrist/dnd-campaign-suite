@@ -2,40 +2,40 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
 
-vi.mock('../common/targetResolver.js', () => ({
+vi.mock('../../common/targetResolver.js', () => ({
   resolveTarget: vi.fn(),
   resolveMapPositions: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock('../../rules/combat/rangeValidation.js', () => ({
+vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
   rangeToFeet: vi.fn(),
 }));
 
-vi.mock('../../rules/combat/damageUtils.js', () => ({
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../rules/combat/applyHealing.js', () => ({
+vi.mock('../../../rules/combat/applyHealing.js', () => ({
   applyHealingToTarget: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/useMetamagic.js', () => ({
   getLastDamageEvent: vi.fn(),
   getLastAttackRoll: vi.fn(),
   getLastAbilityCheck: vi.fn(),
 }));
 
-vi.mock('../../combat/automationService.js', () => ({
+vi.mock('../../../combat/automationService.js', () => ({
   evaluateAutoExpression: vi.fn().mockReturnValue(0),
 }));
 
@@ -43,14 +43,14 @@ vi.mock('../../combat/automationService.js', () => ({
 
 import { handle } from './reactionDebuffHandler.js';
 
-import * as targetResolver from '../common/targetResolver.js';
-import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
-import * as logService from '../../ui/logService.js';
-import * as rangeValidation from '../../rules/combat/rangeValidation.js';
-import * as damageUtils from '../../rules/combat/damageUtils.js';
-import * as applyHealing from '../../rules/combat/applyHealing.js';
-import * as useMetamagic from '../../../hooks/useMetamagic.js';
-import * as automationService from '../../combat/automationService.js';
+import * as targetResolver from '../../common/targetResolver.js';
+import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
+import * as logService from '../../../ui/logService.js';
+import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
+import * as applyHealing from '../../../rules/combat/applyHealing.js';
+import * as useMetamagic from '../../../../hooks/useMetamagic.js';
+import * as automationService from '../../../combat/automationService.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 

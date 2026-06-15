@@ -2,21 +2,21 @@ import { describe, it, expect, vi } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../rules/combat/damageUtils.js', () => ({
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
   getTargetFromAttacker: vi.fn(),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../common/savePrompt.js', () => ({
+vi.mock('../../common/savePrompt.js', () => ({
   buildSaveDc: vi.fn(),
   createSaveListener: vi.fn(({ targetName, saveType, saveDc }) => ({
     promptId: `prompt-${targetName}-${saveType}-${saveDc}`,
@@ -26,10 +26,10 @@ vi.mock('../common/savePrompt.js', () => ({
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './reactionSaveHealHandler.js';
-import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
-import * as damageUtils from '../../rules/combat/damageUtils.js';
-import * as logService from '../../ui/logService.js';
-import * as savePrompt from '../common/savePrompt.js';
+import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
+import * as logService from '../../../ui/logService.js';
+import * as savePrompt from '../../common/savePrompt.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
