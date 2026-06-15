@@ -1,4 +1,5 @@
 import { loadSkills } from '../../ui/dataLoader.js';
+import { evaluateAutoExpression } from '../../combat/automationExpressions.js';
 
 export async function getAbilities(playerStats) {
     const skills = await loadSkills();
@@ -84,8 +85,15 @@ export function getHitPoints(playerStats) {
 
     const passives = playerStats.automation?.passives || [];
     for (const passive of passives) {
-        if (passive.type === 'passive_rule' && passive.effect === 'max_hp_increase' && passive.amount) {
-            hitPoints += passive.amount;
+        if (passive.type === 'passive_rule' && passive.effect === 'max_hp_increase') {
+            if (passive.amount) {
+                hitPoints += passive.amount;
+            } else if (passive.bonusExpression) {
+                const bonus = evaluateAutoExpression(passive.bonusExpression, playerStats);
+                if (typeof bonus === 'number' && !isNaN(bonus)) {
+                    hitPoints += bonus;
+                }
+            }
         }
     }
 

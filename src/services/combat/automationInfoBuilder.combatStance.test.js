@@ -104,6 +104,7 @@ describe('buildAttackInfo – conditional_advantage', () => {
             uses: null,
             recharge: 'long_rest',
             casting_time: 'passive',
+            trigger: '',
             hasAutomation: true,
         })
     })

@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mock the dependencies ────────────────────────────────────────
 
+vi.mock('../../hooks/useRuntimeState.js', () => ({
+    getRuntimeValue: vi.fn(() => null),
+    setRuntimeValue: vi.fn(),
+}))
+
 vi.mock('./automationInfoBuilder.js', () => ({
     buildAttackInfo: vi.fn((feature) => {
         if (!feature?.automation) return null
@@ -47,6 +52,7 @@ vi.mock('../rules/core/attackCalc.js', () => ({
 import { buildAttackInfo } from './automationInfoBuilder.js'
 import { evaluateAutoExpression } from './automationExpressions.js'
 import { parseMagicItemName } from '../rules/core/attackCalc.js'
+import { getRuntimeValue } from '../../hooks/useRuntimeState.js'
 
 import {
     getPassiveBuffs,
@@ -55,6 +61,8 @@ import {
     hasHealingMaximization,
     hasRerollHealingOnes,
     hasFastWrestler,
+    hasTwoWeaponFighting,
+    hasSomaticComponentWaiver,
     getDamageReduction,
 } from './automationPassives.js'
 
@@ -305,6 +313,53 @@ describe('collectWeaponMastery', () => {
         })
         const result = collectWeaponMastery('Longsword', playerStats)
         expect(result.extraMasteries).toEqual(['push'])
+    })
+
+    it('collects extra mastery from weapon_mastery_choice passives', () => {
+        vi.mocked(getRuntimeValue).mockReturnValue('Push')
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'weapon_mastery_choice', masteryProperties: ['Push', 'Topple', 'Sap'], name: 'Mastery Property' },
+                ],
+            },
+            name: 'Test Character',
+            campaignName: 'test',
+        })
+        const result = collectWeaponMastery('Longsword', playerStats)
+        expect(result.extraMasteries).toContain('Push')
+    })
+
+    it('does not add mastery when runtime value is not in masteryProperties', () => {
+        vi.mocked(getRuntimeValue).mockReturnValue('Cleave')
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'weapon_mastery_choice', masteryProperties: ['Push', 'Topple', 'Sap'], name: 'Mastery Property' },
+                ],
+            },
+            name: 'Test Character',
+            campaignName: 'test',
+        })
+        const result = collectWeaponMastery('Longsword', playerStats)
+        expect(result.extraMasteries).not.toContain('Cleave')
+    })
+
+    it('combines weapon_mastery_choice with extraMastery passives', () => {
+        vi.mocked(getRuntimeValue).mockReturnValue('Topple')
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'weapon_mastery_choice', masteryProperties: ['Push', 'Topple', 'Sap'], name: 'Mastery Property' },
+                    { type: 'passive_rule', extraMastery: ['Push'] },
+                ],
+            },
+            name: 'Test Character',
+            campaignName: 'test',
+        })
+        const result = collectWeaponMastery('Longsword', playerStats)
+        expect(result.extraMasteries).toContain('Topple')
+        expect(result.extraMasteries).toContain('Push')
     })
 })
 
@@ -865,5 +920,136 @@ describe('getDamageReduction', () => {
             },
         })
         expect(getDamageReduction(playerStats, 'fire', false)).toBe(8)
+    })
+})
+
+describe('hasTwoWeaponFighting', () => {
+    function makePlayerStats(overrides = {}) {
+        return {
+            automation: { passives: [] },
+            ...overrides,
+        }
+    }
+
+    it('returns true when two_weapon_fighting passive exists', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'passive_rule', effect: 'two_weapon_fighting' },
+                ],
+            },
+        })
+        expect(hasTwoWeaponFighting(playerStats)).toBe(true)
+    })
+
+    it('returns false when no passives exist', () => {
+        const playerStats = makePlayerStats({ automation: { passives: [] } })
+        expect(hasTwoWeaponFighting(playerStats)).toBe(false)
+    })
+
+    it('returns false when automation.passives is missing', () => {
+        const playerStats = makePlayerStats({ automation: {} })
+        expect(hasTwoWeaponFighting(playerStats)).toBe(false)
+    })
+
+    it('returns false when automation is missing', () => {
+        const playerStats = makePlayerStats({ automation: null })
+        expect(hasTwoWeaponFighting(playerStats)).toBe(false)
+    })
+
+    it('returns false when no passives have the effect', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'passive_rule', effect: 'great_weapon_fighting' },
+                    { type: 'passive_buff', effect: 'advantage' },
+                ],
+            },
+        })
+        expect(hasTwoWeaponFighting(playerStats)).toBe(false)
+    })
+
+    it('returns true when two_weapon_fighting exists among other passives', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'passive_buff', effect: 'advantage' },
+                    { type: 'passive_rule', effect: 'two_weapon_fighting' },
+                    { type: 'passive_rule', effect: 'great_weapon_fighting' },
+                ],
+            },
+        })
+        expect(hasTwoWeaponFighting(playerStats)).toBe(true)
+    })
+})
+
+describe('hasSomaticComponentWaiver', () => {
+    function makePlayerStats(overrides = {}) {
+        return {
+            automation: { passives: [] },
+            ...overrides,
+        }
+    }
+
+    it('returns true when somatic_component_waiver passive exists', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'passive_buff', effect: 'somatic_component_waiver' },
+                ],
+            },
+        })
+        expect(hasSomaticComponentWaiver(playerStats)).toBe(true)
+    })
+
+    it('returns false when no passives exist', () => {
+        const playerStats = makePlayerStats({ automation: { passives: [] } })
+        expect(hasSomaticComponentWaiver(playerStats)).toBe(false)
+    })
+
+    it('returns false when automation.passives is missing', () => {
+        const playerStats = makePlayerStats({ automation: {} })
+        expect(hasSomaticComponentWaiver(playerStats)).toBe(false)
+    })
+
+    it('returns false when automation is missing', () => {
+        const playerStats = makePlayerStats({ automation: null })
+        expect(hasSomaticComponentWaiver(playerStats)).toBe(false)
+    })
+
+    it('returns false when no passives have the effect', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'passive_buff', effect: 'truesight' },
+                    { type: 'passive_rule', effect: 'two_weapon_fighting' },
+                ],
+            },
+        })
+        expect(hasSomaticComponentWaiver(playerStats)).toBe(false)
+    })
+
+    it('returns true when somatic_component_waiver exists among other passives', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'passive_buff', effect: 'truesight' },
+                    { type: 'passive_buff', effect: 'somatic_component_waiver' },
+                    { type: 'passive_buff', effect: 'speed_increase' },
+                ],
+            },
+        })
+        expect(hasSomaticComponentWaiver(playerStats)).toBe(true)
+    })
+
+    it('returns false for passive_rule type with same effect', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'passive_rule', effect: 'somatic_component_waiver' },
+                ],
+            },
+        })
+        expect(hasSomaticComponentWaiver(playerStats)).toBe(false)
     })
 })

@@ -199,6 +199,14 @@ function extractFeatSpells(featData) {
     result.grantedSpellLevels.level1 = 1; // Plus one player-chosen
   }
   
+  // Telepathy feat (2024)
+  if (featName === 'Telepathy') {
+    // Grants Detect Thoughts (level 2) as a free spell
+    result.spells.push('Detect Thoughts');
+    result.details.push('Telepathy grants Detect Thoughts (level 2) as a free spell');
+    result.grantedSpellLevels.level2 = 1;
+  }
+  
   // War Caster feat - doesn't grant spells but affects casting
   // No special handling needed
   

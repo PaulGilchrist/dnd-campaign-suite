@@ -1,7 +1,7 @@
 import { computeConditionEffects } from '../../services/combat/conditionEffects.js'
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js'
 
-function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, campaignName, hasTacticalShift }) {
+function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, campaignName, hasTacticalShift, hasSpeedyOpportunityDisadvantage, hasSpeedyDifficultTerrainIgnore }) {
     const condKeys = (conditions || []).map(c => c.key)
     const effects = computeConditionEffects(condKeys, [], targetEffects)
     const badges = []
@@ -29,6 +29,12 @@ function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, c
     const remarkableNoOA = getRuntimeValue(creatureName, 'remarkableAthleteNoOA', campaignName)
     if (creatureName && campaignName && remarkableNoOA) {
         badges.push({ label: 'No OA (Crit)', cls: 'effect-cannot-act', icon: 'fa-ban' })
+    }
+    if (hasSpeedyOpportunityDisadvantage) {
+        badges.push({ label: 'OA Disadv', cls: 'effect-disadvantage', icon: 'fa-arrow-down' })
+    }
+    if (hasSpeedyDifficultTerrainIgnore) {
+        badges.push({ label: 'No Difficult Terrain on Dash', cls: 'effect-cannot-act', icon: 'fa-person-walking' })
     }
     return (
         <>

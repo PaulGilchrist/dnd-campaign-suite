@@ -1,4 +1,5 @@
 import { evaluateAutoExpression } from '../automationExpressions.js'
+import { getAbilityModifier } from '../../shared/abilityLookup.js'
 
 export const miscHandlers = {
     'cantrip_spellcasting_ability': (feature, _playerStats) => {
@@ -691,6 +692,34 @@ export const miscHandlers = {
             effect: auto.effect || 'speed_0_on_oa_hit',
             duration: auto.duration || 'end_of_turn',
             casting_time: auto.casting_time || '1 action',
+            hasAutomation: true
+        }
+    },
+
+    'telekinetic_shove': (feature, playerStats) => {
+        const auto = feature.automation
+        const prof = playerStats.proficiency || 0
+        const saveDc = auto.saveDc === 'ability'
+            ? 8 + getAbilityModifier(playerStats.abilities, auto.saveAbility || 'INT') + prof
+            : auto.saveDc || 10
+        let action = auto.action
+        if (!action && auto.casting_time) {
+            if (auto.casting_time === '1 bonus action' || auto.casting_time === 'bonus_action') {
+                action = 'bonus_action'
+            } else if (auto.casting_time === '1 action' || auto.casting_time === 'action') {
+                action = 'action'
+            }
+        }
+        return {
+            type: 'telekinetic_shove',
+            name: feature.name,
+            saveType: auto.saveType || 'STR',
+            saveDc,
+            saveAbility: auto.saveAbility || 'INT',
+            range: auto.range || '30',
+            pushDistance: auto.pushDistance || 5,
+            action: action || 'bonus_action',
+            casting_time: auto.casting_time || '1 bonus action',
             hasAutomation: true
         }
     }

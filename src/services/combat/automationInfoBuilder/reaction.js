@@ -218,6 +218,17 @@ export const reactionHandlers = {
         }
     },
 
+    'reaction_spell': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'reaction_spell',
+            name: feature.name,
+            trigger: auto.trigger || '',
+            casting_time: auto.casting_time || '1 reaction',
+            hasAutomation: true
+        }
+    },
+
     'sentinel_guardian': (feature, playerStats) => {
         const auto = feature.automation
         const meleeAttacks = (playerStats.attacks || []).filter(

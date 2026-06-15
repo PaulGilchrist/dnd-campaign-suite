@@ -126,6 +126,13 @@ const rulesFactory = {
             const range = rangeMatch ? `${rangeMatch[1]} ft.` : '60 ft.';
             senses.push({ name: 'Truesight', value: range });
         }
+        // Apply Blindsight from passive_buff automation (e.g., Skulker feat)
+        const blindsightPassive = passives.find(p => p.type === 'passive_buff' && p.effect === 'blindsight');
+        if (blindsightPassive && !senses.some(s => s.name === 'Blindsight')) {
+            const rangeMatch = String(blindsightPassive.range || '').match(/(\d+)\s*ft/i);
+            const range = rangeMatch ? `${rangeMatch[1]} ft.` : '10 ft.';
+            senses.push({ name: 'Blindsight', value: range });
+        }
         return senses;
       },
 

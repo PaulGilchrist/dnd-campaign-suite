@@ -47,6 +47,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const monsterTargetEffects = allTargetEffects.filter(te => te.target === (creatureName || monster?.name));
   const inspiringMoveNoOA = useRuntimeValue(monsterName, 'inspiringMovementNoOA', campaignName);
   const remarkableNoOA = useRuntimeValue(monsterName, 'remarkableAthleteNoOA', campaignName);
+  const monsterCharacter = characters?.find(c => c.name === monsterName);
+  const speedyOpportunityDisadvantage = monsterCharacter?.computedStats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'opportunity_attacks_disadvantage');
+  const speedyDifficultTerrainIgnore = monsterCharacter?.computedStats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'ignore_difficult_terrain_on_dash');
 
   const { popupHtml, setPopupHtml, rollAttack, rollDamage, rollAbilityCheck, rollSavingThrow, rollSkillCheck, rollInitiative, quickRollPlayerSave } = useLoggedDiceRoll(
     monsterName,
@@ -287,6 +290,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       if (condEffects.riderCannotOpportunityAttack) condEffectBadges.push({ label: 'No OA', cls: 'effect-cannot-act', icon: 'fa-ban' });
       if (inspiringMoveNoOA) condEffectBadges.push({ label: 'Insp. Move', cls: 'effect-cannot-act', icon: 'fa-person-walking' });
       if (remarkableNoOA) condEffectBadges.push({ label: 'No OA (Crit)', cls: 'effect-cannot-act', icon: 'fa-ban' });
+      if (speedyOpportunityDisadvantage) condEffectBadges.push({ label: 'OA Disadv', cls: 'effect-disadvantage', icon: 'fa-arrow-down' });
+      if (speedyDifficultTerrainIgnore) condEffectBadges.push({ label: 'No Difficult Terrain on Dash', cls: 'effect-cannot-act', icon: 'fa-person-walking' });
     }
 
     return (

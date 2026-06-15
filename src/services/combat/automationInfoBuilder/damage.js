@@ -82,6 +82,18 @@ export const damageHandlers = {
         }
     },
 
+    'weapon_mastery_choice': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'weapon_mastery_choice',
+            name: feature.name,
+            masteryProperties: auto.masteryProperties || [],
+            effect: auto.effect || 'extra_mastery',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
     'damage_reduction': (feature, _playerStats) => {
         const auto = feature.automation
         return {
@@ -153,6 +165,24 @@ export const damageHandlers = {
         }
     },
 
+    'grapple_damage': (feature, _playerStats) => {
+        return {
+            type: 'passive_rule',
+            effect: 'grapple_damage',
+            name: feature.name,
+            hasAutomation: true
+        }
+    },
+
+    'two_weapon_fighting': (feature, _playerStats) => {
+        return {
+            type: 'passive_rule',
+            effect: 'two_weapon_fighting',
+            name: feature.name,
+            hasAutomation: true
+        }
+    },
+
     'reroll_damage_once_per_turn': (feature, _playerStats) => {
         return {
             type: 'passive_rule',
@@ -167,6 +197,14 @@ export const damageHandlers = {
             return {
                 type: 'passive_rule',
                 effect: 'great_weapon_fighting',
+                name: feature.name,
+                hasAutomation: true
+            }
+        }
+        if (feature.type === 'two_weapon_fighting' && feature.source === 'feat' && feature.automation?.type === 'two_weapon_fighting') {
+            return {
+                type: 'passive_rule',
+                effect: 'two_weapon_fighting',
                 name: feature.name,
                 hasAutomation: true
             }

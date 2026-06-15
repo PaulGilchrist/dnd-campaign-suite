@@ -2721,7 +2721,7 @@
                     "type": "passive_buff",
                     "effect": "blindsight",
                     "range": "10 ft",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             },
             {
@@ -2730,9 +2730,10 @@
                 "type": "passive",
                 "automation": {
                     "type": "conditional_advantage",
-                    "target": "stealth_checks",
-                    "condition": "combat_hide_action",
+                    "target": "ability_check",
+                    "condition": "skulker_fog_of_war",
                     "effect": "advantage",
+                    "abilities": ["DEX"],
                     "casting_time": "passive"
                 }
             },
@@ -2743,7 +2744,7 @@
                 "automation": {
                     "type": "passive_rule",
                     "effect": "hidden_miss_doesnt_reveal",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             }
         ],
@@ -2943,7 +2944,13 @@
         "index": "spell-sniper",
         "rangeEffects": {
             "ignoresMeleeDisadvantage": true,
-            "appliesToAttackType": "spell"
+            "appliesToAttackType": "spell",
+            "spellRangeBonus": 60
+        },
+        "automation": {
+            "type": "passive_rule",
+            "effect": "ignore_cover_ranged",
+            "casting_time": "1 action"
         }
     },
     {
@@ -2981,6 +2988,11 @@
             "combat",
             "strength"
         ],
+        "automation": {
+            "type": "passive_rule",
+            "effect": "tavern_brawler_push",
+            "oncePerTurn": true
+        },
         "index": "tavern-brawler"
     },
     {
@@ -2992,7 +3004,14 @@
             {
                 "name": "Increased Hit Points",
                 "description": "Your Hit Point maximum increases by an amount equal to twice your character level when you gain this feat. Whenever you gain a character level thereafter, your Hit Point maximum increases by an additional 2 Hit Points.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_buff",
+                    "target": "self",
+                    "effect": "max_hp_increase",
+                    "bonusExpression": "2 * level",
+                    "casting_time": "1 action"
+                }
             }
         ],
         "ability_score_increase": null,
@@ -3048,7 +3067,16 @@
             {
                 "name": "Telekinetic Shove",
                 "description": "As a Bonus Action, you can telekinetically shove one creature you can see within 30 feet of yourself. When you do so, the target must succeed on a Strength saving throw (DC 8 plus the ability modifier of the score increased by this feat and your Proficiency Bonus) or be moved 5 feet toward or away from you.",
-                "type": "bonus_action"
+                "type": "bonus_action",
+                "automation": {
+                    "type": "telekinetic_shove",
+                    "saveType": "STR",
+                    "saveDc": "ability",
+                    "saveAbility": "INT",
+                    "range": "30",
+                    "pushDistance": 5,
+                    "action": "bonus_action"
+                }
             }
         ],
         "ability_score_increase": {
@@ -3091,7 +3119,17 @@
             {
                 "name": "Detect Thoughts",
                 "description": "You always have the Detect Thoughts spell prepared. You can cast it without a spell slot or spell components, and you must finish a Long Rest before you can cast it in this way again. You can also cast it using spell slots you have of the appropriate level. Your spellcasting ability for the spell is the ability increased by this feat.",
-                "type": "spell"
+                "type": "spell",
+                "automation": {
+                    "type": "free_spell",
+                    "spell": "Detect Thoughts",
+                    "uses": 1,
+                    "uses_expression": "1",
+                    "recharge": "long_rest",
+                    "casting_time": "1 action",
+                    "duration": "Concentration, up to 1 minute",
+                    "concentration": true
+                }
             }
         ],
         "ability_score_increase": {
@@ -3124,12 +3162,37 @@
             {
                 "name": "Enhanced Unarmed Strike",
                 "description": "When you hit with your Unarmed Strike and deal damage, you can deal Bludgeoning damage equal to 1d6 plus your Strength modifier instead of the normal damage of an Unarmed Strike. If you aren't holding any weapons or a Shield when you make the attack roll, the d6 becomes a d8.",
-                "type": "damage"
+                "type": "damage",
+                "automation": {
+                    "type": "attack_rider",
+                    "trigger": "unarmed_strike_hit",
+                    "weaponTypes": ["unarmed"],
+                    "chooseOne": true,
+                    "maxEffects": 2,
+                    "options": [
+                        {
+                            "name": "1d6 Damage",
+                            "effect": "damage_bonus",
+                            "damageExpression": "1d6 + STR modifier",
+                            "damageType": "Bludgeoning"
+                        },
+                        {
+                            "name": "1d8 Damage (No Weapons)",
+                            "effect": "damage_bonus",
+                            "damageExpression": "1d8 + STR modifier",
+                            "damageType": "Bludgeoning"
+                        }
+                    ]
+                }
             },
             {
                 "name": "Grapple Damage",
                 "description": "At the start of each of your turns, you can deal 1d4 Bludgeoning damage to one creature Grappled by you.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_rule",
+                    "effect": "grapple_damage"
+                }
             }
         ],
         "ability_score_increase": null,
@@ -3175,17 +3238,20 @@
                 "description": "When a creature provokes an Opportunity Attack from you by leaving your reach, you can take a Reaction to cast a spell at the creature rather than making an Opportunity Attack. The spell must have a casting time of one action and must target only that creature.",
                 "type": "reaction",
                 "automation": {
-                    "type": "reaction_damage",
+                    "type": "reaction_spell",
                     "trigger": "creature_leaves_reach",
-                    "effect": "cast_spell_as_reaction",
-                    "range": "melee_reach",
                     "casting_time": "1 reaction"
                 }
             },
             {
                 "name": "Somatic Components",
                 "description": "You can perform the Somatic components of spells even when you have weapons or a Shield in one or both hands.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_buff",
+                    "effect": "somatic_component_waiver",
+                    "casting_time": "passive"
+                }
             }
         ],
         "ability_score_increase": {
@@ -3222,7 +3288,22 @@
             {
                 "name": "Mastery Property",
                 "description": "Your training with weapons allows you to use the mastery property of one kind of Simple or Martial weapon of your choice, provided you have proficiency with it. Whenever you finish a Long Rest, you can change the kind of weapon to another eligible kind.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "weapon_mastery_choice",
+                    "masteryProperties": [
+                        "Push",
+                        "Topple",
+                        "Sap",
+                        "Slow",
+                        "Vex",
+                        "Cleave",
+                        "Nick",
+                        "Graze"
+                    ],
+                    "effect": "extra_mastery",
+                    "casting_time": "passive"
+                }
             }
         ],
         "ability_score_increase": {

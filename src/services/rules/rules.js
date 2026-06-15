@@ -697,6 +697,12 @@ const rules = {
         // mark any selected skill from that choice list as expertise
         if (is2024(playerStats, playerSummary)) {
             const expertiseSkills = new Set(playerStats.expertise || []);
+            // Also support expertSkills field (wizard form field name)
+            if (playerStats.expertSkills && Array.isArray(playerStats.expertSkills)) {
+                playerStats.expertSkills.forEach(s => {
+                    if (typeof s === 'string' && s.length > 0) expertiseSkills.add(s);
+                });
+            }
             featProficiencyChoices.forEach(fp => {
                 if (!fp.grantsExpertise) return;
                 if (fp.from) {

@@ -182,6 +182,10 @@ function parse2024Benefit(benefit, feat) {
 
     case 'proficiency': {
       const desc = benefit.description;
+      if (desc.includes('improvised')) {
+        buffs.proficiencies.push({ name: 'Improvised Weapons', type: 'proficiency' });
+        break;
+      }
       if (desc.includes('all skills')) {
         buffs.proficiencies.push({ name: 'all_skills', type: 'skill' });
       } else if (desc.includes('Expertise')) {
@@ -204,6 +208,16 @@ function parse2024Benefit(benefit, feat) {
               type: 'expertise',
             });
           }
+        } else if (/choose.*skill.*proficiency.*expertise/i.test(desc)) {
+          const allSkills = 'Acrobatics, Animal Handling, Arcana, Athletics, Deception, History, Insight, Intimidation, Investigation, Medicine, Nature, Perception, Performance, Persuasion, Religion, Sleight of Hand, Stealth, Survival';
+          buffs.proficiencies.push({
+            name: benefit.name,
+            type: 'proficiency',
+            isChoice: true,
+            choose: 1,
+            from: [allSkills],
+            grantsExpertise: true,
+          });
         } else {
           buffs.features.push({
             name: benefit.name,
@@ -311,6 +325,27 @@ function parse2024Benefit(benefit, feat) {
           type: 'reroll_damage_once_per_turn',
           automation: { type: 'reroll_damage_once_per_turn' },
         });
+      } else if (benefit.name && benefit.name.includes('Enhanced Unarmed')) {
+        buffs.features.push({
+          name: 'Enhanced Unarmed Strike',
+          description: benefit.description,
+          type: 'damage',
+          automation: benefit.automation,
+        });
+      } else if (benefit.name && benefit.name.includes('Extra Attack Damage')) {
+        buffs.features.push({
+          name: 'Two Weapon Fighting',
+          description: benefit.description,
+          type: 'two_weapon_fighting',
+          automation: { type: 'two_weapon_fighting' },
+        });
+      } else if (benefit.name && benefit.name.includes('Dual Wielding')) {
+        buffs.features.push({
+          name: benefit.name,
+          description: benefit.description,
+          type: 'two_weapon_fighting',
+          automation: { type: 'two_weapon_fighting' },
+        });
       } else {
         buffs.features.push({
           name: benefit.name,
@@ -357,6 +392,27 @@ function parse2024Benefit(benefit, feat) {
           description: benefit.description,
           type: 'reroll_damage_once_per_turn',
           automation: { type: 'reroll_damage_once_per_turn' },
+        });
+      } else if (benefitName.includes('Damage Reroll') || benefitName.includes('reroll.*1', 'i')) {
+        buffs.features.push({
+          name: 'Tavern Brawler Damage Reroll',
+          description: benefit.description,
+          type: 'passive',
+          automation: { type: 'tavern_brawler_reroll_ones' },
+        });
+      } else if (benefitName.includes('Push') && benefit.type === 'action') {
+        buffs.features.push({
+          name: 'Tavern Brawler Push',
+          description: benefit.description,
+          type: 'action',
+          automation: { type: 'tavern_brawler_push', oncePerTurn: true },
+        });
+      } else if (benefit.automation?.type === 'weapon_mastery_choice') {
+        buffs.features.push({
+          name: benefit.name || 'Mastery Property',
+          description: benefit.description,
+          type: 'passive',
+          automation: benefit.automation,
         });
       } else if (benefit.type === 'bonus_action') {
         const desc = benefit.description || '';

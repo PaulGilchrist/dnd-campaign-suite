@@ -167,6 +167,31 @@ export function collectTurnStartEffects(features) {
                     name: feature.name,
                 })
             }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'tavern_brawler_push') {
+                effects.push({
+                    type: 'tavern_brawler_push',
+                    name: feature.name,
+                })
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'ignore_loading_crossbows') {
+                effects.push({
+                    type: 'ignore_loading_crossbows',
+                    name: feature.name,
+                    weapons: auto.weapons || [],
+                })
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'no_melee_disadvantage_crossbows') {
+                effects.push({
+                    type: 'no_melee_disadvantage_crossbows',
+                    name: feature.name,
+                })
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'grapple_damage') {
+                effects.push({
+                    type: 'grapple_damage',
+                    name: feature.name,
+                })
+            }
             if (auto?.type === 'third_eye') {
                 effects.push({
                     type: 'third_eye',
@@ -372,6 +397,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'divine_order':
             case 'moonlight_step_rider':
             case 'damage_type_modifier':
+            case 'weapon_mastery_choice':
                 result.passives.push(info)
                 if (info.type === 'passive_rule' && info.effect === 'primal_knowledge' && info.primalKnowledge.length > 0) {
                     result.primalKnowledge.push(...info.primalKnowledge)
@@ -380,8 +406,12 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'passive_rule':
                 if (info.effect === 'superior_defense') {
                     result.specialActions.push(info)
+                } else if (info.effect === 'grapple_damage') {
+                    result.specialActions.push(info)
                 } else if (info.effect === 'ritual_spells') {
                     result.ritualSpells.push(info)
+                } else if (info.effect === 'tavern_brawler_push' || info.effect === 'tavern_brawler_reroll_ones' || info.effect === 'ignore_loading_crossbows' || info.effect === 'no_melee_disadvantage_crossbows') {
+                    result.passives.push(info)
                 } else {
                     result.passives.push(info)
                     if (info.effect === 'primal_knowledge' && info.primalKnowledge.length > 0) {
@@ -522,6 +552,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 result.passives.push(info)
                 break
             case 'reaction_save':
+                result.reactions.push(info)
+                break
+            case 'reaction_spell':
                 result.reactions.push(info)
                 break
             case 'misty_wanderer':
@@ -724,6 +757,13 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break;
             case 'magic_initiate':
                 result.passives.push(info);
+                break;
+            case 'telekinetic_shove':
+                if (info.action === 'bonus_action') {
+                    result.bonusActions.push(info);
+                } else {
+                    result.actions.push(info);
+                }
                 break;
             case 'sentinel':
                 result.passives.push(info);

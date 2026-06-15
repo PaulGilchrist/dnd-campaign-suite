@@ -11,6 +11,7 @@ export const conditionalHandlers = {
             uses: auto.uses || null,
             recharge: auto.recharge || 'long_rest',
             casting_time: auto.casting_time || 'passive',
+            trigger: auto.trigger || '',
             hasAutomation: true
         }
     },

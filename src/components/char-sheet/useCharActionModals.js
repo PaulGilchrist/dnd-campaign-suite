@@ -4,7 +4,7 @@ import { getCombatContext, getTargetFromAttacker } from '../../services/rules/co
 import { getCurrentCombatRound, loadCombatSummary } from '../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
-import { collectWeaponMastery, evaluateAutoExpression } from '../../services/combat/automationService.js';
+import { collectWeaponMastery, evaluateAutoExpression, hasTwoWeaponFighting } from '../../services/combat/automationService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { parseMagicItemName } from '../../services/rules/core/attackCalc.js';
 import { addEntry } from '../../services/ui/logService.js';
@@ -25,6 +25,7 @@ export default function useCharActionModals({
     const [attackRiderModal, setAttackRiderModal] = useState(null);
     const [openHandTechniqueModal, setOpenHandTechniqueModal] = useState(null);
     const [weaponMasteryModal, setWeaponMasteryModal] = useState(null);
+    const [weaponMasteryChoiceModal, setWeaponMasteryChoiceModal] = useState(null);
     const [combatStanceModal, setCombatStanceModal] = useState(null);
     const [teleportModal, setTeleportModal] = useState(null);
     const [healingIllusionModal, setHealingIllusionModal] = useState(null);
@@ -104,6 +105,21 @@ export default function useCharActionModals({
         let total = result.total;
         let rolls = result.rolls;
         const modifier = result.modifier;
+
+        // Apply Two Weapon Fighting feat: add ability modifier to bonus action attack damage for light weapons
+        if (isBonusActionAttack && hasTwoWeaponFighting(playerStats)) {
+            const weaponProperties = attack.properties || [];
+            const hasLight = weaponProperties.includes('Light');
+            if (hasLight && attack.abilityName) {
+                const ability = playerStats.abilities?.find(a => a.name === attack.abilityName);
+                const abilityMod = ability?.bonus || 0;
+                if (abilityMod > 0 && !formula.match(new RegExp(`\\+${abilityMod}\\[${attack.abilityName}\\]`))) {
+                    formula += ` + ${abilityMod}[${attack.abilityName}]`;
+                    total += abilityMod;
+                    rolls = [...rolls, abilityMod];
+                }
+            }
+        }
 
         // Apply rider damage expressions from targetEffects (e.g., Charger feat damage bonus)
         const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
@@ -813,13 +829,72 @@ export default function useCharActionModals({
                 }
             }
 
-            // Enhanced Critical: when you score a Critical Hit with Bludgeoning damage,
-            // attack rolls against that creature have Advantage until start of your next turn
-            if (wasCrit && isCrusherBludgeoning) {
-                const crusherCrit = playerStats.automation.passives.find(
-                    a => a.type === 'conditional_advantage' && a.trigger === 'critical_hit_bludgeoning'
+        // Enhanced Critical: when you score a Critical Hit with Bludgeoning damage,
+        // attack rolls against that creature have Advantage until start of your next turn
+        if (wasCrit && isCrusherBludgeoning) {
+            const crusherCrit = playerStats.automation.passives.find(
+                a => a.type === 'conditional_advantage' && a.trigger === 'critical_hit_bludgeoning'
+            );
+            if (crusherCrit) {
+                const cs = await getCombatContext(campaignName);
+                const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                const targetName = target?.name || null;
+                if (targetName) {
+                    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                    const newEffect = {
+                        target: targetName,
+                        source: crusherCrit.name,
+                        effect: 'crusher_enhanced_critical',
+                        duration: 'until_start_of_next_turn',
+                    };
+                    const updatedEffects = [...storedEffects, newEffect];
+                    setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+                }
+            }
+        }
+
+        // Apply Slasher feat: Hamstring (speed reduction on slashing hit, once per turn) and Enhanced Critical (disadvantage on slashing crit)
+        const slasherDamageType = (attack.damageType || '').toLowerCase();
+        const isSlasherSlashing = slasherDamageType === 'slashing';
+        if (playerStats.automation?.passives) {
+            const slasherHamstring = playerStats.automation.passives.find(
+                a => a.type === 'attack_rider' && a.trigger === 'slashing_damage_hit' && a.oncePerTurn
+            );
+            if (slasherHamstring) {
+                const slasherUsedKey = `_${slasherHamstring.name.replace(/\s+/g, '_')}_usedRound`;
+                const currentRound = getCurrentCombatRound();
+                const slasherUsedRound = getRuntimeValue(playerStats.name, slasherUsedKey, campaignName);
+                const shouldHamstring = isSlasherSlashing && (!slasherUsedRound || slasherUsedRound !== currentRound);
+
+                if (shouldHamstring) {
+                    const cs = await getCombatContext(campaignName);
+                    const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                    const targetName = target?.name || null;
+                    if (targetName && slasherHamstring.options?.length > 0) {
+                        const option = slasherHamstring.options[0];
+                        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                        const newEffect = {
+                            target: targetName,
+                            source: slasherHamstring.name,
+                            option: option.name,
+                            effect: option.effect,
+                            value: option.value || 10,
+                            duration: 'until_start_of_next_turn',
+                        };
+                        const updatedEffects = [...storedEffects, newEffect];
+                        setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+                        setRuntimeValue(playerStats.name, slasherUsedKey, currentRound, campaignName);
+                    }
+                }
+            }
+
+            // Enhanced Critical: when you score a Critical Hit with Slashing damage,
+            // the target has Disadvantage on attack rolls until start of your next turn
+            if (wasCrit && isSlasherSlashing) {
+                const slasherCrit = playerStats.automation.passives.find(
+                    a => a.type === 'conditional_advantage' && a.trigger === 'critical_hit_slashing'
                 );
-                if (crusherCrit) {
+                if (slasherCrit) {
                     const cs = await getCombatContext(campaignName);
                     const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
                     const targetName = target?.name || null;
@@ -827,8 +902,8 @@ export default function useCharActionModals({
                         const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
                         const newEffect = {
                             target: targetName,
-                            source: crusherCrit.name,
-                            effect: 'crusher_enhanced_critical',
+                            source: slasherCrit.name,
+                            effect: 'disadvantage_next_attack',
                             duration: 'until_start_of_next_turn',
                         };
                         const updatedEffects = [...storedEffects, newEffect];
@@ -836,6 +911,7 @@ export default function useCharActionModals({
                     }
                 }
             }
+        }
         }
 
         // Apply Piercer feat: Puncture (reroll one damage die on piercing hit, once per turn)
@@ -936,6 +1012,29 @@ export default function useCharActionModals({
             }
         }
 
+        // Tavern Brawler: Force reroll 1s on unarmed strike damage dice (must use new roll)
+        if (attack.weaponType === 'unarmed' && playerStats.automation?.passives && attack.damage) {
+            const tavernBrawlerReroll = (playerStats.automation.passives || []).find(p => p.effect === 'tavern_brawler_reroll_ones');
+            if (tavernBrawlerReroll) {
+                const diceMatch = attack.damage.match(/(\d+)d(\d+)/);
+                if (diceMatch && rolls.length > 0) {
+                    const dieSize = parseInt(diceMatch[2], 10);
+                    let rerolled = false;
+                    for (let i = 0; i < rolls.length; i++) {
+                        if (rolls[i] === 1) {
+                            const rerolledVal = Math.floor(Math.random() * dieSize) + 1;
+                            total += rerolledVal - 1;
+                            rolls[i] = rerolledVal;
+                            rerolled = true;
+                        }
+                    }
+                    if (rerolled) {
+                        formula += ' [Tavern Brawler]';
+                    }
+                }
+            }
+        }
+
         if (playerStats.automation?.actions) {
             const isCantrip = playerStats.spellAbilities?.spells?.some(s => s.name === attack.name && s.level === 0);
             if (isCantrip) {
@@ -964,6 +1063,31 @@ export default function useCharActionModals({
                             setRuntimeValue(playerStats.name, 'tempHp', Math.max(existing, tempHp), campaignName);
                         }
                     }
+                }
+            }
+        }
+
+        // Tavern Brawler: Push target 5 ft on unarmed strike hit (once per turn)
+        if (attack.weaponType === 'unarmed' && playerStats.automation?.passives) {
+            const tavernBrawlerPush = (playerStats.automation.passives || []).find(p => p.effect === 'tavern_brawler_push');
+            if (tavernBrawlerPush) {
+                const currentRound = getCurrentCombatRound();
+                const usedKey = '_Tavern_Brawler_Push_UsedRound';
+                const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
+                if (!usedRound || usedRound !== currentRound) {
+                    setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+                    const cs = await getCombatContext(campaignName);
+                    const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                    const targetName = target?.name || null;
+                    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                    const newEffect = {
+                        target: targetName,
+                        source: 'Tavern Brawler',
+                        effect: 'push',
+                        value: 5,
+                        duration: 'until_end_of_turn',
+                    };
+                    setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, newEffect], campaignName);
                 }
             }
         }
@@ -1022,6 +1146,42 @@ export default function useCharActionModals({
                     return;
                 }
             }
+
+            // Apply attack_rider automations for Unarmed Strike (e.g. Unarmed Fighting Enhanced Unarmed Strike)
+            const attackRiders = playerStats.automation.passives.filter(
+                a => a.type === 'attack_rider' && a.trigger === 'unarmed_strike_hit' && a.chooseOne && a.options?.length > 0
+            );
+            for (const rider of attackRiders) {
+                const usedKey = `_${rider.name.replace(/\s+/g, '_')}_usedRound`;
+                const currentRound = getCurrentCombatRound();
+                const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
+                if (rider.oncePerTurn && usedRound === currentRound) continue;
+
+                const storedOption = getRuntimeValue(playerStats.name, `_${rider.name.replace(/\s+/g, '_')}_selectedOption`, campaignName);
+                if (storedOption) {
+                    const chosenOption = rider.options.find(o => o.name === storedOption);
+                    if (chosenOption && chosenOption.effect === 'damage_bonus') {
+                        const riderResult = rollExpression(chosenOption.damageExpression);
+                        if (riderResult) {
+                            formula += ` + ${chosenOption.damageExpression}[${chosenOption.damageType || 'same_as_weapon'}]`;
+                            total += riderResult.total;
+                            rolls = [...rolls, ...riderResult.rolls];
+                        }
+                        setRuntimeValue(playerStats.name, `_${rider.name.replace(/\s+/g, '_')}_selectedOption`, null, campaignName);
+                        continue;
+                    }
+                }
+
+                if (rider.options?.length > 0) {
+                    pendingDamageRef.current = { attack, formula, total, rolls, rider, _attackRider: rider };
+                    setDamageTypeChoice({
+                        title: `${rider.name} — Enhanced Unarmed Strike`,
+                        types: rider.options.map(o => o.name),
+                        _attackRider: rider,
+                    });
+                    return;
+                }
+            }
         }
 
         proceedWithDamage(attack, formula, total, rolls, modifier);
@@ -1034,6 +1194,10 @@ export default function useCharActionModals({
             proceedWithDamage(attack, formula, total, rolls, modifier);
             pendingDamageRef.current = null;
         }
+    };
+
+    const handleWeaponMasteryChoice = (_masteryName) => {
+        setWeaponMasteryChoiceModal(null);
     };
 
     const handleDivineFuryDamageType = (chosenType) => {
@@ -1129,6 +1293,51 @@ export default function useCharActionModals({
         proceedWithDamage(attack, formula, total, rolls, modifier);
     };
 
+    const handleEnhancedUnarmedChoice = (chosenOptionName) => {
+        const pending = pendingDamageRef.current;
+        if (!pending) {
+            setDamageTypeChoice(null);
+            return;
+        }
+        const { attack, formula, total, rolls, rider, _attackRider } = pending;
+        if (_attackRider) {
+            const chosenOption = _attackRider.options.find(o => o.name === chosenOptionName);
+            if (chosenOption && chosenOption.effect === 'damage_bonus') {
+                const riderResult = rollExpression(chosenOption.damageExpression);
+                if (riderResult) {
+                    const newFormula = `${formula} + ${chosenOption.damageExpression}[${chosenOption.damageType || 'same_as_weapon'}]`;
+                    const newTotal = total + riderResult.total;
+                    const newRolls = [...rolls, ...riderResult.rolls];
+                    const usedKey = `_${_attackRider.name.replace(/\s+/g, '_')}_usedRound`;
+                    setRuntimeValue(playerStats.name, usedKey, getCurrentCombatRound(), campaignName);
+                    setDamageTypeChoice(null);
+                    pendingDamageRef.current = null;
+                    proceedWithDamage(attack, newFormula, newTotal, newRolls, rider);
+                    return;
+                }
+            }
+        }
+        setDamageTypeChoice(null);
+        pendingDamageRef.current = null;
+        proceedWithDamage(attack, formula, total, rolls, rider);
+    };
+
+    const handleEnhancedUnarmedSkip = () => {
+        const pending = pendingDamageRef.current;
+        if (!pending) {
+            setDamageTypeChoice(null);
+            return;
+        }
+        const { attack, formula, total, rolls, rider, _attackRider } = pending;
+        if (_attackRider) {
+            const usedKey = `_${_attackRider.name.replace(/\s+/g, '_')}_usedRound`;
+            setRuntimeValue(playerStats.name, usedKey, getCurrentCombatRound(), campaignName);
+        }
+        setDamageTypeChoice(null);
+        pendingDamageRef.current = null;
+        proceedWithDamage(attack, formula, total, rolls, rider);
+    };
+
     const handleFeatureChoiceConfirm = (chosenOption) => {
         if (!featureChoice) return;
         const { action, optionKey } = featureChoice;
@@ -1179,6 +1388,7 @@ export default function useCharActionModals({
         attackRiderModal, setAttackRiderModal,
         openHandTechniqueModal, setOpenHandTechniqueModal,
         weaponMasteryModal, setWeaponMasteryModal,
+        weaponMasteryChoiceModal, setWeaponMasteryChoiceModal,
         combatStanceModal, setCombatStanceModal,
         teleportModal, setTeleportModal,
         healingIllusionModal, setHealingIllusionModal,
@@ -1221,12 +1431,15 @@ export default function useCharActionModals({
         featureChoice, setFeatureChoice,
         handleDamageClick,
         handleMasteryClose,
+        handleWeaponMasteryChoice,
         handleDivineFuryDamageType,
         handleDivineFurySkip,
         handleGenericDamageTypeChoice,
         handleGenericDamageTypeSkip,
         handleDamageTypeModifierChoice,
         handleDamageTypeModifierSkip,
+        handleEnhancedUnarmedChoice,
+        handleEnhancedUnarmedSkip,
         handleFeatureChoiceConfirm,
         handleFeatureChoiceSkip,
         handleConstellationSelect,

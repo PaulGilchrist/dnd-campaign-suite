@@ -156,5 +156,50 @@ export const passiveHandlers = {
             casting_time: auto.casting_time || 'passive',
             hasAutomation: true
         }
+    },
+
+    'tavern_brawler_reroll_ones': (feature, _playerStats) => {
+        return {
+            type: 'passive_rule',
+            name: feature.name,
+            effect: 'tavern_brawler_reroll_ones',
+            casting_time: 'passive',
+            hasAutomation: true
+        }
+    },
+
+    'tavern_brawler_push': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'passive_rule',
+            name: feature.name,
+            effect: 'tavern_brawler_push',
+            oncePerTurn: !!auto.oncePerTurn,
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
+    'ignore_loading_crossbows': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'passive_rule',
+            name: feature.name,
+            effect: 'ignore_loading_crossbows',
+            weapons: auto.weapons || [],
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
+    'no_melee_disadvantage_crossbows': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'passive_rule',
+            name: feature.name,
+            effect: 'no_melee_disadvantage_crossbows',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
     }
 }

@@ -73,6 +73,9 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
         if (effect.type === 'use_magic_device') {
             applyUseMagicDeviceTurnStart(activeName, playerStats, effect, campaignName);
         }
+        if (effect.type === 'grapple_damage') {
+            applyGrappleDamageTurnStart(activeName, playerStats, effect, campaignName);
+        }
         if (effect.type === 'heroism_temp_hp') {
             applyHeroismTempHp(activeName, playerStats, effect, campaignName);
         }
@@ -370,6 +373,54 @@ async function applyUseMagicDeviceTurnStart(_activeName, _playerStats, _effect, 
     // The passive effects (attunement limit, charge reroll, scroll handling)
     // are applied continuously via saveModifiers and passive effects.
     // This turn start handler is a no-op placeholder for future state management.
+}
+
+async function applyGrappleDamageTurnStart(activeName, playerStats, effect, campaignName) {
+    const combatSummary = getCombatSummary();
+    if (!combatSummary) return;
+
+    const creatures = combatSummary.creatures || [];
+    const damageExpression = effect.damageExpression || '1d4';
+    const damageType = effect.damageType || 'Bludgeoning';
+
+    const damage = evaluateAutoExpression(damageExpression, playerStats);
+
+    if (typeof damage !== 'number' || isNaN(damage) || damage <= 0) return;
+
+    for (const creature of creatures) {
+        const creatureName = utils.getName(creature.name);
+        if (creatureName === utils.getName(activeName)) continue;
+
+        const conditions = creature.conditions || [];
+        const isGrappled = conditions.some(c => {
+            const cStr = typeof c === 'object' ? String(c.key || '') : String(c);
+            return cStr.toLowerCase() === 'grappled';
+        });
+        if (!isGrappled) continue;
+
+        try {
+            const currentHp = creature.hit_points?.current ?? creature.currentHp ?? 0;
+            const newHp = Math.max(0, currentHp - damage);
+            creature.hit_points = creature.hit_points || {};
+            creature.hit_points.current = newHp;
+            if (creature.currentHp != null) {
+                creature.currentHp = newHp;
+            }
+
+            await addEntry(campaignName, {
+                type: 'damage',
+                characterName: activeName,
+                targetName: creatureName,
+                damageType: damageType.toLowerCase(),
+                damageAmount: damage,
+                description: `Unarmed Fighting grapple damage: ${damage} ${damageType.toLowerCase()} to ${creatureName}`,
+                timestamp: Date.now(),
+            }).catch(() => {});
+        } catch { /* ignore per-creature errors */ }
+    }
+
+    storage.set('combatSummary', combatSummary, campaignName);
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 }
 
 export function addExpiration(attackerName, targetName, effects, campaignName, rounds) {

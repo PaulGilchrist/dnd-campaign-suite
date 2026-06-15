@@ -25,6 +25,14 @@ export const attackHandlers = {
                 sizeLimit: auto.sizeLimit || null,
             }];
         }
+        if (options.length === 0 && !Array.isArray(auto.effects) && auto.effect === 'reduce_speed') {
+            const speedMatch = (auto.speedReduction || '10 ft').match(/(\d+)/);
+            options = [{
+                name: 'Reduce Speed',
+                effect: 'speed_reduction',
+                value: parseInt(speedMatch ? speedMatch[1] : '10', 10) || 10,
+            }];
+        }
         if (options.length === 0 && !Array.isArray(auto.effects) && auto.effect === 'push_or_prone') {
             const dist = (auto.distance || '5 ft').replace(/[^0-9]/g, '');
             options = [

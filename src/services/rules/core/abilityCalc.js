@@ -1,5 +1,6 @@
 import { rules5e as raceRules } from '../../character/race-rules/index.js';
 import { loadSkills } from '../../ui/dataLoader.js';
+import { evaluateAutoExpression } from '../../combat/automationExpressions.js';
 
 export async function getAbilities(playerStats) {
     const skills = await loadSkills();
@@ -40,10 +41,26 @@ export function getHitPoints(playerStats) {
         hitPoints += playerStats.race.subrace.hit_point_bonus_per_level * playerStats.level;
      }
 
-     // Check for subclass hit point bonus (e.g., Draconic Sorcerer Draconic Resilience)
+      // Check for subclass hit point bonus (e.g., Draconic Sorcerer Draconic Resilience)
     if(playerStats.class.subclass?.hit_point_bonus_per_level) {
         hitPoints += playerStats.class.subclass.hit_point_bonus_per_level * playerStats.level;
      }
+
+     // Check for feat-based max HP increase (e.g., Tough feat)
+    const passives = playerStats.automation?.passives || [];
+    for (const passive of passives) {
+        if (passive.type === 'passive_rule' && passive.effect === 'max_hp_increase') {
+            if (passive.amount) {
+                hitPoints += passive.amount;
+            } else if (passive.bonusExpression) {
+                const bonus = evaluateAutoExpression(passive.bonusExpression, playerStats);
+                if (typeof bonus === 'number' && !isNaN(bonus)) {
+                    hitPoints += bonus;
+                }
+            }
+        }
+    }
+
     return hitPoints
 }
 

@@ -686,6 +686,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     const character = characters.find(ch => utils.getName(ch.name) === creature.name)
                     const stats = character?.computedStats || character
                     const hasTacticalShift = stats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'tactical_shift_no_oa')
+                    const hasSpeedyOpportunityDisadvantage = stats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'opportunity_attacks_disadvantage')
+                    const hasSpeedyDifficultTerrainIgnore = stats?.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'ignore_difficult_terrain_on_dash')
                     return (
                         <CreatureCard
                             key={creature.name}
@@ -711,6 +713,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                             allCreatures={combatSummary.creatures}
                             campaignName={campaignName}
                             hasTacticalShift={hasTacticalShift}
+                            hasSpeedyOpportunityDisadvantage={hasSpeedyOpportunityDisadvantage}
+                            hasSpeedyDifficultTerrainIgnore={hasSpeedyDifficultTerrainIgnore}
                         />
                     )
                 })}

@@ -4,6 +4,7 @@ import { handle as handleHealing } from './handlers/healing/healingHandler.js';
 import { handle as handleBuff } from './handlers/buffs/buffHandler.js';
 import { handle as handleCondition } from './handlers/buffs/conditionHandler.js';
 import { handle as handleMagicInitiate } from './handlers/feats/magicInitiateHandler.js';
+import { handle as handleTelekineticShove } from './handlers/feats/telekineticShoveHandler.js';
 import { handle as handleSorcery } from './handlers/resources/sorceryHandler.js';
 import { handle as handleSpellCast } from './handlers/spells/spellCastHandler.js';
 import { handle as handleInitiative } from './handlers/combat/initiativeHandler.js';
@@ -15,6 +16,7 @@ import { handle as handleSpellModifier } from './handlers/spells/spellModifierHa
 import { handle as handleCombatStance } from './handlers/combat/combatStanceHandler.js';
 import { handle as handleReactionDamage } from './handlers/reactions/reactionDamageHandler.js';
 import { handle as handleReactionDebuff } from './handlers/reactions/reactionDebuffHandler.js';
+import { handle as handleReactionSpell } from './handlers/reactions/reactionSpellHandler.js';
 import { handle as handleBoonOfEnergyResistance, applyTypeChoice as applyBoonOfEnergyResistance } from './handlers/reactions/boonOfEnergyResistanceHandler.js';
 import { handle as handleBoonOfFate } from './handlers/reactions/boonOfFateHandler.js';
 import { handle as handleBoonOfRecovery } from './handlers/reactions/boonOfRecoveryHandler.js';
@@ -22,6 +24,7 @@ import { handle as handleLuckyPoint } from './handlers/reactions/luckyPointHandl
 import { handle as handleAttackRider } from './handlers/combat/attackRiderHandler.js';
 import { handle as handleTempHpBuff } from './handlers/buffs/tempHpBuffHandler.js';
 import { handle as handleWeaponMastery } from './handlers/combat/weaponMasteryHandler.js';
+import { handle as handleWeaponMasteryChoice, applyMasterySelection as applyWeaponMasteryChoice } from './handlers/combat/weaponMasteryChoiceHandler.js';
 import { handle as handleBuffAlly } from './handlers/buffs/buffAllyHandler.js';
 import { handle as handleEncouragingSong } from './handlers/buffs/encouragingSongHandler.js';
 import { handle as handleRevivification } from './handlers/healing/revivificationHandler.js';
@@ -210,12 +213,14 @@ const HANDLER_MAP = {
     auto_reroll: handleAutoReroll,
     reaction_damage: handleReactionDamage,
     reaction_debuff: handleReactionDebuff,
+    reaction_spell: handleReactionSpell,
     damage_reduction: handleDamageReduction,
     arcane_ward: handleArcaneWard,
     projected_ward: handleArcaneWard,
     open_hand_technique: handleOpenHandTechnique,
     reaction_save_heal: handleReactionSaveHeal,
-    mastery_rider: handleWeaponMastery,
+        mastery_rider: handleWeaponMastery,
+        weapon_mastery_choice: handleWeaponMasteryChoice,
     revivification: handleRevivification,
      bardic_inspiration: handleBardicInspiration,
        bardic_inspiration_use: handleBardicInspirationUse,
@@ -397,10 +402,13 @@ const HANDLER_MAP = {
         survive_and_heal: handleBoonOfRecovery,
         lucky_point: handleLuckyPoint,
         magic_initiate: handleMagicInitiate,
+        telekinetic_shove: handleTelekineticShove,
         sentinel_guardian: handleSentinelGuardian,
         sentinel: handleSentinelHalt,
+        tavern_brawler_push: handleGenericPopup,
+        grapple_damage: handleGenericPopup,
 };
-export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler, applyProtectionFromPoisonHandler, applyBoonOfEnergyResistance, isProtectionFromEvilAndGoodActive, isCreatureWarded, isProtectionFromPoisonActive, isRayOfEnfeeblementActive };
+export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler, applyProtectionFromPoisonHandler, applyBoonOfEnergyResistance, applyWeaponMasteryChoice, isProtectionFromEvilAndGoodActive, isCreatureWarded, isProtectionFromPoisonActive, isRayOfEnfeeblementActive };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
 

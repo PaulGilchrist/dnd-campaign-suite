@@ -47,6 +47,13 @@ export function collectWeaponMastery(weaponName, playerStats) {
         if (passive.replaceMastery && Array.isArray(passive.replaceMastery)) {
             replaceMastery = passive.replaceMastery;
         }
+        if (passive.type === 'weapon_mastery_choice' && passive.masteryProperties) {
+            const typeKey = `_${passive.name.replace(/\s+/g, '_')}_chosenMastery`;
+            const chosenMastery = getRuntimeValue(playerStats.name, typeKey, playerStats.campaignName);
+            if (chosenMastery && passive.masteryProperties.includes(chosenMastery)) {
+                extraMasteries.push(chosenMastery);
+            }
+        }
     }
 
     if (replaceMastery) {
@@ -93,6 +100,16 @@ export function hasRerollHealingOnes(playerStats) {
 export function hasTacticalShift(playerStats) {
     const passives = playerStats.automation?.passives || [];
     return passives.some(p => p.type === 'passive_rule' && p.effect === 'tactical_shift_no_oa');
+}
+
+export function hasSpeedyOpportunityDisadvantage(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p => p.type === 'passive_rule' && p.effect === 'opportunity_attacks_disadvantage');
+}
+
+export function hasSpeedyDifficultTerrainIgnore(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p => p.type === 'passive_rule' && p.effect === 'ignore_difficult_terrain_on_dash');
 }
 
 export function isResistantToDamageType(playerStats, damageType) {
@@ -161,6 +178,11 @@ export function getResilientSphereSource(targetName, campaignName) {
     return buff?.sourceCharacter || null;
 }
 
+export function hasBlindsight(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p => p.type === 'passive_buff' && p.effect === 'blindsight');
+}
+
 export function hasTruesight(playerStats) {
     const passives = playerStats.automation?.passives || [];
     return passives.some(p => p.type === 'passive_buff' && p.effect === 'truesight');
@@ -174,6 +196,16 @@ export function hasFastWrestler(playerStats) {
 export function hasGreatWeaponFighting(playerStats) {
     const passives = playerStats.automation?.passives || [];
     return passives.some(p => p.type === 'passive_rule' && p.effect === 'great_weapon_fighting');
+}
+
+export function hasTwoWeaponFighting(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p => p.type === 'passive_rule' && p.effect === 'two_weapon_fighting');
+}
+
+export function hasSomaticComponentWaiver(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p => p.type === 'passive_buff' && p.effect === 'somatic_component_waiver');
 }
 
 export function applyGreatWeaponFightingToDamage(rolls, playerStats) {

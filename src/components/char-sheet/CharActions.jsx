@@ -29,6 +29,7 @@ import DivineInterventionModal from './DivineInterventionModal.jsx'
 import AttackRiderModal from './AttackRiderModal.jsx'
 import OpenHandTechniqueModal from './OpenHandTechniqueModal.jsx'
 import WeaponMasteryModal from './WeaponMasteryModal.jsx'
+import WeaponMasteryChoiceModal from './WeaponMasteryChoiceModal.jsx'
 import BastionOfLawModal from './BastionOfLawModal.jsx'
 import CombatStanceModal from './CombatStanceModal.jsx'
 import TeleportModal from './TeleportModal.jsx'
@@ -237,6 +238,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         attackRiderModal, setAttackRiderModal,
         openHandTechniqueModal, setOpenHandTechniqueModal,
         weaponMasteryModal,
+        weaponMasteryChoiceModal, setWeaponMasteryChoiceModal,
         combatStanceModal, setCombatStanceModal,
         teleportModal, setTeleportModal,
         healingIllusionModal, setHealingIllusionModal,
@@ -279,12 +281,15 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         featureChoice, setFeatureChoice,
         handleDamageClick,
         handleMasteryClose,
+        handleWeaponMasteryChoice,
         handleDivineFuryDamageType,
         handleDivineFurySkip,
         handleGenericDamageTypeChoice,
         handleGenericDamageTypeSkip,
         handleDamageTypeModifierChoice,
         handleDamageTypeModifierSkip,
+        handleEnhancedUnarmedChoice,
+        handleEnhancedUnarmedSkip,
         handleFeatureChoiceConfirm,
         handleFeatureChoiceSkip,
         handleConstellationSelect,
@@ -512,6 +517,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         break;
                     case 'wildMagicDoubleRoll':
                         setWildMagicDoubleRollModal(result.payload);
+                        break;
+                    case 'weaponMasteryChoice':
+                        setWeaponMasteryChoiceModal(result.payload);
                         break;
                     case 'wildMagicTamed':
                         setWildMagicTamedModal(result.payload);
@@ -928,6 +936,15 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         onClose={handleMasteryClose}
                     />
                 )}
+                {weaponMasteryChoiceModal && (
+                    <WeaponMasteryChoiceModal
+                        {...weaponMasteryChoiceModal}
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        onClose={() => { setWeaponMasteryChoiceModal(null); }}
+                        onConfirm={handleWeaponMasteryChoice}
+                    />
+                )}
                 {combatStanceModal && (
                     <CombatStanceModal
                         {...combatStanceModal}
@@ -1185,7 +1202,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     </div>
                 )}
                 {damageTypeChoice && (
-                    <div className="sp-overlay" onClick={pendingDamageRef.current?._damageTypeModifier ? handleDamageTypeModifierSkip : handleGenericDamageTypeSkip}>
+                    <div className="sp-overlay" onClick={() => {
+                        if (pendingDamageRef.current?._attackRider) handleEnhancedUnarmedSkip();
+                        else if (pendingDamageRef.current?._damageTypeModifier) handleDamageTypeModifierSkip();
+                        else handleGenericDamageTypeSkip();
+                    }}>
                         <div className="sp-modal" onClick={e => e.stopPropagation()}>
                             <div className="sp-header">
                                 <i className="fa-solid fa-bolt"></i> {damageTypeChoice.title}
@@ -1198,7 +1219,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                             key={type}
                                             className="sp-roll-btn"
                                             style={{ margin: '0 6px 8px 6px' }}
-                                            onClick={() => pendingDamageRef.current?._damageTypeModifier ? handleDamageTypeModifierChoice(type) : handleGenericDamageTypeChoice(type)}
+                                            onClick={() => {
+                                                if (pendingDamageRef.current?._attackRider) handleEnhancedUnarmedChoice(type);
+                                                else if (pendingDamageRef.current?._damageTypeModifier) handleDamageTypeModifierChoice(type);
+                                                else handleGenericDamageTypeChoice(type);
+                                            }}
                                         >
                                             {type}
                                         </button>
@@ -1206,7 +1231,11 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                 </div>
                             </div>
                             <div className="sp-actions">
-                                <button className="sp-dismiss-btn" onClick={pendingDamageRef.current?._damageTypeModifier ? handleDamageTypeModifierSkip : handleGenericDamageTypeSkip}>Skip</button>
+                                <button className="sp-dismiss-btn" onClick={() => {
+                                    if (pendingDamageRef.current?._attackRider) handleEnhancedUnarmedSkip();
+                                    else if (pendingDamageRef.current?._damageTypeModifier) handleDamageTypeModifierSkip();
+                                    else handleGenericDamageTypeSkip();
+                                }}>Skip</button>
                             </div>
                         </div>
                     </div>

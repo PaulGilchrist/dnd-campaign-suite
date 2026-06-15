@@ -58,6 +58,11 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
             const { baseName: offBaseName, magicBonus: offMagicBonus } = parseMagicItemName(offHandName);
             const offHandWeapon = allEquipment.find(item => item.name === offBaseName);
             if (offHandWeapon) {
+                const hasCrossbowExpertDualWielding = (playerStats.automation?.passives || []).some(
+                    p => p.effect === 'two_weapon_fighting' && p.name === 'Dual Wielding'
+                );
+                const isLightCrossbow = !!(offHandWeapon.properties && offHandWeapon.properties.some(p => p.toLowerCase() === 'light') && ['Hand Crossbow', 'Light Crossbow'].includes(offHandWeapon.name));
+                const addAbilityToDamage = isLightCrossbow && hasCrossbowExpertDualWielding;
                 attacks.push(buildWeaponAttack({
                     weapon: offHandWeapon,
                     weaponName: offHandName,
@@ -66,7 +71,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                     proficiency,
                     actionType: 'Bonus Action',
                     weaponType: 'melee',
-                    includeAbilityBonusInDamage: false,
+                    includeAbilityBonusInDamage: addAbilityToDamage,
                 }));
 
                 // Dual Wielder feat: extra bonus action attack beyond standard off-hand
@@ -102,6 +107,28 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
             const diceStr = `1d${martialArtsDie}`;
             attacks.push(...buildMonkAttacks({ diceStr, dexterityBonus: dexterity.bonus, proficiency }));
         }
+    }
+
+    // Tavern Brawler: Add unarmed strike attacks for non-monk characters
+    // Damage: 1d4 + Strength modifier (Bludgeoning)
+    const hasTavernBrawler = (playerStats.automation?.passives || []).some(
+        p => p.effect === 'tavern_brawler_push' || p.effect === 'tavern_brawler_reroll_ones'
+    );
+    if (hasTavernBrawler && playerStats.class?.name !== 'Monk') {
+        const str = playerStats.abilities.find(a => a.name === 'Strength');
+        const strMod = str?.bonus || 0;
+        const tbDice = '1d4';
+        attacks.push({
+            name: 'Unarmed Strike (Tavern Brawler)',
+            damage: `${tbDice}+${strMod}`,
+            damageType: 'Bludgeoning',
+            damageFormula: `Damage Formula = Tavern Brawler Unarmed Strike (${tbDice}) + Strength Modifier (${strMod})`,
+            hitBonus: strMod + proficiency,
+            hitBonusFormula: `To Hit Bonus Formula = Strength Bonus (${strMod}) + Proficiency (${proficiency})`,
+            range: 5,
+            type: 'Action',
+            weaponType: 'unarmed',
+        });
     }
 
     // College of Dance: Dazzling Footwork unarmed strikes (DEX-based, BI die damage)

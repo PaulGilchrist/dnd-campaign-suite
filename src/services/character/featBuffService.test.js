@@ -408,6 +408,33 @@ describe('computeFeatBuffs', () => {
       ]);
     });
 
+    it('should parse Skill Expert generic expertise as a proficiency choice with expertise', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            {
+              type: 'proficiency',
+              name: 'Expertise',
+              description: 'Choose one skill in which you have proficiency but lack Expertise. You gain Expertise with that skill.',
+            },
+          ],
+        },
+        '2024'
+      );
+
+      expect(result.proficiencies).toEqual([
+        {
+          name: 'Expertise',
+          type: 'proficiency',
+          isChoice: true,
+          choose: 1,
+          from: ['Acrobatics, Animal Handling, Arcana, Athletics, Deception, History, Insight, Intimidation, Investigation, Medicine, Nature, Perception, Performance, Persuasion, Religion, Sleight of Hand, Stealth, Survival'],
+          grantsExpertise: true,
+        },
+      ]);
+      expect(result.features).toHaveLength(0);
+    });
+
     it('should parse Observant Keen Observer as a proficiency choice with expertise', () => {
       const result = computeFeatBuffs(
         {
@@ -506,6 +533,54 @@ describe('computeFeatBuffs', () => {
           isBonusAction: true,
         },
       ]);
+    });
+
+    it('should parse all three Skill Expert benefits together', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            {
+              name: 'Ability Score Increase',
+              description: 'Increase one ability score of your choice by 1, to a maximum of 20.',
+              type: 'ability_score_increase',
+            },
+            {
+              name: 'Skill Proficiency',
+              description: 'You gain proficiency in one skill of your choice.',
+              type: 'proficiency',
+            },
+            {
+              name: 'Expertise',
+              description: 'Choose one skill in which you have proficiency but lack Expertise. You gain Expertise with that skill.',
+              type: 'proficiency',
+            },
+          ],
+          ability_score_increase: { scores: ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'], amount: 1, max_value: 20 },
+        },
+        '2024'
+      );
+
+      expect(result.abilityScoreIncreases).toEqual([
+        { name: 'any', amount: [1], isChoice: true, description: 'Increase one ability score of your choice by 1, to a maximum of 20.' },
+      ]);
+      expect(result.proficiencies).toEqual([
+        {
+          name: 'Skill Proficiency',
+          type: 'proficiency',
+          isChoice: true,
+          choose: 1,
+          from: ['skill'],
+        },
+        {
+          name: 'Expertise',
+          type: 'proficiency',
+          isChoice: true,
+          choose: 1,
+          from: ['Acrobatics, Animal Handling, Arcana, Athletics, Deception, History, Insight, Intimidation, Investigation, Medicine, Nature, Perception, Performance, Persuasion, Religion, Sleight of Hand, Stealth, Survival'],
+          grantsExpertise: true,
+        },
+      ]);
+      expect(result.features).toHaveLength(0);
     });
 
     it('should parse a regular proficiency benefit', () => {
@@ -631,6 +706,27 @@ describe('computeFeatBuffs', () => {
           isChoice: true,
           choose: 3,
           from: ["Artisan's Tools"],
+        },
+      ]);
+    });
+
+    it('should parse Skilled feat proficiency choice (three skills or tools)', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            { type: 'proficiency', name: 'Proficiency', description: 'You gain proficiency in any combination of three skills or tools of your choice.' },
+          ],
+        },
+        '2024'
+      );
+
+      expect(result.proficiencies).toEqual([
+        {
+          name: 'Proficiency',
+          type: 'proficiency',
+          isChoice: true,
+          choose: 3,
+          from: ['skills or tools'],
         },
       ]);
     });
