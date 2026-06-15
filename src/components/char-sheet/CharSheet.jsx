@@ -15,7 +15,7 @@ import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT }
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { evaluateAutoExpression } from '../../services/combat/automationService.js';
 import { EXHAUSTION_LEVELS } from '../../services/combat/exhaustionRules.js';
-import { isCreatureWarded } from '../../services/automation/handlers/protectionFromEvilAndGoodHandler.js';
+import { isCreatureWarded } from '../../services/automation/handlers/buffs/protectionFromEvilAndGoodHandler.js';
 import './CharSheet.css'
 
 function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters }) {

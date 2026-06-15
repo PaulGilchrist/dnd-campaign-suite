@@ -5,7 +5,7 @@ import utils from '../../ui/utils.js';
 import { sendDeathSavePrompt, sendConcentrationPrompt } from '../../combat/savePromptService.js';
 import { rollConcentrationSave } from '../../combat/concentrationRules.js';
 import { postLogEntry } from '../../shared/logPoster.js';
-import { isHolyAuraActive, getHolyAuraTargets } from '../../automation/handlers/holyAuraHandler.js';
+import { isHolyAuraActive, getHolyAuraTargets } from '../../automation/handlers/buffs/holyAuraHandler.js';
 
 /**
  * Save the last damage event under the target's key so reaction features

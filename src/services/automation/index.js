@@ -1,8 +1,8 @@
 import { handle as handleSaveOnly } from './handlers/saveOnlyHandler.js';
 import { handle as handleSaveAttack } from './handlers/saveAttackHandler.js';
 import { handle as handleHealing } from './handlers/healing/healingHandler.js';
-import { handle as handleBuff } from './handlers/buffHandler.js';
-import { handle as handleCondition } from './handlers/conditionHandler.js';
+import { handle as handleBuff } from './handlers/buffs/buffHandler.js';
+import { handle as handleCondition } from './handlers/buffs/conditionHandler.js';
 import { handle as handleSorcery } from './handlers/resources/sorceryHandler.js';
 import { handle as handleSpellCast } from './handlers/spellCastHandler.js';
 import { handle as handleInitiative } from './handlers/initiativeHandler.js';
@@ -15,9 +15,9 @@ import { handle as handleCombatStance } from './handlers/combatStanceHandler.js'
 import { handle as handleReactionDamage } from './handlers/reactions/reactionDamageHandler.js';
 import { handle as handleReactionDebuff } from './handlers/reactions/reactionDebuffHandler.js';
 import { handle as handleAttackRider } from './handlers/attackRiderHandler.js';
-import { handle as handleTempHpBuff } from './handlers/tempHpBuffHandler.js';
+import { handle as handleTempHpBuff } from './handlers/buffs/tempHpBuffHandler.js';
 import { handle as handleWeaponMastery } from './handlers/weaponMasteryHandler.js';
-import { handle as handleBuffAlly } from './handlers/buffAllyHandler.js';
+import { handle as handleBuffAlly } from './handlers/buffs/buffAllyHandler.js';
 import { handle as handleRevivification } from './handlers/healing/revivificationHandler.js';
 import { handle as handleBardicInspiration } from './handlers/class-bard/bardicInspirationHandler.js';
 import { handle as handleAutoReroll } from './handlers/autoRerollHandler.js';
@@ -67,8 +67,8 @@ import { handle as handleHolyNimbus } from './handlers/class-cleric-paladin/holy
 import { handle as handleInspiringSmite } from './handlers/class-cleric-paladin/inspiringSmiteHandler.js';
 import { handle as handlePeerlessAthlete } from './handlers/class-cleric-paladin/peerlessAthleteHandler.js';
 import { handle as handleGloriousDefense } from './handlers/class-cleric-paladin/gloriousDefenseHandler.js';
-import { handle as handleProtectionFromEnergy, applyProtectionFromEnergy as applyProtectionFromEnergyHandler } from './handlers/protectionFromEnergyHandler.js';
-import { handle as handleProtectionFromPoison, applyProtectionFromPoison as applyProtectionFromPoisonHandler, isProtectionFromPoisonActive } from './handlers/protectionFromPoisonHandler.js';
+import { handle as handleProtectionFromEnergy, applyProtectionFromEnergy as applyProtectionFromEnergyHandler } from './handlers/buffs/protectionFromEnergyHandler.js';
+import { handle as handleProtectionFromPoison, applyProtectionFromPoison as applyProtectionFromPoisonHandler, isProtectionFromPoisonActive } from './handlers/buffs/protectionFromPoisonHandler.js';
 import { handle as handleLivingLegend } from './handlers/class-cleric-paladin/livingLegendHandler.js';
 import { handle as handleUndyingSentinel } from './handlers/class-cleric-paladin/undyingSentinelHandler.js';
 import { handle as handleElderChampion } from './handlers/class-cleric-paladin/elderChampionHandler.js';
@@ -142,12 +142,12 @@ import { handle as handleElfisLineage } from './handlers/class-other/elfishLinea
 import { handle as handleGnomishLineage } from './handlers/class-other/gnomishLineageHandler.js';
 import { handle as handleLargeForm } from './handlers/class-other/largeFormHandler.js';
 import { handle as handleAid, applyAid as applyAidEffect } from './handlers/healing/aidHandler.js';
-import { handle as handleAuraOfPurity } from './handlers/auraOfPurityHandler.js';
-import { handle as handleHolyAura } from './handlers/holyAuraHandler.js';
-import { handle as handleBladeWard } from './handlers/bladeWardHandler.js';
+import { handle as handleAuraOfPurity } from './handlers/buffs/auraOfPurityHandler.js';
+import { handle as handleHolyAura } from './handlers/buffs/holyAuraHandler.js';
+import { handle as handleBladeWard } from './handlers/buffs/bladeWardHandler.js';
 import { handle as handleCounterSpell } from './handlers/counterSpellHandler.js';
 import { handle as handleEyebite } from './handlers/eyebiteHandler.js';
-import { handle as handleFalseLife } from './handlers/falseLifeHandler.js';
+import { handle as handleFalseLife } from './handlers/buffs/falseLifeHandler.js';
 import { handle as handleFear } from './handlers/fearHandler.js';
 import { handle as handleFeignDeath } from './handlers/feignDeathHandler.js';
 import { handle as handleFleshToStone } from './handlers/fleshToStoneHandler.js';
@@ -157,17 +157,17 @@ import { handle as handleGlobeOfInvulnerability } from './handlers/globeOfInvuln
 import { handle as handleGreaseAreaSave } from './handlers/greaseAreaSaveHandler.js';
 import { handle as handleGreaterRestoration, applyGreaterRestoration as applyGreaterRestorationEffect } from './handlers/greaterRestorationHandler.js';
 import { handle as handleLesserRestoration, applyLesserRestoration as applyLesserRestorationEffect } from './handlers/lesserRestorationHandler.js';
-import { handle as handleLongstrider, applyLongstrider as applyLongstriderEffect } from './handlers/longstriderHandler.js';
-import { handle as handleMageArmor, applyMageArmor as applyMageArmorEffect } from './handlers/mageArmorHandler.js';
-import { handle as handleHeroesFeast, applyHeroesFeast as applyHeroesFeastEffect } from './handlers/heroesFeastHandler.js';
+import { handle as handleLongstrider, applyLongstrider as applyLongstriderEffect } from './handlers/buffs/longstriderHandler.js';
+import { handle as handleMageArmor, applyMageArmor as applyMageArmorEffect } from './handlers/buffs/mageArmorHandler.js';
+import { handle as handleHeroesFeast, applyHeroesFeast as applyHeroesFeastEffect } from './handlers/buffs/heroesFeastHandler.js';
 import { handle as handleHypnoticPatternShake, handleConfirm as handleHypnoticPatternShakeConfirm } from './handlers/hypnoticPatternShake.js';
 import { handle as handleHypnoticPattern } from './handlers/hypnoticPatternHandler.js';
 import { handle as handleMassSuggestion } from './handlers/massSuggestionHandler.js';
 import { handle as handleResilientSphere } from './handlers/resilientSphereHandler.js';
 import { handle as handlePowerWordStun } from './handlers/powerWordStunHandler.js';
 import { handle as handleOttoDance } from './handlers/ottosDanceHandler.js';
-import { handle as handlePassWithoutTrace } from './handlers/passWithoutTraceHandler.js';
-import { handle as handleProtectionFromEvilAndGood, isProtectionFromEvilAndGoodActive, isCreatureWarded } from './handlers/protectionFromEvilAndGoodHandler.js';
+import { handle as handlePassWithoutTrace } from './handlers/buffs/passWithoutTraceHandler.js';
+import { handle as handleProtectionFromEvilAndGood, isProtectionFromEvilAndGoodActive, isCreatureWarded } from './handlers/buffs/protectionFromEvilAndGoodHandler.js';
 import { handle as handleRayOfEnfeeblement, isRayOfEnfeeblementActive } from './handlers/rayOfEnfeeblementHandler.js';
 
 const HANDLER_MAP = {

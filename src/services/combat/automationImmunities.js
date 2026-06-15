@@ -1,4 +1,4 @@
-import { isProtectionFromEvilAndGoodActive, isCreatureWarded } from '../automation/handlers/protectionFromEvilAndGoodHandler.js';
+import { isProtectionFromEvilAndGoodActive, isCreatureWarded } from '../automation/handlers/buffs/protectionFromEvilAndGoodHandler.js';
 
 export function getConditionImmunities(features) {
     const immunities = []
