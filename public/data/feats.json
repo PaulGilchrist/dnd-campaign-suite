@@ -32,13 +32,27 @@
             "You can't be surprised while you are conscious.",
             "Other creatures don't gain advantage on attack rolls against you as a result of being unseen by you."
         ],
-        "automation": {
-            "type": "passive_buff",
-            "target": "self",
-            "effect": "initiative_bonus",
-            "bonusExpression": "5",
-            "casting_time": "1 action"
-        }
+        "automation": [
+            {
+                "type": "passive_buff",
+                "target": "self",
+                "effect": "initiative_bonus",
+                "bonusExpression": "5",
+                "casting_time": "1 action"
+            },
+            {
+                "type": "passive_buff",
+                "target": "self",
+                "effect": "no_surprise",
+                "casting_time": "passive"
+            },
+            {
+                "type": "passive_buff",
+                "target": "self",
+                "effect": "unseen_attacker_advantage_negate",
+                "casting_time": "passive"
+            }
+        ]
     },
     {
         "index": "athlete",

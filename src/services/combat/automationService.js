@@ -1,5 +1,6 @@
 import { buildAttackInfo } from './automationInfoBuilder.js'
 
+export { buildAttackInfo } from './automationInfoBuilder.js'
 export { evaluateAutoExpression, resolveDiceExpression } from './automationExpressions.js'
 export { collectAutomationFromFeatures, processFeatureAutomation, collectTurnStartEffects } from './automationCollector.js'
 export { collectSaveModifiers } from './automationModifiers.js'

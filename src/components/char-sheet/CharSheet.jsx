@@ -299,6 +299,11 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         conditionEffects.targetDisadvantageCount = (conditionEffects.targetDisadvantageCount || 0) + 1;
     }
 
+    // Alert: Other creatures don't gain advantage on attack rolls against you from being unseen
+    if (playerStats?.unseenAttackerAdvantageNegate) {
+        conditionEffects.noAdvantageAgainst = true;
+    }
+
     // Protection from Evil and Good: warded creature types have Disadvantage on attack rolls,
     // target can't be charmed/frightened/possessed by them, advantage on new saves against existing effects
     if (pfeagActive && playerStats && combatContext) {

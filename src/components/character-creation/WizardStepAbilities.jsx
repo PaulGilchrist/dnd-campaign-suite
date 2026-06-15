@@ -1,17 +1,30 @@
 import { useState, useEffect } from 'react';
 import './WizardStepAbilities.css';
 import { loadAbilityScores, loadValidationRules } from '../../services/ui/dataLoader.js';
+import { fetchBackgroundData } from '../../services/ui/dataLoader.js';
+
+function parseBackgroundAbilityScores(abilityScoresStr) {
+  if (!abilityScoresStr) return [];
+  return abilityScoresStr.split(/,?\s+and\s+/i)
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+}
 
 function WizardStepAbilities({
   formData, 
   errors, 
   onAbilityBaseScoreChange,
   onAbilityImprovementChange,
-  onAbilityMiscBonusChange
+  onAbilityMiscBonusChange,
+  _backgroundAbilityChoices,
+  preSelectedBackgroundAbility,
+  onBackgroundAbilityChoose,
+  onBackgroundAbilityRemove
 }) {
   const [pointBuyCosts, setPointBuyCosts] = useState({});
   const [pointsAllowed, setPointsAllowed] = useState(27);
   const [abilityNames, setAbilityNames] = useState(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']);
+  const [bgAbilityChoices, setBgAbilityChoices] = useState([]);
 
     // Load ability names from JSON
   useEffect(() => {
@@ -21,6 +34,28 @@ function WizardStepAbilities({
      };
     loadNames();
   }, []);
+
+  // Load background ability score choices for 2024
+  useEffect(() => {
+    const loadBgAbilities = async () => {
+      if (formData.rules !== '2024' || !formData.background) {
+        setBgAbilityChoices([]);
+        return;
+      }
+      try {
+        const bgData = await fetchBackgroundData(formData.background, '2024');
+        if (bgData?.ability_scores) {
+          setBgAbilityChoices(parseBackgroundAbilityScores(bgData.ability_scores));
+        } else {
+          setBgAbilityChoices([]);
+        }
+      } catch (error) {
+        console.error('Error loading background ability scores:', error);
+        setBgAbilityChoices([]);
+      }
+    };
+    loadBgAbilities();
+  }, [formData.background, formData.rules]);
 
        // Load point buy costs and validation rules from JSON
   useEffect(() => {
@@ -51,11 +86,37 @@ function WizardStepAbilities({
        Use point buy: Each ability base score minimum is 8 and maximum is 15. You have <span className="points-remaining">{Math.max(0, pointsRemaining)} points</span> remaining to spend.
         (Total points allowed: {pointsAllowed})
        </div>
-       <div className="step-description">
-        Total score (base + improvements + misc) cannot exceed 20 for any ability.
-      </div>
+        <div className="step-description">
+         Total score (base + improvements + misc) cannot exceed 20 for any ability.
+       </div>
 
-       <div className="ability-scores-grid">
+       {bgAbilityChoices.length > 0 && (
+        <div className="step-description bg-ability-choice">
+          <strong>Background Ability Score:</strong> Your background ({formData.background}) grants +1 to one of the following abilities. Choose one:{' '}
+          {bgAbilityChoices.map((ability) => {
+            const isSelected = preSelectedBackgroundAbility === ability;
+            const isDisabled = isSelected || (formData.abilities?.find(a => a.name === ability)?.miscBonus || 0) <= 0;
+            return (
+              <button
+                key={ability}
+                type="button"
+                className={`bg-ability-btn ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}
+                onClick={() => {
+                  if (isSelected) {
+                    onBackgroundAbilityRemove?.(ability);
+                  } else {
+                    onBackgroundAbilityChoose?.(ability);
+                  }
+                }}
+              >
+                {ability} {isSelected ? '(chosen)' : ''}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+        <div className="ability-scores-grid">
          {abilityNames.map((ability, index) => {
          const abilityData = formData.abilities?.[index] || { baseScore: '8', abilityImprovements: '0', miscBonus: '0' };
          const baseScore = parseInt(abilityData.baseScore) || 8;

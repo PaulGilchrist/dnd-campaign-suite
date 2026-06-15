@@ -16,7 +16,7 @@ import { getSpellAbilities as getSpellAbilities2024 } from './core/spellCalc2024
 import { getAttacks as getAttacks5e } from './core/attackCalc.js';
 import { getAttacks as getAttacks2024 } from './core/attackCalc2024.js';
 import { getSpellMaxLevel } from '../shared/spell-utils.js';
-import { loadFeatData, loadSkills } from '../ui/dataLoader.js';
+import { loadFeatData, loadSkills, loadBackgroundData } from '../ui/dataLoader.js';
 import { computeAllFeatBuffs } from '../character/featBuffService.js';
 import {
     collectAutomationFromFeatures,
@@ -26,6 +26,8 @@ import {
     getConditionalImmunities,
     getEvasionEffects,
     getAllSaveProficiencies,
+    evaluateAutoExpression,
+    buildAttackInfo,
 } from '../combat/automationService.js';
 
 /**
@@ -246,48 +248,100 @@ const rules = {
      getProficiencies: (playerStats, skill = true, playerSummary) => {
          const { proficiencyUtils: pu } = rules.getSubModules(playerStats, playerSummary);
 
-          if (is2024(playerStats, playerSummary)) {
-               // 2024: extract skill proficiencies from race trait descriptions and proficiency_choices
-              const raceProficiencies = () => {
-                  const extra = [];
-                  const traits = playerStats.race?.traits || [];
-                  traits.forEach(trait => {
-                      // Parse specific skill names from description text
-                      if (trait.description) {
-                          const match = trait.description.match(/proficiency in the ([A-Z][a-z]+(?:,|[,\s]and[,\s]|[,\s]or[,\s]|,?)[A-Za-z\s]+?)\s*skill/i);
-                          if (match) {
-                              const skillsStr = match[1]
-                                  .replace(/\s+and\s+/g, ',')
-                                  .replace(/\s+or\s+/g, ',')
-                                  .replace(/,\s*,/g, ',')
-                                  .split(',')
-                                  .map(s => s.trim())
-                                  .filter(s => s.length > 0);
-                              skillsStr.forEach(sName => {
-                                  extra.push(`Skill: ${sName}`);
-                              });
-                          }
-                      }
-                      // Merge skill proficiency_choices from traits (e.g., Human's Skillful)
-                      if (trait.proficiency_choices) {
-                          const pc = trait.proficiency_choices;
-                          if (pc.from && pc.from.length > 0) {
-                              extra.push(...pc.from);
-                          }
-                      }
-                  });
-                  return extra;
-              };
-             return pu.getProficiencies(
-                 playerStats,
-                 skill,
-                 pu.getProficiencyChoiceCount,
-                  {
-                     raceProficiencies,
-                     bonusSource: playerStats.class.major || {},
-                  }
-              );
-          }
+           if (is2024(playerStats, playerSummary)) {
+                // 2024: extract skill proficiencies from race trait descriptions and proficiency_choices
+               const raceProficiencies = () => {
+                   const extra = [];
+                   const traits = playerStats.race?.traits || [];
+                   traits.forEach(trait => {
+                       // Parse specific skill names from description text
+                       if (trait.description) {
+                           const match = trait.description.match(/proficiency in the ([A-Z][a-z]+(?:,|[,\s]and[,\s]|[,\s]or[,\s]|,?)[A-Za-z\s]+?)\s*skill/i);
+                           if (match) {
+                               const skillsStr = match[1]
+                                   .replace(/\s+and\s+/g, ',')
+                                   .replace(/\s+or\s+/g, ',')
+                                   .replace(/,\s*,/g, ',')
+                                   .split(',')
+                                   .map(s => s.trim())
+                                   .filter(s => s.length > 0);
+                               skillsStr.forEach(sName => {
+                                   extra.push(`Skill: ${sName}`);
+                               });
+                           }
+                       }
+                       // Merge skill proficiency_choices from traits (e.g., Human's Skillful)
+                       if (trait.proficiency_choices) {
+                           const pc = trait.proficiency_choices;
+                           if (pc.from && pc.from.length > 0) {
+                               extra.push(...pc.from);
+                           }
+                       }
+                   });
+                   return extra;
+               };
+
+                // 2024: extract tool proficiencies from background
+                const backgroundToolProficiencies = () => {
+                    const extra = [];
+                    const bgName = playerStats.background;
+                    if (bgName) {
+                        try {
+                            const backgrounds = loadBackgroundData('2024');
+                            if (backgrounds) {
+                                const bg = backgrounds.find(b => b.name === bgName || b.index === bgName.toLowerCase());
+                                if (bg && bg.tool_proficiencies && !bg.tool_proficiencies.startsWith('Choose')) {
+                                    extra.push(bg.tool_proficiencies);
+                                }
+                            }
+                        } catch (e) {
+                            // Background data not available yet, skip
+                        }
+                    }
+                    return extra;
+                };
+
+                // 2024: extract tool proficiency CHOICES from background (e.g., "Choose one kind of Artisan's Tools")
+                const backgroundToolProficiencyChoices = () => {
+                    const choices = [];
+                    const bgName = playerStats.background;
+                    if (bgName) {
+                        try {
+                            const backgrounds = loadBackgroundData('2024');
+                            if (backgrounds) {
+                                const bg = backgrounds.find(b => b.name === bgName || b.index === bgName.toLowerCase());
+                                if (bg && bg.tool_proficiencies && bg.tool_proficiencies.startsWith('Choose')) {
+                                    // Parse "Choose one kind of Artisan's Tools" → extract the tool name
+                                    const toolMatch = bg.tool_proficiencies.match(/Choose\s+(?:one|(\d+))\s+(?:kind\s+of\s+)?(.+?)(?:\s+of\s+your\s+choice)?\s*$/i);
+                                    if (toolMatch) {
+                                        const count = parseInt(toolMatch[1] || '1', 10);
+                                        const toolName = toolMatch[2].trim();
+                                        choices.push({ choose: count, from: [toolName] });
+                                    } else {
+                                        // Fallback: use the full string as the tool name
+                                        choices.push({ choose: 1, from: [bg.tool_proficiencies.replace(/Choose\s+(?:one\s+(?:kind\s+of\s+)?)?/i, '').trim()] });
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            // Background data not available yet, skip
+                        }
+                    }
+                    return choices;
+                };
+
+               return pu.getProficiencies(
+                   playerStats,
+                   skill,
+                   pu.getProficiencyChoiceCount,
+                    {
+                       raceProficiencies,
+                       bonusSource: playerStats.class.major || {},
+                       backgroundToolProficiencies,
+                       backgroundToolProficiencyChoices,
+                    }
+                );
+           }
 
          // 5e: race proficiencies from traits/subrace, uses class.subclass
         return pu.getProficiencies(
@@ -659,14 +713,40 @@ const rules = {
 
            [playerStats.actions, playerStats.bonusActions, playerStats.reactions, playerStats.specialActions, playerStats.characterAdvancement] = rules.getActions(playerStats, playerSummary);
 
-        const allFeatures = [
-          ...(playerStats.actions || []),
-          ...(playerStats.bonusActions || []),
-          ...(playerStats.reactions || []),
-          ...(playerStats.specialActions || []),
-          ...(playerStats.characterAdvancement || []),
-        ];
-        playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+         const allFeatures = [
+           ...(playerStats.actions || []),
+           ...(playerStats.bonusActions || []),
+           ...(playerStats.reactions || []),
+           ...(playerStats.specialActions || []),
+           ...(playerStats.characterAdvancement || []),
+         ];
+
+         // 2024: add background features to automation (e.g., Hermit's Wit)
+         if (is2024(playerStats, playerSummary) && playerStats.background) {
+             try {
+                 const backgrounds = loadBackgroundData('2024');
+                 if (backgrounds) {
+                     const bg = backgrounds.find(b => b.name === playerStats.background || b.index === playerStats.background.toLowerCase());
+                     if (bg && bg.features && Array.isArray(bg.features)) {
+                         bg.features.forEach(feature => {
+                             if (feature.automation) {
+                                 const automations = Array.isArray(feature.automation) ? feature.automation : [feature.automation];
+                                 automations.forEach(auto => {
+                                     const info = buildAttackInfo({ ...feature, automation: auto }, playerStats);
+                                     if (info && (info.type === 'passive_buff' || info.type === 'passive_rule')) {
+                                         allFeatures.push({ name: feature.name, description: feature.description || '', automation: auto, hasAutomation: true });
+                                     }
+                                 });
+                             }
+                         });
+                     }
+                 }
+             } catch (e) {
+                 // Background data not available yet, skip
+             }
+         }
+
+         playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
         playerStats.saveModifiers = collectSaveModifiers(allFeatures);
         playerStats.evasionEffects = getEvasionEffects(allFeatures);
         playerStats.automationConditionImmunities = getConditionImmunities(allFeatures);
@@ -817,8 +897,26 @@ const rules = {
             const wisAbility = playerStats.abilities.find((ability) => ability.name === 'Wisdom');
             playerStats.initiative += (wisAbility?.bonus || 0);
         }
+        // Add initiative_bonus from passive_buff (e.g., Alert feat)
+        const initiativeBonusPassives = (playerStats.automation?.passives ?? []).filter(
+            p => p.type === 'passive_buff' && p.effect === 'initiative_bonus'
+        );
+        for (const passive of initiativeBonusPassives) {
+            const bonus = evaluateAutoExpression(passive.bonusExpression || '0', playerStats);
+            if (typeof bonus === 'number' && !isNaN(bonus)) {
+                playerStats.initiative += bonus;
+            }
+        }
         playerStats.initiativeAdvantage = (playerStats.automation?.passives ?? []).some(
             p => p.type === 'passive_rule' && p.effect === 'initiative_advantage'
+        );
+        // Alert: can't be surprised while conscious
+        playerStats.noSurprise = (playerStats.automation?.passives ?? []).some(
+            p => p.type === 'passive_buff' && p.effect === 'no_surprise'
+        );
+        // Alert: unseen attackers don't gain advantage on attacks against you
+        playerStats.unseenAttackerAdvantageNegate = (playerStats.automation?.passives ?? []).some(
+            p => p.type === 'passive_buff' && p.effect === 'unseen_attacker_advantage_negate'
         );
          [playerStats.armorClass, playerStats.armorClassFormula] = rules.getArmorClass(allEquipment, playerStats, playerSummary);
         playerStats.spellAbilities = rules.getSpellAbilities(allSpells, playerStats, playerSummary);

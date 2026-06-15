@@ -15,6 +15,7 @@ import useWizardResistances from '../../hooks/useWizardResistances.js';
 import useWizardFeats from '../../hooks/useWizardFeats.js';
 import useWizardFeatBuffs from '../../hooks/useWizardFeatBuffs.js';
 import useWizardSpells from '../../hooks/useWizardSpells.js';
+import useWizardBackgroundAbility from '../../hooks/useWizardBackgroundAbility.js';
 
 import useWizardAbilities from '../../hooks/useWizardAbilities.js';
 import useWizardArrayToggle from '../../hooks/useWizardArrayToggle.js';
@@ -33,11 +34,13 @@ const WizardStepRenderer = React.memo(({
   allSpells,
   preSelectedFeats,
   computedBuffs,
+  preSelectedSpells,
   preSelectedSkills,
   preSelectedLanguages,
   preSelectedFightingStyles,
   preSelectedResistances,
   preSelectedImmunities,
+  preSelectedBackgroundAbility,
   skillLimits,
   expertiseLimits,
   skillWarnings,
@@ -83,11 +86,13 @@ const WizardStepRenderer = React.memo(({
     allSpells,
     preSelectedFeats,
     computedBuffs,
+    preSelectedSpells,
     preSelectedSkills,
     preSelectedLanguages,
     preSelectedFightingStyles,
     preSelectedResistances,
     preSelectedImmunities,
+    preSelectedBackgroundAbility,
     skillLimits,
     expertiseLimits,
     skillWarnings,
@@ -191,6 +196,9 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
   const {
     preSelectedSpells,
      } = useWizardSpells(formData, setFormData);
+
+  // Background ability score choice (2024)
+  const { preSelectedBackgroundAbility } = useWizardBackgroundAbility(formData, setFormData);
 
 	// Inventory
 	const [tempInventory, setTempInventory] = useState({ backpack: [], equipped: [] });
@@ -315,6 +323,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
         preSelectedFightingStyles={preSelectedFightingStyles}
         preSelectedResistances={preSelectedResistancesList.resistances}
         preSelectedImmunities={preSelectedResistancesList.immunities}
+        preSelectedBackgroundAbility={preSelectedBackgroundAbility}
         skillLimits={skillLimits}
         expertiseLimits={expertiseLimits}
         skillWarnings={skillWarnings}
@@ -361,6 +370,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
     preSelectedFightingStyles,
     preSelectedResistancesList,
     preSelectedSpells,
+    preSelectedBackgroundAbility,
     skillLimits,
     expertiseLimits,
     skillWarnings,

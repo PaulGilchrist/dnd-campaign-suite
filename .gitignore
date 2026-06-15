@@ -1,5 +1,4 @@
-coverage-report/
-
+docs/spells-2024.pdf
 # Per-campaign character change data (debounced in-memory state)
 public/campaigns/*/data/character-change-data.json
 public/campaigns/*/data/campaign-log.json
@@ -35,6 +34,7 @@ dist-ssr
 
 # Coverage reports
 coverage
+coverage-report
 
 # Openclaw backups
 *openclaw-backup*.tar.gz

@@ -12,6 +12,8 @@
  * @param {Function} getProficiencyChoiceCount - Function that returns the number of proficiency choices allowed by class
  * @param {Object} config - Rule-specific configuration
  * @param {Function} config.raceProficiencies - Function(playerStats) => Array, returns additional proficiencies from race traits/subrace
+ * @param {Function} config.backgroundToolProficiencies - Function() => Array, returns tool proficiencies from background
+ * @param {Function} config.backgroundToolProficiencyChoices - Function() => Array, returns tool proficiency choices from background (e.g., "Choose one kind of Artisan's Tools")
  * @param {Object} config.bonusSource - Object containing bonus_skill_proficiencies and/or bonus_proficiencies (e.g., class.subclass or class.major)
  * @returns {Array} [proficienciesAllowed, proficiencies] - Allowed count and sorted array of proficiency names
  */
@@ -63,6 +65,23 @@ export const getProficiencies = (playerStats, skill = true, getProficiencyChoice
     } else {
         // Filter to only non-skill proficiencies
         proficiencies = proficiencies.filter((proficiency) => !proficiency.startsWith('Skill'));
+
+        // Add background tool proficiencies (2024)
+        if (config.backgroundToolProficiencies) {
+            const bgTools = config.backgroundToolProficiencies();
+            proficiencies = [...new Set([...proficiencies, ...bgTools])];
+        }
+
+        // Add background tool proficiency choices (2024) — e.g., "Choose one kind of Artisan's Tools"
+        if (config.backgroundToolProficiencyChoices) {
+            const bgToolChoices = config.backgroundToolProficiencyChoices();
+            bgToolChoices.forEach(choice => {
+                if (choice.from && choice.from.length > 0) {
+                    proficiencies = [...new Set([...proficiencies, ...choice.from])];
+                    proficienciesAllowed += choice.choose || 1;
+                }
+            });
+        }
 
         // Add bonus proficiencies from subclass/major (e.g., Bard/Valor, Rogue/Assassin)
         if (config.bonusSource && config.bonusSource.bonus_proficiencies) {

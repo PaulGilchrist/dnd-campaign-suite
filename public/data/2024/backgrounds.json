@@ -103,9 +103,20 @@
     "feat": "Healer",
     "skill_proficiencies": "Medicine and Religion",
     "tool_proficiencies": "Herbalism Kit",
-    "equipment": "Choose A or B: (A) Quarterstaff Herbalism Kit, Bedroll, Book (philosophy), Lamp, Oil (3 flasks), Traveler's Clothes, 16 GP; or (8) 50 GP",
+     "equipment": "Choose A or B: (A) Quarterstaff Herbalism Kit, Bedroll, Book (philosophy), Lamp, Oil (3 flasks), Traveler's Clothes, 16 GP; or (8) 50 GP",
     "book": "Player's Handbook 2024",
-    "page": 182
+    "page": 182,
+    "features": [
+      {
+        "name": "Hermit's Wit",
+        "description": "You can draw on your solitude to gain insight into the world around you. You add your Wisdom modifier to your initiative rolls.",
+        "automation": {
+          "type": "passive_buff",
+          "effect": "initiative_bonus",
+          "bonusExpression": "WIS modifier"
+        }
+      }
+    ]
   },
   {
     "index": "merchant",
