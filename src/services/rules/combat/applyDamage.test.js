@@ -113,10 +113,11 @@ function createPlayerCharacter(name, extra = {}) {
  */
 function stubPlayerRuntime(currentHp, conditions = []) {
   getRuntimeValue
-    .mockReturnValueOnce([])                        // activeBuffs
-    .mockReturnValueOnce(undefined)                 // arcaneWardActive (ward not active)
-    .mockReturnValueOnce(currentHp)                 // currentHitPoints
-    .mockReturnValueOnce(conditions);               // activeConditions
+    .mockReturnValueOnce([])                        // activeBuffs (line 83)
+    .mockReturnValueOnce(undefined)                 // arcaneWardActive (line 133)
+    .mockReturnValueOnce(currentHp)                 // currentHitPoints (line 157)
+    .mockReturnValueOnce([])                        // activeBuffs for Warding Bond check (line 189)
+    .mockReturnValueOnce(conditions);               // activeConditions (line 243)
 }
 
 // ── Tests ───────────────────────────────────────────────────────
