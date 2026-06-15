@@ -1,7 +1,7 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getCombatContext, getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../shared/logPoster.js';
-import storage from '../../ui/storage.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { postLogEntry } from '../../../shared/logPoster.js';
+import storage from '../../../ui/storage.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;

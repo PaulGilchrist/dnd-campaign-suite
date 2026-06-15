@@ -2,21 +2,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../rules/combat/damageUtils.js', () => ({
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
   getTargetFromAttacker: vi.fn(),
 }));
 
-vi.mock('../../shared/logPoster.js', () => ({
+vi.mock('../../../shared/logPoster.js', () => ({
   postLogEntry: vi.fn(),
 }));
 
-vi.mock('../../ui/storage.js', () => ({
+vi.mock('../../../ui/storage.js', () => ({
   default: {
     set: vi.fn(),
   },
@@ -25,10 +25,10 @@ vi.mock('../../ui/storage.js', () => ({
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './revivificationHandler.js';
-import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
-import * as damageUtils from '../../rules/combat/damageUtils.js';
-import * as logPoster from '../../shared/logPoster.js';
-import storage from '../../ui/storage.js';
+import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
+import * as logPoster from '../../../shared/logPoster.js';
+import storage from '../../../ui/storage.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

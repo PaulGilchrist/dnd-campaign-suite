@@ -1,10 +1,10 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addExpiration } from '../../rules/effects/expirations.js';
-import { getCombatContext } from '../../rules/combat/damageUtils.js';
-import { rangeToFeet } from '../../rules/combat/rangeValidation.js';
-import { resolveMapPositions } from '../common/targetResolver.js';
-import { evaluateAutoExpression } from '../../combat/automationExpressions.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { resolveMapPositions } from '../../common/targetResolver.js';
+import { evaluateAutoExpression } from '../../../combat/automationExpressions.js';
+import { postLogEntry } from '../../../shared/logPoster.js';
 
 const AID_BUFF_NAME = 'Aid';
 

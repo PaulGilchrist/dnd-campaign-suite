@@ -2,30 +2,30 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../dice/diceRoller.js', () => ({
+vi.mock('../../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
   rollExpressionMaximized: vi.fn(),
 }));
 
-vi.mock('../../character/classFeatures.js', () => ({
+vi.mock('../../../character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(),
 }));
 
-vi.mock('../common/targetResolver.js', () => ({
+vi.mock('../../common/targetResolver.js', () => ({
   resolveTarget: vi.fn(),
 }));
 
-vi.mock('../common/healingRoll.js', () => ({
+vi.mock('../../common/healingRoll.js', () => ({
   applyHealingDirectly: vi.fn(),
   logHealingToSSE: vi.fn(),
 }));
 
-vi.mock('../../combat/automationService.js', () => ({
+vi.mock('../../../combat/automationService.js', () => ({
   resolveHealingBonuses: vi.fn(),
   hasHealingMaximization: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
@@ -33,12 +33,12 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './healingHandler.js';
-import * as diceRoller from '../../dice/diceRoller.js';
-import * as classFeatures from '../../character/classFeatures.js';
-import * as targetResolver from '../common/targetResolver.js';
-import * as healingRoll from '../common/healingRoll.js';
-import * as automationService from '../../combat/automationService.js';
-import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
+import * as classFeatures from '../../../character/classFeatures.js';
+import * as targetResolver from '../../common/targetResolver.js';
+import * as healingRoll from '../../common/healingRoll.js';
+import * as automationService from '../../../combat/automationService.js';
+import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

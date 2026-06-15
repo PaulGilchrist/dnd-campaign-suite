@@ -1,9 +1,9 @@
-import { rollExpression, rollExpressionMaximized } from '../../dice/diceRoller.js';
-import { getClassFeatures } from '../../character/classFeatures.js';
-import { resolveTarget } from '../common/targetResolver.js';
-import { applyHealingDirectly, logHealingToSSE } from '../common/healingRoll.js';
-import { resolveHealingBonuses, hasHealingMaximization } from '../../combat/automationService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { rollExpression, rollExpressionMaximized } from '../../../dice/diceRoller.js';
+import { getClassFeatures } from '../../../character/classFeatures.js';
+import { resolveTarget } from '../../common/targetResolver.js';
+import { applyHealingDirectly, logHealingToSSE } from '../../common/healingRoll.js';
+import { resolveHealingBonuses, hasHealingMaximization } from '../../../combat/automationService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
