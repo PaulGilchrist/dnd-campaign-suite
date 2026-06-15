@@ -134,6 +134,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
       }
 
     // Apply passive_buff speed_bonus effects (e.g., Fast Movement: +10 speed without heavy armor)
+    let buffSpeedBonus = 0;
     const passives = playerStats.automation?.passives || [];
     for (const passive of passives) {
       if (passive.type === 'passive_buff' && passive.effect === 'speed_bonus') {
@@ -179,7 +180,6 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
 
     let flySpeed = null;
     let swimSpeed = null;
-    let buffSpeedBonus = 0;
     let hasteAcBonus = 0;
     let mageArmorActive = false;
     let iceWalkActive = false;

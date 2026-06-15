@@ -96,22 +96,22 @@ function CharCharacterAdvancement({ playerStats, campaignName }) {
                 const isClickable = feature.details || hasAutomation(feature);
                 const options = feature.automation?.options;
                 const optionKey = options ? `_${feature.name.replace(/\s+/g, '_')}_option` : null;
-                const currentOption = optionKey ? (getRuntimeValue(playerStats.name, optionKey, campaignName) || options[0]) : null;
+                const currentOption = optionKey ? (getRuntimeValue(playerStats.name, optionKey, campaignName) || (typeof options[0] === 'object' ? options[0].name : options[0])) : null;
                 return <div key={feature.name || `character-advancement-${index}`}>
                       <b className={isClickable ? "clickable" : ""} onClick={() => handleClick(feature)}>{feature.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(feature.description) }}></span>
                       {options && options.length > 1 && (
                           <div style={{ marginTop: '4px', fontSize: '0.9em' }}>
                               <span style={{ opacity: 0.7 }}>Choice: </span>
                               {options.map((opt, i) => (
-                                  <span key={opt}>
+                                  <span key={typeof opt === 'object' ? opt.name : opt}>
                                       {i > 0 && <span style={{ opacity: 0.4 }}> | </span>}
                                       <span
-                                          className="clickable"
-                                          style={opt === currentOption ? { fontWeight: 'bold', textDecoration: 'underline' } : { opacity: 0.6 }}
-                                          onClick={(e) => handleChoiceClick(feature, opt, e)}
-                                      >
-                                          {opt}
-                                      </span>
+                                           className="clickable"
+                                           style={opt === currentOption ? { fontWeight: 'bold', textDecoration: 'underline' } : { opacity: 0.6 }}
+                                           onClick={(e) => handleChoiceClick(feature, typeof opt === 'object' ? opt.name : opt, e)}
+                                       >
+                                           {typeof opt === 'object' ? opt.name : opt}
+                                       </span>
                                   </span>
                               ))}
                           </div>
