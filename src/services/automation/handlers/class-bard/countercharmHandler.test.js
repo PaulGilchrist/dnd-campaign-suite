@@ -2,42 +2,42 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/useMetamagic.js', () => ({
   getLastAttackRoll: vi.fn(),
   getLastAbilityCheck: vi.fn(),
 }));
 
-vi.mock('../../rules/combat/damageUtils.js', () => ({
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../rules/combat/rangeValidation.js', () => ({
+vi.mock('../../../rules/combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
   getDistanceFeet: vi.fn(),
 }));
 
-vi.mock('../common/targetResolver.js', () => ({
+vi.mock('../../common/targetResolver.js', () => ({
   resolveMapPositions: vi.fn(),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './countercharmHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
-import { getLastAttackRoll, getLastAbilityCheck } from '../../../hooks/useMetamagic.js';
-import { getCombatContext } from '../../rules/combat/damageUtils.js';
-import { rangeToFeet, getDistanceFeet } from '../../rules/combat/rangeValidation.js';
-import { resolveMapPositions } from '../common/targetResolver.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
+import { getLastAttackRoll, getLastAbilityCheck } from '../../../../hooks/useMetamagic.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { rangeToFeet, getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
+import { resolveMapPositions } from '../../common/targetResolver.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

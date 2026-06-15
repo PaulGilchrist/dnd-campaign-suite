@@ -2,28 +2,28 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ─────────────────────
 
-vi.mock('../../dice/diceRoller.js', () => ({
+vi.mock('../../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn().mockImplementation(() => Promise.resolve()),
 }));
 
-vi.mock('../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/useMetamagic.js', () => ({
   getLastDamageEvent: vi.fn(),
 }));
 
-vi.mock('../../rules/combat/damageUtils.js', () => ({
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../rules/combat/applyHealing.js', () => ({
+vi.mock('../../../rules/combat/applyHealing.js', () => ({
   applyHealingToTarget: vi.fn(),
 }));
 
@@ -31,12 +31,12 @@ vi.mock('../../rules/combat/applyHealing.js', () => ({
 
 import { handle } from './bardicInspirationOffenseHandler.js';
 
-import * as diceRoller from '../../dice/diceRoller.js';
-import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
-import * as logService from '../../ui/logService.js';
-import * as useMetamagic from '../../../hooks/useMetamagic.js';
-import * as damageUtils from '../../rules/combat/damageUtils.js';
-import * as applyHealing from '../../rules/combat/applyHealing.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
+import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
+import * as logService from '../../../ui/logService.js';
+import * as useMetamagic from '../../../../hooks/useMetamagic.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
+import * as applyHealing from '../../../rules/combat/applyHealing.js';
 
 // ── Helpers ────────────────────────────────────────────────────────
 

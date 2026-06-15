@@ -2,16 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ─────────────────────
 
-vi.mock('../../dice/diceRoller.js', () => ({
+vi.mock('../../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn().mockImplementation(() => Promise.resolve()),
 }));
 
@@ -19,9 +19,9 @@ vi.mock('../../ui/logService.js', () => ({
 
 import { handle } from './bardicInspirationDefenseHandler.js';
 
-import * as diceRoller from '../../dice/diceRoller.js';
-import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
-import * as logService from '../../ui/logService.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
+import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
+import * as logService from '../../../ui/logService.js';
 
 // ── Helpers ────────────────────────────────────────────────────────
 

@@ -1,30 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './bardicInspirationHandler.js';
-import { resolveTarget, resolveMapPositions } from '../common/targetResolver.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addExpiration } from '../../rules/effects/expirations.js';
-import { evaluateAutoExpression } from '../../combat/automationService.js';
-import { getDistanceFeet, rangeToFeet } from '../../rules/combat/rangeValidation.js';
+import { resolveTarget, resolveMapPositions } from '../../common/targetResolver.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
+import { evaluateAutoExpression } from '../../../combat/automationService.js';
+import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
-vi.mock('../common/targetResolver.js', () => ({
+vi.mock('../../common/targetResolver.js', () => ({
     resolveTarget: vi.fn(),
     resolveMapPositions: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../rules/effects/expirations.js', () => ({
+vi.mock('../../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 
-vi.mock('../../combat/automationService.js', () => ({
+vi.mock('../../../combat/automationService.js', () => ({
     evaluateAutoExpression: vi.fn(),
 }));
 
-vi.mock('../../rules/combat/rangeValidation.js', () => ({
+vi.mock('../../../rules/combat/rangeValidation.js', () => ({
     getDistanceFeet: vi.fn(),
     rangeToFeet: vi.fn(),
 }));

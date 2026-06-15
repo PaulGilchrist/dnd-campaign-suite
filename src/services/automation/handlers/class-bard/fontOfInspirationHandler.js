@@ -1,5 +1,5 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
 
 function getBardicInspirationMax(playerStats) {
     const charisma = playerStats.abilities?.find(a => a.name === 'Charisma');
