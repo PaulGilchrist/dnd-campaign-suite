@@ -157,6 +157,7 @@ import { handle as handleAuraOfPurity } from './handlers/buffs/auraOfPurityHandl
 import { handle as handleHolyAura } from './handlers/buffs/holyAuraHandler.js';
 import { handle as handleBladeWard } from './handlers/buffs/bladeWardHandler.js';
 import { handle as handleShield } from './handlers/shieldHandler.js';
+import { handle as handleShieldOfFaith, applyShieldOfFaith as applyShieldOfFaithEffect, isShieldOfFaithActive, getShieldOfFaithBonus } from './handlers/shieldOfFaithHandler.js';
 import { handle as handleCounterSpell } from './handlers/spells/counterSpellHandler.js';
 import { handle as handleEyebite } from './handlers/spells/eyebiteHandler.js';
 import { handle as handleFalseLife } from './handlers/buffs/falseLifeHandler.js';
@@ -375,6 +376,7 @@ const HANDLER_MAP = {
         holy_aura: handleHolyAura,
         blade_ward: handleBladeWard,
         shield: handleShield,
+        shield_of_faith: handleShieldOfFaith,
         reaction_counterspell: handleCounterSpell,
         eyebite: handleEyebite,
         false_life: handleFalseLife,
@@ -418,7 +420,7 @@ const HANDLER_MAP = {
         tavern_brawler_push: handleGenericPopup,
         grapple_damage: handleGenericPopup,
 };
-export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler, applyProtectionFromPoisonHandler, applyRemoveCurseEffect, applyBoonOfEnergyResistance, applyWeaponMasteryChoice, applyResistanceEffect, isProtectionFromEvilAndGoodActive, isCreatureWarded, isProtectionFromPoisonActive, isRayOfEnfeeblementActive, getResistanceDamageType, isResistanceUsedThisTurn };
+export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler, applyProtectionFromPoisonHandler, applyRemoveCurseEffect, applyBoonOfEnergyResistance, applyWeaponMasteryChoice, applyResistanceEffect, isProtectionFromEvilAndGoodActive, isCreatureWarded, isProtectionFromPoisonActive, isRayOfEnfeeblementActive, getResistanceDamageType, isResistanceUsedThisTurn, applyShieldOfFaithEffect, isShieldOfFaithActive, getShieldOfFaithBonus };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
 

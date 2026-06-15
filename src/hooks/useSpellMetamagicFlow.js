@@ -22,6 +22,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
   const [pendingGreaterRestoration, setPendingGreaterRestoration] = React.useState(null);
   const [pendingLesserRestoration, setPendingLesserRestoration] = React.useState(null);
   const [pendingMageArmor, setPendingMageArmor] = React.useState(null);
+  const [pendingShieldOfFaith, setPendingShieldOfFaith] = React.useState(null);
   const [pendingProtectionFromEnergy, setPendingProtectionFromEnergy] = React.useState(null);
   const [pendingResistance, setPendingResistance] = React.useState(null);
   const [pendingRemoveCurse, setPendingRemoveCurse] = React.useState(null);
@@ -138,6 +139,25 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
           spellLevel: spell.level || 0,
           castingTime: spell.casting_time,
           range: spell.range || 'Touch',
+          creatureTargets,
+        });
+        return;
+      }
+    }
+
+    const isShieldOfFaith = (spell.name || '').toLowerCase() === 'shield of faith';
+    if (isShieldOfFaith) {
+      const cs = getCombatSummary();
+      const creatureTargets = cs?.creatures
+        ?.filter(c => c.name !== playerStats?.name)
+        .map(c => c.name) || [];
+      if (creatureTargets.length > 0) {
+        setPendingShieldOfFaith({
+          spell,
+          spellName: spell.name,
+          spellLevel: spell.level || 0,
+          castingTime: spell.casting_time,
+          range: spell.range || '60 feet',
           creatureTargets,
         });
         return;
@@ -717,5 +737,52 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
   }, [pendingResistance, playerStats.name, campaignName]);
 
-  return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingHeroesFeast, pendingGreaterRestoration, pendingLesserRestoration, pendingMageArmor, pendingProtectionFromEnergy, pendingResistance, pendingRemoveCurse, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleHeroesFeastConfirm, handleHeroesFeastSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, handleLesserRestorationConfirm, handleLesserRestorationSkip, handleMageArmorConfirm, handleMageArmorSkip, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, handleResistanceConfirm, handleResistanceSkip, handleRemoveCurseConfirm, handleRemoveCurseSkip };
+  const handleShieldOfFaithConfirm = React.useCallback(async (result) => {
+    const pending = pendingShieldOfFaith;
+    setPendingShieldOfFaith(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+
+    try {
+      const { applyShieldOfFaithEffect } = await import('../services/automation/index.js');
+      await applyShieldOfFaithEffect(
+        { name: pending.spellName, spell: pending.spell, automation: { type: 'shield_of_faith', range: pending.range } },
+        playerStats,
+        campaignName,
+        null,
+        result
+      );
+    } catch (e) {
+      console.error('[shieldOfFaith] Failed to apply effect:', e);
+    }
+  }, [pendingShieldOfFaith, playerStats, campaignName]);
+
+  const handleShieldOfFaithSkip = React.useCallback(() => {
+    const pending = pendingShieldOfFaith;
+    setPendingShieldOfFaith(null);
+    if (!pending) return;
+
+    addEntry(campaignName, {
+      type: 'spell',
+      characterName: playerStats.name,
+      spellName: pending.spellName,
+      spellLevel: pending.spellLevel || 0,
+      castingTime: pending.castingTime,
+      metamagic: [],
+      spCost: 0,
+      timestamp: Date.now(),
+    });
+  }, [pendingShieldOfFaith, playerStats.name, campaignName]);
+
+  return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingHeroesFeast, pendingGreaterRestoration, pendingLesserRestoration, pendingMageArmor, pendingShieldOfFaith, pendingProtectionFromEnergy, pendingResistance, pendingRemoveCurse, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleHeroesFeastConfirm, handleHeroesFeastSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, handleLesserRestorationConfirm, handleLesserRestorationSkip, handleMageArmorConfirm, handleMageArmorSkip, handleShieldOfFaithConfirm, handleShieldOfFaithSkip, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, handleResistanceConfirm, handleResistanceSkip, handleRemoveCurseConfirm, handleRemoveCurseSkip };
 }

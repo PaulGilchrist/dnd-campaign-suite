@@ -15,6 +15,7 @@ import GreaterRestorationPopup from '../GreaterRestorationPopup.jsx'
 import LesserRestorationPopup from '../LesserRestorationPopup.jsx'
 import RemoveCursePopup from '../RemoveCursePopup.jsx'
 import MageArmorTargetPopup from '../MageArmorTargetPopup.jsx'
+import ShieldOfFaithTargetPopup from '../ShieldOfFaithTargetPopup.jsx'
 import ProtectionFromEnergyTargetPopup from '../ProtectionFromEnergyTargetPopup.jsx'
 import ResistanceTargetPopup from '../ResistanceTargetPopup.jsx'
 import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../../services/dice/diceRoller.js';
@@ -193,7 +194,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
       executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName });
       cachedCastPosRef.current = null;
       }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName]);
-    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingMageArmor, handleMageArmorConfirm, handleMageArmorSkip, pendingProtectionFromEnergy, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, pendingResistance, handleResistanceConfirm, handleResistanceSkip, pendingRemoveCurse, handleRemoveCurseConfirm, handleRemoveCurseSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
+    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingMageArmor, handleMageArmorConfirm, handleMageArmorSkip, pendingShieldOfFaith, handleShieldOfFaithConfirm, handleShieldOfFaithSkip, pendingProtectionFromEnergy, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, pendingResistance, handleResistanceConfirm, handleResistanceSkip, pendingRemoveCurse, handleRemoveCurseConfirm, handleRemoveCurseSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
 
     const resolveSpellPositions = React.useCallback(async () => {
@@ -501,6 +502,17 @@ return (
                         creatureTargets={pendingMageArmor.creatureTargets}
                         onConfirm={handleMageArmorConfirm}
                         onSkip={handleMageArmorSkip}
+                      />
+                    )}
+                    {pendingShieldOfFaith && (
+                      <ShieldOfFaithTargetPopup
+                        spell={{ name: pendingShieldOfFaith.spellName, level: pendingShieldOfFaith.spellLevel || 0 }}
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        range={pendingShieldOfFaith.range}
+                        creatureTargets={pendingShieldOfFaith.creatureTargets}
+                        onConfirm={handleShieldOfFaithConfirm}
+                        onSkip={handleShieldOfFaithSkip}
                       />
                     )}
                     {pendingProtectionFromEnergy && (

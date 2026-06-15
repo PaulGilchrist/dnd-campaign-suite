@@ -307,6 +307,12 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         conditionEffects.magicMissileImmune = true;
     }
 
+    // Shield of Faith: +2 AC for duration (Concentration, up to 10 minutes)
+    const shieldOfFaithActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shield_of_faith');
+    if (shieldOfFaithActive) {
+        conditionEffects.shieldOfFaithAcBonus = 2;
+    }
+
     // Alert: Other creatures don't gain advantage on attack rolls against you from being unseen
     if (playerStats?.unseenAttackerAdvantageNegate) {
         conditionEffects.noAdvantageAgainst = true;

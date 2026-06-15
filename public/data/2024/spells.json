@@ -11221,7 +11221,14 @@
     ],
     "subclasses": [],
     "area_of_effect": null,
-    "status_effects": []
+    "status_effects": [],
+    "automation": {
+      "type": "shield_of_faith",
+      "target": "willing_creature",
+      "duration": "Concentration, up to 10 minutes",
+      "casting_time": "Bonus Action",
+      "range": "60 feet"
+    }
   },
   {
     "index": "shillelagh",

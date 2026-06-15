@@ -60,6 +60,12 @@ function getShieldAcBonus(characterName, campaignName) {
     return shieldActive ? 5 : 0;
 }
 
+function getShieldOfFaithAcBonus(characterName, campaignName) {
+    const activeBuffs = getRuntimeValue(characterName, 'activeBuffs', campaignName) || [];
+    const shieldOfFaithActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shield_of_faith');
+    return shieldOfFaithActive ? 2 : 0;
+}
+
 function isMagicMissileImmune(characterName, campaignName) {
     const activeBuffs = getRuntimeValue(characterName, 'activeBuffs', campaignName) || [];
     return Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'shield');
@@ -382,7 +388,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         throw new Error(`[AC] Target "${target.name}" has no AC defined.`);
       }
 
-        const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) + (context?.defensiveDuelistBonus || 0) + getShieldAcBonus(characterName, campaignName) : undefined;
+        const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) + (context?.defensiveDuelistBonus || 0) + getShieldAcBonus(characterName, campaignName) + getShieldOfFaithAcBonus(characterName, campaignName) : undefined;
         let hit = isAutoMiss ? false : (target ? (effectiveD20 + bonus >= effectiveAc) : undefined);
        const targetName = target?.name || context?.targetName;
        const attackerName = context?.attackerName || characterName;
