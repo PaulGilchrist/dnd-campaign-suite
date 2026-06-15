@@ -222,10 +222,10 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
               </div>
             )}
 
-            {autoReroll && !rerollUsed && rollType === 'save' && (
+            {autoReroll && !rerollUsed && isD20 && (
               <div className="dice-roll-reroll">
                 <button className="dice-roll-reroll-btn" onClick={handleReroll} type="button">
-                  <i className="fa-solid fa-rotate"></i> Reroll Save{autoRerollBonus ? ` (+${autoRerollBonus})` : ''}
+                  <i className="fa-solid fa-rotate"></i> Reroll{autoRerollBonus ? ` (+${autoRerollBonus})` : ''}
                 </button>
               </div>
             )}

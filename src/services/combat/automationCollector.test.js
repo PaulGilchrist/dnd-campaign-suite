@@ -942,3 +942,41 @@ describe('collectAutomationFromFeatures – memorize_spell', () => {
         expect(result.specialActions[0].hasAutomation).toBe(true)
     })
 })
+
+describe('collectAutomationFromFeatures – meta type (Resourceful)', () => {
+    it('places heroic_inspiration_on_long_rest in passives', () => {
+        const features = [
+            {
+                name: 'Resourceful',
+                automation: {
+                    type: 'meta',
+                    effect: 'heroic_inspiration_on_long_rest',
+                    casting_time: 'passive'
+                }
+            }
+        ]
+        const result = collectAutomationFromFeatures(features, {})
+        expect(result.passives).toHaveLength(1)
+        expect(result.passives[0].type).toBe('meta')
+        expect(result.passives[0].effect).toBe('heroic_inspiration_on_long_rest')
+        expect(result.passives[0].name).toBe('Resourceful')
+        expect(result.passives[0].hasAutomation).toBe(true)
+    })
+
+    it('places unknown meta effects in specialActions', () => {
+        const features = [
+            {
+                name: 'Unknown Meta',
+                automation: {
+                    type: 'meta',
+                    effect: 'unknown_effect',
+                    casting_time: 'passive'
+                }
+            }
+        ]
+        const result = collectAutomationFromFeatures(features, {})
+        expect(result.specialActions).toHaveLength(1)
+        expect(result.specialActions[0].type).toBe('meta')
+        expect(result.specialActions[0].effect).toBe('unknown_effect')
+    })
+})

@@ -62,6 +62,7 @@ describe('computeRaceBuffs — null safety', () => {
       traits: [],
       speed: null,
       hitPointBonusPerLevel: 0,
+      feats: [],
     });
   });
 
@@ -76,6 +77,7 @@ describe('computeRaceBuffs — null safety', () => {
       traits: [],
       speed: null,
       hitPointBonusPerLevel: 0,
+      feats: [],
     });
   });
 
@@ -940,6 +942,7 @@ describe('applyRaceBuffsToPlayerData', () => {
       traits: [],
       speed: null,
       hitPointBonusPerLevel: 0,
+      feats: [],
     };
 
     applyRaceBuffsToPlayerData(playerData, buffs);
@@ -960,6 +963,7 @@ describe('applyRaceBuffsToPlayerData', () => {
       traits: [],
       speed: null,
       hitPointBonusPerLevel: 0,
+      feats: [],
     };
 
     applyRaceBuffsToPlayerData(playerData, buffs);
@@ -981,6 +985,7 @@ describe('applyRaceBuffsToPlayerData', () => {
       traits: [],
       speed: null,
       hitPointBonusPerLevel: 0,
+      feats: [],
     };
 
     applyRaceBuffsToPlayerData(playerData, buffs);
@@ -1004,6 +1009,7 @@ describe('applyRaceBuffsToPlayerData', () => {
       traits: [],
       speed: null,
       hitPointBonusPerLevel: 0,
+      feats: [],
     };
 
     applyRaceBuffsToPlayerData(playerData, buffs);
@@ -1024,6 +1030,7 @@ describe('applyRaceBuffsToPlayerData', () => {
       traits: [],
       speed: null,
       hitPointBonusPerLevel: 0,
+      feats: [],
     };
 
     applyRaceBuffsToPlayerData(playerData, buffs);
@@ -1045,6 +1052,7 @@ describe('applyRaceBuffsToPlayerData', () => {
       traits: [],
       speed: null,
       hitPointBonusPerLevel: 0,
+      feats: [],
     };
 
     applyRaceBuffsToPlayerData(playerData, buffs);
@@ -1063,6 +1071,7 @@ describe('applyRaceBuffsToPlayerData', () => {
       traits: [],
       speed: null,
       hitPointBonusPerLevel: 0,
+      feats: [],
     };
 
     applyRaceBuffsToPlayerData(playerData, buffs);

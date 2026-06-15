@@ -57,6 +57,12 @@ export function collectTurnStartEffects(features) {
                     name: feature.name,
                 })
             }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'naturally_stealthy') {
+                effects.push({
+                    type: 'naturally_stealthy',
+                    name: feature.name,
+                })
+            }
             if (auto?.type === 'passive_rule' && auto?.effect === 'create_thrall_temp_hp') {
                 effects.push({
                     type: 'create_thrall_temp_hp',
@@ -551,6 +557,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'umbral_sight':
                 result.passives.push(info)
                 break
+            case 'naturally_stealthy':
+                result.passives.push(info)
+                break
             case 'reaction_save':
                 result.reactions.push(info)
                 break
@@ -797,6 +806,13 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break;
             case 'phantasmal_creatures':
                 result.passives.push(info);
+                break;
+            case 'meta':
+                if (info.effect === 'heroic_inspiration_on_long_rest') {
+                    result.passives.push(info);
+                } else {
+                    result.specialActions.push(info);
+                }
                 break;
             default:
                 result.specialActions.push(info)

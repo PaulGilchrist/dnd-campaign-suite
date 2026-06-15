@@ -1,20 +1,37 @@
 import React from 'react';
 import SelectableList from './SelectableList.jsx';
 import WarningList from '../common/WarningList.jsx';
-import { validateFeats, getFeatLimits, normalizeFeatDescription } from '../../services/character/featValidation.js';
+import { validateFeats, getFeatLimits, normalizeFeatDescription, getRaceFeatChoices } from '../../services/character/featValidation.js';
 import { computeFeatBuffs } from '../../services/character/featBuffService.js';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 
 function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFeats, computedBuffs }) {
   const [warnings, setWarnings] = React.useState([]);
-    // Validate feats when selection changes
-      React.useEffect(() => {
-            const fetchWarnings = async () => {
-              const validationWarnings = await validateFeats(formData, allFeats);
-              setWarnings(validationWarnings);
-            };
-            fetchWarnings();
-          }, [formData, formData.feats, formData.level, formData.rules, allFeats]);
+  const [raceFeatChoices, setRaceFeatChoices] = React.useState([]);
+  const [isVersatile, setIsVersatile] = React.useState(false);
+  // Validate feats when selection changes
+    React.useEffect(() => {
+          const fetchWarnings = async () => {
+            const validationWarnings = await validateFeats(formData, allFeats);
+            setWarnings(validationWarnings);
+          };
+          fetchWarnings();
+        }, [formData, formData.feats, formData.level, formData.rules, allFeats]);
+
+  // Load race feat choices
+  React.useEffect(() => {
+    const fetchRaceChoices = async () => {
+      if (formData.rules === '2024' && formData.race) {
+        const choices = await getRaceFeatChoices(formData);
+        setRaceFeatChoices(choices);
+        setIsVersatile(choices.length > 0);
+      } else {
+        setRaceFeatChoices([]);
+        setIsVersatile(false);
+      }
+    };
+    fetchRaceChoices();
+  }, [formData]);
 
     // Get feat limits for display
     const [featLimits, setFeatLimits] = React.useState({ allowed: 0, originRequired: false, details: '' });
@@ -144,6 +161,11 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
           You have selected {userSelectedCount} of {featLimits.allowed} allowed feat(s)
           {preSelectedCount > 0 ? ` (plus ${preSelectedCount} background feat)` : ''}.
         </p>
+        {isVersatile && raceFeatChoices.length > 0 && (
+          <div className="versatile-trait-info">
+            <p><strong>Versatile Trait:</strong> Your race grants an Origin feat of your choice. Available options: {raceFeatChoices.join(', ')}. Skilled is recommended.</p>
+          </div>
+        )}
         {hasBuffs && (
           <div className="feat-buffs-summary">
             <p><strong>Applied Buffs:</strong></p>

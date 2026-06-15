@@ -208,6 +208,11 @@ export function hasSomaticComponentWaiver(playerStats) {
     return passives.some(p => p.type === 'passive_buff' && p.effect === 'somatic_component_waiver');
 }
 
+export function hasNaturallyStealthy(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p => p.type === 'passive_rule' && p.effect === 'naturally_stealthy');
+}
+
 export function applyGreatWeaponFightingToDamage(rolls, playerStats) {
     if (!hasGreatWeaponFighting(playerStats)) {
         return rolls;

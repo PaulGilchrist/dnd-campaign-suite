@@ -159,6 +159,20 @@ function applyPowerfulBuild(playerStats) {
     return playerStats;
 }
 
+/**
+ * Detect Halfling Nimbleness trait and set canMoveThroughCreatureSpace on playerStats.
+ * Halfling Nimbleness: "You can move through the space of any creature that is a size larger than you,
+ * but you can't stop in the same space."
+ */
+function applyHalflingNimbleness(playerStats) {
+    const traits = playerStats.race?.traits || [];
+    const hasHalflingNimbleness = traits.some(t => t.name === 'Halfling Nimbleness');
+    if (hasHalflingNimbleness) {
+        playerStats.canMoveThroughCreatureSpace = true;
+    }
+    return playerStats;
+}
+
 const rules = {
      // === SHARED METHODS (identical in both rulesets) ===
 
@@ -232,30 +246,38 @@ const rules = {
      getProficiencies: (playerStats, skill = true, playerSummary) => {
          const { proficiencyUtils: pu } = rules.getSubModules(playerStats, playerSummary);
 
-         if (is2024(playerStats, playerSummary)) {
-              // 2024: extract skill proficiencies from race trait descriptions
-             const raceProficiencies = () => {
-                 const extra = [];
-                 const traits = playerStats.race?.traits || [];
-                 traits.forEach(trait => {
-                     if (trait.description) {
-                         const match = trait.description.match(/proficiency in the ([A-Z][a-z]+(?:,|[,\s]and[,\s]|[,\s]or[,\s]|,?)[A-Za-z\s]+?)\s*skill/i);
-                         if (match) {
-                             const skillsStr = match[1]
-                                 .replace(/\s+and\s+/g, ',')
-                                 .replace(/\s+or\s+/g, ',')
-                                 .replace(/,\s*,/g, ',')
-                                 .split(',')
-                                 .map(s => s.trim())
-                                 .filter(s => s.length > 0);
-                             skillsStr.forEach(sName => {
-                                 extra.push(`Skill: ${sName}`);
-                             });
-                         }
-                     }
-                 });
-                 return extra;
-             };
+          if (is2024(playerStats, playerSummary)) {
+               // 2024: extract skill proficiencies from race trait descriptions and proficiency_choices
+              const raceProficiencies = () => {
+                  const extra = [];
+                  const traits = playerStats.race?.traits || [];
+                  traits.forEach(trait => {
+                      // Parse specific skill names from description text
+                      if (trait.description) {
+                          const match = trait.description.match(/proficiency in the ([A-Z][a-z]+(?:,|[,\s]and[,\s]|[,\s]or[,\s]|,?)[A-Za-z\s]+?)\s*skill/i);
+                          if (match) {
+                              const skillsStr = match[1]
+                                  .replace(/\s+and\s+/g, ',')
+                                  .replace(/\s+or\s+/g, ',')
+                                  .replace(/,\s*,/g, ',')
+                                  .split(',')
+                                  .map(s => s.trim())
+                                  .filter(s => s.length > 0);
+                              skillsStr.forEach(sName => {
+                                  extra.push(`Skill: ${sName}`);
+                              });
+                          }
+                      }
+                      // Merge skill proficiency_choices from traits (e.g., Human's Skillful)
+                      if (trait.proficiency_choices) {
+                          const pc = trait.proficiency_choices;
+                          if (pc.from && pc.from.length > 0) {
+                              extra.push(...pc.from);
+                          }
+                      }
+                  });
+                  return extra;
+              };
              return pu.getProficiencies(
                  playerStats,
                  skill,
@@ -625,8 +647,9 @@ const rules = {
          playerStats.class = cr.getClass(allClasses, playerSummary);
          playerStats.wildMagicSurgeTable = playerStats.class?.wild_magic_surge_table || null;
          playerStats.race = rr.getRace(allRaces, playerSummary);
-         applyPowerfulBuild(playerStats);
-         playerStats.inventory.magicItems = rules.getMagicItems(allMagicItems, playerSummary, playerStats);
+          applyPowerfulBuild(playerStats);
+          applyHalflingNimbleness(playerStats);
+          playerStats.inventory.magicItems = rules.getMagicItems(allMagicItems, playerSummary, playerStats);
 
          // 2024-specific: set senses early, store equipment
         if (is2024(playerStats, playerSummary)) {

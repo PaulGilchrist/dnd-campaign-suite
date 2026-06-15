@@ -201,5 +201,16 @@ export const passiveHandlers = {
             casting_time: auto.casting_time || 'passive',
             hasAutomation: true
         }
+    },
+
+    'naturally_stealthy': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'passive_rule',
+            name: feature.name,
+            effect: 'naturally_stealthy',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
     }
 }

@@ -675,7 +675,12 @@
             },
             {
                 "name": "Naturally Stealthy",
-                "description": "You can take the Hide action even when you are obscured only by a creature that is at least one size larger than you."
+                "description": "You can take the Hide action even when you are obscured only by a creature that is at least one size larger than you.",
+                "automation": {
+                    "type": "passive_rule",
+                    "effect": "naturally_stealthy",
+                    "casting_time": "passive"
+                }
             }
         ],
         "languages": [
@@ -701,11 +706,50 @@
             },
             {
                 "name": "Skillful",
-                "description": "You gain proficiency in one skill of your choice."
+                "description": "You gain proficiency in one skill of your choice.",
+                "proficiency_choices": {
+                    "choose": 1,
+                    "from": [
+                        "Skill: Acrobatics",
+                        "Skill: Animal Handling",
+                        "Skill: Arcana",
+                        "Skill: Athletics",
+                        "Skill: Deception",
+                        "Skill: History",
+                        "Skill: Insight",
+                        "Skill: Intimidation",
+                        "Skill: Investigation",
+                        "Skill: Medicine",
+                        "Skill: Nature",
+                        "Skill: Perception",
+                        "Skill: Performance",
+                        "Skill: Persuasion",
+                        "Skill: Religion",
+                        "Skill: Sleight of Hand",
+                        "Skill: Stealth",
+                        "Skill: Survival"
+                    ]
+                }
             },
             {
                 "name": "Versatile",
-                "description": "You gain an Origin feat of your choice (see chapter 5). Skilled is recommended."
+                "description": "You gain an Origin feat of your choice (see chapter 5). Skilled is recommended.",
+                "proficiency_choices": {
+                    "choose": 1,
+                    "from": [
+                        "Crafter",
+                        "Fey Touched",
+                        "Healer",
+                        "Lucky",
+                        "Magic Initiate",
+                        "Musician",
+                        "Savage Attacker",
+                        "Shadow Touched",
+                        "Skilled",
+                        "Tavern Brawler",
+                        "Tough"
+                    ]
+                }
             }
         ],
         "languages": [

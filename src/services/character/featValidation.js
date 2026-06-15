@@ -82,23 +82,40 @@ export async function validateFeats(formData, allFeats) {
           );
 
         if (selectedOriginFeats.length === 0 && selectedFeats.length > 0) {
-            warnings.push({
-                message: `Level 1 2024 characters should select an Origin feat. Your selected feats don't include an Origin feat.`,
-                type: 'warning'
+            // Check if race has Versatile trait
+            const hasVersatile = formData.race?.traits?.some(t => t.name === 'Versatile');
+            if (hasVersatile) {
+                warnings.push({
+                    message: `Your race has the Versatile trait — you should select an Origin feat of your choice.`,
+                    type: 'warning'
+                 });
+             } else {
+                warnings.push({
+                    message: `Level 1 2024 characters should select an Origin feat. Your selected feats don't include an Origin feat.`,
+                    type: 'warning'
                  });
              }
+         }
 
           // Warn if non-origin feats selected at level 1
         const nonOriginFeats = selectedFeats.filter(f =>
              !originFeats.some(of => of.name === f)
              );
         if (nonOriginFeats.length > 0) {
-            warnings.push({
-                message: `Some selected feats are not Origin feats. Level 1 2024 characters typically take an Origin feat.`,
-                type: 'info'
+            const hasVersatile = formData.race?.traits?.some(t => t.name === 'Versatile');
+            if (hasVersatile) {
+                warnings.push({
+                    message: `Consider selecting an Origin feat for your Versatile trait. Skilled is recommended.`,
+                    type: 'info'
+                 });
+             } else {
+                warnings.push({
+                    message: `Some selected feats are not Origin feats. Level 1 2024 characters typically take an Origin feat.`,
+                    type: 'info'
                  });
              }
-         }
+           }
+          }
 
       // Check for Epic Boon feats (typically level 19+)
     const epicBoonFeats = allFeats.filter(f => f.type === 'Epic Boon' || f.type === 'Epic Boon Feat');
@@ -203,6 +220,34 @@ export async function getPreSelectedFeats(formData) {
 
     return Array.from(preSelected);
       }
+
+/**
+ * Gets race-granted feat choices (e.g., Versatile trait grants Origin feat choice)
+ * These are NOT pre-selected; they are available options shown in the feat wizard
+ * @param {object} formData - The character form data
+ * @returns {Promise<string[]>} - Array of feat names available from race traits
+ */
+export async function getRaceFeatChoices(formData) {
+    const ruleset = formData.rules || '5e';
+    const choices = new Set();
+
+    if (formData.race && ruleset === '2024') {
+        if (formData.race.traits) {
+            formData.race.traits.forEach(trait => {
+                if (trait.name === 'Versatile' && trait.proficiency_choices) {
+                    const pc = trait.proficiency_choices;
+                    if (pc.from && pc.from.length > 0) {
+                        pc.from.forEach(featName => {
+                            choices.add(featName);
+                        });
+                    }
+                }
+            });
+        }
+    }
+
+    return Array.from(choices);
+}
 
 /**
  * Normalizes feat description data from both 2024 and 5e formats

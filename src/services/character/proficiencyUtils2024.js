@@ -19,6 +19,21 @@ export function getProficiencyChoiceCount(playerStats, skills = true) {
     proficiencyChoiceCount += playerStats.race.starting_proficiency_options.choose;
    }
 
+  // Count proficiency choices from race traits (e.g., Human's Skillful)
+  if (playerStats.race?.traits) {
+    playerStats.race.traits.forEach(trait => {
+      if (trait.proficiency_choices) {
+        const pc = trait.proficiency_choices;
+        if (pc.from && pc.from.length > 0) {
+          const isSkillChoice = pc.from[0].startsWith('Skill: ');
+          if ((skills && isSkillChoice) || (!skills && !isSkillChoice)) {
+            proficiencyChoiceCount += pc.choose;
+          }
+        }
+      }
+    });
+  }
+
   // Count proficiency choices from subclass/major (e.g., Battle Master's Student of War)
   if (playerStats.class.major?.proficiency_choices) {
     playerStats.class.major.proficiency_choices.forEach(pc => {
@@ -26,7 +41,7 @@ export function getProficiencyChoiceCount(playerStats, skills = true) {
         const isSkillChoice = pc.from[0].startsWith('Skill: ');
         if ((skills && isSkillChoice) || (!skills && !isSkillChoice)) {
           proficiencyChoiceCount += pc.choose;
-         }
+        }
       }
     });
    }

@@ -35,6 +35,7 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
     traits: [],
     speed: null,
     hitPointBonusPerLevel: 0,
+    feats: [],
   };
 
   if (!race) return result;
@@ -106,6 +107,25 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
           .filter(s => s.length > 0);
         skillsStr.forEach(sName => {
           result.proficiencies.push({ name: `Skill: ${sName}` });
+        });
+      }
+    }
+
+    if (ruleset === '2024' && trait.proficiency_choices) {
+      const pc = trait.proficiency_choices;
+      if (pc.from && pc.from.length > 0) {
+        pc.from.forEach(prof => {
+          result.proficiencies.push({ name: prof, isChoice: true, choose: pc.choose });
+        });
+      }
+    }
+
+    if (ruleset === '2024' && trait.proficiency_choices && trait.name === 'Versatile') {
+      const pc = trait.proficiency_choices;
+      if (pc.from && pc.from.length > 0) {
+        pc.from.forEach(featName => {
+          result.feats = result.feats || [];
+          result.feats.push({ name: featName, isChoice: true, choose: pc.choose });
         });
       }
     }
