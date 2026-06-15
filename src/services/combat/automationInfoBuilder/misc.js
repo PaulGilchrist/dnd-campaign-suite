@@ -41,6 +41,7 @@ export const miscHandlers = {
             casting_time: auto.casting_time || '',
             bonusExpression: auto.bonusExpression || '',
             oncePerRage: !!auto.oncePerRage,
+            oncePerTurn: !!auto.oncePerTurn,
             hasAutomation: true
         }
     },

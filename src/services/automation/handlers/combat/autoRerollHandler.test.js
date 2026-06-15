@@ -39,6 +39,10 @@ vi.mock('../../common/targetResolver.js', () => ({
     resolveMapPositions: vi.fn(),
 }));
 
+vi.mock('../../../../services/encounters/combatData.js', () => ({
+    getCurrentCombatRound: vi.fn(() => 1),
+}));
+
 describe('autoRerollHandler.handle', () => {
     let playerStats;
     const campaignName = 'TestCampaign';
@@ -252,6 +256,167 @@ describe('autoRerollHandler.handle', () => {
             const result = await handle(action, playerStats, campaignName, mapName);
             expect(automationInfoPopup).toHaveBeenCalledWith(action);
             expect(result).toEqual({ type: 'popup', payload: { name: 'Simple Action' } });
+        });
+    });
+
+    describe('convert_miss_to_hit (Fearless Aim)', () => {
+        let fearlessAction;
+        beforeEach(() => {
+            fearlessAction = {
+                name: 'Fearless Aim',
+                automation: {
+                    type: 'auto_reroll',
+                    trigger: 'attack_roll_miss',
+                    effect: 'convert_miss_to_hit',
+                    oncePerTurn: true,
+                    casting_time: '1 action',
+                },
+            };
+        });
+
+        it('should block when oncePerTurn already used this round', async () => {
+            const { getCurrentCombatRound } = await import('../../../../services/encounters/combatData.js');
+            getCurrentCombatRound.mockReturnValue(3);
+            getRuntimeValue.mockReturnValue(3);
+
+            const result = await handle(fearlessAction, playerStats, campaignName, mapName);
+
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Fearless Aim',
+                    description: 'Fearless Aim can only be used once per turn.',
+                    automation: fearlessAction.automation,
+                },
+            });
+        });
+
+        it('should fail when no recent attack roll found', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
+            getLastAttackRoll.mockReturnValue(null);
+
+            const result = await handle(fearlessAction, playerStats, campaignName, mapName);
+
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Fearless Aim',
+                    description: 'No recent attack roll found for Player. This feature can only be used shortly after an attack roll.',
+                    automation: fearlessAction.automation,
+                },
+            });
+        });
+
+        it('should fail when attack roll is stale', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
+            getLastAttackRoll.mockReturnValue({ timestamp: Date.now() - 70000, hit: false, d20: 5, bonus: 3, targetAc: 15 });
+
+            const result = await handle(fearlessAction, playerStats, campaignName, mapName);
+
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Fearless Aim',
+                    description: 'No recent attack roll found for Player. This feature can only be used shortly after an attack roll.',
+                    automation: fearlessAction.automation,
+                },
+            });
+        });
+
+        it('should fail when last attack already hit', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
+            getLastAttackRoll.mockReturnValue({ timestamp: Date.now(), hit: true, d20: 18, bonus: 5, targetAc: 15 });
+
+            const result = await handle(fearlessAction, playerStats, campaignName, mapName);
+
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Fearless Aim',
+                    description: 'The last attack already hit — Fearless Aim only works when you miss.',
+                    automation: fearlessAction.automation,
+                },
+            });
+        });
+
+        it('should succeed when last attack missed and not yet used this turn', async () => {
+            const { getCurrentCombatRound } = await import('../../../../services/encounters/combatData.js');
+            getCurrentCombatRound.mockReturnValue(5);
+            getRuntimeValue.mockReturnValue(undefined);
+            getLastAttackRoll.mockReturnValue({
+                timestamp: Date.now(),
+                hit: false,
+                d20: 4,
+                bonus: 5,
+                targetAc: 15,
+            });
+
+            const result = await handle(fearlessAction, playerStats, campaignName, mapName);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(playerStats.name, '_fearlessAim_usedRound', 5, campaignName);
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: 'Fearless Aim',
+                description: expect.stringContaining('Fearless Aim'),
+            }));
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain('Fearless Aim');
+            expect(result.payload.description).toContain('MISS');
+            expect(result.payload.description).toContain('Miss converted to hit!');
+        });
+
+        it('should succeed without tracking when oncePerTurn is false', async () => {
+            const noOncePerTurnAction = {
+                name: 'Fearless Aim',
+                automation: {
+                    type: 'auto_reroll',
+                    trigger: 'attack_roll_miss',
+                    effect: 'convert_miss_to_hit',
+                    oncePerTurn: false,
+                    casting_time: '1 action',
+                },
+            };
+            getLastAttackRoll.mockReturnValue({
+                timestamp: Date.now(),
+                hit: false,
+                d20: 3,
+                bonus: 5,
+                targetAc: 14,
+            });
+
+            const result = await handle(noOncePerTurnAction, playerStats, campaignName, mapName);
+
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                playerStats.name,
+                '_fearlessAim_usedRound',
+                expect.any(Number),
+                campaignName
+            );
+            expect(result.payload.description).toContain('Miss converted to hit!');
+        });
+
+        it('should allow use again in a new round', async () => {
+            const { getCurrentCombatRound } = await import('../../../../services/encounters/combatData.js');
+            getCurrentCombatRound.mockReturnValue(7);
+            getRuntimeValue.mockReturnValue(5);
+            getLastAttackRoll.mockReturnValue({
+                timestamp: Date.now(),
+                hit: false,
+                d20: 6,
+                bonus: 5,
+                targetAc: 15,
+            });
+
+            const result = await handle(fearlessAction, playerStats, campaignName, mapName);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(playerStats.name, '_fearlessAim_usedRound', 7, campaignName);
+            expect(result.payload.description).toContain('Miss converted to hit!');
         });
     });
 });

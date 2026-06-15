@@ -299,8 +299,8 @@ describe('abilityCalc2024', () => {
 
       // Score 0: totalScore=0, bonus=Math.floor((0-10)/2)=Math.floor(-5)=-5
       expect(str.bonus).toBe(-5);
-      // Score 30: totalScore=30, bonus=Math.floor((30-10)/2)=Math.floor(10)=10
-      expect(dex.bonus).toBe(10);
+      // Score 30 capped at 20: totalScore=20, bonus=Math.floor((20-10)/2)=5
+      expect(dex.bonus).toBe(5);
     });
 
     it('should apply Primal Champion at level 20 for Barbarian', async () => {
@@ -415,8 +415,8 @@ describe('abilityCalc2024', () => {
       const result = await getAbilities(playerStats);
       const str = result.find(a => a.name === 'Strength');
 
-      // 22 + 4 = 26, capped at 25
-      expect(str.totalScore).toBe(25);
+      // 22 capped at 20 (standard max), then +4 Primal Champion = 24
+      expect(str.totalScore).toBe(24);
       expect(str.bonus).toBe(7);
     });
   });

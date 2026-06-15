@@ -92,6 +92,24 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 }
             }
 
+            // Apply Athlete feat: climb speed equal to speed
+            const athleteClimbPassive = (stats.automation?.passives || []).find(p => p.effect === 'climb_speed');
+            if (athleteClimbPassive && !stats.climbSpeed) {
+                stats.climbSpeed = stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30;
+            }
+
+            // Expose Athlete Hop Up flag: stand from prone with only 5 ft of movement
+            const athleteHopUpPassive = (stats.automation?.passives || []).find(p => p.effect === 'stand_from_prone');
+            if (athleteHopUpPassive) {
+                stats.athleteStandFromProne = true;
+            }
+
+            // Expose Athlete Jumping flag: running jump requires only 5 ft of movement
+            const athleteJumpPassive = (stats.automation?.passives || []).find(p => p.effect === 'reduced_running_jump_requirement');
+            if (athleteJumpPassive) {
+                stats.athleteReducedJumpRequirement = true;
+            }
+
             // Inject synthetic "Use Bardic Inspiration" feature if this character has an active BI die
             const biDie = getRuntimeValue(playerSummary.name, 'bardicInspirationDie', campaignName);
             if (biDie) {

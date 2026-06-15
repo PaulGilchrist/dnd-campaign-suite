@@ -7,6 +7,7 @@ import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidat
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { getClassFeatures } from '../../../../services/character/classFeatures.js';
 import { evaluateAutoExpression } from '../../../combat/automationService.js';
+import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -362,6 +363,76 @@ export async function handle(action, playerStats, campaignName, mapName) {
         }).catch(() => {});
 
         return result;
+    }
+
+    if (auto.effect === 'convert_miss_to_hit') {
+        if (auto.oncePerTurn) {
+            const currentRound = getCurrentCombatRound();
+            const trackingKey = `_fearlessAim_usedRound`;
+            const usedRound = getRuntimeValue(playerName, trackingKey, campaignName);
+            if (usedRound === currentRound) {
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: action.name,
+                        description: `${action.name} can only be used once per turn.`,
+                        automation: auto,
+                    },
+                };
+            }
+        }
+
+        const attackEvent = getLastAttackRoll(playerName);
+        if (!attackEvent || isStale(attackEvent)) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: `No recent attack roll found for ${playerName}. This feature can only be used shortly after an attack roll.`,
+                    automation: auto,
+                },
+            };
+        }
+
+        if (attackEvent.hit !== false) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: `The last attack already hit — ${action.name} only works when you miss.`,
+                    automation: auto,
+                },
+            };
+        }
+
+        if (auto.oncePerTurn) {
+            const currentRound = getCurrentCombatRound();
+            const trackingKey = `_fearlessAim_usedRound`;
+            await setRuntimeValue(playerName, trackingKey, currentRound, campaignName);
+        }
+
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: `${playerName} used ${action.name} to convert a miss into a hit.`,
+            timestamp: Date.now(),
+        }).catch(() => {});
+
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `<b>${action.name}</b><br/>` +
+                    `d20(${attackEvent.d20}) + ${attackEvent.bonus} = ${attackEvent.d20 + attackEvent.bonus} vs AC ${attackEvent.targetAc || '—'} → <b>MISS</b><br/>` +
+                    `<br/><i>Miss converted to hit!</i>`,
+                automation: auto,
+            },
+        };
     }
 
     if (auto.bonus != null) {

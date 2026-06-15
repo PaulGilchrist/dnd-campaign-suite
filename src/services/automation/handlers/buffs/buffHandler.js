@@ -46,7 +46,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
     }
 
-    if (auto?.effect === 'teleport_on_rage' || auto?.effect === 'teleport_swap_with_illusion' || auto?.effect === 'shadow_step_teleport' || auto?.effect === 'moonlight_step_teleport') {
+    if (auto?.effect === 'teleport_on_rage' || auto?.effect === 'teleport_swap_with_illusion' || auto?.effect === 'shadow_step_teleport' || auto?.effect === 'moonlight_step_teleport' || auto?.effect === 'bonus_teleport') {
         return handleTeleport(action, playerStats, campaignName, _mapName);
     }
 

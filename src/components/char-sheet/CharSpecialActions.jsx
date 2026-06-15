@@ -1,13 +1,30 @@
  
-
+import { useState, useCallback } from 'react';
 import useActionPopup from '../../hooks/useActionPopup.js'
 import Popup from '../common/Popup.jsx'
 import { renderMarkdownInline } from '../../services/ui/sanitize.js';
 import { getFightingStyle } from '../../services/character/fightingStyles.js'
+import { executeHandler } from '../../services/automation/index.js';
+import { hasAutomation } from '../../services/combat/automationService.js';
 
-function CharSpecialActions({ playerStats }) {
-    const { showPopup, popupHtml, setPopupHtml } = useActionPopup('feature')
-      // Build specialActions list immutably
+function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
+    const [popupHtml, setPopupHtml] = useState(null);
+    const [teleportModal, setTeleportModal] = useState(null);
+
+    const handleAutomationClick = useCallback(async (action) => {
+        if (cannotAct) return;
+        const result = await executeHandler(action, playerStats, campaignName, null);
+        if (!result) return;
+        if (result.type === 'popup') {
+            setPopupHtml(result.payload);
+        } else if (result.type === 'modal') {
+            if (result.modalName === 'teleport') {
+                setTeleportModal(result.payload);
+            }
+        }
+    }, [playerStats, campaignName, cannotAct]);
+
+    // Build specialActions list immutably
     let specialActions = [...(playerStats.specialActions || [])];
 
       // Add fighting style special actions

@@ -201,6 +201,7 @@ function parse2024Benefit(benefit, feat) {
         name: benefit.name,
         description: benefit.description,
         type: benefit.type,
+        automation: benefit.automation,
       });
       break;
     }
@@ -293,6 +294,7 @@ export function applyFeatBuffsToFormData(formData, allFeats) {
         description: f.description,
         type: f.type || 'passive',
         source: 'feat',
+        automation: f.automation,
       });
       existingActions.add(f.name);
     }

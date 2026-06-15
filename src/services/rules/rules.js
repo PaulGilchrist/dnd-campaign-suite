@@ -649,6 +649,7 @@ const rules = {
                     description: f.description,
                     type: f.type || 'passive',
                     source: 'feat',
+                    automation: f.automation,
                 });
                 existingActionNames.add(f.name);
             }

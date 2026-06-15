@@ -339,6 +339,7 @@ describe('buildAttackInfo – auto_reroll', () => {
             casting_time: '',
             bonusExpression: '',
             oncePerRage: false,
+            oncePerTurn: false,
             hasAutomation: true,
         })
     })

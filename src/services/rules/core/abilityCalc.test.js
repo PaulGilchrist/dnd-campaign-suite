@@ -124,7 +124,8 @@ describe('abilityCalc', () => {
       const str = result.find(a => a.name === 'Strength');
       const dex = result.find(a => a.name === 'Dexterity');
       expect(str.bonus).toBe(-4);
-      expect(dex.bonus).toBe(10);
+      // Score 30 capped at 20: bonus = (20-10)/2 = 5
+      expect(dex.bonus).toBe(5);
     });
   });
 
