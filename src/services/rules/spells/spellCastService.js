@@ -3,39 +3,39 @@ import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet, rangeT
 import { isInnateSorceryActive, getActiveBuffs } from '../../combat/buffService.js';
 import { triggerPostCastRiderSaves, triggerSpellThief, triggerBewitchingMagic, triggerSoulstitchSpells, hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from './postCastRiderService.js';
 import { triggerPostCastSelfHeals, triggerPostCastAllyHeals } from './postCastHealService.js';
-import { triggerSmiteOfProtection } from '../smiteOfProtectionService.js';
-import { triggerInspiringSmite } from '../inspiringSmiteService.js';
-import { triggerPrimalCompanionSpellShare } from '../primalCompanionSpellShareService.js';
-import { triggerWildMagicSurge } from '../wildMagicSurgeService.js';
+import { triggerSmiteOfProtection } from '../features/smiteOfProtectionService.js';
+import { triggerInspiringSmite } from '../features/inspiringSmiteService.js';
+import { triggerPrimalCompanionSpellShare } from '../features/primalCompanionSpellShareService.js';
+import { triggerWildMagicSurge } from '../features/wildMagicSurgeService.js';
 import { setRuntimeValue, getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { executeHandler } from '../../automation/index.js';
 import { rollExpressionMaximized } from '../../dice/diceRoller.js';
-import { triggerFalseLife } from '../falseLifeService.js';
-import { triggerHealingWord } from '../healingWordService.js';
-import { triggerMassCureWounds } from '../massCureWoundsService.js';
-import { triggerMassHeal } from '../massHealService.js';
-import { triggerMassHealingWord } from '../massHealingWordService.js';
-import { triggerPrayerOfHealing } from '../prayerOfHealingService.js';
-import { triggerFear } from '../fearService.js';
-import { triggerFeignDeath } from '../feignDeathService.js';
-import { triggerFleshToStone } from '../fleshToStoneService.js';
-import { triggerHoldMonster } from '../holdMonsterService.js';
-import { triggerHypnoticPattern } from '../hypnoticPatternService.js';
-import { triggerMassSuggestion } from '../massSuggestionService.js';
-import { triggerForesight } from '../foresightService.js';
-import { triggerResilientSphere } from '../resilientSphereService.js';
-import { triggerOttoDance } from '../ottoDanceService.js';
-import { triggerFriends, endFriendsOnHostileAction } from '../friendsService.js';
-import { triggerRayOfEnfeeblement } from '../rayOfEnfeeblementService.js';
-import { endInvisibilityOnHostileAction } from '../invisibilityService.js';
-import { triggerGlobeOfInvulnerability } from '../globeOfInvulnerabilityService.js';
-import { triggerHeroism } from '../heroismService.js';
-import { triggerHolyAura } from '../holyAuraService.js';
-import { triggerPowerWordFortify } from '../powerWordFortifyService.js';
-import { triggerPowerWordStun } from '../powerWordStunService.js';
+import { triggerFalseLife } from '../features/falseLifeService.js';
+import { triggerHealingWord } from '../features/healingWordService.js';
+import { triggerMassCureWounds } from '../features/massCureWoundsService.js';
+import { triggerMassHeal } from '../features/massHealService.js';
+import { triggerMassHealingWord } from '../features/massHealingWordService.js';
+import { triggerPrayerOfHealing } from '../features/prayerOfHealingService.js';
+import { triggerFear } from '../features/fearService.js';
+import { triggerFeignDeath } from '../features/feignDeathService.js';
+import { triggerFleshToStone } from '../features/fleshToStoneService.js';
+import { triggerHoldMonster } from '../features/holdMonsterService.js';
+import { triggerHypnoticPattern } from '../features/hypnoticPatternService.js';
+import { triggerMassSuggestion } from '../features/massSuggestionService.js';
+import { triggerForesight } from '../features/foresightService.js';
+import { triggerResilientSphere } from '../features/resilientSphereService.js';
+import { triggerOttoDance } from '../features/ottoDanceService.js';
+import { triggerFriends, endFriendsOnHostileAction } from '../features/friendsService.js';
+import { triggerRayOfEnfeeblement } from '../features/rayOfEnfeeblementService.js';
+import { endInvisibilityOnHostileAction } from '../features/invisibilityService.js';
+import { triggerGlobeOfInvulnerability } from '../features/globeOfInvulnerabilityService.js';
+import { triggerHeroism } from '../features/heroismService.js';
+import { triggerHolyAura } from '../features/holyAuraService.js';
+import { triggerPowerWordFortify } from '../features/powerWordFortifyService.js';
+import { triggerPowerWordStun } from '../features/powerWordStunService.js';
 import { executeHandler as executeLongstrider } from '../../automation/index.js';
 import { executeHandler as executeProtectionFromEnergy } from '../../automation/index.js';
 import { executeHandler as executeProtectionFromPoison } from '../../automation/index.js';
@@ -113,8 +113,18 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     }
   }
 
-   if (!formula) {
-       if (spell.name.toLowerCase() === 'power word heal' && metaCtx?.multiTarget) {
+    let spellCastingMod = 0;
+    if (cantripSpellAbility && playerStats.abilities) {
+        const ability = playerStats.abilities.find(a => a.name === cantripSpellAbility);
+        if (ability) {
+            spellCastingMod = ability.bonus;
+        }
+    } else if (playerStats.spellAbilities) {
+        spellCastingMod = playerStats.spellAbilities.modifier || 0;
+    }
+
+    if (!formula) {
+        if (spell.name.toLowerCase() === 'power word heal' && metaCtx?.multiTarget) {
             const target = await getTargetInfo();
             if (target?.name) {
                 await applyPowerWordHealToTarget(target.name, playerStats, campaignName);

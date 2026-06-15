@@ -5,7 +5,7 @@ import { getDistanceFeet, rangeToFeet } from '../../rules/combat/rangeValidation
 import { resolveMapPositions } from '../common/targetResolver.js';
 import { applyHealingToTarget } from '../../rules/combat/applyHealing.js';
 import { applyDamageToTarget } from '../../rules/combat/applyDamage.js';
-import { endInvisibilityOnHostileAction } from '../../rules/invisibilityService.js';
+import { endInvisibilityOnHostileAction } from '../../rules/features/invisibilityService.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 

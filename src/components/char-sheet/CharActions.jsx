@@ -67,8 +67,8 @@ import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { getTargetFromAttacker, getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
-import { endFriendsOnHostileAction } from '../../services/rules/friendsService.js';
-import { endInvisibilityOnHostileAction } from '../../services/rules/invisibilityService.js';
+import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
+import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffService.js';

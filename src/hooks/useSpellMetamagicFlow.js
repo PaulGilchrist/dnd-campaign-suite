@@ -411,7 +411,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { confirmGreaterRestoration } = await import('../services/rules/greaterRestorationService.js');
+      const { confirmGreaterRestoration } = await import('../services/rules/features/greaterRestorationService.js');
       await confirmGreaterRestoration(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'greater_restoration', range: pending.range } },
         playerStats,
