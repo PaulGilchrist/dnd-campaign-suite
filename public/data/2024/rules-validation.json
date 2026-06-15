@@ -5,7 +5,7 @@
             "max": 20
         },
         "point_buy": {
-            "total_points": 27,
+            "total_points": 24,
             "min_base_score": 8,
             "max_base_score": 15,
             "max_total_score": 20,
