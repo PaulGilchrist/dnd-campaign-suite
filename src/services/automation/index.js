@@ -177,6 +177,7 @@ import { handle as handleHeroesFeast, applyHeroesFeast as applyHeroesFeastEffect
 import { handle as handleHypnoticPatternShake, handleConfirm as handleHypnoticPatternShakeConfirm } from './handlers/spells/hypnoticPatternShake.js';
 import { handle as handleHypnoticPattern } from './handlers/spells/hypnoticPatternHandler.js';
 import { handle as handleMassSuggestion } from './handlers/spells/massSuggestionHandler.js';
+import { handle as handleSilence } from './handlers/spells/silenceHandler.js';
 import { handle as handleResilientSphere } from './handlers/spells/resilientSphereHandler.js';
 import { handle as handlePowerWordStun } from './handlers/spells/powerWordStunHandler.js';
 import { handle as handleOttoDance } from './handlers/spells/ottosDanceHandler.js';
@@ -411,6 +412,7 @@ const HANDLER_MAP = {
         boon_of_energy_resistance: handleBoonOfEnergyResistance,
         modify_d20_roll: handleBoonOfFate,
         ray_of_enfeeblement: handleRayOfEnfeeblement,
+        silence: handleSilence,
         survive_and_heal: handleBoonOfRecovery,
         lucky_point: handleLuckyPoint,
         magic_initiate: handleMagicInitiate,

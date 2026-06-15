@@ -7,6 +7,7 @@ import { rollConcentrationSave } from '../../combat/concentrationRules.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { isHolyAuraActive, getHolyAuraTargets } from '../../automation/handlers/buffs/holyAuraHandler.js';
 import { getDamageReduction } from '../../combat/automationPassives.js';
+import { isCreatureInSilenceZone } from '../../rules/features/silenceService.js';
 
 /**
  * Save the last damage event under the target's key so reaction features
@@ -76,15 +77,25 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
    const playerComputed = playerStats?.computedStats || playerStats;
    let resistances = isPlayer ? (playerComputed?.resistances || []) : (creature.resistances || []);
    const immunities = isPlayer ? (playerComputed?.immunities || []) : (creature.immunities || []);
-   if (isPlayer) {
-       const rawBuffs = getRuntimeValue(creature.name, 'activeBuffs', campaignName);
-       const activeBuffs = Array.isArray(rawBuffs) ? rawBuffs : [];
-       for (const buff of activeBuffs) {
-           if (buff.resistanceTypes?.length) {
-               resistances = [...new Set([...resistances, ...buff.resistanceTypes])];
-           }
-       }
-   }
+    if (isPlayer) {
+        const rawBuffs = getRuntimeValue(creature.name, 'activeBuffs', campaignName);
+        const activeBuffs = Array.isArray(rawBuffs) ? rawBuffs : [];
+        for (const buff of activeBuffs) {
+            if (buff.resistanceTypes?.length) {
+                resistances = [...new Set([...resistances, ...buff.resistanceTypes])];
+            }
+        }
+        // Silence — Thunder immunity for creatures in the silence zone
+        for (const buff of activeBuffs) {
+            if (buff.effect === 'silence' && buff.sourceCharacter) {
+                if (isCreatureInSilenceZone(creature.name, buff.sourceCharacter, campaignName)) {
+                    if (!immunities.includes('Thunder')) {
+                        immunities.push('Thunder');
+                    }
+                }
+            }
+        }
+    }
     let finalDamage = computeDamageAfterResistances(rawDamage, damageTypes || [], resistances, immunities, ignoreResistance);
 
     // Apply damage reduction from features (e.g., Heavy Armor Master)

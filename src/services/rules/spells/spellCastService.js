@@ -36,6 +36,7 @@ import { endInvisibilityOnHostileAction } from '../features/invisibilityService.
 import { triggerGlobeOfInvulnerability } from '../features/globeOfInvulnerabilityService.js';
 import { triggerHeroism } from '../features/heroismService.js';
 import { triggerHolyAura } from '../features/holyAuraService.js';
+import { triggerSilence, getSilenceSource, isCreatureInSilenceZone } from '../features/silenceService.js';
 import { triggerPowerWordFortify } from '../features/powerWordFortifyService.js';
 import { triggerPowerWordStun } from '../features/powerWordStunService.js';
 import { triggerSeeInvisibility } from '../features/seeInvisibilityService.js';
@@ -79,6 +80,15 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     if (getActiveBuffs(playerStats.name, campaignName).some(b => b.blocksSpellcasting)) {
         console.warn(`[spellCast] ${playerStats.name} cannot cast spells (blocked by active buff)`);
         return;
+    }
+
+    // Silence — block Verbal components if caster is in a silence zone
+    if (spell.components && spell.components.includes('V')) {
+        const silenceCaster = getSilenceSource(playerStats.name, campaignName);
+        if (silenceCaster && isCreatureInSilenceZone(playerStats.name, silenceCaster, campaignName)) {
+            console.warn(`[spellCast] ${playerStats.name} cannot cast ${spell.name} — Verbal components blocked by Silence`);
+            return;
+        }
     }
 
     // If casting any spell other than Friends, end active Friends early
@@ -346,6 +356,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         // Globe of Invulnerability — toggle passive barrier that blocks spells of level 5 or lower
         if (spell.name && spell.name.toLowerCase() === 'globe of invulnerability') {
             await triggerGlobeOfInvulnerability(spell, metaCtx, playerStats, campaignName, mapName);
+            return;
+        }
+
+        // Silence — 20-ft-radius sphere: creatures inside are Deafened, immune to Thunder, cannot cast Verbal spells
+        if (spell.name && spell.name.toLowerCase() === 'silence') {
+            await triggerSilence(spell, metaCtx, playerStats, campaignName, mapName);
             return;
         }
 
