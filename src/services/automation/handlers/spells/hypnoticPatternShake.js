@@ -1,9 +1,9 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
-import { getCombatContext } from '../../rules/combat/damageUtils.js';
-import { getDistanceFeet, rangeToFeet } from '../../rules/combat/rangeValidation.js';
-import { resolveMapPositions } from '../common/targetResolver.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { resolveMapPositions } from '../../common/targetResolver.js';
+import { postLogEntry } from '../../../shared/logPoster.js';
 
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;

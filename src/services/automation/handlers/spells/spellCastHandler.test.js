@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../dice/diceRoller.js', () => ({
+vi.mock('../../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
@@ -14,8 +14,8 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './spellCastHandler.js';
-import * as diceRoller from '../../dice/diceRoller.js';
-import * as runtimeState from '../../../hooks/useRuntimeState.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
+import * as runtimeState from '../../../../hooks/useRuntimeState.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

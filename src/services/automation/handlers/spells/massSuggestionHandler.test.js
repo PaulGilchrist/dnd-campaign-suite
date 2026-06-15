@@ -2,28 +2,28 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../rules/combat/damageUtils.js', () => ({
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../shared/logPoster.js', () => ({
+vi.mock('../../../shared/logPoster.js', () => ({
   postLogEntry: vi.fn(),
 }));
 
-vi.mock('../../rules/effects/expirations.js', () => ({
+vi.mock('../../../rules/effects/expirations.js', () => ({
   addExpiration: vi.fn(),
 }));
 
-vi.mock('../common/savePrompt.js', () => ({
+vi.mock('../../common/savePrompt.js', () => ({
   buildSaveDc: vi.fn(),
   createSaveListener: vi.fn(),
 }));
@@ -31,11 +31,11 @@ vi.mock('../common/savePrompt.js', () => ({
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './massSuggestionHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getCombatContext } from '../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../shared/logPoster.js';
-import { addExpiration } from '../../rules/effects/expirations.js';
-import { buildSaveDc, createSaveListener } from '../common/savePrompt.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { postLogEntry } from '../../../shared/logPoster.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
+import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

@@ -9,7 +9,7 @@ import { rollD20 } from '../../services/dice/diceRoller.js';
 import { playerIsImmuneToCondition } from '../../services/combat/automationService.js';
 import utils from '../../services/ui/utils.js';
 import storage from '../../services/ui/storage.js';
-import { getEffectOptions } from '../../services/automation/handlers/eyebiteHandler.js';
+import { getEffectOptions } from '../../services/automation/handlers/spells/eyebiteHandler.js';
 
 function EyebiteEffectModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, onClose, characters, featureName = 'Eyebite', rangeFeet = 60, durationRounds = 10 }) {
     const [selectedEffect, setSelectedEffect] = useState(null);

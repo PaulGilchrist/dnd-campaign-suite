@@ -1,5 +1,5 @@
-import { addExpiration } from '../../rules/effects/expirations.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 
 const FEIGN_DEATH_CONDITIONS = ['blinded', 'incapacitated', 'speed_zero'];
 const FEIGN_DEATH_RESISTANCES = [

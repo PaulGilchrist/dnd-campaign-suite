@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
-vi.mock('../../shared/popupResponse.js', () => ({
+vi.mock('../../../shared/popupResponse.js', () => ({
   automationInfoPopup: vi.fn(),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
 import { handle } from './spellModifierHandler.js';
-import * as popupResponse from '../../shared/popupResponse.js';
+import * as popupResponse from '../../../shared/popupResponse.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 function makeAction(overrides = {}) {

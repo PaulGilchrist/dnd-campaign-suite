@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, getEffectOptions } from './eyebiteHandler.js';
 
-vi.mock('../common/savePrompt.js', () => ({
+vi.mock('../../common/savePrompt.js', () => ({
     buildSaveDc: vi.fn((auto, playerStats) => {
         const prof = playerStats.proficiency || 0;
         const wisBonus = playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0;
@@ -9,15 +9,15 @@ vi.mock('../common/savePrompt.js', () => ({
     }),
 }));
 
-vi.mock('../../rules/combat/damageUtils.js', () => ({
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(() => Promise.resolve({ creatures: [] })),
 }));
 
-vi.mock('../../maps/mapsService.js', () => ({
+vi.mock('../../../maps/mapsService.js', () => ({
     loadMapData: vi.fn(() => Promise.resolve(null)),
 }));
 
-vi.mock('../../rules/combat/rangeValidation.js', () => ({
+vi.mock('../../../rules/combat/rangeValidation.js', () => ({
     rangeToFeet: vi.fn(range => {
         if (!range) return 60;
         const match = range.match(/(\d+)\s*ft/);

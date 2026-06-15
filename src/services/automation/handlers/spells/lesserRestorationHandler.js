@@ -1,6 +1,6 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
-import { getCombatContext } from '../../rules/combat/damageUtils.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
 const ALLOWED_CONDITIONS = ['blinded', 'deafened', 'paralyzed', 'poisoned'];
 

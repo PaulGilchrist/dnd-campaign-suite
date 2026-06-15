@@ -1,10 +1,10 @@
-import { buildSaveDc, createSaveListener } from '../common/savePrompt.js';
-import { resolveTarget } from '../common/targetResolver.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
-import { addExpiration } from '../../rules/effects/expirations.js';
-import { getCombatContext } from '../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../shared/logPoster.js';
+import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
+import { resolveTarget } from '../../common/targetResolver.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { postLogEntry } from '../../../shared/logPoster.js';
 
 const MAX_FAILS = 3;
 const MAX_SUCCESSES = 3;

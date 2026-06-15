@@ -8,13 +8,13 @@ vi.mock('./handlers/healing/healingHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/buffs/buffHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/buffs/conditionHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/resources/sorceryHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/spellCastHandler.js', () => ({ handle: vi.fn() }));
+vi.mock('./handlers/spells/spellCastHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/initiativeHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/class-other/genericPopupHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/resources/resourcePoolHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/resources/fontOfMagicHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/healing/healingPoolHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/spellModifierHandler.js', () => ({ handle: vi.fn() }));
+vi.mock('./handlers/spells/spellModifierHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/combatStanceHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/reactions/reactionDamageHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/reactions/reactionDebuffHandler.js', () => ({ handle: vi.fn() }));
@@ -34,7 +34,7 @@ vi.mock('./handlers/class-cleric-paladin/divineSparkHandler.js', () => ({ handle
 vi.mock('./handlers/class-cleric-paladin/divineInterventionHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/bonusActionAttackHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/extraActionHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/eyebiteHandler.js', () => ({ handle: vi.fn() }));
+vi.mock('./handlers/spells/eyebiteHandler.js', () => ({ handle: vi.fn() }));
 
 // ── Imports ────────────────────────────────────────────────────
 
@@ -45,13 +45,13 @@ import * as healingHandler from './handlers/healing/healingHandler.js';
 import * as buffHandler from './handlers/buffs/buffHandler.js';
 import * as conditionHandler from './handlers/buffs/conditionHandler.js';
 import * as sorceryHandler from './handlers/resources/sorceryHandler.js';
-import * as spellCastHandler from './handlers/spellCastHandler.js';
+import * as spellCastHandler from './handlers/spells/spellCastHandler.js';
 import * as initiativeHandler from './handlers/initiativeHandler.js';
 import * as genericPopupHandler from './handlers/class-other/genericPopupHandler.js';
 import * as resourcePoolHandler from './handlers/resources/resourcePoolHandler.js';
 import * as fontOfMagicHandler from './handlers/resources/fontOfMagicHandler.js';
 import * as healingPoolHandler from './handlers/healing/healingPoolHandler.js';
-import * as spellModifierHandler from './handlers/spellModifierHandler.js';
+import * as spellModifierHandler from './handlers/spells/spellModifierHandler.js';
 import * as combatStanceHandler from './handlers/combatStanceHandler.js';
 import * as reactionDamageHandler from './handlers/reactions/reactionDamageHandler.js';
 import * as reactionDebuffHandler from './handlers/reactions/reactionDebuffHandler.js';
@@ -71,7 +71,7 @@ import * as divineSparkHandler from './handlers/class-cleric-paladin/divineSpark
 import * as divineInterventionHandler from './handlers/class-cleric-paladin/divineInterventionHandler.js';
 import * as bonusActionAttackHandler from './handlers/bonusActionAttackHandler.js';
 import * as extraActionHandler from './handlers/extraActionHandler.js';
-import * as eyebiteHandler from './handlers/eyebiteHandler.js';
+import * as eyebiteHandler from './handlers/spells/eyebiteHandler.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

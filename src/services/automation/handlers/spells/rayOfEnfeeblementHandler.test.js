@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, isRayOfEnfeeblementActive } from './rayOfEnfeeblementHandler.js';
 
-vi.mock('../common/savePrompt.js', () => ({
+vi.mock('../../common/savePrompt.js', () => ({
     buildSaveDc: vi.fn((auto, playerStats) => {
         if (auto.saveDc === 'ability') {
             const cha = playerStats.abilities?.find(a => a.name === 'Charisma');
@@ -17,20 +17,20 @@ vi.mock('../common/savePrompt.js', () => ({
     }),
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => null),
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../rules/effects/expirations.js', () => ({
+vi.mock('../../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 
-vi.mock('../../shared/logPoster.js', () => ({
+vi.mock('../../../shared/logPoster.js', () => ({
     postLogEntry: vi.fn(),
 }));
 
@@ -60,7 +60,7 @@ describe('rayOfEnfeeblementHandler', () => {
     });
 
     it('should apply next attack disadvantage on successful save', async () => {
-        const { createSaveListener } = await import('../common/savePrompt.js');
+        const { createSaveListener } = await import('../../common/savePrompt.js');
         createSaveListener.mockImplementation((campaignName, config) => {
             return {
                 promptId: `test-prompt-${Math.random()}`,
@@ -86,7 +86,7 @@ describe('rayOfEnfeeblementHandler', () => {
     });
 
     it('should detect active Ray of Enfeeblement debuff', async () => {
-        const { getRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+        const { getRuntimeValue } = await import('../../../../hooks/useRuntimeState.js');
         getRuntimeValue.mockReturnValue([
             { target: 'Goblin', effect: 'ray_of_enfeeble_debuff', source: 'Test Wizard' },
         ]);
@@ -96,7 +96,7 @@ describe('rayOfEnfeeblementHandler', () => {
     });
 
     it('should return false when debuff is not active', async () => {
-        const { getRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+        const { getRuntimeValue } = await import('../../../../hooks/useRuntimeState.js');
         getRuntimeValue.mockReturnValue([]);
 
         const result = isRayOfEnfeeblementActive('Goblin', 'Test Wizard', 'test-campaign');
