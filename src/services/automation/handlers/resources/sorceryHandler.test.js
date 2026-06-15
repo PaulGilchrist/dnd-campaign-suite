@@ -2,21 +2,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ─────────────────────
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../character/classFeatures.js', () => ({
+vi.mock('../../../character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(),
   spendSorceryPoints: vi.fn(),
 }));
 
-vi.mock('../../combat/buffService.js', () => ({
+vi.mock('../../../combat/buffService.js', () => ({
   setInnateSorceryActive: vi.fn(),
 }));
 
@@ -24,10 +24,10 @@ vi.mock('../../combat/buffService.js', () => ({
 
 import { handle } from './sorceryHandler.js';
 
-import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
-import * as classFeatures from '../../character/classFeatures.js';
-import * as useMetamagic from '../../../hooks/useMetamagic.js';
-import * as buffService from '../../combat/buffService.js';
+import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
+import * as classFeatures from '../../../character/classFeatures.js';
+import * as useMetamagic from '../../../../hooks/useMetamagic.js';
+import * as buffService from '../../../combat/buffService.js';
 
 // ── Helpers ────────────────────────────────────────────────────────
 

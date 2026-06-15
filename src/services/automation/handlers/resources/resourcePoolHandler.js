@@ -1,4 +1,4 @@
-import { handle as handleGiantAncestry } from './giantAncestryHandler.js';
+import { handle as handleGiantAncestry } from '../giantAncestryHandler.js';
 
 export async function handle(action, playerStats, campaignName, mapName) {
     // Giant Ancestry has its own sub-option selection flow

@@ -160,7 +160,7 @@ describe('giantAncestryHandler', () => {
 
     describe('resource_pool routing', () => {
         it('should route Giant Ancestry through resourcePoolHandler', async () => {
-            const { handle: resourcePoolHandle } = await import('./resourcePoolHandler.js');
+            const { handle: resourcePoolHandle } = await import('./resources/resourcePoolHandler.js');
             getRuntimeValue.mockReturnValue(null);
             const action = makeAction();
             const result = await resourcePoolHandle(action, makePlayerStats(), 'campaign', 'map');
