@@ -4,7 +4,7 @@ import WeaponMasteryModal from './WeaponMasteryModal.jsx';
 
 // ── Mocked modules (before the component import) ──
 
-vi.mock('../../services/automation/handlers/weaponMasteryHandler.js', () => ({
+vi.mock('../../services/automation/handlers/combat/weaponMasteryHandler.js', () => ({
     MASTERY_EFFECTS: {
         Push: { label: 'Push (10 ft)', description: 'Push the creature up to 10 feet straight away from you.', effect: 'push', value: 10 },
         Topple: { label: 'Topple (Prone)', description: 'Force the creature to make a Constitution saving throw or fall Prone.', effect: 'topple', requiresSave: true, saveAbility: 'CON' },
@@ -29,7 +29,7 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
 
 // ── Re-import mocked modules ──
 
-import * as weaponMasteryHandler from '../../services/automation/handlers/weaponMasteryHandler.js';
+import * as weaponMasteryHandler from '../../services/automation/handlers/combat/weaponMasteryHandler.js';
 import * as useActionPopup from '../../hooks/useActionPopup.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
 

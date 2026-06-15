@@ -30,7 +30,7 @@ vi.mock('../../services/automation/index.js', () => ({
   executeHandler: vi.fn(),
 }));
 
-vi.mock('../../services/automation/handlers/saveAttackHandler.js', () => ({
+vi.mock('../../services/automation/handlers/combat/saveAttackHandler.js', () => ({
   isExhausted: vi.fn(() => false),
 }));
 

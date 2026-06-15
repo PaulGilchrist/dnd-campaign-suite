@@ -4,12 +4,12 @@ import CombatStanceModal from './CombatStanceModal.jsx';
 
 // ── Mocked modules (before the component import) ──
 
-vi.mock('../../services/automation/handlers/combatStanceHandler.js', () => ({
+vi.mock('../../services/automation/handlers/combat/combatStanceHandler.js', () => ({
   applyStanceOption: vi.fn(),
 }));
 
 // ── Re-import mocked modules ──
-import * as combatStanceHandler from '../../services/automation/handlers/combatStanceHandler.js';
+import * as combatStanceHandler from '../../services/automation/handlers/combat/combatStanceHandler.js';
 
 // ── Test fixtures ──
 

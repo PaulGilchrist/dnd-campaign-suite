@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { applyRiderOption } from '../../services/automation/handlers/attackRiderHandler.js';
+import { applyRiderOption } from '../../services/automation/handlers/combat/attackRiderHandler.js';
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import './CharSheet.css';
 

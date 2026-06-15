@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { applyBonusActionChoice } from '../../services/automation/handlers/bonusActionChoiceHandler.js';
+import { applyBonusActionChoice } from '../../services/automation/handlers/combat/bonusActionChoiceHandler.js';
 import './CharSheet.css';
 
 function BonusActionChoiceModal({ action, playerStats, campaignName, onClose }) {

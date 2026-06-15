@@ -4,7 +4,7 @@ import AttackRiderModal from './AttackRiderModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../services/automation/handlers/attackRiderHandler.js', () => ({
+vi.mock('../../services/automation/handlers/combat/attackRiderHandler.js', () => ({
   applyRiderOption: vi.fn().mockResolvedValue({
     type: 'popup',
     payload: {
@@ -22,7 +22,7 @@ vi.mock('../../hooks/useRuntimeState.js', () => ({
 
 // ── Re-import mocked modules ──
 
-import { applyRiderOption } from '../../services/automation/handlers/attackRiderHandler.js';
+import { applyRiderOption } from '../../services/automation/handlers/combat/attackRiderHandler.js';
 
 // ── Test fixtures ──
 

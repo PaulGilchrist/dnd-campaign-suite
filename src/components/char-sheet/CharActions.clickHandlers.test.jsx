@@ -33,7 +33,7 @@ vi.mock('../../services/automation/index.js', () => ({
   executeHandler: vi.fn(),
 }));
 
-vi.mock('../../services/automation/handlers/saveAttackHandler.js', () => ({
+vi.mock('../../services/automation/handlers/combat/saveAttackHandler.js', () => ({
   isExhausted: vi.fn(() => false),
 }));
 
@@ -153,7 +153,7 @@ vi.mock('../../hooks/useActionSpellMetamagic.js', () => ({
 
 import { useActionSpellMetamagic } from '../../hooks/useActionSpellMetamagic.js';
 import { hasAutomation } from '../../services/combat/automationService.js';
-import { isExhausted } from '../../services/automation/handlers/saveAttackHandler.js';
+import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffService.js';
 import { executeHandler } from '../../services/automation/index.js';

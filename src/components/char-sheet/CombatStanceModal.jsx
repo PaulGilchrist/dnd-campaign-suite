@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { applyStanceOption } from '../../services/automation/handlers/combatStanceHandler.js';
+import { applyStanceOption } from '../../services/automation/handlers/combat/combatStanceHandler.js';
 import './CharSheet.css';
 
 function CombatStanceModal({ action, playerStats, campaignName, onClose }) {

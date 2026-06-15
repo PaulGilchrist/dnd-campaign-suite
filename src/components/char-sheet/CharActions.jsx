@@ -15,7 +15,7 @@ import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '
 import * as mapsService from '../../services/maps/mapsService.js';
 import { computeFeatRangeEffects } from '../../services/character/featRangeService.js';
 import { hasAutomation } from '../../services/combat/automationService.js'
-import { isExhausted } from '../../services/automation/handlers/saveAttackHandler.js'
+import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import HealingPoolModal from './HealingPoolModal.jsx'
 import HandOfHealingModal from './HandOfHealingModal.jsx'

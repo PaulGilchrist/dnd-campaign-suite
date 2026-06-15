@@ -33,7 +33,7 @@ vi.mock('../../services/automation/index.js', () => ({
   executeHandler: vi.fn(),
 }));
 
-vi.mock('../../services/automation/handlers/saveAttackHandler.js', () => ({
+vi.mock('../../services/automation/handlers/combat/saveAttackHandler.js', () => ({
   isExhausted: vi.fn(() => false),
 }));
 
@@ -467,7 +467,7 @@ describe('CharActions rendering', () => {
   describe('rage expendable / restore', () => {
     it('should show Restore with Rage button when rage-expendable action is exhausted', async () => {
       const { hasAutomation } = await import('../../services/combat/automationService.js');
-      const { isExhausted } = await import('../../services/automation/handlers/saveAttackHandler.js');
+      const { isExhausted } = await import('../../services/automation/handlers/combat/saveAttackHandler.js');
       hasAutomation.mockReturnValue(true);
       isExhausted.mockReturnValue(true);
       const stats = createStats({
@@ -479,7 +479,7 @@ describe('CharActions rendering', () => {
 
     it('should not show Restore with Rage when not rage-expendable', async () => {
       const { hasAutomation } = await import('../../services/combat/automationService.js');
-      const { isExhausted } = await import('../../services/automation/handlers/saveAttackHandler.js');
+      const { isExhausted } = await import('../../services/automation/handlers/combat/saveAttackHandler.js');
       hasAutomation.mockReturnValue(true);
       isExhausted.mockReturnValue(true);
       const stats = createStats({
