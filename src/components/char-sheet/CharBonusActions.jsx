@@ -101,6 +101,15 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         if (attack.type !== 'Bonus Action') return false;
         // Filter out Horde Breaker placeholder — UI will show it conditionally
         if (attack.isHordeBreaker) return false;
+        // Filter out Light weapon bonus action attack when Nick mastery has been used this turn
+        if (attack.properties?.includes('Light') && is2024Rules) {
+            const nickUsedKey = '_Nick_UsedRound';
+            const currentRound = getCurrentCombatRound();
+            const nickUsedRound = getRuntimeValue(playerStats.name, nickUsedKey, campaignName);
+            if (nickUsedRound === currentRound) {
+                return false;
+            }
+        }
         return true;
     });
     const attackNames = new Set((playerStats.attacks || []).map(a => a.name));

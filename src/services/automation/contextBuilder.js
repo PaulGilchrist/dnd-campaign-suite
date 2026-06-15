@@ -222,6 +222,19 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         const strokeOfLuckUsed = hasStrokeOfLuck ? getRuntimeValue(playerName, 'strokeOfLuckUsed', campaignName) : false;
         const strokeOfLuckAvailable = hasStrokeOfLuck && !strokeOfLuckUsed;
 
+        // Graze: check if the graze mastery effect is active for this target
+        let grazeDamage = false;
+        let grazeAbilityName = null;
+        let grazeAbilityMod = 0;
+        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+        const grazeEffect = storedEffects.find(te => te.effect === 'graze' && te.target === targetName);
+        if (grazeEffect) {
+            grazeDamage = true;
+            grazeAbilityName = grazeEffect.abilityName || attack.abilityName || 'STR';
+            const grazeAbility = playerStats.abilities?.find(a => a.name === grazeAbilityName);
+            grazeAbilityMod = grazeAbility?.bonus || 0;
+        }
+
         // Boon of Fate: check if the player has the passive available
         const hasBoonOfFate = (playerStats.automation?.passives || []).some(
             p => p.type === 'modify_d20_roll'
@@ -254,6 +267,9 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             boonOfFate: boonOfFateAvailable,
             isPsychicBlade: attack.isPsychicBlade === true,
             playerStats,
+            grazeDamage,
+            grazeAbilityName,
+            grazeAbilityMod,
         };
        });
 }

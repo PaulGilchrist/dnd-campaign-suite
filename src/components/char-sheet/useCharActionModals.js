@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
+import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';
 import { getCurrentCombatRound, loadCombatSummary } from '../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
@@ -69,6 +70,7 @@ export default function useCharActionModals({
     const [featureChoice, setFeatureChoice] = useState(null);
 
     const pendingDamageRef = useRef(null);
+    const [cleaveAttackPending, setCleaveAttackPending] = useState(null);
 
     const proceedWithDamage = (attack, formula, total, rolls, modifier) => {
         (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
@@ -1188,10 +1190,49 @@ export default function useCharActionModals({
         proceedWithDamage(attack, formula, total, rolls, modifier);
     };
 
-    const handleMasteryClose = () => {
+    const handleMasteryClose = async () => {
         setWeaponMasteryModal(null);
         if (pendingDamageRef.current) {
             const { attack, formula, total, rolls, modifier } = pendingDamageRef.current;
+            // Check if Cleave was activated — look for cleave effect in targetEffects
+            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+            const cleaveEffect = storedEffects.find(te => te.effect === 'cleave');
+            if (cleaveEffect) {
+                // Clear the cleave effect so it doesn't trigger again
+                const filteredEffects = storedEffects.filter(te => te.effect !== 'cleave');
+                setRuntimeValue(campaignName, 'targetEffects', filteredEffects, campaignName);
+                // Proceed with the first attack damage
+                proceedWithDamage(attack, formula, total, rolls, modifier);
+                pendingDamageRef.current = null;
+                // Show cleave target selection
+                const cs = await getCombatContext(campaignName);
+                const firstTarget = cs?.creatures?.find(c => c.name === cleaveEffect.target);
+                if (cs?.creatures && firstTarget?.position) {
+                    const secondTargets = cs.creatures
+                        .filter(c => c.name !== cleaveEffect.target && c.position)
+                        .map(c => ({
+                            creature: c,
+                            distance: getDistanceFeet(firstTarget.position, c.position),
+                        }))
+                        .filter(t => t.distance !== null && t.distance <= 5);
+                    if (secondTargets.length > 0) {
+                        setCleaveAttackPending({
+                            attackName: attack.name,
+                            damage: attack.damage,
+                            damageType: attack.damageType || 'same_as_weapon',
+                            abilityName: attack.abilityName,
+                            weaponType: attack.weaponType,
+                            properties: attack.properties || [],
+                            proficiencyBonus: attack.proficiencyBonus || playerStats.proficiency || 0,
+                            abilities: playerStats.abilities || [],
+                            campaignName,
+                            playerStats,
+                            secondTargets: secondTargets.map(t => t.creature),
+                        });
+                        return;
+                    }
+                }
+            }
             proceedWithDamage(attack, formula, total, rolls, modifier);
             pendingDamageRef.current = null;
         }
@@ -1199,6 +1240,68 @@ export default function useCharActionModals({
 
     const handleWeaponMasteryChoice = (_masteryName) => {
         setWeaponMasteryChoiceModal(null);
+    };
+
+    const handleCleaveAttack = async (cleaveTargetName) => {
+        if (!cleaveTargetName) {
+            setCleaveAttackPending(null);
+            return;
+        }
+        const data = cleaveAttackPending;
+        if (!data) return;
+        setCleaveAttackPending(null);
+
+        const { attackName, damage, damageType, abilityName, proficiencyBonus, abilities, campaignName: cleaveCampaign } = data;
+
+        const ability = abilities?.find(a => a.name === abilityName);
+        const abilityMod = ability?.bonus || 0;
+        const attackBonus = abilityMod + proficiencyBonus;
+
+        const cs = await getCombatContext(cleaveCampaign);
+        const target = cs?.creatures?.find(c => c.name === cleaveTargetName);
+        const targetAc = target?.ac || 0;
+
+        const d20Roll = Math.floor(Math.random() * 20) + 1;
+        const totalRoll = d20Roll + attackBonus;
+        const hit = totalRoll >= targetAc;
+
+        let damageFormula = damage;
+        let damageResult = null;
+        if (hit) {
+            const negMod = abilityMod < 0 ? abilityMod : 0;
+            if (negMod < 0) {
+                damageFormula = `${damage} + ${negMod}[${abilityName}]`;
+            } else {
+                const parts = damage.split(' + ');
+                const filteredParts = parts.filter(part => {
+                    const match = part.match(/^\d+\[([^\]]+)\]$/);
+                    return !match || match[1] !== abilityName;
+                });
+                damageFormula = filteredParts.length > 0 ? filteredParts.join(' + ') : parts[0];
+            }
+            damageResult = rollExpression(damageFormula);
+        }
+
+        if (hit && damageResult) {
+            const context = {
+                targetName: cleaveTargetName,
+                damageType,
+                attackerName: playerStats.name,
+            };
+            rollDamage(`${attackName} (Cleave)`, damageFormula, damageResult.total, damageResult.rolls, 0, context);
+        } else {
+            const context = {
+                targetName: cleaveTargetName,
+                damageType,
+                attackerName: playerStats.name,
+                isAutoMiss: true,
+            };
+            rollDamage(`${attackName} (Cleave)`, damageFormula, 0, [], 0, context);
+        }
+    };
+
+    const handleCleaveSkip = () => {
+        setCleaveAttackPending(null);
     };
 
     const handleDivineFuryDamageType = (chosenType) => {
@@ -1446,5 +1549,8 @@ export default function useCharActionModals({
         handleFeatureChoiceSkip,
         handleConstellationSelect,
         handleElderChampionRestore,
+        cleaveAttackPending,
+        handleCleaveAttack,
+        handleCleaveSkip,
     };
 }

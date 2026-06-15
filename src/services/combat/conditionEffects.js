@@ -329,6 +329,13 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     rayOfEnfeebleDamageReduction: false,
     seeInvisibilityActive: false,
     wardingBondAcBonus: 0,
+    cleaveAttack: false,
+    grazeDamage: false,
+    nickExtraAttack: false,
+    toppleEffect: false,
+    toppleSaveType: null,
+    toppleSaveDc: null,
+    toppleSaveAbility: null,
    }
 
   const conditionSet = new Set(conditions)
@@ -635,6 +642,33 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     if (te.effect === 'ray_of_enfeeble_debuff') {
       if (te.strCheckDisadvantage) effects.strCheckDisadvantage = true;
       if (te.rayOfEnfeebleDamageReduction) effects.rayOfEnfeebleDamageReduction = true;
+    }
+    // Handle Cleave — extra melee attack against second creature within 5 ft
+    if (te.effect === 'cleave') {
+      effects.cleaveAttack = true;
+      effects.cleaveTarget = te.target;
+      effects.cleaveSource = te.source;
+    }
+    // Handle Graze — damage on miss equal to ability modifier
+    if (te.effect === 'graze') {
+      effects.grazeDamage = true;
+      effects.grazeTarget = te.target;
+      effects.grazeSource = te.source;
+    }
+    // Handle Nick — extra attack as part of Attack action (Light weapon)
+    if (te.effect === 'nick') {
+      effects.nickExtraAttack = true;
+      effects.nickTarget = te.target;
+      effects.nickSource = te.source;
+    }
+    // Handle Topple — CON save, Prone condition on failure
+    if (te.effect === 'topple') {
+      effects.toppleEffect = true;
+      effects.saveType = te.saveType || 'CON';
+      effects.saveDc = te.saveDc || 'ability';
+      effects.saveAbility = te.saveAbility || 'CON';
+      effects.conditionToApply = 'prone';
+      effects.conditionDuration = te.duration || 'until_start_of_next_turn';
     }
     // Handle Slow — AC penalty and DEX save disadvantage
     if (te.effect === 'ac_penalty') {

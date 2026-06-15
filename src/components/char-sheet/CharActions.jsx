@@ -297,6 +297,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         handleFeatureChoiceSkip,
         handleConstellationSelect,
         handleElderChampionRestore,
+        cleaveAttackPending,
+        handleCleaveAttack,
+        handleCleaveSkip,
         hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
     } = useCharActionModals({
         playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects,
@@ -950,6 +953,44 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         onClose={() => { setWeaponMasteryChoiceModal(null); }}
                         onConfirm={handleWeaponMasteryChoice}
                     />
+                )}
+                {cleaveAttackPending && (
+                    <div className="sp-overlay" onClick={handleCleaveSkip}>
+                        <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                            <div className="sp-header">
+                                <i className="fa-solid fa-crosshairs"></i> Cleave — Choose Second Target
+                            </div>
+                            <div className="sp-body">
+                                <p>Choose a creature within 5 feet of the first target for the Cleave extra attack:</p>
+                                <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                                    {cleaveAttackPending.secondTargets.map((target, i) => {
+                                        const hp = target.currentHp ?? target.maxHp;
+                                        const maxHp = target.maxHp;
+                                        const pct = maxHp > 0 ? Math.round((hp / maxHp) * 100) : 0;
+                                        return (
+                                            <label key={i} style={{
+                                                display: 'block', padding: '8px 12px', margin: '4px 0',
+                                                borderRadius: '6px', cursor: 'pointer',
+                                                background: 'transparent',
+                                                border: '1px solid transparent',
+                                            }} onClick={() => handleCleaveAttack(target.name)}>
+                                                <strong>{target.name}</strong>
+                                                <span style={{ marginLeft: '8px', opacity: 0.7 }}>
+                                                    {hp}/{maxHp} HP ({pct}%)
+                                                </span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                                <p style={{ opacity: 0.7, fontSize: '0.85em', marginTop: '8px' }}>
+                                    On a hit, the second creature takes weapon damage (no ability modifier to damage unless negative). Once per turn.
+                                </p>
+                            </div>
+                            <div className="sp-actions">
+                                <button className="sp-dismiss-btn" onClick={handleCleaveSkip}>Skip</button>
+                            </div>
+                        </div>
+                    </div>
                 )}
                 {combatStanceModal && (
                     <CombatStanceModal
