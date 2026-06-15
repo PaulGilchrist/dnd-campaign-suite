@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, handleSummon, handleCommand, handleRestore, handleBonusActionCommand, applyBonusActionCommand } from './primalCompanionHandler.js';
-import * as runtimeState from '../../../hooks/useRuntimeState.js';
+import * as runtimeState from '../../../../hooks/useRuntimeState.js';
 
 describe('primalCompanionHandler', () => {
     const mockPlayerStats = { name: 'TestRanger' };

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { applyBonusActionCommand } from '../../services/automation/handlers/primalCompanionHandler.js';
+import { applyBonusActionCommand } from '../../services/automation/handlers/class-ranger/primalCompanionHandler.js';
 import './CharSheet.css';
 
 const BONUS_ACTION_COMMANDS = [

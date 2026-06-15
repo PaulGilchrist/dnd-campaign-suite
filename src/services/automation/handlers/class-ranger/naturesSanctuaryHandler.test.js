@@ -1,25 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { handle, handleMove } from './naturesSanctuaryHandler.js'
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }))
 
-vi.mock('../../rules/effects/expirations.js', () => ({
+vi.mock('../../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }))
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }))
 
-vi.mock('../../rules/combat/rangeValidation.js', () => ({
+vi.mock('../../../rules/combat/rangeValidation.js', () => ({
     rangeToFeet: vi.fn((v) => parseInt(v) || 120),
 }))
 
-const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/useRuntimeState.js')
-const { addExpiration } = await import('../../rules/effects/expirations.js')
+const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/useRuntimeState.js')
+const { addExpiration } = await import('../../../rules/effects/expirations.js')
 
 beforeEach(() => {
     vi.clearAllMocks()

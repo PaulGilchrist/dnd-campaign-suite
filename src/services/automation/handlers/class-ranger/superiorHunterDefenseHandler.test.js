@@ -1,18 +1,18 @@
 import { handle } from './superiorHunterDefenseHandler.js';
-import * as runtimeState from '../../../hooks/useRuntimeState.js';
-import * as logService from '../../ui/logService.js';
-import * as damageUtils from '../../rules/combat/damageUtils.js';
+import * as runtimeState from '../../../../hooks/useRuntimeState.js';
+import * as logService from '../../../ui/logService.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../rules/combat/damageUtils.js', () => ({
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
 }));
 

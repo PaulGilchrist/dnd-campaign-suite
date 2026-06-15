@@ -1,7 +1,7 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
 
-const CHOICES = ['Escape the Horde', 'Multiattack Defense'];
+const CHOICES = ['Colossus Slayer', 'Horde Breaker'];
 
 export async function handle(action, playerStats, campaignName) {
     const optionKey = `_${action.name.replace(/\s+/g, '_')}_choice`;
@@ -11,7 +11,7 @@ export async function handle(action, playerStats, campaignName) {
     if (!chosen) {
         return {
             type: 'modal',
-            modalName: 'defensiveTactics',
+            modalName: 'hunterPrey',
             payload: {
                 action,
                 playerStats,
@@ -21,9 +21,9 @@ export async function handle(action, playerStats, campaignName) {
     }
 
     // Choice already made — show info popup
-    const description = chosen === 'Escape the Horde'
-        ? 'Escape the Horde active: Opportunity Attacks have Disadvantage against you.'
-        : 'Multiattack Defense active: When a creature hits you with an attack roll, that creature has Disadvantage on all other attack rolls against you this turn.';
+    const description = chosen === 'Colossus Slayer'
+        ? 'Colossus Slayer active: When you hit a creature with a weapon attack, it takes an extra 1d8 damage if it is below its hit point maximum. Once per turn.'
+        : 'Horde Breaker active: Once per turn, when you make a weapon attack, you can make another attack with the same weapon against a different creature within 5 feet of the original target and within range.';
 
     return {
         type: 'popup',
@@ -39,21 +39,21 @@ export async function handle(action, playerStats, campaignName) {
 export async function applyChoice(playerStats, campaignName, choice) {
     if (!CHOICES.includes(choice)) return null;
 
-    const optionKey = `_${'Defensive Tactics'.replace(/\s+/g, '_')}_choice`;
+    const optionKey = `_${'Hunter\'s Prey'.replace(/\s+/g, '_')}_choice`;
     await setRuntimeValue(playerStats.name, optionKey, choice, campaignName);
 
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
-        abilityName: "Defensive Tactics",
-        description: `Defensive Tactics choice: ${choice}`,
+        abilityName: "Hunter's Prey",
+        description: `Hunter's Prey choice: ${choice}`,
     }).catch(() => {});
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
-            name: "Defensive Tactics",
+            name: "Hunter's Prey",
             description: `Selected: <b>${choice}</b>. This choice can be changed on a Short or Long Rest.`,
         },
     };

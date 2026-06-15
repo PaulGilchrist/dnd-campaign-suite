@@ -1,7 +1,7 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
-import { getCombatContext } from '../../rules/combat/damageUtils.js';
-import { getLastDamageEvent } from '../../../hooks/useMetamagic.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { getLastDamageEvent } from '../../../../hooks/useMetamagic.js';
 
 const EVENT_STALENESS_MS = 60000;
 
