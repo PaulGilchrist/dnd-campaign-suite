@@ -23,7 +23,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const playerName = playerStats.name;
     const effectType = auto.effect || 'advantage';
 
-    const maxLP = playerStats._luckyPointsMax || 0;
+    const maxLP = playerStats._trackedResources?.luckyPoints?.max || 0;
     const currentLP = Number(getRuntimeValue(playerName, 'luckyPoints', campaignName) ?? maxLP);
     if (currentLP <= 0) {
         return {

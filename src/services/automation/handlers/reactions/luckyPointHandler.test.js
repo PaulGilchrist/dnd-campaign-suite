@@ -8,7 +8,7 @@ vi.mock('../../../../hooks/useMetamagic.js');
 vi.mock('../../../ui/logService.js');
 
 describe('luckyPointHandler.handle', () => {
-    const mockPlayerStats = { name: 'TestFighter', level: 10, feats: [{ name: 'Lucky' }], _luckyPointsMax: 5 };
+    const mockPlayerStats = { name: 'TestFighter', level: 10, feats: [{ name: 'Lucky' }], _trackedResources: { luckyPoints: { current: 5, max: 5 } } };
     const mockCampaignName = 'TestCampaign';
 
     beforeEach(() => {
