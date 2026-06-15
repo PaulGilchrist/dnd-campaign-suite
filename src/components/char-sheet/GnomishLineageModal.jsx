@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { confirmGnomishLineage } from '../../services/automation/handlers/gnomishLineageHandler.js';
+import { confirmGnomishLineage } from '../../services/automation/handlers/class-other/gnomishLineageHandler.js';
 import './CharSheet.css';
 
 const GNOME_LINEAGES = [

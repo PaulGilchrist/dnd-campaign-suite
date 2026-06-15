@@ -1,12 +1,12 @@
 import { handle, isLargeFormActive } from './largeFormHandler.js';
-import * as runtimeState from '../../../hooks/useRuntimeState.js';
+import * as runtimeState from '../../../../hooks/useRuntimeState.js';
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { confirmElfisLineage } from '../../services/automation/handlers/elfishLineageHandler.js';
+import { confirmElfisLineage } from '../../services/automation/handlers/class-other/elfishLineageHandler.js';
 import './CharSheet.css';
 
 const ELVEN_LINEAGES = [

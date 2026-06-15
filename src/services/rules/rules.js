@@ -10,7 +10,7 @@ import * as proficiencyUtils2024 from '../character/proficiencyUtils2024.js';
 import { getAbilities as getAbilities5e, getHitPoints as getHitPoints5e, getCarryingCapacity as getCarryingCapacity5e } from './core/abilityCalc.js';
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { getAbilities as getAbilities2024, getHitPoints as getHitPoints2024, getCarryingCapacity as getCarryingCapacity2024 } from './core/abilityCalc2024.js';
-import { getElfisLineageSelection } from '../automation/handlers/elfishLineageHandler.js';
+import { getElfisLineageSelection } from '../automation/handlers/class-other/elfishLineageHandler.js';
 import { getSpellAbilities as getSpellAbilities5e } from './core/spellCalc.js';
 import { getSpellAbilities as getSpellAbilities2024 } from './core/spellCalc2024.js';
 import { getAttacks as getAttacks5e } from './core/attackCalc.js';

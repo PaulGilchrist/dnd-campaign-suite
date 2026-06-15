@@ -5,13 +5,13 @@ import {
     getElfisLineageCantrip,
     getElfisLineageLevel3Spell,
     getElfisLineageLevel5Spell,
-} from '../../automation/handlers/elfishLineageHandler.js';
+} from '../../automation/handlers/class-other/elfishLineageHandler.js';
 import {
     getGnomishLineageSelection,
     getGnomishLineageCantrip,
     getGnomishLineageLevel3Spell,
     getGnomishLineageLevel5Spell,
-} from '../../automation/handlers/gnomishLineageHandler.js';
+} from '../../automation/handlers/class-other/gnomishLineageHandler.js';
 
 export function getSpellAbilities(allSpells, playerStats, playerSummary) {
     let spellAbilities = null;

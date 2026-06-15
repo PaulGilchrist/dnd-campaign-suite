@@ -4,35 +4,35 @@ import { handle, confirmGiantAncestry, getGiantAncestrySelection, getGiantAncest
 
 // ── Mocks ──────────────────────────────────────────────────────
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => null),
     setRuntimeValue: vi.fn(async () => {}),
 }));
 
-vi.mock('../../dice/diceRoller.js', () => ({
+vi.mock('../../../dice/diceRoller.js', () => ({
     rollExpression: vi.fn((_expr) => ({ total: 5, rolls: [5], modifier: 0 })),
 }));
 
-vi.mock('../../ui/logService.js', () => ({
+vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(async () => {}),
 }));
 
-vi.mock('../common/targetResolver.js', () => ({
+vi.mock('../../common/targetResolver.js', () => ({
     resolveTarget: vi.fn(async () => ({ target: { name: 'Goblin' } })),
 }));
 
-vi.mock('../../combat/automationService.js', () => ({
+vi.mock('../../../combat/automationService.js', () => ({
     evaluateAutoExpression: vi.fn((_expr) => 5),
 }));
 
-vi.mock('../../rules/combat/damageUtils.js', () => ({
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(async () => null),
     getTargetFromAttacker: vi.fn(() => null),
 }));
 
 // ── Re-import after mocking ────────────────────────────────────
 
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -160,7 +160,7 @@ describe('giantAncestryHandler', () => {
 
     describe('resource_pool routing', () => {
         it('should route Giant Ancestry through resourcePoolHandler', async () => {
-            const { handle: resourcePoolHandle } = await import('./resources/resourcePoolHandler.js');
+            const { handle: resourcePoolHandle } = await import('../resources/resourcePoolHandler.js');
             getRuntimeValue.mockReturnValue(null);
             const action = makeAction();
             const result = await resourcePoolHandle(action, makePlayerStats(), 'campaign', 'map');
