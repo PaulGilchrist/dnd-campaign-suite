@@ -1,6 +1,6 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getLastAttackRoll } from '../../../hooks/useMetamagic.js';
-import { addEntry } from '../../ui/logService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getLastAttackRoll } from '../../../../hooks/useMetamagic.js';
+import { addEntry } from '../../../ui/logService.js';
 
 const EVENT_STALENESS_MS = 60000;
 

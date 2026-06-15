@@ -1,5 +1,5 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { loadSpells } from '../../ui/dataLoader.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { loadSpells } from '../../../ui/dataLoader.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const playerName = playerStats.name;

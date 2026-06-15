@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { applySoulstitchSelection } from '../../services/automation/handlers/soulstitchSpellsHandler.js';
+import { applySoulstitchSelection } from '../../services/automation/handlers/class-wizard/soulstitchSpellsHandler.js';
 import './CharSheet.css';
 
 function SoulstitchSpellsModal({ action, playerStats, campaignName, onClose }) {

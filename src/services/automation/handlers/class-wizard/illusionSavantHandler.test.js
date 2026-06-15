@@ -1,13 +1,13 @@
 import { handle, onIllusionSavantSelected, onIllusionSavantCast, onIllusionSavantLevelUp } from './illusionSavantHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { loadSpells } from '../../ui/dataLoader.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { loadSpells } from '../../../ui/dataLoader.js';
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../ui/dataLoader.js', () => ({
+vi.mock('../../../ui/dataLoader.js', () => ({
     loadSpells: vi.fn(),
 }));
 

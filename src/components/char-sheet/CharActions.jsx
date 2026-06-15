@@ -78,9 +78,9 @@ import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../s
 import { useActionSpellMetamagic } from '../../hooks/useActionSpellMetamagic.js';
 import useCharActionModals from './useCharActionModals.js';
 import DivinationSavantModal from './DivinationSavantModal.jsx';
-import { onDivinationSavantSelected } from '../../services/automation/handlers/divinationSavantHandler.js';
+import { onDivinationSavantSelected } from '../../services/automation/handlers/class-wizard/divinationSavantHandler.js';
 import IllusionSavantModal from './IllusionSavantModal.jsx';
-import { onIllusionSavantSelected } from '../../services/automation/handlers/illusionSavantHandler.js';
+import { onIllusionSavantSelected } from '../../services/automation/handlers/class-wizard/illusionSavantHandler.js';
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/bastionOfLawHandler.js';
 import ThirdEyeModal from './ThirdEyeModal.jsx';
 import useInitiativeEffects from './useInitiativeEffects.js';

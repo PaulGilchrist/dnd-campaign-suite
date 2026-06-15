@@ -1,5 +1,5 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { addEntry } from '../../ui/logService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
 
 const ARCAN_WARD_KEY = 'arcaneWardHp';
 const ARCAN_WARD_ACTIVE_KEY = 'arcaneWardActive';

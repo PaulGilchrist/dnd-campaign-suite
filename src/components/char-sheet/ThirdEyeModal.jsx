@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { applyThirdEye } from '../../services/automation/handlers/thirdEyeHandler.js';
+import { applyThirdEye } from '../../services/automation/handlers/class-wizard/thirdEyeHandler.js';
 import './CharSheet.css';
 
 const THIRD_EYE_OPTIONS = [

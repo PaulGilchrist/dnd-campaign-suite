@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 
 const HANDLER_MODAL = 'phantasmalCreatures';
 const HANDLER_CONFIRM = 'phantasmal_creatures_confirm';

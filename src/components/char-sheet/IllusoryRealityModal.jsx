@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { confirmIllusoryReality } from '../../services/automation/handlers/illusoryRealityHandler.js';
+import { confirmIllusoryReality } from '../../services/automation/handlers/class-wizard/illusoryRealityHandler.js';
 import './CharSheet.css';
 
 function IllusoryRealityModal({ action, playerStats, campaignName, onClose }) {

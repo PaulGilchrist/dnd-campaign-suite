@@ -7,8 +7,8 @@ import { executeHandler } from '../../services/automation/index.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import SpellMasteryModal from './SpellMasteryModal.jsx'
 import SignatureSpellsModal from './SignatureSpellsModal.jsx'
-import { onSpellMasterySelected } from '../../services/automation/handlers/spellMasteryHandler.js';
-import { onSignatureSpellsSelected } from '../../services/automation/handlers/signatureSpellsHandler.js';
+import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
+import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { useState, useCallback } from 'react';
 
 function CharCharacterAdvancement({ playerStats, campaignName }) {

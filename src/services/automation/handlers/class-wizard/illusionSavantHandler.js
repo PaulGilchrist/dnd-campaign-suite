@@ -1,34 +1,34 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { loadSpells } from '../../ui/dataLoader.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { loadSpells } from '../../../ui/dataLoader.js';
 
-const DIVINATION_SCHOOL = 'Divination';
+const ILLUSION_SCHOOL = 'Illusion';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const playerName = playerStats.name;
-    const currentSelection = getRuntimeValue(playerName, '_Divination_Savant_selection', campaignName);
+    const currentSelection = getRuntimeValue(playerName, '_Illusion_Savant_selection', campaignName);
     const selectedSpells = Array.isArray(currentSelection) ? currentSelection : [];
 
     if (!selectedSpells.length) {
         const allSpells = await loadSpells(playerStats.rules || '2024');
-        const divinationSpells = allSpells.filter(s => {
-            if (s.school !== DIVINATION_SCHOOL) return false;
+        const illusionSpells = allSpells.filter(s => {
+            if (s.school !== ILLUSION_SCHOOL) return false;
             if (s.level < 0 || s.level > 2) return false;
             return true;
         });
 
-        if (!divinationSpells.length) {
+        if (!illusionSpells.length) {
             return {
                 type: 'popup',
                 payload: {
                     type: 'automation_info',
                     name: action.name,
-                    description: 'No Divination school spells of level 2 or lower available.',
+                    description: 'No Illusion school spells of level 2 or lower available.',
                 },
             };
         }
 
         const optionDetails = {};
-        for (const s of divinationSpells) {
+        for (const s of illusionSpells) {
             optionDetails[s.name] = {
                 name: s.name,
                 level: s.level,
@@ -41,12 +41,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         return {
             type: 'modal',
-            modalName: 'divinationSavant',
+            modalName: 'illusionSavant',
             payload: {
                 action,
                 playerStats,
                 campaignName,
-                divinationOptions: divinationSpells.map(s => s.name),
+                illusionOptions: illusionSpells.map(s => s.name),
                 optionDetails,
                 selectedSpells: [],
             },
@@ -68,7 +68,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: 'All Divination Savant spells have been used. Finish a Short or Long Rest to regain them.',
+                description: 'All Illusion Savant spells have been used. Finish a Short or Long Rest to regain them.',
                 automation: action.automation,
             },
         };
@@ -82,7 +82,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     };
 }
 
-export async function onDivinationSavantSelected(action, playerStats, campaignName, spell1, spell2) {
+export async function onIllusionSavantSelected(action, playerStats, campaignName, spell1, spell2) {
     const playerName = playerStats.name;
 
     if (!spell1 || !spell2 || spell1 === spell2) {
@@ -91,27 +91,27 @@ export async function onDivinationSavantSelected(action, playerStats, campaignNa
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: 'Two different Divination school spells (level 2 or lower) must be selected.',
+                description: 'Two different Illusion school spells (level 2 or lower) must be selected.',
             },
         };
     }
 
-    await setRuntimeValue(playerName, '_Divination_Savant_selection', [spell1, spell2], campaignName, true);
+    await setRuntimeValue(playerName, '_Illusion_Savant_selection', [spell1, spell2], campaignName, true);
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: action.name,
-            description: `Divination Savant: You have added <b>${spell1}</b> and <b>${spell2}</b> to your spellbook for free. These are always prepared.`,
+            description: `Illusion Savant: You have added <b>${spell1}</b> and <b>${spell2}</b> to your spellbook for free. These are always prepared.`,
             automation: action.automation,
         },
     };
 }
 
-export async function onDivinationSavantCast(action, playerStats, campaignName, spellName) {
+export async function onIllusionSavantCast(action, playerStats, campaignName, spellName) {
     const playerName = playerStats.name;
-    const selection = getRuntimeValue(playerName, '_Divination_Savant_selection', campaignName);
+    const selection = getRuntimeValue(playerName, '_Illusion_Savant_selection', campaignName);
     const selectedSpells = Array.isArray(selection) ? selection : [];
 
     if (!selectedSpells.includes(spellName)) {
@@ -120,7 +120,7 @@ export async function onDivinationSavantCast(action, playerStats, campaignName, 
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `${spellName} is not a Divination Savant spell.`,
+                description: `${spellName} is not an Illusion Savant spell.`,
             },
         };
     }
@@ -133,7 +133,7 @@ export async function onDivinationSavantCast(action, playerStats, campaignName, 
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `${spellName} has already been cast as a Divination Savant spell. Finish a Short or Long Rest to regain.`,
+                description: `${spellName} has already been cast as an Illusion Savant spell. Finish a Short or Long Rest to regain.`,
             },
         };
     }
@@ -145,13 +145,13 @@ export async function onDivinationSavantCast(action, playerStats, campaignName, 
         payload: {
             type: 'automation_info',
             name: action.name,
-            description: `${spellName} cast as a Divination Savant spell (no spell slot expended). Finish a Short or Long Rest to regain.`,
+            description: `${spellName} cast as an Illusion Savant spell (no spell slot expended). Finish a Short or Long Rest to regain.`,
             automation: action.automation,
         },
     };
 }
 
-export async function onDivinationSavantLevelUp(action, playerStats, campaignName, spellName) {
+export async function onIllusionSavantLevelUp(action, playerStats, campaignName, spellName) {
     const playerName = playerStats.name;
 
     if (!spellName) {
@@ -160,38 +160,38 @@ export async function onDivinationSavantLevelUp(action, playerStats, campaignNam
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: 'A Divination school spell must be selected.',
+                description: 'An Illusion school spell must be selected.',
             },
         };
     }
 
     const allSpells = await loadSpells(playerStats.rules || '2024');
     const spellDetail = allSpells.find(s => s.name === spellName);
-    if (!spellDetail || spellDetail.school !== DIVINATION_SCHOOL) {
+    if (!spellDetail || spellDetail.school !== ILLUSION_SCHOOL) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `${spellName} is not a Divination school spell.`,
+                description: `${spellName} is not an Illusion school spell.`,
             },
         };
     }
 
-    const currentSelection = getRuntimeValue(playerName, '_Divination_Savant_selection', campaignName);
+    const currentSelection = getRuntimeValue(playerName, '_Illusion_Savant_selection', campaignName);
     const updatedSelection = Array.isArray(currentSelection) ? [...currentSelection] : [];
     if (!updatedSelection.includes(spellName)) {
         updatedSelection.push(spellName);
     }
 
-    await setRuntimeValue(playerName, '_Divination_Savant_selection', updatedSelection, campaignName, true);
+    await setRuntimeValue(playerName, '_Illusion_Savant_selection', updatedSelection, campaignName, true);
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: action.name,
-            description: `Divination Savant: You have added <b>${spellName}</b> to your spellbook for free (gained new spell slot level). This spell is always prepared.`,
+            description: `Illusion Savant: You have added <b>${spellName}</b> to your spellbook for free (gained new spell slot level). This spell is always prepared.`,
             automation: action.automation,
         },
     };

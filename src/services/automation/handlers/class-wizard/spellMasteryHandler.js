@@ -1,5 +1,5 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { loadSpells } from '../../ui/dataLoader.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { loadSpells } from '../../../ui/dataLoader.js';
 
 const ACTION_CASTING_TIMES = new Set(['Action', '1 Action']);
 

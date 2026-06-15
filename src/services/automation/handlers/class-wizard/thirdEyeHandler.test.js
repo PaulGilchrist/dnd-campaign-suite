@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, applyThirdEye } from './thirdEyeHandler.js';
-import * as runtimeState from '../../../hooks/useRuntimeState.js';
+import * as runtimeState from '../../../../hooks/useRuntimeState.js';
 
 describe('thirdEyeHandler', () => {
     beforeEach(() => {
