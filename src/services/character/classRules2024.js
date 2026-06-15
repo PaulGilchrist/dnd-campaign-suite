@@ -1,7 +1,9 @@
 import { cloneDeep } from 'lodash';
-import * as featureCategories from './featureCategories2024.js'
-import { categorizeFeatures, mergeCategorizedFeatures } from './featureCategorizationUtils.js'
+import { getCategories } from './featureCategories.js'
+import { mergeCategorizedFeatures, addFeatures } from './featureCategorizationUtils.js'
 import utils from '../ui/utils.js';
+
+const featureCategories = getCategories('2024');
 
 const classRules = {
     getClass: (allClasses, playerSummary) => {
@@ -133,20 +135,12 @@ const classRules = {
         const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
         return classLevel?.beast_known_forms || 0;
         },
-    getDruidBeastFlySpeed(playerStats) {
-           // 2024 Rules: Use beast_fly_speed from class_levels ("Yes" or "No")
-        const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-        return classLevel?.beast_fly_speed === 'Yes';
-        },
-        addFeatures: (levels) => {
-         // Flatten all features from all levels, maintaining reverse order (highest level first)
-        const allFeatures = [];
-        for (let i = levels.length - 1; i >= 0; i--) {
-            allFeatures.push(...(levels[i].features || []));
-         }
-        return categorizeFeatures(allFeatures, featureCategories, { descriptionField: 'description' });
-        },
-        getFeatures: (playerStats) => {
+     getDruidBeastFlySpeed(playerStats) {
+            // 2024 Rules: Use beast_fly_speed from class_levels ("Yes" or "No")
+         const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+         return classLevel?.beast_fly_speed === 'Yes';
+         },
+         getFeatures: (playerStats) => {
                     // 2024 Rules: Process class and major features
              const classLevels = playerStats.class?.class_levels?.filter(classLevel => classLevel.level <= playerStats.level) || [];
 
@@ -158,7 +152,7 @@ const classRules = {
               const isDeflectEnergyAvailable = playerStats.level >= 13;
               const replacedByDeflectEnergy = isDeflectEnergyAvailable ? ['Deflect Attacks'] : [];
 
-              let features = classRules.addFeatures(classLevels);
+               let features = addFeatures(classLevels, featureCategories, { descriptionField: 'description' });
               if (replacedByHeightened.length > 0) {
                   const toFilter = new Set(replacedByHeightened);
                   Object.keys(features).forEach(cat => {
@@ -177,7 +171,7 @@ const classRules = {
                  const majorFeaturesList = playerStats.class.major.features?.filter(feature => feature.level <= playerStats.level) || [];
                         // Create a dummy level structure for addFeatures
                  const majorLevels = [{ features: majorFeaturesList }];
-                 const majorFeatures = classRules.addFeatures(majorLevels);
+                  const majorFeatures = addFeatures(majorLevels, featureCategories, { descriptionField: 'description' });
 
                  features = mergeCategorizedFeatures(features, majorFeatures);
                      }

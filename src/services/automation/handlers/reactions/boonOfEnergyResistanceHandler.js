@@ -1,4 +1,4 @@
-import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { setChosenRuntimeValue, getChosenRuntimeValue } from '../../common/choiceStorage.js';
 import { addEntry } from '../../../ui/logService.js';
 
 const ENERGY_TYPES = [
@@ -10,8 +10,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const name = action.name;
 
-    const typesKey = `_${name.replace(/\s+/g, '_')}_chosenTypes`;
-    const chosenTypes = getRuntimeValue(playerStats.name, typesKey, campaignName);
+    const chosenTypes = getChosenRuntimeValue(playerStats, name, 'chosenTypes', campaignName);
 
     const validTypes = auto.validTypes || ENERGY_TYPES;
     const maxSelections = auto.count || 2;
@@ -54,11 +53,10 @@ export async function applyTypeChoice(action, playerStats, campaignName, chosenT
         return null;
     }
 
-    const typesKey = `_${name.replace(/\s+/g, '_')}_chosenTypes`;
-    const existingTypes = getRuntimeValue(playerStats.name, typesKey, campaignName);
+    const existingTypes = getChosenRuntimeValue(playerStats, name, 'chosenTypes', campaignName);
     const isChange = existingTypes && existingTypes.length > 0 && JSON.stringify(existingTypes.sort()) !== JSON.stringify([...filtered].sort());
 
-    await setRuntimeValue(playerStats.name, typesKey, filtered, campaignName);
+    await setChosenRuntimeValue(playerStats, name, filtered, 'chosenTypes', campaignName);
 
     addEntry(campaignName, {
         type: 'ability_use',

@@ -105,7 +105,7 @@ Each character has a `rules` field (`'5e'` or `'2024'`). This is the single disp
 | Class rules | `classRules.js` | `classRules2024.js` |
 | Race rules | `race-rules/5e.js` | `race-rules/2024.js` |
 | Proficiencies | `proficiencyUtils.js` | `proficiencyUtils2024.js` |
-| Feature categories | `featureCategories5e.js` | `featureCategories2024.js` |
+| Feature categories | `featureCategories.js` (unified) | `featureCategories.js` (unified) |
 
 **Key differences in 2024:** No racial ASI, no fighting style bonuses to attack rolls, all spells always-prepared, `major` instead of `subclass`, `hit_point_die` field, `saving_throw_proficiencies` array, weapon mastery, focus points (ki), energy dice.
 

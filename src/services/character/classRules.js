@@ -1,7 +1,9 @@
 import { cloneDeep, merge } from 'lodash';
 import utils from '../ui/utils.js'
-import * as featureCategories from './featureCategories5e.js'
-import { categorizeFeatures, mergeCategorizedFeatures } from './featureCategorizationUtils.js'
+import { getCategories } from './featureCategories.js'
+import { mergeCategorizedFeatures, addFeatures } from './featureCategorizationUtils.js'
+
+const featureCategories = getCategories('5e');
 
 const classRules = {
     getClass: (allClasses, playerSummary) => {
@@ -45,27 +47,19 @@ const classRules = {
     },
                 getDruidBeastFlySpeed: (playerStats) => {
           // 5e Rules: Use class_specific.wild_shape_fly
-         const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
-        const wildShapeFly = classLevel?.class_specific?.wild_shape_fly;
-        if (wildShapeFly === true) return true;
-        if (wildShapeFly === false) return false;
-        return undefined;
-       },
-        addFeatures: (levels) => {
-        // Flatten all features from all levels, maintaining reverse order (highest level first)
-        const allFeatures = [];
-        for (let i = levels.length - 1; i >= 0; i--) {
-            allFeatures.push(...(levels[i].features || []));
-        }
-        return categorizeFeatures(allFeatures, featureCategories, { descriptionField: 'description' });
-     },
+          const classLevel = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level);
+         const wildShapeFly = classLevel?.class_specific?.wild_shape_fly;
+         if (wildShapeFly === true) return true;
+         if (wildShapeFly === false) return false;
+         return undefined;
+        },
         getFeatures: (playerStats) => {
                // Dependencies: Class
             const classLevels = playerStats.class.class_levels.filter(classLevel => classLevel.level <= playerStats.level);
-            let features = classRules.addFeatures(classLevels);
-            if (playerStats.class.subclass) {
-                const subClassLevels = playerStats.class.subclass.class_levels.filter(classLevel => classLevel.level <= playerStats.level);
-                const subclassFeatures = classRules.addFeatures(subClassLevels);
+             let features = addFeatures(classLevels, featureCategories, { descriptionField: 'description' });
+             if (playerStats.class.subclass) {
+                 const subClassLevels = playerStats.class.subclass.class_levels.filter(classLevel => classLevel.level <= playerStats.level);
+                 const subclassFeatures = addFeatures(subClassLevels, featureCategories, { descriptionField: 'description' });
                 features = mergeCategorizedFeatures(features, subclassFeatures);
                }
             return features;

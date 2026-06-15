@@ -1,4 +1,4 @@
-import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { setChosenRuntimeValue, getChosenRuntimeValue } from '../../common/choiceStorage.js';
 import { addEntry } from '../../../ui/logService.js';
 
 const DAMAGE_TYPES = ['Acid', 'Cold', 'Fire', 'Lightning', 'Poison'];
@@ -8,8 +8,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const name = action.name;
 
     // Check if a damage type has already been chosen
-    const typeKey = `_${name.replace(/\s+/g, '_')}_chosenType`;
-    const chosenType = getRuntimeValue(playerStats.name, typeKey, campaignName);
+    const chosenType = getChosenRuntimeValue(playerStats, name, 'chosenType', campaignName);
 
     if (chosenType) {
         addEntry(campaignName, {
@@ -53,11 +52,10 @@ export async function applyTypeChoice(action, playerStats, campaignName, chosenT
         return null;
     }
 
-    const typeKey = `_${name.replace(/\s+/g, '_')}_chosenType`;
-    const existingType = getRuntimeValue(playerStats.name, typeKey, campaignName);
+    const existingType = getChosenRuntimeValue(playerStats, name, 'chosenType', campaignName);
     const isChange = existingType && existingType !== chosenType;
 
-    setRuntimeValue(playerStats.name, typeKey, chosenType, campaignName);
+    setChosenRuntimeValue(playerStats, name, chosenType, 'chosenType', campaignName);
 
     addEntry(campaignName, {
         type: 'ability_use',

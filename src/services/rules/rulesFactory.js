@@ -4,7 +4,7 @@ import { rules2024 } from '../character/race-rules/index.js';
 import classRules from '../character/classRules.js';
 import classRules2024 from '../character/classRules2024.js';
 import { computeTrackedResources } from './trackedResources.js';
-import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getChosenRuntimeValue } from '../automation/common/choiceStorage.js';
 
 const rulesFactory = {
       /**
@@ -187,7 +187,7 @@ const rulesFactory = {
         }
 
         // Resolve Elemental Affinity damage type resistance (2024 Draconic Sorcery)
-        const elementalAffinityType = getRuntimeValue(playerStats.name, '_Elemental_Affinity_chosenType', playerSummary.campaignName);
+        const elementalAffinityType = getChosenRuntimeValue(playerStats, 'Elemental Affinity', 'chosenType');
         if (elementalAffinityType) {
             playerStats.resistances = [...new Set([
                 ...(playerStats.resistances || []),
@@ -196,7 +196,7 @@ const rulesFactory = {
         }
 
         // Resolve Fiendish Resilience damage type resistance (2024 Warlock Fiend Patron)
-        const fiendishResilienceType = getRuntimeValue(playerStats.name, '_Fiendish_Resilience_chosenType', playerSummary.campaignName);
+        const fiendishResilienceType = getChosenRuntimeValue(playerStats, 'Fiendish Resilience', 'chosenType');
         if (fiendishResilienceType) {
             playerStats.resistances = [...new Set([
                 ...(playerStats.resistances || []),
@@ -205,7 +205,7 @@ const rulesFactory = {
         }
 
         // Resolve Boon Of Energy Resistance damage type resistances (2024 Epic Boon)
-        const boonEnergyResistances = getRuntimeValue(playerStats.name, '_Boon_Of_Energy_Resistance_chosenTypes', playerSummary.campaignName);
+        const boonEnergyResistances = getChosenRuntimeValue(playerStats, 'Boon Of Energy Resistance', 'chosenTypes');
         if (Array.isArray(boonEnergyResistances) && boonEnergyResistances.length > 0) {
             playerStats.resistances = [...new Set([
                 ...(playerStats.resistances || []),

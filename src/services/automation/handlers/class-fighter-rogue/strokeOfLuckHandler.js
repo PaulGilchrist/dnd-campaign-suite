@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../../hooks/useMetamagic.js';
+import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -32,15 +33,7 @@ export async function handle(action, playerStats, campaignName) {
     // Check usage limit: once per short or long rest
     const strokeOfLuckUsed = getRuntimeValue(playerName, 'strokeOfLuckUsed', campaignName);
     if (strokeOfLuckUsed) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name} has no uses remaining. Recharges on a Short or Long Rest.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action.name, `${action.name} has no uses remaining. Recharges on a Short or Long Rest.`, auto);
     }
 
     // Find the most recent failed D20 test (attack, ability check, or save)
@@ -53,15 +46,7 @@ export async function handle(action, playerStats, campaignName) {
     const saveFresh = saveEvent && !isStale(saveEvent);
 
     if (!attackFresh && !abilityFresh && !saveFresh) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No recent D20 test found for ${playerName}. This feature can only be used shortly after a failed attack roll, ability check, or saving throw.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action.name, `No recent D20 test found for ${playerName}. This feature can only be used shortly after a failed attack roll, ability check, or saving throw.`, auto);
     }
 
     let description;
@@ -90,8 +75,5 @@ export async function handle(action, playerStats, campaignName) {
         timestamp: Date.now(),
     }).catch(() => {});
 
-    return {
-        type: 'popup',
-        payload: { type: 'automation_info', name: action.name, description, automation: auto },
-    };
+    return infoPopup(action.name, description, auto);
 }

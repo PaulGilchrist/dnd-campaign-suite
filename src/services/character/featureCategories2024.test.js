@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import {
+import { categories2024 } from './featureCategories.js';
+
+const {
   featuresToIgnore,
   actions,
   bonusActions,
   reactions,
   characterAdvancement
-} from './featureCategories2024.js';
+} = categories2024;
 
 describe('featureCategories2024', () => {
   describe('featuresToIgnore', () => {

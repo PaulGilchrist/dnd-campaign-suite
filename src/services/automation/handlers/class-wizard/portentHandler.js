@@ -2,6 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeSt
 import { addEntry } from '../../../ui/logService.js';
 import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../../hooks/useMetamagic.js';
 import { rollD20 } from '../../../../services/dice/diceRoller.js';
+import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -43,15 +44,7 @@ async function handle(action, playerStats, campaignName, _mapName) {
     // Get available Portent dice
     const portentDice = getPortentDice(playerName, campaignName);
     if (portentDice.length === 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name}: No foretelling rolls remaining. Replenished on a Long Rest.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action.name, `${action.name}: No foretelling rolls remaining. Replenished on a Long Rest.`, auto);
     }
 
     // Find the most recent d20 test (attack, ability check, or save)
@@ -64,15 +57,7 @@ async function handle(action, playerStats, campaignName, _mapName) {
     const saveFresh = saveEvent && !isStale(saveEvent);
 
     if (!attackFresh && !abilityFresh && !saveFresh) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No recent D20 test found for ${playerName}. Portent can only be used shortly after a failed attack roll, ability check, or saving throw.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action.name, `No recent D20 test found for ${playerName}. Portent can only be used shortly after a failed attack roll, ability check, or saving throw.`, auto);
     }
 
     // Pick the highest Portent die to use
@@ -105,10 +90,7 @@ async function handle(action, playerStats, campaignName, _mapName) {
         timestamp: Date.now(),
     }).catch(() => {});
 
-    return {
-        type: 'popup',
-        payload: { type: 'automation_info', name: action.name, description, automation: auto },
-    };
+    return infoPopup(action.name, description, auto);
 }
 
 async function refreshPortentDice(playerName, campaignName, playerStats) {

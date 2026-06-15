@@ -1,29 +1,16 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { computeAllFeatBuffs } from '../services/character/featBuffService.js';
+import { injectSpecialActions } from '../services/shared/injectSpecialActions.js';
+import { applyAbilityScoreIncreases, mergeDeduplicated } from '../services/shared/buffApplier.js';
 
 function buildFormDataWithBuffs(prev, buffs) {
   const next = { ...prev };
   next.abilities = (prev.abilities || []).map(a => ({ ...a, miscBonus: 0 }));
 
-  buffs.abilityScoreIncreases.forEach(inc => {
-    if (inc.name && inc.name !== 'any') {
-      const ability = next.abilities.find(
-        a => a.name.toLowerCase() === inc.name.toLowerCase()
-      );
-      if (ability) {
-        ability.miscBonus = (ability.miscBonus || 0) + inc.amount;
-      }
-    }
-  });
+  applyAbilityScoreIncreases(next.abilities, buffs.abilityScoreIncreases);
 
   if (buffs.resistances.length > 0) {
-    const existing = new Set((prev.resistances || []).map(r => r.toLowerCase()));
-    const newResists = buffs.resistances.filter(
-      r => !existing.has(r.toLowerCase())
-    );
-    if (newResists.length > 0) {
-      next.resistances = [...(prev.resistances || []), ...newResists];
-    }
+    mergeDeduplicated(next, 'resistances', buffs.resistances);
   }
 
   const allSkillProfs = (buffs.proficiencies || []).filter(p => p.name === 'all_skills' && p.type === 'skill');
@@ -39,18 +26,11 @@ function buildFormDataWithBuffs(prev, buffs) {
   const existingActions = new Set(
     (prev.specialActions || []).map(a => (typeof a === 'string' ? a : a.name))
   );
-  buffs.features.forEach(f => {
-    if (!existingActions.has(f.name)) {
-      next.specialActions = next.specialActions || [];
-      next.specialActions.push({
-        name: f.name,
-        description: f.description,
-        type: f.type || 'passive',
-        source: 'feat',
-      });
-      existingActions.add(f.name);
-    }
-  });
+  const added = injectSpecialActions(existingActions, buffs.features, { includeAutomation: false });
+  if (added.length > 0) {
+    next.specialActions = next.specialActions || [];
+    next.specialActions.push(...added);
+  }
 
   const featProficiencies = (buffs.proficiencies || []).filter(
     p => p.type === 'proficiency' && p.isChoice

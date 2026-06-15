@@ -2,16 +2,8 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeSt
 import { resolveTarget } from '../../common/targetResolver.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { evaluateAutoExpression } from '../../../combat/automationService.js';
-import { getAbilityModifier } from '../../../shared/abilityLookup.js';
+import { buildSaveDc } from '../../common/savePrompt.js';
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
-
-function buildManeuverSaveDc(auto, playerStats) {
-    if (auto.saveDc) return auto.saveDc;
-    const saveAbility = auto.saveAbility || 'STR';
-    const abilityBonus = getAbilityModifier(playerStats.abilities, saveAbility);
-    const prof = playerStats.proficiency || 0;
-    return 8 + abilityBonus + prof;
-}
 
 function hasRelentless(playerStats) {
     return (playerStats.automation?.passives || []).some(p => p.type === 'passive_rule' && p.effect === 'relentless');
@@ -29,7 +21,7 @@ function setRelentlessUsed(playerStats, campaignName) {
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
 
-    const saveDc = buildManeuverSaveDc(auto, playerStats);
+    const saveDc = buildSaveDc(auto, playerStats);
     const superiorityDieSize = evaluateAutoExpression(auto.dieExpression || 'superiority_die', playerStats);
     const usesKey = 'superiorityDice';
     const defaultMax = auto.uses_max || 4;

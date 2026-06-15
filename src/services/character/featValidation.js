@@ -5,6 +5,7 @@
  */
 
 import { loadValidationRules, fetchBackgroundData } from '../ui/dataLoader.js';
+import { stripParenthetical } from '../shared/nameUtils.js';
 /**
  * Gets the number of feats allowed based on ruleset, level, and class from JSON
  * @param {object} formData - The character form data
@@ -195,8 +196,7 @@ export function getFeatTypeInfo(featName, allFeats) {
  * @returns {string} - The normalized feat name
  */
 export function normalizeBackgroundFeatName(rawName) {
-    if (!rawName) return rawName;
-    return rawName.replace(/\s*\([^)]*\)\s*$/, '').trim();
+    return stripParenthetical(rawName);
 }
 
 /**

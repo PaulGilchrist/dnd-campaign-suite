@@ -1,5 +1,6 @@
 import { findFeat } from '../shared/featFinder.js';
 import { resetMiscBonuses, applyAbilityScoreIncreases, mergeDeduplicated } from '../shared/buffApplier.js';
+import { injectSpecialActions } from '../shared/injectSpecialActions.js';
 
 /**
  * Feat Buff Service
@@ -518,19 +519,11 @@ export function applyFeatBuffsToFormData(formData, allFeats) {
     if (f.type === 'speed' || f.type === 'initiative' || f.type === 'hp_per_level' || f.type === 'hp_flat') return false;
     return true;
   });
-  nonAbilityBuffs.forEach(f => {
-    if (!existingActions.has(f.name)) {
-      formData.specialActions = formData.specialActions || [];
-      formData.specialActions.push({
-        name: f.name,
-        description: f.description,
-        type: f.type || 'passive',
-        source: 'feat',
-        automation: f.automation,
-      });
-      existingActions.add(f.name);
-    }
-  });
+  const added = injectSpecialActions(existingActions, nonAbilityBuffs, { includeAutomation: true });
+  if (added.length > 0) {
+    formData.specialActions = formData.specialActions || [];
+    formData.specialActions.push(...added);
+  }
 
   return buffs;
 }

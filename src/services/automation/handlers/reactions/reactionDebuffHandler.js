@@ -6,6 +6,7 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { getLastAttackRoll, getLastDamageEvent, getLastAbilityCheck } from '../../../../hooks/useMetamagic.js';
 import { evaluateAutoExpression } from '../../../combat/automationService.js';
+import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -67,11 +68,7 @@ async function handleAttackRollDebuff(action, _playerStats, campaignName, attack
         description += `<br/><i>The attack already missed — no effect.</i>`;
     }
 
-    return {
-        type: 'popup',
-        payload: { type: 'automation_info', name: action.name, description, automation: auto },
-        defenderHp,
-    };
+    return infoPopup(action.name, description, auto, { defenderHp });
 }
 
 async function handleAbilityCheckDebuff(action, _playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, _combatSummary) {
@@ -79,15 +76,7 @@ async function handleAbilityCheckDebuff(action, _playerStats, campaignName, atta
 
     const checkEvent = getLastAbilityCheck(attackerName);
     if (!checkEvent || isStale(checkEvent)) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No recent ability check found for ${attackerName}. ${action.name} can only be used shortly after an ability check.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action.name, `No recent ability check found for ${attackerName}. ${action.name} can only be used shortly after an ability check.`, auto);
     }
 
     const { d20, bonus, checkName } = checkEvent;
@@ -97,10 +86,7 @@ async function handleAbilityCheckDebuff(action, _playerStats, campaignName, atta
 
     const description = `<b>${action.name}</b><br/>Creature: ${attackerName}<br/>Bardic Inspiration die: 1d${bardicDieSize} = <b>${biDieRoll}</b><br/>${checkName}: d20(${d20}) + ${bonus} = ${originalTotal} → <b>${reducedTotal}</b>`;
 
-    return {
-        type: 'popup',
-        payload: { type: 'automation_info', name: action.name, description, automation: auto },
-    };
+    return infoPopup(action.name, description, auto);
 }
 
 async function handleDamageDebuff(action, _playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
@@ -108,28 +94,12 @@ async function handleDamageDebuff(action, _playerStats, campaignName, attackerNa
 
     const lastEvent = getLastDamageEvent(attackerName);
     if (!lastEvent || !lastEvent.rawDamage || isStale(lastEvent)) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No recent damage event found for ${attackerName}. ${action.name} can only be used shortly after a damage roll.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action.name, `No recent damage event found for ${attackerName}. ${action.name} can only be used shortly after a damage roll.`, auto);
     }
 
     const defenderName = lastEvent.targetName;
     if (!defenderName) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `Could not determine who ${attackerName} damaged. Cannot apply ${action.name}.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action.name, `Could not determine who ${attackerName} damaged. Cannot apply ${action.name}.`, auto);
     }
 
     const originalDamage = lastEvent.rawDamage;
@@ -144,11 +114,7 @@ async function handleDamageDebuff(action, _playerStats, campaignName, attackerNa
 
     const description = `<b>${action.name}</b><br/>Attacker: ${attackerName}<br/>Defender: ${defenderName}<br/>Bardic Inspiration die: 1d${bardicDieSize} = <b>${biDieRoll}</b><br/>Original damage: ${originalDamage}<br/>Reduced damage: <b>${reducedDamage}</b><br/>${healAmount > 0 ? `Healed ${defenderName} for ${healAmount} HP.` : ''}${defenderHp != null ? `<br/>${defenderName} HP: ${defenderHp}` : ''}`;
 
-    return {
-        type: 'popup',
-        payload: { type: 'automation_info', name: action.name, description, automation: auto },
-        defenderHp,
-    };
+    return infoPopup(action.name, description, auto, { defenderHp });
 }
 
 async function handleDisadvantageDebuff(action, _playerStats, campaignName, attackerName, combatSummary) {
@@ -156,15 +122,7 @@ async function handleDisadvantageDebuff(action, _playerStats, campaignName, atta
 
     const attackEvent = getLastAttackRoll(attackerName);
     if (!attackEvent || isStale(attackEvent)) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action.name, `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`, auto);
     }
 
     const { d20, bonus, targetName, targetAc, hit, effectiveAc } = attackEvent;
@@ -202,12 +160,7 @@ async function handleDisadvantageDebuff(action, _playerStats, campaignName, atta
         description += `<br/><i>The attack already missed — no effect.</i>`;
     }
 
-    return {
-        type: 'popup',
-        payload: { type: 'automation_info', name: action.name, description, automation: auto },
-        defenderHp,
-        defenderName,
-    };
+    return infoPopup(action.name, description, auto, { defenderHp, defenderName });
 }
 
 async function applyImprovedWardingFlare(playerStats, defenderName, campaignName) {
@@ -373,17 +326,9 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
     if (effect === 'disadvantage_on_attack_roll') {
         const attackEvent = getLastAttackRoll(attackerName);
-        if (!attackEvent || isStale(attackEvent)) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: featureName,
-                    description: `No recent attack roll found for ${attackerName}. ${featureName} can only be used shortly after an attack roll.`,
-                    automation: auto,
-                },
-            };
-        }
+    if (!attackEvent || isStale(attackEvent)) {
+        return infoPopup(action.name, `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`, auto);
+    }
         result = await handleDisadvantageDebuff(action, playerStats, campaignName, attackerName, combatSummary);
     } else {
         const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);

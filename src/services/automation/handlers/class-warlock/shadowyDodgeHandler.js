@@ -1,5 +1,6 @@
 import { addEntry } from '../../../ui/logService.js';
 import { getLastAttackRoll } from '../../../../hooks/useMetamagic.js';
+import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -16,15 +17,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Get the last attack roll against the player
     const attackEvent = getLastAttackRoll(playerName);
     if (!attackEvent || isStale(attackEvent)) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `No recent attack roll against you found. ${featureName} can only be used shortly after an attack roll.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(featureName, `No recent attack roll against you found. ${featureName} can only be used shortly after an attack roll.`, auto);
     }
 
     const { d20, bonus, targetName, targetAc, hit, effectiveAc } = attackEvent;
@@ -60,8 +53,5 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         timestamp: Date.now(),
     }).catch(() => {});
 
-    return {
-        type: 'popup',
-        payload: { type: 'automation_info', name: featureName, description, automation: auto },
-    };
+    return infoPopup(featureName, description, auto);
 }

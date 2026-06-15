@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../hooks/useMetamagic.js';
+import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -26,15 +27,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const maxLP = playerStats._trackedResources?.luckyPoints?.max || 0;
     const currentLP = Number(getRuntimeValue(playerName, 'luckyPoints', campaignName) ?? maxLP);
     if (currentLP <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name} requires at least 1 Lucid Point. You have ${currentLP} remaining.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action.name, `${action.name} requires at least 1 Lucid Point. You have ${currentLP} remaining.`, auto);
     }
 
     const attackEvent = getLastAttackRoll(playerName);
@@ -46,15 +39,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const saveFresh = saveEvent && !isStale(saveEvent);
 
     if (!attackFresh && !abilityFresh && !saveFresh) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No recent D20 test found for ${playerName}. This feature can only be used shortly after a failed attack roll, ability check, or saving throw.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action.name, `No recent D20 test found for ${playerName}. This feature can only be used shortly after a failed attack roll, ability check, or saving throw.`, auto);
     }
 
     let description;
@@ -81,8 +66,5 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         timestamp: Date.now(),
     }).catch(() => {});
 
-    return {
-        type: 'popup',
-        payload: { type: 'automation_info', name: action.name, description, automation: auto },
-    };
+    return infoPopup(action.name, description, auto);
 }

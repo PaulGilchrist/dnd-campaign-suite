@@ -1,7 +1,11 @@
 import { cloneDeep, merge } from 'lodash';
 import utils from '../../ui/utils.js'
-import * as featureCategories from '../featureCategories5e.js'
+import { getCategories } from '../featureCategories.js'
 import { categorizeFeatures, mergeCategorizedFeatures } from '../featureCategorizationUtils.js'
+import { computePassiveSkills } from '../../shared/computePassiveSkills.js'
+import { deduplicateAndSort } from '../../shared/deduplicateAndSort.js'
+
+const featureCategories = getCategories('5e');
 
 const raceRules = {
     getImmunities: (playerSummary) => {
@@ -17,9 +21,9 @@ const raceRules = {
         if(playerSummary.class.name === "Paladin" && playerSummary.level > 2) {
             immunities.push("Disease"); // Divine Health
            }
-        if(playerSummary.immunities) {
-            immunities = [...new Set([...immunities, ...playerSummary.immunities])];
-           }
+         if(playerSummary.immunities) {
+             immunities = deduplicateAndSort([...immunities, ...playerSummary.immunities]);
+            }
         return immunities.sort();
         },
     getRace: (allRaces, playerSummary) => {
@@ -85,36 +89,21 @@ const raceRules = {
         } else if(playerSummary.race.name === "Tiefling") {
             resistances.push("Fire"); // Hellish Resistance
         }
-        if(playerSummary.resistances) {
-            resistances = [...new Set([...resistances, ...playerSummary.resistances])];
-           }
+         if(playerSummary.resistances) {
+             resistances = deduplicateAndSort([...resistances, ...playerSummary.resistances]);
+            }
         return resistances.sort();
         },
     getSenses: (playerStats) => {
-           // Dependencies: Race
-        const senses = playerStats.senses ? [...playerStats.senses] : [];
-        const darkvisionInSenses = senses.some((sense) => sense.name === 'Darkvision');
-        const darkvisionRace = playerStats.race.traits.some((trait) => trait.name === 'Darkvision');
-        if (darkvisionRace && !darkvisionInSenses) {
-            senses.push({ name: 'Darkvision', value: '60 ft.' });
-           }
-        // Passive skills
-        const getPassiveScore = (abilityName, skillName) => {
-            const ability = playerStats.abilities?.find(a => a.name === abilityName);
-            if (!ability) return null;
-            const skill = ability.skills?.find(s => s.name === skillName);
-            const base = 10 + (ability.bonus || 0);
-            if (!skill) return base;
-            return 10 + (skill.bonus || 0);
-        };
-        const passPer = getPassiveScore('Wisdom', 'Perception');
-        if (passPer !== null) senses.push({ name: 'Passive Perception', value: String(passPer) });
-        const passInv = getPassiveScore('Intelligence', 'Investigation');
-        if (passInv !== null) senses.push({ name: 'Passive Investigation', value: String(passInv) });
-        const passIns = getPassiveScore('Wisdom', 'Insight');
-        if (passIns !== null) senses.push({ name: 'Passive Insight', value: String(passIns) });
-        return senses.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        },
+            // Dependencies: Race
+         const passiveSenses = computePassiveSkills(playerStats);
+         const darkvisionInSenses = passiveSenses.some((sense) => sense.name === 'Darkvision');
+         const darkvisionRace = playerStats.race.traits.some((trait) => trait.name === 'Darkvision');
+         if (darkvisionRace && !darkvisionInSenses) {
+             passiveSenses.push({ name: 'Darkvision', value: '60 ft.' });
+            }
+         return passiveSenses.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+          },
         addTraits: (traits) => {
             return categorizeFeatures(traits, featureCategories, { descriptionField: 'description' });
               },

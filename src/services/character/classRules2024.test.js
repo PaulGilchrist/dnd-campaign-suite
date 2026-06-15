@@ -13,12 +13,21 @@ vi.mock('../ui/utils.js', () => ({
      }
 }));
 
-vi.mock('./featureCategories2024.js', () => ({
-  actions: [],
-  bonusActions: [],
-  reactions: [],
-  passive: [],
-  maintained: []
+vi.mock('./featureCategories.js', () => ({
+  getCategories: vi.fn(() => ({
+    actions: [],
+    bonusActions: [],
+    reactions: [],
+    passive: [],
+    maintained: []
+  })),
+  categories2024: {
+    actions: [],
+    bonusActions: [],
+    reactions: [],
+    passive: [],
+    maintained: []
+  }
 }));
 
 vi.mock('./featureCategorizationUtils.js', () => ({

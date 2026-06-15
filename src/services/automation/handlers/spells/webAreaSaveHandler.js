@@ -2,6 +2,7 @@ import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { playerIsImmuneToCondition } from '../../../combat/automationImmunities.js';
 
 /**
  * Web spell area save handler for 2024 ruleset.
@@ -56,7 +57,6 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
     if (isAlreadyRestrained) return null;
 
     // Check condition immunity
-    const { playerIsImmuneToCondition } = await import('../../../combat/automationImmunities.js');
     const targetCharacter = (await getCombatContext(campaignName))?.creatures?.find(c => c.name === targetName);
     if (targetCharacter?.type === 'player') {
         const targetStats = {

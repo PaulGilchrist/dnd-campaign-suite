@@ -1,4 +1,4 @@
-import { executeHandler, applyRemoveCurse as applyRemoveCurseEffect } from '../../automation/index.js';
+import { executeHandler, applyRemoveCurseEffect } from '../../automation/index.js';
 
 export async function triggerRemoveCurse(spell, metaCtx, playerStats, campaignName, mapName) {
     const isRemoveCurse = (spell.name || '').toLowerCase() === 'remove curse';

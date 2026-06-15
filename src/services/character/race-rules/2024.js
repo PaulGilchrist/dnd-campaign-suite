@@ -1,8 +1,12 @@
 import { cloneDeep } from 'lodash';
-import * as featureCategories from '../featureCategories2024.js'
+import { getCategories } from '../featureCategories.js'
 import { categorizeFeatures, mergeCategorizedFeatures } from '../featureCategorizationUtils.js'
 import utils from '../../ui/utils.js';
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { computePassiveSkills } from '../../shared/computePassiveSkills.js';
+import { deduplicateAndSort } from '../../shared/deduplicateAndSort.js';
+
+const featureCategories = getCategories('2024');
 
 const LEGACY_KEY = '_fiendishLegacySelection';
 
@@ -29,7 +33,7 @@ const raceRules = {
             }
 
         if(playerSummary.immunities) {
-            immunities = [...new Set([...immunities, ...playerSummary.immunities])];
+            immunities = deduplicateAndSort([...immunities, ...playerSummary.immunities]);
             }
 
         return immunities.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -125,94 +129,79 @@ const raceRules = {
         }
 
         if(playerSummary.resistances) {
-            resistances = [...new Set([...resistances, ...playerSummary.resistances])];
+            resistances = deduplicateAndSort([...resistances, ...playerSummary.resistances]);
         }
 
         return resistances.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
           },
     getSenses: (playerStats) => {
             // 2024 Rules: Extract senses from racial traits
-        const senses = playerStats.senses ? [...playerStats.senses] : [];
+         const passiveSenses = computePassiveSkills(playerStats);
 
-        if (playerStats.race && playerStats.race.traits) {
-            playerStats.race.traits.forEach(trait => {
-                if (trait.description) {
-                        // Check for darkvision
-                    if (trait.description.toLowerCase().includes('darkvision')) {
-                        const darkvisionMatch = trait.description.match(/darkvision with a range of (\d+) feet/i);
-                        if (darkvisionMatch) {
-                            const range = `${darkvisionMatch[1]} ft.`;
-                            if (!senses.some((sense) => sense.name === 'Darkvision')) {
-                                senses.push({ name: 'Darkvision', value: range });
-                                }
-                            }
-                        }
+         if (playerStats.race && playerStats.race.traits) {
+             playerStats.race.traits.forEach(trait => {
+                 if (trait.description) {
+                         // Check for darkvision
+                     if (trait.description.toLowerCase().includes('darkvision')) {
+                         const darkvisionMatch = trait.description.match(/darkvision with a range of (\d+) feet/i);
+                         if (darkvisionMatch) {
+                             const range = `${darkvisionMatch[1]} ft.`;
+                             if (!passiveSenses.some((sense) => sense.name === 'Darkvision')) {
+                                 passiveSenses.push({ name: 'Darkvision', value: range });
+                                 }
+                             }
+                         }
 
-                    // Check for tremorsense (skip Stonecunning — it's conditional, not passive)
-                    if (trait.description.toLowerCase().includes('tremorsense')) {
-                        // Stonecunning is a bonus action with uses, not a passive sense
-                        if (trait.name === 'Stonecunning') {
-                            // Don't add passive tremorsense for Stonecunning
-                        } else {
-                            const tremorsenseMatch = trait.description.match(/tremorsense with a range of (\d+) feet/i);
-                            if (tremorsenseMatch) {
-                                const range = `${tremorsenseMatch[1]} ft.`;
-                                if (!senses.some((sense) => sense.name === 'Tremorsense')) {
-                                    senses.push({ name: 'Tremorsense', value: range });
-                                }
-                            }
-                        }
-                    }
-                    }
-                });
-            }
+                     // Check for tremorsense (skip Stonecunning — it's conditional, not passive)
+                     if (trait.description.toLowerCase().includes('tremorsense')) {
+                         // Stonecunning is a bonus action with uses, not a passive sense
+                         if (trait.name === 'Stonecunning') {
+                             // Don't add passive tremorsense for Stonecunning
+                         } else {
+                             const tremorsenseMatch = trait.description.match(/tremorsense with a range of (\d+) feet/i);
+                             if (tremorsenseMatch) {
+                                 const range = `${tremorsenseMatch[1]} ft.`;
+                                 if (!passiveSenses.some((sense) => sense.name === 'Tremorsense')) {
+                                     passiveSenses.push({ name: 'Tremorsense', value: range });
+                                 }
+                             }
+                         }
+                     }
+                     }
+                 });
+             }
 
-        // Elfish Lineage: Drow lineage overrides Darkvision to 120 ft.
-        const campaignName = playerStats.campaignName;
-        const elfisLineage = playerStats.race?.lineage || getRuntimeValue(playerStats.name, '_elfishLineageSelection', campaignName);
-        if (elfisLineage === 'Drow') {
-            const darkvisionIndex = senses.findIndex(s => s.name === 'Darkvision');
-            if (darkvisionIndex !== -1) {
-                const currentFeet = extractDarkvisionFeet(senses[darkvisionIndex].value);
-                if (currentFeet < 120) {
-                    senses[darkvisionIndex] = { ...senses[darkvisionIndex], value: '120 ft.' };
-                }
-            } else {
-                senses.push({ name: 'Darkvision', value: '120 ft.' });
-            }
-        }
+         // Elfish Lineage: Drow lineage overrides Darkvision to 120 ft.
+         const campaignName = playerStats.campaignName;
+         const elfisLineage = playerStats.race?.lineage || getRuntimeValue(playerStats.name, '_elfishLineageSelection', campaignName);
+         if (elfisLineage === 'Drow') {
+             const darkvisionIndex = passiveSenses.findIndex(s => s.name === 'Darkvision');
+             if (darkvisionIndex !== -1) {
+                 const currentFeet = extractDarkvisionFeet(passiveSenses[darkvisionIndex].value);
+                 if (currentFeet < 120) {
+                     passiveSenses[darkvisionIndex] = { ...passiveSenses[darkvisionIndex], value: '120 ft.' };
+                 }
+             } else {
+                 passiveSenses.push({ name: 'Darkvision', value: '120 ft.' });
+             }
+         }
 
-        // Gnomish Lineage: Deep Gnome lineage overrides Darkvision to 120 ft.
-        const gnomishLineage = playerStats.race?.lineage || getRuntimeValue(playerStats.name, '_gnomishLineageSelection', campaignName);
-        if (gnomishLineage === 'Deep Gnome') {
-            const darkvisionIndex = senses.findIndex(s => s.name === 'Darkvision');
-            if (darkvisionIndex !== -1) {
-                const currentFeet = extractDarkvisionFeet(senses[darkvisionIndex].value);
-                if (currentFeet < 120) {
-                    senses[darkvisionIndex] = { ...senses[darkvisionIndex], value: '120 ft.' };
-                }
-            } else {
-                senses.push({ name: 'Darkvision', value: '120 ft.' });
-            }
-        }
+         // Gnomish Lineage: Deep Gnome lineage overrides Darkvision to 120 ft.
+         const gnomishLineage = playerStats.race?.lineage || getRuntimeValue(playerStats.name, '_gnomishLineageSelection', campaignName);
+         if (gnomishLineage === 'Deep Gnome') {
+             const darkvisionIndex = passiveSenses.findIndex(s => s.name === 'Darkvision');
+             if (darkvisionIndex !== -1) {
+                 const currentFeet = extractDarkvisionFeet(passiveSenses[darkvisionIndex].value);
+                 if (currentFeet < 120) {
+                     passiveSenses[darkvisionIndex] = { ...passiveSenses[darkvisionIndex], value: '120 ft.' };
+                 }
+             } else {
+                 passiveSenses.push({ name: 'Darkvision', value: '120 ft.' });
+             }
+         }
 
-        // Passive skills
-        const getPassiveScore = (abilityName, skillName) => {
-            const ability = playerStats.abilities?.find(a => a.name === abilityName);
-            if (!ability) return null;
-            const skill = ability.skills?.find(s => s.name === skillName);
-            const base = 10 + (ability.bonus || 0);
-            if (!skill) return base;
-            return 10 + (skill.bonus || 0);
-        };
-        const passPer = getPassiveScore('Wisdom', 'Perception');
-        if (passPer !== null) senses.push({ name: 'Passive Perception', value: String(passPer) });
-        const passInv = getPassiveScore('Intelligence', 'Investigation');
-        if (passInv !== null) senses.push({ name: 'Passive Investigation', value: String(passInv) });
-        const passIns = getPassiveScore('Wisdom', 'Insight');
-        if (passIns !== null) senses.push({ name: 'Passive Insight', value: String(passIns) });
-        return senses.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-         },
+         return passiveSenses.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+          },
         addTraits: (traits) => {
         return categorizeFeatures(traits, featureCategories, { descriptionField: 'description' });
           },

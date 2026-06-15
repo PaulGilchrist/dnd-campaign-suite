@@ -2,6 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeSt
 import { addEntry } from '../../../ui/logService.js';
 import { getLastAbilityCheck, getLastSaveRoll } from '../../../../hooks/useMetamagic.js';
 import { evaluateAutoExpression } from '../../../combat/automationService.js';
+import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -31,15 +32,7 @@ export async function handle(action, playerStats, campaignName) {
     const currentUses = Number(getRuntimeValue(playerName, 'darkOnesLookUses', campaignName) ?? maxUses);
 
     if (currentUses <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name} has no uses remaining. Recharges on a Long Rest.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action.name, `${action.name} has no uses remaining. Recharges on a Long Rest.`, auto);
     }
 
     // Find the most recent ability check or saving throw
@@ -50,15 +43,7 @@ export async function handle(action, playerStats, campaignName) {
     const saveFresh = saveEvent && !isStale(saveEvent);
 
     if (!abilityFresh && !saveFresh) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No recent ability check or saving throw found for ${playerName}. This feature can only be used shortly after an ability check or saving throw.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action.name, `No recent ability check or saving throw found for ${playerName}. This feature can only be used shortly after an ability check or saving throw.`, auto);
     }
 
     // Roll 1d10
@@ -86,8 +71,5 @@ export async function handle(action, playerStats, campaignName) {
         timestamp: Date.now(),
     }).catch(() => {});
 
-    return {
-        type: 'popup',
-        payload: { type: 'automation_info', name: action.name, description, automation: auto },
-    };
+    return infoPopup(action.name, description, auto);
 }

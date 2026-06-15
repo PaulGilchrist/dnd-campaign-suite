@@ -4,6 +4,7 @@ import * as mapsService from '../../maps/mapsService.js';
 import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem, rangeToFeet } from '../../rules/combat/rangeValidation.js';
 import { computeCover } from '../../rules/combat/coverService.js';
 import { loadNPCs } from '../../npcs/npcsService.js';
+import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 export function rollDamageForAction(auto, options = {}) {
     const damage = auto.damage;
@@ -24,16 +25,20 @@ export function rollDamageForAction(auto, options = {}) {
             saveType: auto.saveType || 'DEX',
             saveSuccess: auto.dcSuccess ?? (auto.shape === 'cone' ? 0.5 : 0),
          },
-     };
+      };
 }
 
-import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
-
-export async function buildAttackContextForDamage(attackContext, playerName, campaignName, mapName) {
+export async function buildBaseAttackContext(playerName, campaignName, damageType) {
     const cs = await getCombatContext(campaignName);
     const target = cs ? getTargetFromAttacker(cs, playerName) : null;
     const targetName = target?.name || (cs ? getAttackerTargetName(cs, playerName) : undefined);
-    let resistanceNotice = target ? getResistanceNotice([attackContext.damageType], target.resistances, target.immunities, target.name) : null;
+    const resistanceNotice = target ? getResistanceNotice([damageType], target.resistances, target.immunities, target.name) : null;
+    return { target, targetName, resistanceNotice };
+}
+
+export async function buildAttackContextForDamage(attackContext, playerName, campaignName, mapName) {
+    const { targetName, resistanceNotice: initialNotice } = await buildBaseAttackContext(playerName, campaignName, attackContext.damageType);
+    let resistanceNotice = initialNotice;
 
     // Check Nature's Sanctuary resistance for allies in the cube
     if (!resistanceNotice && targetName && mapName && campaignName) {
@@ -42,7 +47,6 @@ export async function buildAttackContextForDamage(attackContext, playerName, cam
             const sanctuaryX = Number(getRuntimeValue(playerName, 'naturesSanctuaryCubeX', campaignName) || 0);
             const sanctuaryY = Number(getRuntimeValue(playerName, 'naturesSanctuaryCubeY', campaignName) || 0);
             if (sanctuaryX > 0 && sanctuaryY > 0 && targetName) {
-                // Check if target is in the sanctuary cube (3x3 grid centered on placement)
                 const mapData = await mapsService.loadMapData(campaignName, mapName);
                 const targetPlayer = mapData?.players?.find(p => p.name === targetName);
                 const targetNpc = mapData?.placedItems?.find(i => i.name === targetName || i.name?.startsWith(targetName + ' '));
@@ -56,7 +60,6 @@ export async function buildAttackContextForDamage(attackContext, playerName, cam
                     const dx = Math.abs(targetGridPos.gridX - sanctuaryX);
                     const dy = Math.abs(targetGridPos.gridY - sanctuaryY);
                     if (dx <= 1 && dy <= 1) {
-                        // Target is in the sanctuary cube - check if attacker has land resistance
                         const landResistance = getRuntimeValue(playerName, 'naturesSanctuaryResistance', campaignName);
                         if (landResistance) {
                             const lowerDamageType = attackContext.damageType.toLowerCase();
@@ -80,7 +83,7 @@ export async function buildAttackContextForDamage(attackContext, playerName, cam
             dcSuccess: attackContext.saveSuccess,
             attackerName: playerName,
          };
-     }
+      }
 
     try {
         const [mapData, npcs] = await Promise.all([
@@ -137,7 +140,7 @@ export async function buildAttackContextForDamage(attackContext, playerName, cam
                 if (meleeResult.mode === 'disadvantage') {
                     return { ...buildSyncCtx(targetName, resistanceNotice, attackContext, playerName), forcedMode: 'disadvantage', rangeReason: meleeResult.reason };
                  }
-             }
+            }
 
             if (isRanged && targetPos && !rangeToFeet(attackContext.range)) {
                 const walls = mapData?.walls || new Set();

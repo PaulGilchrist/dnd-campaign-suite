@@ -1,4 +1,5 @@
-import { getTargetFromAttacker, getCombatContext, getResistanceNotice, getAttackerTargetName } from '../rules/combat/damageUtils.js';
+import { buildBaseAttackContext } from './common/damageRoll.js';
+import { getCombatContext, getTargetFromAttacker } from '../rules/combat/damageUtils.js';
 import * as mapsService from '../maps/mapsService.js';
 import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem, rangeToFeet } from '../rules/combat/rangeValidation.js';
 import { computeCover } from '../rules/combat/coverService.js';
@@ -16,10 +17,7 @@ import { hasProtectionBuff } from '../combat/protectionBuffUtils.js';
 export function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects) {
     const playerName = playerStats.name;
 
-    return getCombatContext(campaignName).then(cs => {
-        const target = cs ? getTargetFromAttacker(cs, playerName) : null;
-        const targetName = target?.name || (cs ? getAttackerTargetName(cs, playerName) : undefined);
-        const resistanceNotice = target ? getResistanceNotice([attack.damageType], target.resistances, target.immunities, target.name) : null;
+    return buildBaseAttackContext(playerName, campaignName, attack.damageType).then(({ target, targetName, resistanceNotice }) => {
 
         // Hunter's Lore: reveal full IRV info for Hunter's Mark target
         let hunterLoreNotice = null;
@@ -271,7 +269,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             grazeAbilityName,
             grazeAbilityMod,
         };
-       });
+        });
 }
 
 export function buildAttackContext(attack, playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects) {

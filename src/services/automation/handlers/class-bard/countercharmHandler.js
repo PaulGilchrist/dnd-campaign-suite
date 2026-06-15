@@ -4,6 +4,7 @@ import { getLastAttackRoll, getLastAbilityCheck } from '../../../../hooks/useMet
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
+import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -84,15 +85,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     if (usesMax > 0) {
         const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? usesMax);
         if (currentUses <= 0) {
-            return {
-                type: 'popup',
-                payload: {
-                    type: 'automation_info',
-                    name: featureName,
-                    description: `${featureName} has no uses remaining. Recharges on a Long Rest.`,
-                    automation: auto,
-                },
-            };
+            return infoPopup(featureName, `${featureName} has no uses remaining. Recharges on a Long Rest.`, auto);
         }
     }
 
@@ -100,15 +93,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const result = await findRecentFailedSave(playerStats, campaignName, mapName, rangeFt);
 
     if (!result) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: featureName,
-                description: `No recent save (attack roll or ability check) found for you or any ally within ${auto.range || '30 ft'}. ${featureName} must be used shortly after a failed save against a Charmed or Frightened effect.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(featureName, `No recent save (attack roll or ability check) found for you or any ally within ${auto.range || '30 ft'}. ${featureName} must be used shortly after a failed save against a Charmed or Frightened effect.`, auto);
     }
 
     const { name: targetName, event: saveEvent, type: saveType } = result;

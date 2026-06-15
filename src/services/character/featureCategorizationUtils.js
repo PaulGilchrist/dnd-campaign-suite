@@ -100,6 +100,24 @@ export const categorizeFeatures = (items, categories, options = {}) => {
 };
 
 /**
+ * Categorize features from class levels into the defined categories.
+ * Flattens features from all levels up to the given max level,
+ * maintaining reverse order (highest level first).
+ *
+ * @param {Array} levels - Array of level objects with optional `features` arrays
+ * @param {Object} categories - Category definitions from feature-categories file
+ * @param {Object} options - Optional configuration passed to categorizeFeatures
+ * @returns {Object} Categorized features
+ */
+export const addFeatures = (levels, categories, options = {}) => {
+  const allFeatures = [];
+  for (let i = levels.length - 1; i >= 0; i--) {
+    allFeatures.push(...(levels[i].features || []));
+  }
+  return categorizeFeatures(allFeatures, categories, options);
+};
+
+/**
  * Merge two categorized feature objects, deduplicating by name in each category.
  *
  * @param {Object} base - Base categorized features

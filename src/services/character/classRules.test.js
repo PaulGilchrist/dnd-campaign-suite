@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import classRules from './classRules.js';
+import { addFeatures } from './featureCategorizationUtils.js';
+import { categories5e } from './featureCategories.js';
+const featureCategories = categories5e;
 
 describe('classRules', () => {
   describe('getClass', () => {
@@ -674,14 +677,14 @@ describe('classRules', () => {
          { level: 2, features: ['Second Wind', 'Action Surge'] }
        ];
 
-      const result = classRules.addFeatures(levels);
+       const result = addFeatures(levels, featureCategories, { descriptionField: 'description' });
 
-      expect(result).toBeDefined();
-      expect(typeof result).toBe('object');
-        });
+       expect(result).toBeDefined();
+       expect(typeof result).toBe('object');
+         });
 
     it('should handle empty levels array', () => {
-      const result = classRules.addFeatures([]);
+      const result = addFeatures([], featureCategories, { descriptionField: 'description' });
 
       expect(result).toBeDefined();
         });
@@ -692,7 +695,7 @@ describe('classRules', () => {
          { level: 2 }
        ];
 
-      const result = classRules.addFeatures(levels);
+       const result = addFeatures(levels, featureCategories, { descriptionField: 'description' });
 
       expect(result).toBeDefined();
         });
@@ -703,7 +706,7 @@ describe('classRules', () => {
          { level: 2, features: [] }
        ];
 
-      const result = classRules.addFeatures(levels);
+       const result = addFeatures(levels, featureCategories, { descriptionField: 'description' });
 
       expect(result).toBeDefined();
       });

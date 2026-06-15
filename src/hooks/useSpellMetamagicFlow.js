@@ -4,6 +4,7 @@ import { addEntry } from '../services/ui/logService.js'
 import { getMultiTargetSpreadForSpell } from '../services/rules/spells/postCastRiderService.js'
 import { getCombatSummary } from '../services/encounters/combatData.js'
 import { isPsionicSpell, hasPsionicSorcery } from '../services/rules/spells/metamagicRules.js'
+import { confirmRemoveCurse } from '../services/rules/features/removeCurseService.js'
 
 function getCreatureTargets(excludeName) {
   const cs = getCombatSummary();
@@ -566,7 +567,6 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { confirmRemoveCurse } = await import('../services/rules/features/removeCurseService.js');
       await confirmRemoveCurse(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'remove_curse', range: pending.range } },
         playerStats,

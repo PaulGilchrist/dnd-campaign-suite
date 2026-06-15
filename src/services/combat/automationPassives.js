@@ -2,7 +2,21 @@ import { buildAttackInfo } from './automationInfoBuilder.js'
 import { evaluateAutoExpression } from './automationExpressions.js'
 import { parseMagicItemName } from '../rules/core/attackCalc.js'
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js'
+import { getChosenRuntimeValue } from '../automation/common/choiceStorage.js'
 import { applyGreatWeaponFighting } from '../rules/core/greatWeaponFighting.js'
+
+/**
+ * Check if playerStats has a passive automation matching type and effect.
+ *
+ * @param {Object} playerStats - PlayerStats object
+ * @param {string} type - Automation type (e.g. 'passive_rule', 'passive_buff', 'passive_immunity')
+ * @param {string} effect - Effect identifier
+ * @returns {boolean}
+ */
+export function hasPassiveEffect(playerStats, type, effect) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p => p.type === type && p.effect === effect);
+}
 
 export function getPassiveBuffs(features, playerStats) {
     const buffs = []
@@ -48,8 +62,7 @@ export function collectWeaponMastery(weaponName, playerStats) {
             replaceMastery = passive.replaceMastery;
         }
         if (passive.type === 'weapon_mastery_choice' && passive.masteryProperties) {
-            const typeKey = `_${passive.name.replace(/\s+/g, '_')}_chosenMastery`;
-            const chosenMastery = getRuntimeValue(playerStats.name, typeKey, playerStats.campaignName);
+            const chosenMastery = getChosenRuntimeValue(playerStats, passive.name, 'chosenMastery');
             if (chosenMastery && passive.masteryProperties.includes(chosenMastery)) {
                 extraMasteries.push(chosenMastery);
             }
@@ -88,28 +101,23 @@ export function resolveHealingBonuses(playerStats, prof, level, slotLevel) {
 }
 
 export function hasHealingMaximization(playerStats) {
-    const passives = playerStats.automation?.passives || [];
-    return passives.some(p => p.type === 'passive_rule' && p.effect === 'maximize_healing_dice');
+    return hasPassiveEffect(playerStats, 'passive_rule', 'maximize_healing_dice');
 }
 
 export function hasRerollHealingOnes(playerStats) {
-    const passives = playerStats.automation?.passives || [];
-    return passives.some(p => p.type === 'passive_rule' && p.effect === 'reroll_healing_ones');
+    return hasPassiveEffect(playerStats, 'passive_rule', 'reroll_healing_ones');
 }
 
 export function hasTacticalShift(playerStats) {
-    const passives = playerStats.automation?.passives || [];
-    return passives.some(p => p.type === 'passive_rule' && p.effect === 'tactical_shift_no_oa');
+    return hasPassiveEffect(playerStats, 'passive_rule', 'tactical_shift_no_oa');
 }
 
 export function hasSpeedyOpportunityDisadvantage(playerStats) {
-    const passives = playerStats.automation?.passives || [];
-    return passives.some(p => p.type === 'passive_rule' && p.effect === 'opportunity_attacks_disadvantage');
+    return hasPassiveEffect(playerStats, 'passive_rule', 'opportunity_attacks_disadvantage');
 }
 
 export function hasSpeedyDifficultTerrainIgnore(playerStats) {
-    const passives = playerStats.automation?.passives || [];
-    return passives.some(p => p.type === 'passive_rule' && p.effect === 'ignore_difficult_terrain_on_dash');
+    return hasPassiveEffect(playerStats, 'passive_rule', 'ignore_difficult_terrain_on_dash');
 }
 
 export function isResistantToDamageType(playerStats, damageType) {
@@ -132,8 +140,7 @@ export function hasIgnoreResistance(playerStats, damageType) {
             }
         }
         if (passive.type === 'damage_type_choice' && passive.effect === 'elemental_adept') {
-            const typeKey = `_${passive.name.replace(/\s+/g, '_')}_chosenType`;
-            const chosenType = getRuntimeValue(playerStats.name, typeKey, playerStats.campaignName);
+            const chosenType = getChosenRuntimeValue(playerStats, passive.name, 'chosenType');
             if (chosenType && chosenType.toLowerCase() === String(damageType).toLowerCase()) {
                 return true;
             }
@@ -146,8 +153,7 @@ export function hasMinDamage(playerStats, damageType) {
     const passives = playerStats.automation?.passives || [];
     for (const passive of passives) {
         if (passive.type === 'damage_type_choice' && passive.effect === 'elemental_adept' && passive.minDamage) {
-            const typeKey = `_${passive.name.replace(/\s+/g, '_')}_chosenType`;
-            const chosenType = getRuntimeValue(playerStats.name, typeKey, playerStats.campaignName);
+            const chosenType = getChosenRuntimeValue(playerStats, passive.name, 'chosenType');
             if (chosenType && chosenType.toLowerCase() === String(damageType).toLowerCase()) {
                 return true;
             }
@@ -179,38 +185,31 @@ export function getResilientSphereSource(targetName, campaignName) {
 }
 
 export function hasBlindsight(playerStats) {
-    const passives = playerStats.automation?.passives || [];
-    return passives.some(p => p.type === 'passive_buff' && p.effect === 'blindsight');
+    return hasPassiveEffect(playerStats, 'passive_buff', 'blindsight');
 }
 
 export function hasTruesight(playerStats) {
-    const passives = playerStats.automation?.passives || [];
-    return passives.some(p => p.type === 'passive_buff' && p.effect === 'truesight');
+    return hasPassiveEffect(playerStats, 'passive_buff', 'truesight');
 }
 
 export function hasFastWrestler(playerStats) {
-    const passives = playerStats.automation?.passives || [];
-    return passives.some(p => p.type === 'passive_buff' && p.effect === 'fast_wrestler');
+    return hasPassiveEffect(playerStats, 'passive_buff', 'fast_wrestler');
 }
 
 export function hasGreatWeaponFighting(playerStats) {
-    const passives = playerStats.automation?.passives || [];
-    return passives.some(p => p.type === 'passive_rule' && p.effect === 'great_weapon_fighting');
+    return hasPassiveEffect(playerStats, 'passive_rule', 'great_weapon_fighting');
 }
 
 export function hasTwoWeaponFighting(playerStats) {
-    const passives = playerStats.automation?.passives || [];
-    return passives.some(p => p.type === 'passive_rule' && p.effect === 'two_weapon_fighting');
+    return hasPassiveEffect(playerStats, 'passive_rule', 'two_weapon_fighting');
 }
 
 export function hasSomaticComponentWaiver(playerStats) {
-    const passives = playerStats.automation?.passives || [];
-    return passives.some(p => p.type === 'passive_buff' && p.effect === 'somatic_component_waiver');
+    return hasPassiveEffect(playerStats, 'passive_buff', 'somatic_component_waiver');
 }
 
 export function hasNaturallyStealthy(playerStats) {
-    const passives = playerStats.automation?.passives || [];
-    return passives.some(p => p.type === 'passive_rule' && p.effect === 'naturally_stealthy');
+    return hasPassiveEffect(playerStats, 'passive_rule', 'naturally_stealthy');
 }
 
 export function applyGreatWeaponFightingToDamage(rolls, playerStats) {

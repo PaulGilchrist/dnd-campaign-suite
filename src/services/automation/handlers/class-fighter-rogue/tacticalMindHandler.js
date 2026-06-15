@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getLastAbilityCheck } from '../../../../hooks/useMetamagic.js';
+import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -15,15 +16,7 @@ async function handle(action, playerStats, campaignName, _mapName) {
 
     const abilityEvent = getLastAbilityCheck(playerName);
     if (!abilityEvent || isStale(abilityEvent)) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `No recent ability check found for ${playerName}. This feature can only be used shortly after an ability check.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action.name, `No recent ability check found for ${playerName}. This feature can only be used shortly after an ability check.`, auto);
     }
 
     const { d20, bonus: checkBonus, checkName } = abilityEvent;
@@ -32,15 +25,7 @@ async function handle(action, playerStats, campaignName, _mapName) {
     const modifiedTotal = originalTotal + d10Roll;
 
     if (d20 === 20) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name}: Natural 20 — no bonus needed.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action.name, `${action.name}: Natural 20 — no bonus needed.`, auto);
     }
 
     const description = `<b>${action.name}</b><br/>` +
@@ -56,15 +41,7 @@ async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     if (currentUses <= 0) {
-        return {
-            type: 'popup',
-            payload: {
-                type: 'automation_info',
-                name: action.name,
-                description: `${action.name}: No Second Wind uses remaining.`,
-                automation: auto,
-            },
-        };
+        return infoPopup(action.name, `${action.name}: No Second Wind uses remaining.`, auto);
     }
 
     await setRuntimeValue(playerName, 'secondWindUses', currentUses - 1, campaignName);
@@ -78,10 +55,7 @@ async function handle(action, playerStats, campaignName, _mapName) {
         timestamp: Date.now(),
     }).catch(() => {});
 
-    return {
-        type: 'popup',
-        payload: { type: 'automation_info', name: action.name, description, automation: auto },
-    };
+    return infoPopup(action.name, description, auto);
 }
 
 export { handle };
